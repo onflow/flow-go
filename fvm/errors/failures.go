@@ -180,3 +180,23 @@ func (e MetaTransactionFailure) FailureCode() FailureCode {
 func (e MetaTransactionFailure) Unwrap() error {
 	return e.err
 }
+
+// FVMInternalFailure indicates that an internal error occurs during tx execution.
+type FVMInternalFailure struct {
+	msg string
+	err error
+}
+
+// NewFVMInternalFailuref constructs a new FVMInternalFailure
+func NewFVMInternalFailuref(msg string, args ...interface{}) *FVMInternalFailure {
+	return &FVMInternalFailure{err: fmt.Errorf(msg, args...)}
+}
+
+func (e *FVMInternalFailure) Error() string {
+	return e.msg
+}
+
+// Code returns the error code for this error type
+func (e *FVMInternalFailure) FailureCode() FailureCode {
+	return ErrCodeFVMInternalFailure
+}

@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	programsCache "github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -35,9 +34,18 @@ func (i *TransactionInvoker) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programsCache.Programs,
-) (processErr error) {
-
+) error {
 	txIDStr := proc.ID.String()
+	var blockHeight uint64
+	if ctx.BlockHeader != nil {
+		blockHeight = ctx.BlockHeader.Height
+	}
+
+	logger := i.logger.With().
+		Str("txHash", txIDStr).
+		Uint64("blockHeight", blockHeight).
+		Logger()
+
 	var span otelTrace.Span
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
@@ -47,55 +55,66 @@ func (i *TransactionInvoker) Process(
 		defer span.End()
 	}
 
-	var blockHeight uint64
-	if ctx.BlockHeader != nil {
-		blockHeight = ctx.BlockHeader.Height
-	}
-
 	parentState := sth.State()
+	// always set the state back to the parent state after processing the transaction
+	defer sth.SetActiveState(parentState)
+
 	childState := sth.NewChild()
 
-	defer func() {
-		// an extra check for state holder health, this should never happen
-		if childState != sth.State() {
-			// error transaction
-			msg := "child state doesn't match the active state on the state holder"
-			i.logger.Error().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
-				Msg(msg)
+	// ==== Do the actual processing ====
+	err := i.process(vm, ctx, proc, sth, programs, span, logger)
 
-			// drop delta
-			childState.View().DropDelta()
-			proc.Err = errors.NewFVMInternalErrorf(msg)
-			proc.Logs = make([]string, 0)
-			proc.Events = make([]flow.Event, 0)
-			proc.ServiceEvents = make([]flow.Event, 0)
+	// if the process error is a fatal error, we are about to crash the FVM. No need to do any other checking.
+	var fatal errors.Failure
+	if errors.As(err, &fatal) {
+		return err
+	}
+
+	if childState != sth.State() {
+		// error transaction
+		msg := "child state doesn't match the active state on the state holder"
+		logger.Error().
+			Msg(msg)
+
+		// This is a failure scenario. This should not happen and indicates a FVM bug.
+		return errors.NewFVMInternalFailuref(msg)
+	}
+
+	// merge even if there is an error
+	mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits())
+
+	if mergeError != nil {
+		// if merge error is fatal just return it
+		if errors.As(mergeError, &fatal) {
+			return mergeError
 		}
 
-		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
-			if processErr != nil {
-				// An error happened while an error was already being handled!
-				// Don't hide the processErr.
-				// But do take the one that is a Failure if one of them is a Failure.
-				var fatal errors.Failure
-				if errors.Is(mergeError, fatal) && !errors.Is(processErr, fatal) {
-					i.logger.Warn().
-						Err(processErr).
-						Msg("Hiding this error because a fatal error occurred during merging state")
-					processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
-				} else {
-					i.logger.
-						Warn().
-						Err(mergeError).
-						Msg("Hiding merging state error because an error occurred during transaction processing")
-				}
-			} else {
-				processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
-			}
+		// if there was already an error, it takes precedence
+		if err != nil {
+			// however still log the merge error
+			logger.
+				Error().
+				Err(mergeError).
+				Msg("Hiding merging state error because an error occurred during transaction processing")
+
+			return err
 		}
-		sth.SetActiveState(parentState)
-	}()
+		return fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
+	}
+
+	return err
+}
+
+func (i *TransactionInvoker) process(
+	vm *VirtualMachine,
+	ctx *Context,
+	proc *TransactionProcedure,
+	sth *state.StateHolder,
+	programs *programsCache.Programs,
+	span otelTrace.Span,
+	logger zerolog.Logger,
+) (processErr error) {
+	state := sth.State()
 
 	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
@@ -115,6 +134,7 @@ func (i *TransactionInvoker) Process(
 			PredeclaredValues: predeclaredValues,
 		},
 	)
+
 	if err != nil {
 		var interactionLimiExceededErr *errors.LedgerInteractionLimitExceededError
 		if errors.As(err, &interactionLimiExceededErr) {
@@ -132,7 +152,7 @@ func (i *TransactionInvoker) Process(
 
 	// log te execution intensities here, so tha they do not contain data from storage limit checks and
 	// transaction deduction, because the payer is not charged for those.
-	i.logExecutionIntensities(sth, txIDStr)
+	i.logExecutionIntensities(sth, logger)
 
 	// disable the limit checks on states
 	sth.DisableAllLimitEnforcements()
@@ -170,13 +190,11 @@ func (i *TransactionInvoker) Process(
 		defer sth.EnableAllLimitEnforcements()
 
 		// drop delta since transaction failed
-		childState.View().DropDelta()
+		state.View().DropDelta()
 		// if tx fails just do clean up
 		programs.Cleanup(programsCache.ModifiedSets{})
 		// log transaction as failed
-		i.logger.Info().
-			Str("txHash", txIDStr).
-			Uint64("blockHeight", blockHeight).
+		logger.Info().
 			Msg("transaction executed with error")
 
 		// TODO(patrick): make env reusable on error
@@ -194,11 +212,9 @@ func (i *TransactionInvoker) Process(
 		// if fee deduction fails just do clean up and exit
 		if feesError != nil {
 			// drop delta
-			childState.View().DropDelta()
+			state.View().DropDelta()
 			programs.Cleanup(programsCache.ModifiedSets{})
-			i.logger.Info().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
+			logger.Info().
 				Msg("transaction fee deduction executed with error")
 
 			txError = feesError
@@ -311,8 +327,8 @@ func valueDeclarations(env Environment) []runtime.ValueDeclaration {
 }
 
 // logExecutionIntensities logs execution intensities of the transaction
-func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txHash string) {
-	if i.logger.Debug().Enabled() {
+func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, logger zerolog.Logger) {
+	if logger.Debug().Enabled() {
 		computation := zerolog.Dict()
 		for s, u := range sth.ComputationIntensities() {
 			computation.Uint(strconv.FormatUint(uint64(s), 10), u)
@@ -321,8 +337,7 @@ func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txH
 		for s, u := range sth.MemoryIntensities() {
 			memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
-		i.logger.Info().
-			Str("txHash", txHash).
+		logger.Info().
 			Uint64("ledgerInteractionUsed", sth.InteractionUsed()).
 			Uint("computationUsed", sth.TotalComputationUsed()).
 			Uint64("memoryEstimate", sth.TotalMemoryEstimate()).

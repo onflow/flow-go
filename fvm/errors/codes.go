@@ -21,6 +21,7 @@ const (
 	FailureCodeStateMergeFailure      FailureCode = 2003
 	FailureCodeBlockFinderFailure     FailureCode = 2004
 	FailureCodeHasherFailure          FailureCode = 2005
+	ErrCodeFVMInternalFailure         FailureCode = 2006
 	FailureCodeMetaTransactionFailure FailureCode = 2100
 )
 
@@ -39,6 +40,7 @@ const (
 	ErrCodeInvalidEnvelopeSignatureError ErrorCode = 1009
 
 	// base errors 1050 - 1100
+	//  Deprecated: ErrCodeFVMInternalError
 	ErrCodeFVMInternalError            ErrorCode = 1050
 	ErrCodeValueError                  ErrorCode = 1051
 	ErrCodeInvalidArgumentError        ErrorCode = 1052

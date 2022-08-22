@@ -211,23 +211,3 @@ func (e AccountAuthorizationError) Code() ErrorCode {
 func (e AccountAuthorizationError) Unwrap() error {
 	return e.err
 }
-
-// FVMInternalError indicates that an internal error occurs during tx execution.
-type FVMInternalError struct {
-	msg string
-	err error
-}
-
-// NewFVMInternalErrorf constructs a new FVMInternalError
-func NewFVMInternalErrorf(msg string, args ...interface{}) *FVMInternalError {
-	return &FVMInternalError{err: fmt.Errorf(msg, args...)}
-}
-
-func (e *FVMInternalError) Error() string {
-	return e.msg
-}
-
-// Code returns the error code for this error type
-func (e *FVMInternalError) Code() ErrorCode {
-	return ErrCodeFVMInternalError
-}
