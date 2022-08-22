@@ -180,16 +180,19 @@ func (p *AutoProfiler) goHeapProfile(sampleTypes ...string) (*profile.Profile, e
 		return nil, fmt.Errorf("failed to find all sample types: want: %+v, got: %+v", sampleTypes, prof.SampleType)
 	}
 
-	for i, j := range selectedSampleTypes {
-		prof.SampleType[i] = prof.SampleType[j]
+	newSampleType := make([]*profile.ValueType, 0, len(selectedSampleTypes))
+	for _, j := range selectedSampleTypes {
+		newSampleType = append(newSampleType, prof.SampleType[j])
 	}
-	prof.SampleType = prof.SampleType[:len(selectedSampleTypes)]
+	prof.SampleType = newSampleType
+	prof.DefaultSampleType = prof.SampleType[0].Type
 
 	for _, s := range prof.Sample {
-		for i, j := range selectedSampleTypes {
-			s.Value[i] = s.Value[j]
+		newValue := make([]int64, 0, len(selectedSampleTypes))
+		for _, j := range selectedSampleTypes {
+			newValue = append(newValue, s.Value[j])
 		}
-		s.Value = s.Value[:len(selectedSampleTypes)]
+		s.Value = newValue
 	}
 
 	// Merge profile with itself to remove empty samples.
@@ -224,7 +227,7 @@ func (p *AutoProfiler) pprofAllocs(w io.Writer) (err error) {
 		return context.Canceled
 	}
 
-	p2, err := p.goHeapProfile()
+	p2, err := p.goHeapProfile("alloc_objects", "alloc_space")
 	if err != nil {
 		return fmt.Errorf("failed to get allocs profile: %w", err)
 	}
