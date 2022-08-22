@@ -2,32 +2,25 @@ package epochs
 
 import (
 	"encoding/hex"
-	"fmt"
 
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	emulator "github.com/onflow/flow-emulator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-	emulator "github.com/onflow/flow-emulator"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
-
-	"github.com/onflow/flow-core-contracts/lib/go/contracts"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
-
 	"github.com/onflow/flow-go-sdk/test"
-
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	"github.com/onflow/flow-go/integration/utils"
 )
 
 // Suite tests the quorum certificate voting process against the
@@ -261,39 +254,4 @@ func (s *Suite) SignAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address
 	// submit transaction
 	_, err := s.emulatorClient.Submit(tx)
 	require.NoError(s.T(), err)
-}
-
-// This function initializes Cluster records in order to pass the cluster information
-// as an argument to the startVoting transaction
-func initClusters(clusterNodeIDStrings [][]string, numberOfClusters, numberOfNodesPerCluster int) [][]cadence.Value {
-	clusterIndices := make([]cadence.Value, numberOfClusters)
-	clusterNodeIDs := make([]cadence.Value, numberOfClusters)
-	clusterNodeWeights := make([]cadence.Value, numberOfClusters)
-
-	for i := 0; i < numberOfClusters; i++ {
-
-		clusterIndices[i] = cadence.NewUInt16(uint16(i))
-
-		nodeIDs := make([]cadence.Value, numberOfNodesPerCluster)
-		nodeWeights := make([]cadence.Value, numberOfNodesPerCluster)
-
-		for j := 0; j < numberOfNodesPerCluster; j++ {
-			nodeID := fmt.Sprintf("%064d", i*numberOfNodesPerCluster+j)
-			cdcNodeID, err := cadence.NewString(nodeID)
-			if err != nil {
-				panic(err)
-			}
-			nodeIDs[j] = cdcNodeID
-
-			// default weight per node
-			nodeWeights[j] = cadence.NewUInt64(uint64(100))
-
-		}
-
-		clusterNodeIDs[i] = cadence.NewArray(nodeIDs)
-		clusterNodeWeights[i] = cadence.NewArray(nodeWeights)
-
-	}
-
-	return [][]cadence.Value{clusterIndices, clusterNodeIDs, clusterNodeWeights}
 }

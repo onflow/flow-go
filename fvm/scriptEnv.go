@@ -2,22 +2,17 @@ package fvm
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
-	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/trace"
 )
 
 var _ runtime.Interface = &ScriptEnv{}
@@ -26,8 +21,6 @@ var _ Environment = &ScriptEnv{}
 // ScriptEnv is a read-only mostly used for executing scripts.
 type ScriptEnv struct {
 	commonEnv
-
-	reqContext context.Context
 }
 
 func NewScriptEnvironment(
@@ -36,34 +29,43 @@ func NewScriptEnvironment(
 	vm *VirtualMachine,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (*ScriptEnv, error) {
+) *ScriptEnv {
 
 	accounts := state.NewAccounts(sth)
 	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	metrics := handler.NewMetricsHandler(fvmContext.Metrics)
+	tracer := environment.NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
+	meter := environment.NewCancellableMeter(reqContext, sth)
 
-	ctx := &EnvContext{nestedContext{fvmContext}, nil}
 	env := &ScriptEnv{
 		commonEnv: commonEnv{
-			ctx:                   ctx,
-			ProgramLogger:         NewProgramLogger(ctx),
-			UnsafeRandomGenerator: NewUnsafeRandomGenerator(ctx),
-			sth:                   sth,
-			vm:                    vm,
-			programs:              programsHandler,
-			accounts:              accounts,
-			accountKeys:           accountKeys,
-			uuidGenerator:         uuidGenerator,
-			metrics:               metrics,
+			Tracer: tracer,
+			Meter:  meter,
+			ProgramLogger: environment.NewProgramLogger(
+				tracer,
+				fvmContext.Logger,
+				fvmContext.Metrics,
+				fvmContext.CadenceLoggingEnabled,
+			),
+			UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
+				tracer,
+				fvmContext.BlockHeader,
+			),
+			ctx:            fvmContext,
+			sth:            sth,
+			vm:             vm,
+			programs:       programsHandler,
+			accounts:       accounts,
+			accountKeys:    accountKeys,
+			uuidGenerator:  uuidGenerator,
+			frozenAccounts: nil,
 		},
-		reqContext: reqContext,
 	}
 
 	// TODO(patrick): remove this hack
-	env.MeterInterface = env
 	env.AccountInterface = env
+	env.fullEnv = env
 
 	env.contracts = handler.NewContractHandler(
 		accounts,
@@ -73,209 +75,7 @@ func NewScriptEnvironment(
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
-	var err error
-	// set the execution parameters from the state
-	if fvmContext.AllowContextOverrideByExecutionState {
-		err = env.setExecutionParameters()
-	}
-
-	return env, err
-}
-
-func (e *ScriptEnv) setExecutionParameters() error {
-	// Check that the service account exists because all the settings are stored in it
-	serviceAddress := e.Context().Chain.ServiceAddress()
-	service := runtime.Address(serviceAddress)
-
-	// set the property if no error, but if the error is a fatal error then return it
-	setIfOk := func(prop string, err error, setter func()) (fatal error) {
-		err, fatal = errors.SplitErrorTypes(err)
-		if fatal != nil {
-			// this is a fatal error. return it
-			e.ctx.Logger.
-				Error().
-				Err(fatal).
-				Msgf("error getting %s", prop)
-			return fatal
-		}
-		if err != nil {
-			// this is a general error.
-			// could be that no setting was present in the state,
-			// or that the setting was not parseable,
-			// or some other deterministic thing.
-			e.ctx.Logger.
-				Debug().
-				Err(err).
-				Msgf("could not set %s. Using defaults", prop)
-			return nil
-		}
-		// everything is ok. do the setting
-		setter()
-		return nil
-	}
-
-	var ok bool
-	var m *weighted.Meter
-	// only set the weights if the meter is a weighted.Meter
-	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
-		return nil
-	}
-
-	computationWeights, err := GetExecutionEffortWeights(e, service)
-	err = setIfOk(
-		"execution effort weights",
-		err,
-		func() { m.SetComputationWeights(computationWeights) })
-	if err != nil {
-		return err
-	}
-
-	memoryWeights, err := GetExecutionMemoryWeights(e, service)
-	err = setIfOk(
-		"execution memory weights",
-		err,
-		func() { m.SetMemoryWeights(memoryWeights) })
-	if err != nil {
-		return err
-	}
-
-	memoryLimit, err := GetExecutionMemoryLimit(e, service)
-	err = setIfOk(
-		"execution memory limit",
-		err,
-		func() { m.SetTotalMemoryLimit(memoryLimit) })
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
-	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetStorageCapacity).End()
-
-	err = e.Meter(meter.ComputationKindGetStorageCapacity, 1)
-	if err != nil {
-		return 0, fmt.Errorf("get storage capacity failed: %w", err)
-	}
-
-	result, invokeErr := InvokeAccountStorageCapacityContract(
-		e,
-		e.traceSpan,
-		address)
-	if invokeErr != nil {
-		return 0, errors.HandleRuntimeError(invokeErr)
-	}
-
-	// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
-	// divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
-	return storageMBUFixToBytesUInt(result), nil
-}
-
-func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
-	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
-
-	err = e.Meter(meter.ComputationKindGetAccountBalance, 1)
-	if err != nil {
-		return 0, fmt.Errorf("get account balance failed: %w", err)
-	}
-
-	result, invokeErr := InvokeAccountBalanceContract(e, e.traceSpan, address)
-	if invokeErr != nil {
-		return 0, errors.HandleRuntimeError(invokeErr)
-	}
-	return result.ToGoValue().(uint64), nil
-}
-
-func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
-	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
-
-	err = e.Meter(meter.ComputationKindGetAccountAvailableBalance, 1)
-	if err != nil {
-		return 0, fmt.Errorf("get account available balance failed: %w", err)
-	}
-
-	result, invokeErr := InvokeAccountAvailableBalanceContract(
-		e,
-		e.traceSpan,
-		address)
-
-	if invokeErr != nil {
-		return 0, errors.HandleRuntimeError(invokeErr)
-	}
-	return result.ToGoValue().(uint64), nil
-}
-
-func (e *ScriptEnv) ResolveLocation(
-	identifiers []runtime.Identifier,
-	location runtime.Location,
-) ([]runtime.ResolvedLocation, error) {
-	defer e.ctx.StartExtensiveTracingSpanFromRoot(trace.FVMEnvResolveLocation).End()
-
-	err := e.Meter(meter.ComputationKindResolveLocation, 1)
-	if err != nil {
-		return nil, fmt.Errorf("resolve location failed: %w", err)
-	}
-
-	addressLocation, isAddress := location.(common.AddressLocation)
-
-	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
-	// then return a single resolved location which declares all identifiers.
-	if !isAddress {
-		return []runtime.ResolvedLocation{
-			{
-				Location:    location,
-				Identifiers: identifiers,
-			},
-		}, nil
-	}
-
-	// if the location is an address,
-	// and no specific identifiers where requested in the import statement,
-	// then fetch all identifiers at this address
-	if len(identifiers) == 0 {
-		address := flow.Address(addressLocation.Address)
-
-		err := e.accounts.CheckAccountNotFrozen(address)
-		if err != nil {
-			return nil, fmt.Errorf("resolve location failed: %w", err)
-		}
-
-		contractNames, err := e.contracts.GetContractNames(addressLocation.Address)
-		if err != nil {
-			return nil, fmt.Errorf("resolve location failed: %w", err)
-		}
-
-		// if there are no contractNames deployed,
-		// then return no resolved locations
-		if len(contractNames) == 0 {
-			return nil, nil
-		}
-
-		identifiers = make([]ast.Identifier, len(contractNames))
-
-		for i := range identifiers {
-			identifiers[i] = runtime.Identifier{
-				Identifier: contractNames[i],
-			}
-		}
-	}
-
-	// return one resolved location per identifier.
-	// each resolved location is an address contract location
-	resolvedLocations := make([]runtime.ResolvedLocation, len(identifiers))
-	for i := range resolvedLocations {
-		identifier := identifiers[i]
-		resolvedLocations[i] = runtime.ResolvedLocation{
-			Location: common.AddressLocation{
-				Address: addressLocation.Address,
-				Name:    identifier.Identifier,
-			},
-			Identifiers: []runtime.Identifier{identifier},
-		}
-	}
-
-	return resolvedLocations, nil
+	return env
 }
 
 func (e *ScriptEnv) EmitEvent(_ cadence.Event) error {
@@ -285,85 +85,6 @@ func (e *ScriptEnv) EmitEvent(_ cadence.Event) error {
 func (e *ScriptEnv) Events() []flow.Event {
 	return []flow.Event{}
 }
-
-func (e *ScriptEnv) checkContext() error {
-	// in the future this context check should be done inside the cadence
-	select {
-	case <-e.reqContext.Done():
-		err := e.reqContext.Err()
-		if errors.Is(err, context.DeadlineExceeded) {
-			return errors.NewScriptExecutionTimedOutError()
-		}
-		return errors.NewScriptExecutionCancelledError(err)
-	default:
-		return nil
-	}
-}
-
-func (e *ScriptEnv) Meter(kind common.ComputationKind, intensity uint) error {
-	// this method is called on every unit of operation, so
-	// checking the context here is the most likely would capture
-	// timeouts or cancellation as soon as they happen, though
-	// we might revisit this when optimizing script execution
-	// by only checking on specific kind of Meter calls.
-	if err := e.checkContext(); err != nil {
-		return err
-	}
-
-	if e.sth.EnforceComputationLimits {
-		return e.sth.State().MeterComputation(kind, intensity)
-	}
-	return nil
-}
-
-func (e *ScriptEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
-	if e.sth.EnforceMemoryLimits() {
-		return e.sth.State().MeterMemory(kind, intensity)
-	}
-	return nil
-}
-
-func (e *ScriptEnv) VerifySignature(
-	signature []byte,
-	tag string,
-	signedData []byte,
-	publicKey []byte,
-	signatureAlgorithm runtime.SignatureAlgorithm,
-	hashAlgorithm runtime.HashAlgorithm,
-) (bool, error) {
-	defer e.ctx.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
-
-	err := e.Meter(meter.ComputationKindVerifySignature, 1)
-	if err != nil {
-		return false, fmt.Errorf("verify signature failed: %w", err)
-	}
-
-	valid, err := crypto.VerifySignatureFromRuntime(
-		signature,
-		tag,
-		signedData,
-		publicKey,
-		signatureAlgorithm,
-		hashAlgorithm,
-	)
-
-	if err != nil {
-		return false, fmt.Errorf("verify signature failed: %w", err)
-	}
-
-	return valid, nil
-}
-
-func (e *ScriptEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
-	err := e.Meter(meter.ComputationKindValidatePublicKey, 1)
-	if err != nil {
-		return fmt.Errorf("validate public key failed: %w", err)
-	}
-
-	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
-}
-
-// Block Environment Functions
 
 func (e *ScriptEnv) CreateAccount(_ runtime.Address) (address runtime.Address, err error) {
 	return runtime.Address{}, errors.NewOperationNotSupportedError("CreateAccount")
@@ -379,25 +100,6 @@ func (e *ScriptEnv) RevokeEncodedAccountKey(_ runtime.Address, _ int) (publicKey
 
 func (e *ScriptEnv) AddAccountKey(_ runtime.Address, _ *runtime.PublicKey, _ runtime.HashAlgorithm, _ int) (*runtime.AccountKey, error) {
 	return nil, errors.NewOperationNotSupportedError("AddAccountKey")
-}
-
-func (e *ScriptEnv) GetAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
-	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
-
-	err := e.Meter(meter.ComputationKindGetAccountKey, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get account key failed: %w", err)
-	}
-
-	if e.accountKeys != nil {
-		accKey, err := e.accountKeys.GetAccountKey(address, index)
-		if err != nil {
-			return nil, fmt.Errorf("get account key failed: %w", err)
-		}
-		return accKey, err
-	}
-
-	return nil, errors.NewOperationNotSupportedError("GetAccountKey")
 }
 
 func (e *ScriptEnv) RevokeAccountKey(_ runtime.Address, _ int) (*runtime.AccountKey, error) {

@@ -22,9 +22,13 @@ type LegacyControllerMigration struct {
 func (lc *LegacyControllerMigration) Migrate(payload []ledger.Payload) ([]ledger.Payload, error) {
 	newPayloads := make([]ledger.Payload, len(payload))
 	for i, p := range payload {
-		owner := p.Key.KeyParts[0].Value
-		controller := p.Key.KeyParts[1].Value
-		key := p.Key.KeyParts[2].Value
+		k, err := p.Key()
+		if err != nil {
+			return nil, err
+		}
+		owner := k.KeyParts[0].Value
+		controller := k.KeyParts[1].Value
+		key := k.KeyParts[2].Value
 
 		if len(controller) > 0 {
 			if bytes.Equal(owner, controller) &&
@@ -43,7 +47,7 @@ func (lc *LegacyControllerMigration) Migrate(payload []ledger.Payload) ([]ledger
 			ledger.NewKeyPart(state.KeyPartOwner, owner),
 			ledger.NewKeyPart(state.KeyPartKey, key),
 		})
-		newPayloads[i] = *ledger.NewPayload(newKey, p.Value)
+		newPayloads[i] = *ledger.NewPayload(newKey, p.Value())
 	}
 	return newPayloads, nil
 }

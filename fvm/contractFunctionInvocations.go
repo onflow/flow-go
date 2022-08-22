@@ -1,11 +1,8 @@
 package fvm
 
 import (
-	otelTrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -22,7 +19,6 @@ var deductTransactionFeesInvocationArgumentTypes = []sema.Type{
 // the service account.
 func InvokeDeductTransactionFeesContract(
 	env Environment,
-	traceSpan otelTrace.Span,
 	payer flow.Address,
 	inclusionEffort uint64,
 	executionEffort uint64,
@@ -36,15 +32,15 @@ func InvokeDeductTransactionFeesContract(
 			Name:    systemcontracts.ContractNameFlowFees,
 		},
 		systemcontracts.ContractServiceAccountFunction_deductTransactionFee,
-		[]interpreter.Value{
-			interpreter.NewUnmeteredAddressValueFromBytes(payer.Bytes()),
-			interpreter.UFix64Value(inclusionEffort),
-			interpreter.UFix64Value(executionEffort),
+		[]cadence.Value{
+			cadence.BytesToAddress(payer.Bytes()),
+			cadence.UFix64(inclusionEffort),
+			cadence.UFix64(executionEffort),
 		},
 		deductTransactionFeesInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(env, traceSpan)
+	return invoker.Invoke(env)
 }
 
 var setupNewAccountInvocationArgumentTypes = []sema.Type{
@@ -56,7 +52,6 @@ var setupNewAccountInvocationArgumentTypes = []sema.Type{
 // the service account.
 func InvokeSetupNewAccountContract(
 	env Environment,
-	traceSpan otelTrace.Span,
 	flowAddress flow.Address,
 	payer common.Address,
 ) (cadence.Value, error) {
@@ -68,14 +63,14 @@ func InvokeSetupNewAccountContract(
 			Name:    systemcontracts.ContractServiceAccount,
 		},
 		systemcontracts.ContractServiceAccountFunction_setupNewAccount,
-		[]interpreter.Value{
-			interpreter.NewAddressValue(env, common.Address(flowAddress)),
-			interpreter.NewAddressValue(env, payer),
+		[]cadence.Value{
+			cadence.BytesToAddress(flowAddress.Bytes()),
+			cadence.BytesToAddress(payer.Bytes()),
 		},
 		setupNewAccountInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(env, traceSpan)
+	return invoker.Invoke(env)
 }
 
 var accountAvailableBalanceInvocationArgumentTypes = []sema.Type{
@@ -86,7 +81,6 @@ var accountAvailableBalanceInvocationArgumentTypes = []sema.Type{
 // contract on the storage fees contract.
 func InvokeAccountAvailableBalanceContract(
 	env Environment,
-	traceSpan otelTrace.Span,
 	address common.Address,
 ) (cadence.Value, error) {
 
@@ -96,13 +90,13 @@ func InvokeAccountAvailableBalanceContract(
 			Name:    systemcontracts.ContractStorageFees,
 		},
 		systemcontracts.ContractStorageFeesFunction_defaultTokenAvailableBalance,
-		[]interpreter.Value{
-			interpreter.NewAddressValue(env, address),
+		[]cadence.Value{
+			cadence.BytesToAddress(address.Bytes()),
 		},
 		accountAvailableBalanceInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(env, traceSpan)
+	return invoker.Invoke(env)
 }
 
 var accountBalanceInvocationArgumentTypes = []sema.Type{
@@ -113,7 +107,6 @@ var accountBalanceInvocationArgumentTypes = []sema.Type{
 // on the service account.
 func InvokeAccountBalanceContract(
 	env Environment,
-	traceSpan otelTrace.Span,
 	address common.Address,
 ) (cadence.Value, error) {
 
@@ -122,13 +115,13 @@ func InvokeAccountBalanceContract(
 			Address: common.Address(env.Context().Chain.ServiceAddress()),
 			Name:    systemcontracts.ContractServiceAccount},
 		systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
-		[]interpreter.Value{
-			interpreter.NewAddressValue(env, address),
+		[]cadence.Value{
+			cadence.BytesToAddress(address.Bytes()),
 		},
 		accountBalanceInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(env, traceSpan)
+	return invoker.Invoke(env)
 }
 
 var accountStorageCapacityInvocationArgumentTypes = []sema.Type{
@@ -139,7 +132,6 @@ var accountStorageCapacityInvocationArgumentTypes = []sema.Type{
 // contract on the storage fees contract.
 func InvokeAccountStorageCapacityContract(
 	env Environment,
-	traceSpan otelTrace.Span,
 	address common.Address,
 ) (cadence.Value, error) {
 
@@ -149,13 +141,44 @@ func InvokeAccountStorageCapacityContract(
 			Name:    systemcontracts.ContractStorageFees,
 		},
 		systemcontracts.ContractStorageFeesFunction_calculateAccountCapacity,
-		[]interpreter.Value{
-			interpreter.NewAddressValue(env, address),
+		[]cadence.Value{
+			cadence.BytesToAddress(address.Bytes()),
 		},
 		accountStorageCapacityInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(env, traceSpan)
+	return invoker.Invoke(env)
+}
+
+// InvokeAccountsStorageCapacity prepares a function that calls get storage capacity on the storage fees contract
+// for multiple accounts at once
+func InvokeAccountsStorageCapacity(
+	env Environment,
+	addresses []common.Address,
+) (cadence.Value, error) {
+	arrayValues := make([]cadence.Value, len(addresses))
+	for i, address := range addresses {
+		arrayValues[i] = cadence.BytesToAddress(address.Bytes())
+	}
+	invoker := NewContractFunctionInvoker(
+		common.AddressLocation{
+			Address: common.Address(env.Context().Chain.ServiceAddress()),
+			Name:    systemcontracts.ContractStorageFees,
+		},
+		systemcontracts.ContractStorageFeesFunction_calculateAccountsCapacity,
+		[]cadence.Value{
+			cadence.NewArray(arrayValues),
+		},
+		[]sema.Type{
+			sema.NewConstantSizedType(
+				nil,
+				&sema.AddressType{},
+				int64(len(arrayValues)),
+			),
+		},
+		env.Context().Logger,
+	)
+	return invoker.Invoke(env)
 }
 
 var useContractAuditVoucherInvocationArgumentTypes = []sema.Type{
@@ -167,7 +190,6 @@ var useContractAuditVoucherInvocationArgumentTypes = []sema.Type{
 // deployment audit voucher contract.
 func InvokeUseContractAuditVoucherContract(
 	env Environment,
-	traceSpan otelTrace.Span,
 	address common.Address,
 	code string) (bool, error) {
 
@@ -177,14 +199,14 @@ func InvokeUseContractAuditVoucherContract(
 			Name:    systemcontracts.ContractDeploymentAudits,
 		},
 		systemcontracts.ContractDeploymentAuditsFunction_useVoucherForDeploy,
-		[]interpreter.Value{
-			interpreter.NewAddressValue(env, address),
-			interpreter.NewUnmeteredStringValue(code),
+		[]cadence.Value{
+			cadence.BytesToAddress(address.Bytes()),
+			cadence.String(code),
 		},
 		useContractAuditVoucherInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	resultCdc, err := invoker.Invoke(env, traceSpan)
+	resultCdc, err := invoker.Invoke(env)
 	if err != nil {
 		return false, err
 	}

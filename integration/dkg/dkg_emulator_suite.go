@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -491,7 +492,7 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 func (s *DKGSuite) prepareAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) (*flow.Block, error) {
 
 	// set block reference
-	latestBlock, err := s.adminEmulatorClient.GetLatestBlock(nil, true)
+	latestBlock, err := s.adminEmulatorClient.GetLatestBlock(context.Background(), true)
 	if err != nil {
 		return nil, fmt.Errorf("could not get latest block: %w", err)
 	}

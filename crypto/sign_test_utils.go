@@ -269,16 +269,22 @@ func benchVerify(b *testing.B, algo SigningAlgorithm, halg hash.Hasher) {
 	for j := 0; j < len(seed); j++ {
 		seed[j] = byte(j)
 	}
-	sk, _ := GeneratePrivateKey(algo, seed)
+	sk, err := GeneratePrivateKey(algo, seed)
+	require.NoError(b, err)
 	pk := sk.PublicKey()
 
 	input := []byte("Bench input")
-	s, _ := sk.Sign(input, halg)
+	s, err := sk.Sign(input, halg)
+	require.NoError(b, err)
+	var result bool
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		pk.Verify(s, input, halg)
+		result, err = pk.Verify(s, input, halg)
+		require.NoError(b, err)
 	}
+	// sanity check
+	require.True(b, result)
 
 	b.StopTimer()
 }
@@ -288,13 +294,21 @@ func benchSign(b *testing.B, algo SigningAlgorithm, halg hash.Hasher) {
 	for j := 0; j < len(seed); j++ {
 		seed[j] = byte(j)
 	}
-	sk, _ := GeneratePrivateKey(algo, seed)
+	sk, err := GeneratePrivateKey(algo, seed)
+	require.NoError(b, err)
 
 	input := []byte("Bench input")
+	var signature []byte
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		sk.Sign(input, halg)
+		signature, err = sk.Sign(input, halg)
+		require.NoError(b, err)
 	}
+	// sanity check
+	result, err := sk.PublicKey().Verify(signature, input, halg)
+	require.NoError(b, err)
+	require.True(b, result)
+
 	b.StopTimer()
 }

@@ -111,13 +111,13 @@ func Test_Programs(t *testing.T) {
 		return nil, nil
 	})
 
-	sth := state.NewStateHolder(state.NewState(mainView))
+	stTxn := state.NewStateTransaction(mainView, state.DefaultParameters())
 
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)
 	programs := programsStorage.NewEmptyPrograms()
 
-	accounts := state.NewAccounts(sth)
+	accounts := state.NewAccounts(stTxn)
 
 	err := accounts.Create(nil, addressA)
 	require.NoError(t, err)

@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -50,7 +49,7 @@ const payloadEncodingVersion = 1
 // before scratch buffer is used again.
 func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 
-	encPayloadSize := encoding.EncodedPayloadLengthWithoutPrefix(n.Payload(), payloadEncodingVersion)
+	encPayloadSize := ledger.EncodedPayloadLengthWithoutPrefix(n.Payload(), payloadEncodingVersion)
 
 	encodedNodeSize := encNodeTypeSize +
 		encHeightSize +
@@ -94,7 +93,7 @@ func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 
 	// EncodeAndAppendPayloadWithoutPrefix appends encoded payload to the resliced buf.
 	// Returned buf is resliced to include appended payload.
-	buf = encoding.EncodeAndAppendPayloadWithoutPrefix(buf[:pos], n.Payload(), payloadEncodingVersion)
+	buf = ledger.EncodeAndAppendPayloadWithoutPrefix(buf[:pos], n.Payload(), payloadEncodingVersion)
 
 	return buf
 }
@@ -386,7 +385,7 @@ func readPayloadFromReader(reader io.Reader, scratch []byte) (*ledger.Payload, e
 	}
 
 	// Decode and copy payload
-	payload, err := encoding.DecodePayloadWithoutPrefix(scratch, false, payloadEncodingVersion)
+	payload, err := ledger.DecodePayloadWithoutPrefix(scratch, false, payloadEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode payload: %w", err)
 	}

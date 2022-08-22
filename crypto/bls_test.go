@@ -289,6 +289,7 @@ func TestAggregateSignatures(t *testing.T) {
 			"verification of signature %s should fail, it shouldn't be %s private keys are %s, input is %x",
 			aggSig, expectedSig, sks, input)
 		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
+		require.NoError(t, err)
 	})
 
 	// check if one the public keys is not correct
@@ -749,13 +750,11 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 	// number of keys
 	keysNum := mrand.Intn(sigsNum) + 1
 	sks := make([]PrivateKey, 0, keysNum)
-	pks := make([]PublicKey, 0, keysNum)
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	// generate the keys
 	for i := 0; i < keysNum; i++ {
 		sk := randomSK(t, seed)
 		sks = append(sks, sk)
-		pks = append(pks, sk.PublicKey())
 	}
 
 	// number of messages (could be larger or smaller than the number of keys)
@@ -809,6 +808,7 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		messages[0][0] ^= 1                // make sure the signature is different
 		var err error
 		sigs[randomIndex], err = sks[0].Sign(messages[0][:], inputKmacs[0])
+		require.NoError(t, err)
 		messages[0][0] ^= 1
 		aggSig, err = AggregateBLSSignatures(sigs)
 		require.NoError(t, err)

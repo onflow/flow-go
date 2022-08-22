@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -30,12 +30,12 @@ func TestPopulatedTrie(t *testing.T) {
 	emptyTrie := trie.NewEmptyMTrie()
 
 	// key: 0000...
-	p1 := utils.PathByUint8(1)
-	v1 := utils.LightPayload8('A', 'a')
+	p1 := testutils.PathByUint8(1)
+	v1 := testutils.LightPayload8('A', 'a')
 
 	// key: 0100....
-	p2 := utils.PathByUint8(64)
-	v2 := utils.LightPayload8('B', 'b')
+	p2 := testutils.PathByUint8(64)
+	v2 := testutils.LightPayload8('B', 'b')
 
 	paths := []ledger.Path{p1, p2}
 	payloads := []ledger.Payload{*v1, *v2}
@@ -95,12 +95,12 @@ func TestUniqueNodeIterator(t *testing.T) {
 		emptyTrie := trie.NewEmptyMTrie()
 
 		// key: 0000...
-		p1 := utils.PathByUint8(1)
-		v1 := utils.LightPayload8('A', 'a')
+		p1 := testutils.PathByUint8(1)
+		v1 := testutils.LightPayload8('A', 'a')
 
 		// key: 0100....
-		p2 := utils.PathByUint8(64)
-		v2 := utils.LightPayload8('B', 'b')
+		p2 := testutils.PathByUint8(64)
+		v2 := testutils.LightPayload8('B', 'b')
 
 		paths := []ledger.Path{p1, p2}
 		payloads := []ledger.Payload{*v1, *v2}
@@ -157,12 +157,12 @@ func TestUniqueNodeIterator(t *testing.T) {
 		emptyTrie := trie.NewEmptyMTrie()
 
 		// key: 0000...
-		p1 := utils.PathByUint8(1)
-		v1 := utils.LightPayload8('A', 'a')
+		p1 := testutils.PathByUint8(1)
+		v1 := testutils.LightPayload8('A', 'a')
 
 		// key: 0100....
-		p2 := utils.PathByUint8(64)
-		v2 := utils.LightPayload8('B', 'b')
+		p2 := testutils.PathByUint8(64)
+		v2 := testutils.LightPayload8('B', 'b')
 
 		paths := []ledger.Path{p1, p2}
 		payloads := []ledger.Payload{*v1, *v2}
@@ -185,12 +185,12 @@ func TestUniqueNodeIterator(t *testing.T) {
 		// New trie reuses its parent's left sub-trie.
 
 		// key: 1000...
-		p3 := utils.PathByUint8(128)
-		v3 := utils.LightPayload8('C', 'c')
+		p3 := testutils.PathByUint8(128)
+		v3 := testutils.LightPayload8('C', 'c')
 
 		// key: 1100....
-		p4 := utils.PathByUint8(192)
-		v4 := utils.LightPayload8('D', 'd')
+		p4 := testutils.PathByUint8(192)
+		v4 := testutils.LightPayload8('D', 'd')
 
 		paths = []ledger.Path{p3, p4}
 		payloads = []ledger.Payload{*v3, *v4}
@@ -213,7 +213,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		// New trie reuses its parent's right sub-trie, and left sub-trie's leaf node.
 
 		// key: 0000...
-		v5 := utils.LightPayload8('E', 'e')
+		v5 := testutils.LightPayload8('E', 'e')
 
 		paths = []ledger.Path{p1}
 		payloads = []ledger.Payload{*v5}

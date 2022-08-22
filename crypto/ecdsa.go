@@ -15,6 +15,7 @@ import (
 	"math/big"
 
 	"github.com/btcsuite/btcd/btcec"
+
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
@@ -26,7 +27,8 @@ type ecdsaAlgo struct {
 	algo SigningAlgorithm
 }
 
-//  ECDSA contexts for each supported curve
+// ECDSA contexts for each supported curve
+//
 // NIST P-256 curve
 var p256Instance *ecdsaAlgo
 
