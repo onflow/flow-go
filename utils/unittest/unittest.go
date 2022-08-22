@@ -394,7 +394,12 @@ func NetworkTopology() network.Topology {
 
 // CrashTest safely tests functions that crash (as the expected behavior) by checking that running the function creates an error and
 // an expected error message.
-func CrashTest(
+func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string) {
+	CrashTestWithExpectedStatus(t, scenario, expectedErrorMsg, 1)
+}
+
+// CrashTestWithExpectedStatus checks for the test crashing with a specific exit code.
+func CrashTestWithExpectedStatus(
 	t *testing.T,
 	scenario func(*testing.T),
 	expectedErrorMsg string,
