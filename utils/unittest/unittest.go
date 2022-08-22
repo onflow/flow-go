@@ -414,7 +414,7 @@ func CrashTest(
 
 	if len(expectedStatus) == 0 {
 		// any non-zero status is expected
-		require.Greater(t, cmd.ProcessState.ExitCode(), 0)
+		require.NotEqual(t, cmd.ProcessState.ExitCode(), 0)
 	} else {
 		// expect specific status
 		require.Contains(t, expectedStatus, cmd.ProcessState.ExitCode())
