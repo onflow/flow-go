@@ -7,10 +7,11 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/slashing"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
