@@ -405,6 +405,9 @@ func CrashTestWithExpectedStatus(
 	expectedErrorMsg string,
 	expectedStatus ...int,
 ) {
+	require.NotNil(t, scenario)
+	require.NotEmpty(t, expectedStatus)
+
 	if os.Getenv("CRASH_TEST") == "1" {
 		scenario(t)
 		return
@@ -417,13 +420,8 @@ func CrashTestWithExpectedStatus(
 	// expect error from run
 	require.Error(t, err)
 
-	if len(expectedStatus) == 0 {
-		// any non-zero status is expected
-		require.NotEqual(t, cmd.ProcessState.ExitCode(), 0)
-	} else {
-		// expect specific status
-		require.Contains(t, expectedStatus, cmd.ProcessState.ExitCode())
-	}
+	// expect specific status codes
+	require.Contains(t, expectedStatus, cmd.ProcessState.ExitCode())
 
 	// expect logger.Fatal() message to be pushed to stdout
 	outStr := string(outBytes)
