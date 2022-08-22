@@ -32,7 +32,6 @@ func NewScriptEnvironment(
 ) *ScriptEnv {
 
 	accounts := state.NewAccounts(sth)
-	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	tracer := environment.NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
@@ -48,6 +47,7 @@ func NewScriptEnvironment(
 				fvmContext.Metrics,
 				fvmContext.CadenceLoggingEnabled,
 			),
+			UUIDGenerator: environment.NewUUIDGenerator(tracer, meter, sth),
 			UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
 				tracer,
 				fvmContext.BlockHeader,
@@ -58,7 +58,6 @@ func NewScriptEnvironment(
 			programs:       programsHandler,
 			accounts:       accounts,
 			accountKeys:    accountKeys,
-			uuidGenerator:  uuidGenerator,
 			frozenAccounts: nil,
 		},
 	}
