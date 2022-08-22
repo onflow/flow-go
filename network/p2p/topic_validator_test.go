@@ -33,9 +33,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleConsensus), withLogger(logger))
 	sn2, _ := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleConsensus), withLogger(logger))
-	defer func() {
-		stopNodes(t, []*p2p.Node{sn1, sn2})
-	}()
+	defer stopNodes(t, []*p2p.Node{sn1, sn2})
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -105,9 +103,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 
 	sn1, _ := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleConsensus), withLogger(logger))
 	sn2, _ := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleConsensus), withLogger(logger))
-	defer func() {
-		stopNodes(t, []*p2p.Node{sn1, sn2})
-	}()
+	defer stopNodes(t, []*p2p.Node{sn1, sn2})
 
 	// unauthenticated messages should not be dropped on public channels
 	channel := channels.PublicSyncCommittee
@@ -165,9 +161,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleConsensus))
 	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleConsensus))
 	an1, identity3 := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleAccess))
-	defer func() {
-		stopNodes(t, []*p2p.Node{sn1, sn2, an1})
-	}()
+	defer stopNodes(t, []*p2p.Node{sn1, sn2, an1})
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -270,9 +264,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 
 	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_1", withRole(flow.RoleConsensus))
 	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_2", withRole(flow.RoleConsensus))
-	defer func() {
-		stopNodes(t, []*p2p.Node{sn1, sn2})
-	}()
+	defer stopNodes(t, []*p2p.Node{sn1, sn2})
 
 	// try to publish BlockProposal on invalid SyncCommittee channel
 	channel := channels.SyncCommittee
@@ -343,9 +335,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_1", withRole(flow.RoleConsensus))
 	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_2", withRole(flow.RoleConsensus))
 	an1, identity3 := nodeFixture(t, nodeFixtureCtx, sporkId, "access_1", withRole(flow.RoleAccess))
-	defer func() {
-		stopNodes(t, []*p2p.Node{sn1, sn2, an1})
-	}()
+	defer stopNodes(t, []*p2p.Node{sn1, sn2, an1})
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -434,9 +424,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	ln1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "collection_1", withRole(flow.RoleCollection))
 	ln2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "collection_2", withRole(flow.RoleCollection))
 	ln3, identity3 := nodeFixture(t, nodeFixtureCtx, sporkId, "collection_3", withRole(flow.RoleCollection))
-	defer func() {
-		stopNodes(t, []*p2p.Node{ln1, ln2, ln3})
-	}()
+	defer stopNodes(t, []*p2p.Node{ln1, ln2, ln3})
 
 	channel := channels.SyncCluster(flow.Testnet)
 	topic := channels.TopicFromChannel(channel, sporkId)

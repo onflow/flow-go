@@ -149,13 +149,13 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 		s, err := n.Subscribe(topic, codec, unittest.AllowAllPeerFilter())
 		require.NoError(t, err)
 
-		go func(s *pubsub.Subscription, n *p2p.Node) {
+		go func(s *pubsub.Subscription, nodeID peer.ID) {
 			msg, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, msg)
 			assert.Equal(t, data, msg.Data)
-			ch <- n.Host().ID()
-		}(s, n)
+			ch <- nodeID
+		}(s, n.Host().ID())
 	}
 
 	// fullyConnectedGraph checks that each node is directly connected to all the other nodes
