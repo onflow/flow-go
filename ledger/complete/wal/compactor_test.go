@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -71,7 +72,7 @@ func Test_Compactor(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 1, zerolog.Nop()) //keep only latest checkpoint
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 1, zerolog.Nop(), atomic.NewBool(false)) //keep only latest checkpoint
 			co := CompactorObserver{fromBound: 9, done: make(chan struct{})}
 			compactor.Subscribe(&co)
 
@@ -247,7 +248,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 2, zerolog.Nop())
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 2, zerolog.Nop(), atomic.NewBool(false))
 
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {

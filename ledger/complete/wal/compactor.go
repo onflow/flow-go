@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/observable"
@@ -18,25 +19,27 @@ type Compactor struct {
 	stopc        chan struct{}
 	lm           *lifecycle.LifecycleManager
 	sync.Mutex
-	observers          map[observable.Observer]struct{}
-	interval           time.Duration
-	checkpointDistance uint
-	checkpointsToKeep  uint
+	observers                            map[observable.Observer]struct{}
+	interval                             time.Duration
+	checkpointDistance                   uint
+	checkpointsToKeep                    uint
+	triggerCheckpointOnNextSegmentFinish *atomic.Bool // to trigger checkpoint manually
 }
 
-func NewCompactor(checkpointer *Checkpointer, interval time.Duration, checkpointDistance uint, checkpointsToKeep uint, logger zerolog.Logger) *Compactor {
+func NewCompactor(checkpointer *Checkpointer, interval time.Duration, checkpointDistance uint, checkpointsToKeep uint, logger zerolog.Logger, triggerCheckpointOnNextSegmentFinish *atomic.Bool) *Compactor {
 	if checkpointDistance < 1 {
 		checkpointDistance = 1
 	}
 	return &Compactor{
-		checkpointer:       checkpointer,
-		logger:             logger,
-		stopc:              make(chan struct{}),
-		observers:          make(map[observable.Observer]struct{}),
-		lm:                 lifecycle.NewLifecycleManager(),
-		interval:           interval,
-		checkpointDistance: checkpointDistance,
-		checkpointsToKeep:  checkpointsToKeep,
+		checkpointer:                         checkpointer,
+		logger:                               logger,
+		stopc:                                make(chan struct{}),
+		observers:                            make(map[observable.Observer]struct{}),
+		lm:                                   lifecycle.NewLifecycleManager(),
+		interval:                             interval,
+		checkpointDistance:                   checkpointDistance,
+		checkpointsToKeep:                    checkpointsToKeep,
+		triggerCheckpointOnNextSegmentFinish: triggerCheckpointOnNextSegmentFinish,
 	}
 }
 
@@ -111,26 +114,36 @@ func (c *Compactor) createCheckpoints() (int, error) {
 		return -1, fmt.Errorf("cannot get latest checkpoint: %w", err)
 	}
 
+	// if admin tool was used to trigger checkpoint, then it's equivilent to setting checkpoint distance
+	// as 1 for once.
+	if to-from > 1 && c.triggerCheckpointOnNextSegmentFinish.CAS(true, false) {
+		c.logger.Info().Msgf("manually trigger checkpointing (from: %v, to: %v)", from, to-1)
+		return c.runCheckpoint(from, to)
+	} else if to-from > int(c.checkpointDistance) {
+		c.triggerCheckpointOnNextSegmentFinish.Store(false)
+		return c.runCheckpoint(from, to)
+	}
+
+	return -1, nil
+}
+
+func (c *Compactor) runCheckpoint(from, to int) (int, error) {
 	// we only return a positive value if the latest checkpoint index has changed
-	newLatestCheckpoint := -1
 	// more then one segment means we can checkpoint safely up to `to`-1
 	// presumably last segment is being written to
-	if to-from > int(c.checkpointDistance) {
-		startTime := time.Now()
-
-		checkpointNumber := to - 1
-		c.logger.Info().Msgf("creating checkpoint %d from segment %d to segment %d", checkpointNumber, from, checkpointNumber)
-		err = c.checkpointer.Checkpoint(checkpointNumber, func() (io.WriteCloser, error) {
-			return c.checkpointer.CheckpointWriter(checkpointNumber)
-		})
-		if err != nil {
-			return -1, fmt.Errorf("error creating checkpoint (%d): %w", checkpointNumber, err)
-		}
-		newLatestCheckpoint = checkpointNumber
-
-		duration := time.Since(startTime)
-		c.logger.Info().Float64("total_time_s", duration.Seconds()).Msgf("created checkpoint %d from segment %d to segment %d", checkpointNumber, from, checkpointNumber)
+	startTime := time.Now()
+	checkpointNumber := to - 1
+	c.logger.Info().Msgf("creating checkpoint %d from segment %d to segment %d", checkpointNumber, from, checkpointNumber)
+	err := c.checkpointer.Checkpoint(checkpointNumber, func() (io.WriteCloser, error) {
+		return c.checkpointer.CheckpointWriter(checkpointNumber)
+	})
+	if err != nil {
+		return -1, fmt.Errorf("error creating checkpoint (%d): %w", checkpointNumber, err)
 	}
+	newLatestCheckpoint := checkpointNumber
+
+	duration := time.Since(startTime)
+	c.logger.Info().Float64("total_time_s", duration.Seconds()).Msgf("created checkpoint %d from segment %d to segment %d", checkpointNumber, from, checkpointNumber)
 	return newLatestCheckpoint, nil
 }
 
