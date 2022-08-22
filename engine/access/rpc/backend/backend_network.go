@@ -19,7 +19,11 @@ type backendNetwork struct {
 	snapshotHistoryLimit int
 }
 
-// used by the observer
+/* NetworkAPI func
+The observer and access nodes need to be able to handle GetNetworkParameters
+and GetLatestProtocolStateSnapshot RPCs so this logic was split into
+the backendNetwork so that we can ignore the rest of the backend logic
+*/
 func NewNetworkAPI(state protocol.State, chainID flow.ChainID, snapshotHistoryLimit int) *backendNetwork {
 	return &backendNetwork{
 		state:                state,
