@@ -20,15 +20,33 @@ func TestAccountStatusMigration(t *testing.T) {
 	address2 := flow.HexToAddress("0x2")
 
 	payloads := []ledger.Payload{
-		{Key: createPayloadKeyWithLegacyController(address1, KeyStorageUsed, true), Value: utils.Uint64ToBinary(12)},
-		{Key: createPayloadKeyWithLegacyController(address1, "other registers", true), Value: utils.Uint64ToBinary(2)},
-		{Key: createPayloadKeyWithLegacyController(address2, "other registers2", true), Value: utils.Uint64ToBinary(3)},
-		{Key: createPayloadKeyWithLegacyController(address1, KeyExists, true), Value: []byte{1}},
-		{Key: createPayloadKeyWithLegacyController(address1, KeyAccountFrozen, true), Value: []byte{1}},
-		{Key: createPayloadKeyWithLegacyController(address1, KeyPublicKeyCount, true), Value: utils.Uint64ToBinary(2)},
-		{Key: createPayloadKeyWithLegacyController(address1, KeyPrefixPublicKey+"0", true), Value: []byte{1}},
-		{Key: createPayloadKeyWithLegacyController(address1, KeyPrefixPublicKey+"1", true), Value: []byte{2}},
-		{Key: createPayloadKeyWithLegacyController(address1, KeyStorageIndex, true), Value: []byte{1, 0, 0, 0, 0, 0, 0, 0}},
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, KeyStorageUsed, true),
+			utils.Uint64ToBinary(12)),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, "other registers", true),
+			utils.Uint64ToBinary(2)),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address2, "other registers2", true),
+			utils.Uint64ToBinary(3)),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, KeyExists, true),
+			[]byte{1}),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, KeyAccountFrozen, true),
+			[]byte{1}),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, KeyPublicKeyCount, true),
+			utils.Uint64ToBinary(2)),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, KeyPrefixPublicKey+"0", true),
+			[]byte{1}),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, KeyPrefixPublicKey+"1", true),
+			[]byte{2}),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, KeyStorageIndex, true),
+			[]byte{1, 0, 0, 0, 0, 0, 0, 0}),
 	}
 
 	newPayloads, err := mig.Migrate(payloads)
@@ -46,10 +64,10 @@ func TestAccountStatusMigration(t *testing.T) {
 	expectedStatus.SetPublicKeyCount(2)
 	expectedStatus.SetStorageUsed(12)
 	expectedStatus.SetStorageIndex([8]byte{1, 0, 0, 0, 0, 0, 0, 0})
-	expectedPayload := &ledger.Payload{
-		Key:   createPayloadKeyWithLegacyController(address1, state.KeyAccountStatus, true),
-		Value: expectedStatus.ToBytes(),
-	}
+	expectedPayload := ledger.NewPayload(
+		createPayloadKeyWithLegacyController(address1, state.KeyAccountStatus, true),
+		expectedStatus.ToBytes(),
+	)
 
 	// check address two status
 	require.True(t, newPayloads[4].Equals(expectedPayload))

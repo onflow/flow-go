@@ -29,6 +29,10 @@ func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
 	}
 }
 
+func (builder *RPCEngineBuilder) Handler() accessproto.AccessAPIServer {
+	return builder.handler
+}
+
 // WithBlockSignerDecoder specifies that signer indices in block headers should be translated
 // to full node IDs with the given decoder.
 // Returns self-reference for chaining.

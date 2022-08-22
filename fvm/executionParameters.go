@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"context"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -8,8 +10,118 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
+
+func getEnvironmentMeterParameters(
+	vm *VirtualMachine,
+	ctx Context,
+	view state.View,
+	programs *programs.Programs,
+	procComputationLimit uint,
+	procMemoryLimit uint64,
+) (
+	meter.MeterParameters,
+	error,
+) {
+	params := meter.DefaultParameters().
+		WithComputationLimit(procComputationLimit).
+		WithMemoryLimit(procMemoryLimit)
+
+	var err error
+	if ctx.AllowContextOverrideByExecutionState {
+		stTxn := state.NewStateTransaction(
+			view,
+			state.DefaultParameters().
+				WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+				WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
+				WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
+
+		stTxn.DisableAllLimitEnforcements()
+
+		env := NewScriptEnvironment(context.Background(), ctx, vm, stTxn, programs)
+
+		params, err = fillEnvironmentMeterParameters(ctx, env, params)
+	}
+
+	// TODO(patrick): disable memory/interaction limits for service account
+
+	return params, err
+}
+
+func fillEnvironmentMeterParameters(
+	ctx Context,
+	env Environment,
+	params meter.MeterParameters,
+) (
+	meter.MeterParameters,
+	error,
+) {
+
+	// Check that the service account exists because all the settings are
+	// stored in it
+	serviceAddress := ctx.Chain.ServiceAddress()
+	service := runtime.Address(serviceAddress)
+
+	// set the property if no error, but if the error is a fatal error then
+	// return it
+	setIfOk := func(prop string, err error, setter func()) (fatal error) {
+		err, fatal = errors.SplitErrorTypes(err)
+		if fatal != nil {
+			// this is a fatal error. return it
+			ctx.Logger.
+				Error().
+				Err(fatal).
+				Msgf("error getting %s", prop)
+			return fatal
+		}
+		if err != nil {
+			// this is a general error.
+			// could be that no setting was present in the state,
+			// or that the setting was not parseable,
+			// or some other deterministic thing.
+			ctx.Logger.
+				Debug().
+				Err(err).
+				Msgf("could not set %s. Using defaults", prop)
+			return nil
+		}
+		// everything is ok. do the setting
+		setter()
+		return nil
+	}
+
+	computationWeights, err := GetExecutionEffortWeights(env, service)
+	err = setIfOk(
+		"execution effort weights",
+		err,
+		func() { params = params.WithComputationWeights(computationWeights) })
+	if err != nil {
+		return params, err
+	}
+
+	memoryWeights, err := GetExecutionMemoryWeights(env, service)
+	err = setIfOk(
+		"execution memory weights",
+		err,
+		func() { params = params.WithMemoryWeights(memoryWeights) })
+	if err != nil {
+		return params, err
+	}
+
+	memoryLimit, err := GetExecutionMemoryLimit(env, service)
+	err = setIfOk(
+		"execution memory limit",
+		err,
+		func() { params = params.WithMemoryLimit(memoryLimit) })
+	if err != nil {
+		return params, err
+	}
+
+	return params, nil
+}
 
 func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	env Environment,

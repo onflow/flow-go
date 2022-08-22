@@ -20,6 +20,8 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/debug"
@@ -46,13 +48,14 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	vm             VirtualMachine
-	vmCtx          fvm.Context
-	metrics        module.ExecutionMetrics
-	tracer         module.Tracer
-	log            zerolog.Logger
-	systemChunkCtx fvm.Context
-	committer      ViewCommitter
+	vm                    VirtualMachine
+	vmCtx                 fvm.Context
+	metrics               module.ExecutionMetrics
+	tracer                module.Tracer
+	log                   zerolog.Logger
+	systemChunkCtx        fvm.Context
+	committer             ViewCommitter
+	executionDataProvider *provider.Provider
 }
 
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
@@ -78,15 +81,17 @@ func NewBlockComputer(
 	tracer module.Tracer,
 	logger zerolog.Logger,
 	committer ViewCommitter,
+	executionDataProvider *provider.Provider,
 ) (BlockComputer, error) {
 	return &blockComputer{
-		vm:             vm,
-		vmCtx:          vmCtx,
-		metrics:        metrics,
-		tracer:         tracer,
-		log:            logger,
-		systemChunkCtx: SystemChunkContext(vmCtx, logger),
-		committer:      committer,
+		vm:                    vm,
+		vmCtx:                 vmCtx,
+		metrics:               metrics,
+		tracer:                tracer,
+		log:                   logger,
+		systemChunkCtx:        SystemChunkContext(vmCtx, logger),
+		committer:             committer,
+		executionDataProvider: executionDataProvider,
 	}, nil
 }
 
@@ -104,7 +109,7 @@ func (e *blockComputer) ExecuteBlock(
 	}
 	defer span.End()
 
-	results, err := e.executeBlock(span, block, stateView, program)
+	results, err := e.executeBlock(ctx, span, block, stateView, program)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -115,6 +120,7 @@ func (e *blockComputer) ExecuteBlock(
 }
 
 func (e *blockComputer) executeBlock(
+	ctx context.Context,
 	blockSpan otelTrace.Span,
 	block *entity.ExecutableBlock,
 	stateView state.View,
@@ -190,13 +196,14 @@ func (e *blockComputer) executeBlock(
 		if err != nil {
 			return nil, fmt.Errorf("cannot merge view: %w", err)
 		}
+
 		collectionIndex++
 	}
 
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
 	colView := stateView.NewChild()
-	_, err = e.executeSystemCollection(blockSpan, collectionIndex, txIndex, systemChunkCtx, colView, programs, res)
+	systemCol, err := e.executeSystemCollection(blockSpan, collectionIndex, txIndex, systemChunkCtx, colView, programs, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
@@ -218,7 +225,44 @@ func (e *blockComputer) executeBlock(
 
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 
+	executionData := generateExecutionData(res, collections, systemCol)
+
+	executionDataID, err := e.executionDataProvider.Provide(ctx, block.Height(), executionData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to provide execution data: %w", err)
+	}
+
+	res.ExecutionDataID = executionDataID
+
 	return res, nil
+}
+
+func generateExecutionData(
+	res *execution.ComputationResult,
+	collections []*entity.CompleteCollection,
+	systemCol *flow.Collection,
+) *execution_data.BlockExecutionData {
+	executionData := &execution_data.BlockExecutionData{
+		BlockID:             res.ExecutableBlock.ID(),
+		ChunkExecutionDatas: make([]*execution_data.ChunkExecutionData, 0, len(collections)+1),
+	}
+
+	for i, collection := range collections {
+		col := collection.Collection()
+		executionData.ChunkExecutionDatas = append(executionData.ChunkExecutionDatas, &execution_data.ChunkExecutionData{
+			Collection: &col,
+			Events:     res.Events[i],
+			TrieUpdate: res.TrieUpdates[i],
+		})
+	}
+
+	executionData.ChunkExecutionDatas = append(executionData.ChunkExecutionDatas, &execution_data.ChunkExecutionData{
+		Collection: systemCol,
+		Events:     res.Events[len(res.Events)-1],
+		TrieUpdate: res.TrieUpdates[len(res.TrieUpdates)-1],
+	})
+
+	return executionData
 }
 
 func (e *blockComputer) executeSystemCollection(
@@ -229,21 +273,19 @@ func (e *blockComputer) executeSystemCollection(
 	collectionView state.View,
 	programs *programs.Programs,
 	res *execution.ComputationResult,
-) (uint32, error) {
-
+) (*flow.Collection, error) {
 	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeSystemCollection)
 	defer colSpan.End()
 
 	tx, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
 	if err != nil {
-		return txIndex, fmt.Errorf("could not get system chunk transaction: %w", err)
+		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
 	}
 
 	err = e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res, true)
-	txIndex++
 
 	if err != nil {
-		return txIndex, err
+		return nil, err
 	}
 
 	systemChunkTxResult := res.TransactionResults[len(res.TransactionResults)-1]
@@ -261,7 +303,9 @@ func (e *blockComputer) executeSystemCollection(
 
 	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
 
-	return txIndex, err
+	return &flow.Collection{
+		Transactions: []*flow.TransactionBody{tx},
+	}, err
 }
 
 func (e *blockComputer) executeCollection(

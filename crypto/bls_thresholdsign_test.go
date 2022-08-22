@@ -83,10 +83,10 @@ func testCentralizedStatefulAPI(t *testing.T) {
 					enough, err := ts.TrustedAdd(i, share)
 					assert.NoError(t, err)
 					assert.False(t, enough)
-					// check HasSignature is true
+					// check HasShare is true
 					ok, err = ts.HasShare(i)
 					assert.NoError(t, err)
-					assert.True(t, verif)
+					assert.True(t, ok)
 					// check EnoughSignature
 					assert.False(t, ts.EnoughShares(), "threshold shouldn't be reached")
 					// check ThresholdSignature
@@ -318,7 +318,7 @@ func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 	gt = t
 	// number of participants to test
 	n := 5
-	lead := mrand.Intn(n) // random leader
+	lead := mrand.Intn(n) // random
 	var sync sync.WaitGroup
 	chans := make([]chan *message, n)
 	processors := make([]testDKGProcessor, 0, n)
@@ -400,7 +400,7 @@ func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 		for i := 0; i < n; i++ {
 			chans[i] = make(chan *message, 2*n)
 		}
-		// start DKG in all participants but the leader
+		// start DKG in all participants but the
 		seed := make([]byte, SeedMinLenDKG)
 		read, err := rand.Read(seed)
 		require.Equal(t, read, SeedMinLenDKG)
@@ -539,67 +539,6 @@ type statelessKeys struct {
 	publicKeyShares []PublicKey
 }
 
-// This is a testing function using the stateless api
-// It simulates processing incoming messages by a participant during TS
-func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
-	n := proc.dkg.Size()
-	// Sign a share and broadcast it
-	kmac := NewExpandMsgXOFKMAC128(thresholdSignatureTag)
-	ownSignShare, _ := proc.keys.myPrivateKey.Sign(thresholdSignatureMessage, kmac)
-	// the local valid signature shares
-	signShares := make([]Signature, 0, n)
-	signers := make([]int, 0, n)
-	// add the participant own share
-	signShares = append(signShares, ownSignShare)
-	signers = append(signers, proc.current)
-	proc.protocol = tsType
-	proc.Broadcast(ownSignShare)
-	for {
-		select {
-		case newMsg := <-proc.chans[proc.current]:
-			log.Debugf("%d Receiving TS from %d:", proc.current, newMsg.orig)
-			verif, err := proc.keys.publicKeyShares[newMsg.orig].Verify(newMsg.data, thresholdSignatureMessage, kmac)
-			require.NoError(t, err)
-			assert.True(t, verif,
-				"the signature share sent from %d to %d is not correct", newMsg.orig,
-				proc.current)
-			// append the received signature share
-			if verif {
-				// check the signer is new
-				isSeen := true
-				for _, i := range signers {
-					if i == newMsg.orig {
-						isSeen = false
-					}
-				}
-				if isSeen {
-					signShares = append(signShares, newMsg.data)
-					signers = append(signers, newMsg.orig)
-				}
-			}
-			threshReached, err := EnoughShares(optimalThreshold(n), len(signShares))
-			assert.NoError(t, err)
-			if threshReached {
-				// Reconstruct the threshold signature
-				thresholdSignature, err := BLSReconstructThresholdSignature(n, optimalThreshold(n), signShares, signers)
-				assert.NoError(t, err)
-				verif, err = proc.keys.groupPublicKey.Verify(thresholdSignature, thresholdSignatureMessage, kmac)
-				require.NoError(t, err)
-				assert.True(t, verif, "the threshold signature is not correct")
-				if verif {
-					log.Infof("%d reconstructed a valid signature: %d\n", proc.current,
-						thresholdSignature)
-				}
-			}
-
-		// if timeout, finalize TS
-		case <-time.After(time.Second):
-			sync.Done()
-			return
-		}
-	}
-}
-
 // Centralized test of threshold signature protocol using the threshold key generation.
 func testCentralizedStatelessAPI(t *testing.T) {
 	n := 10
@@ -649,6 +588,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 			thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
+			assert.Nil(t, thresholdSignature)
 		}
 	}
 }
@@ -656,7 +596,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 func BenchmarkSimpleKeyGen(b *testing.B) {
 	n := 60
 	seed := make([]byte, SeedMinLenDKG)
-	rand.Read(seed)
+	_, _ = rand.Read(seed)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _, _, _ = BLSThresholdKeyGen(n, optimalThreshold(n), seed)

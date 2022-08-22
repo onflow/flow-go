@@ -75,7 +75,6 @@ type Engine struct {
 	collections       storage.Collections
 	transactions      storage.Transactions
 	executionReceipts storage.ExecutionReceipts
-	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
 	// metrics
@@ -155,7 +154,6 @@ func New(
 		transactions:               transactions,
 		executionResults:           executionResults,
 		executionReceipts:          executionReceipts,
-		maxReceiptHeight:           0,
 		transactionMetrics:         transactionMetrics,
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
@@ -416,6 +414,7 @@ func (e *Engine) trackFinalizedMetricForBlock(hb *model.Block) {
 
 	if ti, found := e.blocksToMarkExecuted.ByID(hb.BlockID); found {
 		e.trackExecutedMetricForBlock(block, ti)
+		e.transactionMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
 		e.blocksToMarkExecuted.Remove(hb.BlockID)
 	}
 }
@@ -427,33 +426,29 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 		return fmt.Errorf("failed to store execution receipt: %w", err)
 	}
 
-	block, err := e.blocks.ByID(r.ExecutionResult.BlockID)
-	if err != nil {
-		return fmt.Errorf("failed to lookup block while handling receipt: %w", err)
-	}
-
-	if block.Header.Height > e.maxReceiptHeight {
-		e.transactionMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
-		e.maxReceiptHeight = block.Header.Height
-	}
-
-	e.trackExecutedMetricForReceipt(r)
+	e.trackExecutionReceiptMetrics(r)
 	return nil
 }
 
-func (e *Engine) trackExecutedMetricForReceipt(r *flow.ExecutionReceipt) {
+func (e *Engine) trackExecutionReceiptMetrics(r *flow.ExecutionReceipt) {
 	// TODO add actual execution time to execution receipt?
 	now := time.Now().UTC()
 
 	// retrieve the block
 	b, err := e.blocks.ByID(r.ExecutionResult.BlockID)
+
 	if errors.Is(err, storage.ErrNotFound) {
 		e.blocksToMarkExecuted.Add(r.ExecutionResult.BlockID, now)
 		return
-	} else if err != nil {
+	}
+
+	if err != nil {
 		e.log.Warn().Err(err).Msg("could not track tx executed metric: executed block not found locally")
 		return
 	}
+
+	e.transactionMetrics.UpdateExecutionReceiptMaxHeight(b.Header.Height)
+
 	e.trackExecutedMetricForBlock(b, now)
 }
 

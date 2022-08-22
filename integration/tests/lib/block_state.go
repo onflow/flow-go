@@ -79,7 +79,7 @@ func (bs *BlockState) WaitForBlockById(t *testing.T, blockId flow.Identifier) *m
 func (bs *BlockState) processAncestors(t *testing.T, b *messages.BlockProposal, confirmsHeight uint64) {
 	// puts this block proposal and all ancestors into `finalizedByHeight`
 	t.Logf("%v new height arrived: %d\n", time.Now().UTC(), b.Header.Height)
-	ancestor, ok := b, true
+	ancestor := b
 	for ancestor.Header.Height > bs.highestFinalized {
 		heightDistance := b.Header.Height - ancestor.Header.Height
 		viewDistance := b.Header.View - ancestor.Header.View
@@ -122,6 +122,7 @@ func (bs *BlockState) processAncestors(t *testing.T, b *messages.BlockProposal, 
 		}
 
 		// find parent
+		var ok bool
 		ancestor, ok = bs.blocksByID[ancestor.Header.ParentID]
 
 		// stop if parent not found
