@@ -98,7 +98,7 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 				Msg("allowing inbound connection intercept secured has no peer filters set")
 			return true
 		}
-		
+
 		if err := c.peerIDPassesAllFilters(p, c.onInterceptSecuredFilters); err != nil {
 			// log the illegal connection attempt from the remote node
 			c.log.Error().

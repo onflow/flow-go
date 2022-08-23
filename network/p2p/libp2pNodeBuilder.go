@@ -34,6 +34,22 @@ import (
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func(context.Context) (*Node, error)
 
+// defaultConnGaterPeerFilter returns a PeerFilter that drops incoming connections from unknown and ejected peers
+func defaultConnGaterPeerFilter(idProvider id.IdentityProvider) PeerFilter {
+	return func(p peer.ID) error {
+		id, found := idProvider.ByPeerID(p)
+		if !found {
+			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.Pretty())
+		}
+
+		if id.Ejected {
+			return fmt.Errorf("peer with node ID %s is ejected", id.NodeID)
+		}
+
+		return nil
+	}
+}
+
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
 func DefaultLibP2PNodeFactory(
@@ -50,29 +66,11 @@ func DefaultLibP2PNodeFactory(
 	return func(ctx context.Context) (*Node, error) {
 		connManager := NewConnManager(log, metrics)
 
-		// drop incoming connections from unknown peers
-		peerFilter := func(pid peer.ID) error {
-			if _, found := idProvider.ByPeerID(pid); !found {
-				return fmt.Errorf("failed to get identity of unknown peer with ID: %s", pid.Pretty())
-			}
-			return nil
-		}
-		// drop incoming connections from unknown and ejected peers
-		isEjectedPeerFilter := func(pid peer.ID) error {
-			id, found := idProvider.ByPeerID(pid)
-			if !found {
-				return fmt.Errorf("failed to get identity of unknown peer with ID: %s", pid.Pretty())
-			}
-			if id.Ejected {
-				return fmt.Errorf("peer is ejected: %s", id.NodeID)
-			}
-
-			return nil
-		}
-
+		// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
+		peerFilter := defaultConnGaterPeerFilter(idProvider)
 		connGater := NewConnGater(log,
 			WithOnInterceptPeerDialFilters([]PeerFilter{peerFilter}),
-			WithOnInterceptSecuredFilters([]PeerFilter{isEjectedPeerFilter}),
+			WithOnInterceptSecuredFilters([]PeerFilter{peerFilter}),
 		)
 
 		builder := NewNodeBuilder(log, address, flowKey, sporkId).
