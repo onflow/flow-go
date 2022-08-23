@@ -926,6 +926,15 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 			fvm.WithContractDeploymentRestricted(false),
 		)
 	}
+	if fnb.RootChainID == flow.Sandboxnet {
+		// temporarily disable limiting storage, so that  transactionStorageLimiter.go doens't call the non-existent
+		// function on FlowStorageFees smart contract and crash. This should make it so transactions don't fail
+		// and the core contracts can be upgraded
+		vmOpts = append(vmOpts,
+			fvm.WithAccountStorageLimit(false),
+		)
+	}
+
 	fnb.FvmOptions = vmOpts
 }
 
