@@ -65,6 +65,14 @@ func (o *Orchestrator) Register(network insecure.OrchestratorNetwork) {
 // the attack Orchestrator instead of dispatching them directly to the network.
 // The Orchestrator completely determines what the corrupted conduit should send to the network.
 func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
+	lg := o.logger.With().
+		Hex("corrupt_origin_id", logging.ID(event.CorruptOriginId)).
+		Str("channel", event.Channel.String()).
+		Str("protocol", event.Protocol.String()).
+		Uint32("target_num", event.TargetNum).
+		Str("target_ids", fmt.Sprintf("%v", event.TargetIds)).
+		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
+
 	switch event.FlowProtocolEvent.(type) {
 
 	case *flow.ExecutionReceipt:
@@ -95,14 +103,11 @@ func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 		err := o.network.SendEgress(event)
 
 		if err != nil {
+			// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
+			lg.Fatal().Err(err).Msg("egress event not passed through")
 			return fmt.Errorf("could not send rpc egress event on channel: %w", err)
 		}
-		o.logger.Debug().
-			Hex("corrupt_origin_id", logging.ID(event.CorruptOriginId)).
-			Str("channel", string(event.Channel)).
-			Str("protocol", event.Protocol.String()).
-			Str("type", fmt.Sprintf("%T", event)).
-			Msg("egress event has passed through")
+		lg.Debug().Msg("egress event has passed through")
 	}
 
 	return nil
@@ -111,19 +116,20 @@ func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 // HandleIngressEvent implements logic of processing the incoming (ingress) events to a corrupt node.
 // Wintermute orchestrator doesn't corrupt ingress events, so it just passes them through.
 func (o *Orchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
+	lg := o.logger.With().
+		Hex("origin_id", logging.ID(event.OriginID)).
+		Str("channel", event.Channel.String()).
+		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
+		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
+
 	err := o.network.SendIngress(event)
 
 	if err != nil {
+		// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
+		lg.Fatal().Err(err).Msg("ingress event not passed through")
 		return fmt.Errorf("could not send rpc ingress event on channel: %w", err)
 	}
-	o.logger.Debug().
-		Hex("origin_id", logging.ID(event.OriginID)).
-		Str("channel", string(event.Channel)).
-		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
-		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).
-		Str("type", fmt.Sprintf("%T", event)).
-		Msg("ingress event has passed through")
-
+	lg.Debug().Msg("ingress event has passed through")
 	return nil
 }
 

@@ -43,7 +43,7 @@ func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 	}
 }
 
-// HandleEventFromCorruptedNode implements logic of processing the outgoing (egress) events received from a corrupted node.
+// HandleEgressEvent implements logic of processing the outgoing (egress) events received from a corrupted node.
 //
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 // the attacker instead of dispatching them to the network.
@@ -51,7 +51,7 @@ func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 // In this dummy orchestrator, the incoming event is passed through without any changes.
 // Passing through means that the orchestrator returns the events as they are to the original corrupted nodes so they
 // dispatch them on the Flow network.
-func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent) error {
+func (d *dummyOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 	lg := d.logger.With().
 		Hex("corrupt_origin_id", logging.ID(event.CorruptOriginId)).
 		Str("channel", event.Channel.String()).
@@ -73,7 +73,7 @@ func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressE
 
 	err := d.orchestratorNetwork.SendEgress(event)
 	if err != nil {
-		// dummy orchestrator is used for testing and upon error we want it to crash.
+		// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
 		lg.Fatal().Err(err).Msg("could not pass through egress event")
 		return err
 	}
@@ -81,8 +81,8 @@ func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressE
 	return nil
 }
 
-// HandleEventToCorruptedNode implements logic of processing the incoming (ingress) events to a corrupt node.
-func (d *dummyOrchestrator) HandleEventToCorruptedNode(event *insecure.IngressEvent) error {
+// HandleIngressEvent implements logic of processing the incoming (ingress) events to a corrupt node.
+func (d *dummyOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 	lg := d.logger.With().
 		Hex("origin_id", logging.ID(event.OriginID)).
 		Str("channel", event.Channel.String()).
@@ -92,7 +92,7 @@ func (d *dummyOrchestrator) HandleEventToCorruptedNode(event *insecure.IngressEv
 	err := d.orchestratorNetwork.SendIngress(event)
 
 	if err != nil {
-		// dummy orchestrator is used for testing and upon error we want it to crash.
+		// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
 		lg.Fatal().Err(err).Msg("could not pass through ingress event")
 		return err
 	}
