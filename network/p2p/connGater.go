@@ -59,7 +59,7 @@ func NewConnGater(log zerolog.Logger, opts ...ConnGaterOption) *ConnGater {
 // InterceptPeerDial - a callback which allows or disallows outbound connection
 func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
 	if len(c.onInterceptPeerDialFilters) == 0 {
-		c.log.Warn().
+		c.log.Debug().
 			Str("peer_id", p.Pretty()).
 			Msg("allowing outbound connection intercept peer dial has no peer filters set")
 		return true
@@ -93,7 +93,7 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 	switch dir {
 	case network.DirInbound:
 		if len(c.onInterceptSecuredFilters) == 0 {
-			c.log.Warn().
+			c.log.Debug().
 				Str("peer_id", p.Pretty()).
 				Msg("allowing inbound connection intercept secured has no peer filters set")
 			return true
