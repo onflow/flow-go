@@ -44,6 +44,13 @@ func (st *WorkerStatsTracker) AddWorker() {
 	st.workers++
 }
 
+func (st *WorkerStatsTracker) GetWorkers() int {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	return st.workers
+}
+
 func (st *WorkerStatsTracker) AddTxSent() {
 	now := time.Now().Unix()
 
@@ -52,6 +59,13 @@ func (st *WorkerStatsTracker) AddTxSent() {
 
 	st.txsSent++
 	st.txsSentPerSecond[now]++
+}
+
+func (st *WorkerStatsTracker) GetTxSent() int {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	return st.txsSent
 }
 
 // AvgTPSBetween returns the average transactions per second TPS between the two time points
@@ -80,8 +94,8 @@ func (st *WorkerStatsTracker) Digest() string {
 		"Avg TPS (last 10s)",
 	})
 	t.AppendRow(table.Row{
-		st.workers,
-		st.txsSent,
+		st.GetWorkers(),
+		st.GetTxSent(),
 		// use 11 seconds to correct for rounding in buckets
 		st.AvgTPSBetween(time.Now().Add(-11*time.Second), time.Now()),
 	})
