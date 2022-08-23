@@ -1,10 +1,11 @@
-package state_test
+package environment_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
@@ -12,7 +13,10 @@ import (
 func TestUUIDs_GetAndSetUUID(t *testing.T) {
 	view := utils.NewSimpleView()
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	uuidsA := state.NewUUIDGenerator(stTxn)
+	uuidsA := environment.NewUUIDGenerator(
+		environment.NewTracer(nil, nil, false),
+		environment.NewMeter(stTxn),
+		stTxn)
 
 	uuid, err := uuidsA.GetUUID() // start from zero
 	require.NoError(t, err)
@@ -22,7 +26,10 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 	require.NoError(t, err)
 
 	// create new UUIDs instance
-	uuidsB := state.NewUUIDGenerator(stTxn)
+	uuidsB := environment.NewUUIDGenerator(
+		environment.NewTracer(nil, nil, false),
+		environment.NewMeter(stTxn),
+		stTxn)
 	uuid, err = uuidsB.GetUUID() // should read saved value
 	require.NoError(t, err)
 
@@ -32,7 +39,10 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 func Test_GenerateUUID(t *testing.T) {
 	view := utils.NewSimpleView()
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	genA := state.NewUUIDGenerator(stTxn)
+	genA := environment.NewUUIDGenerator(
+		environment.NewTracer(nil, nil, false),
+		environment.NewMeter(stTxn),
+		stTxn)
 
 	uuidA, err := genA.GenerateUUID()
 	require.NoError(t, err)
@@ -46,7 +56,10 @@ func Test_GenerateUUID(t *testing.T) {
 	require.Equal(t, uint64(2), uuidC)
 
 	// Create new generator instance from same ledger
-	genB := state.NewUUIDGenerator(stTxn)
+	genB := environment.NewUUIDGenerator(
+		environment.NewTracer(nil, nil, false),
+		environment.NewMeter(stTxn),
+		stTxn)
 
 	uuidD, err := genB.GenerateUUID()
 	require.NoError(t, err)
