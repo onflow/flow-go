@@ -19,7 +19,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220720151516-797b149ceaaa
 	github.com/onflow/flow-emulator v0.33.4-0.20220708171627-a9c955cd26c6
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
-	github.com/onflow/flow-go v0.25.13-0.20220708171206-7015f054a69f
+	github.com/onflow/flow-go v0.26.14-test-synchronization.0.20220823064642-5b5125da2f87
 	github.com/onflow/flow-go-sdk v0.26.5-0.20220629191626-900f9f91bffc
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
@@ -298,4 +298,4 @@ require (
 // temp fix for MacOS build. See comment https://github.com/ory/dockertest/issues/208#issuecomment-686820414
 //replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
 
-replace github.com/onflow/flow-go => ../
+//replace github.com/onflow/flow-go => ../
