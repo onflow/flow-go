@@ -826,7 +826,7 @@ func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, view *de
 	// execute the script
 	err = vm.Run(vmCtx, script, view, p)
 	if err != nil {
-		return 0, fmt.Errorf("could not read epoch counter, script internal error: %w", script.Err)
+		return 0, fmt.Errorf("could not read epoch counter, script internal error: %w", err)
 	}
 	if script.Err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, script error: %w", script.Err)
