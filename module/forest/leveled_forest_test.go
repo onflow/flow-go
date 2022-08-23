@@ -33,6 +33,18 @@ func NewVertexMock(vertexId string, vertexLevel uint64, parentId string, parentL
 	return v
 }
 
+// FOREST:
+//                             ↙-- [A]
+//      (Genesis) ← [B] ← [C]  ←-- [D]
+//         ⋮         ⋮      ⋮        ⋮
+//         ⋮         ⋮      ⋮   (Missing1) ←---- [W]
+//         ⋮         ⋮      ⋮        ⋮        (Missing2) ← [X] ← [Y]
+//         ⋮         ⋮      ⋮        ⋮             ⋮        ⋮  ↖ [Z]
+//         ⋮         ⋮      ⋮        ⋮             ⋮        ⋮     ⋮
+// LEVEL:  0         1     2        3             4       5     6
+// Nomenclature:
+//  [B] Vertex B (internally represented as a full vertex container)
+//  (M) referenced vertex that has not been added (internally represented as empty vertex container)
 var TestVertices = map[string]*mock.Vertex{
 	"A": NewVertexMock("A", 3, "Genesis", 0),
 	"B": NewVertexMock("B", 1, "Genesis", 0),
@@ -139,12 +151,18 @@ func TestLevelledForest_VerifyVertex(t *testing.T) {
 	assert.True(t, IsInvalidVertexError(err))
 
 	// KNOWN vertex whose PARENT references a known vertex but with mismatching level
-	err = F.VerifyVertex(NewVertexMock("D", 10, "C", 10))
+	err = F.VerifyVertex(NewVertexMock("D", 3, "C", 1))
 	assert.Error(t, err)
 	assert.True(t, IsInvalidVertexError(err))
 
-	// adding unknown vertex whose PARENT references a known vertex but with mismatching level
+	// unknown vertex whose PARENT references a known vertex but with mismatching level
 	err = F.VerifyVertex(NewVertexMock("F", 4, "Genesis", 10))
+	assert.Error(t, err)
+	assert.True(t, IsInvalidVertexError(err))
+
+	// UNKNOWN vertex (Missing) that is already referenced as parent by an existing vertex [W]
+	// _but_ new vertex has inconsistent level compared to the parent information [W] reports
+	err = F.VerifyVertex(NewVertexMock("Missing1", 2, "Genesis", 0))
 	assert.Error(t, err)
 	assert.True(t, IsInvalidVertexError(err))
 }

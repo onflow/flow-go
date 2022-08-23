@@ -55,7 +55,11 @@ func (f *BlockBuilder) GenesisBlock() *model.Block {
 	return makeGenesis().Block
 }
 
-// [3,4] denotes a block of view 4, with a qc of view 3.
+// AddVersioned adds a block with the given qcView and blockView.
+// In addition the version identifier of the QC embedded within the block
+// is specified by `qcVersion`. The version identifier for the block itself
+// (primarily for emulating different payloads) is specified by `blockVersion`.
+// [3,4] denotes a block of view 4, with a qc of view 3
 // [3,4'] denotes a block of view 4, with a qc of view 3, but has a different BlockID than [3,4]
 // [3,4'] can be created by AddVersioned(3, 4, 0, 1)
 // [3',4] can be created by AddVersioned(3, 4, 1, 0)
