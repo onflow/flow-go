@@ -746,10 +746,13 @@ func (proc dummyTestDKGProcessor) FlagMisbehavior(int, string) {}
 func TestDKGErrorTypes(t *testing.T) {
 	t.Run("dkgFailureError sanity", func(t *testing.T) {
 		failureError := dkgFailureErrorf("some error")
+		invInpError := invalidInputsErrorf("")
 		otherError := fmt.Errorf("some error")
 		assert.True(t, IsDKGFailureError(failureError))
 		assert.False(t, IsDKGFailureError(otherError))
+		assert.False(t, IsDKGFailureError(invInpError))
 		assert.False(t, IsDKGFailureError(nil))
+		assert.False(t, IsInvalidInputsError(failureError))
 	})
 
 	t.Run("dkgInvalidStateTransitionError sanity", func(t *testing.T) {
@@ -757,7 +760,7 @@ func TestDKGErrorTypes(t *testing.T) {
 		invInpError := invalidInputsErrorf("")
 		otherError := fmt.Errorf("some error")
 		assert.True(t, IsDKGInvalidStateTransitionError(failureError))
-		assert.True(t, IsInvalidInputsError(failureError))
+		assert.False(t, IsInvalidInputsError(failureError))
 		assert.False(t, IsDKGInvalidStateTransitionError(invInpError))
 		assert.False(t, IsDKGInvalidStateTransitionError(otherError))
 		assert.False(t, IsDKGInvalidStateTransitionError(nil))

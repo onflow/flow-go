@@ -103,16 +103,14 @@ func (e dkgInvalidStateTransitionError) Unwrap() error {
 }
 
 // dkgInvalidStateTransitionErrorf constructs a new dkgInvalidStateTransitionError
-// always embedded in a invalidInputsError (API misuse)
 func dkgInvalidStateTransitionErrorf(msg string, args ...interface{}) error {
-	err := &dkgInvalidStateTransitionError{
+	return &dkgInvalidStateTransitionError{
 		error: fmt.Errorf(msg, args...),
 	}
-	return invalidInputsErrorf("invalid state transition %w", err)
 }
 
 // IsDkgInvalidStateTransitionError checks if the input error is of a dkgInvalidStateTransition type.
-// invalidStateTransition is a subtype of invalidInputsError, returned when a caller
+// invalidStateTransition is returned when a caller
 // triggers an invalid state transition in the local DKG instance.
 // Such a failure can only happen if the API is misued by not respecting
 // the state machine conditions.

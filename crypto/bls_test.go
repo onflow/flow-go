@@ -316,13 +316,13 @@ func TestAggregateSignatures(t *testing.T) {
 		// test aggregating an empty signature list
 		aggSig, err = AggregateBLSSignatures(sigs[:0])
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsAggregationEmptyListError(err))
 		assert.Nil(t, aggSig)
 
 		// test verification with an empty key list
 		result, err := VerifyBLSSignatureOneMessage(pks[:0], aggSig, input, kmac)
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsAggregationEmptyListError(err))
 		assert.False(t, result)
 
 		// test with a signature of a wrong length
@@ -342,7 +342,7 @@ func TestAggregateSignatures(t *testing.T) {
 		// test the empty key list
 		aggSk, err := AggregateBLSPrivateKeys(sks[:0])
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsAggregationEmptyListError(err))
 		assert.Nil(t, aggSk)
 
 		// test with an invalid key type
@@ -420,7 +420,7 @@ func TestAggregatePubKeys(t *testing.T) {
 		// empty list
 		aggPK, err := AggregateBLSPublicKeys(pks[:0])
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsAggregationEmptyListError(err))
 		assert.Nil(t, aggPK)
 
 		// test with an invalid key type
@@ -839,7 +839,7 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		// empty key list
 		valid, err = VerifyBLSSignatureManyMessages(inputPks[:0], aggSig, inputMsgs, inputKmacs)
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsAggregationEmptyListError(err))
 		assert.False(t, valid, "verification should fail with empty list key")
 
 		// nil hasher
@@ -864,11 +864,11 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 
 func TestBLSErrorTypes(t *testing.T) {
 	t.Run("aggregateEmptyListError sanity", func(t *testing.T) {
-		err := newAggregationEmptyListError()
+		err := aggregationEmptyListError
 		invInpError := invalidInputsErrorf("")
 		otherError := fmt.Errorf("some error")
 		assert.True(t, IsAggregationEmptyListError(err))
-		assert.True(t, IsInvalidInputsError(err))
+		assert.False(t, IsInvalidInputsError(err))
 		assert.False(t, IsAggregationEmptyListError(invInpError))
 		assert.False(t, IsAggregationEmptyListError(otherError))
 		assert.False(t, IsAggregationEmptyListError(nil))

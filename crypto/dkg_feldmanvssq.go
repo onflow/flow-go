@@ -104,8 +104,8 @@ func (s *feldmanVSSQualState) init() {
 // The second call is a timeout for broadcasting the complaints.
 //
 // The returned erorr is :
-//    - invalidInputsError/dkgInvalidStateTransitionError if the DKG instance was not running.
-//    - invalidInputsError/dkgInvalidStateTransitionError if the DKG instance already called the 2 required timeouts.
+//    - dkgInvalidStateTransitionError if the DKG instance was not running.
+//    - dkgInvalidStateTransitionError if the DKG instance already called the 2 required timeouts.
 //    - nil otherwise.
 func (s *feldmanVSSQualState) NextTimeout() error {
 	if !s.running {
@@ -198,7 +198,7 @@ const (
 // orig is the message origin index
 //
 // The function returns:
-//  - invalidInputsError/dkgInvalidStateTransitionError if the instance is not running
+//  - dkgInvalidStateTransitionError if the instance is not running
 //  - invalidInputsError if `orig` is not valid (in [0, size-1])
 //  - nil otherwise
 func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
@@ -254,7 +254,7 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 // orig is the message origin index.
 //
 // The function returns:
-//  - invalidInputsError/dkgInvalidStateTransitionError if the instance is not running
+//  - dkgInvalidStateTransitionError if the instance is not running
 //  - invalidInputsError if `orig` is not valid (in [0, size-1])
 //  - nil otherwise
 func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
@@ -292,7 +292,7 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 // otherwise, the protocol can be broken
 //
 // The function returns:
-//  - invalidInputsError/dkgInvalidStateTransitionError if the instance is not running
+//  - dkgInvalidStateTransitionError if the instance is not running
 //  - invalidInputsError if `orig` is not valid (in [0, size-1])
 //  - nil otherwise
 func (s *feldmanVSSQualState) ForceDisqualify(participant int) error {

@@ -90,7 +90,7 @@ func (s *feldmanVSSstate) init() {
 // If the current participant is not the leader, the seed is ignored.
 //
 // The function returns:
-// - invalidInputsError/dkgInvalidStateTransitionError if the DKG instance is already running.
+// - dkgInvalidStateTransitionError if the DKG instance is already running.
 // - error if an unexpected exception occurs
 // - nil otherwise
 func (s *feldmanVSSstate) Start(seed []byte) error {
@@ -114,7 +114,7 @@ func (s *feldmanVSSstate) Start(seed []byte) error {
 // - the finalized private key which is the current participant's own private key share
 //
 // The returned erorr is :
-//    - invalidInputsError/dkgInvalidStateTransitionError if the DKG instance was not running.
+//    - dkgInvalidStateTransitionError if the DKG instance was not running.
 //    - dkgFailureError if the private key and vector are inconsistent.
 //    - nil otherwise.
 func (s *feldmanVSSstate) End() (PrivateKey, PublicKey, []PublicKey, error) {
@@ -150,7 +150,7 @@ const (
 // `orig` is the message origin index.
 //
 // The function returns:
-//  - invalidInputsError/dkgInvalidStateTransitionError if the instance is not running
+//  - dkgInvalidStateTransitionError if the instance is not running
 //  - invalidInputsError if `orig` is not valid (in [0, size-1])
 //  - nil otherwise
 func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
@@ -190,7 +190,7 @@ func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 // `orig` is the message origin index.
 //
 // The function returns:
-//  - invalidInputsError/dkgInvalidStateTransitionError if the instance is not running
+//  - dkgInvalidStateTransitionError if the instance is not running
 //  - invalidInputsError if `orig` is not valid (in [0, size-1])
 //  - nil otherwise
 func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
@@ -225,7 +225,7 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 // otherwise, the protocol can be broken.
 //
 // The function returns:
-//  - invalidInputsError/dkgInvalidStateTransitionError if the instance is not running
+//  - dkgInvalidStateTransitionError if the instance is not running
 //  - invalidInputsError if `orig` is not valid (in [0, size-1])
 //  - nil otherwise
 func (s *feldmanVSSstate) ForceDisqualify(participant int) error {
