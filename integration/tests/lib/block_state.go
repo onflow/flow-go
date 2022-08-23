@@ -135,8 +135,7 @@ func (bs *BlockState) processAncestors(t *testing.T, b *messages.BlockProposal, 
 // WaitForHighestFinalizedProgress waits until last finalized height progresses, e.g., if
 // latest finalized block is 10, this will wait until any block height higher than 10 is finalized, and
 // returns that block.
-func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T) *messages.BlockProposal {
-	currentFinalized := bs.HighestFinalizedHeight()
+func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T, currentFinalized uint64) *messages.BlockProposal {
 	require.Eventually(t, func() bool {
 		bs.RLock()
 		defer bs.RUnlock()
@@ -156,8 +155,7 @@ func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T) *messages.Bl
 
 // WaitUntilNextHeightFinalized waits until the next block height that will be proposed is finalized: If the latest
 // proposed block has height 13, and the latest finalized block is 10, this will wait until block height 14 is finalized
-func (bs *BlockState) WaitUntilNextHeightFinalized(t *testing.T) *messages.BlockProposal {
-	currentProposed := bs.HighestProposedHeight()
+func (bs *BlockState) WaitUntilNextHeightFinalized(t *testing.T, currentProposed uint64) *messages.BlockProposal {
 	require.Eventually(t, func() bool {
 		bs.RLock()
 		defer bs.RUnlock()
