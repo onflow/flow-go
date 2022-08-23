@@ -473,11 +473,11 @@ func (q *EpochQuery) Current() protocol.Epoch {
 	}
 	setup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
-		return invalid.NewEpochf("could not get current EpochSetup (id=%x) for block %x: %w", q.snap.blockID, err)
+		return invalid.NewEpochf("could not get current EpochSetup (id=%x) for block %x: %w", status.CurrentEpoch.SetupID, q.snap.blockID, err)
 	}
 	commit, err := q.snap.state.epoch.commits.ByID(status.CurrentEpoch.CommitID)
 	if err != nil {
-		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", q.snap.blockID, err)
+		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.CurrentEpoch.CommitID, q.snap.blockID, err)
 	}
 
 	epoch, err := inmem.NewCommittedEpoch(setup, commit)
