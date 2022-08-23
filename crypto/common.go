@@ -30,6 +30,10 @@ type invalidInputsError struct {
 	error
 }
 
+func (e invalidInputsError) Unwrap() error {
+	return e.error
+}
+
 // invalidInputsErrorf constructs a new invalidInputsError
 func invalidInputsErrorf(msg string, args ...interface{}) error {
 	return &invalidInputsError{

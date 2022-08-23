@@ -138,7 +138,7 @@ func internalExpandMsgXOFKMAC128(key string) hash.Hasher {
 // with a domain separation tag.
 //
 // The function returns:
-//  - (nil, invalidInputError) if the hasher is nil or its output size is not 128 bytes
+//  - (nil, invalidInputsError) if the hasher is nil or its output size is not 128 bytes
 //  - (signature, nil) otherwise
 func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, error) {
 	if kmac == nil {
@@ -178,7 +178,7 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 // If the hasher used is ExpandMsgXOFKMAC128, the hasher is read only.
 //
 // The function returns:
-//  - (false, invalidInputError) if the hasher is nil or its output size is not 128 bytes
+//  - (false, invalidInputsError) if the hasher is nil or its output size is not 128 bytes
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
 func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) (bool, error) {

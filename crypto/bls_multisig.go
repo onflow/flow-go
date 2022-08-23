@@ -45,7 +45,7 @@ var popKMAC = internalExpandMsgXOFKMAC128(blsPOPCipherSuite)
 // and is not used by any other application.
 //
 // The function returns:
-//  - (nil, invalidInputError) if the input key is not of type PrKeyBLSBLS12381
+//  - (nil, invalidInputsError) if the input key is not of type PrKeyBLSBLS12381
 //  - (pop, nil) otherwise
 func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
 	_, ok := sk.(*PrKeyBLSBLS12381)
@@ -61,7 +61,7 @@ func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
 // The function internally uses the same KMAC hasher used to generate the PoP.
 //
 // The function returns:
-//  - (false, invalidInputError) if the input key is not of type PubKeyBLSBLS12381
+//  - (false, invalidInputsError) if the input key is not of type PubKeyBLSBLS12381
 //  - (validity, nil) otherwise
 func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 	_, ok := pk.(*PubKeyBLSBLS12381)
@@ -94,7 +94,7 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 
 	// check for empty list
 	if len(sigs) == 0 {
-		return nil, aggregationEmptyListErrorf("signature list should not be empty")
+		return nil, newAggregationEmptyListError()
 	}
 
 	// flatten the shares (required by the C layer)
@@ -141,7 +141,7 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 
 	// check for empty list
 	if len(keys) == 0 {
-		return nil, aggregationEmptyListErrorf("keys list should not be empty")
+		return nil, newAggregationEmptyListError()
 	}
 
 	scalars := make([]scalar, 0, len(keys))
@@ -176,7 +176,7 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 
 	// check for empty list
 	if len(keys) == 0 {
-		return nil, aggregationEmptyListErrorf("keys list should not be empty")
+		return nil, newAggregationEmptyListError()
 	}
 
 	points := make([]pointG2, 0, len(keys))
@@ -315,7 +315,7 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 	}
 	// check the list lengths
 	if len(pks) == 0 {
-		return false, aggregationEmptyListErrorf("key list is empty")
+		return false, newAggregationEmptyListError()
 	}
 	if len(pks) != len(messages) || len(kmac) != len(messages) {
 		return false, invalidInputsErrorf(
@@ -457,7 +457,7 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 
 	// empty list check
 	if len(pks) == 0 {
-		return []bool{}, aggregationEmptyListErrorf("key list should not be empty")
+		return []bool{}, newAggregationEmptyListError()
 	}
 
 	if len(pks) != len(sigs) {
@@ -527,26 +527,17 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	return verifBool, nil
 }
 
-type aggregationEmptyListError struct {
-	error
+var aggregationEmptyListError = errors.New("empty list")
+
+// newAggregationEmptyListError constructs a new aggregationEmptyListError
+// always embedded in a invalidInputsError (API misuse)
+func newAggregationEmptyListError() error {
+	return invalidInputsErrorf("list to aggregate should not be empty %w", aggregationEmptyListError)
 }
 
-func (e aggregationEmptyListError) Unwrap() error {
-	return e.error
-}
-
-// aggregationEmptyListErrorf constructs a new invalidInputsError (API misuse)
-// for the case of empty lists passed into aggregation functions.
-func aggregationEmptyListErrorf(msg string, args ...interface{}) error {
-	return &aggregationEmptyListError{
-		error: invalidInputsErrorf(msg, args...),
-	}
-}
-
-// IsAggregationEmptyListError checks if the input error is of a aggregationEmptyList error type.
+// IsAggregationEmptyListError checks if the input error is of an aggregationEmptyList error.
 // aggregationEmptyList is a subtype of invalidInputsError, returned when a BLS
 // aggregation function is called with an empty list which is not allowed in some cases.
 func IsAggregationEmptyListError(err error) bool {
-	var target *aggregationEmptyListError
-	return errors.As(err, &target)
+	return errors.Is(err, aggregationEmptyListError)
 }

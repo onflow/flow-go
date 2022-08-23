@@ -19,7 +19,7 @@ import (
 // SPOCKProve generates a spock poof for data under the private key sk.
 //
 // The function returns:
-//  - (nil, invalidInputError) if :
+//  - (nil, invalidInputsError) if :
 //    - the hasher is nil or its output size is not 128 bytes
 //    - input key is not a BLS key
 //  - (nil, error) if an unexpected error occurs
@@ -42,7 +42,7 @@ func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error)
 // and public key.
 //
 // The function returns:
-//  - (false, invalidInputError) if :
+//  - (false, invalidInputsError) if :
 //    - the hasher is nil or its output size is not 128 bytes
 //    - input key is not a BLS key
 //  - (false, error) if an unexpected error occurs
@@ -70,7 +70,7 @@ func SPOCKVerifyAgainstData(pk PublicKey, proof Signature, data []byte, kmac has
 // The proofs membership checks in G1 are included in the verifcation.
 //
 // The function returns:
-//  - (false, invalidInputError) if at least one key is not a BLS key.
+//  - (false, invalidInputsError) if at least one key is not a BLS key.
 //  - (false, error) if an unexpected error occurs.
 //  - (validity, nil) otherwise
 func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signature) (bool, error) {
