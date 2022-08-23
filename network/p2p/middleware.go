@@ -192,8 +192,8 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 
 // isProtocolParticipant returns a PeerFilter that returns true if a peer is a staked node.
 func (m *Middleware) isProtocolParticipant() PeerFilter {
-	return func(peerID peer.ID) error {
-		if _, ok := m.ov.Identity(peerID); !ok {
+	return func(p peer.ID) error {
+		if _, ok := m.ov.Identity(p); !ok {
 			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.Pretty())
 		}
 		return nil

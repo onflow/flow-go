@@ -2,6 +2,7 @@ package p2p_test
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -44,13 +45,17 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	require.NoError(t, err)
 
 	// peer filter used by the topic validator to check if node is staked
-	isStaked := func(pid peer.ID) bool {
+	isStaked := func(pid peer.ID) error {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
-			return false
+			return err
 		}
-		_, ok := ids.ByNodeID(fid)
-		return ok
+
+		if _, ok := ids.ByNodeID(fid); !ok {
+			return fmt.Errorf("id not found")
+		}
+
+		return nil
 	}
 
 	// node1 is connected to node2

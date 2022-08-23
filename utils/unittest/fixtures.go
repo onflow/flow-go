@@ -2086,9 +2086,9 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 	return results
 }
 
-func AllowAllPeerFilter() func(peer.ID) bool {
-	return func(_ peer.ID) bool {
-		return true
+func AllowAllPeerFilter() func(peer.ID) error {
+	return func(_ peer.ID) error {
+		return nil
 	}
 }
 
