@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -43,12 +44,12 @@ func LoggerWithWriterAndLevel(writer io.Writer, level zerolog.Level) zerolog.Log
 
 // go:noinline
 func LoggerForTest(t *testing.T, level zerolog.Level) zerolog.Logger {
-	_, file, _, ok := runtime.Caller(0)
+	_, file, _, ok := runtime.Caller(1)
 	if !ok {
-		file = "unknown"
+		file = "???"
 	}
 	return LoggerWithLevel(level).With().
-		Str("testfile", file).Str("testcase", t.Name()).Logger()
+		Str("testfile", filepath.Base(file)).Str("testcase", t.Name()).Logger()
 }
 
 func LoggerWithLevel(level zerolog.Level) zerolog.Logger {
