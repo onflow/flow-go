@@ -75,27 +75,8 @@ func (i *TransactionInvoker) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-
 		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
-			if processErr != nil {
-				// An error happened while an error was already being handled!
-				// Don't hide the processErr.
-				// But do take the one that is a Failure if one of them is a Failure.
-				var fatal errors.Failure
-				if errors.Is(mergeError, fatal) && !errors.Is(processErr, fatal) {
-					i.logger.Warn().
-						Err(processErr).
-						Msg("Hiding this error because a fatal error occurred during merging state")
-					processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
-				} else {
-					i.logger.
-						Warn().
-						Err(mergeError).
-						Msg("Hiding merging state error because an error occurred during transaction processing")
-				}
-			} else {
-				processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
-			}
+			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
 	}()

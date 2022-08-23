@@ -121,6 +121,15 @@ func (e *ScriptEnv) setExecutionParameters() error {
 
 	meter := e.sth.State().Meter()
 
+	computationWeights, err := GetExecutionEffortWeights(e, service)
+	err = setIfOk(
+		"execution effort weights",
+		err,
+		func() { meter.SetComputationWeights(computationWeights) })
+	if err != nil {
+		return err
+	}
+
 	memoryWeights, err := GetExecutionMemoryWeights(e, service)
 	err = setIfOk(
 		"execution memory weights",
@@ -135,15 +144,6 @@ func (e *ScriptEnv) setExecutionParameters() error {
 		"execution memory limit",
 		err,
 		func() { meter.SetTotalMemoryLimit(memoryLimit) })
-	if err != nil {
-		return err
-	}
-
-	computationWeights, err := GetExecutionEffortWeights(e, service)
-	err = setIfOk(
-		"execution effort weights",
-		err,
-		func() { meter.SetComputationWeights(computationWeights) })
 	if err != nil {
 		return err
 	}
