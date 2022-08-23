@@ -575,6 +575,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	trackerStorage.On("Update", mock.Anything).Return(func(fn exedatatracker.UpdateFn) error {
 		return fn(func(uint64, ...cid.Cid) error { return nil })
 	})
+	trackerStorage.On("SetFulfilledHeight", mock.Anything).Return(nil)
 
 	prov := exedataprovider.NewProvider(
 		zerolog.Nop(),
