@@ -583,6 +583,8 @@ github.com/google/pprof v0.0.0-20210226084205-cbba55b83ad5/go.mod h1:kpwsk12EmLe
 github.com/google/pprof v0.0.0-20210601050228-01bbb1931b22/go.mod h1:kpwsk12EmLew5upagYY7GY0pfYCcupk39gWOCRROcvE=
 github.com/google/pprof v0.0.0-20210609004039-a478d1d731e9/go.mod h1:kpwsk12EmLew5upagYY7GY0pfYCcupk39gWOCRROcvE=
 github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1/go.mod h1:kpwsk12EmLew5upagYY7GY0pfYCcupk39gWOCRROcvE=
+github.com/google/pprof v0.0.0-20220818150347-1763105d910c h1:jk3Bnv5QzOSJil2OC6EQBoqy+lj/Kw56nrkEzvrQm2w=
+github.com/google/pprof v0.0.0-20220818150347-1763105d910c/go.mod h1:dDKJzRmX4S37WGHujM7tX//fmj1uioxKzKxz3lo4HJo=
 github.com/google/renameio v0.1.0/go.mod h1:KWCgfxg9yswjAJkECMjeO8J8rahYeXnNhOm40UhjYkI=
 github.com/google/uuid v1.0.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/google/uuid v1.1.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
@@ -1425,6 +1427,8 @@ github.com/onflow/flow-ft/lib/go/contracts v0.5.0 h1:Cg4gHGVblxcejfNNG5Mfj98Wf4z
 github.com/onflow/flow-ft/lib/go/contracts v0.5.0/go.mod h1:1zoTjp1KzNnOPkyqKmWKerUyf0gciw+e6tAEt0Ks3JE=
 github.com/onflow/flow-ft/lib/go/templates v0.2.0 h1:oQQk5UthLS9KfKLkZVJg/XAVq8CXW7HAxSTu4HwBJkU=
 github.com/onflow/flow-ft/lib/go/templates v0.2.0/go.mod h1:qwkTElMcI+PnSBGIWGu1K9OYBLatNimWTC8un9qUji0=
+github.com/onflow/flow-go v0.26.14-test-synchronization.0.20220823064642-5b5125da2f87 h1:t24Smdo26S9q+lQgaFiFb08kLDPm3ydJ2n7NVmPhyH8=
+github.com/onflow/flow-go v0.26.14-test-synchronization.0.20220823064642-5b5125da2f87/go.mod h1:MbMHJKJdPcvIPpP3l9LutfQutRS+uTEtog6fq/6Lq5o=
 github.com/onflow/flow-go-sdk v0.13.0/go.mod h1:yqnSajzJVFfrTg68F4WXRR1Yzs1akqAjyscEDyFudPE=
 github.com/onflow/flow-go-sdk v0.20.0/go.mod h1:52QZyLwU3p3UZ2FXOy+sRl4JPdtvJoae1spIUBOFxA8=
 github.com/onflow/flow-go-sdk v0.26.5-0.20220629191626-900f9f91bffc h1:7vWFaj4xPbrVdA0jGY4B/PnrD0D469crv7a8Aq79ts0=
