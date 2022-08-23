@@ -562,15 +562,20 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 
 			// Get latest executed block and a view at that block
 			ctx := context.Background()
-			_, blockID, err := executionState.GetHighestExecutedBlockID(ctx)
+			highestExecutedHeight, blockID, err := executionState.GetHighestExecutedBlockID(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("cannot get the latest executed block id: %w", err)
 			}
+
+			node.Logger.Info().Msgf("highest executed block (id: %v, height: %v)", blockID, highestExecutedHeight)
+
 			stateCommit, err := executionState.StateCommitmentByBlockID(ctx, blockID)
 			if err != nil {
 				return nil, fmt.Errorf("cannot get the state comitment at latest executed block id %s: %w", blockID.String(), err)
 			}
 			blockView := executionState.NewView(stateCommit)
+
+			node.Logger.Info().Msgf("highest executed block statecommitment: %x", stateCommit)
 
 			// Get the epoch counter from the smart contract at the last executed block.
 			contractEpochCounter, err := getContractEpochCounter(vm, vmCtx, blockView)
@@ -826,7 +831,7 @@ func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, view *de
 	// execute the script
 	err = vm.Run(vmCtx, script, view, p)
 	if err != nil {
-		return 0, fmt.Errorf("could not read epoch counter, script internal error: %w", script.Err)
+		return 0, fmt.Errorf("could not read epoch counter, script internal error: %w", err)
 	}
 	if script.Err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, script error: %w", script.Err)
