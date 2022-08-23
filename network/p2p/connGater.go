@@ -58,11 +58,18 @@ func NewConnGater(log zerolog.Logger, opts ...ConnGaterOption) *ConnGater {
 
 // InterceptPeerDial - a callback which allows or disallows outbound connection
 func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
+	if len(c.onInterceptPeerDialFilters) == 0 {
+		c.log.Warn().
+			Str("peer_id", p.Pretty()).
+			Msg("allowing outbound connection intercept peer dial has no peer filters set")
+		return true
+	}
+
 	if err := c.peerIDPassesAllFilters(p, c.onInterceptPeerDialFilters); err != nil {
 		// log the filtered outbound connection attempt
 		c.log.Warn().
 			Err(err).
-			Str("node_id", p.Pretty()).
+			Str("peer_id", p.Pretty()).
 			Msg("rejected outbound connection attempt")
 		return false
 	}
@@ -85,11 +92,18 @@ func (c *ConnGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
 func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr network.ConnMultiaddrs) bool {
 	switch dir {
 	case network.DirInbound:
+		if len(c.onInterceptSecuredFilters) == 0 {
+			c.log.Warn().
+				Str("peer_id", p.Pretty()).
+				Msg("allowing inbound connection intercept secured has no peer filters set")
+			return true
+		}
+		
 		if err := c.peerIDPassesAllFilters(p, c.onInterceptSecuredFilters); err != nil {
 			// log the illegal connection attempt from the remote node
 			c.log.Error().
 				Err(err).
-				Str("node_id", p.Pretty()).
+				Str("peer_id", p.Pretty()).
 				Str("local_address", addr.LocalMultiaddr().String()).
 				Str("remote_address", addr.RemoteMultiaddr().String()).
 				Msg("rejected inbound connection")
