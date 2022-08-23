@@ -134,7 +134,8 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 	checkBlocks := runBlocks / 2
 
 	// get the first block height
-	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T())
+	currentFinalized := s.BlockState.HighestFinalizedHeight()
+	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
 	s.T().Logf("got block height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// wait for the requested number of sealed blocks, then pause the network so we can inspect the dbs
