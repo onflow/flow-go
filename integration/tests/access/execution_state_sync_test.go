@@ -44,12 +44,7 @@ type ExecutionStateSyncSuite struct {
 }
 
 func (s *ExecutionStateSyncSuite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "execution_state_sync_test.go").
-		Str("testcase", s.T().Name()).
-		Logger()
-
-	s.log = logger
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 

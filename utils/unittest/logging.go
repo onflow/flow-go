@@ -6,8 +6,10 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -37,6 +39,16 @@ func LoggerWithWriterAndLevel(writer io.Writer, level zerolog.Level) zerolog.Log
 	})
 	log := zerolog.New(writer).Level(level).With().Timestamp().Logger()
 	return log
+}
+
+// go:noinline
+func LoggerForTest(t *testing.T, level zerolog.Level) zerolog.Logger {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		file = "unknown"
+	}
+	return LoggerWithLevel(level).With().
+		Str("testfile", file).Str("testcase", t.Name()).Logger()
 }
 
 func LoggerWithLevel(level zerolog.Level) zerolog.Logger {
