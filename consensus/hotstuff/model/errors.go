@@ -225,6 +225,11 @@ func (e ByzantineThresholdExceededError) Error() string {
 	return e.Evidence
 }
 
+func IsByzantineThresholdExceededError(err error) bool {
+	var target ByzantineThresholdExceededError
+	return errors.As(err, &target)
+}
+
 // DoubleVoteError indicates that a consensus replica has voted for two different
 // blocks, or has provided two semantically different votes for the same block.
 type DoubleVoteError struct {
