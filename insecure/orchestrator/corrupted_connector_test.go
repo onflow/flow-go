@@ -1,4 +1,4 @@
-package attacknetwork
+package orchestrator
 
 import (
 	"context"
@@ -52,7 +52,7 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 			// are filled by gRPC on the fly, which are not relevant to the test's sanity.
 			require.Equal(t, receivedMsg.Egress.Payload, msg.Egress.Payload)
 			require.Equal(t, receivedMsg.Egress.Protocol, msg.Egress.Protocol)
-			require.Equal(t, receivedMsg.Egress.OriginID, msg.Egress.OriginID)
+			require.Equal(t, receivedMsg.Egress.CorruptOriginID, msg.Egress.CorruptOriginID)
 			require.Equal(t, receivedMsg.Egress.TargetNum, msg.Egress.TargetNum)
 			require.Equal(t, receivedMsg.Egress.TargetIDs, msg.Egress.TargetIDs)
 			require.Equal(t, receivedMsg.Egress.ChannelID, msg.Egress.ChannelID)
@@ -101,7 +101,7 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 				// are filled by gRPC on the fly, which are not relevant to the test's sanity.
 				require.Equal(t, receivedMsg.Egress.Payload, msg.Egress.Payload)
 				require.Equal(t, receivedMsg.Egress.Protocol, msg.Egress.Protocol)
-				require.Equal(t, receivedMsg.Egress.OriginID, msg.Egress.OriginID)
+				require.Equal(t, receivedMsg.Egress.CorruptOriginID, msg.Egress.CorruptOriginID)
 				require.Equal(t, receivedMsg.Egress.TargetNum, msg.Egress.TargetNum)
 				require.Equal(t, receivedMsg.Egress.TargetIDs, msg.Egress.TargetIDs)
 				require.Equal(t, receivedMsg.Egress.ChannelID, msg.Egress.ChannelID)
@@ -156,7 +156,7 @@ func withMockCorruptibleConduitFactory(t *testing.T, run func(flow.Identity, irr
 
 	run(*corruptedIdentity, ccfCtx, ccf)
 
-	// terminates attackNetwork
+	// terminates orchestratorNetwork
 	cancel()
 	unittest.RequireCloseBefore(t, ccf.Done(), 1*time.Second, "could not stop corruptible conduit on time")
 }

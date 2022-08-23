@@ -24,10 +24,12 @@ const (
 // dummyOrchestrator represents a simple orchestrator that passes through all incoming events.
 type dummyOrchestrator struct {
 	sync.Mutex
-	logger        zerolog.Logger
-	attackNetwork insecure.AttackNetwork
-	eventTracker  map[string]flow.IdentifierList
+	logger              zerolog.Logger
+	orchestratorNetwork insecure.OrchestratorNetwork
+	eventTracker        map[string]flow.IdentifierList
 }
+
+var _ insecure.AttackOrchestrator = &dummyOrchestrator{}
 
 func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 	return &dummyOrchestrator{
@@ -41,7 +43,7 @@ func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 	}
 }
 
-// HandleEventFromCorruptedNode implements logic of processing the events received from a corrupted node.
+// HandleEgressEvent implements logic of processing the outgoing (egress) events received from a corrupted node.
 //
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 // the attacker instead of dispatching them to the network.
@@ -49,9 +51,9 @@ func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 // In this dummy orchestrator, the incoming event is passed through without any changes.
 // Passing through means that the orchestrator returns the events as they are to the original corrupted nodes so they
 // dispatch them on the Flow network.
-func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent) error {
+func (d *dummyOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 	lg := d.logger.With().
-		Hex("corrupted_id", logging.ID(event.CorruptedNodeId)).
+		Hex("corrupt_origin_id", logging.ID(event.CorruptOriginId)).
 		Str("channel", event.Channel.String()).
 		Str("protocol", event.Protocol.String()).
 		Uint32("target_num", event.TargetNum).
@@ -69,18 +71,37 @@ func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressE
 		d.eventTracker[typeResultApproval] = append(d.eventTracker[typeResultApproval], e.ID())
 	}
 
-	err := d.attackNetwork.Send(event)
+	err := d.orchestratorNetwork.SendEgress(event)
 	if err != nil {
-		// dummy orchestrator is used for testing and upon error we want it to crash.
-		lg.Fatal().Err(err).Msg("could not pass through incoming event")
+		// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
+		lg.Fatal().Err(err).Msg("could not pass through egress event")
 		return err
 	}
-	lg.Info().Msg("incoming event passed through successfully")
+	lg.Info().Msg("egress event passed through successfully")
 	return nil
 }
 
-func (d *dummyOrchestrator) WithAttackNetwork(attackNetwork insecure.AttackNetwork) {
-	d.attackNetwork = attackNetwork
+// HandleIngressEvent implements logic of processing the incoming (ingress) events to a corrupt node.
+func (d *dummyOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
+	lg := d.logger.With().
+		Hex("origin_id", logging.ID(event.OriginID)).
+		Str("channel", event.Channel.String()).
+		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
+		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
+
+	err := d.orchestratorNetwork.SendIngress(event)
+
+	if err != nil {
+		// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
+		lg.Fatal().Err(err).Msg("could not pass through ingress event")
+		return err
+	}
+	lg.Info().Msg("ingress event passed through successfully")
+	return nil
+}
+
+func (d *dummyOrchestrator) Register(orchestratorNetwork insecure.OrchestratorNetwork) {
+	d.orchestratorNetwork = orchestratorNetwork
 }
 
 // mustSeenFlowProtocolEvent checks the dummy orchestrator has passed through the flow protocol events with given ids. It fails

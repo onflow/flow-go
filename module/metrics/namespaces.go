@@ -83,6 +83,7 @@ const (
 	subsystemExeDataProvider        = "provider"
 	subsystemExeDataPruner          = "pruner"
 	subsystemExecutionDataRequester = "execution_data_requester"
+	subsystemExeDataBlobstore       = "blobstore"
 )
 
 // module/synchronization core

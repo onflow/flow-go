@@ -5,7 +5,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// CorruptedNodeConnection abstracts connection from orchestrator to a corrupted conduit factory through the attack network.
+// CorruptedNodeConnection abstracts connection from orchestrator to a corrupted conduit factory through the orchestrator network.
 type CorruptedNodeConnection interface {
 	// SendMessage sends the message from orchestrator to the corrupted conduit factory.
 	SendMessage(*Message) error

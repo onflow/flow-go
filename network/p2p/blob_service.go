@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-bitswap"
 	bsnet "github.com/ipfs/go-bitswap/network"
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -17,11 +18,13 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/rs/zerolog"
+	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -61,6 +64,17 @@ func WithBitswapOptions(opts ...bitswap.Option) network.BlobServiceOption {
 func WithHashOnRead(enabled bool) network.BlobServiceOption {
 	return func(bs network.BlobService) {
 		bs.(*blobService).blockStore.HashOnRead(enabled)
+	}
+}
+
+// WithRateLimit sets a rate limit on reads from the underlying datastore that allows up
+// to r bytes per second and permits bursts of at most b bytes. Note that b should be
+// set to at least the max blob size, otherwise blobs larger than b cannot be read from
+// the blobstore.
+func WithRateLimit(r float64, b int) network.BlobServiceOption {
+	return func(bs network.BlobService) {
+		blobService := bs.(*blobService)
+		blobService.blockStore = newRateLimitedBlockStore(blobService.blockStore, r, b)
 	}
 }
 
@@ -191,4 +205,34 @@ func (s *blobServiceSession) GetBlob(ctx context.Context, c cid.Cid) (blobs.Blob
 
 func (s *blobServiceSession) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan blobs.Blob {
 	return s.session.GetBlocks(ctx, ks)
+}
+
+type rateLimitedBlockStore struct {
+	blockstore.Blockstore
+	limiter *rate.Limiter
+	metrics module.RateLimitedBlockstoreMetrics
+}
+
+func newRateLimitedBlockStore(bs blockstore.Blockstore, r float64, b int) *rateLimitedBlockStore {
+	return &rateLimitedBlockStore{
+		Blockstore: bs,
+		limiter:    rate.NewLimiter(rate.Limit(r), b),
+		metrics:    metrics.NewRateLimitedBlockstoreCollector(),
+	}
+}
+
+func (r *rateLimitedBlockStore) Get(ctx context.Context, c cid.Cid) (blocks.Block, error) {
+	size, err := r.Blockstore.GetSize(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.limiter.WaitN(ctx, size)
+	if err != nil {
+		return nil, err
+	}
+
+	r.metrics.BytesRead(size)
+
+	return r.Blockstore.Get(ctx, c)
 }

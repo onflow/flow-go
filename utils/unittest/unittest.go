@@ -394,19 +394,34 @@ func NetworkTopology() network.Topology {
 
 // CrashTest safely tests functions that crash (as the expected behavior) by checking that running the function creates an error and
 // an expected error message.
-func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string, testName string) {
+func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string) {
+	CrashTestWithExpectedStatus(t, scenario, expectedErrorMsg, 1)
+}
+
+// CrashTestWithExpectedStatus checks for the test crashing with a specific exit code.
+func CrashTestWithExpectedStatus(
+	t *testing.T,
+	scenario func(*testing.T),
+	expectedErrorMsg string,
+	expectedStatus ...int,
+) {
+	require.NotNil(t, scenario)
+	require.NotEmpty(t, expectedStatus)
+
 	if os.Getenv("CRASH_TEST") == "1" {
 		scenario(t)
 		return
 	}
 
-	cmd := exec.Command(os.Args[0], "-test.run="+testName)
+	cmd := exec.Command(os.Args[0], "-test.run="+t.Name())
 	cmd.Env = append(os.Environ(), "CRASH_TEST=1")
 
 	outBytes, err := cmd.Output()
 	// expect error from run
 	require.Error(t, err)
-	require.Contains(t, "exit status 1", err.Error())
+
+	// expect specific status codes
+	require.Contains(t, expectedStatus, cmd.ProcessState.ExitCode())
 
 	// expect logger.Fatal() message to be pushed to stdout
 	outStr := string(outBytes)
