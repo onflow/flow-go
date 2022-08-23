@@ -51,20 +51,23 @@ func DefaultLibP2PNodeFactory(
 		connManager := NewConnManager(log, metrics)
 
 		// drop incoming connections from unknown peers
-		peerFilter := func(pid peer.ID) bool {
-			_, found := idProvider.ByPeerID(pid)
-			return found
+		peerFilter := func(pid peer.ID) error {
+			if _, found := idProvider.ByPeerID(pid); !found {
+				return fmt.Errorf("failed to get identity of unknown peer with ID: %s", pid.Pretty())
+			}
+			return nil
 		}
 		// drop incoming connections from unknown and ejected peers
-		isEjectedPeerFilter := func(pid peer.ID) bool {
+		isEjectedPeerFilter := func(pid peer.ID) error {
 			id, found := idProvider.ByPeerID(pid)
 			if !found {
-				return false
+				return fmt.Errorf("failed to get identity of unknown peer with ID: %s", pid.Pretty())
 			}
 			if id.Ejected {
-				return false
+				return fmt.Errorf("peer is ejected: %s", id.NodeID)
 			}
-			return true
+
+			return nil
 		}
 
 		connGater := NewConnGater(log,
