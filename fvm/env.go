@@ -70,6 +70,7 @@ type commonEnv struct {
 	*environment.Tracer
 	environment.Meter
 	*environment.ProgramLogger
+	*environment.UUIDGenerator
 	*environment.UnsafeRandomGenerator
 
 	// TODO(patrick): rm
@@ -77,13 +78,12 @@ type commonEnv struct {
 
 	AccountInterface
 
-	sth           *state.StateHolder
-	vm            *VirtualMachine
-	programs      *handler.ProgramsHandler
-	accounts      state.Accounts
-	accountKeys   *handler.AccountKeyHandler
-	contracts     *handler.ContractHandler
-	uuidGenerator *state.UUIDGenerator
+	sth         *state.StateHolder
+	vm          *VirtualMachine
+	programs    *handler.ProgramsHandler
+	accounts    state.Accounts
+	accountKeys *handler.AccountKeyHandler
+	contracts   *handler.ContractHandler
 
 	frozenAccounts []common.Address
 
@@ -97,25 +97,6 @@ func (env *commonEnv) Context() *Context {
 
 func (env *commonEnv) VM() *VirtualMachine {
 	return env.vm
-}
-
-func (env *commonEnv) GenerateUUID() (uint64, error) {
-	defer env.StartExtensiveTracingSpanFromRoot(trace.FVMEnvGenerateUUID).End()
-
-	if env.uuidGenerator == nil {
-		return 0, errors.NewOperationNotSupportedError("GenerateUUID")
-	}
-
-	err := env.MeterComputation(meter.ComputationKindGenerateUUID, 1)
-	if err != nil {
-		return 0, fmt.Errorf("generate uuid failed: %w", err)
-	}
-
-	uuid, err := env.uuidGenerator.GenerateUUID()
-	if err != nil {
-		return 0, fmt.Errorf("generate uuid failed: %w", err)
-	}
-	return uuid, err
 }
 
 // GetCurrentBlockHeight returns the current block height.
