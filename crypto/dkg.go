@@ -85,7 +85,7 @@ type index byte
 
 // newDKGCommon initializes the common structure of DKG protocols
 func newDKGCommon(size int, threshold int, myIndex int,
-	processor DKGProcessor, leaderIndex int) (*dkgCommon, error) {
+	processor DKGProcessor, dealerIndex int) (*dkgCommon, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
 		return nil, invalidInputsErrorf(
 			"size should be between %d and %d",
@@ -93,9 +93,9 @@ func newDKGCommon(size int, threshold int, myIndex int,
 			DKGMaxSize)
 	}
 
-	if myIndex >= size || leaderIndex >= size || myIndex < 0 || leaderIndex < 0 {
+	if myIndex >= size || dealerIndex >= size || myIndex < 0 || dealerIndex < 0 {
 		return nil, invalidInputsErrorf(
-			"indices of current and leader nodes must be between 0 and %d, got %d",
+			"indices of current and dealer nodes must be between 0 and %d, got %d",
 			size-1,
 			myIndex)
 	}

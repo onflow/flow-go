@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/meter"
 	programsStorage "github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -112,16 +111,13 @@ func Test_Programs(t *testing.T) {
 		return nil, nil
 	})
 
-	sth := state.NewStateHolder(state.NewState(
-		mainView,
-		meter.NewMeter(meter.DefaultParameters()),
-		state.DefaultParameters()))
+	stTxn := state.NewStateTransaction(mainView, state.DefaultParameters())
 
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)
 	programs := programsStorage.NewEmptyPrograms()
 
-	accounts := state.NewAccounts(sth)
+	accounts := state.NewAccounts(stTxn)
 
 	err := accounts.Create(nil, addressA)
 	require.NoError(t, err)

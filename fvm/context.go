@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -14,7 +15,7 @@ import (
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
 	Chain   flow.Chain
-	Blocks  Blocks
+	Blocks  environment.Blocks
 	Metrics handler.MetricsReporter
 	Tracer  module.Tracer
 	// AllowContextOverrideByExecutionState is a flag telling the fvm to override certain parts of the context from the state
@@ -209,7 +210,7 @@ func WithExtensiveTracing() Option {
 //
 // The VM uses the block storage provider to provide historical block information to
 // the Cadence runtime.
-func WithBlocks(blocks Blocks) Option {
+func WithBlocks(blocks environment.Blocks) Option {
 	return func(ctx Context) Context {
 		ctx.Blocks = blocks
 		return ctx

@@ -77,13 +77,11 @@ func (suite *ConsensusFollowerSuite) TestReceiveBlocks() {
 		var err error
 		receiveBlocks := func() {
 			for i := 0; i < blockCount; i++ {
-				select {
-				case blockID := <-suite.followerMgr1.blockIDChan:
-					receivedBlocks[blockID] = struct{}{}
-					_, err = suite.followerMgr1.getBlock(blockID)
-					if err != nil {
-						return
-					}
+				blockID := <-suite.followerMgr1.blockIDChan
+				receivedBlocks[blockID] = struct{}{}
+				_, err = suite.followerMgr1.getBlock(blockID)
+				if err != nil {
+					return
 				}
 			}
 		}

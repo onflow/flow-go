@@ -19,10 +19,11 @@ const (
 // Network subsystems represent the various layers of networking.
 const (
 	// subsystemLibp2p = "libp2p"
-	subsystemGossip = "gossip"
-	subsystemEngine = "engine"
-	subsystemQueue  = "queue"
-	subsystemDHT    = "dht"
+	subsystemGossip  = "gossip"
+	subsystemEngine  = "engine"
+	subsystemQueue   = "queue"
+	subsystemDHT     = "dht"
+	subsystemBitswap = "bitswap"
 )
 
 // Storage subsystems represent the various components of the storage layer.
@@ -82,6 +83,7 @@ const (
 	subsystemExeDataProvider        = "provider"
 	subsystemExeDataPruner          = "pruner"
 	subsystemExecutionDataRequester = "execution_data_requester"
+	subsystemExeDataBlobstore       = "blobstore"
 )
 
 // module/synchronization core

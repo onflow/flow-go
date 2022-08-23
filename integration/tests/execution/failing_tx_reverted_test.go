@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
-	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/integration/tests/lib"
 )
@@ -26,7 +27,8 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	serviceAddress := chain.ServiceAddress()
 
 	// wait for next height finalized (potentially first height), called blockA
-	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T())
+	currentFinalized := s.BlockState.HighestFinalizedHeight()
+	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
 	s.T().Logf("got blockA height %v ID %v\n", blockA.Header.Height, blockA.Header.ID())
 
 	// send transaction
@@ -59,11 +61,13 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	)
 	tx.PayloadSignatures = nil
 	tx.EnvelopeSignatures = nil
+
+	currentProposed := s.BlockState.HighestProposedHeight()
 	err = s.AccessClient().SendTransaction(context.Background(), &tx)
 	require.NoError(s.T(), err, "could not send tx to create counter with wrong sig")
 
 	// wait until the next proposed block is finalized, called blockC
-	blockC := s.BlockState.WaitUntilNextHeightFinalized(s.T())
+	blockC := s.BlockState.WaitUntilNextHeightFinalized(s.T(), currentProposed)
 	s.T().Logf("got blockC height %v ID %v\n", blockC.Header.Height, blockC.Header.ID())
 
 	// wait for execution receipt for blockC from execution node 1

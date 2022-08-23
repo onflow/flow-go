@@ -146,7 +146,6 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 		previousSporkId,
 		"test_one_to_k_crosstalk_prevention",
 	)
-
 	defer stopNode(t, node1)
 
 	// create and start node 2 on localhost and random port with the same root block ID
@@ -155,9 +154,9 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 		previousSporkId,
 		"test_one_to_k_crosstalk_prevention",
 	)
+	defer stopNode(t, node2)
 
 	pInfo2, err := p2p.PeerAddressInfo(id2)
-	defer stopNode(t, node2)
 	require.NoError(t, err)
 
 	// spork topic is derived by suffixing the channel with the root block ID

@@ -79,6 +79,7 @@ func (i *TransactionInvoker) Process(
 	}()
 
 	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+
 	predeclaredValues := valueDeclarations(env)
 
 	location := common.TransactionLocation(proc.ID)
@@ -159,6 +160,7 @@ func (i *TransactionInvoker) Process(
 			Uint64("blockHeight", blockHeight).
 			Msg("transaction executed with error")
 
+		// TODO(patrick): make env reusable on error
 		// reset env
 		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
@@ -180,7 +182,7 @@ func (i *TransactionInvoker) Process(
 				Uint64("blockHeight", blockHeight).
 				Msg("transaction fee deduction executed with error")
 
-			return feesError
+			txError = feesError
 		}
 	}
 
@@ -304,7 +306,7 @@ func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txH
 			Str("txHash", txHash).
 			Uint64("ledgerInteractionUsed", sth.InteractionUsed()).
 			Uint("computationUsed", sth.TotalComputationUsed()).
-			Uint("memoryEstimate", sth.TotalMemoryEstimate()).
+			Uint64("memoryEstimate", sth.TotalMemoryEstimate()).
 			Dict("computationIntensities", computation).
 			Dict("memoryIntensities", memory).
 			Msg("transaction execution data")
