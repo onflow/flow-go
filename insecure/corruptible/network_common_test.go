@@ -43,7 +43,7 @@ func TestProcessAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 	f := func(t *testing.T) {
 		processAttackerMessage_EmptyEgressIngressMessage_Exit(t)
 	}
-	unittest.CrashTest(t, f, "both ingress and egress messages can't be nil", "TestProcessAttackerMessage_EmptyEgressIngressMessage_Exit")
+	unittest.CrashTest(t, f, "both ingress and egress messages can't be nil")
 }
 
 func processAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
@@ -84,7 +84,7 @@ func TestProcessAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) 
 	f := func(t *testing.T) {
 		processAttackerMessage_NotEmptyEgressIngressMessage_Exit(t)
 	}
-	unittest.CrashTest(t, f, "both ingress and egress messages can't be set", "TestProcessAttackerMessage_NotEmptyEgressIngressMessage_Exit")
+	unittest.CrashTest(t, f, "both ingress and egress messages can't be set")
 }
 
 func processAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {

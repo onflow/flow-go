@@ -2,7 +2,9 @@
 # for why we need to explicitly list all statuses
 
 status = [
-  "Lint",
+  "Lint (./)",
+  "Lint (./integration/)",
+  "Lint (./crypto/)",
   "Unit Tests",
   "Integration Tests (integration-mvp)",
   "Integration Tests (integration-ghost)",
