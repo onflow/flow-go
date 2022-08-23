@@ -1,36 +1,9 @@
 package forest
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 )
-
-// InvalidVertexError indicates that a proposed vertex is invalid for insertion to the forest.
-type InvalidVertexError struct {
-	// Vertex is the invalid vertex
-	Vertex Vertex
-	// msg provides additional context
-	msg string
-}
-
-func (err InvalidVertexError) Error() string {
-	return fmt.Sprintf("invalid vertex %s: %s", VertexToString(err.Vertex), err.msg)
-}
-
-func IsInvalidVertexError(err error) bool {
-	var target InvalidVertexError
-	return errors.As(err, &target)
-}
-
-func NewInvalidVertexErrorf(vertex Vertex, msg string, args ...interface{}) InvalidVertexError {
-	return InvalidVertexError{
-		Vertex: vertex,
-		msg:    fmt.Sprintf(msg, args...),
-	}
-}
 
 // LevelledForest contains multiple trees (which is a potentially disconnected planar graph).
 // Each vertex in the graph has a level and a hash. A vertex can only have one parent, which
@@ -159,7 +132,7 @@ func (f *LevelledForest) GetSize() uint64 {
 }
 
 // GetChildren returns a VertexIterator to iterate over the children
-// An empty VertexIterator is returned, if no vertices are known whose parent is `id` , `level`
+// An empty VertexIterator is returned, if no vertices are known whose parent is `id`.
 func (f *LevelledForest) GetChildren(id flow.Identifier) VertexIterator {
 	container := f.vertices[id]
 	// if vertex does not exist, container is the default zero value for vertexContainer, which contains a nil-slice for its children
@@ -288,7 +261,7 @@ func (f *LevelledForest) VerifyVertex(v Vertex) error {
 		return f.ensureConsistentParent(v)
 	}
 
-	// Found a vertex container, i.e. `v` already exists or it is referenced by some other vertex.
+	// Found a vertex container, i.e. `v` already exists, or it is referenced by some other vertex.
 	// In all cases, `v.Level()` should match the vertexContainer's information
 	if v.Level() != storedContainer.level {
 		return NewInvalidVertexErrorf(v, "level conflicts with stored vertex with same id (%d!=%d)", v.Level(), storedContainer.level)
