@@ -65,7 +65,7 @@ install-mock-generators:
 
 .PHONY: install-tools
 install-tools: crypto_setup_tests crypto_setup_gopath check-go-version install-mock-generators
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.46.2; \
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.47.3; \
 	cd ${GOPATH}; \
 	go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
@@ -83,7 +83,7 @@ emulator-build:
 	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
 
 .PHONY: test
-test: generate-mocks emulator-build unittest
+test: verfiy-mocks emulator-build unittest
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -115,6 +115,10 @@ generate: generate-proto generate-mocks
 .PHONY: generate-proto
 generate-proto:
 	prototool generate protobuf
+
+.PHONY: verfiy-mocks
+verfiy-mocks: generate-mocks
+	git diff --exit-code
 
 .PHONY: generate-mocks
 generate-mocks:
