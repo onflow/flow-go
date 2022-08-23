@@ -34,7 +34,7 @@ type Suite struct {
 	verID                   flow.Identifier      // corrupted verification node
 	PreferredUnicasts       string               // preferred unicast protocols between execution and verification nodes.
 	Orchestrator            *dummyOrchestrator
-	orchestratorNetwork     *orchestrator.OrchestratorNetwork
+	orchestratorNetwork     *orchestrator.Network
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.

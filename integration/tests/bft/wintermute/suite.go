@@ -42,7 +42,7 @@ type Suite struct {
 
 	PreferredUnicasts   string // preferred unicast protocols between execution and verification nodes.
 	Orchestrator        *wintermute.Orchestrator
-	orchestratorNetwork *orchestrator.OrchestratorNetwork
+	orchestratorNetwork *orchestrator.Network
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.

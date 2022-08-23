@@ -16,8 +16,8 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// OrchestratorNetwork implements a middleware for mounting an attack orchestrator and empowering it to communicate with the corrupt nodes.
-type OrchestratorNetwork struct {
+// Network implements a middleware for mounting an attack orchestrator and empowering it to communicate with the corrupt nodes.
+type Network struct {
 	component.Component
 	cm                 *component.ComponentManager
 	orchestratorMutex  sync.Mutex // to ensure thread-safe calls into orchestrator.
@@ -29,16 +29,16 @@ type OrchestratorNetwork struct {
 	corruptConnector   insecure.CorruptedNodeConnector                      // connection generator to corrupt nodes.
 }
 
-var _ insecure.OrchestratorNetwork = &OrchestratorNetwork{}
+var _ insecure.OrchestratorNetwork = &Network{}
 
 func NewOrchestratorNetwork(
 	logger zerolog.Logger,
 	codec network.Codec,
 	orchestrator insecure.AttackOrchestrator,
 	connector insecure.CorruptedNodeConnector,
-	corruptNodeIds flow.IdentityList) (*OrchestratorNetwork, error) {
+	corruptNodeIds flow.IdentityList) (*Network, error) {
 
-	orchestratorNetwork := &OrchestratorNetwork{
+	orchestratorNetwork := &Network{
 		orchestrator:       orchestrator,
 		logger:             logger,
 		codec:              codec,
@@ -74,7 +74,7 @@ func NewOrchestratorNetwork(
 }
 
 // start triggers the sub-modules of orchestrator network.
-func (on *OrchestratorNetwork) start(ctx irrecoverable.SignalerContext) error {
+func (on *Network) start(ctx irrecoverable.SignalerContext) error {
 	// creates a connection to all corrupt nodes in the orchestrator network.
 	for _, corruptNodeId := range on.corruptNodeIds {
 		connection, err := on.corruptConnector.Connect(ctx, corruptNodeId.NodeID)
@@ -92,7 +92,7 @@ func (on *OrchestratorNetwork) start(ctx irrecoverable.SignalerContext) error {
 }
 
 // stop conducts the termination logic of the sub-modules of orchestrator network.
-func (on *OrchestratorNetwork) stop() error {
+func (on *Network) stop() error {
 	// tears down connections to corrupt nodes.
 	var errors *multierror.Error
 	for _, connection := range on.corruptConnections {
@@ -109,7 +109,7 @@ func (on *OrchestratorNetwork) stop() error {
 // Observe is the inbound message handler of the orchestrator network.
 // Instead of dispatching their messages to the networking layer of Flow, the conduits of corrupt nodes
 // dispatch the outgoing messages to the orchestrator network by calling the InboundHandler method of it remotely.
-func (on *OrchestratorNetwork) Observe(message *insecure.Message) {
+func (on *Network) Observe(message *insecure.Message) {
 	if err := on.processEgressMessage(message); err != nil {
 		on.logger.Fatal().Err(err).Msg("could not process message of corrupt node")
 	}
@@ -117,7 +117,7 @@ func (on *OrchestratorNetwork) Observe(message *insecure.Message) {
 
 // processEgressMessage processes incoming messages arrived from corrupt conduits by passing them
 // to the orchestrator.
-func (on *OrchestratorNetwork) processEgressMessage(message *insecure.Message) error {
+func (on *Network) processEgressMessage(message *insecure.Message) error {
 	event, err := on.codec.Decode(message.Egress.Payload)
 	if err != nil {
 		return fmt.Errorf("could not decode observed payload: %w", err)
@@ -154,7 +154,7 @@ func (on *OrchestratorNetwork) processEgressMessage(message *insecure.Message) e
 
 // SendEgress enforces dissemination of given event via its encapsulated corrupt node networking layer through the Flow network.
 // An orchestrator decides when to send an egress message on behalf of a corrupt node.
-func (on *OrchestratorNetwork) SendEgress(event *insecure.EgressEvent) error {
+func (on *Network) SendEgress(event *insecure.EgressEvent) error {
 	msg, err := on.eventToEgressMessage(event.CorruptOriginId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
 	if err != nil {
 		return fmt.Errorf("could not convert egress event to egress message: %w", err)
@@ -171,7 +171,7 @@ func (on *OrchestratorNetwork) SendEgress(event *insecure.EgressEvent) error {
 // SendIngress sends an incoming message from the flow network (from another node that could be or honest or corrupt)
 // to the corrupt node. This message was intercepted by the orchestrator network and relayed to the orchestrator before being sent
 // to the corrupt node.
-func (on *OrchestratorNetwork) SendIngress(event *insecure.IngressEvent) error {
+func (on *Network) SendIngress(event *insecure.IngressEvent) error {
 	msg, err := on.eventToIngressMessage(event.OriginID, event.FlowProtocolEvent, event.Channel, event.CorruptTargetID)
 	if err != nil {
 		return fmt.Errorf("could not convert ingress event to ingress message: %w", err)
@@ -185,7 +185,7 @@ func (on *OrchestratorNetwork) SendIngress(event *insecure.IngressEvent) error {
 }
 
 // sendMessage is a helper function for sending both ingress and egress messages.
-func (on *OrchestratorNetwork) sendMessage(msg *insecure.Message, corruptNodeId flow.Identifier) error {
+func (on *Network) sendMessage(msg *insecure.Message, corruptNodeId flow.Identifier) error {
 	connection, ok := on.corruptConnections[corruptNodeId]
 	if !ok {
 		return fmt.Errorf("no connection available for corrupt conduit factory to node %x: ", corruptNodeId)
@@ -200,7 +200,7 @@ func (on *OrchestratorNetwork) sendMessage(msg *insecure.Message, corruptNodeId 
 }
 
 // eventToEgressMessage converts the given application layer event to a protobuf message that is meant to be sent FROM the corrupt node.
-func (on *OrchestratorNetwork) eventToEgressMessage(corruptId flow.Identifier,
+func (on *Network) eventToEgressMessage(corruptId flow.Identifier,
 	event interface{},
 	channel channels.Channel,
 	protocol insecure.Protocol,
@@ -227,7 +227,7 @@ func (on *OrchestratorNetwork) eventToEgressMessage(corruptId flow.Identifier,
 }
 
 // eventToIngressMessage converts the given application layer event to a protobuf message that is meant to be sent TO the corrupt node.
-func (on *OrchestratorNetwork) eventToIngressMessage(originId flow.Identifier,
+func (on *Network) eventToIngressMessage(originId flow.Identifier,
 	event interface{},
 	channel channels.Channel,
 	targetId flow.Identifier) (*insecure.Message, error) {
