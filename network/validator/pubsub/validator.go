@@ -64,7 +64,7 @@ type ValidatorData struct {
 	From              peer.ID
 }
 
-func TopicValidator(log zerolog.Logger, codec network.Codec, peerFilter func(peer.ID) bool, validators ...MessageValidator) pubsub.ValidatorEx {
+func TopicValidator(log zerolog.Logger, codec network.Codec, peerFilter func(id peer.ID) error, validators ...MessageValidator) pubsub.ValidatorEx {
 	log = log.With().
 		Str("component", "libp2p_node_topic_validator").
 		Logger()
@@ -84,8 +84,9 @@ func TopicValidator(log zerolog.Logger, codec network.Codec, peerFilter func(pee
 			return pubsub.ValidationReject
 		}
 
-		if !peerFilter(from) {
+		if err := peerFilter(from); err != nil {
 			log.Warn().
+				Err(err).
 				Str("peer_id", from.String()).
 				Hex("sender", msg.OriginID).
 				Msg("filtering message from un-allowed peer")

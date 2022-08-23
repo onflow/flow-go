@@ -9,7 +9,6 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/libp2p/go-libp2p-core/transport"
 	discovery "github.com/libp2p/go-libp2p-discovery"
@@ -34,22 +33,6 @@ import (
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func(context.Context) (*Node, error)
 
-// defaultConnGaterPeerFilter returns a PeerFilter that drops incoming connections from unknown and ejected peers
-func defaultConnGaterPeerFilter(idProvider id.IdentityProvider) PeerFilter {
-	return func(p peer.ID) error {
-		id, found := idProvider.ByPeerID(p)
-		if !found {
-			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.Pretty())
-		}
-
-		if id.Ejected {
-			return fmt.Errorf("peer with node ID %s is ejected", id.NodeID)
-		}
-
-		return nil
-	}
-}
-
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
 func DefaultLibP2PNodeFactory(
@@ -67,7 +50,7 @@ func DefaultLibP2PNodeFactory(
 		connManager := NewConnManager(log, metrics)
 
 		// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
-		peerFilter := defaultConnGaterPeerFilter(idProvider)
+		peerFilter := notEjectedPeerFilter(idProvider)
 		connGater := NewConnGater(log,
 			WithOnInterceptPeerDialFilters([]PeerFilter{peerFilter}),
 			WithOnInterceptSecuredFilters([]PeerFilter{peerFilter}),

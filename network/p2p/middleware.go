@@ -60,16 +60,7 @@ const (
 
 var (
 	_ network.Middleware = (*Middleware)(nil)
-
-	// allowAll is a peerFilterFunc that will always return true for all peer ids.
-	// This filter is used to allow communication by all roles on public network channels.
-	allowAll = func(_ peer.ID) bool { return true }
 )
-
-// peerFilterFunc is a func type that will be used in the TopicValidator to filter
-// peers by ID and drop messages from unwanted peers before message payload decoding
-// happens.
-type peerFilterFunc func(id peer.ID) bool
 
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
@@ -194,12 +185,13 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 
 // isStakedPeerFilter returns a peerFilterFunc that uses m.ov.Identity to get the identity
 // for a peer ID. If a identity is not found the peer is unstaked.
-func (m *Middleware) isStakedPeerFilter() peerFilterFunc {
-	f := func(id peer.ID) bool {
-		_, ok := m.ov.Identity(id)
-		return ok
+func (m *Middleware) isStakedPeerFilter() PeerFilter {
+	f := func(p peer.ID) error {
+		if _, ok := m.ov.Identity(p); !ok {
+			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.Pretty())
+		}
+		return nil
 	}
-
 	return f
 }
 
@@ -545,12 +537,12 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 
 	topic := channels.TopicFromChannel(channel, m.rootBlockID)
 
-	var peerFilter peerFilterFunc
+	var peerFilter PeerFilter
 	var validators []psValidator.MessageValidator
 	if channels.PublicChannels().Contains(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
 		// return true for every node.
-		peerFilter = allowAll
+		peerFilter = allowAllPeerFilter()
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
