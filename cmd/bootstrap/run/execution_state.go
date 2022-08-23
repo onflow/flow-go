@@ -33,7 +33,7 @@ func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, erro
 }
 
 // NOTE: this is now unused and should become part of another tool.
-func GenerateExecutionState(
+func GenerateExecutionStateasdfasdf(
 	dbDir string,
 	accountKey flow.AccountPublicKey,
 	chain flow.Chain,

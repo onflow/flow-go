@@ -616,7 +616,7 @@ func generateEmptyExecutionState(
 		DKGPubKeys:                   dkgData.PubKeyShares,
 	}
 
-	commit, err = run.GenerateExecutionState(
+	commit, err = run.GenerateExecutionStateasdfasdf(
 		filepath.Join(flagOutdir, model.DirnameExecutionState),
 		serviceAccountPublicKey,
 		chainID.Chain(),

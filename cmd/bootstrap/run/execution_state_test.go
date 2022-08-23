@@ -25,7 +25,7 @@ func TestGenerateExecutionState(t *testing.T) {
 	bootstrapDir, err := ioutil.TempDir("/tmp", "flow-integration-bootstrap")
 	require.NoError(t, err)
 	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
-	commit, err := GenerateExecutionState(
+	commit, err := GenerateExecutionStateasdfasdf(
 		trieDir,
 		pk,
 		flow.Testnet.Chain(),
