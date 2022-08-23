@@ -88,7 +88,7 @@ func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOp
 		opt(f)
 	}
 
-	hdr, err := client.GetLatestBlockHeader(newCtx, false)
+	hdr, err := client.GetLatestBlockHeader(newCtx, true)
 	if err != nil {
 		return nil, err
 	}
@@ -148,6 +148,17 @@ func (f *txFollowerImpl) run() {
 		case <-f.ctx.Done():
 			return
 		default:
+		}
+
+		hdr, err := f.client.GetLatestBlockHeader(f.ctx, true)
+		if err != nil {
+			f.logger.Error().Err(err).Msg("failed to get latest block header")
+			continue
+		}
+		if hdr.Height < f.height+1 {
+			f.logger.Trace().Uint64("want", f.height+1).Uint64("got", hdr.Height).
+				Msg("expected block is not yet sealed")
+			continue
 		}
 
 		getBlockByHeightTime := time.Now()
