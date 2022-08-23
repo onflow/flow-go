@@ -33,12 +33,20 @@ func NewInvalidVertexErrorf(vertex Vertex, msg string, args ...interface{}) Inva
 }
 
 // LevelledForest contains multiple trees (which is a potentially disconnected planar graph).
-// Each vertexContainer in the graph has a level (view) and a hash. A vertexContainer can only have one parent
-// with strictly smaller level (view). A vertexContainer can have multiple children, all with
-// strictly larger level (view).
+// Each vertex in the graph has a level and a hash. A vertex can only have one parent, which
+// must have strictly smaller level. A vertex can have multiple children, all with strictly
+// larger level.
 // A LevelledForest provides the ability to prune all vertices up to a specific level.
 // A tree whose root is below the pruning threshold might decompose into multiple
 // disconnected subtrees as a result of pruning.
+// By design, the LevelledForest does _not_ touch the parent information for vertices
+// that are on the lowest retained level. Thereby, it is possible to initialize the
+// LevelledForest with a root vertex at the lowest retained level, without this root
+// needing to have a parent. Furthermore, the root vertex can be at level 0 and in
+// absence of a parent still satisfy the condition that any parent must be of lower level
+// (mathematical principle of vacuous truth) without the implementation needing to worry
+// about unsigned integer underflow.
+//
 // LevelledForest is NOT safe for concurrent use by multiple goroutines.
 type LevelledForest struct {
 	vertices        VertexSet
@@ -172,11 +180,18 @@ func (f *LevelledForest) GetNumberOfChildren(id flow.Identifier) int {
 
 // GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified level.
 // An empty VertexIterator is returned, if no vertices are known at the specified level.
+// If `level` is already pruned, an empty VertexIterator is returned.
 func (f *LevelledForest) GetVerticesAtLevel(level uint64) VertexIterator {
 	return newVertexIterator(f.verticesAtLevel[level]) // go returns the zero value for a missing level. Here, a nil slice
 }
 
-// GetNumberOfVerticesAtLevel returns number of full vertices at given level
+// GetNumberOfVerticesAtLevel returns the number of full vertices at given level.
+// A full vertex is a vertex that was explicitly added to the forest. In contrast,
+// an empty vertex container represents a vertex that is _referenced_ as parent by
+// one or more full vertices, but has not been added itself to the forest.
+// We only count vertices that have been explicitly added to the forest and not yet
+// pruned. (In comparision, we do _not_ count vertices that are _referenced_ as
+// parent by vertices, but have not been added themselves).
 func (f *LevelledForest) GetNumberOfVerticesAtLevel(level uint64) int {
 	num := 0
 	for _, container := range f.verticesAtLevel[level] {
@@ -240,86 +255,82 @@ func (f *LevelledForest) getOrCreateVertexContainer(id flow.Identifier, level ui
 	return container
 }
 
-// VerifyVertex verifies that vertex satisfies ANY of the following conditions:
-// (1) The vertex's level is below the lowest level in the forest
-// (2) The vertex is equal to a vertex which already exists in the forest
-// (3) The vertex is a new vertex with a consistent parent (as defined in verifyParent)
+// VerifyVertex verifies that adding vertex `v` would yield a valid Levelled Forest.
+// Specifically, we verify that _all_ of the following conditions are satisfied:
+// (1) `v.Level()` must be strictly larger than the level that `v` reports
+//     for its parent (maintains an acyclic graph).
+// (2) If a vertex with the same ID as `v.VertexID()` exists in the graph or is
+//     referenced by another vertex within the graph, the level must be identical.
+//     (In other words, we don't have vertices with the same ID but different level)
+// (3) Let `ParentLevel`, `ParentID` denote the level, ID that `v` reports for its parent.
+//     If a vertex with `ParentID` exists (or is referenced by other vertices as their parent),
+//     we require that the respective level is identical to `ParentLevel`.
+// Notes:
+//  * If `v.Level()` has already been pruned, adding it to the forest is a NoOp.
+//    Hence, any vertex with level below the pruning threshold automatically passes.
+//  * By design, the LevelledForest does _not_ touch the parent information for vertices
+//    that are on the lowest retained level. Thereby, it is possible to initialize the
+//    LevelledForest with a root vertex at the lowest retained level, without this root
+//    needing to have a parent. Furthermore, the root vertex can be at level 0 and in
+//    absence of a parent still satisfy the condition that any parent must be of lower level
+//    (mathematical principle of vacuous truth) without the implementation needing to worry
+//    about unsigned integer underflow.
 // Error returns:
 // * InvalidVertexError if the input vertex is invalid for insertion to the forest.
-func (f *LevelledForest) VerifyVertex(vertex Vertex) error {
-	if vertex.Level() < f.LowestLevel {
+func (f *LevelledForest) VerifyVertex(v Vertex) error {
+	if v.Level() < f.LowestLevel {
 		return nil
 	}
-	isKnownVertex, err := f.isEquivalentToStoredVertex(vertex)
-	if err != nil {
-		return fmt.Errorf("invalid Vertex: %w", err)
-	}
-	if isKnownVertex {
-		return nil
-	}
-	// vertex not found in storage => new vertex
 
-	// verify new vertex
-	if vertex.Level() == f.LowestLevel {
-		return nil
-	}
-	return f.verifyParent(vertex)
-}
-
-// isEquivalentToStoredVertex evaluates whether a vertex is equivalent to already stored vertex.
-// For vertices at pruning level, parents are ignored.
-//
-// (1) return value (false, nil)
-// Two vertices are _not equivalent_ if they have different IDs (Hashes).
-//
-// (2) return value (true, nil)
-// Two vertices _are equivalent_ if their respective fields are identical:
-// ID, Level, and Parent (both parent ID and parent Level)
-//
-// (3) return value (false, error)
-// errors if the vertices' IDs are identical, but they differ
-// in any of the _relevant_ fields (as defined in (2)).
-//
-// Error returns:
-// * InvalidVertexError if the input vertex has the same ID, but different
-//   fields compared to some vertex already stored in the forest
-func (f *LevelledForest) isEquivalentToStoredVertex(vertex Vertex) (bool, error) {
-	storedVertex, haveStoredVertex := f.GetVertex(vertex.VertexID())
-	if !haveStoredVertex {
-		return false, nil //have no vertex with same id stored
+	storedContainer, haveVertexContainer := f.vertices[v.VertexID()]
+	if !haveVertexContainer { // have no vertex with same id stored
+		// the only thing remaining to check is the parent information
+		return f.ensureConsistentParent(v)
 	}
 
-	// found vertex in storage with identical ID
-	// => we expect all other (relevant) fields to be identical
-	if vertex.Level() != storedVertex.Level() { // view number
-		return false, NewInvalidVertexErrorf(vertex, "level conflicts with stored vertex with same id (%d!=%d)", vertex.Level(), storedVertex.Level())
+	// Found a vertex container, i.e. `v` already exists or it is referenced by some other vertex.
+	// In all cases, `v.Level()` should match the vertexContainer's information
+	if v.Level() != storedContainer.level {
+		return NewInvalidVertexErrorf(v, "level conflicts with stored vertex with same id (%d!=%d)", v.Level(), storedContainer.level)
 	}
+
+	// vertex container is empty, i.e. `v` is referenced by some other vertex as its parent:
+	if f.isEmptyContainer(storedContainer) {
+		// the only thing remaining to check is the parent information
+		return f.ensureConsistentParent(v)
+	}
+
+	// vertex container holds a vertex with the same ID as `v`:
+	// The parent information from vertexContainer has already been checked for consistency. So
+	// we simply compare with the existing vertex for inconsistencies
+
 	// the vertex is at or below the lowest retained level, so we can't check the parent (it's pruned)
-	if vertex.Level() <= f.LowestLevel {
-		return true, nil
+	if v.Level() == f.LowestLevel {
+		return nil
 	}
 
-	newParentId, newParentLevel := vertex.Parent()
-	storedParentId, storedParentLevel := storedVertex.Parent()
-	if newParentId != storedParentId { // qc.blockID
-		return false, NewInvalidVertexErrorf(vertex, "parent ID conflicts with stored parent (%x!=%x)", newParentId, storedParentId)
+	newParentId, newParentLevel := v.Parent()
+	storedParentId, storedParentLevel := storedContainer.vertex.Parent()
+	if newParentId != storedParentId {
+		return NewInvalidVertexErrorf(v, "parent ID conflicts with stored parent (%x!=%x)", newParentId, storedParentId)
 	}
-	if newParentLevel != storedParentLevel { // qc.view
-		return false, NewInvalidVertexErrorf(vertex, "parent level conflicts with stored parent (%d!=%d)", newParentLevel, storedParentLevel)
+	if newParentLevel != storedParentLevel {
+		return NewInvalidVertexErrorf(v, "parent level conflicts with stored parent (%d!=%d)", newParentLevel, storedParentLevel)
 	}
 	// all _relevant_ fields identical
-	return true, nil
+	return nil
 }
 
-// verifyParent verifies whether vertex.Parent() is consistent with current forest.
-// An error is raised if
-// * there is a parent with the same id but different view;
+// ensureConsistentParent verifies that vertex.Parent() is consistent with current forest.
+// Returns InvalidVertexError if:
+// * there is a parent with the same ID but different level;
 // * the parent's level is _not_ smaller than the vertex's level
-//
-// Error returns:
-// * InvalidVertexError if the input vertex's parent information is internally
-//   inconsistent or inconsistent with a parent vertex already stored in the forest.
-func (f *LevelledForest) verifyParent(vertex Vertex) error {
+func (f *LevelledForest) ensureConsistentParent(vertex Vertex) error {
+	if vertex.Level() <= f.LowestLevel {
+		// the vertex is at or below the lowest retained level, so we can't check the parent (it's pruned)
+		return nil
+	}
+
 	// verify parent
 	parentID, parentLevel := vertex.Parent()
 	if !(vertex.Level() > parentLevel) {
