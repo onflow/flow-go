@@ -13,14 +13,20 @@ import (
 
 var _ connmgr.ConnectionGater = (*ConnGater)(nil)
 
+// ConnGaterOption allow the connection gater to be configured with a list of PeerFilter funcs for a specific conn gater callback.
+// In the current implementation of the ConnGater the following callbacks can be configured with peer filters.
+// * InterceptPeerDial - peer filters can be configured with WithOnInterceptPeerDialFilters which will allow or disallow outbound connections.
+// * InterceptSecured - peer filters can be configured with WithOnInterceptSecuredFilters which will allow or disallow inbound connections after libP2P security handshake.
 type ConnGaterOption func(*ConnGater)
 
+// WithOnInterceptPeerDialFilters sets peer filters for outbound connections.
 func WithOnInterceptPeerDialFilters(filters []PeerFilter) ConnGaterOption {
 	return func(c *ConnGater) {
 		c.onInterceptPeerDialFilters = filters
 	}
 }
 
+// WithOnInterceptSecuredFilters sets peer filters for inbound secured connections.
 func WithOnInterceptSecuredFilters(filters []PeerFilter) ConnGaterOption {
 	return func(c *ConnGater) {
 		c.onInterceptSecuredFilters = filters
