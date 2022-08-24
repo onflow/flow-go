@@ -83,6 +83,9 @@ func (i *TransactionInvoker) Process(
 
 	location := common.TransactionLocation(proc.ID)
 
+	runtimeEnv := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+	declareStandardLibraryValues(runtimeEnv, env)
+
 	var txError error
 	err := vm.Runtime.ExecuteTransaction(
 		runtime.Script{
@@ -90,8 +93,9 @@ func (i *TransactionInvoker) Process(
 			Arguments: proc.Transaction.Arguments,
 		},
 		runtime.Context{
-			Interface: env,
-			Location:  location,
+			Interface:   env,
+			Location:    location,
+			Environment: runtimeEnv,
 		},
 	)
 	if err != nil {
