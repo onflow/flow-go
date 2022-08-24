@@ -250,15 +250,37 @@ func testEpochForViewWithFallback(t *testing.T, lookup *EpochLookup, state proto
 
 	t.Run("should be able to query within any committed epoch", func(t *testing.T) {
 		for _, epoch := range epochs {
-			counter, err := lookup.EpochForViewWithFallback(unittest.Uint64InRange(epoch.firstView, epoch.finalView))
-			assert.NoError(t, err)
-			assert.Equal(t, epoch.counter, counter)
+			t.Run("first view", func(t *testing.T) {
+				counter, err := lookup.EpochForViewWithFallback(epoch.firstView)
+				assert.NoError(t, err)
+				assert.Equal(t, epoch.counter, counter)
+			})
+			t.Run("final view", func(t *testing.T) {
+				counter, err := lookup.EpochForViewWithFallback(epoch.finalView)
+				assert.NoError(t, err)
+				assert.Equal(t, epoch.counter, counter)
+			})
+			t.Run("random view in range", func(t *testing.T) {
+				counter, err := lookup.EpochForViewWithFallback(unittest.Uint64InRange(epoch.firstView, epoch.finalView))
+				assert.NoError(t, err)
+				assert.Equal(t, epoch.counter, counter)
+			})
 		}
 	})
 
 	t.Run("should return ErrViewForUnknownEpoch below earliest epoch", func(t *testing.T) {
-		_, err := lookup.EpochForViewWithFallback(unittest.Uint64InRange(0, epochs[0].firstView-1))
-		assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
+		t.Run("view 0", func(t *testing.T) {
+			_, err := lookup.EpochForViewWithFallback(0)
+			assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
+		})
+		t.Run("boundary of earliest epoch", func(t *testing.T) {
+			_, err := lookup.EpochForViewWithFallback(epochs[0].firstView - 1)
+			assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
+		})
+		t.Run("random view below earliest epoch", func(t *testing.T) {
+			_, err := lookup.EpochForViewWithFallback(unittest.Uint64InRange(0, epochs[0].firstView-1))
+			assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
+		})
 	})
 
 	// if epoch fallback is triggered, fallback to returning latest epoch counter
