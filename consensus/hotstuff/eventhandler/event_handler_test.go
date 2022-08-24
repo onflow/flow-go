@@ -927,6 +927,95 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ProposalForActiveView() {
 	es.communicator.AssertNotCalled(es.T(), "BroadcastProposalWithDelay", mock.Anything, mock.Anything)
 }
 
+// TestOnPartialTcCreated_ProducedTimeout tests that when receiving partial TC for active view we will create a timeout object
+// immediately.
+func (es *EventHandlerSuite) TestOnPartialTcCreated_ProducedTimeout() {
+	es.timeoutAggregator.On("AddTimeout", mock.Anything).Return().Once()
+
+	partialTc := &hotstuff.PartialTcCreated{
+		View:       es.initView,
+		NewestQC:   es.parentProposal.Block.QC,
+		LastViewTC: nil,
+	}
+
+	err := es.eventhandler.OnPartialTcCreated(partialTc)
+	require.NoError(es.T(), err)
+
+	// partial TC shouldn't trigger view change
+	require.Equal(es.T(), partialTc.View, es.paceMaker.CurView(), "incorrect view change")
+
+	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+	// the last call is BroadcastTimeout
+	require.Equal(es.T(), "BroadcastTimeout", lastCall.Method)
+	timeoutObject, ok := lastCall.Arguments[0].(*model.TimeoutObject)
+	require.True(es.T(), ok)
+	// it should broadcast a TO with same view as partialTc.View
+	require.Equal(es.T(), partialTc.View, timeoutObject.View)
+}
+
+// TestOnPartialTcCreated_NotActiveView tests that we don't create timeout object if partial TC was delivered for a past, non-current view.
+// NOTE: it is not possible to receive a partial timeout for a FUTURE view, unless the partial timeout contains
+// either a QC/TC allowing us to enter that view, therefore that case is not covered here.
+// See TestOnPartialTcCreated_QcAndTcProcessing instead.
+func (es *EventHandlerSuite) TestOnPartialTcCreated_NotActiveView() {
+	partialTc := &hotstuff.PartialTcCreated{
+		View:     es.initView - 1,
+		NewestQC: es.parentProposal.Block.QC,
+	}
+
+	err := es.eventhandler.OnPartialTcCreated(partialTc)
+	require.NoError(es.T(), err)
+
+	// partial TC shouldn't trigger view change
+	require.Equal(es.T(), es.initView, es.paceMaker.CurView(), "incorrect view change")
+	// we don't want to create timeout if partial TC was delivered for view different than active one.
+	es.communicator.AssertNotCalled(es.T(), "BroadcastTimeout", mock.Anything)
+}
+
+// TestOnPartialTcCreated_QcAndTcProcessing tests that EventHandler processes QC and TC included in hotstuff.PartialTcCreated
+// data structure. This tests cases like the following example:
+// * the pacemaker is in view 10
+// * we observe a partial timeout for view 11 with a QC for view 10
+// * we should change to view 11 using the QC, then broadcast a timeout for view 11
+func (es *EventHandlerSuite) TestOnPartialTcCreated_QcAndTcProcessing() {
+
+	testOnPartialTcCreated := func(partialTc *hotstuff.PartialTcCreated) {
+		es.timeoutAggregator.On("AddTimeout", mock.Anything).Return().Once()
+
+		es.endView++
+
+		err := es.eventhandler.OnPartialTcCreated(partialTc)
+		require.NoError(es.T(), err)
+
+		require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+
+		lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+		// the last call is BroadcastTimeout
+		require.Equal(es.T(), "BroadcastTimeout", lastCall.Method)
+		timeoutObject, ok := lastCall.Arguments[0].(*model.TimeoutObject)
+		require.True(es.T(), ok)
+		// it should broadcast a TO with same view as partialTc.View
+		require.Equal(es.T(), partialTc.View, timeoutObject.View)
+	}
+
+	es.Run("qc-triggered-view-change", func() {
+		partialTc := &hotstuff.PartialTcCreated{
+			View:     es.qc.View + 1,
+			NewestQC: es.qc,
+		}
+		testOnPartialTcCreated(partialTc)
+	})
+	es.Run("tc-triggered-view-change", func() {
+		tc := helper.MakeTC(helper.WithTCView(es.endView), helper.WithTCNewestQC(es.qc))
+		partialTc := &hotstuff.PartialTcCreated{
+			View:       tc.View + 1,
+			NewestQC:   tc.NewestQC,
+			LastViewTC: tc,
+		}
+		testOnPartialTcCreated(partialTc)
+	})
+}
+
 func createBlock(view uint64) *model.Block {
 	blockID := flow.MakeID(struct {
 		BlockID uint64

@@ -10,25 +10,28 @@ import (
 
 // BlockView specifies the data to create a block
 type BlockView struct {
-	View uint64 // the view of the block to be created
-
-	// the version of the block for that view.  useful for creating a different block of the same view with a different version
+	// View is the view of the block to be created
+	View uint64
+	// BlockVersion is the version of the block for that view.
+	// Useful for creating conflicting blocks at the same view.
 	BlockVersion int
-
-	QCView uint64 // the view for the QC to be built on top of
-
-	// the version of the QC for that view.
+	// QCView is the view of the QC embedded in this block (also: the view of the block's parent)
+	QCView uint64
+	// QCVersion is the version of the QC for that view.
 	QCVersion int
 }
 
+// QCIndex returns a unique identifier for the block's QC.
 func (bv *BlockView) QCIndex() string {
 	return fmt.Sprintf("%v-%v", bv.QCView, bv.QCVersion)
 }
 
+// BlockIndex returns a unique identifier for the block.
 func (bv *BlockView) BlockIndex() string {
 	return fmt.Sprintf("%v-%v", bv.View, bv.BlockVersion)
 }
 
+// BlockBuilder is a test utility for creating block structure fixtures.
 type BlockBuilder struct {
 	blockViews []*BlockView
 }
@@ -39,6 +42,7 @@ func NewBlockBuilder() *BlockBuilder {
 	}
 }
 
+// Add adds a block with the given qcView and blockView.
 func (f *BlockBuilder) Add(qcView uint64, blockView uint64) {
 	f.blockViews = append(f.blockViews, &BlockView{
 		View:   blockView,
@@ -46,19 +50,30 @@ func (f *BlockBuilder) Add(qcView uint64, blockView uint64) {
 	})
 }
 
-// [3,4] denotes a block of view 4, with a qc of view 3.
-// [3,4'] denotes a block of view 4, with a qc of view 3, but has a different BlockID than [3,4],
+// GenesisBlock returns the genesis block, which is always finalized.
+func (f *BlockBuilder) GenesisBlock() *model.Block {
+	return makeGenesis().Block
+}
+
+// AddVersioned adds a block with the given qcView and blockView.
+// In addition the version identifier of the QC embedded within the block
+// is specified by `qcVersion`. The version identifier for the block itself
+// (primarily for emulating different payloads) is specified by `blockVersion`.
+// [3,4] denotes a block of view 4, with a qc of view 3
+// [3,4'] denotes a block of view 4, with a qc of view 3, but has a different BlockID than [3,4]
 // [3,4'] can be created by AddVersioned(3, 4, 0, 1)
 // [3',4] can be created by AddVersioned(3, 4, 1, 0)
-func (f *BlockBuilder) AddVersioned(qcView uint64, blockView uint64, qcversion int, blockversion int) {
+func (f *BlockBuilder) AddVersioned(qcView uint64, blockView uint64, qcVersion int, blockVersion int) {
 	f.blockViews = append(f.blockViews, &BlockView{
 		View:         blockView,
 		QCView:       qcView,
-		BlockVersion: blockversion,
-		QCVersion:    qcversion,
+		BlockVersion: blockVersion,
+		QCVersion:    qcVersion,
 	})
 }
 
+// Blocks returns a list of all blocks added to the BlockBuilder.
+// Returns an error if the blocks do not form a connected tree rooted at genesis.
 func (f *BlockBuilder) Blocks() ([]*model.Proposal, error) {
 	blocks := make([]*model.Proposal, 0, len(f.blockViews))
 

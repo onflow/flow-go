@@ -23,6 +23,7 @@ type Finalizer interface {
 
 	// MakeValid will mark a block as having passed the consensus algorithm's
 	// internal validation.
+	// TODO(active-pacemaker) we can remove MakeValid when QC validation occurs in compliance layer
 	MakeValid(blockID flow.Identifier) error
 
 	// MakeFinal will declare a block and all of its ancestors as finalized, which
