@@ -7,7 +7,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.8.0
 	github.com/supranational/blst v0.3.4
-	golang.org/x/crypto v0.0.0-20220817201139-bc19a97f63c8
+	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 	gonum.org/v1/gonum v0.6.1
 	pgregory.net/rapid v0.4.7
 )
