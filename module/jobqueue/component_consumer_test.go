@@ -151,6 +151,8 @@ func (suite *ComponentConsumerSuite) TestHappyPath() {
 		})
 
 		// verify all jobs were run
+		mu.Lock()
+		defer mu.Unlock()
 		assert.Len(suite.T(), finishedJobs, len(jobData))
 		for index := range jobData {
 			assert.True(suite.T(), finishedJobs[index], "job %d did not finished", index)
@@ -167,6 +169,8 @@ func (suite *ComponentConsumerSuite) TestHappyPath() {
 		})
 
 		// verify all jobs were run
+		mu.Lock()
+		defer mu.Unlock()
 		assert.Len(suite.T(), finishedJobs, len(jobData))
 		for index := range jobData {
 			assert.True(suite.T(), finishedJobs[index], "job %d did not finished", index)
@@ -219,7 +223,8 @@ func (suite *ComponentConsumerSuite) TestProgressesOnComplete() {
 	})
 
 	// verify all jobs were run
-	// (Synchronized with notifier by runTest waitinig on consumer.Done())
+	mu.Lock()
+	defer mu.Unlock()
 	assert.Len(suite.T(), finishedJobs, int(stopIndex))
 	for index := range finishedJobs {
 		assert.LessOrEqual(suite.T(), index, stopIndex)
