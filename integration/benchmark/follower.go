@@ -155,14 +155,16 @@ func (f *txFollowerImpl) run() {
 			f.logger.Error().Err(err).Msg("failed to get latest block header")
 			continue
 		}
-		if hdr.Height < f.height+1 {
-			f.logger.Trace().Uint64("want", f.height+1).Uint64("got", hdr.Height).
+
+		nextHeight := f.Height() + 1
+		if hdr.Height < nextHeight {
+			f.logger.Trace().Uint64("want", nextHeight).Uint64("got", hdr.Height).
 				Msg("expected block is not yet sealed")
 			continue
 		}
 
 		getBlockByHeightTime := time.Now()
-		block, err := f.client.GetBlockByHeight(f.ctx, f.height+1)
+		block, err := f.client.GetBlockByHeight(f.ctx, nextHeight)
 		if err != nil {
 			f.logger.Trace().Err(err).Msg("next block is not yet available, retrying")
 			continue
