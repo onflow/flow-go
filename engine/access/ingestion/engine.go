@@ -417,15 +417,15 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 	// skip requesting collections, if this block is below the last full block height
 	// this means that either we have already received these collections, or the block
 	// may contain unverifiable guarantees (in case this node has just joined the network)
-	lastFullBlockHeight, err := e.blocks.GetLastFullBlockHeight()
-	if err != nil {
-		return fmt.Errorf("could not get last full block height: %w", err)
-	}
-
-	if block.Header.Height <= lastFullBlockHeight {
-		e.log.Info().Msgf("skipping requesting collections for finalized block below last full block height (%d<=%d)", block.Header.Height, lastFullBlockHeight)
-		return nil
-	}
+	//lastFullBlockHeight, err := e.blocks.GetLastFullBlockHeight()
+	//if err != nil {
+	//	return fmt.Errorf("could not get last full block height: %w", err)
+	//}
+	//
+	//if block.Header.Height <= lastFullBlockHeight {
+	//	e.log.Info().Msgf("skipping requesting collections for finalized block below last full block height (%d<=%d)", block.Header.Height, lastFullBlockHeight)
+	//	return nil
+	//}
 
 	// queue requesting each of the collections from the collection node
 	e.requestCollectionsInFinalizedBlock(block.Payload.Guarantees)
