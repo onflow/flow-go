@@ -63,6 +63,12 @@ func (cache *epochRangeCache) combinedRange() (firstView uint64, finalView uint6
 // No errors are expected during normal operation.
 func (cache *epochRangeCache) add(epoch epochRange) error {
 
+	// sanity check: ensure the epoch we are adding is considered a non-zero value
+	// this helps ensure internal consistency in this component, but if we ever trip this check, something is seriously wrong elsewhere
+	if !epoch.exists() {
+		return fmt.Errorf("sanity check failed: caller attempted to cache invalid zero epoch")
+	}
+
 	latestCachedEpoch := cache.latest()
 	// initial case - no epoch ranges are stored yet
 	if !latestCachedEpoch.exists() {
@@ -183,12 +189,6 @@ func (lookup *EpochLookup) cacheEpoch(epoch protocol.Epoch) error {
 		counter:   counter,
 		firstView: firstView,
 		finalView: finalView,
-	}
-
-	// sanity check: ensure the epoch we are adding is considered a non-zero value
-	// this helps ensure internal consistency in this component, but if we ever trip this check, something is seriously wrong elsewhere
-	if !cachedEpoch.exists() {
-		return fmt.Errorf("sanity check failed: caller attempted to cache invalid zero epoch")
 	}
 
 	lookup.mu.Lock()
