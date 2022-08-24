@@ -22,14 +22,20 @@ type epochRange struct {
 	finalView uint64
 }
 
+// exists returns true when the epochRange is initialized (anything besides the zero value for the struct).
+// It is useful for checking existence while iterating the epochRangeCache.
+func (er epochRange) exists() bool {
+	return er != epochRange{}
+}
+
 // epochRangeCache stores at most the 3 latest epoch ranges.
 // Ranges are ordered by counter (ascending) and right-aligned.
 // For example, if we only have one epoch cached, `epochRangeCache[0]` and `epochRangeCache[1]` are `nil`.
 // Not safe for concurrent use.
-type epochRangeCache [3]*epochRange
+type epochRangeCache [3]epochRange
 
 // latest returns the latest cached epoch range, or nil if no epochs are cached.
-func (cache *epochRangeCache) latest() *epochRange {
+func (cache *epochRangeCache) latest() epochRange {
 	return cache[2]
 }
 
@@ -40,7 +46,7 @@ func (cache *epochRangeCache) combinedRange() (firstView uint64, finalView uint6
 
 	// low end of the range is the first view of the first cached epoch
 	for _, epoch := range cache {
-		if epoch != nil {
+		if epoch.exists() {
 			firstView = epoch.firstView
 			break
 		}
@@ -55,17 +61,17 @@ func (cache *epochRangeCache) combinedRange() (firstView uint64, finalView uint6
 // Adding the same epoch multiple times is a no-op.
 // Guarantees ordering and alignment properties of epochRangeCache are preserved.
 // No errors are expected during normal operation.
-func (cache *epochRangeCache) add(epoch *epochRange) error {
+func (cache *epochRangeCache) add(epoch epochRange) error {
 
 	latestCachedEpoch := cache.latest()
 	// initial case - no epoch ranges are stored yet
-	if latestCachedEpoch == nil {
+	if !latestCachedEpoch.exists() {
 		cache[2] = epoch
 		return nil
 	}
 
 	// adding the same epoch multiple times is a no-op
-	if *latestCachedEpoch == *epoch {
+	if latestCachedEpoch == epoch {
 		return nil
 	}
 
@@ -173,10 +179,16 @@ func (lookup *EpochLookup) cacheEpoch(epoch protocol.Epoch) error {
 		return err
 	}
 
-	cachedEpoch := &epochRange{
+	cachedEpoch := epochRange{
 		counter:   counter,
 		firstView: firstView,
 		finalView: finalView,
+	}
+
+	// sanity check: ensure the epoch we are adding is considered a non-zero value
+	// this helps ensure internal consistency in this component, but if we ever trip this check, something is seriously wrong elsewhere
+	if !cachedEpoch.exists() {
+		return fmt.Errorf("sanity check failed: caller attempted to cache invalid zero epoch")
 	}
 
 	lookup.mu.Lock()
@@ -223,7 +235,7 @@ func (lookup *EpochLookup) EpochForViewWithFallback(view uint64) (uint64, error)
 
 	// view is within a known epoch
 	for _, epoch := range lookup.epochs {
-		if epoch == nil {
+		if !epoch.exists() {
 			continue
 		}
 		if epoch.firstView <= view && view <= epoch.finalView {
