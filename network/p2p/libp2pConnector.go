@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
-	discovery "github.com/libp2p/go-libp2p-discovery"
+	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -23,7 +23,7 @@ const (
 
 // Libp2pConnector is a libp2p based Connector implementation to connect and disconnect from peers
 type Libp2pConnector struct {
-	backoffConnector *discovery.BackoffConnector
+	backoffConnector *discoveryBackoff.BackoffConnector
 	host             host.Host
 	log              zerolog.Logger
 	pruneConnections bool
@@ -158,13 +158,13 @@ func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 
 // defaultLibp2pBackoffConnector creates a default libp2p backoff connector similar to the one created by libp2p.pubsub
 // (https://github.com/libp2p/go-libp2p-pubsub/blob/master/discovery.go#L34)
-func defaultLibp2pBackoffConnector(host host.Host) (*discovery.BackoffConnector, error) {
+func defaultLibp2pBackoffConnector(host host.Host) (*discoveryBackoff.BackoffConnector, error) {
 	rngSrc := rand.NewSource(rand.Int63())
 	minBackoff, maxBackoff := time.Second*10, time.Hour
 	cacheSize := 100
 	dialTimeout := time.Minute * 2
-	backoff := discovery.NewExponentialBackoff(minBackoff, maxBackoff, discovery.FullJitter, time.Second, 5.0, 0, rand.New(rngSrc))
-	backoffConnector, err := discovery.NewBackoffConnector(host, cacheSize, dialTimeout, backoff)
+	backoff := discoveryBackoff.NewExponentialBackoff(minBackoff, maxBackoff, discoveryBackoff.FullJitter, time.Second, 5.0, 0, rand.New(rngSrc))
+	backoffConnector, err := discoveryBackoff.NewBackoffConnector(host, cacheSize, dialTimeout, backoff)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backoff connector: %w", err)
 	}

@@ -13,7 +13,7 @@ import (
 )
 
 func TestProfiler(t *testing.T) {
-	t.Parallel()
+	// profiler depends on the shared state, hence only one enabled=true test can run at a time.
 	t.Run("profilerEnabled", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(tempDir string) {
 			p, err := profiler.New(zerolog.Nop(), &profiler.NoopUploader{}, tempDir, time.Millisecond*100, time.Millisecond*100, true)

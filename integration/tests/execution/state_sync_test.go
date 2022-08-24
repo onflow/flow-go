@@ -26,7 +26,8 @@ type StateSyncSuite struct {
 
 func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	// wait for next height finalized (potentially first height), called blockA
-	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T())
+	currentFinalized := s.BlockState.HighestFinalizedHeight()
+	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// wait for execution receipt for blockA from execution node 1
@@ -53,7 +54,8 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	require.NotEqual(s.T(), finalStateExe1BlockA, finalStateExe1BlockB)
 
 	// wait until the next proposed block is finalized, called blockC
-	blockC := s.BlockState.WaitUntilNextHeightFinalized(s.T())
+	currentProposed := s.BlockState.HighestProposedHeight()
+	blockC := s.BlockState.WaitUntilNextHeightFinalized(s.T(), currentProposed)
 	s.T().Logf("got blockC height %v ID %v", blockC.Header.Height, blockC.Header.ID())
 
 	// wait for execution receipt for blockC from execution node 1
