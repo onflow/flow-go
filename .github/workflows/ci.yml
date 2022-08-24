@@ -67,6 +67,12 @@ jobs:
 
   unit-test:
     name: Unit Tests
+    strategy:
+      fail-fast: false
+      matrix:
+        make:
+          - make unittest-main-no-engine
+          - make unittest-main-engine
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
@@ -76,16 +82,18 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
+    - name: Prep environment
+      run: make install-tools tidy
     - name: Run tests
       if: github.actor != 'bors[bot]'
-      run: make ci
+      run: ${{ matrix.make }}
     - name: Run tests (Bors)
       if: github.actor == 'bors[bot]'
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 25
         max_attempts: 3
-        command: make ci
+        command: ${{ matrix.make }}
     - name: Upload coverage report
       uses: codecov/codecov-action@v3
       with:
@@ -98,19 +106,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-category:
-          - integration-bft
-          - integration-mvp
-          - integration-ghost
-          - integration-network
-          - integration-epochs
-          - integration-access
-          - integration-collection
-          - integration-consensus
-          - integration-execution
-          - integration-verification
-    env:
-      TEST_CATEGORY: ${{ matrix.test-category }}
+        make:
+          - make -C integration access-tests
+          - make -C integration bft-tests
+          - make -C integration collection-tests
+          - make -C integration consensus-tests
+          - make -C integration epochs-tests
+          - make -C integration execution-tests
+          - make -C integration ghost-tests
+          - make -C integration mvp-tests
+          - make -C integration network-tests
+          - make -C integration verification-tests
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
@@ -126,14 +132,14 @@ jobs:
       run: make docker-build-flow
     - name: Run tests
       if: github.actor != 'bors[bot]'
-      run: ./tools/test_monitor/run-tests.sh
+      run: ${{ matrix.make }}
     - name: Run tests (Bors)
       if: github.actor == 'bors[bot]'
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 15
         max_attempts: 2
-        command: ./tools/test_monitor/run-tests.sh
+        command: ${{ matrix.make }}
 
   localnet-test:
     name: Localnet Compatibility Tests With Flow-CLI Client and Observer

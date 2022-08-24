@@ -50,6 +50,15 @@ cmd/util/util:
 ############################################################################################
 # CAUTION: DO NOT MODIFY THESE TARGETS! DOING SO WILL BREAK THE FLAKY TEST MONITOR
 
+.PHONY: unittest-main-no-engine
+unittest-main-no-engine:
+	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic `go list ./... | grep -v -e flow-go/engine`
+
+# engine unit tests take a relatively long time to run so we want to isolate them into a separate target that can be run as a separate CI job
+.PHONY: unittest-main-engine
+unittest-main-engine:
+	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic `go list ./... | grep -e flow-go/engine`
+
 .PHONY: unittest-main
 unittest-main:
 	# test all packages with Relic library enabled
@@ -83,7 +92,7 @@ emulator-build:
 	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
 
 .PHONY: test
-test: verfiy-mocks emulator-build unittest
+test: verify-mocks emulator-build unittest
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -116,8 +125,8 @@ generate: generate-proto generate-mocks
 generate-proto:
 	prototool generate protobuf
 
-.PHONY: verfiy-mocks
-verfiy-mocks: generate-mocks
+.PHONY: verify-mocks
+verify-mocks: generate-mocks
 	git diff --exit-code
 
 .PHONY: generate-mocks
