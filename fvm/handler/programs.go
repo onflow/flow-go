@@ -72,7 +72,7 @@ func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Pro
 
 	h.Programs.Set(address, program, last.state)
 
-	err := h.mergeState(last.state, h.masterState.EnforceInteractionLimits())
+	err := h.mergeState(last.state, h.masterState.EnforceLimits())
 
 	return err
 }
@@ -141,13 +141,13 @@ func (h *ProgramsHandler) Cleanup() error {
 
 	for i := stackLen - 1; i > 0; i-- {
 		entry := h.viewsStack[i]
-		err := h.viewsStack[i-1].state.MergeState(entry.state, h.masterState.EnforceInteractionLimits())
+		err := h.viewsStack[i-1].state.MergeState(entry.state, h.masterState.EnforceLimits())
 		if err != nil {
 			return fmt.Errorf("cannot merge state while cleanup: %w", err)
 		}
 	}
 
-	err := h.initialState.MergeState(h.viewsStack[0].state, h.masterState.EnforceInteractionLimits())
+	err := h.initialState.MergeState(h.viewsStack[0].state, h.masterState.EnforceLimits())
 	if err != nil {
 		return err
 	}

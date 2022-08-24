@@ -85,6 +85,8 @@ func (e *ScriptEnv) Events() []flow.Event {
 	return []flow.Event{}
 }
 
+// Block Environment Functions
+
 func (e *ScriptEnv) CreateAccount(_ runtime.Address) (address runtime.Address, err error) {
 	return runtime.Address{}, errors.NewOperationNotSupportedError("CreateAccount")
 }
