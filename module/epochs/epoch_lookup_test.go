@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,17 +29,36 @@ type EpochLookupSuite struct {
 	params     *mockprotocol.Params
 
 	// backend for mocked functions
-	currentEpochCounter    uint64
+	mu                     sync.Mutex
 	epochFallbackTriggered bool
 	phase                  flow.EpochPhase
 
 	// config for each epoch
-	prevEpoch epochRange
-	currEpoch epochRange
-	nextEpoch epochRange
+	currentEpochCounter uint64
+	prevEpoch           epochRange
+	currEpoch           epochRange
+	nextEpoch           epochRange
 
 	lookup *EpochLookup
 	cancel context.CancelFunc
+}
+
+func (suite *EpochLookupSuite) WithLock(f func()) {
+	suite.mu.Lock()
+	f()
+	suite.mu.Unlock()
+}
+
+func (suite *EpochLookupSuite) EpochFallbackTriggered() bool {
+	suite.mu.Lock()
+	defer suite.mu.Unlock()
+	return suite.epochFallbackTriggered
+}
+
+func (suite *EpochLookupSuite) Phase() flow.EpochPhase {
+	suite.mu.Lock()
+	defer suite.mu.Unlock()
+	return suite.phase
 }
 
 func TestEpochLookup(t *testing.T) {
@@ -60,11 +80,11 @@ func (suite *EpochLookupSuite) SetupTest() {
 
 	suite.snapshot.On("Epochs").Return(suite.epochQuery)
 	suite.snapshot.On("Phase").Return(
-		func() flow.EpochPhase { return suite.phase },
+		func() flow.EpochPhase { return suite.Phase() },
 		func() error { return nil })
 
 	suite.params.On("EpochFallbackTriggered").Return(
-		func() bool { return suite.epochFallbackTriggered },
+		func() bool { return suite.EpochFallbackTriggered() },
 		func() error { return nil })
 
 	suite.state.On("Final").Return(suite.snapshot)
@@ -84,7 +104,9 @@ func (suite *EpochLookupSuite) CommitEpochs(epochs ...epochRange) {
 		suite.epochQuery.Add(mockEpoch)
 		// if we add a next epoch (counter 1 greater than current), then set phase to committed
 		if epoch.counter == suite.currentEpochCounter+1 {
-			suite.phase = flow.EpochPhaseCommitted
+			suite.WithLock(func() {
+				suite.phase = flow.EpochPhaseCommitted
+			})
 		}
 	}
 }
@@ -143,6 +165,9 @@ func (suite *EpochLookupSuite) TestEpochForViewWithFallback_CurrNextPrev() {
 // EpochLookup with an initial state of epoch fallback triggered.
 func (suite *EpochLookupSuite) TestEpochForViewWithFallback_EpochFallbackTriggered() {
 	epochs := []epochRange{suite.prevEpoch, suite.currEpoch, suite.nextEpoch}
+	suite.WithLock(func() {
+		suite.epochFallbackTriggered = true
+	})
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
@@ -157,7 +182,9 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochFallbackTriggered() {
 	suite.CreateAndStartEpochLookup()
 
 	// trigger epoch fallback
-	suite.epochFallbackTriggered = true
+	suite.WithLock(func() {
+		suite.epochFallbackTriggered = true
+	})
 	suite.lookup.EpochEmergencyFallbackTriggered()
 
 	// wait for the protocol event to be processed (async)
