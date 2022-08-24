@@ -328,6 +328,10 @@ func (proc *BootstrapProcedure) MemoryLimit(_ Context) uint64 {
 	return math.MaxUint64
 }
 
+func (proc *BootstrapProcedure) ShouldDisableMemoryAndInteractionLimits(_ Context) bool {
+	return true
+}
+
 func (b *BootstrapProcedure) createAccount(publicKeys []flow.AccountPublicKey) flow.Address {
 	address, err := b.addressGenerator.NextAddress()
 	if err != nil {
