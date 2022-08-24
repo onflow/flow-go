@@ -14,10 +14,9 @@ import (
 // the state it is recommended that such services wraps
 // a state manager instead of a state itself.
 type StateHolder struct {
-	enforceLimits         bool
-	payerIsServiceAccount bool
-	startState            *State
-	activeState           *State
+	enforceLimits bool
+	startState    *State
+	activeState   *State
 }
 
 // NewStateTransaction constructs a new state transaction which manages nested
@@ -109,11 +108,6 @@ func (s *StateHolder) ViewForTestingOnly() View {
 	return s.activeState.View()
 }
 
-// SetPayerIsServiceAccount sets if the payer is the service account
-func (s *StateHolder) SetPayerIsServiceAccount() {
-	s.payerIsServiceAccount = true
-}
-
 // NewChild constructs a new child of active state
 // and set it as active state and return it
 // this is basically a utility function for common
@@ -141,11 +135,6 @@ func (s *StateHolder) EnforceComputationLimits() bool {
 }
 
 // EnforceInteractionLimits returns if the interaction limits should be enforced or not
-func (s *StateHolder) EnforceInteractionLimits() bool {
-	return !s.payerIsServiceAccount && s.enforceLimits
-}
-
-// EnforceMemoryLimits returns if the memory limits should be enforced or not
-func (s *StateHolder) EnforceMemoryLimits() bool {
-	return !s.payerIsServiceAccount && s.enforceLimits
+func (s *StateHolder) EnforceLimits() bool {
+	return s.enforceLimits
 }

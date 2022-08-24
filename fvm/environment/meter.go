@@ -31,7 +31,7 @@ func (meter *meterImpl) MeterComputation(
 	kind common.ComputationKind,
 	intensity uint,
 ) error {
-	if meter.stTxn.EnforceComputationLimits() {
+	if meter.stTxn.EnforceLimits() {
 		return meter.stTxn.MeterComputation(kind, intensity)
 	}
 	return nil
@@ -42,7 +42,7 @@ func (meter *meterImpl) ComputationUsed() uint64 {
 }
 
 func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
-	if meter.stTxn.EnforceMemoryLimits() {
+	if meter.stTxn.EnforceLimits() {
 		return meter.stTxn.MeterMemory(usage.Kind, uint(usage.Amount))
 	}
 	return nil
