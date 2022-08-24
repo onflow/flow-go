@@ -24,7 +24,7 @@ type epochRange struct {
 
 // epochRangeCache stores at most the 3 latest epoch ranges.
 // Ranges are ordered by counter (ascending) and right-aligned.
-// For example, if we only have one epoch cached, `epochRangeCache[0]` and `epochRangeCache[1]` are `nil`. 
+// For example, if we only have one epoch cached, `epochRangeCache[0]` and `epochRangeCache[1]` are `nil`.
 // Not safe for concurrent use.
 type epochRangeCache [3]*epochRange
 
