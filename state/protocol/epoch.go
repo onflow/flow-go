@@ -42,93 +42,16 @@ type EpochQuery interface {
 // Methods error if epoch preparation has not progressed far enough for
 // this information to be determined by a finalized block.
 //
-// TODO Epoch / Snapshot API Structure:
-//
-// Currently Epoch and Snapshot APIs are structured to allow chained queries
-// to be used without error checking at each call where errors might occur.
-// Instead, errors are cached in the resulting struct (eg. invalid.Epoch)
-// until the query chain ends with a function which can return an error.
-//
-// For example, snapshot.Epochs().Next() could introduce an error ErrNextEpochNotSetup
-// if the next epoch is not set up. However, the error is not returned and
-// therefore cannot be checked until we query something about the resulting epoch.
-//
-// This has the negative side-effect of expanding the surface error of errors
-// introduced in an intermediary chained call. If the error were returned when
-// introduced, it could be checked once, then the Epoch could be queried safely.
-// However, since the errors introduced at snapshot.Epochs().Next() are not
-// exposed until the Epoch is queried, to conform with error handling guidelines
-// we need to check them for each query on Epoch, even though we should only need
-// to check them once.
-//
-// CURRENT ERROR CHECKING REQUIREMENT:
-//
-// counter, err := snapshot.Epochs().Next().Counter()
-// if errors.Is(err, ErrNoPreviousEpoch) {...}
-// if errors.Is(err, ErrNextEpochNotSetup) {...}
-// if errors.Is(err, state.ErrUnknownSnapshotReference) {...}
-// if err != nil {...}
-//
-// dkg, err := snapshot.Epochs().Next().DKG()
-// if errors.Is(err, ErrNoPreviousEpoch) {...}
-// if errors.Is(err, ErrNextEpochNotSetup) {...}
-// if errors.Is(err, state.ErrUnknownSnapshotReference) {...}
-// if errors.Is(err, ErrEpochNotCommitted) {...}
-// if err != nil {...}
-//
-// ERROR CHECKING REQUIREMENTS WITH INTERMEDIARY CALLS RETURNING ERRORS:
-//
-// epoch, err := snapshot.Epochs().Next()
-// if errors.Is(err, ErrNextEpochNotSetup) {...}
-// if errors.Is(err, state.ErrUnknownSnapshotReference) {...}
-// if err != nil {...}
-//
-// counter, err := epoch.Counter()
-// if err != nil {...}
-//
-// dkg, err := snapshot.Epochs().Next().DKG()
-// if errors.Is(err, ErrEpochNotCommitted) {...}
-// if err != nil {...}
-//
-// The current pattern also unnecessarily expands the error handling scope of
-// conversion functions. For example, inmem.FromEpoch must handle, and might
-// return any of:
-// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-// even though these errors all occur when the epoch is queried, and could be
-// handled before the the conversion occurs.
-//
-// NOTE: these problems similarly affect Snapshot.
-//
-// For Snapshot in particular, this pattern causes another problem. When querying
-// a protocol state snapshot, it is desirable to query exactly one snapshot reference
-// (eg. state.Final())and use the same reference for the duration of the process.
-// Querying state.Final()... multiple times in the same process can lead to subtle bugs,
-// because the finalized block might change between calls.
-// Forcing declaring an intermediary variable by error checking at the point the
-// snapshot is defined encourages using the same snapshot, as desired.
-//
-// CURRENT PATTERN:
-// head, err := state.Final().Head()
-// if err != nil {...}
-// qc, err := state.Final().QuorumCertificate() // we might query a different finalized snapshot here!
-// if err != nil {...}
-//
-// ALTERNATIVE PATTERN:
-// final, err := state.Final() // returning error encourages creating a local variable bound to a single consistent snapshot
-// if err != nil {...}
-//
-// head, err := final.Head()
-// if err != nil {...}
-// qc, err := final.QuorumCertificate()
-// if err != nil {...}
-//
-// SUMMARY:
+//TODO Epoch / Snapshot API Structure:  Currently Epoch and Snapshot APIs
+// are structured to allow chained queries to be used without error checking
+// at each call where errors might occur. Instead, errors are cached in the
+// resulting struct (eg. invalid.Epoch) until the query chain ends with a
+// function which can return an error. This has some negative effects:
 // 1. Cached intermediary errors result in more complex error handling
 //    a) each final call of the chained query needs to handle all intermediary errors, every time
 //    b) intermediary errors must be handled by dependencies on the final call of the query chain (eg. conversion functions)
 // 2. The error caching pattern encourages potentially dangerous snapshot query patterns
+// See https://github.com/dapperlabs/flow-go/issues/6368 for details and proposal
 //
 type Epoch interface {
 
