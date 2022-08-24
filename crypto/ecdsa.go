@@ -8,13 +8,13 @@ package crypto
 // This implementation does not include any security against side-channel attacks.
 
 import (
-	goecdsa "crypto/ecdsa"
+	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
 	"math/big"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
 
 	"github.com/onflow/flow-go/crypto/hash"
 )
@@ -43,7 +43,7 @@ func bitsToBytes(bits int) int {
 // the signature is the concatenation bytes(r)||bytes(s)
 // where r and s are padded to the curve order size
 func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
-	r, s, err := goecdsa.Sign(rand.Reader, sk.goPrKey, h)
+	r, s, err := ecdsa.Sign(rand.Reader, sk.goPrKey, h)
 	if err != nil {
 		return nil, fmt.Errorf("ECDSA Sign failed: %w", err)
 	}
@@ -85,7 +85,7 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 	var s big.Int
 	r.SetBytes(sig[:Nlen])
 	s.SetBytes(sig[Nlen:])
-	return goecdsa.Verify(pk.goPubKey, h, &r, &s), nil
+	return ecdsa.Verify(pk.goPubKey, h, &r, &s), nil
 }
 
 // Verify verifies a signature of an input data under the public key.
@@ -140,13 +140,13 @@ var one = new(big.Int).SetInt64(1)
 
 // goecdsaGenerateKey generates a public and private key pair
 // for the crypto/ecdsa library using the input seed as input
-func goecdsaGenerateKey(c elliptic.Curve, seed []byte) *goecdsa.PrivateKey {
+func goecdsaGenerateKey(c elliptic.Curve, seed []byte) *ecdsa.PrivateKey {
 	k := new(big.Int).SetBytes(seed)
 	n := new(big.Int).Sub(c.Params().N, one)
 	k.Mod(k, n)
 	k.Add(k, one)
 
-	priv := new(goecdsa.PrivateKey)
+	priv := new(ecdsa.PrivateKey)
 	priv.PublicKey.Curve = c
 	priv.D = k
 	// public key is not computed
@@ -187,7 +187,7 @@ func (a *ecdsaAlgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
 		return nil, invalidInputsErrorf("input is not a valid %s key", a.algo)
 	}
 
-	priv := goecdsa.PrivateKey{
+	priv := ecdsa.PrivateKey{
 		D: &d,
 	}
 	priv.PublicKey.Curve = a.curve
@@ -220,7 +220,7 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 		return nil, invalidInputsErrorf("input %x is not a valid %s key", der, a.algo)
 	}
 
-	pk := goecdsa.PublicKey{
+	pk := ecdsa.PublicKey{
 		Curve: a.curve,
 		X:     &x,
 		Y:     &y,
@@ -240,25 +240,25 @@ func (a *ecdsaAlgo) decodePublicKeyCompressed(pkBytes []byte) (PublicKey, error)
 	if len(pkBytes) != expectedLen {
 		return nil, invalidInputsErrorf(fmt.Sprintf("input length incompatible, expected %d, got %d", expectedLen, len(pkBytes)))
 	}
-	var goPubKey *goecdsa.PublicKey
+	var goPubKey *ecdsa.PublicKey
 
 	if a.curve == elliptic.P256() {
 		x, y := elliptic.UnmarshalCompressed(a.curve, pkBytes)
 		if x == nil {
 			return nil, invalidInputsErrorf("Key %x can't be interpreted as %v", pkBytes, a.algo.String())
 		}
-		goPubKey = new(goecdsa.PublicKey)
+		goPubKey = new(ecdsa.PublicKey)
 		goPubKey.Curve = a.curve
 		goPubKey.X = x
 		goPubKey.Y = y
 
 	} else if a.curve == btcec.S256() {
-		pk, err := btcec.ParsePubKey(pkBytes, btcec.S256())
+		pk, err := btcec.ParsePubKey(pkBytes)
 		if err != nil {
 			return nil, invalidInputsErrorf("Key %x can't be interpreted as %v", pkBytes, a.algo.String())
 		}
-		// This assertion never fails
-		goPubKey = (*goecdsa.PublicKey)(pk)
+		// convert to a crypto/ecdsa key
+		goPubKey = pk.ToECDSA()
 	} else {
 		return nil, invalidInputsErrorf("the input curve is not supported")
 	}
@@ -269,8 +269,8 @@ func (a *ecdsaAlgo) decodePublicKeyCompressed(pkBytes []byte) (PublicKey, error)
 type PrKeyECDSA struct {
 	// the signature algo
 	alg *ecdsaAlgo
-	// goecdsa private key
-	goPrKey *goecdsa.PrivateKey
+	// ecdsa private key
+	goPrKey *ecdsa.PrivateKey
 	// public key
 	pubKey *PubKeyECDSA
 }
@@ -340,7 +340,7 @@ type PubKeyECDSA struct {
 	// the signature algo
 	alg *ecdsaAlgo
 	// public key data
-	goPubKey *goecdsa.PublicKey
+	goPubKey *ecdsa.PublicKey
 }
 
 // Algorithm returns the the algo related to the private key
@@ -354,13 +354,10 @@ func (pk *PubKeyECDSA) Size() int {
 }
 
 // EncodeCompressed returns a compressed encoding according to X9.62 section 4.3.6.
-// This compressed representation uses an extra byte to disambiguate sign.
+// This compressed representation uses an extra byte to disambiguate parity.
 // The expected input is a public key (x,y).
 func (pk *PubKeyECDSA) EncodeCompressed() []byte {
-	if pk.alg.curve == btcec.S256() {
-		return (*btcec.PublicKey)(pk.goPubKey).SerializeCompressed()
-	}
-	return elliptic.MarshalCompressed(pk.goPubKey, pk.goPubKey.X, pk.goPubKey.Y)
+	return elliptic.MarshalCompressed(pk.goPubKey.Curve, pk.goPubKey.X, pk.goPubKey.Y)
 }
 
 // given a public key (x,y), returns a raw uncompressed encoding bytes(x)||bytes(y)
