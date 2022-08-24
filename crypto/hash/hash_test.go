@@ -130,7 +130,7 @@ func TestHashersAPI(t *testing.T) {
 		// Reset should empty the state
 		h := newFunction()
 		expectedEmptyHash := h.SumHash()
-		h.Write(data)
+		_, _ = h.Write(data)
 		h.Reset()
 		emptyHash := h.SumHash()
 		assert.Equal(t, expectedEmptyHash, emptyHash)
@@ -154,7 +154,7 @@ func TestHashersAPI(t *testing.T) {
 		// ComputeHash output does not depend on the hasher state
 		h = newFunction()
 
-		h.Write([]byte("dummy data"))
+		_, _ = h.Write([]byte("dummy data"))
 		hash1 = h.ComputeHash(data)
 		assert.Equal(t, hash1, hash2)
 	}

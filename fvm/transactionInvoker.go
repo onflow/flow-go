@@ -72,7 +72,7 @@ func (i *TransactionInvoker) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
+		if mergeError := parentState.MergeState(childState, sth.EnforceLimits()); mergeError != nil {
 			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
@@ -306,7 +306,7 @@ func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txH
 			Str("txHash", txHash).
 			Uint64("ledgerInteractionUsed", sth.InteractionUsed()).
 			Uint("computationUsed", sth.TotalComputationUsed()).
-			Uint("memoryEstimate", sth.TotalMemoryEstimate()).
+			Uint64("memoryEstimate", sth.TotalMemoryEstimate()).
 			Dict("computationIntensities", computation).
 			Dict("memoryIntensities", memory).
 			Msg("transaction execution data")

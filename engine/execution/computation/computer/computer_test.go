@@ -29,8 +29,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -174,7 +174,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		contextOptions := []fvm.Option{
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
-			fvm.WithBlocks(&fvm.NoopBlockFinder{}),
+			fvm.WithBlocks(&environment.NoopBlockFinder{}),
 		}
 		// set 0 clusters to pass n_collectors >= n_clusters check
 		epochConfig := epochs.DefaultEpochConfig()
@@ -441,62 +441,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
 
 		assertEventHashesMatch(t, collectionCount+1, result)
-	})
-
-	t.Run("system transaction does not read memory limit from state", func(t *testing.T) {
-
-		meter.DefaultMemoryWeights = meter.ExecutionMemoryWeights{
-			0: 1, // single weight set to 1
-		}
-		execCtx := fvm.NewContext(
-			zerolog.Nop(),
-			fvm.WithMemoryLimit(10), // the context memory limit is set to 10
-		)
-
-		rt := &testRuntime{
-			executeTransaction: func(script runtime.Script, r runtime.Context) error {
-				err := r.Interface.MeterMemory(common.MemoryUsage{
-					Kind:   0,
-					Amount: 11,
-				})
-				require.NoError(t, err) // should fail if limit is taken from the default context
-
-				return nil
-			},
-			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
-				require.Fail(t, "system chunk should not read context from the state")
-				return nil, nil
-			},
-		}
-
-		vm := fvm.NewVirtualMachine(rt)
-
-		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
-
-		prov := provider.NewProvider(
-			zerolog.Nop(),
-			metrics.NewNoopCollector(),
-			execution_data.DefaultSerializer,
-			bservice,
-			trackerStorage,
-		)
-
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
-		require.NoError(t, err)
-
-		block := generateBlock(0, 0, rag)
-
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
-
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
-		assert.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, 1) // system chunk
 	})
 
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
@@ -800,8 +744,8 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return ledger.Get(owner, key)
 	})
-	sth := state.NewStateHolder(state.NewState(view, meter.NewMeter(meter.DefaultParameters()), state.DefaultParameters()))
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
+	accounts := state.NewAccounts(stTxn)
 
 	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
 	// as freeze check should happen before a transaction signature is checked
@@ -851,7 +795,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	execCtx := fvm.NewContext(
 		zerolog.Nop(),
 		fvm.WithChain(flow.Localnet.Chain()),
-		fvm.WithBlocks(&fvm.NoopBlockFinder{}),
+		fvm.WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
 	runtime := fvm.NewInterpreterRuntime()

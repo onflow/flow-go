@@ -27,20 +27,6 @@ func (_m *MeterInterface) Meter(_a0 common.ComputationKind, _a1 uint) error {
 	return r0
 }
 
-// meterMemory provides a mock function with given fields: kind, intensity
-func (_m *MeterInterface) meterMemory(kind common.MemoryKind, intensity uint) error {
-	ret := _m.Called(kind, intensity)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(common.MemoryKind, uint) error); ok {
-		r0 = rf(kind, intensity)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 type mockConstructorTestingTNewMeterInterface interface {
 	mock.TestingT
 	Cleanup(func())

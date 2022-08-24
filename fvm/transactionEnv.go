@@ -47,7 +47,6 @@ func NewTransactionEnvironment(
 
 	accounts := state.NewAccounts(sth)
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
-	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	// TODO set the flags on context
 	eventHandler := handler.NewEventHandler(ctx.Chain,
@@ -56,16 +55,19 @@ func NewTransactionEnvironment(
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	tracer := environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
+	meter := environment.NewMeter(sth)
 
 	env := &TransactionEnv{
 		commonEnv: commonEnv{
 			Tracer: tracer,
+			Meter:  meter,
 			ProgramLogger: environment.NewProgramLogger(
 				tracer,
 				ctx.Logger,
 				ctx.Metrics,
 				ctx.CadenceLoggingEnabled,
 			),
+			UUIDGenerator: environment.NewUUIDGenerator(tracer, meter, sth),
 			UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
 				tracer,
 				ctx.BlockHeader,
@@ -76,7 +78,6 @@ func NewTransactionEnvironment(
 			programs:       programsHandler,
 			accounts:       accounts,
 			accountKeys:    accountKeys,
-			uuidGenerator:  uuidGenerator,
 			frozenAccounts: nil,
 		},
 
@@ -88,7 +89,6 @@ func NewTransactionEnvironment(
 	}
 
 	// TODO(patrick): rm this hack
-	env.MeterInterface = env
 	env.AccountInterface = env
 	env.fullEnv = env
 
@@ -227,7 +227,7 @@ func (e *TransactionEnv) isAuthorizer(address runtime.Address) bool {
 func (e *TransactionEnv) EmitEvent(event cadence.Event) error {
 	defer e.StartExtensiveTracingSpanFromRoot(trace.FVMEnvEmitEvent).End()
 
-	err := e.Meter(meter.ComputationKindEmitEvent, 1)
+	err := e.MeterComputation(meter.ComputationKindEmitEvent, 1)
 	if err != nil {
 		return fmt.Errorf("emit event failed: %w", err)
 	}
@@ -241,13 +241,6 @@ func (e *TransactionEnv) Events() []flow.Event {
 
 func (e *TransactionEnv) ServiceEvents() []flow.Event {
 	return e.eventHandler.ServiceEvents()
-}
-
-func (e *TransactionEnv) Meter(kind common.ComputationKind, intensity uint) error {
-	if e.sth.EnforceComputationLimits() {
-		return e.sth.MeterComputation(kind, intensity)
-	}
-	return nil
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
@@ -279,7 +272,7 @@ func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) e
 func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvCreateAccount).End()
 
-	err = e.Meter(meter.ComputationKindCreateAccount, 1)
+	err = e.MeterComputation(meter.ComputationKindCreateAccount, 1)
 	if err != nil {
 		return address, err
 	}
@@ -318,7 +311,7 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte) error {
 	defer e.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
 
-	err := e.Meter(meter.ComputationKindAddEncodedAccountKey, 1)
+	err := e.MeterComputation(meter.ComputationKindAddEncodedAccountKey, 1)
 	if err != nil {
 		return fmt.Errorf("add encoded account key failed: %w", err)
 	}
@@ -347,7 +340,7 @@ func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey
 func (e *TransactionEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
-	err = e.Meter(meter.ComputationKindRevokeEncodedAccountKey, 1)
+	err = e.MeterComputation(meter.ComputationKindRevokeEncodedAccountKey, 1)
 	if err != nil {
 		return publicKey, fmt.Errorf("revoke encoded account key failed: %w", err)
 	}
@@ -380,7 +373,7 @@ func (e *TransactionEnv) AddAccountKey(
 ) {
 	defer e.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
 
-	err := e.Meter(meter.ComputationKindAddAccountKey, 1)
+	err := e.MeterComputation(meter.ComputationKindAddAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("add account key failed: %w", err)
 	}
@@ -402,7 +395,7 @@ func (e *TransactionEnv) AddAccountKey(
 func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
-	err := e.Meter(meter.ComputationKindRevokeAccountKey, 1)
+	err := e.MeterComputation(meter.ComputationKindRevokeAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("revoke account key failed: %w", err)
 	}
@@ -413,7 +406,7 @@ func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvUpdateAccountContractCode).End()
 
-	err = e.Meter(meter.ComputationKindUpdateAccountContractCode, 1)
+	err = e.MeterComputation(meter.ComputationKindUpdateAccountContractCode, 1)
 	if err != nil {
 		return fmt.Errorf("update account contract code failed: %w", err)
 	}
@@ -434,7 +427,7 @@ func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name
 func (e *TransactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountContractCode).End()
 
-	err = e.Meter(meter.ComputationKindRemoveAccountContractCode, 1)
+	err = e.MeterComputation(meter.ComputationKindRemoveAccountContractCode, 1)
 	if err != nil {
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}

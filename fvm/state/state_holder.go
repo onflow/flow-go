@@ -14,14 +14,15 @@ import (
 // the state it is recommended that such services wraps
 // a state manager instead of a state itself.
 type StateHolder struct {
-	enforceLimits         bool
-	payerIsServiceAccount bool
-	startState            *State
-	activeState           *State
+	enforceLimits bool
+	startState    *State
+	activeState   *State
 }
 
-// NewStateHolder constructs a new state manager
-func NewStateHolder(startState *State) *StateHolder {
+// NewStateTransaction constructs a new state transaction which manages nested
+// transactions.
+func NewStateTransaction(startView View, params StateParameters) *StateHolder {
+	startState := NewState(startView, params)
 	return &StateHolder{
 		enforceLimits: true,
 		startState:    startState,
@@ -95,7 +96,7 @@ func (s *StateHolder) MemoryIntensities() meter.MeteredMemoryIntensities {
 	return s.activeState.MemoryIntensities()
 }
 
-func (s *StateHolder) TotalMemoryEstimate() uint {
+func (s *StateHolder) TotalMemoryEstimate() uint64 {
 	return s.activeState.TotalMemoryEstimate()
 }
 
@@ -105,11 +106,6 @@ func (s *StateHolder) InteractionUsed() uint64 {
 
 func (s *StateHolder) ViewForTestingOnly() View {
 	return s.activeState.View()
-}
-
-// SetPayerIsServiceAccount sets if the payer is the service account
-func (s *StateHolder) SetPayerIsServiceAccount() {
-	s.payerIsServiceAccount = true
 }
 
 // NewChild constructs a new child of active state
@@ -139,11 +135,6 @@ func (s *StateHolder) EnforceComputationLimits() bool {
 }
 
 // EnforceInteractionLimits returns if the interaction limits should be enforced or not
-func (s *StateHolder) EnforceInteractionLimits() bool {
-	return !s.payerIsServiceAccount && s.enforceLimits
-}
-
-// EnforceMemoryLimits returns if the memory limits should be enforced or not
-func (s *StateHolder) EnforceMemoryLimits() bool {
-	return !s.payerIsServiceAccount && s.enforceLimits
+func (s *StateHolder) EnforceLimits() bool {
+	return s.enforceLimits
 }

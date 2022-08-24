@@ -1794,7 +1794,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		block := unittest.BlockWithParentFixture(head)
 		payload := flow.EmptyPayload()
 		payload.Guarantees = []*flow.CollectionGuarantee{
-			&flow.CollectionGuarantee{
+			{
 				ChainID:          cluster.ChainID(),
 				ReferenceBlockID: head.ID(),
 				SignerIndices:    validSignerIndices,
@@ -1813,7 +1813,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
-		require.True(t, errors.As(err, &signature.ErrInvalidChecksum), err)
+		require.True(t, errors.Is(err, signature.ErrInvalidChecksum), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// now the guarantee has invalid signer indices: the checksum should have 4 bytes, but it only has 1
@@ -1827,7 +1827,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
-		require.True(t, errors.As(err, &signature.ErrInvalidChecksum), err)
+		require.True(t, errors.Is(err, signature.ErrInvalidChecksum), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// let's test even if the checksum is correct, but signer indices is still wrong because the tailing are not 0,
@@ -1840,7 +1840,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
-		require.True(t, errors.As(err, &signature.ErrIllegallyPaddedBitVector), err)
+		require.True(t, errors.Is(err, signature.ErrIllegallyPaddedBitVector), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// test imcompatible bit vector length
@@ -1849,7 +1849,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
-		require.True(t, errors.As(err, &signature.ErrIncompatibleBitVectorLength), err)
+		require.True(t, errors.Is(err, signature.ErrIncompatibleBitVectorLength), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// revert back to good value
@@ -1859,7 +1859,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].ReferenceBlockID = flow.ZeroID
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.True(t, errors.As(err, &storage.ErrNotFound), err)
+		require.True(t, errors.Is(err, storage.ErrNotFound), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// revert back to good value
@@ -1874,7 +1874,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].ChainID = flow.ChainID("some_bad_chain_ID")
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.True(t, errors.As(err, &realprotocol.ErrClusterNotFound), err)
+		require.True(t, errors.Is(err, realprotocol.ErrClusterNotFound), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 	})
 }

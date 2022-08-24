@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -14,18 +15,19 @@ import (
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
 	Chain   flow.Chain
-	Blocks  Blocks
+	Blocks  environment.Blocks
 	Metrics handler.MetricsReporter
 	Tracer  module.Tracer
-	// AllowContextOverrideByExecutionState is a flag telling the fvm to override certain parts of the context from the state
-	AllowContextOverrideByExecutionState bool
-	ComputationLimit                     uint64
-	MemoryLimit                          uint64
-	MaxStateKeySize                      uint64
-	MaxStateValueSize                    uint64
-	MaxStateInteractionSize              uint64
-	EventCollectionByteSizeLimit         uint64
-	BlockHeader                          *flow.Header
+	// DisableMemoryAndInteractionLimits will override memory and interaction
+	// limits and set them to MaxUint64, effectively disabling these limits.
+	DisableMemoryAndInteractionLimits bool
+	ComputationLimit                  uint64
+	MemoryLimit                       uint64
+	MaxStateKeySize                   uint64
+	MaxStateValueSize                 uint64
+	MaxStateInteractionSize           uint64
+	EventCollectionByteSizeLimit      uint64
+	BlockHeader                       *flow.Header
 	// NOTE: The ServiceAccountEnabled option is used by the playground
 	// https://github.com/onflow/flow-playground-api/blob/1ad967055f31db8f1ce88e008960e5fc14a9fbd1/compute/computer.go#L76
 	ServiceAccountEnabled bool
@@ -71,24 +73,24 @@ const (
 
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
-		Chain:                                flow.Mainnet.Chain(),
-		Blocks:                               nil,
-		Metrics:                              &handler.NoopMetricsReporter{},
-		Tracer:                               nil,
-		AllowContextOverrideByExecutionState: true,
-		ComputationLimit:                     DefaultComputationLimit,
-		MemoryLimit:                          DefaultMemoryLimit,
-		MaxStateKeySize:                      state.DefaultMaxKeySize,
-		MaxStateValueSize:                    state.DefaultMaxValueSize,
-		MaxStateInteractionSize:              state.DefaultMaxInteractionSize,
-		EventCollectionByteSizeLimit:         DefaultEventCollectionByteSizeLimit,
-		BlockHeader:                          nil,
-		ServiceAccountEnabled:                true,
-		RestrictContractDeployment:           true,
-		RestrictContractRemoval:              true,
-		CadenceLoggingEnabled:                false,
-		ServiceEventCollectionEnabled:        false,
-		ExtensiveTracing:                     false,
+		Chain:                             flow.Mainnet.Chain(),
+		Blocks:                            nil,
+		Metrics:                           &handler.NoopMetricsReporter{},
+		Tracer:                            nil,
+		DisableMemoryAndInteractionLimits: false,
+		ComputationLimit:                  DefaultComputationLimit,
+		MemoryLimit:                       DefaultMemoryLimit,
+		MaxStateKeySize:                   state.DefaultMaxKeySize,
+		MaxStateValueSize:                 state.DefaultMaxValueSize,
+		MaxStateInteractionSize:           state.DefaultMaxInteractionSize,
+		EventCollectionByteSizeLimit:      DefaultEventCollectionByteSizeLimit,
+		BlockHeader:                       nil,
+		ServiceAccountEnabled:             true,
+		RestrictContractDeployment:        true,
+		RestrictContractRemoval:           true,
+		CadenceLoggingEnabled:             false,
+		ServiceEventCollectionEnabled:     false,
+		ExtensiveTracing:                  false,
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
@@ -121,10 +123,11 @@ func WithGasLimit(limit uint64) Option {
 	}
 }
 
-// WithAllowContextOverrideByExecutionState sets if certain context parameters get loaded from the state or not
-func WithAllowContextOverrideByExecutionState(load bool) Option {
+// WithMemoryAndInteractionLimitsDisabled will override memory and interaction
+// limits and set them to MaxUint64, effectively disabling these limits.
+func WithMemoryAndInteractionLimitsDisabled() Option {
 	return func(ctx Context) Context {
-		ctx.AllowContextOverrideByExecutionState = load
+		ctx.DisableMemoryAndInteractionLimits = true
 		return ctx
 	}
 }
@@ -209,7 +212,7 @@ func WithExtensiveTracing() Option {
 //
 // The VM uses the block storage provider to provide historical block information to
 // the Cadence runtime.
-func WithBlocks(blocks Blocks) Option {
+func WithBlocks(blocks environment.Blocks) Option {
 	return func(ctx Context) Context {
 		ctx.Blocks = blocks
 		return ctx
