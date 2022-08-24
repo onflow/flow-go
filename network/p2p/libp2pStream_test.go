@@ -153,8 +153,11 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(t, 0, p2p.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
 
-	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
-	streamCount := 100
+	// Now attempt to create another 50 outbound stream to the same destination by calling CreateStream
+	//
+	// NB! This number must be lower than default limits in libp2p:
+	// See: https://github.com/libp2p/go-libp2p/blob/master/limits.go
+	streamCount := 50
 	var streams []network.Stream
 	for i := 0; i < streamCount; i++ {
 		pInfo, err := p2p.PeerAddressInfo(*id2)
@@ -600,18 +603,18 @@ func TestConnectionGating(t *testing.T) {
 		_, ok := node1Peers[p]
 		return ok
 	}))
+	defer stopNode(t, node1)
 
 	node2Peers := make(map[peer.ID]struct{})
 	node2, node2Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
 		_, ok := node2Peers[p]
 		return ok
 	}))
+	defer stopNode(t, node2)
 
-	defer stopNode(t, node1)
 	node1Info, err := p2p.PeerAddressInfo(node1Id)
 	assert.NoError(t, err)
 
-	defer stopNode(t, node2)
 	node2Info, err := p2p.PeerAddressInfo(node2Id)
 	assert.NoError(t, err)
 

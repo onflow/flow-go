@@ -68,7 +68,9 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -106,6 +108,8 @@ type ExecutionConfig struct {
 	apiBurstlimits                       map[string]int
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
+	blobstoreRateLimit                   int
+	blobstoreBurstLimit                  int
 }
 
 type ExecutionNodeBuilder struct {
@@ -165,6 +169,8 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			flags.Uint64Var(&e.exeConf.executionDataPrunerThreshold, "execution-data-height-range-threshold", 100_000, "height threshold used to trigger Execution Data pruning")
 			flags.StringToIntVar(&e.exeConf.apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,ExecuteScriptAtBlockID=500 etc. note limits apply globally to all clients.")
 			flags.StringToIntVar(&e.exeConf.apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,ExecuteScriptAtBlockID=100 etc. note limits apply globally to all clients.")
+			flags.IntVar(&e.exeConf.blobstoreRateLimit, "blobstore-rate-limit", 0, "per second outgoing rate limit for Execution Data blobstore")
+			flags.IntVar(&e.exeConf.blobstoreBurstLimit, "blobstore-burst-limit", 0, "outgoing burst limit for Execution Data blobstore")
 		}).
 		ValidateFlags(func() error {
 			if e.exeConf.enableBlockDataUpload {
@@ -467,7 +473,13 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return executionDataPruner, err
 		}).
 		Component("provider engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, executionDataDatastore)
+			opts := []network.BlobServiceOption{}
+
+			if e.exeConf.blobstoreRateLimit > 0 && e.exeConf.blobstoreBurstLimit > 0 {
+				opts = append(opts, p2p.WithRateLimit(float64(e.exeConf.blobstoreRateLimit), e.exeConf.blobstoreBurstLimit))
+			}
+
+			bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, executionDataDatastore, opts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to register blob service: %w", err)
 			}
