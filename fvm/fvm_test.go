@@ -118,7 +118,7 @@ func TestPrograms(t *testing.T) {
 					)
 					require.NoError(t, err)
 
-					tx := fvm.Transaction(txBody, uint32(i))
+					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 					err = vm.Run(txCtx, tx, view, programs)
 					require.NoError(t, err)
@@ -505,7 +505,7 @@ func TestEventLimits(t *testing.T) {
 
 	programs := programs.NewEmptyPrograms()
 
-	tx := fvm.Transaction(txBody, 0)
+	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 	err := vm.Run(ctx, tx, ledger, programs)
 	require.NoError(t, err)
 
@@ -522,7 +522,7 @@ func TestEventLimits(t *testing.T) {
 
 	t.Run("With limits", func(t *testing.T) {
 		txBody.Payer = unittest.RandomAddressFixture()
-		tx := fvm.Transaction(txBody, 0)
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 		err := vm.Run(ctx, tx, ledger, programs)
 		require.NoError(t, err)
 
@@ -532,7 +532,7 @@ func TestEventLimits(t *testing.T) {
 
 	t.Run("With service account as payer", func(t *testing.T) {
 		txBody.Payer = chain.ServiceAddress()
-		tx := fvm.Transaction(txBody, 0)
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 		err := vm.Run(ctx, tx, ledger, programs)
 		require.NoError(t, err)
 
@@ -568,7 +568,7 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 			require.NoError(t, err)
 			txBody.AddEnvelopeSignature(accounts[0], 0, sig)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
@@ -881,7 +881,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
@@ -915,7 +915,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			tx = fvm.Transaction(txBody, 0)
+			tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
@@ -946,7 +946,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			tx = fvm.Transaction(txBody, 1)
+			tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
@@ -1021,7 +1021,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
@@ -1070,7 +1070,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
@@ -1106,7 +1106,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
@@ -1172,7 +1172,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 			// There are 100 breaks and each break uses 1_000_000 memory
@@ -1209,7 +1209,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
@@ -1244,7 +1244,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
@@ -1278,7 +1278,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
@@ -1319,7 +1319,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 			require.NoError(t, tx.Err)
@@ -1341,7 +1341,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err = testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
 			require.NoError(t, err)
 
-			tx = fvm.Transaction(txBody, 0)
+			tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
@@ -1606,7 +1606,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				_ = testutil.SignPayload(txBody, account, privateKey)
 				_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 				err = vm.Run(subCtx, tx, view, programs)
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
@@ -1665,7 +1665,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				_ = testutil.SignPayload(txBody, account, privateKey)
 				_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 				err = vm.Run(subCtx, tx, view, programs)
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
