@@ -11,11 +11,11 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/libp2p/go-libp2p-core/transport"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/config"
-	"github.com/libp2p/go-tcp-transport"
+	discoveryRouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
@@ -198,7 +198,7 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 
 	psOpts := append(
 		DefaultPubsubOptions(DefaultMaxPubSubMsgSize),
-		pubsub.WithDiscovery(discovery.NewRoutingDiscovery(rsys)),
+		pubsub.WithDiscovery(discoveryRouting.NewRoutingDiscovery(rsys)),
 		pubsub.WithMessageIdFn(DefaultMessageIDFunction),
 	)
 
