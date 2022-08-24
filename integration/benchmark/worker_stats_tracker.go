@@ -8,11 +8,15 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 )
 
+type WorkerStats struct {
+	workers int
+	txsSent int
+}
+
 // WorkerStatsTracker keeps track of worker stats
 type WorkerStatsTracker struct {
 	mux              sync.Mutex
-	workers          int
-	txsSent          int
+	stats            WorkerStats
 	txsSentPerSecond map[int64]int // tracks txs sent at the timestamp in seconds
 
 	printer *Worker
@@ -41,14 +45,7 @@ func (st *WorkerStatsTracker) AddWorker() {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	st.workers++
-}
-
-func (st *WorkerStatsTracker) GetWorkers() int {
-	st.mux.Lock()
-	defer st.mux.Unlock()
-
-	return st.workers
+	st.stats.workers++
 }
 
 func (st *WorkerStatsTracker) AddTxSent() {
@@ -57,15 +54,15 @@ func (st *WorkerStatsTracker) AddTxSent() {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	st.txsSent++
+	st.stats.txsSent++
 	st.txsSentPerSecond[now]++
 }
 
-func (st *WorkerStatsTracker) GetTxSent() int {
+func (st *WorkerStatsTracker) GetStats() WorkerStats {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	return st.txsSent
+	return st.stats
 }
 
 // AvgTPSBetween returns the average transactions per second TPS between the two time points
@@ -93,9 +90,11 @@ func (st *WorkerStatsTracker) Digest() string {
 		"total TXs sent",
 		"Avg TPS (last 10s)",
 	})
+
+	stats := st.GetStats()
 	t.AppendRow(table.Row{
-		st.GetWorkers(),
-		st.GetTxSent(),
+		stats.workers,
+		stats.txsSent,
 		// use 11 seconds to correct for rounding in buckets
 		st.AvgTPSBetween(time.Now().Add(-11*time.Second), time.Now()),
 	})
