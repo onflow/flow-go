@@ -24,6 +24,7 @@ type epochRange struct {
 
 // epochRangeCache stores at most the 3 latest epoch ranges.
 // Ranges are ordered by counter (ascending) and right-aligned.
+// For example, if we only have one epoch cached, `epochRangeCache[0]` and `epochRangeCache[1]` are `nil`. 
 // Not safe for concurrent use.
 type epochRangeCache [3]*epochRange
 
@@ -70,7 +71,7 @@ func (cache *epochRangeCache) add(epoch *epochRange) error {
 
 	// sanity check: ensure counters/views are sequential
 	if epoch.counter != latestCachedEpoch.counter+1 {
-		return fmt.Errorf("non-sequential epoch counters: adding epoch %d when latest cached epoch is %d", epoch.counter, cache[2].counter)
+		return fmt.Errorf("non-sequential epoch counters: adding epoch %d when latest cached epoch is %d", epoch.counter, latestCachedEpoch.counter)
 	}
 	if epoch.firstView != latestCachedEpoch.finalView+1 {
 		return fmt.Errorf("non-sequential epoch view ranges: adding range [%d,%d] when latest cached range is [%d,%d]",

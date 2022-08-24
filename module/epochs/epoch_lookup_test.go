@@ -112,7 +112,7 @@ func (suite *EpochLookupSuite) TestEpochForViewWithFallback_Curr() {
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
 }
 
-// TestEpochForViewWithFallback_Curr tests constructing and subsequently querying
+// TestEpochForViewWithFallback_PrevCurr tests constructing and subsequently querying
 // EpochLookup with an initial state of a previous and current epoch.
 func (suite *EpochLookupSuite) TestEpochForViewWithFallback_PrevCurr() {
 	epochs := []epochRange{suite.prevEpoch, suite.currEpoch}
@@ -121,7 +121,7 @@ func (suite *EpochLookupSuite) TestEpochForViewWithFallback_PrevCurr() {
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
 }
 
-// TestEpochForViewWithFallback_Curr tests constructing and subsequently querying
+// TestEpochForViewWithFallback_CurrNext tests constructing and subsequently querying
 // EpochLookup with an initial state of a current and next epoch.
 func (suite *EpochLookupSuite) TestEpochForViewWithFallback_CurrNext() {
 	epochs := []epochRange{suite.currEpoch, suite.nextEpoch}
@@ -130,7 +130,7 @@ func (suite *EpochLookupSuite) TestEpochForViewWithFallback_CurrNext() {
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
 }
 
-// TestEpochForViewWithFallback_Curr tests constructing and subsequently querying
+// TestEpochForViewWithFallback_CurrNextPrev tests constructing and subsequently querying
 // EpochLookup with an initial state of a previous, current, and next epoch.
 func (suite *EpochLookupSuite) TestEpochForViewWithFallback_CurrNextPrev() {
 	epochs := []epochRange{suite.prevEpoch, suite.currEpoch, suite.nextEpoch}
@@ -139,7 +139,7 @@ func (suite *EpochLookupSuite) TestEpochForViewWithFallback_CurrNextPrev() {
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
 }
 
-// TestEpochForViewWithFallback_Curr tests constructing and subsequently querying
+// TestEpochForViewWithFallback_EpochFallbackTriggered tests constructing and subsequently querying
 // EpochLookup with an initial state of epoch fallback triggered.
 func (suite *EpochLookupSuite) TestEpochForViewWithFallback_EpochFallbackTriggered() {
 	epochs := []epochRange{suite.prevEpoch, suite.currEpoch, suite.nextEpoch}
@@ -148,6 +148,9 @@ func (suite *EpochLookupSuite) TestEpochForViewWithFallback_EpochFallbackTrigger
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
 }
 
+// TestProtocolEvents_EpochFallbackTriggered tests constructing and subsequently querying
+// EpochLookup where at construction time `EpochLookup` there is no epoch fallback,
+// but an epoch fallback happens later via an epoch event. 
 func (suite *EpochLookupSuite) TestProtocolEvents_EpochFallbackTriggered() {
 	// initially, only current epoch is committed
 	suite.CommitEpochs(suite.currEpoch)
@@ -175,6 +178,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochFallbackTriggered() {
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch)
 }
 
+// TestProtocolEvents_CommittedEpoch tests correct processing of an `EpochCommittedPhaseStarted` event
 func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 	// initially, only current epoch is committed
 	suite.CommitEpochs(suite.currEpoch)
