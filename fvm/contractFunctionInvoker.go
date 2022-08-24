@@ -26,7 +26,8 @@ func NewContractFunctionInvoker(
 	functionName string,
 	arguments []cadence.Value,
 	argumentTypes []sema.Type,
-	logger zerolog.Logger) *ContractFunctionInvoker {
+	logger zerolog.Logger,
+) *ContractFunctionInvoker {
 	return &ContractFunctionInvoker{
 		contractLocation: contractLocation,
 		functionName:     functionName,
@@ -45,16 +46,13 @@ func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error)
 	span.SetAttributes(i.logSpanAttrs...)
 	defer span.End()
 
-	predeclaredValues := valueDeclarations(env)
-
 	value, err := env.VM().Runtime.InvokeContractFunction(
 		i.contractLocation,
 		i.functionName,
 		i.arguments,
 		i.argumentTypes,
 		runtime.Context{
-			Interface:         env,
-			PredeclaredValues: predeclaredValues,
+			Interface: env,
 		},
 	)
 

@@ -2,6 +2,7 @@ package environment
 
 import (
 	"fmt"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/cadence/runtime"
 
@@ -92,7 +93,7 @@ func RuntimeBlockFromHeader(header *flow.Header) runtime.Block {
 	return runtime.Block{
 		Height:    header.Height,
 		View:      header.View,
-		Hash:      runtime.BlockHash(header.ID()),
+		Hash:      stdlib.BlockHash(header.ID()),
 		Timestamp: header.Timestamp.UnixNano(),
 	}
 }

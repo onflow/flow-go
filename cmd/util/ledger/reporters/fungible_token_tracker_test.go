@@ -3,6 +3,7 @@ package reporters_test
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/cadence/runtime"
 	"os"
 	"strings"
 	"testing"
@@ -28,7 +29,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 	chain := flow.Testnet.Chain()
 	view := migrations.NewView(payloads)
 
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	vm := fvm.NewVirtualMachine(rt)
 	opts := []fvm.Option{
 		fvm.WithChain(chain),

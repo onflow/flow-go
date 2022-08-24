@@ -3,6 +3,7 @@ package computation
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/cadence/runtime"
 	"math/rand"
 	"testing"
 	"time"
@@ -85,7 +86,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 	tracer, err := trace.NewTracer(zerolog.Nop(), "", "", 4)
 	require.NoError(b, err)
 
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{}))
 
 	chain := flow.Emulator.Chain()
 	execCtx := fvm.NewContext(

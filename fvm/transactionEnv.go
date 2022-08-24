@@ -92,7 +92,8 @@ func NewTransactionEnvironment(
 	env.AccountInterface = env
 	env.fullEnv = env
 
-	env.contracts = handler.NewContractHandler(accounts,
+	env.contracts = handler.NewContractHandler(
+		accounts,
 		func() bool {
 			enabled, defined := env.GetIsContractDeploymentRestricted()
 			if !defined {

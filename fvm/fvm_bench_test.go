@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/cadence/runtime"
 	"io"
 	"math/rand"
 	"strings"
@@ -142,7 +143,7 @@ type BasicBlockExecutor struct {
 }
 
 func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	vm := fvm.NewVirtualMachine(rt)
 
 	opts := []fvm.Option{

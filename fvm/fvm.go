@@ -19,15 +19,8 @@ type Procedure interface {
 	MemoryLimit(ctx Context) uint64
 }
 
-func NewInterpreterRuntime(options ...runtime.Option) runtime.Runtime {
-
-	defaultOptions := []runtime.Option{
-		runtime.WithContractUpdateValidationEnabled(true),
-	}
-
-	return runtime.NewInterpreterRuntime(
-		append(defaultOptions, options...)...,
-	)
+func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
+	return runtime.NewInterpreterRuntime(config)
 }
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
