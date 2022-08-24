@@ -29,7 +29,7 @@ type EpochLookupSuite struct {
 	params     *mockprotocol.Params
 
 	// backend for mocked functions
-	mu                     sync.Mutex
+	mu                     sync.Mutex // protects access to epochFallbackTriggered and phase
 	epochFallbackTriggered bool
 	phase                  flow.EpochPhase
 
@@ -41,24 +41,6 @@ type EpochLookupSuite struct {
 
 	lookup *EpochLookup
 	cancel context.CancelFunc
-}
-
-func (suite *EpochLookupSuite) WithLock(f func()) {
-	suite.mu.Lock()
-	f()
-	suite.mu.Unlock()
-}
-
-func (suite *EpochLookupSuite) EpochFallbackTriggered() bool {
-	suite.mu.Lock()
-	defer suite.mu.Unlock()
-	return suite.epochFallbackTriggered
-}
-
-func (suite *EpochLookupSuite) Phase() flow.EpochPhase {
-	suite.mu.Lock()
-	defer suite.mu.Unlock()
-	return suite.phase
 }
 
 func TestEpochLookup(t *testing.T) {
@@ -95,6 +77,26 @@ func (suite *EpochLookupSuite) TearDownTest() {
 	if suite.cancel != nil {
 		suite.cancel()
 	}
+}
+
+// WithLock runs the given function while holding the suite lock. Must be used
+// while updating fields used as backends for mocked functions.
+func (suite *EpochLookupSuite) WithLock(f func()) {
+	suite.mu.Lock()
+	f()
+	suite.mu.Unlock()
+}
+
+func (suite *EpochLookupSuite) EpochFallbackTriggered() bool {
+	suite.mu.Lock()
+	defer suite.mu.Unlock()
+	return suite.epochFallbackTriggered
+}
+
+func (suite *EpochLookupSuite) Phase() flow.EpochPhase {
+	suite.mu.Lock()
+	defer suite.mu.Unlock()
+	return suite.phase
 }
 
 // CommitEpochs adds the new epochs to the state.
