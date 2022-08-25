@@ -140,7 +140,7 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			flags.BoolVar(&e.exeConf.extensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
 			flags.BoolVar(&e.exeConf.cadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
 			flags.UintVar(&e.exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for storing actual chunk data packs")
-			flags.Uint32Var(&e.exeConf.chunkDataPackRequestsCacheSize, "chdp-request-cache", mempool.DefaultChunkDataPackRequestQueueSize, "cache size for chunk data pack requests")
+			flags.Uint32Var(&e.exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
 			flags.DurationVar(&e.exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.DurationVar(&e.exeConf.scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
 				"threshold for logging script execution")
