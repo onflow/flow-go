@@ -229,9 +229,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 
 // onChunkDataRequest receives a request for a chunk data pack,
 // and if such a chunk data pack is available in the execution state, it is sent to the requester node.
-// It returns an error if either of the following situatations hit:
-// 1. The chunk data pack exists, but not retrievable from the storage (e.g., inconsistent storage state).
-// 2. The requester for chunk data pack is not authorized in this current epoch.
+// TODO improve error handling https://github.com/dapperlabs/flow-go/issues/6363
 func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 	processStartTime := time.Now()
 
