@@ -426,6 +426,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 		return fmt.Errorf("failed to store execution receipt: %w", err)
 	}
 
+	// TODO(jordan): TestEpochJoinAndLeaveAN fatals here for added AN
 	block, err := e.blocks.ByID(r.ExecutionResult.BlockID)
 	if err != nil {
 		return fmt.Errorf("failed to lookup block while handling receipt: %w", err)

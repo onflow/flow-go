@@ -132,10 +132,9 @@ func (s *Suite) Ghost() *client.GhostClient {
 	return client
 }
 
-// TimedLogf logs the message using t.Log, but prefixes the current time.
-func (s *Suite) TimedLogf(msg string, args ...interface{}) {
-	args = append([]interface{}{time.Now().String()}, args...)
-	s.T().Logf("%s - "+msg, args...)
+// Logf logs the message.
+func (s *Suite) Logf(msg string, args ...interface{}) {
+	s.log.Info().Msgf("$=> "+msg, args...)
 }
 
 func (s *Suite) TearDownTest() {
@@ -771,19 +770,19 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	}
 
 	// staking our new node and add get the corresponding container for that node
-	s.TimedLogf("staking joining node with role %s", role.String())
+	s.Logf("staking joining node with role %s", role.String())
 	info, testContainer := s.StakeNewNode(s.ctx, env, role)
-	s.TimedLogf("successfully staked joining node: %s", info.NodeID)
+	s.Logf("successfully staked joining node: %s", info.NodeID)
 
 	// use admin transaction to remove node, this simulates a node leaving the network
-	s.TimedLogf("removing node %s with role %s", containerToReplace.Config.NodeID, role.String())
+	s.Logf("removing node %s with role %s", containerToReplace.Config.NodeID, role.String())
 	s.removeNodeFromProtocol(s.ctx, env, containerToReplace.Config.NodeID)
-	s.TimedLogf("successfully removed node: %s", containerToReplace.Config.NodeID)
+	s.Logf("successfully removed node: %s", containerToReplace.Config.NodeID)
 
 	// wait for epoch setup phase before we start our container and pause the old container
-	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
+	s.Logf("waiting for EpochSetup phase of first epoch to begin")
 	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
-	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
+	s.Logf("successfully reached EpochSetup phase of first epoch")
 
 	// get latest snapshot and start new container
 	snapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
@@ -793,15 +792,15 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	header, err := snapshot.Head()
 	require.NoError(s.T(), err)
-	s.TimedLogf("retrieved header after entering EpochSetup phase: height=%d, view=%d", header.Height, header.View)
+	s.Logf("retrieved header after entering EpochSetup phase: height=%d, view=%d", header.Height, header.View)
 
 	epoch1FinalView, err := snapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
 	// wait for 5 views after the start of the next epoch before we pause our container to replace
-	s.TimedLogf("waiting for sealed view %d before pausing container", epoch1FinalView+5)
+	s.Logf("waiting for sealed view %d before pausing container", epoch1FinalView+5)
 	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+5)
-	s.TimedLogf("observed sealed view %d -> pausing container", epoch1FinalView+5)
+	s.Logf("observed sealed view %d -> pausing container", epoch1FinalView+5)
 
 	// make sure container to replace removed from smart contract state
 	s.assertNodeNotApprovedOrProposed(s.ctx, env, containerToReplace.Config.NodeID)
@@ -814,9 +813,9 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	require.NoError(s.T(), err)
 
 	// wait for 5 views after pausing our container to replace before we assert healthy network
-	s.TimedLogf("waiting for sealed view %d before asserting network health", epoch1FinalView+10)
+	s.Logf("waiting for sealed view %d before asserting network health", epoch1FinalView+10)
 	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+10)
-	s.TimedLogf("observed sealed view %d -> asserting network health", epoch1FinalView+10)
+	s.Logf("observed sealed view %d -> asserting network health", epoch1FinalView+10)
 
 	// make sure the network is healthy after adding new node
 	checkNetworkHealth(s.ctx, env, snapshot, info)

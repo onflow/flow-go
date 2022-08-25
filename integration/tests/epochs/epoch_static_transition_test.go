@@ -37,16 +37,16 @@ func (s *StaticEpochTransitionSuite) SetupTest() {
 // successful DKG).
 // This is equivalent to runTestEpochJoinAndLeave, without any committee changes.
 func (s *StaticEpochTransitionSuite) TestStaticEpochTransition() {
-	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
+	s.Logf("waiting for EpochSetup phase of first epoch to begin")
 	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
-	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
+	s.Logf("successfully reached EpochSetup phase of first epoch")
 
 	snapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
 	require.NoError(s.T(), err)
 
 	header, err := snapshot.Head()
 	require.NoError(s.T(), err)
-	s.TimedLogf("retrieved header after entering EpochSetup phase: height=%d, view=%d", header.Height, header.View)
+	s.Logf("retrieved header after entering EpochSetup phase: height=%d, view=%d", header.Height, header.View)
 
 	epoch1FinalView, err := snapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
@@ -54,16 +54,16 @@ func (s *StaticEpochTransitionSuite) TestStaticEpochTransition() {
 	require.NoError(s.T(), err)
 
 	// wait for the final view of the first epoch
-	s.TimedLogf("waiting for the final view (%d) of epoch %d", epoch1FinalView, epoch1Counter)
+	s.Logf("waiting for the final view (%d) of epoch %d", epoch1FinalView, epoch1Counter)
 	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+5)
-	s.TimedLogf("sealed final view (%d) of epoch %d", epoch1FinalView, epoch1Counter)
+	s.Logf("sealed final view (%d) of epoch %d", epoch1FinalView, epoch1Counter)
 
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
 	s.assertEpochCounter(s.ctx, 1)
 
 	// submit a smoke test transaction to verify the network can seal a transaction
-	s.TimedLogf("sending smoke test transaction in second epoch")
+	s.Logf("sending smoke test transaction in second epoch")
 	s.submitSmokeTestTransaction(s.ctx)
-	s.TimedLogf("successfully submitted and observed sealing of smoke test transaction")
+	s.Logf("successfully submitted and observed sealing of smoke test transaction")
 }
