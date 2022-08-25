@@ -772,7 +772,7 @@ func (ec *ExecutionCollector) ChunkDataPackResponseDispatchedInNetwork(dispatchT
 // ChunkDataPackRetrievedFromDatabase is executed every time a chunk data pack is queried from database.
 // It records the time it took to query the chunk data pack.
 func (ec *ExecutionCollector) ChunkDataPackRetrievedFromDatabase(queryTime time.Duration) {
-	ec.chunkDataPackQueryTime.Observe(float64(queryTime.Milliseconds()))
+	ec.chunkDataPackQueryTime.Observe(float64(dispatchTime.Milliseconds())*1000)
 }
 
 func (ec *ExecutionCollector) ExecutionSync(syncing bool) {
