@@ -88,7 +88,7 @@ func (NoopBlockFinder) ByHeightFrom(_ uint64, _ *flow.Header) (*flow.Header, err
 	return nil, nil
 }
 
-func RuntimeBlockFromHeader(header *flow.Header) runtime.Block {
+func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
 	return runtime.Block{
 		Height:    header.Height,
 		View:      header.View,
