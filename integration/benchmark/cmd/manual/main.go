@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"flag"
 	"net"
 	"os"
@@ -19,7 +18,6 @@ import (
 	"github.com/onflow/flow-go-sdk/access"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/benchmark"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -80,24 +78,6 @@ func main() {
 	flowTokenAddress := addressGen.NextAddress()
 	log.Info().Msgf("Flow Token Address: %v", flowTokenAddress)
 
-	serviceAccountPrivateKeyBytes, err := hex.DecodeString(*serviceAccountPrivateKeyHex)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("error while hex decoding hardcoded root key")
-	}
-
-	ServiceAccountPrivateKey := flow.AccountPrivateKey{
-		SignAlgo: unittest.ServiceAccountPrivateKeySignAlgo,
-		HashAlgo: unittest.ServiceAccountPrivateKeyHashAlgo,
-	}
-	ServiceAccountPrivateKey.PrivateKey, err = crypto.DecodePrivateKey(
-		ServiceAccountPrivateKey.SignAlgo, serviceAccountPrivateKeyBytes)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("error while decoding hardcoded root key bytes")
-	}
-
-	// get the private key string
-	encodedPrivateKey := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
-
 	// sleep in order to ensure the testnet is up and running
 	if *sleep > 0 {
 		log.Info().Msgf("Sleeping for %v before starting benchmark", sleep)
@@ -129,7 +109,7 @@ func main() {
 				loaderMetrics,
 				clients,
 				benchmark.NetworkParams{
-					ServAccPrivKeyHex:     encodedPrivateKey,
+					ServAccPrivKeyHex:     *serviceAccountPrivateKeyHex,
 					ServiceAccountAddress: &serviceAccountAddress,
 					FungibleTokenAddress:  &fungibleTokenAddress,
 					FlowTokenAddress:      &flowTokenAddress,

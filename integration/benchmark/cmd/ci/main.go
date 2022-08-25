@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -24,7 +23,6 @@ import (
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/benchmark"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -123,24 +121,6 @@ func main() {
 	flowTokenAddress := addressGen.NextAddress()
 	log.Info().Msgf("Flow Token Address: %v", flowTokenAddress)
 
-	serviceAccountPrivateKeyBytes, err := hex.DecodeString(serviceAccountPrivateKeyHex)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("error while hex decoding hardcoded root key")
-	}
-
-	ServiceAccountPrivateKey := flow.AccountPrivateKey{
-		SignAlgo: unittest.ServiceAccountPrivateKeySignAlgo,
-		HashAlgo: unittest.ServiceAccountPrivateKeyHashAlgo,
-	}
-	ServiceAccountPrivateKey.PrivateKey, err = crypto.DecodePrivateKey(
-		ServiceAccountPrivateKey.SignAlgo, serviceAccountPrivateKeyBytes)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("error while decoding hardcoded root key bytes")
-	}
-
-	// get the private key string
-	encodedPrivateKey := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
-
 	flowClient, err := client.NewClient(accessNodeAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
@@ -157,7 +137,7 @@ func main() {
 		loaderMetrics,
 		[]access.Client{flowClient},
 		benchmark.NetworkParams{
-			ServAccPrivKeyHex:     encodedPrivateKey,
+			ServAccPrivKeyHex:     serviceAccountPrivateKeyHex,
 			ServiceAccountAddress: &serviceAccountAddress,
 			FungibleTokenAddress:  &fungibleTokenAddress,
 			FlowTokenAddress:      &flowTokenAddress,
