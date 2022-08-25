@@ -2,8 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/onflow/cadence/runtime"
 	"time"
+
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/spf13/pflag"
 
