@@ -154,6 +154,7 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovelerWorker(ctx irrecovera
 			// there is at list a single chunk data pack request queued up.
 			e.shovelChunkDataPackRequests()
 		case <-ctx.Done():
+			// close the internal channel, the workers will drain the channel before exiting
 			close(e.chdpRequestChannel)
 			e.log.Trace().Msg("processing chunk data pack request worker terminated")
 			return
