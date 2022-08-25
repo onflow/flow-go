@@ -348,7 +348,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil).Once()
 
 		// channel tracking for the first chunk data pack request responded.
-		responded := make(chan struct{})
 		chunkConduit.On("Unicast", mock.Anything, originIdentity.NodeID).
 			Run(func(args mock.Arguments) {
 				res, ok := args[0].(*messages.ChunkDataResponse)
@@ -356,7 +355,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 				actualChunkID := res.ChunkDataPack.ChunkID
 				assert.Equal(t, chunkID, actualChunkID)
-				close(responded)
 			}).
 			Return(nil).Once()
 
@@ -378,8 +376,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.Eventually(t, func() bool {
 			return requestQueue.Size() == uint(0) // ensuring first request has been picked up from the queue.
 		}, 1*time.Second, 100*time.Millisecond)
-		// waits till first chunk data pack is replied and then makes the requester unauthorized.
-		unittest.RequireCloseBefore(t, responded, 1*time.Second, "could not get first chunk data pack responded")
 		currentAuthorizedState = false
 
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
