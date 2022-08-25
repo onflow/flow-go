@@ -565,8 +565,8 @@ func (in *Instance) Run() error {
 
 func (in *Instance) ProcessBlock(proposal *model.Proposal) {
 	in.updatingBlocks.Lock()
-	_, parentExists := in.headers[proposal.Block.QC.BlockID]
 	defer in.updatingBlocks.Unlock()
+	_, parentExists := in.headers[proposal.Block.QC.BlockID]
 
 	if parentExists {
 		next := proposal

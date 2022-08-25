@@ -28,7 +28,9 @@ func Connect(instances []*Instance) {
 			func(header *flow.Header, delay time.Duration) error {
 
 				// sender should always have the parent
+				sender.updatingBlocks.RLock()
 				parent, exists := sender.headers[header.ParentID]
+				sender.updatingBlocks.RUnlock()
 				if !exists {
 					return fmt.Errorf("parent for proposal not found (sender: %x, parent: %x)", sender.localID, header.ParentID)
 				}
