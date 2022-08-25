@@ -138,18 +138,16 @@ func internalExpandMsgXOFKMAC128(key string) hash.Hasher {
 // with a domain separation tag.
 //
 // The function returns:
-//  - (nil, invalidInputsError) if the hasher is nil or its output size is not 128 bytes
+//  - (false, nilHasherError) if a hasher is nil
+//  - (false, invalidHasherSizeError) if a hasher's output size is not 128 bytes
 //  - (signature, nil) otherwise
 func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, error) {
 	if kmac == nil {
-		return nil, invalidInputsErrorf("hasher is empty")
+		return nil, nilHasherError
 	}
 	// check hasher output size
 	if kmac.Size() != expandMsgOutput {
-		return nil, invalidInputsErrorf(
-			"hasher with %d output byte size is required, got hasher with size %d",
-			expandMsgOutput,
-			kmac.Size())
+		return nil, newInvalidHasherSizeError(expandMsgOutput, kmac.Size())
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
@@ -178,7 +176,8 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 // If the hasher used is ExpandMsgXOFKMAC128, the hasher is read only.
 //
 // The function returns:
-//  - (false, invalidInputsError) if the hasher is nil or its output size is not 128 bytes
+//  - (false, nilHasherError) if a hasher is nil
+//  - (false, invalidHasherSizeError) if a hasher's output size is not 128 bytes
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
 func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) (bool, error) {
@@ -187,14 +186,11 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	}
 
 	if kmac == nil {
-		return false, invalidInputsErrorf("hasher is empty")
+		return false, nilHasherError
 	}
 	// check hasher output size
 	if kmac.Size() != expandMsgOutput {
-		return false, invalidInputsErrorf(
-			"hasher with at least %d output byte size is required, got hasher with size %d",
-			expandMsgOutput,
-			kmac.Size())
+		return false, newInvalidHasherSizeError(expandMsgOutput, kmac.Size())
 	}
 
 	// hash the input to 128 bytes

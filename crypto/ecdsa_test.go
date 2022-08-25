@@ -44,6 +44,27 @@ func TestECDSA(t *testing.T) {
 	}
 }
 
+func TestECDSAHasher(t *testing.T) {
+	// generate a key pair
+	seed := make([]byte, KeyGenSeedMinLenECDSAP256)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, KeyGenSeedMinLenECDSAP256)
+	require.NoError(t, err)
+	sk, err := GeneratePrivateKey(ECDSAP256, seed)
+	require.NoError(t, err)
+	sig := make([]byte, SignatureLenECDSAP256)
+
+	// empty hasher
+	t.Run("Empty hasher", func(t *testing.T) {
+		_, err := sk.Sign(seed, nil)
+		assert.Error(t, err)
+		assert.True(t, IsNilHasherError(err))
+		_, err = sk.PublicKey().Verify(sig, seed, nil)
+		assert.Error(t, err)
+		assert.True(t, IsNilHasherError(err))
+	})
+}
+
 // Signing bench
 func BenchmarkECDSAP256Sign(b *testing.B) {
 	halg := hash.NewSHA3_256()

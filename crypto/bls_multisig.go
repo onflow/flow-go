@@ -265,9 +265,10 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 // message and hasher.
 //
 // The function returns:
+//  - (false, nilHasherError) if hasher is nil
+//  - (false, invalidHasherSizeError) if hasher's output size is not 128 bytes
 //  - (false, invalidInputsError) if:
 //      - Or at least one key is not of type PubKeyBLSBLS12381
-//      - input hasher is nil or its output size is not 128 bytes
 //  - (nil, aggregationEmptyListError) if input key slice is empty
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
@@ -296,10 +297,11 @@ func VerifyBLSSignatureOneMessage(pks []PublicKey, s Signature,
 // Membership check is performed on the input signature.
 //
 // The function returns:
+//  - (false, nilHasherError) if a hasher is nil
+//  - (false, invalidHasherSizeError) if a hasher's output size is not 128 bytes
 //  - (false, invalidInputsError) if:
 //      - size of keys is not matching the size of messages and hashers
 //      - Or at least one key is not of type PubKeyBLSBLS12381
-//      - at least one input hasher is nil or its output size is not 128 bytes
 //  - (false, aggregationEmptyListError) if input key slice is empty
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
@@ -329,13 +331,13 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 	hashes := make([][]byte, 0, len(messages))
 	for i, k := range kmac {
 		if k == nil {
-			return false, invalidInputsErrorf("hasher at index %d is nil", i)
+			return false, fmt.Errorf("hasher at index %d is invalid: %w ", i, nilHasherError)
 		}
 		if k.Size() != expandMsgOutput {
 			return false, invalidInputsErrorf(
-				"Hasher with %d output byte size is required, current size is %d",
-				expandMsgOutput,
-				k.Size())
+				"hasher at index %d is invalid %w:",
+				i,
+				newInvalidHasherSizeError(expandMsgOutput, k.Size()))
 		}
 		hashes = append(hashes, k.ComputeHash(messages[i]))
 	}
@@ -443,10 +445,11 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 // An error is returned if the key slice is empty.
 //
 // The function returns:
+//  - ([]false, nilHasherError) if a hasher is nil
+//  - ([]false, invalidHasherSizeError) if a hasher's output size is not 128 bytes
 //  - ([]false, invalidInputsError) if:
 //      - size of keys is not matching the size of signatures
 //      - Or at least one key is not of type PubKeyBLSBLS12381
-//      - input hasher is nil or its output size is not 128 bytes
 //  - ([]false, aggregationEmptyListError) if input key slice is empty
 //  - ([]false, error) if an unexpected error occurs
 //  - ([]validity, nil) otherwise
@@ -470,14 +473,11 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	verifBool := make([]bool, len(sigs))
 	// hasher check
 	if kmac == nil {
-		return verifBool, invalidInputsErrorf("verification requires a Hasher")
+		return verifBool, nilHasherError
 	}
 
 	if kmac.Size() != expandMsgOutput {
-		return verifBool, invalidInputsErrorf(
-			"hasher with at least %d output byte size is required, current size is %d",
-			expandMsgOutput,
-			kmac.Size())
+		return verifBool, newInvalidHasherSizeError(expandMsgOutput, kmac.Size())
 	}
 
 	pkPoints := make([]pointG2, 0, len(pks))

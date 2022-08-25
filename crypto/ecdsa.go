@@ -85,14 +85,14 @@ func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 // modified temporarily.
 //
 // The function returns:
-//  - (nil, invalidInputsError) if the hasher is nil
+//  - (false, nilHasherError) if a hasher is nil
 //  - (nil, error) if an unexpected error occurs
 //  - (signature, nil) otherwise
 func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 	// no need to check the hasher output size as all supported hash algos
 	// have at least 32 bytes output
 	if alg == nil {
-		return nil, invalidInputsErrorf("hasher is nil")
+		return nil, nilHasherError
 	}
 	h := alg.ComputeHash(data)
 	return sk.signHash(h)
@@ -122,14 +122,14 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 // modified temporarily.
 //
 // The function returns:
-//  - (false, invalidInputsError) if the hasher is nil
+//  - ([]false, nilHasherError) if a hasher is nil
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool, error) {
 	// no need to check the hasher output size as all supported hash algos
 	// have at lease 32 bytes output
 	if alg == nil {
-		return false, invalidInputsErrorf("hasher is nil")
+		return false, nilHasherError
 	}
 
 	h := alg.ComputeHash(data)

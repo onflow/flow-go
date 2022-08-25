@@ -69,22 +69,22 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 	t.Run("Empty hasher", func(t *testing.T) {
 		_, err := sk.Sign(seed, nil)
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNilHasherError(err))
 		_, err = sk.PublicKey().Verify(sig, seed, nil)
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNilHasherError(err))
 	})
 
 	// short size hasher
 	t.Run("short size hasher", func(t *testing.T) {
 		s, err := sk.Sign(seed, hash.NewSHA2_256())
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsInvalidHasherSizeError(err))
 		assert.Nil(t, s)
 
 		valid, err := sk.PublicKey().Verify(sig, seed, hash.NewSHA2_256())
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsInvalidHasherSizeError(err))
 		assert.False(t, valid)
 	})
 
@@ -649,7 +649,7 @@ func TestBLSBatchVerify(t *testing.T) {
 		}
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, nil)
 		require.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNilHasherError(err))
 
 		assert.Equal(t, valid, expectedValid,
 			"verification should fail with nil hasher, got %v", valid)
@@ -661,7 +661,7 @@ func TestBLSBatchVerify(t *testing.T) {
 			expectedValid[i] = false
 		}
 		pks[0] = invalidSK(t).PublicKey()
-		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, nil)
+		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, kmac)
 		require.Error(t, err)
 		assert.True(t, IsInvalidInputsError(err))
 
@@ -847,7 +847,7 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		inputKmacs[0] = nil
 		valid, err = VerifyBLSSignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs)
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNilHasherError(err))
 		assert.False(t, valid, "verification should fail with nil hasher")
 		inputKmacs[0] = tmp
 

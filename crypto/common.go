@@ -46,3 +46,37 @@ func IsInvalidInputsError(err error) bool {
 	var target *invalidInputsError
 	return errors.As(err, &target)
 }
+
+var nilHasherError = errors.New("hasher cannot be nil")
+
+// IsNilHasherError checks if the input error wraps a nilHasherError.
+// nilHasherError is returned when a nil hasher is used.
+func IsNilHasherError(err error) bool {
+	return errors.Is(err, nilHasherError)
+}
+
+// invalidHasherSizeError is an error returned when a crypto API is called with a hasher
+// with an output size not suited with the cryptographic operation.
+type invalidHasherSizeError struct {
+	error
+}
+
+func (e invalidHasherSizeError) Unwrap() error {
+	return e.error
+}
+
+// invalidInputsErrorf constructs a new invalidHasherSizeError
+func newInvalidHasherSizeError(expected, given int) error {
+	return &invalidHasherSizeError{
+		error: fmt.Errorf("the hasher used has an invalid output size, expects %d but got %d",
+			expected, given),
+	}
+}
+
+// IsInvalidHasherSizeError checks if the input error is of a invalidHasherSizeError type.
+// invalidHasherSizeError is an error returned when a crypto API is called with a hasher
+// with an output size not suited with the cryptographic operation.
+func IsInvalidHasherSizeError(err error) bool {
+	var target *invalidHasherSizeError
+	return errors.As(err, &target)
+}
