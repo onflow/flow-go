@@ -2,6 +2,7 @@ package p2p_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -91,7 +92,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	topic := channels.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 5
-	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
+	// golog.SetAllLoggers(golog.LevelInfo) // change this to Debug if libp2p logs are needed
 
 	// Step 1: Creates nodes
 	// Nodes will be connected in a hub and spoke configuration where one node will act as the DHT server,
@@ -174,6 +175,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	// Step 4: publish a message to the topic
 	require.NoError(t, dhtServerNode.Publish(ctx, topic, data))
+	fmt.Println("sender", dhtServerNode.Host().ID().Pretty())
 
 	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message

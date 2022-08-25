@@ -2087,7 +2087,8 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 }
 
 func AllowAllPeerFilter() func(peer.ID) bool {
-	return func(_ peer.ID) bool {
+	return func(p peer.ID) bool {
+		fmt.Println("received a message from: ", p.Pretty())
 		return true
 	}
 }

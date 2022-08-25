@@ -112,7 +112,7 @@ func nodeFixture(
 		unicasts:    nil,
 		key:         generateNetworkingKey(t),
 		address:     defaultAddress,
-		logger:      unittest.Logger().Level(zerolog.ErrorLevel),
+		logger:      unittest.Logger(),
 	}
 
 	for _, opt := range opts {
