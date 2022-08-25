@@ -36,6 +36,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
+		requestQueue := queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector())
 
 		e, err := New(
 			unittest.Logger(),
@@ -45,7 +46,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			execState,
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
-			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
+			requestQueue,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -71,6 +72,11 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		// submit using origin ID with invalid role
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 		require.NoError(t, e.Process(channels.RequestChunks, originID, req))
+
+		require.Eventually(t, func() bool {
+			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
+		}, 1*time.Second, 100*time.Millisecond)
+
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
@@ -87,6 +93,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
+		requestQueue := queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector())
 
 		e, err := New(
 			unittest.Logger(),
@@ -96,7 +103,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			execState,
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
-			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
+			requestQueue,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -121,6 +128,11 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		// submit using origin ID with zero weight
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 		require.NoError(t, e.Process(channels.RequestChunks, originID, req))
+
+		require.Eventually(t, func() bool {
+			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
+		}, 1*time.Second, 100*time.Millisecond)
+
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
@@ -137,6 +149,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
+		requestQueue := queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector())
 
 		e, err := New(
 			unittest.Logger(),
@@ -146,7 +159,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			execState,
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
-			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
+			requestQueue,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -171,6 +184,11 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		// submit using non-existing origin ID
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 		require.NoError(t, e.Process(channels.RequestChunks, originID, req))
+
+		require.Eventually(t, func() bool {
+			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
+		}, 1*time.Second, 100*time.Millisecond)
+
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
@@ -188,6 +206,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
 
 		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(nil, errors.New("not found!"))
+		requestQueue := queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector())
 
 		e, err := New(
 			unittest.Logger(),
@@ -197,7 +216,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			execState,
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
-			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
+			requestQueue,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -217,6 +236,11 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		// submit using non-existing origin ID
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
+
+		require.Eventually(t, func() bool {
+			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
+		}, 1*time.Second, 100*time.Millisecond)
+
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
@@ -233,6 +257,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
+		requestQueue := queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector())
 
 		e, err := New(
 			unittest.Logger(),
@@ -242,7 +267,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			execState,
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
-			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
+			requestQueue,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -279,6 +304,11 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		// submit using non-existing origin ID
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
+
+		require.Eventually(t, func() bool {
+			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
+		}, 1*time.Second, 100*time.Millisecond)
+
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 	})
@@ -293,6 +323,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
+		requestQueue := queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector())
 
 		e, err := New(
 			unittest.Logger(),
@@ -302,7 +333,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			execState,
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return currentAuthorizedState, nil },
-			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
+			requestQueue,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -344,11 +375,18 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
 
+		require.Eventually(t, func() bool {
+			return requestQueue.Size() == uint(0) // ensuring first request has been picked up from the queue.
+		}, 1*time.Second, 100*time.Millisecond)
 		// waits till first chunk data pack is replied and then makes the requester unauthorized.
 		unittest.RequireCloseBefore(t, responded, 1*time.Second, "could not get first chunk data pack responded")
 		currentAuthorizedState = false
 
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
+		require.Eventually(t, func() bool {
+			return requestQueue.Size() == uint(0) // ensuring second request has been picked up from the queue as well.
+		}, 1*time.Second, 100*time.Millisecond)
+
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 	})
