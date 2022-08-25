@@ -84,6 +84,7 @@ type Middleware struct {
 	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
+	bitswapMetrics             module.BitswapMetrics
 	rootBlockID                flow.Identifier
 	validators                 []network.MessageValidator
 	peerManagerFactory         PeerManagerFactoryFunc
@@ -131,7 +132,8 @@ func NewMiddleware(
 	log zerolog.Logger,
 	libP2PNodeFactory LibP2PFactoryFunc,
 	flowID flow.Identifier,
-	metrics module.NetworkMetrics,
+	met module.NetworkMetrics,
+	bitswapMet module.BitswapMetrics,
 	rootBlockID flow.Identifier,
 	unicastMessageTimeout time.Duration,
 	idTranslator IDTranslator,
@@ -150,7 +152,8 @@ func NewMiddleware(
 		wg:                         &sync.WaitGroup{},
 		me:                         flowID,
 		libP2PNodeFactory:          libP2PNodeFactory,
-		metrics:                    metrics,
+		metrics:                    met,
+		bitswapMetrics:             bitswapMet,
 		rootBlockID:                rootBlockID,
 		validators:                 DefaultValidators(log, flowID),
 		unicastMessageTimeout:      unicastMessageTimeout,
@@ -200,7 +203,7 @@ func (m *Middleware) isProtocolParticipant() PeerFilter {
 }
 
 func (m *Middleware) NewBlobService(channel channels.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
-	return NewBlobService(m.libP2PNode.Host(), m.libP2PNode.routing, channel.String(), ds, opts...)
+	return NewBlobService(m.libP2PNode.Host(), m.libP2PNode.routing, channel.String(), ds, m.bitswapMetrics, m.log, opts...)
 }
 
 func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.PingInfoProvider) network.PingService {

@@ -57,10 +57,6 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 		}
 	}()
 
-	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
-		st.SetPayerIsServiceAccount()
-	}
-
 	for _, p := range ctx.TransactionProcessors {
 		err := p.Process(vm, &ctx, proc, st, programs)
 		txErr, failure := errors.SplitErrorTypes(err)
@@ -98,17 +94,20 @@ func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
 }
 
 func (proc *TransactionProcedure) MemoryLimit(ctx Context) uint64 {
-	// TODO for BFT (enforce max computation limit, already checked by collection nodes)
+	// TODO for BFT (enforce max memory limit, already checked by collection nodes)
 	// TODO let user select a lower limit for memory (when its part of fees)
 
 	memoryLimit := ctx.MemoryLimit // TODO use the one set by tx
-	// if the memory limit is set to zero by user, fallback to the gas limit set by the context
+	// if the context memory limit is also zero, fallback to the default memory limit
 	if memoryLimit == 0 {
-		memoryLimit = ctx.MemoryLimit
-		// if the context memory limit is also zero, fallback to the default memory limit
-		if memoryLimit == 0 {
-			memoryLimit = DefaultMemoryLimit
-		}
+		memoryLimit = DefaultMemoryLimit
 	}
 	return memoryLimit
+}
+
+func (proc *TransactionProcedure) ShouldDisableMemoryAndInteractionLimits(
+	ctx Context,
+) bool {
+	return ctx.DisableMemoryAndInteractionLimits ||
+		proc.Transaction.Payer == ctx.Chain.ServiceAddress()
 }

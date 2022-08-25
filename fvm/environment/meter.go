@@ -17,50 +17,50 @@ type Meter interface {
 	MemoryEstimate() uint64
 }
 
-type meter struct {
+type meterImpl struct {
 	stTxn *state.StateHolder
 }
 
 func NewMeter(stTxn *state.StateHolder) Meter {
-	return &meter{
+	return &meterImpl{
 		stTxn: stTxn,
 	}
 }
 
-func (meter *meter) MeterComputation(
+func (meter *meterImpl) MeterComputation(
 	kind common.ComputationKind,
 	intensity uint,
 ) error {
-	if meter.stTxn.EnforceComputationLimits() {
+	if meter.stTxn.EnforceLimits() {
 		return meter.stTxn.MeterComputation(kind, intensity)
 	}
 	return nil
 }
 
-func (meter *meter) ComputationUsed() uint64 {
+func (meter *meterImpl) ComputationUsed() uint64 {
 	return uint64(meter.stTxn.TotalComputationUsed())
 }
 
-func (meter *meter) MeterMemory(usage common.MemoryUsage) error {
-	if meter.stTxn.EnforceMemoryLimits() {
+func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
+	if meter.stTxn.EnforceLimits() {
 		return meter.stTxn.MeterMemory(usage.Kind, uint(usage.Amount))
 	}
 	return nil
 }
 
-func (meter *meter) MemoryEstimate() uint64 {
+func (meter *meterImpl) MemoryEstimate() uint64 {
 	return meter.stTxn.TotalMemoryEstimate()
 }
 
 type cancellableMeter struct {
-	meter
+	meterImpl
 
 	ctx context.Context
 }
 
 func NewCancellableMeter(ctx context.Context, stTxn *state.StateHolder) Meter {
 	return &cancellableMeter{
-		meter: meter{
+		meterImpl: meterImpl{
 			stTxn: stTxn,
 		},
 		ctx: ctx,
@@ -89,5 +89,5 @@ func (meter *cancellableMeter) MeterComputation(
 		// do nothing
 	}
 
-	return meter.meter.MeterComputation(kind, intensity)
+	return meter.meterImpl.MeterComputation(kind, intensity)
 }

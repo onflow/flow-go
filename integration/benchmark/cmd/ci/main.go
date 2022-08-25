@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -14,7 +15,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -50,13 +50,15 @@ type dataSlice struct {
 }
 
 // Hardcoded CI values
-const loadType = "token-transfer"
-const metricport = uint(8080)
-const accessNodeAddress = "127.0.0.1:3569"
-const pushgateway = "127.0.0.1:9091"
-const accountMultiplier = 50
-const feedbackEnabled = true
-const serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
+const (
+	loadType                    = "token-transfer"
+	metricport                  = uint(8080)
+	accessNodeAddress           = "127.0.0.1:3569"
+	pushgateway                 = "127.0.0.1:9091"
+	accountMultiplier           = 50
+	feedbackEnabled             = true
+	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
+)
 
 func main() {
 	// holdover flags from loader/main.go
@@ -94,18 +96,11 @@ func main() {
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
 
-	pusher := push.New(pushgateway, "loader").Gatherer(prometheus.DefaultGatherer)
-	go func() {
-		t := time.NewTicker(10 * time.Second)
-		defer t.Stop()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-		for {
-			err := pusher.Push()
-			if err != nil {
-				log.Warn().Err(err).Msg("failed to push metrics to pushgateway")
-			}
-		}
-	}()
+	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
+	defer sp.Close()
 
 	tps, err := strconv.ParseInt(*tpsFlag, 0, 32)
 	if err != nil {

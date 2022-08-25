@@ -100,29 +100,6 @@ func (_m *AccountInterface) GetAccountKey(address common.Address, keyIndex int) 
 	return r0, r1
 }
 
-// GetSigningAccounts provides a mock function with given fields:
-func (_m *AccountInterface) GetSigningAccounts() ([]common.Address, error) {
-	ret := _m.Called()
-
-	var r0 []common.Address
-	if rf, ok := ret.Get(0).(func() []common.Address); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]common.Address)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // RevokeAccountKey provides a mock function with given fields: address, keyIndex
 func (_m *AccountInterface) RevokeAccountKey(address common.Address, keyIndex int) (*runtime.AccountKey, error) {
 	ret := _m.Called(address, keyIndex)

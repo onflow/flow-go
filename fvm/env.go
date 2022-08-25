@@ -14,7 +14,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
@@ -23,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/storage"
 )
 
 // Environment accepts a context and a virtual machine instance and provides
@@ -59,9 +57,6 @@ type AccountInterface interface {
 	RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error)
 
 	AddEncodedAccountKey(address runtime.Address, publicKey []byte) error
-
-	// TODO(patrick): figure out where this belongs
-	GetSigningAccounts() ([]runtime.Address, error)
 }
 
 // Parts of the environment that are common to all transaction and script
@@ -70,20 +65,23 @@ type commonEnv struct {
 	*environment.Tracer
 	environment.Meter
 	*environment.ProgramLogger
+	*environment.UUIDGenerator
 	*environment.UnsafeRandomGenerator
+	*environment.CryptoLibrary
+	*environment.BlockInfo
+	environment.TransactionInfo
 
 	// TODO(patrick): rm
 	ctx Context
 
 	AccountInterface
 
-	sth           *state.StateHolder
-	vm            *VirtualMachine
-	programs      *handler.ProgramsHandler
-	accounts      state.Accounts
-	accountKeys   *handler.AccountKeyHandler
-	contracts     *handler.ContractHandler
-	uuidGenerator *state.UUIDGenerator
+	sth         *state.StateHolder
+	vm          *VirtualMachine
+	programs    *handler.ProgramsHandler
+	accounts    state.Accounts
+	accountKeys *handler.AccountKeyHandler
+	contracts   *handler.ContractHandler
 
 	frozenAccounts []common.Address
 
@@ -97,68 +95,6 @@ func (env *commonEnv) Context() *Context {
 
 func (env *commonEnv) VM() *VirtualMachine {
 	return env.vm
-}
-
-func (env *commonEnv) GenerateUUID() (uint64, error) {
-	defer env.StartExtensiveTracingSpanFromRoot(trace.FVMEnvGenerateUUID).End()
-
-	if env.uuidGenerator == nil {
-		return 0, errors.NewOperationNotSupportedError("GenerateUUID")
-	}
-
-	err := env.MeterComputation(meter.ComputationKindGenerateUUID, 1)
-	if err != nil {
-		return 0, fmt.Errorf("generate uuid failed: %w", err)
-	}
-
-	uuid, err := env.uuidGenerator.GenerateUUID()
-	if err != nil {
-		return 0, fmt.Errorf("generate uuid failed: %w", err)
-	}
-	return uuid, err
-}
-
-// GetCurrentBlockHeight returns the current block height.
-func (env *commonEnv) GetCurrentBlockHeight() (uint64, error) {
-	defer env.StartExtensiveTracingSpanFromRoot(trace.FVMEnvGetCurrentBlockHeight).End()
-
-	err := env.MeterComputation(meter.ComputationKindGetCurrentBlockHeight, 1)
-	if err != nil {
-		return 0, fmt.Errorf("get current block height failed: %w", err)
-	}
-
-	if env.ctx.BlockHeader == nil {
-		return 0, errors.NewOperationNotSupportedError("GetCurrentBlockHeight")
-	}
-	return env.ctx.BlockHeader.Height, nil
-}
-
-// GetBlockAtHeight returns the block at the given height.
-func (env *commonEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
-	defer env.StartSpanFromRoot(trace.FVMEnvGetBlockAtHeight).End()
-
-	err := env.MeterComputation(meter.ComputationKindGetBlockAtHeight, 1)
-	if err != nil {
-		return runtime.Block{}, false, fmt.Errorf("get block at height failed: %w", err)
-	}
-
-	if env.ctx.Blocks == nil {
-		return runtime.Block{}, false, errors.NewOperationNotSupportedError("GetBlockAtHeight")
-	}
-
-	if env.ctx.BlockHeader != nil && height == env.ctx.BlockHeader.Height {
-		return runtimeBlockFromHeader(env.ctx.BlockHeader), true, nil
-	}
-
-	header, err := env.ctx.Blocks.ByHeightFrom(height, env.ctx.BlockHeader)
-	// TODO (ramtin): remove dependency on storage and move this if condition to blockfinder
-	if errors.Is(err, storage.ErrNotFound) {
-		return runtime.Block{}, false, nil
-	} else if err != nil {
-		return runtime.Block{}, false, fmt.Errorf("get block at height failed for height %v: %w", height, err)
-	}
-
-	return runtimeBlockFromHeader(header), true, nil
 }
 
 func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
@@ -505,22 +441,6 @@ func (env *commonEnv) SetProgram(location common.Location, program *interpreter.
 	return nil
 }
 
-func (env *commonEnv) Hash(
-	data []byte,
-	tag string,
-	hashAlgorithm runtime.HashAlgorithm,
-) ([]byte, error) {
-	defer env.StartSpanFromRoot(trace.FVMEnvHash).End()
-
-	err := env.MeterComputation(meter.ComputationKindHash, 1)
-	if err != nil {
-		return nil, fmt.Errorf("hash failed: %w", err)
-	}
-
-	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
-	return crypto.HashWithTag(hashAlgo, tag, data)
-}
-
 func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, error) {
 	defer env.StartExtensiveTracingSpanFromRoot(trace.FVMEnvDecodeArgument).End()
 
@@ -535,75 +455,11 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 
 // Commit commits changes and return a list of updated keys
 func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
-	// commit changes and return a list of updated keys
-	err := env.programs.Cleanup()
-	if err != nil {
-		return programs.ModifiedSets{}, err
-	}
-
 	keys, err := env.contracts.Commit()
 	return programs.ModifiedSets{
 		ContractUpdateKeys: keys,
 		FrozenAccounts:     env.frozenAccounts,
 	}, err
-}
-
-func (env *commonEnv) VerifySignature(
-	signature []byte,
-	tag string,
-	signedData []byte,
-	publicKey []byte,
-	signatureAlgorithm runtime.SignatureAlgorithm,
-	hashAlgorithm runtime.HashAlgorithm,
-) (
-	bool,
-	error,
-) {
-	defer env.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
-
-	err := env.MeterComputation(meter.ComputationKindVerifySignature, 1)
-	if err != nil {
-		return false, fmt.Errorf("verify signature failed: %w", err)
-	}
-
-	valid, err := crypto.VerifySignatureFromRuntime(
-		signature,
-		tag,
-		signedData,
-		publicKey,
-		signatureAlgorithm,
-		hashAlgorithm,
-	)
-
-	if err != nil {
-		return false, fmt.Errorf("verify signature failed: %w", err)
-	}
-
-	return valid, nil
-}
-
-func (env *commonEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
-	err := env.MeterComputation(meter.ComputationKindValidatePublicKey, 1)
-	if err != nil {
-		return fmt.Errorf("validate public key failed: %w", err)
-	}
-
-	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
-}
-
-func (commonEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
-	return crypto.VerifyPOP(pk, sig)
-}
-
-func (commonEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
-	return crypto.AggregateSignatures(sigs)
-}
-
-func (commonEnv) BLSAggregatePublicKeys(
-	keys []*runtime.PublicKey,
-) (*runtime.PublicKey, error) {
-
-	return crypto.AggregatePublicKeys(keys)
 }
 
 func (commonEnv) ResourceOwnerChanged(

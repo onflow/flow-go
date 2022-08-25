@@ -216,7 +216,11 @@ func (s *storage) init(startHeight uint64) error {
 
 	if fulfilledHeightErr == nil && prunedHeightErr == nil {
 		if prunedHeight > fulfilledHeight {
-			return fmt.Errorf("inconsistency detected: pruned height is greater than fulfilled height")
+			return fmt.Errorf(
+				"inconsistency detected: pruned height (%d) is greater than fulfilled height (%d)",
+				prunedHeight,
+				fulfilledHeight,
+			)
 		}
 
 		// replay pruning in case it was interrupted during previous shutdown

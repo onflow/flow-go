@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
@@ -26,7 +25,6 @@ func Test_Programs(t *testing.T) {
 
 	newState := state.NewState(
 		utils.NewSimpleView(),
-		meter.NewMeter(meter.DefaultParameters()),
 		state.DefaultParameters(),
 	)
 

@@ -1,4 +1,4 @@
-package attacknetwork
+package orchestrator
 
 import (
 	"context"
@@ -18,31 +18,31 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestAttackNetworkObserve_SingleMessage(t *testing.T) {
-	testAttackNetworkObserve(t, 1)
+func TestOrchestratorNetworkObserve_SingleMessage(t *testing.T) {
+	testOrchestratorNetworkObserve(t, 1)
 }
 
-func TestAttackNetworkObserve_MultipleConcurrentMessages(t *testing.T) {
-	testAttackNetworkObserve(t, 10)
+func TestOrchestratorNetworkObserve_MultipleConcurrentMessages(t *testing.T) {
+	testOrchestratorNetworkObserve(t, 10)
 }
 
-// testAttackNetworkObserve evaluates that upon receiving concurrent messages from corruptible conduits, the attack network
+// testOrchestratorNetworkObserve evaluates that upon receiving concurrent messages from corruptible conduits, the orchestrator network
 // decodes the messages into events and relays them to its registered orchestrator.
-func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
+func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
-	messages, events, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
+	messages, egressEvents, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
 
 	withMockOrchestrator(
 		t,
 		corruptedIds,
-		func(network *AttackNetwork, orchestrator *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
+		func(orchestratorNetwork *Network, orchestrator *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
 			// mocks orchestrator to receive each event exactly once.
-			orchestratorWG := mockOrchestratorHandlingEgressEvent(t, orchestrator, events)
+			orchestratorWG := mockOrchestratorHandlingEgressEvent(t, orchestrator, egressEvents)
 
-			// sends all messages concurrently to the attack network (imitating corruptible conduits sending
-			// messages concurrently to attack network).
-			attackNetworkSendWG := sync.WaitGroup{}
-			attackNetworkSendWG.Add(concurrencyDegree)
+			// sends all messages concurrently to the orchestrator network (imitating corruptible conduits sending
+			// messages concurrently to orchestrator network).
+			orchestratorNetworkSendWG := sync.WaitGroup{}
+			orchestratorNetworkSendWG.Add(concurrencyDegree)
 
 			for i, msg := range messages {
 				msg := msg
@@ -51,50 +51,50 @@ func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 				go func() {
 					err := ccf.attackerObserveStream.Send(msg) // pretends the ith ccf is sending message to attacker for observe
 					require.NoError(t, err)
-					attackNetworkSendWG.Done()
+					orchestratorNetworkSendWG.Done()
 				}()
 			}
 
-			// all messages should be sent to attack network in a timely fashion.
-			unittest.RequireReturnsBefore(t, attackNetworkSendWG.Wait, 1*time.Second, "could not send all messages to attack network on time")
-			// all events should be relayed to the orchestrator by the attack network in a timely fashion.
+			// all messages should be sent to orchestrator network in a timely fashion.
+			unittest.RequireReturnsBefore(t, orchestratorNetworkSendWG.Wait, 1*time.Second, "could not send all messages to attack orchestratorNetwork on time")
+			// all events should be relayed to the orchestrator by the orchestrator network in a timely fashion.
 			unittest.RequireReturnsBefore(t, orchestratorWG.Wait, 1*time.Second, "orchestrator could not receive messages on time")
 		})
 }
 
-func TestAttackNetworkUnicast_SingleMessage(t *testing.T) {
-	testAttackNetwork(t, insecure.Protocol_UNICAST, 1)
+func TestOrchestratorNetworkUnicast_SingleMessage(t *testing.T) {
+	testOrchestratorNetwork(t, insecure.Protocol_UNICAST, 1)
 }
 
-func TestAttackNetworkUnicast_ConcurrentMessages(t *testing.T) {
-	testAttackNetwork(t, insecure.Protocol_UNICAST, 10)
+func TestOrchestratorNetworkUnicast_ConcurrentMessages(t *testing.T) {
+	testOrchestratorNetwork(t, insecure.Protocol_UNICAST, 10)
 }
 
-func TestAttackNetworkMulticast_SingleMessage(t *testing.T) {
-	testAttackNetwork(t, insecure.Protocol_MULTICAST, 1)
+func TestOrchestratorNetworkMulticast_SingleMessage(t *testing.T) {
+	testOrchestratorNetwork(t, insecure.Protocol_MULTICAST, 1)
 }
 
-func TestAttackNetworkMulticast_ConcurrentMessages(t *testing.T) {
-	testAttackNetwork(t, insecure.Protocol_MULTICAST, 10)
+func TestOrchestratorNetworkMulticast_ConcurrentMessages(t *testing.T) {
+	testOrchestratorNetwork(t, insecure.Protocol_MULTICAST, 10)
 }
 
-func TestAttackNetworkPublish_SingleMessage(t *testing.T) {
-	testAttackNetwork(t, insecure.Protocol_PUBLISH, 1)
+func TestOrchestratorNetworkPublish_SingleMessage(t *testing.T) {
+	testOrchestratorNetwork(t, insecure.Protocol_PUBLISH, 1)
 }
 
-func TestAttackNetworkPublish_ConcurrentMessages(t *testing.T) {
-	testAttackNetwork(t, insecure.Protocol_PUBLISH, 10)
+func TestOrchestratorNetworkPublish_ConcurrentMessages(t *testing.T) {
+	testOrchestratorNetwork(t, insecure.Protocol_PUBLISH, 10)
 }
 
-// testAttackNetwork evaluates that the orchestrator can successfully route an event to a corrupted node through the attack network.
+// testOrchestratorNetwork evaluates that the orchestrator can successfully route an event to a corrupted node through the orchestrator network.
 // By a corrupted node here, we mean a node that runs with a corruptible conduit factory.
-func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
+func testOrchestratorNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
-	_, events, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), protocol, concurrencyDegree)
+	_, egressEvents, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), protocol, concurrencyDegree)
 
 	withMockOrchestrator(t,
 		corruptedIds,
-		func(attackNetwork *AttackNetwork, _ *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
+		func(orchestratorNetwork *Network, _ *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
 			attackerMsgReceived := &sync.WaitGroup{}
 			attackerMsgReceived.Add(concurrencyDegree)
 
@@ -102,67 +102,67 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 				corruptedId := corruptedId
 				ccf := ccfs[i]
 
-				// testing message delivery from attack network to ccfs
+				// testing message delivery from orchestrator network to ccfs
 				go func() {
 					msg := <-ccf.attackerMsg
-					matchEgressEventForMessage(t, events, msg, corruptedId.NodeID)
+					matchEventForMessage(t, egressEvents, msg, corruptedId.NodeID)
 					attackerMsgReceived.Done()
 				}()
 			}
 
-			attackNetworkSendWG := &sync.WaitGroup{}
-			attackNetworkSendWG.Add(concurrencyDegree)
+			orchestratorNetworkSendWG := &sync.WaitGroup{}
+			orchestratorNetworkSendWG.Add(concurrencyDegree)
 
-			for _, event := range events {
+			for _, event := range egressEvents {
 				event := event
 				go func() {
-					err := attackNetwork.Send(event)
+					err := orchestratorNetwork.SendEgress(event)
 					require.NoError(t, err)
 
-					attackNetworkSendWG.Done()
+					orchestratorNetworkSendWG.Done()
 				}()
 			}
 
-			// all events should be sent to attackNetwork in a timely fashion.
-			unittest.RequireReturnsBefore(t, attackNetworkSendWG.Wait, 1*time.Second, "could not send all events to attackNetwork on time")
-			// all events should be relayed to the connections by the attackNetwork in a timely fashion.
+			// all events should be sent to orchestratorNetwork in a timely fashion.
+			unittest.RequireReturnsBefore(t, orchestratorNetworkSendWG.Wait, 1*time.Second, "could not send all events to orchestratorNetwork on time")
+			// all events should be relayed to the connections by the orchestratorNetwork in a timely fashion.
 			unittest.RequireReturnsBefore(t, attackerMsgReceived.Wait, 1*time.Second, "connections could not receive messages on time")
 		})
 }
 
 // matchEgressEventForMessage fails the test if given message is not meant to be sent on behalf of the corrupted id, or it does not correspond to any
 // of the given events.
-func matchEgressEventForMessage(t *testing.T, events []*insecure.EgressEvent, message *insecure.Message, corruptedId flow.Identifier) {
+func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, message *insecure.Message, corruptedId flow.Identifier) {
 	codec := unittest.NetworkCodec()
 
-	require.Equal(t, corruptedId[:], message.Egress.OriginID[:])
+	require.Equal(t, corruptedId[:], message.Egress.CorruptOriginID[:])
 
-	for _, event := range events {
-		if event.CorruptedNodeId == corruptedId {
-			require.Equal(t, event.Channel.String(), message.Egress.ChannelID)
-			require.Equal(t, event.Protocol, message.Egress.Protocol)
-			require.Equal(t, flow.IdsToBytes(event.TargetIds), message.Egress.TargetIDs)
-			require.Equal(t, event.TargetNum, message.Egress.TargetNum)
+	for _, egressEvent := range egressEvents {
+		if egressEvent.CorruptOriginId == corruptedId {
+			require.Equal(t, egressEvent.Channel.String(), message.Egress.ChannelID)
+			require.Equal(t, egressEvent.Protocol, message.Egress.Protocol)
+			require.Equal(t, flow.IdsToBytes(egressEvent.TargetIds), message.Egress.TargetIDs)
+			require.Equal(t, egressEvent.TargetNum, message.Egress.TargetNum)
 
 			content, err := codec.Decode(message.Egress.Payload)
 			require.NoError(t, err)
 
-			require.Equal(t, event.FlowProtocolEvent, content)
+			require.Equal(t, egressEvent.FlowProtocolEvent, content)
 
 			return
 		}
 	}
 
-	require.Fail(t, fmt.Sprintf("could not find any matching event for the message: %v", message))
+	require.Fail(t, fmt.Sprintf("could not find any matching egressEvent for the message: %v", message))
 }
 
 // withMockOrchestrator creates a Corrupted Conduit Factory (CCF) for each given corrupted identity.
-// It then creates an attack network, establishes a connection to each CCF, and then registers a mock orchestrator
-// on top of the attack network.
-// Once the attack network, CCFs, and mock orchestrator are all ready, it executes the injected "run" function.
+// It then creates an orchestrator network, establishes a connection to each CCF, and then registers a mock orchestrator
+// on top of the orchestrator network.
+// Once the orchestrator network, CCFs, and mock orchestrator are all ready, it executes the injected "run" function.
 func withMockOrchestrator(t *testing.T,
 	corruptedIds flow.IdentityList,
-	run func(*AttackNetwork, *mockinsecure.AttackOrchestrator, []*mockCorruptibleConduitFactory)) {
+	run func(*Network, *mockinsecure.AttackOrchestrator, []*mockCorruptibleConduitFactory)) {
 
 	withMockCorruptibleConduitFactories(t,
 		corruptedIds.NodeIDs(),
@@ -171,7 +171,7 @@ func withMockOrchestrator(t *testing.T,
 			orchestrator := &mockinsecure.AttackOrchestrator{}
 			connector := NewCorruptedConnector(unittest.Logger(), corruptedIds, ccfPorts)
 
-			attackNetwork, err := NewAttackNetwork(
+			orchestratorNetwork, err := NewOrchestratorNetwork(
 				unittest.Logger(),
 				unittest.NetworkCodec(),
 				orchestrator,
@@ -179,24 +179,24 @@ func withMockOrchestrator(t *testing.T,
 				corruptedIds)
 			require.NoError(t, err)
 
-			// mocks registering attackNetwork as the attack network functionality for orchestrator.
-			orchestrator.On("WithAttackNetwork", attackNetwork).Return().Once()
+			// mocks registering orchestratorNetwork as the orchestrator network functionality for orchestrator.
+			orchestrator.On("Register", orchestratorNetwork).Return().Once()
 
-			// life-cycle management of attackNetwork.
+			// life-cycle management of orchestratorNetwork.
 			ctx, cancel := context.WithCancel(context.Background())
 			attackCtx, errChan := irrecoverable.WithSignaler(ctx)
 			go func() {
 				select {
 				case err := <-errChan:
-					t.Error("attackNetwork startup encountered fatal error", err)
+					t.Error("orchestratorNetwork startup encountered fatal error", err)
 				case <-ctx.Done():
 					return
 				}
 			}()
 
-			// starts attackNetwork
-			attackNetwork.Start(attackCtx)
-			unittest.RequireCloseBefore(t, attackNetwork.Ready(), 1*time.Second, "could not start attackNetwork on time")
+			// starts orchestratorNetwork
+			orchestratorNetwork.Start(attackCtx)
+			unittest.RequireCloseBefore(t, orchestratorNetwork.Ready(), 1*time.Second, "could not start orchestratorNetwork on time")
 
 			attackerRegisteredOnAllCCFs := &sync.WaitGroup{}
 			attackerRegisteredOnAllCCFs.Add(len(ccfs))
@@ -211,11 +211,11 @@ func withMockOrchestrator(t *testing.T,
 
 			unittest.RequireReturnsBefore(t, attackerRegisteredOnAllCCFs.Wait, 1*time.Second, "could not register attacker on all ccfs on time")
 
-			run(attackNetwork, orchestrator, ccfs)
+			run(orchestratorNetwork, orchestrator, ccfs)
 
-			// terminates attackNetwork
+			// terminates orchestratorNetwork
 			cancel()
-			unittest.RequireCloseBefore(t, attackNetwork.Done(), 1*time.Second, "could not stop attackNetwork on time")
+			unittest.RequireCloseBefore(t, orchestratorNetwork.Done(), 1*time.Second, "could not stop orchestratorNetwork on time")
 		})
 }
 
@@ -227,7 +227,7 @@ func mockOrchestratorHandlingEgressEvent(t *testing.T, orchestrator *mockinsecur
 
 	mu := sync.Mutex{}
 	seen := make(map[*insecure.EgressEvent]struct{}) // keeps track of unique egress events received by orchestrator
-	orchestrator.On("HandleEventFromCorruptedNode", mock.Anything).Run(func(args mock.Arguments) {
+	orchestrator.On("HandleEgressEvent", mock.Anything).Run(func(args mock.Arguments) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -288,7 +288,7 @@ func withMockCorruptibleConduitFactories(
 
 	run(ccfCtx, ccfs, ccfPorts)
 
-	// terminates attackNetwork
+	// terminates orchestratorNetwork
 	cancel()
 
 	// stop all ccfs

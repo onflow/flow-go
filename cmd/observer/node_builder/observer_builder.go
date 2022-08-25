@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -62,7 +63,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
-	"github.com/onflow/flow-go/state/protocol"
+	stateprotocol "github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
@@ -156,7 +157,7 @@ type ObserverServiceBuilder struct {
 
 	// components
 	LibP2PNode              *p2p.Node
-	FollowerState           protocol.MutableState
+	FollowerState           stateprotocol.MutableState
 	SyncCore                *chainsync.Core
 	RpcEng                  *rpc.Engine
 	FinalizationDistributor *pubsub.FinalizationDistributor
@@ -991,10 +992,15 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		proxy := &apiproxy.FlowAccessAPIRouter{
-			Logger:          builder.Logger,
-			Metrics:         metrics.NewObserverCollector(),
-			Upstream:        forwarder,
-			AccessAPIServer: engineBuilder.Handler(),
+			Logger:   builder.Logger,
+			Metrics:  metrics.NewObserverCollector(),
+			Upstream: forwarder,
+			Observer: protocol.NewHandler(protocol.New(
+				node.State,
+				node.Storage.Blocks,
+				node.Storage.Headers,
+				backend.NewNetworkAPI(node.State, node.RootChainID, backend.DefaultSnapshotHistoryLimit),
+			)),
 		}
 
 		// build the rpc engine
@@ -1017,6 +1023,7 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
+		builder.Metrics.Bitswap,
 		builder.SporkID,
 		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,

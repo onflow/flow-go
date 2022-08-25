@@ -58,7 +58,21 @@ func (_m *Procedure) Run(vm *fvm.VirtualMachine, ctx fvm.Context, sth *state.Sta
 	return r0
 }
 
-type NewProcedureT interface {
+// ShouldDisableMemoryAndInteractionLimits provides a mock function with given fields: ctx
+func (_m *Procedure) ShouldDisableMemoryAndInteractionLimits(ctx fvm.Context) bool {
+	ret := _m.Called(ctx)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(fvm.Context) bool); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+type mockConstructorTestingTNewProcedure interface {
 	mock.TestingT
 	Cleanup(func())
 }

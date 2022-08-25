@@ -20,37 +20,23 @@ func getEnvironmentMeterParameters(
 	ctx Context,
 	view state.View,
 	programs *programs.Programs,
-	procComputationLimit uint,
-	procMemoryLimit uint64,
+	params meter.MeterParameters,
 ) (
 	meter.MeterParameters,
 	error,
 ) {
-	params := meter.DefaultParameters().
-		WithComputationLimit(procComputationLimit).
-		WithMemoryLimit(procMemoryLimit)
+	sth := state.NewStateTransaction(
+		view,
+		state.DefaultParameters().
+			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
+			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 
-	var err error
-	if ctx.AllowContextOverrideByExecutionState {
-		sth := state.NewStateHolder(
-			state.NewState(
-				view,
-				meter.NewMeter(meter.DefaultParameters()),
-				state.DefaultParameters().
-					WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-					WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-					WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize)))
+	sth.DisableAllLimitEnforcements()
 
-		sth.DisableAllLimitEnforcements()
+	env := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
 
-		env := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
-
-		params, err = fillEnvironmentMeterParameters(ctx, env, params)
-	}
-
-	// TODO(patrick): disable memory/interaction limits for service account
-
-	return params, err
+	return fillEnvironmentMeterParameters(ctx, env, params)
 }
 
 func fillEnvironmentMeterParameters(
