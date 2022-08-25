@@ -385,12 +385,6 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Help:      "the total number of chunk data pack requests processed by provider engine",
 	})
 
-	chunkDataPackResponseDeliveredTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemProvider,
-		Name:      "chunk_data_pack_delivered_total",
-		Help:      "the total number of chunk data pack responses delivered by provider engine",
-	})
 
 	chunkDataPackResponseDispatchTime := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
