@@ -131,6 +131,13 @@ func (p *AutoProfiler) start() {
 			continue
 		}
 
+		// default CreateTemp permissions are 0600.
+		err = os.Chmod(f.Name(), 0644)
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to set profile permissions")
+			continue
+		}
+
 		err = os.Rename(f.Name(), path)
 		if err != nil {
 			logger.Error().Err(err).Msg("failed to rename profile")
