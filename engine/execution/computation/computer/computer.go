@@ -3,7 +3,6 @@ package computer
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -28,8 +27,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const SystemChunkEventCollectionMaxSize = 256_000_000  // ~256MB
-const SystemChunkLedgerIntractionLimit = 1_000_000_000 // ~1GB
+const SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
@@ -66,10 +64,8 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithTransactionFeesEnabled(false),
 		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(logger)),
-		fvm.WithMaxStateInteractionSize(SystemChunkLedgerIntractionLimit),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
-		fvm.WithAllowContextOverrideByExecutionState(false), // disable reading the memory limit (and computation/memory weights) from the state
-		fvm.WithMemoryLimit(math.MaxUint64),                 // and set the memory limit to the maximum
+		fvm.WithMemoryAndInteractionLimitsDisabled(),
 	)
 }
 

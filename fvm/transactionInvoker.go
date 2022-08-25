@@ -72,7 +72,7 @@ func (i *TransactionInvoker) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
+		if mergeError := parentState.MergeState(childState, sth.EnforceLimits()); mergeError != nil {
 			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)

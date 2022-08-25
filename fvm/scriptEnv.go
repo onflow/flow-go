@@ -52,6 +52,13 @@ func NewScriptEnvironment(
 				tracer,
 				fvmContext.BlockHeader,
 			),
+			CryptoLibrary: environment.NewCryptoLibrary(tracer, meter),
+			BlockInfo: environment.NewBlockInfo(
+				tracer,
+				meter,
+				fvmContext.BlockHeader,
+				fvmContext.Blocks,
+			),
 			ctx:            fvmContext,
 			sth:            sth,
 			vm:             vm,
@@ -84,6 +91,8 @@ func (e *ScriptEnv) EmitEvent(_ cadence.Event) error {
 func (e *ScriptEnv) Events() []flow.Event {
 	return []flow.Event{}
 }
+
+// Block Environment Functions
 
 func (e *ScriptEnv) CreateAccount(_ runtime.Address) (address runtime.Address, err error) {
 	return runtime.Address{}, errors.NewOperationNotSupportedError("CreateAccount")
