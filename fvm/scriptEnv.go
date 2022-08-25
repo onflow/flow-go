@@ -52,6 +52,13 @@ func NewScriptEnvironment(
 				tracer,
 				fvmContext.BlockHeader,
 			),
+			CryptoLibrary: environment.NewCryptoLibrary(tracer, meter),
+			BlockInfo: environment.NewBlockInfo(
+				tracer,
+				meter,
+				fvmContext.BlockHeader,
+				fvmContext.Blocks,
+			),
 			ctx:            fvmContext,
 			sth:            sth,
 			vm:             vm,

@@ -72,6 +72,13 @@ func NewTransactionEnvironment(
 				tracer,
 				ctx.BlockHeader,
 			),
+			CryptoLibrary: environment.NewCryptoLibrary(tracer, meter),
+			BlockInfo: environment.NewBlockInfo(
+				tracer,
+				meter,
+				ctx.BlockHeader,
+				ctx.Blocks,
+			),
 			ctx:            ctx,
 			sth:            sth,
 			vm:             vm,
