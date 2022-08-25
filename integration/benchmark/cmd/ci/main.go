@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/access"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/cmd/build"
@@ -138,18 +139,11 @@ func main() {
 	}
 
 	// get the private key string
-	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
+	encodedPrivateKey := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 
-	loadedAccessAddr := accessNodeAddress
-	flowClient, err := client.NewClient(loadedAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	flowClient, err := client.NewClient(accessNodeAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
-	}
-
-	supervisorAccessAddr := accessNodeAddress
-	supervisorClient, err := client.NewClient(supervisorAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
 	}
 
 	// run load
@@ -157,22 +151,24 @@ func main() {
 
 	loaderMetrics.SetTPSConfigured(loadCase.tps)
 
-	var lg *benchmark.ContLoadGenerator
-	lg, err = benchmark.NewContLoadGenerator(
+	lg, err := benchmark.New(
+		ctx,
 		log,
 		loaderMetrics,
-		flowClient,
-		supervisorClient,
-		loadedAccessAddr,
-		priv,
-		&serviceAccountAddress,
-		&fungibleTokenAddress,
-		&flowTokenAddress,
-		loadCase.tps,
-		accountMultiplier,
-		benchmark.LoadType(loadType),
-		feedbackEnabled,
-		benchmark.ConstExecParam{
+		[]access.Client{flowClient},
+		benchmark.NetworkParams{
+			ServAccPrivKeyHex:     encodedPrivateKey,
+			ServiceAccountAddress: &serviceAccountAddress,
+			FungibleTokenAddress:  &fungibleTokenAddress,
+			FlowTokenAddress:      &flowTokenAddress,
+		},
+		benchmark.LoadParams{
+			TPS:              loadCase.tps,
+			NumberOfAccounts: loadCase.tps * accountMultiplier,
+			LoadType:         benchmark.LoadType(loadType),
+			FeedbackEnabled:  feedbackEnabled,
+		},
+		benchmark.ConstExecParams{
 			MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
 			AuthAccountNum:  *authAccNumInConstExecTx,
 			ArgSizeInByte:   *argSizeInByteInConstExecTx,

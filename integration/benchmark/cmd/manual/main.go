@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/access"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/crypto"
@@ -36,7 +37,7 @@ func main() {
 	tpsFlag := flag.String("tps", "1", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
 	tpsDurationsFlag := flag.String("tps-durations", "0", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	chainIDStr := flag.String("chain", string(flowsdk.Emulator), "chain ID")
-	access := flag.String("access", net.JoinHostPort("127.0.0.1", "3569"), "access node address")
+	accessNodes := flag.String("access", net.JoinHostPort("127.0.0.1", "3569"), "access node address")
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 	logLvl := flag.String("log-level", "info", "set log level")
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
@@ -71,10 +72,6 @@ func main() {
 	sp := benchmark.NewStatsPusher(ctx, log, *pushgateway, "loader", prometheus.DefaultGatherer)
 	defer sp.Close()
 
-	accessNodeAddrs := strings.Split(*access, ",")
-
-	cases := parseLoadCases(log, tpsFlag, tpsDurationsFlag)
-
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
 	log.Info().Msgf("Service Address: %v", serviceAccountAddress)
@@ -99,7 +96,7 @@ func main() {
 	}
 
 	// get the private key string
-	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
+	encodedPrivateKey := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 
 	// sleep in order to ensure the testnet is up and running
 	if *sleep > 0 {
@@ -107,23 +104,18 @@ func main() {
 		time.Sleep(*sleep)
 	}
 
-	loadedAccessAddr := accessNodeAddrs[0]
-	flowClient, err := client.NewClient(loadedAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
-	}
-
-	supervisorAccessAddr := accessNodeAddrs[0]
-	if len(accessNodeAddrs) > 1 {
-		supervisorAccessAddr = accessNodeAddrs[1]
-	}
-	supervisorClient, err := client.NewClient(supervisorAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
+	accessNodeAddrs := strings.Split(*accessNodes, ",")
+	clients := make([]access.Client, 0, len(accessNodeAddrs))
+	for _, addr := range accessNodeAddrs {
+		client, err := client.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatal().Str("addr", addr).Err(err).Msgf("unable to initialize flow client")
+		}
+		clients = append(clients, client)
 	}
 
 	// run load cases
-	for i, c := range cases {
+	for i, c := range parseLoadCases(log, tpsFlag, tpsDurationsFlag) {
 		log.Info().Str("load_type", *loadTypeFlag).Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
 
 		loaderMetrics.SetTPSConfigured(c.tps)
@@ -131,21 +123,24 @@ func main() {
 		var lg *benchmark.ContLoadGenerator
 		if c.tps > 0 {
 			var err error
-			lg, err = benchmark.NewContLoadGenerator(
+			lg, err = benchmark.New(
+				ctx,
 				log,
 				loaderMetrics,
-				flowClient,
-				supervisorClient,
-				loadedAccessAddr,
-				priv,
-				&serviceAccountAddress,
-				&fungibleTokenAddress,
-				&flowTokenAddress,
-				c.tps,
-				*accountMultiplierFlag,
-				benchmark.LoadType(*loadTypeFlag),
-				*feedbackEnabled,
-				benchmark.ConstExecParam{
+				clients,
+				benchmark.NetworkParams{
+					ServAccPrivKeyHex:     encodedPrivateKey,
+					ServiceAccountAddress: &serviceAccountAddress,
+					FungibleTokenAddress:  &fungibleTokenAddress,
+					FlowTokenAddress:      &flowTokenAddress,
+				},
+				benchmark.LoadParams{
+					TPS:              c.tps,
+					NumberOfAccounts: c.tps * *accountMultiplierFlag,
+					LoadType:         benchmark.LoadType(*loadTypeFlag),
+					FeedbackEnabled:  *feedbackEnabled,
+				},
+				benchmark.ConstExecParams{
 					MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
 					AuthAccountNum:  *authAccNumInConstExecTx,
 					ArgSizeInByte:   *argSizeInByteInConstExecTx,
