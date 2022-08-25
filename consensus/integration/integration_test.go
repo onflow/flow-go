@@ -150,7 +150,7 @@ func blockNothing(_ network.Channel, _ interface{}, _, _ *Node) (bool, time.Dura
 	return false, 0
 }
 
-// blockNodes specifies that all messages sent by or received any member of the `denyList`
+// blockNodes specifies that all messages sent or received by any member of the `denyList`
 // should be dropped, i.e. we return `true` (block message), `0` (no delay).
 // For nodes _not_ in the `denyList`,  we return `false` (no blocking), `0` (no delay).
 func blockNodes(denyList ...*Node) BlockOrDelayFunc {

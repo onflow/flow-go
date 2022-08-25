@@ -57,7 +57,7 @@ func blockReceiverMessagesRandomly(dropProbability float32) BlockOrDelayFunc {
 }
 
 // delayReceiverMessagesByRange delivers all messages, but with a randomly sampled
-// delay in the interval [low, high). Panicks
+// delay in the interval [low, high). Panics when `low` < 0 or `low > `high`
 func delayReceiverMessagesByRange(low time.Duration, high time.Duration) BlockOrDelayFunc {
 	lock := new(sync.Mutex)
 	prng := rand.New(rand.NewSource(64))
