@@ -32,7 +32,6 @@ func NewScriptEnvironment(
 ) *ScriptEnv {
 
 	accounts := state.NewAccounts(sth)
-	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	tracer := environment.NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
@@ -48,9 +47,17 @@ func NewScriptEnvironment(
 				fvmContext.Metrics,
 				fvmContext.CadenceLoggingEnabled,
 			),
+			UUIDGenerator: environment.NewUUIDGenerator(tracer, meter, sth),
 			UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
 				tracer,
 				fvmContext.BlockHeader,
+			),
+			CryptoLibrary: environment.NewCryptoLibrary(tracer, meter),
+			BlockInfo: environment.NewBlockInfo(
+				tracer,
+				meter,
+				fvmContext.BlockHeader,
+				fvmContext.Blocks,
 			),
 			ctx:            fvmContext,
 			sth:            sth,
@@ -58,7 +65,6 @@ func NewScriptEnvironment(
 			programs:       programsHandler,
 			accounts:       accounts,
 			accountKeys:    accountKeys,
-			uuidGenerator:  uuidGenerator,
 			frozenAccounts: nil,
 		},
 	}
@@ -85,6 +91,8 @@ func (e *ScriptEnv) EmitEvent(_ cadence.Event) error {
 func (e *ScriptEnv) Events() []flow.Event {
 	return []flow.Event{}
 }
+
+// Block Environment Functions
 
 func (e *ScriptEnv) CreateAccount(_ runtime.Address) (address runtime.Address, err error) {
 	return runtime.Address{}, errors.NewOperationNotSupportedError("CreateAccount")

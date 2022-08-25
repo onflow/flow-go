@@ -47,7 +47,6 @@ func NewTransactionEnvironment(
 
 	accounts := state.NewAccounts(sth)
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
-	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	// TODO set the flags on context
 	eventHandler := handler.NewEventHandler(ctx.Chain,
@@ -68,9 +67,17 @@ func NewTransactionEnvironment(
 				ctx.Metrics,
 				ctx.CadenceLoggingEnabled,
 			),
+			UUIDGenerator: environment.NewUUIDGenerator(tracer, meter, sth),
 			UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
 				tracer,
 				ctx.BlockHeader,
+			),
+			CryptoLibrary: environment.NewCryptoLibrary(tracer, meter),
+			BlockInfo: environment.NewBlockInfo(
+				tracer,
+				meter,
+				ctx.BlockHeader,
+				ctx.Blocks,
 			),
 			ctx:            ctx,
 			sth:            sth,
@@ -78,7 +85,6 @@ func NewTransactionEnvironment(
 			programs:       programsHandler,
 			accounts:       accounts,
 			accountKeys:    accountKeys,
-			uuidGenerator:  uuidGenerator,
 			frozenAccounts: nil,
 		},
 
