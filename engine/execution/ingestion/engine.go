@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -69,6 +70,7 @@ type Engine struct {
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	pauseExecution         bool
 	executionDataPruner    *pruner.Pruner
+	uploaders              []uploader.Uploader
 }
 
 func New(
@@ -95,6 +97,7 @@ func New(
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pauseExecution bool,
 	pruner *pruner.Pruner,
+	uploaders []uploader.Uploader,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -128,6 +131,7 @@ func New(
 		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
 		pauseExecution:         pauseExecution,
 		executionDataPruner:    pruner,
+		uploaders:              uploaders,
 	}
 
 	// move to state syncing engine
@@ -145,6 +149,12 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	if !e.pauseExecution {
+		if computation.GetUploaderEnabled() {
+			if err := e.retryUpload(); err != nil {
+				e.log.Warn().Msg("failed to re-upload all ComputationResults")
+			}
+		}
+
 		err := e.reloadUnexecutedBlocks()
 		if err != nil {
 			e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
@@ -1239,6 +1249,16 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 				Msg("extensive log: executed tx content")
 		}
 	}
+}
+
+func (e *Engine) retryUpload() (err error) {
+	for _, u := range e.uploaders {
+		switch retryableUploaderWraper := u.(type) {
+		case uploader.RetryableUploaderWrapper:
+			err = retryableUploaderWraper.RetryUpload()
+		}
+	}
+	return err
 }
 
 func GenerateExecutionReceipt(
