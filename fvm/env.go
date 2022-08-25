@@ -57,9 +57,6 @@ type AccountInterface interface {
 	RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error)
 
 	AddEncodedAccountKey(address runtime.Address, publicKey []byte) error
-
-	// TODO(patrick): figure out where this belongs
-	GetSigningAccounts() ([]runtime.Address, error)
 }
 
 // Parts of the environment that are common to all transaction and script
@@ -72,6 +69,7 @@ type commonEnv struct {
 	*environment.UnsafeRandomGenerator
 	*environment.CryptoLibrary
 	*environment.BlockInfo
+	environment.TransactionInfo
 
 	// TODO(patrick): rm
 	ctx Context
@@ -457,12 +455,6 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 
 // Commit commits changes and return a list of updated keys
 func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
-	// commit changes and return a list of updated keys
-	err := env.programs.Cleanup()
-	if err != nil {
-		return programs.ModifiedSets{}, err
-	}
-
 	keys, err := env.contracts.Commit()
 	return programs.ModifiedSets{
 		ContractUpdateKeys: keys,

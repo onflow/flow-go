@@ -59,13 +59,14 @@ func NewScriptEnvironment(
 				fvmContext.BlockHeader,
 				fvmContext.Blocks,
 			),
-			ctx:            fvmContext,
-			sth:            sth,
-			vm:             vm,
-			programs:       programsHandler,
-			accounts:       accounts,
-			accountKeys:    accountKeys,
-			frozenAccounts: nil,
+			TransactionInfo: environment.NoTransactionInfo{},
+			ctx:             fvmContext,
+			sth:             sth,
+			vm:              vm,
+			programs:        programsHandler,
+			accounts:        accounts,
+			accountKeys:     accountKeys,
+			frozenAccounts:  nil,
 		},
 	}
 
@@ -120,8 +121,4 @@ func (e *ScriptEnv) UpdateAccountContractCode(_ runtime.Address, _ string, _ []b
 
 func (e *ScriptEnv) RemoveAccountContractCode(_ runtime.Address, _ string) (err error) {
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
-}
-
-func (e *ScriptEnv) GetSigningAccounts() ([]runtime.Address, error) {
-	return nil, errors.NewOperationNotSupportedError("GetSigningAccounts")
 }

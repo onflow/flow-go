@@ -61,13 +61,9 @@ type CollectorSuite struct {
 // and clusters and starts the network.
 //
 // NOTE: This must be called explicitly by each test, since nodes/clusters vary
-//       between test cases.
+// between test cases.
 func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", suite.T().Name()).
-		Logger()
-	suite.log = logger
+	suite.log = unittest.LoggerForTest(suite.Suite.T(), zerolog.InfoLevel)
 	suite.log.Info().Msg("================> SetupTest")
 
 	var (
