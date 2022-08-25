@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TimeoutObjectFilter is a filter function for dropping Votes.
+// VoteFilter is a filter function for dropping Votes.
 // Return value `true` implies that the the given Vote should be
 // dropped, while `false` indicates that the Vote should be received.
 type VoteFilter func(*model.Vote) bool
