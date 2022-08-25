@@ -2,6 +2,7 @@ package environment
 
 import (
 	"fmt"
+
 	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/cadence/runtime"

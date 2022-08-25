@@ -2,9 +2,10 @@ package fvm
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/stdlib"
-	"strconv"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"

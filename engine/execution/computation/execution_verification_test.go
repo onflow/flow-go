@@ -3,8 +3,9 @@ package computation
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/cadence/runtime"
 	"testing"
+
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"

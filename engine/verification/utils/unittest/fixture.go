@@ -2,9 +2,10 @@ package verificationtest
 
 import (
 	"context"
-	"github.com/onflow/cadence/runtime"
 	"math/rand"
 	"testing"
+
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"

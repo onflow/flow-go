@@ -3,9 +3,10 @@ package computation
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/cadence/runtime"
 	"testing"
 	"time"
+
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -181,14 +182,15 @@ func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header
 //
 // block structure and operations
 // Block1 (empty block)
-//     -> Block11 (deploy contract v1)
-//         -> Block111  (emit event - version should be 1) and (update contract to v3)
-//             -> Block1111   (emit event - version should be 3)
-//	       -> Block112 (emit event - version should be 1) and (update contract to v4)
-//             -> Block1121  (emit event - version should be 4)
-//     -> Block12 (deploy contract v2)
-//         -> Block121 (emit event - version should be 2)
-//             -> Block1211 (emit event - version should be 2)
+//
+//	    -> Block11 (deploy contract v1)
+//	        -> Block111  (emit event - version should be 1) and (update contract to v3)
+//	            -> Block1111   (emit event - version should be 3)
+//		       -> Block112 (emit event - version should be 1) and (update contract to v4)
+//	            -> Block1121  (emit event - version should be 4)
+//	    -> Block12 (deploy contract v2)
+//	        -> Block121 (emit event - version should be 2)
+//	            -> Block1211 (emit event - version should be 2)
 func TestPrograms_TestBlockForks(t *testing.T) {
 	block := unittest.BlockFixture()
 	rt := fvm.NewInterpreterRuntime(runtime.Config{})

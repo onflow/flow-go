@@ -3,8 +3,9 @@ package handler_test
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/onflow/cadence/runtime"
 	"testing"
+
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"

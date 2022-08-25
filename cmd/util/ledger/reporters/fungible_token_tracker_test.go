@@ -3,10 +3,11 @@ package reporters_test
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/onflow/cadence/runtime"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
