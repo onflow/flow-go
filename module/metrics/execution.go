@@ -395,17 +395,17 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 	chunkDataPackResponseDispatchTime := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemProvider,
-		Name:      "chunk_data_pack_response_dispatch_time_ms",
-		Help:      "the total time spent on dispatching a chunk data pack response on the network milliseconds",
-		Buckets:   []float64{100, 500, 1000, 1500, 2000, 2500, 3000, 6000},
+		Name:      "chunk_data_pack_response_dispatch_time_seconds",
+		Help:      "the total time spent on dispatching a chunk data pack response on the network in seconds",
+		Buckets:   []float64{.1, .5, 1, 1.5, 2, 2.5, 3, 6},
 	})
 
 	chunkDataPackQueryTime := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemProvider,
-		Name:      "chunk_data_pack_query_time_ms",
-		Help:      "the total time spent on querying a chunk data pack from database",
-		Buckets:   []float64{100, 500, 1000, 1500, 2000, 2500, 3000, 6000},
+		Name:      "chunk_data_pack_query_time_seconds",
+		Help:      "the total time spent on querying a chunk data pack from database in seconds",
+		Buckets:   []float64{.01, .05, .1, .5, 1, 2, 5},
 	})
 
 	blockDataUploadsInProgress := promauto.NewGauge(prometheus.GaugeOpts{
