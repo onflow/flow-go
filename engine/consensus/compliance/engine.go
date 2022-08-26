@@ -303,7 +303,7 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 	return nil
 }
 
-// loop() implements the processing of inbound messages. Only returns when Engine is terminated.
+// loop implements the processing of inbound messages. Only returns when Engine is terminated.
 func (e *Engine) loop() {
 	for {
 		select {
