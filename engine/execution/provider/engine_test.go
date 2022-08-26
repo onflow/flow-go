@@ -77,7 +77,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
-		}, 1*time.Second, 100*time.Millisecond)
+		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
@@ -135,7 +135,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
-		}, 1*time.Second, 100*time.Millisecond)
+		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
@@ -193,7 +193,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
-		}, 1*time.Second, 100*time.Millisecond)
+		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
@@ -247,7 +247,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
-		}, 1*time.Second, 100*time.Millisecond)
+		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
@@ -317,7 +317,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
-		}, 1*time.Second, 100*time.Millisecond)
+		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
@@ -393,7 +393,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
 		require.Eventually(t, func() bool {
 			return requestQueue.Size() == uint(0) // ensuring second request has been picked up from the queue as well.
-		}, 1*time.Second, 100*time.Millisecond)
+		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
