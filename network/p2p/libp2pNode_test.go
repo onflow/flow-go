@@ -144,7 +144,7 @@ func TestConnGater(t *testing.T) {
 	node1Peers := make(map[peer.ID]struct{})
 	node1, identity1 := nodeFixture(t, ctx, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) error {
 		if _, ok := node1Peers[pid]; !ok {
-			return fmt.Errorf("id not found: %s", pid.Pretty())
+			return fmt.Errorf("peer id not found: %s", pid.Pretty())
 		}
 		return nil
 	}))
