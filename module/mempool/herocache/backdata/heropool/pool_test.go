@@ -433,15 +433,15 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 	// adding elements
 	for i, e := range entitiesToBeAdded {
 		// adding each element must be successful.
-		result := pool.Add(e.ID(), e, uint64(i))
+		entityIndex, slotAvailable, ejectionHappened := pool.Add(e.ID(), e, uint64(i))
 
 		if i < len(pool.poolEntities) {
 			// in case of no over limit, size of entities linked list should be incremented by each addition.
 			require.Equal(t, pool.Size(), uint32(i+1))
 
-			require.True(t, result.Success)
-			require.False(t, result.Ejection)
-			require.Equal(t, result.EntityIndex, EIndex(i))
+			require.True(t, slotAvailable)
+			require.False(t, ejectionHappened)
+			require.Equal(t, entityIndex, EIndex(i))
 
 			// in case pool is not full, the head should retrieve the first added entity.
 			headEntity, headExists := pool.Head()
@@ -455,8 +455,8 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			require.Equal(t, e, entity)
 
 			if i >= len(pool.poolEntities) {
-				require.True(t, result.Success)
-				require.True(t, result.Ejection)
+				require.True(t, slotAvailable)
+				require.True(t, ejectionHappened)
 				// when pool is full and with LRU ejection, the head should move forward with each element added.
 				headEntity, headExists := pool.Head()
 				require.True(t, headExists)
@@ -466,16 +466,16 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 
 		if ejectionMode == RandomEjection {
 			if i >= len(pool.poolEntities) {
-				require.True(t, result.Success)
-				require.True(t, result.Ejection)
+				require.True(t, slotAvailable)
+				require.True(t, ejectionHappened)
 			}
 		}
 
 		if ejectionMode == NoEjection {
 			if i >= len(pool.poolEntities) {
-				require.False(t, result.Success)
-				require.False(t, result.Ejection)
-				require.Equal(t, result.EntityIndex, EIndex(0))
+				require.False(t, slotAvailable)
+				require.False(t, ejectionHappened)
+				require.Equal(t, entityIndex, EIndex(0))
 
 				// when pool is full and with NoEjection, the head must keep pointing to the first added element.
 				headEntity, headExists := pool.Head()
