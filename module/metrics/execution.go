@@ -378,7 +378,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 	chunkDataPackRequestProcessedTotal := promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemProvider,
-		Name:      "chunk_data_pack_requested_total",
+		Name:      "chunk_data_packs_requested_total",
 		Help:      "the total number of chunk data pack requests processed by provider engine",
 	})
 
