@@ -2,6 +2,7 @@ package integration
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -109,9 +110,10 @@ func Test2TimeoutOutof4Instances(t *testing.T) {
 			WithStopCondition(ViewReached(finalView)),
 		)
 		instances = append(instances, in)
+		fmt.Println("correct instance: ", in.localID)
 	}
 
-	// set up one instance which can't vote, nor propose
+	// set up two instances which can't vote, nor propose
 	for n := numPass; n < numPass+numFail; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
@@ -124,6 +126,7 @@ func Test2TimeoutOutof4Instances(t *testing.T) {
 			WithOutgoingProposals(BlockAllProposals),
 		)
 		instances = append(instances, in)
+		fmt.Println("bad instance: ", in.localID)
 	}
 
 	// connect the communicators of the instances together
@@ -140,6 +143,11 @@ func Test2TimeoutOutof4Instances(t *testing.T) {
 		}(in)
 	}
 	wg.Wait()
+
+	for _, in := range instances {
+		fmt.Println("latest finalized: ", in.localID, in.forks.FinalizedBlock().View, in.forks.FinalizedBlock().BlockID)
+		fmt.Printf(">> qc signers: %b\n", in.forks.FinalizedBlock().QC.SignerIndices)
+	}
 
 	// check that all instances have the same finalized block
 	ref := instances[0]

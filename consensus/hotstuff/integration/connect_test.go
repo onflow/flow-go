@@ -80,6 +80,10 @@ func Connect(instances []*Instance) {
 					return fmt.Errorf("can't send to self (sender: %x)", sender.localID)
 				}
 
+				defer func() {
+					fmt.Println(sender.localID, " -> ", recipientID, " view: ", view, "should_block_out=", sender.blockVoteOut(vote))
+				}()
+
 				// check if we should block the outgoing vote
 				if sender.blockVoteOut(vote) {
 					return nil
