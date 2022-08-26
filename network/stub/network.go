@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -109,6 +110,13 @@ func (n *Network) UnRegisterChannel(channel channels.Channel) error {
 	defer n.Unlock()
 	delete(n.engines, channel)
 	return nil
+}
+
+// SendReputationFeedback reports reputation feedback to libP2P for a message received and processed by an message engine. The message engine
+// will report feedBack as true if a message was consumed in some happy path and false if a message was not useful. Currently this
+// fun is a no-op.
+func (n *Network) SendReputationFeedback(id peer.ID, messageID string, topic channels.Topic, feedBack bool) {
+	return
 }
 
 // submit is called when the attached Engine to the channel is sending an event to an

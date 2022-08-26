@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/ipfs/go-datastore"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -47,4 +48,9 @@ type Adapter interface {
 	// UnRegisterChannel unregisters the engine for the specified channel. The engine will no longer be able to send or
 	// receive messages from that channel.
 	UnRegisterChannel(channel channels.Channel) error
+
+	// SendReputationFeedback reports reputation feedback to libP2P for a message received and processed by an message engine. The message engine
+	// will report feedBack as true if a message was consumed in some happy path and false if a message was not useful. Currently this
+	// fun is a no-op.
+	SendReputationFeedback(id peer.ID, messageID string, topic channels.Topic, feedBack bool)
 }
