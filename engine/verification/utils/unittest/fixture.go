@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -252,7 +254,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		)
 		require.NoError(t, err)
 
-		rt := fvm.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime(runtime.Config{})
 
 		vm := fvm.NewVirtualMachine(rt)
 

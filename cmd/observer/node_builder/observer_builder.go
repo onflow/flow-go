@@ -21,7 +21,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -662,7 +661,7 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 			return nil, fmt.Errorf("failed to decode secured GRPC server public key hex %w", err)
 		}
 
-		publicFlowNetworkingKey, err := crypto.DecodePublicKey(sdkcrypto.ECDSA_P256, bytes)
+		publicFlowNetworkingKey, err := crypto.DecodePublicKey(crypto.ECDSAP256, bytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get public flow networking key could not decode public key bytes %w", err)
 		}
