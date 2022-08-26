@@ -153,11 +153,8 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(t, 0, p2p.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
 
-	// Now attempt to create another 50 outbound stream to the same destination by calling CreateStream
-	//
-	// NB! This number must be lower than default limits in libp2p:
-	// See: https://github.com/libp2p/go-libp2p/blob/master/limits.go
-	streamCount := 50
+	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
+	streamCount := 100
 	var streams []network.Stream
 	for i := 0; i < streamCount; i++ {
 		pInfo, err := p2p.PeerAddressInfo(*id2)
