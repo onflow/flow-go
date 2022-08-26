@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -37,6 +38,9 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 		envMock.On("VM").
 			Return(&vm).
 			Once()
+		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
+			fvm.NewReusableCadenceRuntime())
+		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
 	}
 
@@ -169,6 +173,9 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 		envMock.On("VM").
 			Return(&vm).
 			Once()
+		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
+			fvm.NewReusableCadenceRuntime())
+		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
 	}
 

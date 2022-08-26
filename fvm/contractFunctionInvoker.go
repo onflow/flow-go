@@ -47,13 +47,17 @@ func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error)
 	span.SetAttributes(i.logSpanAttrs...)
 	defer span.End()
 
+	runtimeEnv := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(runtimeEnv)
+
 	value, err := env.VM().Runtime.InvokeContractFunction(
 		i.contractLocation,
 		i.functionName,
 		i.arguments,
 		i.argumentTypes,
 		runtime.Context{
-			Interface: env,
+			Interface:   env,
+			Environment: runtimeEnv,
 		},
 	)
 

@@ -42,6 +42,7 @@ type Context struct {
 	TransactionProcessors         []TransactionProcessor
 	ScriptProcessors              []ScriptProcessor
 	Logger                        zerolog.Logger
+	ReusableCadenceRuntimePool    ReusableCadenceRuntimePool
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -98,7 +99,8 @@ func defaultContext(logger zerolog.Logger) Context {
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvoker(),
 		},
-		Logger: logger,
+		Logger:                     logger,
+		ReusableCadenceRuntimePool: NewReusableCadenceRuntimePool(0),
 	}
 }
 
@@ -304,6 +306,15 @@ func WithAccountStorageLimit(enabled bool) Option {
 func WithTransactionFeesEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.TransactionFeesEnabled = enabled
+		return ctx
+	}
+}
+
+// WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
+// use for creating the cadence runtime.
+func WithReusableCadenceRuntimePool(pool ReusableCadenceRuntimePool) Option {
+	return func(ctx Context) Context {
+		ctx.ReusableCadenceRuntimePool = pool
 		return ctx
 	}
 }
