@@ -36,6 +36,11 @@ const (
 	// DefaultChunkDataPackRequestWorker is the default number of concurrent workers processing chunk data pack requests on
 	// execution nodes.
 	DefaultChunkDataPackRequestWorker = 100
+	// DefaultChunkDataPackQueryTimeout is the default timeout value for querying a chunk data pack from storage.
+	DefaultChunkDataPackQueryTimeout = 10 * time.Second
+	// DefaultChunkDataPackDeliveryTimeout is the default timeout value for delivery of a chunk data pack to a verification
+	// node.
+	DefaultChunkDataPackDeliveryTimeout = 10 * time.Second
 )
 
 // An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
@@ -58,6 +63,11 @@ type Engine struct {
 	// buffered channel for ChunkDataRequest workers to pick
 	// requests and process.
 	chdpRequestChannel chan *mempool.ChunkDataPackRequest
+
+	// timeout for delivery of a chunk data pack response in the network.
+	chunkDataPackDeliveryTimeout time.Duration
+	// timeout for querying chunk data pack through database.
+	chunkDataPackQueryTimeout time.Duration
 }
 
 func New(
@@ -70,6 +80,8 @@ func New(
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	chunkDataPackRequestQueue mempool.ChunkDataPackMessageStore,
 	chdpRequestWorkers uint,
+	chunkDataPackQueryTimeout time.Duration,
+	chunkDataPackDeliveryTimeout time.Duration,
 ) (*Engine, error) {
 
 	log := logger.With().Str("engine", "receipts").Logger()
@@ -105,15 +117,17 @@ func New(
 		})
 
 	engine := Engine{
-		log:                    log,
-		tracer:                 tracer,
-		state:                  state,
-		execState:              execState,
-		metrics:                metrics,
-		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
-		chdpRequestHandler:     handler,
-		chdpRequestQueue:       chunkDataPackRequestQueue,
-		chdpRequestChannel:     make(chan *mempool.ChunkDataPackRequest, chdpRequestWorkers),
+		log:                          log,
+		tracer:                       tracer,
+		state:                        state,
+		execState:                    execState,
+		metrics:                      metrics,
+		checkAuthorizedAtBlock:       checkAuthorizedAtBlock,
+		chdpRequestHandler:           handler,
+		chdpRequestQueue:             chunkDataPackRequestQueue,
+		chdpRequestChannel:           make(chan *mempool.ChunkDataPackRequest, chdpRequestWorkers),
+		chunkDataPackDeliveryTimeout: chunkDataPackDeliveryTimeout,
+		chunkDataPackQueryTimeout:    chunkDataPackQueryTimeout,
 	}
 
 	var err error
@@ -260,7 +274,11 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 
 	queryTime := time.Since(processStartTime)
 	lg = lg.With().Dur("query_time", queryTime).Logger()
-	e.metrics.ChunkDataPackRetrievedFromDatabase(queryTime)
+	if queryTime > e.chunkDataPackQueryTimeout {
+		lg.Warn().
+			Dur("query_timout", e.chunkDataPackQueryTimeout).
+			Msg("chunk data pack query takes longer than expected timeout")
+	}
 
 	_, err = e.ensureAuthorized(chunkDataPack.ChunkID, request.RequesterId)
 	if err != nil {
@@ -299,7 +317,11 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 
 	deliveryTime := time.Since(deliveryStartTime)
 	lg = lg.With().Dur("delivery_time", deliveryTime).Logger()
-	e.metrics.ChunkDataPackResponseDispatchedInNetwork(deliveryTime)
+	if deliveryTime > e.chunkDataPackDeliveryTimeout {
+		lg.Warn().
+			Dur("delivery_timout", e.chunkDataPackDeliveryTimeout).
+			Msg("chunk data pack delivery takes longer than expected timeout")
+	}
 
 	if chunkDataPack.Collection != nil {
 		// logging collection id of non-system chunks.

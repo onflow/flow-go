@@ -61,8 +61,6 @@ type ExecutionCollector struct {
 	scriptMemoryUsage                  prometheus.Histogram
 	scriptMemoryEstimate               prometheus.Histogram
 	scriptMemoryDifference             prometheus.Histogram
-	chunkDataPackResponseDispatchTime  prometheus.Histogram
-	chunkDataPackQueryTime             prometheus.Histogram
 	numberOfAccounts                   prometheus.Gauge
 	chunkDataPackRequestProcessedTotal prometheus.Counter
 	stateSyncActive                    prometheus.Gauge
@@ -384,22 +382,6 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Help:      "the total number of chunk data pack requests processed by provider engine",
 	})
 
-	chunkDataPackResponseDispatchTime := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemProvider,
-		Name:      "chunk_data_pack_response_dispatch_time_seconds",
-		Help:      "the total time spent on dispatching a chunk data pack response on the network in seconds",
-		Buckets:   []float64{.1, .5, 1, 1.5, 2, 2.5, 3, 6},
-	})
-
-	chunkDataPackQueryTime := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemProvider,
-		Name:      "chunk_data_pack_query_time_seconds",
-		Help:      "the total time spent on querying a chunk data pack from database in seconds",
-		Buckets:   []float64{.01, .05, .1, .5, 1, 2, 5},
-	})
-
 	blockDataUploadsInProgress := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemBlockDataUploader,
@@ -461,8 +443,6 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		chunkDataPackRequestProcessedTotal: chunkDataPackRequestProcessedTotal,
 		blockDataUploadsInProgress:         blockDataUploadsInProgress,
 		blockDataUploadsDuration:           blockDataUploadsDuration,
-		chunkDataPackResponseDispatchTime:  chunkDataPackResponseDispatchTime,
-		chunkDataPackQueryTime:             chunkDataPackQueryTime,
 
 		stateReadsPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
@@ -750,19 +730,6 @@ func (ec *ExecutionCollector) RuntimeTransactionInterpreted(dur time.Duration) {
 // It increases the request processed counter by one.
 func (ec *ExecutionCollector) ChunkDataPackRequestProcessed() {
 	ec.chunkDataPackRequestProcessedTotal.Inc()
-}
-
-// ChunkDataPackResponseDispatchedInNetwork is executed every time a chunk data pack request is successfully replied.
-// It records the time it took to dispatch the reply on the network.
-// It also increases the response counter by one.
-func (ec *ExecutionCollector) ChunkDataPackResponseDispatchedInNetwork(dispatchTime time.Duration) {
-	ec.chunkDataPackResponseDispatchTime.Observe(dispatchTime.Seconds())
-}
-
-// ChunkDataPackRetrievedFromDatabase is executed every time a chunk data pack is queried from database.
-// It records the time it took to query the chunk data pack.
-func (ec *ExecutionCollector) ChunkDataPackRetrievedFromDatabase(queryTime time.Duration) {
-	ec.chunkDataPackQueryTime.Observe(queryTime.Seconds())
 }
 
 func (ec *ExecutionCollector) ExecutionSync(syncing bool) {

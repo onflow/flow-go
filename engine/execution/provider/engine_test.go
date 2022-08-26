@@ -47,7 +47,9 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
 			requestQueue,
-			DefaultChunkDataPackRequestWorker)
+			DefaultChunkDataPackRequestWorker,
+			DefaultChunkDataPackQueryTimeout,
+			DefaultChunkDataPackDeliveryTimeout)
 		require.NoError(t, err)
 
 		originID := unittest.IdentifierFixture()
@@ -104,7 +106,9 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
 			requestQueue,
-			DefaultChunkDataPackRequestWorker)
+			DefaultChunkDataPackRequestWorker,
+			DefaultChunkDataPackQueryTimeout,
+			DefaultChunkDataPackDeliveryTimeout)
 		require.NoError(t, err)
 
 		originID := unittest.IdentifierFixture()
@@ -160,7 +164,9 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
 			requestQueue,
-			DefaultChunkDataPackRequestWorker)
+			DefaultChunkDataPackRequestWorker,
+			DefaultChunkDataPackQueryTimeout,
+			DefaultChunkDataPackDeliveryTimeout)
 		require.NoError(t, err)
 
 		originID := unittest.IdentifierFixture()
@@ -217,7 +223,9 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
 			requestQueue,
-			DefaultChunkDataPackRequestWorker)
+			DefaultChunkDataPackRequestWorker,
+			DefaultChunkDataPackQueryTimeout,
+			DefaultChunkDataPackDeliveryTimeout)
 		require.NoError(t, err)
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -268,7 +276,9 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
 			requestQueue,
-			DefaultChunkDataPackRequestWorker)
+			DefaultChunkDataPackRequestWorker,
+			DefaultChunkDataPackQueryTimeout,
+			DefaultChunkDataPackDeliveryTimeout)
 		require.NoError(t, err)
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -334,7 +344,9 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return currentAuthorizedState, nil },
 			requestQueue,
-			DefaultChunkDataPackRequestWorker)
+			DefaultChunkDataPackRequestWorker,
+			DefaultChunkDataPackQueryTimeout,
+			DefaultChunkDataPackDeliveryTimeout)
 		require.NoError(t, err)
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))

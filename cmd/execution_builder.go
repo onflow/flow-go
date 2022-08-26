@@ -113,6 +113,8 @@ type ExecutionConfig struct {
 	blobstoreBurstLimit                  int
 	chunkDataPackRequestsCacheSize       uint32
 	chunkDataPackRequestWorkers          uint
+	chunkDataPackQueryTimeout            time.Duration
+	chunkDataPackDeliveryTimeout         time.Duration
 }
 
 type ExecutionNodeBuilder struct {
@@ -160,6 +162,10 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			flags.IntVar(&e.exeConf.syncThreshold, "sync-threshold", 100,
 				"the maximum number of sealed and unexecuted blocks before triggering state syncing")
 			flags.BoolVar(&e.exeConf.extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
+			flags.DurationVar(&e.exeConf.chunkDataPackQueryTimeout, "chunk-data-pack-query-timeout", exeprovider.DefaultChunkDataPackQueryTimeout,
+				"timeout duration to determine a chunk data pack query being slow")
+			flags.DurationVar(&e.exeConf.chunkDataPackDeliveryTimeout, "chunk-data-pack-delivery-timeout", exeprovider.DefaultChunkDataPackDeliveryTimeout,
+				"timeout duration to determine a chunk data pack response delivery being slow")
 			flags.UintVar(&e.exeConf.chunkDataPackRequestWorkers, "chunk-data-pack-workers", exeprovider.DefaultChunkDataPackRequestWorker, "number of workers to process chunk data pack requests")
 			flags.BoolVar(&e.exeConf.pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, "+
 				"but still be able to serve queries")
@@ -570,6 +576,8 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				checkAuthorizedAtBlock,
 				chdpReqQueue,
 				e.exeConf.chunkDataPackRequestWorkers,
+				e.exeConf.chunkDataPackQueryTimeout,
+				e.exeConf.chunkDataPackDeliveryTimeout,
 			)
 			if err != nil {
 				return nil, err

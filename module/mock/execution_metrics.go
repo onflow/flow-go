@@ -19,16 +19,6 @@ func (_m *ExecutionMetrics) ChunkDataPackRequestProcessed() {
 	_m.Called()
 }
 
-// ChunkDataPackResponseDispatchedInNetwork provides a mock function with given fields: _a0
-func (_m *ExecutionMetrics) ChunkDataPackResponseDispatchedInNetwork(_a0 time.Duration) {
-	_m.Called(_a0)
-}
-
-// ChunkDataPackRetrievedFromDatabase provides a mock function with given fields: queryTime
-func (_m *ExecutionMetrics) ChunkDataPackRetrievedFromDatabase(queryTime time.Duration) {
-	_m.Called(queryTime)
-}
-
 // ExecutionBlockDataUploadFinished provides a mock function with given fields: dur
 func (_m *ExecutionMetrics) ExecutionBlockDataUploadFinished(dur time.Duration) {
 	_m.Called(dur)
