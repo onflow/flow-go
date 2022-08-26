@@ -52,13 +52,21 @@ func NewScriptEnvironment(
 				tracer,
 				fvmContext.BlockHeader,
 			),
-			ctx:            fvmContext,
-			sth:            sth,
-			vm:             vm,
-			programs:       programsHandler,
-			accounts:       accounts,
-			accountKeys:    accountKeys,
-			frozenAccounts: nil,
+			CryptoLibrary: environment.NewCryptoLibrary(tracer, meter),
+			BlockInfo: environment.NewBlockInfo(
+				tracer,
+				meter,
+				fvmContext.BlockHeader,
+				fvmContext.Blocks,
+			),
+			TransactionInfo: environment.NoTransactionInfo{},
+			ctx:             fvmContext,
+			sth:             sth,
+			vm:              vm,
+			programs:        programsHandler,
+			accounts:        accounts,
+			accountKeys:     accountKeys,
+			frozenAccounts:  nil,
 		},
 	}
 
@@ -84,6 +92,8 @@ func (e *ScriptEnv) EmitEvent(_ cadence.Event) error {
 func (e *ScriptEnv) Events() []flow.Event {
 	return []flow.Event{}
 }
+
+// Block Environment Functions
 
 func (e *ScriptEnv) CreateAccount(_ runtime.Address) (address runtime.Address, err error) {
 	return runtime.Address{}, errors.NewOperationNotSupportedError("CreateAccount")
@@ -111,8 +121,4 @@ func (e *ScriptEnv) UpdateAccountContractCode(_ runtime.Address, _ string, _ []b
 
 func (e *ScriptEnv) RemoveAccountContractCode(_ runtime.Address, _ string) (err error) {
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
-}
-
-func (e *ScriptEnv) GetSigningAccounts() ([]runtime.Address, error) {
-	return nil, errors.NewOperationNotSupportedError("GetSigningAccounts")
 }

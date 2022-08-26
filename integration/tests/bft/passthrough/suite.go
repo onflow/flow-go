@@ -60,11 +60,7 @@ func (s *Suite) AccessClient() *testnet.Client {
 // - One corrupted verification node
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", s.T().Name()).
-		Logger()
-	s.log = logger
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
@@ -146,7 +142,7 @@ func (s *Suite) SetupSuite() {
 	// starts tracking blocks by the ghost node
 	s.Track(s.T(), ctx, s.Ghost())
 
-	s.Orchestrator = NewDummyOrchestrator(logger)
+	s.Orchestrator = NewDummyOrchestrator(s.log)
 
 	// start orchestrator network
 	codec := unittest.NetworkCodec()

@@ -121,7 +121,7 @@ verfiy-mocks: generate-mocks
 	git diff --exit-code
 
 .PHONY: generate-mocks
-generate-mocks:
+generate-mocks: install-mock-generators
 	mockery --name '(Connector|PingInfoProvider)' --dir=network/p2p --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
 	mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Local,Requester
@@ -157,6 +157,7 @@ generate-mocks:
 	mockery --name '.*' --dir="./consensus/hotstuff" --case=underscore --output="./consensus/hotstuff/mocks" --outpkg="mocks"
 	mockery --name '.*' --dir="./engine/access/wrapper" --case=underscore --output="./engine/access/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
+	mockery --name 'API' --dir="./engine/protocol" --case=underscore --output="./engine/protocol/mock" --outpkg="mock"
 	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/backend" --case=underscore --output="./engine/access/rpc/backend/mock" --outpkg="mock"
 	mockery --name 'IngestRPC' --dir="./engine/execution/ingestion" --case=underscore --tags relic --output="./engine/execution/ingestion/mock" --outpkg="mock"
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"

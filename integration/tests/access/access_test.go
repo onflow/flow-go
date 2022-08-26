@@ -44,11 +44,7 @@ func (s *AccessSuite) TearDownTest() {
 }
 
 func (suite *AccessSuite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "api.go").
-		Str("testcase", suite.T().Name()).
-		Logger()
-	suite.log = logger
+	suite.log = unittest.LoggerForTest(suite.Suite.T(), zerolog.InfoLevel)
 	suite.log.Info().Msg("================> SetupTest")
 	defer func() {
 		suite.log.Info().Msg("================> Finish SetupTest")
