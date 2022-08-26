@@ -147,9 +147,9 @@ var (
 
 		// Tokens
 
-		common.MemoryKindValueToken:  41,
-		common.MemoryKindSyntaxToken: 25,
-		common.MemoryKindSpaceToken:  50,
+		common.MemoryKindTypeToken:  25,
+		common.MemoryKindErrorToken: 41, // TODO: find proper value
+		common.MemoryKindSpaceToken: 50,
 
 		// AST nodes
 
