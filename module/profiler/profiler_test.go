@@ -2,6 +2,7 @@ package profiler_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,7 +27,27 @@ func TestProfiler(t *testing.T) {
 			require.Eventuallyf(t, func() bool {
 				dirEnts, err := os.ReadDir(tempDir)
 				require.NoError(t, err)
-				return len(dirEnts) > 4
+
+				foundPtypes := make(map[string]bool)
+				for _, pType := range []string{"heap", "allocs", "goroutine", "cpu", "block"} {
+					foundPtypes[pType] = false
+				}
+
+				for pName := range foundPtypes {
+					for _, ent := range dirEnts {
+						if strings.Contains(ent.Name(), pName) {
+							foundPtypes[pName] = true
+						}
+					}
+				}
+
+				for pName, found := range foundPtypes {
+					if !found {
+						t.Logf("profiler %s not found", pName)
+						return false
+					}
+				}
+				return true
 			}, time.Second*5, time.Millisecond*100, "profiler did not generate any profiles in %v", tempDir)
 
 			unittest.AssertClosesBefore(t, p.Done(), 5*time.Second)
