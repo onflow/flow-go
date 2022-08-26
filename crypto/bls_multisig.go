@@ -78,14 +78,15 @@ func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 // could also be the aggregation of other signatures.
 // The order of the signatures in the slice does not matter since the aggregation
 // is commutative. The slice should not be empty.
-// No subgroup membership check is performed on the input signatures.
+// No G1 subgroup membership check is performed on the input signatures.
 //
 // The function returns:
-//  - (nil, invalidInputsError):
-//		- (nil, aggregationEmptyListError) : if no signatures are provided (input slice is empty)
-//      - Or a deserialization of at least one signature fails (input is an invalid serialization of a
-// 		compressed G1 element following [zcash]
-//     https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
+//
+//	- (nil, aggregationEmptyListError) : if no signatures are provided (input slice is empty)
+//  - (nil, invalidSignatureError) if a deserialization of at least one signature fails (input is an invalid serialization of a
+// 		compressed E1 element following [zcash]
+//     https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-). The function
+//     does not check
 //  - (nil, error) if an unexpected error occurs
 //  - (aggregated_signature, nil) otherwise
 func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
@@ -101,9 +102,7 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
 	for i, sig := range sigs {
 		if len(sig) != signatureLengthBLSBLS12381 {
-			return nil, invalidInputsErrorf(
-				"signature at index %d has an invalid length, %d is expected, got %d",
-				i, signatureLengthBLSBLS12381, len(sig))
+			return nil, fmt.Errorf("signature at index %d has an invalid length: %w", i, invalidSignatureError)
 		}
 		flatSigs = append(flatSigs, sig...)
 	}
@@ -119,7 +118,7 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	case valid:
 		return aggregatedSig, nil
 	case invalid:
-		return nil, invalidInputsErrorf("decoding at least one BLS signatures failed")
+		return nil, invalidSignatureError
 	default:
 		return nil, fmt.Errorf("aggregating signatures failed")
 	}
@@ -542,4 +541,13 @@ var notBLSKeyError = errors.New("input key has to be a BLS on BLS12-381 key")
 // used is not a BLS on BLS12 381 key.
 func IsNotBLSKeyError(err error) bool {
 	return errors.Is(err, notBLSKeyError)
+}
+
+var invalidSignatureError = errors.New("input signature does not deserialize to an E1 element")
+
+// IsInvalidSignatureError checks if the input error wraps an invalidSignatureError.
+// invalidSignatureError is returned when a signature input does not serilaize to a
+// valid element on E1 of the BLS12-381 curve.
+func IsInvalidSignatureError(err error) bool {
+	return errors.Is(err, invalidSignatureError)
 }

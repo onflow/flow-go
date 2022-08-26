@@ -222,7 +222,7 @@ func TestBLSPOP(t *testing.T) {
 // it against the signature of the message under an aggregated private key.
 // Verify the aggregated signature using the multi-signature verification with
 // one message.
-func TestAggregateSignatures(t *testing.T) {
+func TestBLSAggregateSignatures(t *testing.T) {
 	// random message
 	input := make([]byte, 100)
 	_, err := rand.Read(input)
@@ -329,14 +329,14 @@ func TestAggregateSignatures(t *testing.T) {
 		shortSig := sigs[0][:signatureLengthBLSBLS12381-1]
 		aggSig, err = AggregateBLSSignatures([]Signature{shortSig})
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsInvalidSignatureError(err))
 		assert.Nil(t, aggSig)
 
 		// test with an invalid signature of a correct length
 		invalidSig := BLSInvalidSignature()
 		aggSig, err = AggregateBLSSignatures([]Signature{invalidSig})
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsInvalidSignatureError(err))
 		assert.Nil(t, aggSig)
 
 		// test the empty key list

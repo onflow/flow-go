@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestThresholdSignature(t *testing.T) {
+func TestBLSThresholdSignature(t *testing.T) {
 	// stateless API
 	t.Run("centralized_stateless_keygen", testCentralizedStatelessAPI)
 	// stateful API
@@ -199,8 +199,9 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			share, err := skShares[index].Sign(thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
 
-			// alter signature - signature is not a valid point
-			share[4] ^= 1
+			// alter signature - invalid serialization
+			tmp := share[0]
+			share[0] = invalidBLSSignatureHeader
 			// VerifyShare
 			verif, err := ts.VerifyShare(index, share)
 			assert.NoError(t, err)
@@ -215,7 +216,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			assert.NoError(t, err)
 			assert.False(t, verif)
 			// restore share
-			share[4] ^= 1
+			share[0] = tmp
 
 			// valid curve point but invalid signature
 			otherIndex := (index + 1) % n // otherIndex is different than index
@@ -234,7 +235,8 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			assert.False(t, verif)
 
 			// trust add one invalid signature and check ThresholdSignature
-			share[4] ^= 1                             // alter the share
+			tmp = share[0]
+			share[0] = invalidBLSSignatureHeader      // alter the share
 			enough, err = ts.TrustedAdd(index, share) // invalid share
 			assert.NoError(t, err)
 			assert.False(t, enough)
@@ -252,9 +254,9 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			}
 			sig, err := ts.ThresholdSignature()
 			assert.Error(t, err)
-			assert.True(t, IsInvalidInputsError(err))
+			assert.True(t, IsInvalidSignatureError(err))
 			assert.Nil(t, sig)
-			share[4] ^= 1 // restore the share
+			share[0] = tmp // restore the share
 		})
 
 		t.Run("constructor errors", func(t *testing.T) {
@@ -584,12 +586,22 @@ func testCentralizedStatelessAPI(t *testing.T) {
 		// check failure with a random redundant signer
 		if threshold > 1 {
 			randomDuplicate := mrand.Intn(int(threshold)) + 1 // 1 <= duplicate <= threshold
+			tmp := signers[randomDuplicate]
 			signers[randomDuplicate] = signers[0]
 			thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
 			assert.Error(t, err)
-			assert.True(t, IsInvalidInputsError(err))
+			assert.True(t, IsDuplicatedSignerError(err))
 			assert.Nil(t, thresholdSignature)
+			signers[randomDuplicate] = tmp
 		}
+
+		// check with an invalid signature (invalid serlization)
+		invalidSig := make([]byte, signatureLengthBLSBLS12381)
+		signShares[0] = invalidSig
+		thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
+		assert.Error(t, err)
+		assert.True(t, IsInvalidSignatureError(err))
+		assert.Nil(t, thresholdSignature)
 	}
 }
 
