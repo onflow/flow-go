@@ -12,6 +12,7 @@ import (
 	cadenceRuntime "github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm/state"
@@ -121,7 +122,8 @@ func (r *ConstantSizeReporter) worker(
 					func(v interpreter.Value) bool {
 						if composite, ok := v.(*interpreter.CompositeValue); ok {
 							atomic.AddUint64(&numberOfCompositeTypes, 1)
-							if allFieldsAreConstantSize(r.log, inter, composite) {
+							compositeType := composite.StaticType(inter).(interpreter.CompositeStaticType)
+							if allFieldsAreConstantSized(r.log, inter, compositeType) {
 								atomic.AddUint64(&numberOfCompositeTypesWithConstantSizeChildren, 1)
 							}
 						}
@@ -143,38 +145,81 @@ func (r *ConstantSizeReporter) worker(
 	wg.Done()
 }
 
-func allFieldsAreConstantSize(logger zerolog.Logger, inter *interpreter.Interpreter, value *interpreter.CompositeValue) bool {
-	// if any of children is not true return false
-	foundANonConstant := false
-	value.ForEachField(inter,
-		func(_ string, value interpreter.Value) {
-			if !IsConstantSize(logger, inter, value) {
-				foundANonConstant = true
-			}
-		})
+func allFieldsAreConstantSized(logger zerolog.Logger, inter *interpreter.Interpreter, typ interpreter.CompositeStaticType) bool {
+	semaType, err := inter.ConvertStaticToSemaType(typ)
+	if err != nil {
+		// something wrong
+		return false
+	}
 
-	return !foundANonConstant
+	compositeSemaType := semaType.(*sema.CompositeType)
+	for _, fieldName := range compositeSemaType.Fields {
+		field, ok := compositeSemaType.Members.Get(fieldName)
+		if !ok {
+			continue
+		}
+
+		fieldSemaType := field.TypeAnnotation.Type
+		fieldStaticType := interpreter.ConvertSemaToStaticType(nil, fieldSemaType)
+
+		if !isConstantSize(logger, inter, fieldStaticType) {
+			return false
+		}
+	}
+
+	return true
 }
 
-func IsConstantSize(logger zerolog.Logger, inter *interpreter.Interpreter, value interpreter.Value) bool {
-	// only for composite types you could iterate over feilds
+func isConstantSize(logger zerolog.Logger, inter *interpreter.Interpreter, typ interpreter.StaticType) bool {
+	// only for composite types you could iterate over fields
 	// for regular maps and array return false
-	switch value.(type) {
-	case *interpreter.CompositeValue:
-		return allFieldsAreConstantSize(logger, inter, value.(*interpreter.CompositeValue))
-	case *interpreter.DictionaryValue, *interpreter.ArrayValue, *interpreter.StringValue,
-		interpreter.IntValue, interpreter.UIntValue,
-		*interpreter.SomeValue, interpreter.PathValue, *interpreter.CapabilityValue,
-		interpreter.LinkValue, interpreter.TypeValue:
+	switch typ := typ.(type) {
+	case interpreter.CompositeStaticType:
+		return allFieldsAreConstantSized(logger, inter, typ)
+	case interpreter.DictionaryStaticType,
+		interpreter.ArrayStaticType:
 		return false
-	case interpreter.BoolValue, interpreter.CharacterValue, interpreter.AddressValue,
-		interpreter.NilValue, interpreter.VoidValue,
-		interpreter.Int8Value, interpreter.Int16Value, interpreter.Int32Value, interpreter.Int64Value, interpreter.Int128Value, interpreter.Int256Value,
-		interpreter.UInt8Value, interpreter.UInt16Value, interpreter.UInt32Value, interpreter.UInt64Value, interpreter.UInt128Value, interpreter.UInt256Value,
-		interpreter.Word8Value, interpreter.Word16Value, interpreter.Word32Value, interpreter.Word64Value, interpreter.Fix64Value, interpreter.UFix64Value:
-		return true
+	case interpreter.OptionalStaticType:
+		// check the inner type
+		return isConstantSize(logger, inter, typ.Type)
+	case interpreter.PrimitiveStaticType:
+		switch typ {
+		case interpreter.PrimitiveStaticTypeString,
+			interpreter.PrimitiveStaticTypeInt,
+			interpreter.PrimitiveStaticTypeUInt,
+			interpreter.PrimitiveStaticTypePath,
+			interpreter.PrimitiveStaticTypeCapability,
+			interpreter.PrimitiveStaticTypeMetaType:
+			return false
+		case interpreter.PrimitiveStaticTypeBool,
+			interpreter.PrimitiveStaticTypeCharacter,
+			interpreter.PrimitiveStaticTypeAddress,
+			interpreter.PrimitiveStaticTypeVoid,
+			interpreter.PrimitiveStaticTypeInt8,
+			interpreter.PrimitiveStaticTypeInt16,
+			interpreter.PrimitiveStaticTypeInt32,
+			interpreter.PrimitiveStaticTypeInt64,
+			interpreter.PrimitiveStaticTypeInt128,
+			interpreter.PrimitiveStaticTypeInt256,
+			interpreter.PrimitiveStaticTypeUInt8,
+			interpreter.PrimitiveStaticTypeUInt16,
+			interpreter.PrimitiveStaticTypeUInt32,
+			interpreter.PrimitiveStaticTypeUInt64,
+			interpreter.PrimitiveStaticTypeUInt128,
+			interpreter.PrimitiveStaticTypeUInt256,
+			interpreter.PrimitiveStaticTypeWord8,
+			interpreter.PrimitiveStaticTypeWord16,
+			interpreter.PrimitiveStaticTypeWord32,
+			interpreter.PrimitiveStaticTypeWord64,
+			interpreter.PrimitiveStaticTypeFix64,
+			interpreter.PrimitiveStaticTypeUFix64:
+			return true
+		default:
+			logger.Warn().Msgf("unknown type found %T", typ)
+			return false
+		}
 	default:
-		logger.Warn().Msgf("unknown type found %T", value)
+		logger.Warn().Msgf("unknown type found %T", typ)
 		return false
 		// panic(fmt.Errorf("unknown type found %T", value))
 	}
