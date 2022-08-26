@@ -34,7 +34,7 @@ const (
 	// SECG secp256k1
 	SignatureLenECDSASecp256k1 = 64
 	PrKeyLenECDSASecp256k1     = 32
-	// PubKeyLenECDSASecp256k1 is the size of uncompressed points on P256
+	// PubKeyLenECDSASecp256k1 is the size of uncompressed points on secp256k1
 	PubKeyLenECDSASecp256k1        = 64
 	KeyGenSeedMinLenECDSASecp256k1 = PrKeyLenECDSASecp256k1 + (securityBits / 8)
 )
@@ -89,11 +89,16 @@ func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 //  - (nil, error) if an unexpected error occurs
 //  - (signature, nil) otherwise
 func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
-	// no need to check the hasher output size as all supported hash algos
-	// have at least 32 bytes output
 	if alg == nil {
 		return nil, nilHasherError
 	}
+	// check hasher's size is at least the curve order in bytes
+	Nlen := bitsToBytes((sk.alg.curve.Params().N).BitLen())
+	if alg.Size() < Nlen {
+		return nil, invalidHasherSizeErrorf(
+			"hasher's size should be at least %d, got %d", Nlen, alg.Size())
+	}
+
 	h := alg.ComputeHash(data)
 	return sk.signHash(h)
 }
@@ -126,10 +131,15 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool, error) {
-	// no need to check the hasher output size as all supported hash algos
-	// have at lease 32 bytes output
 	if alg == nil {
 		return false, nilHasherError
+	}
+
+	// check hasher's size is at least the curve order in bytes
+	Nlen := bitsToBytes((pk.alg.curve.Params().N).BitLen())
+	if alg.Size() < Nlen {
+		return false, invalidHasherSizeErrorf(
+			"hasher's size should be at least %d, got %d", Nlen, alg.Size())
 	}
 
 	h := alg.ComputeHash(data)

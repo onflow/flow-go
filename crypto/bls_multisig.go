@@ -337,7 +337,8 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 			return false, invalidInputsErrorf(
 				"hasher at index %d is invalid %w:",
 				i,
-				newInvalidHasherSizeError(expandMsgOutput, k.Size()))
+				invalidHasherSizeErrorf("hasher's size should be at least %d, got %d",
+					expandMsgOutput, k.Size()))
 		}
 		hashes = append(hashes, k.ComputeHash(messages[i]))
 	}
@@ -477,7 +478,9 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	}
 
 	if kmac.Size() != expandMsgOutput {
-		return verifBool, newInvalidHasherSizeError(expandMsgOutput, kmac.Size())
+		return verifBool, invalidHasherSizeErrorf(
+			"hasher's size needs to be %d, got %d",
+			expandMsgOutput, kmac.Size())
 	}
 
 	pkPoints := make([]pointG2, 0, len(pks))

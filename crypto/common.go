@@ -65,11 +65,10 @@ func (e invalidHasherSizeError) Unwrap() error {
 	return e.error
 }
 
-// invalidInputsErrorf constructs a new invalidHasherSizeError
-func newInvalidHasherSizeError(expected, given int) error {
+// invalidHasherSizeErrorf constructs a new invalidHasherSizeError
+func invalidHasherSizeErrorf(msg string, args ...interface{}) error {
 	return &invalidHasherSizeError{
-		error: fmt.Errorf("the hasher used has an invalid output size, expects %d but got %d",
-			expected, given),
+		error: fmt.Errorf(msg, args...),
 	}
 }
 
