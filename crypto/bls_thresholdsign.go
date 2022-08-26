@@ -83,11 +83,11 @@ type blsThresholdSignatureInspector struct {
 // where n is the length of the public key shares slice.
 //
 // The function returns
-// - (nil, InvalidInputsError) if:
+// - (nil, invalidInputsError) if:
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]
-//   - at least one public key is not of type pubKeyBLSBLS12381 or the private key is not of type prKeyBLSBLS12381
 //   - input private key and public key at my index do not match
+// - (nil, notBLSKeyError) if the private or at least one public key is not of type BLS BLS12-381.
 // - (pointer, nil) otherwise
 func NewBLSThresholdSignatureParticipant(
 	groupPublicKey PublicKey,
@@ -108,7 +108,7 @@ func NewBLSThresholdSignatureParticipant(
 
 	// check private key is BLS key
 	if _, ok := myPrivateKey.(*prKeyBLSBLS12381); !ok {
-		return nil, invalidInputsErrorf("private key of participant %d is not a BLS key", myIndex)
+		return nil, fmt.Errorf("private key of participant %d is not valid: %w", myIndex, notBLSKeyError)
 	}
 
 	// create the follower
@@ -139,10 +139,10 @@ func NewBLSThresholdSignatureParticipant(
 // where n is the length of the public key shares slice.
 //
 // The function returns
-// - (nil, InvalidInputsError) if:
+// - (nil, invalidInputsError) if:
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]
-//   - at least one public key is not of type pubKeyBLSBLS12381
+// - (nil, ) at least one public key is not of type pubKeyBLSBLS12381
 // - (pointer, nil) otherwise
 func NewBLSThresholdSignatureInspector(
 	groupPublicKey PublicKey,
@@ -167,11 +167,11 @@ func NewBLSThresholdSignatureInspector(
 	// check keys are BLS keys
 	for i, pk := range sharePublicKeys {
 		if _, ok := pk.(*pubKeyBLSBLS12381); !ok {
-			return nil, invalidInputsErrorf("key at index %d is not a BLS key", i)
+			return nil, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
 		}
 	}
 	if _, ok := groupPublicKey.(*pubKeyBLSBLS12381); !ok {
-		return nil, invalidInputsErrorf("group key at is not a BLS key")
+		return nil, fmt.Errorf("group key is invalid: %w", notBLSKeyError)
 	}
 
 	return &blsThresholdSignatureInspector{
@@ -204,7 +204,7 @@ func (s *blsThresholdSignatureParticipant) SignShare() (Signature, error) {
 	return share, nil
 }
 
-// validIndex returns InvalidInputsError error if given index is valid and nil otherwise.
+// validIndex returns invalidInputsError error if given index is valid and nil otherwise.
 // This function is thread safe.
 func (s *blsThresholdSignatureInspector) validIndex(orig int) error {
 	if orig >= s.size || orig < 0 {

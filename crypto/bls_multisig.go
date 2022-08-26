@@ -331,7 +331,7 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 			return false, fmt.Errorf("hasher at index %d is invalid: %w ", i, nilHasherError)
 		}
 		if k.Size() != expandMsgOutput {
-			return false, invalidInputsErrorf(
+			return false, fmt.Errorf(
 				"hasher at index %d is invalid %w:",
 				i,
 				invalidHasherSizeErrorf("hasher's size should be at least %d, got %d",
