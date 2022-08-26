@@ -271,7 +271,6 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 	}
 
 	e.deliverChunkDataResponse(chunkDataPack, request.RequesterId)
-	return
 }
 
 // deliverChunkDataResponse delivers chunk data pack to the requester through network.
