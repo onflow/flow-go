@@ -148,39 +148,39 @@ func BenchmarkComputeBlock(b *testing.B) {
 		Header:  &flow.Header{},
 		Payload: &flow.Payload{},
 	}
-	for _, cols := range []int{1, 4, 16} {
-		for _, txes := range []int{16, 32, 64, 128} {
-			cols := cols
-			txes := txes
-			b.Run(fmt.Sprintf("%d/cols/%d/txes", cols, txes), func(b *testing.B) {
-				b.StopTimer()
-				b.ResetTimer()
 
-				var elapsed time.Duration
-				for i := 0; i < b.N; i++ {
-					executableBlock := createBlock(b, parentBlock, accs, cols, txes)
-					parentBlock = executableBlock.Block
+	const (
+		cols = 16
+		txes = 128
+	)
 
-					b.StartTimer()
-					start := time.Now()
-					res, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
-					elapsed += time.Since(start)
-					b.StopTimer()
+	b.Run(fmt.Sprintf("%d/cols/%d/txes", cols, txes), func(b *testing.B) {
+		b.StopTimer()
+		b.ResetTimer()
 
-					require.NoError(b, err)
-					for j, r := range res.TransactionResults {
-						// skip system transactions
-						if j >= cols*txes {
-							break
-						}
-						require.Emptyf(b, r.ErrorMessage, "Transaction %d failed", j)
-					}
+		var elapsed time.Duration
+		for i := 0; i < b.N; i++ {
+			executableBlock := createBlock(b, parentBlock, accs, cols, txes)
+			parentBlock = executableBlock.Block
+
+			b.StartTimer()
+			start := time.Now()
+			res, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+			elapsed += time.Since(start)
+			b.StopTimer()
+
+			require.NoError(b, err)
+			for j, r := range res.TransactionResults {
+				// skip system transactions
+				if j >= cols*txes {
+					break
 				}
-				totalTxes := int64(cols) * int64(txes) * int64(b.N)
-				b.ReportMetric(float64(elapsed.Nanoseconds()/totalTxes/int64(time.Microsecond)), "us/tx")
-			})
+				require.Emptyf(b, r.ErrorMessage, "Transaction %d failed", j)
+			}
 		}
-	}
+		totalTxes := int64(cols) * int64(txes) * int64(b.N)
+		b.ReportMetric(float64(elapsed.Nanoseconds()/totalTxes/int64(time.Microsecond)), "us/tx")
+	})
 }
 
 func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colNum int, txNum int) *entity.ExecutableBlock {
