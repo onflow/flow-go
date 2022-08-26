@@ -210,7 +210,7 @@ func (env *commonEnv) GetStorageCapacity(
 		env.fullEnv,
 		address)
 	if invokeErr != nil {
-		return 0, errors.HandleRuntimeError(invokeErr)
+		return 0, invokeErr
 	}
 
 	// Return type is actually a UFix64 with the unit of megabytes so some
@@ -234,7 +234,7 @@ func (env *commonEnv) GetAccountBalance(
 
 	result, invokeErr := InvokeAccountBalanceContract(env.fullEnv, address)
 	if invokeErr != nil {
-		return 0, errors.HandleRuntimeError(invokeErr)
+		return 0, invokeErr
 	}
 	return result.ToGoValue().(uint64), nil
 }
@@ -257,7 +257,7 @@ func (env *commonEnv) GetAccountAvailableBalance(
 		address)
 
 	if invokeErr != nil {
-		return 0, errors.HandleRuntimeError(invokeErr)
+		return 0, invokeErr
 	}
 	return result.ToGoValue().(uint64), nil
 }

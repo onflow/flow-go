@@ -103,7 +103,8 @@ func NewTransactionEnvironment(
 	env.AccountInterface = env
 	env.fullEnv = env
 
-	env.contracts = handler.NewContractHandler(accounts,
+	env.contracts = handler.NewContractHandler(
+		accounts,
 		func() bool {
 			enabled, defined := env.GetIsContractDeploymentRestricted()
 			if !defined {
@@ -294,7 +295,7 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 			flowAddress,
 			payer)
 		if invokeErr != nil {
-			return address, errors.HandleRuntimeError(invokeErr)
+			return address, invokeErr
 		}
 	}
 
