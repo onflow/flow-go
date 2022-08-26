@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
+	"golang.org/x/tools/go/packages"
 	"os"
-	"os/exec"
 	"strings"
 )
 
@@ -48,7 +48,7 @@ func main() {
 
 	restPackages := listRestPackages(allFlowPackages, seenPackages)
 
-	fmt.Println("restPackages length: ", string(len(restPackages)))
+	fmt.Sprint("restPackages length: ", len(restPackages))
 
 	fmt.Println("finished generating package list")
 	// generate JSON output that will be read in by CI matrix
@@ -72,18 +72,14 @@ func listRestPackages(allFlowPackages []string, seenPackages map[string]string) 
 }
 
 func listAllFlowPackages() []string {
-	cmd := exec.Command("go", "list", "./...")
-	outBytes, err := cmd.Output()
+	flowPackages, err := packages.Load(&packages.Config{}, "./...")
+
 	if err != nil {
-		panic("error during go list: " + err.Error())
+		panic(err)
 	}
-
-	if cmd.ProcessState.ExitCode() != 0 {
-		panic("process exit code not 0: " + string(cmd.ProcessState.ExitCode()))
+	var flowPackagesStr []string
+	for _, p := range flowPackages {
+		flowPackagesStr = append(flowPackagesStr, p.PkgPath)
 	}
-
-	allPackagesStr := string(outBytes)
-	allPackages := strings.Fields(allPackagesStr)
-
-	return allPackages
+	return flowPackagesStr
 }
