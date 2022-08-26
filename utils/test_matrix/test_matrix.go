@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const flowPackagePrefix = "github.com/onflow/flow-go/"
+
 // Generates a list of packages to test that will be passed to GitHub Actions
 func main() {
 	fmt.Println("*** Test Matrix Generator ***")
@@ -18,8 +20,19 @@ func main() {
 
 	allFlowPackages := listAllFlowPackages()
 
-	//listTargetPackages(allFlowPackages)
+	targetPackages, seenPackages := listTargetPackages(allFlowPackages)
 
+	println(fmt.Sprint("targetPackages lengh=", len(targetPackages)))
+
+	restPackages := listRestPackages(allFlowPackages, seenPackages)
+
+	fmt.Sprint("restPackages length: ", len(restPackages))
+
+	fmt.Println("finished generating package list")
+	// generate JSON output that will be read in by CI matrix
+}
+
+func listTargetPackages(allFlowPackages []string) (map[string][]string, map[string]string) {
 	targetPackages := make(map[string][]string)
 
 	// Stores list of packages already seen / allocated to other lists. Needed for the last package which will
@@ -34,7 +47,7 @@ func main() {
 
 		// go through all packages to see which ones to pull out
 		for _, allPackage := range allFlowPackages {
-			if strings.HasPrefix(allPackage, "github.com/onflow/flow-go/"+targetPackagePrefix) {
+			if strings.HasPrefix(allPackage, flowPackagePrefix+targetPackagePrefix) {
 				fmt.Println("found package match: ", allPackage)
 				targetPackage = append(targetPackage, allPackage)
 				seenPackages[allPackage] = allPackage
@@ -45,13 +58,7 @@ func main() {
 		}
 		targetPackages[targetPackagePrefix] = targetPackage
 	}
-
-	restPackages := listRestPackages(allFlowPackages, seenPackages)
-
-	fmt.Sprint("restPackages length: ", len(restPackages))
-
-	fmt.Println("finished generating package list")
-	// generate JSON output that will be read in by CI matrix
+	return targetPackages, seenPackages
 }
 
 func listRestPackages(allFlowPackages []string, seenPackages map[string]string) []string {
