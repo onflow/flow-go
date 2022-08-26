@@ -189,7 +189,7 @@ func testSignHashCrossBLST(t *rapid.T) {
 	sigBLST.Sign(&skBLST, message, blsCipher)
 	sigBytesBLST := sigBLST.Compress()
 
-	skFlowBLS, ok := skFlow.(*PrKeyBLSBLS12381)
+	skFlowBLS, ok := skFlow.(*prKeyBLSBLS12381)
 	require.True(t, ok, "incoherent key type assertion")
 	sigFlow := skFlowBLS.signWithXMDSHA256(message)
 	sigBytesFlow := sigFlow.Bytes()

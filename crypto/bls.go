@@ -141,7 +141,7 @@ func internalExpandMsgXOFKMAC128(key string) hash.Hasher {
 //  - (false, nilHasherError) if a hasher is nil
 //  - (false, invalidHasherSizeError) if a hasher's output size is not 128 bytes
 //  - (signature, nil) otherwise
-func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, error) {
+func (sk *prKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, error) {
 	if kmac == nil {
 		return nil, nilHasherError
 	}
@@ -182,7 +182,7 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 //  - (false, invalidHasherSizeError) if a hasher's output size is not 128 bytes
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
-func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) (bool, error) {
+func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) (bool, error) {
 	if len(s) != signatureLengthBLSBLS12381 {
 		return false, nil
 	}
@@ -278,7 +278,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 		return nil, invalidInputsErrorf("input length must be %d, got %d",
 			pubKeyLengthBLSBLS12381, len(publicKeyBytes))
 	}
-	var pk PubKeyBLSBLS12381
+	var pk pubKeyBLSBLS12381
 	err := readPointG2(&pk.point, publicKeyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("decode public key failed %w", err)
@@ -298,10 +298,10 @@ func (a *blsBLS12381Algo) decodePublicKeyCompressed(publicKeyBytes []byte) (Publ
 	return a.decodePublicKey(publicKeyBytes)
 }
 
-// PrKeyBLSBLS12381 is the private key of BLS using BLS12_381, it implements PrivateKey
-type PrKeyBLSBLS12381 struct {
+// prKeyBLSBLS12381 is the private key of BLS using BLS12_381, it implements PrivateKey
+type prKeyBLSBLS12381 struct {
 	// public key
-	pk *PubKeyBLSBLS12381
+	pk *pubKeyBLSBLS12381
 	// private key data
 	scalar scalar
 }
@@ -309,8 +309,8 @@ type PrKeyBLSBLS12381 struct {
 // newPrKeyBLSBLS12381 creates a new BLS private key with the given scalar.
 // If no scalar is provided, the function allocates an
 // empty scalar.
-func newPrKeyBLSBLS12381(x *scalar) *PrKeyBLSBLS12381 {
-	var sk PrKeyBLSBLS12381
+func newPrKeyBLSBLS12381(x *scalar) *prKeyBLSBLS12381 {
+	var sk prKeyBLSBLS12381
 	if x == nil {
 		// initialize the scalar
 		C.bn_new_wrapper((*C.bn_st)(&sk.scalar))
@@ -323,27 +323,27 @@ func newPrKeyBLSBLS12381(x *scalar) *PrKeyBLSBLS12381 {
 }
 
 // Algorithm returns the Signing Algorithm
-func (sk *PrKeyBLSBLS12381) Algorithm() SigningAlgorithm {
+func (sk *prKeyBLSBLS12381) Algorithm() SigningAlgorithm {
 	return BLSBLS12381
 }
 
 // Size returns the private key lengh in bytes
-func (sk *PrKeyBLSBLS12381) Size() int {
+func (sk *prKeyBLSBLS12381) Size() int {
 	return PrKeyLenBLSBLS12381
 }
 
 // computePublicKey generates the public key corresponding to
 // the input private key. The function makes sure the piblic key
 // is valid in G2.
-func (sk *PrKeyBLSBLS12381) computePublicKey() {
-	var newPk PubKeyBLSBLS12381
+func (sk *prKeyBLSBLS12381) computePublicKey() {
+	var newPk pubKeyBLSBLS12381
 	// compute public key pk = g2^sk
 	generatorScalarMultG2(&(newPk.point), &(sk.scalar))
 	sk.pk = &newPk
 }
 
 // PublicKey returns the public key corresponding to the private key
-func (sk *PrKeyBLSBLS12381) PublicKey() PublicKey {
+func (sk *prKeyBLSBLS12381) PublicKey() PublicKey {
 	if sk.pk != nil {
 		return sk.pk
 	}
@@ -353,15 +353,15 @@ func (sk *PrKeyBLSBLS12381) PublicKey() PublicKey {
 
 // Encode returns a byte encoding of the private key.
 // The encoding is a raw encoding in big endian padded to the group order
-func (a *PrKeyBLSBLS12381) Encode() []byte {
+func (a *prKeyBLSBLS12381) Encode() []byte {
 	dest := make([]byte, prKeyLengthBLSBLS12381)
 	writeScalar(dest, &a.scalar)
 	return dest
 }
 
 // Equals checks is two public keys are equal.
-func (sk *PrKeyBLSBLS12381) Equals(other PrivateKey) bool {
-	otherBLS, ok := other.(*PrKeyBLSBLS12381)
+func (sk *prKeyBLSBLS12381) Equals(other PrivateKey) bool {
+	otherBLS, ok := other.(*prKeyBLSBLS12381)
 	if !ok {
 		return false
 	}
@@ -369,13 +369,13 @@ func (sk *PrKeyBLSBLS12381) Equals(other PrivateKey) bool {
 }
 
 // String returns the hex string representation of the key.
-func (sk *PrKeyBLSBLS12381) String() string {
+func (sk *prKeyBLSBLS12381) String() string {
 	return fmt.Sprintf("%#x", sk.Encode())
 }
 
-// PubKeyBLSBLS12381 is the public key of BLS using BLS12_381,
+// pubKeyBLSBLS12381 is the public key of BLS using BLS12_381,
 // it implements PublicKey
-type PubKeyBLSBLS12381 struct {
+type pubKeyBLSBLS12381 struct {
 	// public key data
 	point pointG2
 }
@@ -383,29 +383,29 @@ type PubKeyBLSBLS12381 struct {
 // newPubKeyBLSBLS12381 creates a new BLS public key with the given point.
 // If no scalar is provided, the function allocates an
 // empty scalar.
-func newPubKeyBLSBLS12381(p *pointG2) *PubKeyBLSBLS12381 {
+func newPubKeyBLSBLS12381(p *pointG2) *pubKeyBLSBLS12381 {
 	if p != nil {
-		return &PubKeyBLSBLS12381{
+		return &pubKeyBLSBLS12381{
 			point: *p,
 		}
 	}
-	return &PubKeyBLSBLS12381{}
+	return &pubKeyBLSBLS12381{}
 }
 
 // Algorithm returns the Signing Algorithm
-func (pk *PubKeyBLSBLS12381) Algorithm() SigningAlgorithm {
+func (pk *pubKeyBLSBLS12381) Algorithm() SigningAlgorithm {
 	return BLSBLS12381
 }
 
 // Size returns the public key lengh in bytes
-func (pk *PubKeyBLSBLS12381) Size() int {
+func (pk *pubKeyBLSBLS12381) Size() int {
 	return PubKeyLenBLSBLS12381
 }
 
 // Encode returns a byte encoding of the public key.
 // The encoding is a compressed encoding of the point
 // [zcash] https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-
-func (a *PubKeyBLSBLS12381) EncodeCompressed() []byte {
+func (a *pubKeyBLSBLS12381) EncodeCompressed() []byte {
 	if serializationG2 != compressed {
 		panic("library is not configured to use compressed public key serialization")
 	}
@@ -414,15 +414,15 @@ func (a *PubKeyBLSBLS12381) EncodeCompressed() []byte {
 
 // Encode returns a byte encoding of the public key.
 // Since we use a compressed encoding by default, this delegates to EncodeCompressed
-func (a *PubKeyBLSBLS12381) Encode() []byte {
+func (a *pubKeyBLSBLS12381) Encode() []byte {
 	dest := make([]byte, pubKeyLengthBLSBLS12381)
 	writePointG2(dest, &a.point)
 	return dest
 }
 
 // Equals checks is two public keys are equal
-func (pk *PubKeyBLSBLS12381) Equals(other PublicKey) bool {
-	otherBLS, ok := other.(*PubKeyBLSBLS12381)
+func (pk *pubKeyBLSBLS12381) Equals(other PublicKey) bool {
+	otherBLS, ok := other.(*pubKeyBLSBLS12381)
 	if !ok {
 		return false
 	}
@@ -430,7 +430,7 @@ func (pk *PubKeyBLSBLS12381) Equals(other PublicKey) bool {
 }
 
 // String returns the hex string representation of the key.
-func (pk *PubKeyBLSBLS12381) String() string {
+func (pk *pubKeyBLSBLS12381) String() string {
 	return fmt.Sprintf("%#x", pk.Encode())
 }
 
@@ -500,7 +500,7 @@ func mapToG1(data []byte) *pointG1 {
 //
 // The function is in this file because cgo can't be used in go test files.
 // TODO: implement a hasher for XMD SHA256 and use the `Sign` function.
-func (sk *PrKeyBLSBLS12381) signWithXMDSHA256(data []byte) Signature {
+func (sk *prKeyBLSBLS12381) signWithXMDSHA256(data []byte) Signature {
 
 	dst := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
 	hash := make([]byte, expandMsgOutput)

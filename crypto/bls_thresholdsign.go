@@ -87,7 +87,7 @@ type blsThresholdSignatureInspector struct {
 // - (nil, InvalidInputsError) if:
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]
-//   - at least one public key is not of type PubKeyBLSBLS12381 or the private key is not of type PrKeyBLSBLS12381
+//   - at least one public key is not of type pubKeyBLSBLS12381 or the private key is not of type prKeyBLSBLS12381
 //   - input private key and public key at my index do not match
 // - (pointer, nil) otherwise
 func NewBLSThresholdSignatureParticipant(
@@ -108,7 +108,7 @@ func NewBLSThresholdSignatureParticipant(
 	}
 
 	// check private key is BLS key
-	if _, ok := myPrivateKey.(*PrKeyBLSBLS12381); !ok {
+	if _, ok := myPrivateKey.(*prKeyBLSBLS12381); !ok {
 		return nil, invalidInputsErrorf("private key of participant %d is not a BLS key", myIndex)
 	}
 
@@ -143,7 +143,7 @@ func NewBLSThresholdSignatureParticipant(
 // - (nil, InvalidInputsError) if:
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]
-//   - at least one public key is not of type PubKeyBLSBLS12381
+//   - at least one public key is not of type pubKeyBLSBLS12381
 // - (pointer, nil) otherwise
 func NewBLSThresholdSignatureInspector(
 	groupPublicKey PublicKey,
@@ -167,11 +167,11 @@ func NewBLSThresholdSignatureInspector(
 
 	// check keys are BLS keys
 	for i, pk := range sharePublicKeys {
-		if _, ok := pk.(*PubKeyBLSBLS12381); !ok {
+		if _, ok := pk.(*pubKeyBLSBLS12381); !ok {
 			return nil, invalidInputsErrorf("key at index %d is not a BLS key", i)
 		}
 	}
-	if _, ok := groupPublicKey.(*PubKeyBLSBLS12381); !ok {
+	if _, ok := groupPublicKey.(*pubKeyBLSBLS12381); !ok {
 		return nil, invalidInputsErrorf("group key at is not a BLS key")
 	}
 

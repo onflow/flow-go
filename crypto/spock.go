@@ -19,16 +19,14 @@ import (
 // SPOCKProve generates a spock poof for data under the private key sk.
 //
 // The function returns:
-//  - (nil, invalidInputsError) if :
-//    - the hasher is nil or its output size is not 128 bytes
-//    - input key is not a BLS key
+//  - (false, nilHasherError) if the hasher is nil
+//  - (false, invalidHasherSiseError) if hasher's output size is not 128 bytes
+//  - (nil, notBLSKeyError) if input key is not a BLS key
 //  - (nil, error) if an unexpected error occurs
 //  - (proof, nil) otherwise
 func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error) {
 	if sk.Algorithm() != BLSBLS12381 {
-		return nil, invalidInputsErrorf(
-			"private key must be a BLS key, got %s",
-			sk.Algorithm())
+		return nil, notBLSKeyError
 	}
 
 	// BLS signature of data
@@ -42,16 +40,14 @@ func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error)
 // and public key.
 //
 // The function returns:
-//  - (false, invalidInputsError) if :
-//    - the hasher is nil or its output size is not 128 bytes
-//    - input key is not a BLS key
+//  - (false, notBLSKeyError) if input key is not a BLS key
+//  - (false, nilHasherError) if the hasher is nil
+//  - (false, invalidHasherSiseError) if hasher's output size is not 128 bytes
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
 func SPOCKVerifyAgainstData(pk PublicKey, proof Signature, data []byte, kmac hash.Hasher) (bool, error) {
 	if pk.Algorithm() != BLSBLS12381 {
-		return false, invalidInputsErrorf(
-			"public key must be a BLS key, got %s",
-			pk.Algorithm())
+		return false, notBLSKeyError
 	}
 	// BLS verification of data
 	return pk.Verify(proof, data, kmac)
@@ -70,14 +66,14 @@ func SPOCKVerifyAgainstData(pk PublicKey, proof Signature, data []byte, kmac has
 // The proofs membership checks in G1 are included in the verifcation.
 //
 // The function returns:
-//  - (false, invalidInputsError) if at least one key is not a BLS key.
+//  - (false, notBLSKeyError) if at least one key is not a BLS key.
 //  - (false, error) if an unexpected error occurs.
 //  - (validity, nil) otherwise
 func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signature) (bool, error) {
-	blsPk1, ok1 := pk1.(*PubKeyBLSBLS12381)
-	blsPk2, ok2 := pk2.(*PubKeyBLSBLS12381)
+	blsPk1, ok1 := pk1.(*pubKeyBLSBLS12381)
+	blsPk2, ok2 := pk2.(*pubKeyBLSBLS12381)
 	if !(ok1 && ok2) {
-		return false, invalidInputsErrorf("public keys must be BLS keys")
+		return false, notBLSKeyError
 	}
 
 	if len(proof1) != signatureLengthBLSBLS12381 || len(proof2) != signatureLengthBLSBLS12381 {

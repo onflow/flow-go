@@ -205,12 +205,12 @@ func TestBLSPOP(t *testing.T) {
 		// ecdsa key
 		sk := invalidSK(t)
 		s, err := BLSGeneratePOP(sk)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.Nil(t, s)
 
 		s = make([]byte, SignatureLenBLSBLS12381)
 		result, err := BLSVerifyPOP(sk.PublicKey(), s)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.False(t, result)
 	})
 }
@@ -349,7 +349,7 @@ func TestAggregateSignatures(t *testing.T) {
 		sk := invalidSK(t)
 		aggSk, err = AggregateBLSPrivateKeys([]PrivateKey{sk})
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.Nil(t, aggSk)
 	})
 }
@@ -427,7 +427,7 @@ func TestAggregatePubKeys(t *testing.T) {
 		pk := invalidSK(t).PublicKey()
 		aggPK, err = AggregateBLSPublicKeys([]PublicKey{pk})
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.Nil(t, aggPK)
 	})
 }
@@ -462,7 +462,7 @@ func TestBLSRemovePubKeys(t *testing.T) {
 		partialPk, err := RemoveBLSPublicKeys(aggPk, pks[:pkToRemoveNum])
 		require.NoError(t, err)
 
-		BLSkey, ok := expectedPatrialPk.(*PubKeyBLSBLS12381)
+		BLSkey, ok := expectedPatrialPk.(*pubKeyBLSBLS12381)
 		require.True(t, ok)
 
 		assert.True(t, BLSkey.Equals(partialPk),
@@ -476,7 +476,7 @@ func TestBLSRemovePubKeys(t *testing.T) {
 		partialPk, err := RemoveBLSPublicKeys(aggPk, []PublicKey{extraPk})
 		assert.NoError(t, err)
 
-		BLSkey, ok := expectedPatrialPk.(*PubKeyBLSBLS12381)
+		BLSkey, ok := expectedPatrialPk.(*pubKeyBLSBLS12381)
 		require.True(t, ok)
 		assert.False(t, BLSkey.Equals(partialPk),
 			"incorrect key %s, should not be %s, keys are %s, index is %d, extra key is %s",
@@ -492,7 +492,7 @@ func TestBLSRemovePubKeys(t *testing.T) {
 		randomPkPlusNeutralPk, err := AggregateBLSPublicKeys([]PublicKey{randomPk, neutralPk})
 		require.NoError(t, err)
 
-		BLSRandomPk, ok := randomPk.(*PubKeyBLSBLS12381)
+		BLSRandomPk, ok := randomPk.(*pubKeyBLSBLS12381)
 		require.True(t, ok)
 
 		assert.True(t, BLSRandomPk.Equals(randomPkPlusNeutralPk),
@@ -505,7 +505,7 @@ func TestBLSRemovePubKeys(t *testing.T) {
 		partialPk, err := RemoveBLSPublicKeys(aggPk, []PublicKey{})
 		require.NoError(t, err)
 
-		aggBLSkey, ok := aggPk.(*PubKeyBLSBLS12381)
+		aggBLSkey, ok := aggPk.(*pubKeyBLSBLS12381)
 		require.True(t, ok)
 
 		assert.True(t, aggBLSkey.Equals(partialPk),
@@ -517,12 +517,12 @@ func TestBLSRemovePubKeys(t *testing.T) {
 		pk := invalidSK(t).PublicKey()
 		partialPk, err := RemoveBLSPublicKeys(pk, pks)
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.Nil(t, partialPk)
 
 		partialPk, err = RemoveBLSPublicKeys(aggPk, []PublicKey{pk})
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.Nil(t, partialPk)
 	})
 }
@@ -663,7 +663,7 @@ func TestBLSBatchVerify(t *testing.T) {
 		pks[0] = invalidSK(t).PublicKey()
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, kmac)
 		require.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 
 		assert.Equal(t, valid, expectedValid,
 			"verification should fail with invalid key, got %v", valid)
@@ -856,7 +856,7 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		inputPks[0] = invalidSK(t).PublicKey()
 		valid, err = VerifyBLSSignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs)
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.False(t, valid, "verification should fail with nil hasher")
 		inputPks[0] = tmpPK
 	})

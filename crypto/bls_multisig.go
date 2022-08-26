@@ -45,12 +45,12 @@ var popKMAC = internalExpandMsgXOFKMAC128(blsPOPCipherSuite)
 // and is not used by any other application.
 //
 // The function returns:
-//  - (nil, invalidInputsError) if the input key is not of type PrKeyBLSBLS12381
+//  - (nil, notBLSKeyError) if the input key is not of type BLS BLS12-381
 //  - (pop, nil) otherwise
 func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
-	_, ok := sk.(*PrKeyBLSBLS12381)
+	_, ok := sk.(*prKeyBLSBLS12381)
 	if !ok {
-		return nil, invalidInputsErrorf("key is not a BLS key")
+		return nil, notBLSKeyError
 	}
 	// sign the public key
 	return sk.Sign(sk.PublicKey().Encode(), popKMAC)
@@ -61,12 +61,12 @@ func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
 // The function internally uses the same KMAC hasher used to generate the PoP.
 //
 // The function returns:
-//  - (false, invalidInputsError) if the input key is not of type PubKeyBLSBLS12381
+//  - (false, notBLSKeyError) if the input key is not of type BLS BLS12-381
 //  - (validity, nil) otherwise
 func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
-	_, ok := pk.(*PubKeyBLSBLS12381)
+	_, ok := pk.(*pubKeyBLSBLS12381)
 	if !ok {
-		return false, invalidInputsErrorf("key is not a BLS key")
+		return false, notBLSKeyError
 	}
 	// verify the signature against the public key
 	return pk.Verify(s, pk.Encode(), popKMAC)
@@ -132,7 +132,7 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 // No check is performed on the input private keys.
 //
 // The function returns:
-//  - (nil, invalidInputsError) if at least one key is not of type PrKeyBLSBLS12381
+//  - (nil, notBLSKeyError) if at least one key is not of type BLS BLS12-381
 //  - (nil, aggregationEmptyListError): if no keys are provided (input slice is empty)
 //  - (aggregated_key, nil) otherwise
 func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
@@ -146,9 +146,9 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 
 	scalars := make([]scalar, 0, len(keys))
 	for i, sk := range keys {
-		skBls, ok := sk.(*PrKeyBLSBLS12381)
+		skBls, ok := sk.(*prKeyBLSBLS12381)
 		if !ok {
-			return nil, invalidInputsErrorf("key at index %d is not a BLS key", i)
+			return nil, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
 		}
 		scalars = append(scalars, skBls.scalar)
 	}
@@ -167,7 +167,7 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 // No check is performed on the input public keys.
 //
 // The function returns:
-//  - (nil, invalidInputsError) if at least one key is not of type PubKeyBLSBLS12381
+//  - (nil, notBLSKeyError) if at least one key is not of type BLS BLS12-381
 //  - (nil, aggregationEmptyListError) no keys are provided (input slice is empty)
 //  - (aggregated_key, nil) otherwise
 func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
@@ -181,9 +181,9 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 
 	points := make([]pointG2, 0, len(keys))
 	for i, pk := range keys {
-		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
+		pkBLS, ok := pk.(*pubKeyBLSBLS12381)
 		if !ok {
-			return nil, invalidInputsErrorf("key at index %d is not a BLS key", i)
+			return nil, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
 		}
 		points = append(points, pkBLS.point)
 	}
@@ -216,22 +216,22 @@ func NeutralBLSPublicKey() PublicKey {
 // No membership check is performed on the input public keys.
 //
 // The function returns:
-//  - (nil, invalidInputsError) if at least one input key is not of type PubKeyBLSBLS12381
+//  - (nil, notBLSKeyError) if at least one input key is not of type BLS BLS12-381
 //  - (remaining_key, nil) otherwise
 func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {
 	// set BLS context
 	blsInstance.reInit()
 
-	aggPKBLS, ok := aggKey.(*PubKeyBLSBLS12381)
+	aggPKBLS, ok := aggKey.(*pubKeyBLSBLS12381)
 	if !ok {
-		return nil, invalidInputsErrorf("aggregated Key is not a BLS key")
+		return nil, notBLSKeyError
 	}
 
 	pointsToSubtract := make([]pointG2, 0, len(keysToRemove))
 	for i, pk := range keysToRemove {
-		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
+		pkBLS, ok := pk.(*pubKeyBLSBLS12381)
 		if !ok {
-			return nil, invalidInputsErrorf("key at index %d is not a BLS key", i)
+			return nil, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
 		}
 		pointsToSubtract = append(pointsToSubtract, pkBLS.point)
 	}
@@ -267,8 +267,7 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 // The function returns:
 //  - (false, nilHasherError) if hasher is nil
 //  - (false, invalidHasherSizeError) if hasher's output size is not 128 bytes
-//  - (false, invalidInputsError) if:
-//      - Or at least one key is not of type PubKeyBLSBLS12381
+//  - (false, notBLSKeyError) if at least one key is not of type pubKeyBLSBLS12381
 //  - (nil, aggregationEmptyListError) if input key slice is empty
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
@@ -299,9 +298,8 @@ func VerifyBLSSignatureOneMessage(pks []PublicKey, s Signature,
 // The function returns:
 //  - (false, nilHasherError) if a hasher is nil
 //  - (false, invalidHasherSizeError) if a hasher's output size is not 128 bytes
-//  - (false, invalidInputsError) if:
-//      - size of keys is not matching the size of messages and hashers
-//      - Or at least one key is not of type PubKeyBLSBLS12381
+//  - (false, notBLSKeyError) if at least one key is not a BLS BLS12-381 key
+//  - (false, invalidInputsError) if size of keys is not matching the size of messages and hashers
 //  - (false, aggregationEmptyListError) if input key slice is empty
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
@@ -359,12 +357,11 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 
 	// fill the 2 maps
 	for i, pk := range pks {
-		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
+		pkBLS, ok := pk.(*pubKeyBLSBLS12381)
 		if !ok {
-			return false, invalidInputsErrorf(
-				"public key at index %d is not BLS key, it is a %s key",
-				i,
-				pk.Algorithm())
+			return false, fmt.Errorf(
+				"public key at index %d is invalid: %w",
+				i, notBLSKeyError)
 		}
 
 		mapPerHash[string(hashes[i])] = append(mapPerHash[string(hashes[i])], pkBLS.point)
@@ -448,9 +445,8 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 // The function returns:
 //  - ([]false, nilHasherError) if a hasher is nil
 //  - ([]false, invalidHasherSizeError) if a hasher's output size is not 128 bytes
-//  - ([]false, invalidInputsError) if:
-//      - size of keys is not matching the size of signatures
-//      - Or at least one key is not of type PubKeyBLSBLS12381
+//  - ([]false, notBLSKeyError) if at least one key is not of type BLS BLS12-381
+//  - ([]false, invalidInputsError) if size of keys is not matching the size of signatures
 //  - ([]false, aggregationEmptyListError) if input key slice is empty
 //  - ([]false, error) if an unexpected error occurs
 //  - ([]validity, nil) otherwise
@@ -485,9 +481,9 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 
 	pkPoints := make([]pointG2, 0, len(pks))
 	for i, pk := range pks {
-		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
+		pkBLS, ok := pk.(*pubKeyBLSBLS12381)
 		if !ok {
-			return verifBool, invalidInputsErrorf("key at index %d is not a BLS key", i)
+			return verifBool, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
 		}
 		pkPoints = append(pkPoints, pkBLS.point)
 	}
@@ -537,4 +533,13 @@ var aggregationEmptyListError = errors.New("list to aggregate should not be empt
 // an empty list which is not allowed in some cases.
 func IsAggregationEmptyListError(err error) bool {
 	return errors.Is(err, aggregationEmptyListError)
+}
+
+var notBLSKeyError = errors.New("input key has to be a BLS on BLS12-381 key")
+
+// IsNotBLSPublicKeyError checks if the input error wraps a notBLSKeyError.
+// notBLSKeyError is returned when a private or public key
+// used is not a BLS on BLS12 381 key.
+func IsNotBLSKeyError(err error) bool {
+	return errors.Is(err, notBLSKeyError)
 }
