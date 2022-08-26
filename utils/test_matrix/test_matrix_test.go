@@ -3,8 +3,9 @@ package main
 import "testing"
 import "github.com/stretchr/testify/require"
 
-func TestListRestPackages(t *testing.T) {
-	allFlowPackages := []string{
+// Can't have a const []string so resorting to using a test helper function.
+func getAllFlowPackages() []string {
+	return []string{
 		"abc",
 		"def",
 		"ghi",
@@ -12,20 +13,28 @@ func TestListRestPackages(t *testing.T) {
 		"mno",
 		"pqr",
 		"stu",
-		"vwxyx",
+		"vwx",
+		"yz",
 	}
+}
 
+func TestListTargetPackages(t *testing.T) {
+
+}
+
+func TestListRestPackages(t *testing.T) {
 	var seenPackages = make(map[string]string)
 	seenPackages["abc"] = "abc"
 	seenPackages["ghi"] = "ghi"
 	seenPackages["mno"] = "mno"
 	seenPackages["stu"] = "stu"
 
-	restPackages := listRestPackages(allFlowPackages, seenPackages)
+	restPackages := listRestPackages(getAllFlowPackages(), seenPackages)
 
-	require.Equal(t, 4, len(restPackages))
+	require.Equal(t, 5, len(restPackages))
 	require.Contains(t, restPackages, "def")
 	require.Contains(t, restPackages, "jkl")
 	require.Contains(t, restPackages, "pqr")
-	require.Contains(t, restPackages, "vwxyx")
+	require.Contains(t, restPackages, "vwx")
+	require.Contains(t, restPackages, "yz")
 }

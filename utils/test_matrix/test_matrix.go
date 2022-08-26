@@ -20,7 +20,7 @@ func main() {
 
 	allFlowPackages := listAllFlowPackages()
 
-	targetPackages, seenPackages := listTargetPackages(allFlowPackages)
+	targetPackages, seenPackages := listTargetPackages(os.Args[1:], allFlowPackages)
 
 	println(fmt.Sprint("targetPackages lengh=", len(targetPackages)))
 
@@ -32,7 +32,9 @@ func main() {
 	// generate JSON output that will be read in by CI matrix
 }
 
-func listTargetPackages(allFlowPackages []string) (map[string][]string, map[string]string) {
+// listTargetPackages returns a map-list of target packages to run as separate CI jobs, based on a list of target package prefixes.
+// It also returns a list of the "seen" packages that can then be used to extract the remaining packages to run (in a separate CI job).
+func listTargetPackages(targetPackagePrefixes []string, allFlowPackages []string) (map[string][]string, map[string]string) {
 	targetPackages := make(map[string][]string)
 
 	// Stores list of packages already seen / allocated to other lists. Needed for the last package which will
@@ -41,7 +43,7 @@ func listTargetPackages(allFlowPackages []string) (map[string][]string, map[stri
 	seenPackages := make(map[string]string)
 
 	// iterate over the target packages to run as separate CI jobs
-	for i, targetPackagePrefix := range os.Args[1:] {
+	for i, targetPackagePrefix := range targetPackagePrefixes {
 		fmt.Printf("Package prefix %d is %s\n", i+1, targetPackagePrefix)
 		var targetPackage []string
 
