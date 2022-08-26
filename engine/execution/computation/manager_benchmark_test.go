@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -85,7 +87,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 	tracer, err := trace.NewTracer(zerolog.Nop(), "", "", 4)
 	require.NoError(b, err)
 
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{}))
 
 	chain := flow.Emulator.Chain()
 	execCtx := fvm.NewContext(

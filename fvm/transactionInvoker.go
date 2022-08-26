@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/stdlib"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
@@ -94,9 +96,10 @@ func (i *TransactionInvoker) Process(
 
 	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
-	predeclaredValues := valueDeclarations(env)
-
 	location := common.TransactionLocation(proc.ID)
+
+	runtimeEnv := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+	declareStandardLibraryValues(runtimeEnv, env)
 
 	var txError error
 	err = vm.Runtime.ExecuteTransaction(
@@ -105,19 +108,22 @@ func (i *TransactionInvoker) Process(
 			Arguments: proc.Transaction.Arguments,
 		},
 		runtime.Context{
-			Interface:         env,
-			Location:          location,
-			PredeclaredValues: predeclaredValues,
+			Interface:   env,
+			Location:    location,
+			Environment: runtimeEnv,
 		},
 	)
 	if err != nil {
-		var interactionLimiExceededErr *errors.LedgerInteractionLimitExceededError
-		if errors.As(err, &interactionLimiExceededErr) {
+		var interactionLimitExceededErr *errors.LedgerInteractionLimitExceededError
+		if errors.As(err, &interactionLimitExceededErr) {
 			// If it is this special interaction limit error, just set it directly as the tx error
 			txError = err
 		} else {
 			// Otherwise, do what we use to do
-			txError = fmt.Errorf("transaction invocation failed when executing transaction: %w", errors.HandleRuntimeError(err))
+			txError = fmt.Errorf(
+				"transaction invocation failed when executing transaction: %w",
+				errors.HandleRuntimeError(err),
+			)
 		}
 	}
 
@@ -260,15 +266,17 @@ var setAccountFrozenFunctionType = &sema.FunctionType{
 	},
 }
 
-func valueDeclarations(env Environment) []runtime.ValueDeclaration {
+type StandardLibraryInterface interface {
+	SetAccountFrozen(address common.Address, frozen bool) error
+}
+
+func declareStandardLibraryValues(runtimeEnv runtime.Environment, i StandardLibraryInterface) {
 	// TODO return the errors instead of panicing
 
-	setAccountFrozen := runtime.ValueDeclaration{
-		Name:           "setAccountFrozen",
-		Type:           setAccountFrozenFunctionType,
-		Kind:           common.DeclarationKindFunction,
-		IsConstant:     true,
-		ArgumentLabels: nil,
+	runtimeEnv.Declare(stdlib.StandardLibraryValue{
+		Name: "setAccountFrozen",
+		Type: setAccountFrozenFunctionType,
+		Kind: common.DeclarationKindFunction,
 		Value: interpreter.NewUnmeteredHostFunctionValue(
 			func(invocation interpreter.Invocation) interpreter.Value {
 				address, ok := invocation.Arguments[0].(interpreter.AddressValue)
@@ -283,12 +291,7 @@ func valueDeclarations(env Environment) []runtime.ValueDeclaration {
 						"second argument of setAccountFrozen must be a boolean"))
 				}
 
-				var err error
-				if env, isTXEnv := env.(*TransactionEnv); isTXEnv {
-					err = env.SetAccountFrozen(common.Address(address), bool(frozen))
-				} else {
-					err = errors.NewOperationNotSupportedError("SetAccountFrozen")
-				}
+				err := i.SetAccountFrozen(common.Address(address), bool(frozen))
 				if err != nil {
 					panic(err)
 				}
@@ -297,9 +300,7 @@ func valueDeclarations(env Environment) []runtime.ValueDeclaration {
 			},
 			setAccountFrozenFunctionType,
 		),
-	}
-
-	return []runtime.ValueDeclaration{setAccountFrozen}
+	})
 }
 
 // logExecutionIntensities logs execution intensities of the transaction

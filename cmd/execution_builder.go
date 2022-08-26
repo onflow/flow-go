@@ -498,11 +498,9 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				executionDataTracker,
 			)
 
-			options := []runtime.Option{}
-			if e.exeConf.cadenceTracing {
-				options = append(options, runtime.WithTracingEnabled(true))
-			}
-			rt := fvm.NewInterpreterRuntime(options...)
+			rt := fvm.NewInterpreterRuntime(runtime.Config{
+				TracingEnabled: e.exeConf.cadenceTracing,
+			})
 
 			vm := fvm.NewVirtualMachine(rt)
 
