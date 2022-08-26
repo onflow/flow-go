@@ -84,7 +84,7 @@ func TestDelay(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-// TestOneNodeBehind verify that if one node (here node 0) consistently experiences a significant
+// TestOneNodeBehind verifies that if one node (here node 0) consistently experiences a significant
 // delay receiving messages beyond the hotstuff timeout, the committee still can reach consensus.
 func TestOneNodeBehind(t *testing.T) {
 	stopper := NewStopper(50, 0)
