@@ -32,7 +32,6 @@ type TransactionEnv struct {
 	tx               *flow.TransactionBody
 	txIndex          uint32
 	txID             flow.Identifier
-	authorizers      []runtime.Address
 }
 
 func NewTransactionEnvironment(
@@ -79,6 +78,11 @@ func NewTransactionEnvironment(
 				ctx.BlockHeader,
 				ctx.Blocks,
 			),
+			TransactionInfo: environment.NewTransactionInfo(
+				tracer,
+				tx.Authorizers,
+				ctx.Chain.ServiceAddress(),
+			),
 			ctx:            ctx,
 			sth:            sth,
 			vm:             vm,
@@ -99,7 +103,8 @@ func NewTransactionEnvironment(
 	env.AccountInterface = env
 	env.fullEnv = env
 
-	env.contracts = handler.NewContractHandler(accounts,
+	env.contracts = handler.NewContractHandler(
+		accounts,
 		func() bool {
 			enabled, defined := env.GetIsContractDeploymentRestricted()
 			if !defined {
@@ -218,19 +223,6 @@ func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code [
 		string(code[:]))
 }
 
-func (e *TransactionEnv) isAuthorizerServiceAccount() bool {
-	return e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress()))
-}
-
-func (e *TransactionEnv) isAuthorizer(address runtime.Address) bool {
-	for _, accountAddress := range e.getSigningAccounts() {
-		if accountAddress == address {
-			return true
-		}
-	}
-	return false
-}
-
 func (e *TransactionEnv) EmitEvent(event cadence.Event) error {
 	defer e.StartExtensiveTracingSpanFromRoot(trace.FVMEnvEmitEvent).End()
 
@@ -259,7 +251,7 @@ func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) e
 		return fmt.Errorf("setting account frozen failed: %w", err)
 	}
 
-	if !e.isAuthorizerServiceAccount() {
+	if !e.IsServiceAccountAuthorizer() {
 		err := errors.NewOperationAuthorizationErrorf("SetAccountFrozen", "accounts can be frozen only by transactions authorized by the service account")
 		return fmt.Errorf("setting account frozen failed: %w", err)
 	}
@@ -423,7 +415,7 @@ func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name
 		return fmt.Errorf("update account contract code failed: %w", err)
 	}
 
-	err = e.contracts.SetContract(address, name, code, e.getSigningAccounts())
+	err = e.contracts.SetContract(address, name, code, e.SigningAccounts())
 	if err != nil {
 		return fmt.Errorf("updating account contract code failed: %w", err)
 	}
@@ -444,26 +436,10 @@ func (e *TransactionEnv) RemoveAccountContractCode(address runtime.Address, name
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}
 
-	err = e.contracts.RemoveContract(address, name, e.getSigningAccounts())
+	err = e.contracts.RemoveContract(address, name, e.SigningAccounts())
 	if err != nil {
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}
 
 	return nil
-}
-
-func (e *TransactionEnv) GetSigningAccounts() ([]runtime.Address, error) {
-	defer e.StartExtensiveTracingSpanFromRoot(trace.FVMEnvGetSigningAccounts).End()
-	return e.getSigningAccounts(), nil
-}
-
-func (e *TransactionEnv) getSigningAccounts() []runtime.Address {
-	if e.authorizers == nil {
-		e.authorizers = make([]runtime.Address, len(e.tx.Authorizers))
-
-		for i, auth := range e.tx.Authorizers {
-			e.authorizers[i] = runtime.Address(auth)
-		}
-	}
-	return e.authorizers
 }
