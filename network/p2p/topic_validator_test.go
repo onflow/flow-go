@@ -52,7 +52,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 		}
 
 		if _, ok := ids.ByNodeID(fid); !ok {
-			return fmt.Errorf("id not found")
+			return fmt.Errorf("flow id not found: %x", fid)
 		}
 
 		return nil
