@@ -43,14 +43,12 @@ func listTargetPackages(targetPackagePrefixes []string, allFlowPackages []string
 	seenPackages := make(map[string]string)
 
 	// iterate over the target packages to run as separate CI jobs
-	for i, targetPackagePrefix := range targetPackagePrefixes {
-		fmt.Printf("Package prefix %d is %s\n", i+1, targetPackagePrefix)
+	for _, targetPackagePrefix := range targetPackagePrefixes {
 		var targetPackage []string
 
 		// go through all packages to see which ones to pull out
 		for _, allPackage := range allFlowPackages {
 			if strings.HasPrefix(allPackage, flowPackagePrefix+targetPackagePrefix) {
-				fmt.Println("found package match: ", allPackage)
 				targetPackage = append(targetPackage, allPackage)
 				seenPackages[allPackage] = allPackage
 			}
