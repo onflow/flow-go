@@ -43,7 +43,7 @@ func TestMessagesLostAcrossNetwork(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
-	hub.WithFilter(blockReceiverMessagesByPercentage(10))
+	hub.WithFilter(blockReceiverMessagesRandomly(0.1))
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
