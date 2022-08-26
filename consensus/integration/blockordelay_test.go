@@ -47,7 +47,7 @@ func blockNodesFirstMessages(n uint64, denyList ...*Node) BlockOrDelayFunc {
 // blockReceiverMessagesRandomly drops messages randomly with a probability of `dropProbability` ∈ [0,1]
 func blockReceiverMessagesRandomly(dropProbability float32) BlockOrDelayFunc {
 	lock := new(sync.Mutex)
-	prng := rand.New(rand.NewSource(64))
+	prng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		lock.Lock()
 		block := prng.Float32() < dropProbability
@@ -60,7 +60,7 @@ func blockReceiverMessagesRandomly(dropProbability float32) BlockOrDelayFunc {
 // delay in the interval [low, high). Panics when `low` < 0 or `low > `high`
 func delayReceiverMessagesByRange(low time.Duration, high time.Duration) BlockOrDelayFunc {
 	lock := new(sync.Mutex)
-	prng := rand.New(rand.NewSource(64))
+	prng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	delayRangeNs := int64(high - low)
 	minDelayNs := int64(low)
 
