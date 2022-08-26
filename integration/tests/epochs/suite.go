@@ -82,6 +82,8 @@ func (s *Suite) SetupTest() {
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
+		// we disable requiring approvals on epoch tests, because it increases time-to-seal
+		// which can interferes with the time-sensitive DKG and cause test flakiness
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 0)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 0)),
 		testnet.WithLogLevel(zerolog.WarnLevel),
