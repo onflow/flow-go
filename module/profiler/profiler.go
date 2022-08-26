@@ -3,6 +3,7 @@ package profiler
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -105,11 +106,41 @@ func (p *AutoProfiler) start() {
 		path := filepath.Join(p.dir, fmt.Sprintf("%s-%s", prof.profileName, time.Now().Format(time.RFC3339)))
 
 		logger := p.log.With().Str("profileName", prof.profileName).Str("profilePath", path).Logger()
-		logger.Info().Str("file", path).Str("profile", prof.profileName).Msg("capturing")
+		logger.Info().Str("file", path).Msg("capturing")
 
-		err := p.pprof(path, prof.profileFunc)
+		f, err := os.CreateTemp(p.dir, "profile")
 		if err != nil {
-			logger.Warn().Err(err).Str("profile", prof.profileName).Msg("failed to generate profile")
+			logger.Err(err).Msg("failed to create temp profile")
+			continue
+		}
+		logger = logger.With().Str("tempFile", f.Name()).Logger()
+
+		// Remove temp file if it still exists.
+		defer func(logger zerolog.Logger, tmpName string) {
+			if _, err := os.Stat(tmpName); errors.Is(err, os.ErrNotExist) {
+				return
+			}
+			if err := os.Remove(tmpName); err != nil {
+				logger.Warn().Err(err).Msg("failed to remove profile")
+			}
+		}(logger, f.Name())
+
+		err = p.pprof(f, prof.profileFunc)
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to generate profile")
+			continue
+		}
+
+		// default CreateTemp permissions are 0600.
+		err = os.Chmod(f.Name(), 0644)
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to set profile permissions")
+			continue
+		}
+
+		err = os.Rename(f.Name(), path)
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to rename profile")
 			continue
 		}
 
@@ -118,19 +149,14 @@ func (p *AutoProfiler) start() {
 
 		err = p.uploader.Upload(ctx, path, prof.profileType)
 		if err != nil {
-			logger.Warn().Err(err).Str("profile", prof.profileName).Msg("failed to upload profile")
+			logger.Warn().Err(err).Msg("failed to upload profile")
 			continue
 		}
 	}
 	p.log.Info().Dur("duration", time.Since(startTime)).Msg("finished profile trace")
 }
 
-func (p *AutoProfiler) pprof(path string, profileFunc profileFunc) (err error) {
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("failed to open %s: %w", path, err)
-	}
-
+func (p *AutoProfiler) pprof(f *os.File, profileFunc profileFunc) (err error) {
 	defer func() {
 		multierr.AppendInto(&err, f.Close())
 	}()

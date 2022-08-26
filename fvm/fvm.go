@@ -2,11 +2,13 @@ package fvm
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,17 +19,11 @@ type Procedure interface {
 	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
 	ComputationLimit(ctx Context) uint64
 	MemoryLimit(ctx Context) uint64
+	ShouldDisableMemoryAndInteractionLimits(ctx Context) bool
 }
 
-func NewInterpreterRuntime(options ...runtime.Option) runtime.Runtime {
-
-	defaultOptions := []runtime.Option{
-		runtime.WithContractUpdateValidationEnabled(true),
-	}
-
-	return runtime.NewInterpreterRuntime(
-		append(defaultOptions, options...)...,
-	)
+func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
+	return runtime.NewInterpreterRuntime(config)
 }
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
@@ -44,16 +40,25 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 
 // Run runs a procedure against a ledger in the given context.
 func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
-	meterParams, err := getEnvironmentMeterParameters(
+	meterParams := meter.DefaultParameters().
+		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
+		WithMemoryLimit(proc.MemoryLimit(ctx))
+
+	meterParams, err = getEnvironmentMeterParameters(
 		vm,
 		ctx,
 		v,
 		programs,
-		uint(proc.ComputationLimit(ctx)),
-		proc.MemoryLimit(ctx),
+		meterParams,
 	)
 	if err != nil {
 		return fmt.Errorf("error gettng environment meter parameters: %w", err)
+	}
+
+	interactionLimit := ctx.MaxStateInteractionSize
+	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
+		meterParams = meterParams.WithMemoryLimit(math.MaxUint64)
+		interactionLimit = math.MaxUint64
 	}
 
 	stTxn := state.NewStateTransaction(
@@ -62,7 +67,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			WithMeterParameters(meterParams).
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
+			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
 	err = proc.Run(vm, ctx, stTxn, programs)

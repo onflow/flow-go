@@ -27,7 +27,7 @@ func NewStateBoundAddressGenerator(stateHolder *StateHolder, chain flow.Chain) *
 // this requires changes outside of fvm since the type is defined on flow model
 // and emulator and others might be dependent on that
 func (g *StateBoundAddressGenerator) Bytes() []byte {
-	stateBytes, err := g.stateHolder.Get("", keyAddressState, g.stateHolder.EnforceInteractionLimits())
+	stateBytes, err := g.stateHolder.Get("", keyAddressState, g.stateHolder.EnforceLimits())
 	if err != nil {
 		panic(err)
 	}
@@ -35,7 +35,7 @@ func (g *StateBoundAddressGenerator) Bytes() []byte {
 }
 
 func (g *StateBoundAddressGenerator) constructAddressGen() (flow.AddressGenerator, error) {
-	stateBytes, err := g.stateHolder.Get("", keyAddressState, g.stateHolder.EnforceInteractionLimits())
+	stateBytes, err := g.stateHolder.Get("", keyAddressState, g.stateHolder.EnforceLimits())
 	if err != nil {
 		return nil, fmt.Errorf("failed to read address generator state from the state: %w", err)
 	}
@@ -56,7 +56,7 @@ func (g *StateBoundAddressGenerator) NextAddress() (flow.Address, error) {
 	}
 
 	// update the ledger state
-	err = g.stateHolder.Set("", keyAddressState, addressGenerator.Bytes(), g.stateHolder.EnforceInteractionLimits())
+	err = g.stateHolder.Set("", keyAddressState, addressGenerator.Bytes(), g.stateHolder.EnforceLimits())
 	if err != nil {
 		return address, fmt.Errorf("failed to update the state with address generator state: %w", err)
 	}

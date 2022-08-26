@@ -36,7 +36,7 @@ func (generator *UUIDGenerator) GetUUID() (uint64, error) {
 	stateBytes, err := generator.stTxn.Get(
 		"",
 		keyUUID,
-		generator.stTxn.EnforceInteractionLimits())
+		generator.stTxn.EnforceLimits())
 	if err != nil {
 		return 0, fmt.Errorf("cannot get uuid byte from state: %w", err)
 	}
@@ -53,7 +53,7 @@ func (generator *UUIDGenerator) SetUUID(uuid uint64) error {
 		"",
 		keyUUID,
 		bytes,
-		generator.stTxn.EnforceInteractionLimits())
+		generator.stTxn.EnforceLimits())
 	if err != nil {
 		return fmt.Errorf("cannot set uuid byte to state: %w", err)
 	}

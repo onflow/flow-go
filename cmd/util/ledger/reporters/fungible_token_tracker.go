@@ -153,7 +153,11 @@ func (r *FungibleTokenTracker) worker(
 			panic(err)
 		}
 
-		inter := &interpreter.Interpreter{}
+		inter, err := interpreter.NewInterpreter(nil, nil, &interpreter.Config{})
+		if err != nil {
+			panic(err)
+		}
+
 		for _, domain := range domains {
 			storageMap := storage.GetStorageMap(owner, domain, true)
 			itr := storageMap.Iterator(inter)
@@ -182,7 +186,10 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 
 	// because compValue.Kind == common.CompositeKindResource
 	// we could pass nil to the IsResourceKinded method
-	inter := &interpreter.Interpreter{}
+	inter, err := interpreter.NewInterpreter(nil, nil, &interpreter.Config{})
+	if err != nil {
+		panic(err)
+	}
 	if compValue.IsResourceKinded(nil) {
 		typeIDStr := string(compValue.TypeID())
 		if _, ok := r.vaultTypeIDs[typeIDStr]; ok {
