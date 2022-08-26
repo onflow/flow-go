@@ -72,10 +72,11 @@ func (b *Buffer) Deliver(sendOne func(*PendingMessage) bool) {
 		}
 	}
 
-	// add the unsent messages back to the buffer
 	b.Lock()
+	defer b.Unlock()
+
+	// add the unsent messages back to the buffer
 	b.pending = append(unsent, b.pending...)
-	b.Unlock()
 }
 
 // takeAll takes all pending messages from the buffer and empties the buffer.
