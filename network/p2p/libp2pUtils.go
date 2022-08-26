@@ -240,7 +240,7 @@ func notEjectedPeerFilter(idProvider id.IdentityProvider) PeerFilter {
 		if id, found := idProvider.ByPeerID(p); !found {
 			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.Pretty())
 		} else if id.Ejected {
-			return fmt.Errorf("peer with node ID %s is ejected", id.NodeID)
+			return fmt.Errorf("node with the peer_id %s is ejected", id.NodeID)
 		}
 
 		return nil
