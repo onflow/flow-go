@@ -87,13 +87,14 @@ func (p *Pool) initFreeEntities() {
 }
 
 // Add writes given entity into a poolEntity on the underlying entities linked-list.
-// The first boolean return value says whether pool has an available slot. Pool goes out of available slots if
+//
+// The first boolean return value (slotAvailable) says whether pool has an available slot. Pool goes out of available slots if
 // it is full and no ejection is set.
 //
-// If the pool has an available slot (either empty or by ejection), then the second boolean returned value determines
-// whether an ejection happened to make one slot free or not. Ejection happens if there is no available
+// If the pool has an available slot (either empty or by ejection), then the second boolean returned value (ejectionOccurred)
+// determines whether an ejection happened to make one slot free or not. Ejection happens if there is no available
 // slot, and there is an ejection mode set.
-func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (EIndex, bool, bool) {
+func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (i EIndex, slotAvailable bool, ejectionOccurred bool) {
 	entityIndex, slotAvailable, ejectionHappened := p.sliceIndexForEntity()
 	if slotAvailable {
 		p.poolEntities[entityIndex].entity = entity
@@ -153,13 +154,13 @@ func (p Pool) Head() (flow.Entity, bool) {
 
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
 //
-// The first boolean return value says whether pool has an available slot. Pool goes out of available slots if
-// it is full and no ejection is set.
+// The first boolean return value (hasAvailableSlot) says whether pool has an available slot.
+// Pool goes out of available slots if it is full and no ejection is set.
 //
-// If the pool has an available slot (either empty or by ejection), then the second boolean returned value determines
-// whether an ejection happened to make one slot free or not. Ejection happens if there is no available
-// slot, and there is an ejection mode set.
-func (p *Pool) sliceIndexForEntity() (EIndex, bool, bool) {
+// If the pool has an available slot (either empty or by ejection), then the second boolean returned value
+// (ejectionOccurred) determines whether an ejection happened to make one slot free or not.
+// Ejection happens if there is no available slot, and there is an ejection mode set.
+func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectionOccurred bool) {
 	if p.free.head.isUndefined() {
 		// the free list is empty, so we are out of space, and we need to eject.
 		switch p.ejectionMode {
