@@ -314,9 +314,17 @@ func (e *Engine) loop() {
 	}
 }
 
+// processAvailableMessages processes any available messages from the inbound queues.
+// Only returns when all inbound queues are empty (or the engine is terminated).
+// No errors expected during normal operations.
 func (e *Engine) processAvailableMessages() error {
-
 	for {
+		select {
+		case <-e.unit.Quit():
+			return nil
+		default:
+		}
+
 		msg, ok := e.pendingBlocks.Get()
 		if ok {
 			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.ClusterBlockProposal))
@@ -389,27 +397,27 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
 		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
 		Uint64("timeout_view", timeout.View)
-
 	if timeout.LastViewTC != nil {
 		logContext.
 			Uint64("last_view_tc_view", timeout.LastViewTC.View).
 			Uint64("last_view_tc_newest_qc_view", timeout.LastViewTC.NewestQC.View)
 	}
-
 	log := logContext.Logger()
 
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
-
-	// retrieve all collection nodes in our cluster
-	recipients, err := e.state.Final().Identities(filter.And(
-		filter.In(e.cluster),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get cluster members: %w", err)
-	}
-
 	e.unit.Launch(func() {
+		// Retrieve all collection nodes in our cluster (excluding myself).
+		// Note: retrieving the final state requires a time-intensive database read.
+		//       Therefore, we execute this in a separate routine, because
+		//       `BroadcastTimeout` is directly called by the consensus core logic.
+		recipients, err := e.state.Final().Identities(filter.And(
+			filter.In(e.cluster),
+			filter.Not(filter.HasNodeID(e.me.NodeID())),
+		))
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("could not get cluster members for broadcasting timeout")
+		}
+
 		// create the proposal message for the collection
 		msg := &messages.ClusterTimeoutObject{
 			View:       timeout.View,
@@ -418,7 +426,7 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 			SigData:    timeout.SigData,
 		}
 
-		err := e.con.Publish(msg, recipients.NodeIDs()...)
+		err = e.con.Publish(msg, recipients.NodeIDs()...)
 		if errors.Is(err, network.EmptyTargetList) {
 			return
 		}
@@ -426,7 +434,6 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 			log.Err(err).Msg("could not broadcast timeout")
 			return
 		}
-
 		log.Info().Msg("cluster timeout broadcast")
 
 		// TODO(active-pacemaker): update metrics
@@ -439,8 +446,8 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 
 // BroadcastProposalWithDelay submits a cluster block proposal (effectively a proposal
 // for the next collection) to all the collection nodes in our cluster.
+// No errors are expected during normal operation.
 func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) error {
-
 	// first, check that we are the proposer of the block
 	if header.ProposerID != e.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
@@ -477,19 +484,18 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		Logger()
 
 	log.Debug().Msg("processing cluster broadcast request from hotstuff")
-
-	// retrieve all collection nodes in our cluster
-	recipients, err := e.state.Final().Identities(filter.And(
-		filter.In(e.cluster),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get cluster members: %w", err)
-	}
-
 	e.unit.LaunchAfter(delay, func() {
+		// retrieve all collection nodes in our cluster
+		recipients, err := e.state.Final().Identities(filter.And(
+			filter.In(e.cluster),
+			filter.Not(filter.HasNodeID(e.me.NodeID())),
+		))
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("could not get cluster members for broadcasting collection proposal")
+		}
 
-		go e.core.hotstuff.SubmitProposal(header, parent.View)
+		// forward collection proposal to node's local consensus instance
+		e.core.hotstuff.SubmitProposal(header, parent.View) // non-blocking
 
 		// create the proposal message for the collection
 		msg := &messages.ClusterBlockProposal{
@@ -497,7 +503,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Payload: payload,
 		}
 
-		err := e.con.Publish(msg, recipients.NodeIDs()...)
+		err = e.con.Publish(msg, recipients.NodeIDs()...)
 		if errors.Is(err, network.EmptyTargetList) {
 			return
 		}
@@ -521,6 +527,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 // BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
 // Note the header has incomplete fields, because it was converted from a hotstuff.
+// No errors are expected during normal operation.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	return e.BroadcastProposalWithDelay(header, 0)
 }

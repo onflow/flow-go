@@ -59,8 +59,9 @@ func TestMessagesLostAcrossNetwork(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-// TestDelay verifies that we still reach consensus even if messages are
-// significantly delayed. Due to the delay, some proposals might be orphaned.
+// TestDelay verifies that we still reach consensus even if _all_ messages are significantly
+// delayed. Due to the delay, some proposals might be orphaned. The message delay is sampled
+// for each message from the interval [0.1*hotstuffTimeout, 0.5*hotstuffTimeout].
 func TestDelay(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_LONG_RUNNING, "could run for a while depending on what messages are being dropped")
 	stopper := NewStopper(50, 0)
@@ -83,8 +84,8 @@ func TestDelay(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-// TestOneNodeBehind verify that if one node (here node 0) consistently experiences a
-// significant delay receiving messages, the committee still can reach consensus.
+// TestOneNodeBehind verify that if one node (here node 0) consistently experiences a significant
+// delay receiving messages beyond the hotstuff timeout, the committee still can reach consensus.
 func TestOneNodeBehind(t *testing.T) {
 	stopper := NewStopper(50, 0)
 	participantsData := createConsensusIdentities(t, 3)
