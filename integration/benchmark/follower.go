@@ -145,14 +145,14 @@ func (f *txFollowerImpl) run() {
 	defer close(f.stopped)
 
 	var totalTxs, totalUnknownTxs uint64
-	for lastBlockTime := time.Now(); ; <-t.C {
-		blockResolutionStart := time.Now()
+	for lastBlockTime := time.Now(); ; {
 
 		select {
 		case <-f.ctx.Done():
 			return
-		default:
+		case <-t.C:
 		}
+		blockResolutionStart := time.Now()
 
 		hdr, err := f.client.GetLatestBlockHeader(f.ctx, true)
 		if err != nil {
