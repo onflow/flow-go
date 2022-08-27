@@ -216,6 +216,13 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 		return nil
 	}
 
+	p.log.Info().
+		Str("voter_id", vote.SignerID.String()).
+		Uint64("view", vote.View).
+		Uint64("total_weight", p.stakingSigAggtor.TotalWeight()).
+		Str("block_id", vote.BlockID.String()).
+		Msg("processing vote - about to add... (VoteProcessor)")
+
 	// Add staking sig to aggregator.
 	_, err = p.stakingSigAggtor.TrustedAdd(vote.SignerID, stakingSig)
 	if err != nil {
@@ -240,6 +247,14 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	if !p.rbRector.EnoughShares() {
 		return nil
 	}
+
+	p.log.Info().
+		Str("voter_id", vote.SignerID.String()).
+		Uint64("view", vote.View).
+		Str("block_id", vote.BlockID.String()).
+		Uint64("total_weight", p.stakingSigAggtor.TotalWeight()).
+		Uint64("req_weight", p.minRequiredWeight).
+		Msg("about to create a qc (VoteProcessor)")
 
 	// At this point, we have enough signatures to build a QC. Another routine
 	// might just be at this point. To avoid duplicate work, only one routine can pass:

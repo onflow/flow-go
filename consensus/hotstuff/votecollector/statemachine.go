@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var (
@@ -120,6 +121,18 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 		return fmt.Errorf("internal error processing vote %v for block %v: %w",
 			vote.ID(), vote.BlockID, err)
 	}
+
+	votes := m.votesCache.All()
+	var voters flow.IdentifierList
+	for _, vote := range votes {
+		voters = append(voters, vote.SignerID)
+	}
+
+	m.log.Info().
+		Int("cached_votes", m.votesCache.Size()).
+		Str("voters", fmt.Sprintf("%v", voters)).
+		Msg("processed vote (VoteCollector)")
+
 	return nil
 }
 

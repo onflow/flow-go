@@ -89,9 +89,11 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 // for every round, but no block will be finalized, because finalization requires direct 1-chain and QC.
 func Test2TimeoutOutof4Instances(t *testing.T) {
 
+	unittest.LogVerbose()
+
 	numPass := 2
 	numFail := 2
-	finalView := uint64(30)
+	finalView := uint64(20)
 
 	// generate the 4 hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)

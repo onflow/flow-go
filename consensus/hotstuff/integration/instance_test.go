@@ -376,11 +376,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	in.validator = validator.New(in.committee, in.verifier)
 
 	weight := uint64(1000)
-	stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)
-	stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
-
-	rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
-	rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	indices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), []flow.Identifier(in.participants.NodeIDs()))
 	require.NoError(t, err)
@@ -396,6 +391,12 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	voteProcessorFactory := mocks.NewVoteProcessorFactory(t)
 	voteProcessorFactory.On("Create", mock.Anything, mock.Anything).Return(
 		func(log zerolog.Logger, proposal *model.Proposal) hotstuff.VerifyingVoteProcessor {
+			stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)
+			stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
+
+			rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
+			rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
+
 			return votecollector.NewCombinedVoteProcessor(
 				log, proposal.Block,
 				stakingSigAggtor, rbRector,
@@ -540,15 +541,18 @@ func (in *Instance) Run() error {
 		case msg := <-in.queue:
 			switch m := msg.(type) {
 			case *model.Proposal:
+				fmt.Printf("$$ %x->%x received proposal view=%d qc_view=%d block_id=%x\n", m.Block.ProposerID, in.localID, m.Block.View, m.Block.QC.View, m.Block.BlockID)
 				err := in.handler.OnReceiveProposal(m)
 				if err != nil {
 					return fmt.Errorf("could not process proposal: %w", err)
 				}
 			case *model.Vote:
+				fmt.Printf("$$ %x->%x received vote view=%d block_id=%x\n", m.SignerID, in.localID, m.View, m.BlockID)
 				in.voteAggregator.AddVote(m)
 			case *model.TimeoutObject:
 				in.timeoutAggregator.AddTimeout(m)
 			case *flow.QuorumCertificate:
+				fmt.Printf("$$ %x received qc view=%d, signers=%b, block_id=%x\n", in.localID, m.View, m.SignerIndices, m.BlockID)
 				err := in.handler.OnReceiveQc(m)
 				if err != nil {
 					return fmt.Errorf("could not process received qc: %w", err)

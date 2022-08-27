@@ -149,7 +149,7 @@ func (va *VoteAggregator) processQueuedVoteEvents(ctx context.Context) error {
 		va.log.Info().
 			Uint64("view", vote.View).
 			Hex("block_id", vote.BlockID[:]).
-			Str("vote_id", vote.ID().String()).
+			Str("voter_id", vote.SignerID.String()).
 			Msg("vote has been processed successfully")
 	}
 }
