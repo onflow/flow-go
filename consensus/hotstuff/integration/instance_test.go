@@ -376,11 +376,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	in.validator = validator.New(in.committee, in.verifier)
 
 	weight := uint64(1000)
-	stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)
-	stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
-
-	rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
-	rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	indices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), []flow.Identifier(in.participants.NodeIDs()))
 	require.NoError(t, err)
@@ -396,6 +391,12 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	voteProcessorFactory := mocks.NewVoteProcessorFactory(t)
 	voteProcessorFactory.On("Create", mock.Anything, mock.Anything).Return(
 		func(log zerolog.Logger, proposal *model.Proposal) hotstuff.VerifyingVoteProcessor {
+			stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)
+			stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
+
+			rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
+			rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
+
 			return votecollector.NewCombinedVoteProcessor(
 				log, proposal.Block,
 				stakingSigAggtor, rbRector,
