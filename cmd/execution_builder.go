@@ -497,11 +497,9 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				executionDataTracker,
 			)
 
-			options := []runtime.Option{}
-			if e.exeConf.cadenceTracing {
-				options = append(options, runtime.WithTracingEnabled(true))
-			}
-			rt := fvm.NewInterpreterRuntime(options...)
+			rt := fvm.NewInterpreterRuntime(runtime.Config{
+				TracingEnabled: e.exeConf.cadenceTracing,
+			})
 
 			vm := fvm.NewVirtualMachine(rt)
 
@@ -838,7 +836,7 @@ func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, view *de
 	// execute the script
 	err = vm.Run(vmCtx, script, view, p)
 	if err != nil {
-		return 0, fmt.Errorf("could not read epoch counter, script internal error: %w", script.Err)
+		return 0, fmt.Errorf("could not read epoch counter, internal error while executing script: %w", err)
 	}
 	if script.Err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, script error: %w", script.Err)

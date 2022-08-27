@@ -41,6 +41,8 @@ type Programs struct {
 	programs map[common.LocationID]*ProgramEntry
 	parent   *Programs
 	cleaned  bool
+
+	txIndex uint32
 }
 
 func NewEmptyPrograms() *Programs {
@@ -54,6 +56,17 @@ func (p *Programs) ChildPrograms() *Programs {
 		programs: map[common.LocationID]*ProgramEntry{},
 		parent:   p,
 	}
+}
+
+func (p *Programs) NextTxIndexForTestingOnly() uint32 {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.txIndex
+}
+
+func (p *Programs) GetForTestingOnly(location common.AddressLocation) (*interpreter.Program, *state.State, bool) {
+	return p.Get(location)
 }
 
 // Get returns stored program, state which contains changes which correspond to loading this program,
@@ -106,6 +119,8 @@ func (p *Programs) Cleanup(modifiedSets ModifiedSets) {
 
 	p.lock.Lock()
 	defer p.lock.Unlock()
+
+	p.txIndex++
 
 	// In mature system, we would track dependencies between contracts
 	// and invalidate only affected ones, possibly setting them to

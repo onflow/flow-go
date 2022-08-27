@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -622,9 +623,14 @@ func TestCompactorConcurrency(t *testing.T) {
 		// Run Compactor in background.
 		<-compactor.Ready()
 
+		var wg sync.WaitGroup
+		wg.Add(numGoroutine)
+
 		// Run 4 goroutines and each goroutine updates size+1 tries.
 		for j := 0; j < numGoroutine; j++ {
 			go func(parentState ledger.State) {
+				defer wg.Done()
+
 				// size+1 is used to ensure that size/2*numGoroutine segments are finalized.
 				for i := 0; i < size+1; i++ {
 					payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
@@ -648,6 +654,9 @@ func TestCompactorConcurrency(t *testing.T) {
 				}
 			}(rootState)
 		}
+
+		// wait for goroutines updating ledger
+		wg.Wait()
 
 		// wait for the bound-checking observer to confirm checkpoints have been made
 		select {

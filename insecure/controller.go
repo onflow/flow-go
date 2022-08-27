@@ -22,5 +22,7 @@ type EgressController interface {
 // messages from remote nodes to this engine.
 type IngressController interface {
 	// HandleIncomingEvent sends an incoming event (to an engine) to the corrupted networking layer to process.
-	HandleIncomingEvent(channels.Channel, flow.Identifier, interface{})
+	// Boolean return type represents whether attacker is registered with the corrupted network.
+	// Returns true if it is, false otherwise.
+	HandleIncomingEvent(channels.Channel, flow.Identifier, interface{}) bool
 }

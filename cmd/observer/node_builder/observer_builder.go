@@ -21,7 +21,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -37,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -62,7 +62,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
-	"github.com/onflow/flow-go/state/protocol"
+	stateprotocol "github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
@@ -156,7 +156,7 @@ type ObserverServiceBuilder struct {
 
 	// components
 	LibP2PNode              *p2p.Node
-	FollowerState           protocol.MutableState
+	FollowerState           stateprotocol.MutableState
 	SyncCore                *chainsync.Core
 	RpcEng                  *rpc.Engine
 	FinalizationDistributor *pubsub.FinalizationDistributor
@@ -661,7 +661,7 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 			return nil, fmt.Errorf("failed to decode secured GRPC server public key hex %w", err)
 		}
 
-		publicFlowNetworkingKey, err := crypto.DecodePublicKey(sdkcrypto.ECDSA_P256, bytes)
+		publicFlowNetworkingKey, err := crypto.DecodePublicKey(crypto.ECDSAP256, bytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get public flow networking key could not decode public key bytes %w", err)
 		}
@@ -991,10 +991,15 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		proxy := &apiproxy.FlowAccessAPIRouter{
-			Logger:          builder.Logger,
-			Metrics:         metrics.NewObserverCollector(),
-			Upstream:        forwarder,
-			AccessAPIServer: engineBuilder.Handler(),
+			Logger:   builder.Logger,
+			Metrics:  metrics.NewObserverCollector(),
+			Upstream: forwarder,
+			Observer: protocol.NewHandler(protocol.New(
+				node.State,
+				node.Storage.Blocks,
+				node.Storage.Headers,
+				backend.NewNetworkAPI(node.State, node.RootChainID, backend.DefaultSnapshotHistoryLimit),
+			)),
 		}
 
 		// build the rpc engine

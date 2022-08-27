@@ -61,7 +61,7 @@ func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID 
 	err := ccf.RegisterAdapter(adapter)
 	require.NoError(t, err)
 
-	corruptibleNetwork, err := NewCorruptibleNetwork(
+	corruptibleNetwork, err := NewCorruptNetwork(
 		logger,
 		flow.BftTestnet,
 		insecure.DefaultAddress,
@@ -82,7 +82,7 @@ func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
 		flow.Identity, // identity of ccf
 		*Network, // corruptible network
 		*mocknetwork.Adapter, // mock adapter that corrupted network uses to communicate with authorized flow nodes.
-		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
+		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 	)) {
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
@@ -122,7 +122,7 @@ func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
 
 	run(*corruptedIdentity, corruptibleNetwork, adapter, stream)
 
-	// terminates attackNetwork
+	// terminates orchestratorNetwork
 	cancel()
 	unittest.RequireCloseBefore(t, corruptibleNetwork.Done(), 1*time.Second, "could not stop corruptible conduit on time")
 }

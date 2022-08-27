@@ -45,6 +45,7 @@ const (
 	DefaultObserverCount     = 0
 	DefaultNClusters         = 1
 	DefaultProfiler          = false
+	DefaultProfileUploader   = false
 	DefaultTracing           = true
 	DefaultCadenceTracing    = false
 	DefaultExtensiveTracing  = false
@@ -73,6 +74,7 @@ var (
 	numViewsInDKGPhase     uint64
 	numViewsEpoch          uint64
 	profiler               bool
+	profileUploader        bool
 	tracing                bool
 	cadenceTracing         bool
 	extesiveTracing        bool
@@ -92,6 +94,7 @@ func init() {
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
+	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
 	flag.BoolVar(&cadenceTracing, "cadence-tracing", DefaultCadenceTracing, "whether to enable the tracing in cadance")
 	flag.BoolVar(&extesiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
@@ -496,6 +499,7 @@ func defaultService(role, dataDir, profilerDir string, i int) Service {
 			"--secretsdir=/data/secret",
 			"--loglevel=DEBUG",
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
+			fmt.Sprintf("--profile-uploader-enabled=%t", profileUploader),
 			fmt.Sprintf("--tracer-enabled=%t", tracing),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",

@@ -25,7 +25,7 @@
 /ledger/** @ramtinms @m4ksio @AlexHentschel
 
 # FVM Stream 
-/fvm/**  @ramtinms @janezpodhostnik
+/fvm/**  @ramtinms @janezpodhostnik @pattyshack
 
 # Networking Stream
 /network/** @yhassanzadeh13 @vishalchangrani
@@ -37,8 +37,8 @@
 /cmd/bootstrap/** @vishalchangrani
 
 # Performance Stream
-/integration/benchmark/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack @AndrewM-SDET
-/integration/localnet/** @SaveTheRbtz @simonhf @Kay-Zee @zhangchiqing @pattyshack @AndrewM-SDET
+/integration/benchmark/** @SaveTheRbtz @simonhf @Kay-Zee @AndrewM-SDET
+/integration/localnet/** @SaveTheRbtz @simonhf @Kay-Zee @zhangchiqing @AndrewM-SDET
 /module/profiler/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack
 /module/trace/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack
 /module/tracer.go @SaveTheRbtz @simonhf @Kay-Zee @pattyshack
