@@ -41,6 +41,10 @@ func WithMetrics(m *metrics.LoaderCollector) followerOption {
 	return func(f *txFollowerImpl) { f.metrics = m }
 }
 
+// txFollowerImpl is a follower that tracks the current block height and can notify on transaction completion.
+//
+// On creation it starts a goroutine that periodically checks for new blocks.
+// Since there is only a single goroutine that is updating the latest blockID and blockHeight synchronization there pretty relaxed.
 type txFollowerImpl struct {
 	logger  zerolog.Logger
 	metrics *metrics.LoaderCollector
@@ -203,6 +207,7 @@ func (f *txFollowerImpl) run() {
 }
 
 // Follow returns a channel that will be closed when the transaction is completed.
+// If transaction is already being followed, return the existing channel.
 func (f *txFollowerImpl) Follow(txID flowsdk.Identifier) <-chan struct{} {
 	f.mu.Lock()
 	defer f.mu.Unlock()
