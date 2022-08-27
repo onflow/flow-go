@@ -9,8 +9,9 @@ import (
 )
 
 type WorkerStats struct {
-	workers int
-	txsSent int
+	workers     int
+	txsSent     int
+	txsExecuted int
 }
 
 // WorkerStatsTracker keeps track of worker stats
@@ -39,6 +40,21 @@ func (st *WorkerStatsTracker) StartPrinting(interval time.Duration) {
 // StopPrinting stops reporting of worker stats
 func (st *WorkerStatsTracker) StopPrinting() {
 	st.printer.Stop()
+}
+
+// TODO(rbtz): move transaction tracking to the follower.
+func (st *WorkerStatsTracker) IncTxExecuted() {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	st.stats.txsExecuted++
+}
+
+func (st *WorkerStatsTracker) GetTxExecuted() int {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	return st.stats.txsExecuted
 }
 
 func (st *WorkerStatsTracker) AddWorker() {
@@ -88,6 +104,7 @@ func (st *WorkerStatsTracker) Digest() string {
 	t.AppendHeader(table.Row{
 		"workers",
 		"total TXs sent",
+		"total TXs finished",
 		"Avg TPS (last 10s)",
 	})
 
@@ -95,6 +112,7 @@ func (st *WorkerStatsTracker) Digest() string {
 	t.AppendRow(table.Row{
 		stats.workers,
 		stats.txsSent,
+		stats.txsExecuted,
 		// use 11 seconds to correct for rounding in buckets
 		st.AvgTPSBetween(time.Now().Add(-11*time.Second), time.Now()),
 	})
