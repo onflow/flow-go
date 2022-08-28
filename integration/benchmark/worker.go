@@ -42,18 +42,18 @@ func (w *Worker) Start() {
 
 		t := time.NewTicker(w.interval)
 		defer t.Stop()
-		for ; ; <-t.C {
-			select {
-			case <-w.ctx.Done():
-				return
-			default:
-			}
-
+		for {
 			w.wg.Add(1)
 			go func() {
 				defer w.wg.Done()
 				w.work(w.workerID)
 			}()
+
+			select {
+			case <-w.ctx.Done():
+				return
+			case <-t.C:
+			}
 		}
 	}()
 }

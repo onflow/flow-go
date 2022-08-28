@@ -622,7 +622,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 
 func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
-	timeout := 1 * time.Millisecond
+	timeout := 10 * time.Second
 	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{}))
 	chain := flow.Mainnet.Chain()
 	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
