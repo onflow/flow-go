@@ -21,6 +21,30 @@ func TestKeyGenErrors(t *testing.T) {
 	assert.True(t, IsInvalidInputsError(err))
 }
 
+func TestHasherErrors(t *testing.T) {
+	t.Run("nilHasher error sanity", func(t *testing.T) {
+		err := nilHasherError
+		invInpError := invalidInputsErrorf("")
+		otherError := fmt.Errorf("some error")
+		assert.True(t, IsNilHasherError(err))
+		assert.False(t, IsInvalidInputsError(err))
+		assert.False(t, IsNilHasherError(invInpError))
+		assert.False(t, IsNilHasherError(otherError))
+		assert.False(t, IsNilHasherError(nil))
+	})
+
+	t.Run("nilHasher error sanity", func(t *testing.T) {
+		err := invalidHasherSizeErrorf("")
+		invInpError := invalidInputsErrorf("")
+		otherError := fmt.Errorf("some error")
+		assert.True(t, IsInvalidHasherSizeError(err))
+		assert.False(t, IsInvalidInputsError(err))
+		assert.False(t, IsInvalidHasherSizeError(invInpError))
+		assert.False(t, IsInvalidHasherSizeError(otherError))
+		assert.False(t, IsInvalidHasherSizeError(nil))
+	})
+}
+
 // tests sign and verify are consistent for multiple generated keys and messages
 func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	t.Logf("Testing Generation/Signature/Verification for %s", salg)

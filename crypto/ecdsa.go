@@ -86,6 +86,7 @@ func (sk *prKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 //
 // The function returns:
 //  - (false, nilHasherError) if a hasher is nil
+//  - (false, invalidHasherSizeError) when the hasher's output size is less than the curve order (currently 32 bytes).
 //  - (nil, error) if an unexpected error occurs
 //  - (signature, nil) otherwise
 func (sk *prKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
@@ -127,7 +128,8 @@ func (pk *pubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 // modified temporarily.
 //
 // The function returns:
-//  - ([]false, nilHasherError) if a hasher is nil
+//  - (false, nilHasherError) if a hasher is nil
+//  - (false, invalidHasherSizeError) when the hasher's output size is less than the curve order (currently 32 bytes).
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
 func (pk *pubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool, error) {

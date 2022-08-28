@@ -547,7 +547,7 @@ var invalidSignatureError = errors.New("input signature does not deserialize to 
 
 // IsInvalidSignatureError checks if the input error wraps an invalidSignatureError.
 // invalidSignatureError is returned when a signature input does not serilaize to a
-// valid element on E1 of the BLS12-381 curve.
+// valid element on E1 of the BLS12-381 curve (but without checking the element is on subgroup G1).
 func IsInvalidSignatureError(err error) bool {
 	return errors.Is(err, invalidSignatureError)
 }

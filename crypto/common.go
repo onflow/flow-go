@@ -41,7 +41,10 @@ func invalidInputsErrorf(msg string, args ...interface{}) error {
 	}
 }
 
-// IsInvalidInputsError checks if the input error is of a invalidInputsError type
+// IsInvalidInputsError checks if the input error is of an invalidInputsError type
+// invalidInputsError is returned when the API is provided invalid inputs.
+// Some specific errors are assigned specific sentinel errors for a simpler error check
+// while the remaining input errors trigger an invalidInputsError.
 func IsInvalidInputsError(err error) bool {
 	var target *invalidInputsError
 	return errors.As(err, &target)
@@ -72,7 +75,7 @@ func invalidHasherSizeErrorf(msg string, args ...interface{}) error {
 	}
 }
 
-// IsInvalidHasherSizeError checks if the input error is of a invalidHasherSizeError type.
+// IsInvalidHasherSizeError checks if the input error is of an invalidHasherSizeError type.
 // invalidHasherSizeError is an error returned when a crypto API is called with a hasher
 // with an output size not suited with the cryptographic operation.
 func IsInvalidHasherSizeError(err error) bool {

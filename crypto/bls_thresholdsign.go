@@ -142,7 +142,7 @@ func NewBLSThresholdSignatureParticipant(
 // - (nil, invalidInputsError) if:
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]
-// - (nil, ) at least one public key is not of type pubKeyBLSBLS12381
+// - (nil, notBLSKeyError) at least one public key is not of type pubKeyBLSBLS12381
 // - (pointer, nil) otherwise
 func NewBLSThresholdSignatureInspector(
 	groupPublicKey PublicKey,

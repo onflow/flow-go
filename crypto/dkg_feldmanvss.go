@@ -301,7 +301,7 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 		return
 	}
 
-	if s.xReceived { // TODO: also check validKey
+	if s.xReceived {
 		s.processor.FlagMisbehavior(int(origin), "private share was already received")
 		return
 	}

@@ -873,6 +873,17 @@ func TestBLSErrorTypes(t *testing.T) {
 		assert.False(t, IsAggregationEmptyListError(otherError))
 		assert.False(t, IsAggregationEmptyListError(nil))
 	})
+
+	t.Run("notBLSKeyError sanity", func(t *testing.T) {
+		err := notBLSKeyError
+		invInpError := invalidInputsErrorf("")
+		otherError := fmt.Errorf("some error")
+		assert.True(t, IsNotBLSKeyError(err))
+		assert.False(t, IsInvalidInputsError(err))
+		assert.False(t, IsNotBLSKeyError(invInpError))
+		assert.False(t, IsNotBLSKeyError(otherError))
+		assert.False(t, IsNotBLSKeyError(nil))
+	})
 }
 
 // VerifyBLSSignatureManyMessages bench
