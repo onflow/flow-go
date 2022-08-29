@@ -100,7 +100,7 @@ func main() {
 	defer cancel()
 
 	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
-	defer sp.Close()
+	defer sp.Stop()
 
 	tps, err := strconv.ParseInt(*tpsFlag, 0, 32)
 	if err != nil {
