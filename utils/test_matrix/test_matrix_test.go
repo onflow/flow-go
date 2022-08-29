@@ -64,3 +64,27 @@ func TestListRestPackages(t *testing.T) {
 	require.Contains(t, restPackages, flowPackagePrefix+"vwx/ghi")
 	require.Contains(t, restPackages, flowPackagePrefix+"yz")
 }
+
+func TestGenerateTestMatrix(t *testing.T) {
+	targetPackages, seenPackages := listTargetPackages([]string{"abc", "ghi"}, getAllFlowPackages())
+	require.Equal(t, 2, len(targetPackages))
+	require.Equal(t, 4, len(seenPackages))
+
+	restPackages := listRestPackages(getAllFlowPackages(), seenPackages)
+
+	testMatrix := generateTestMatrix(targetPackages, restPackages)
+
+	// should be 3 groups in test matrix: abc, ghi, rest
+	require.Equal(t, 3, len(testMatrix))
+
+	require.Equal(t, "abc", testMatrix[0].name)
+	require.Equal(t, "github.com/onflow/flow-go/abc github.com/onflow/flow-go/abc/def github.com/onflow/flow-go/abc/def/ghi",
+		testMatrix[0].packages)
+
+	require.Equal(t, "ghi", testMatrix[1].name)
+	require.Equal(t, "github.com/onflow/flow-go/ghi", testMatrix[1].packages)
+
+	require.Equal(t, "rest", testMatrix[2].name)
+	require.Equal(t, "github.com/onflow/flow-go/def github.com/onflow/flow-go/def/abc github.com/onflow/flow-go/jkl github.com/onflow/flow-go/mno/abc github.com/onflow/flow-go/pqr github.com/onflow/flow-go/stu github.com/onflow/flow-go/vwx github.com/onflow/flow-go/vwx/ghi github.com/onflow/flow-go/yz",
+		testMatrix[2].packages)
+}

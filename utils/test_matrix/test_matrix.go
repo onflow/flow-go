@@ -9,6 +9,11 @@ import (
 
 const flowPackagePrefix = "github.com/onflow/flow-go/"
 
+type testMatrix struct {
+	name     string
+	packages string
+}
+
 // Generates a list of packages to test that will be passed to GitHub Actions
 func main() {
 	fmt.Println("*** Test Matrix Generator ***")
@@ -30,6 +35,31 @@ func main() {
 
 	fmt.Println("finished generating package list")
 	// generate JSON output that will be read in by CI matrix
+	generateTestMatrix(targetPackages, restPackages)
+
+}
+
+func generateTestMatrix(targetPackages map[string][]string, restPackages []string) []testMatrix {
+
+	var testMatrices []testMatrix
+
+	for names := range targetPackages {
+		targetTestMatrix := testMatrix{
+			name:     names,
+			packages: strings.Join(targetPackages[names], " "),
+		}
+		testMatrices = append(testMatrices, targetTestMatrix)
+	}
+
+	// add the "rest" packages after all target packages added
+	restTestMatrix := testMatrix{
+		name:     "rest",
+		packages: strings.Join(restPackages, " "),
+	}
+
+	testMatrices = append(testMatrices, restTestMatrix)
+
+	return testMatrices
 }
 
 // listTargetPackages returns a map-list of target packages to run as separate CI jobs, based on a list of target package prefixes.
