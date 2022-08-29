@@ -118,6 +118,20 @@ func (_m *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []fl
 	return r0
 }
 
+// InsertLastFullBlockHeightIfNotExists provides a mock function with given fields: height
+func (_m *Blocks) InsertLastFullBlockHeightIfNotExists(height uint64) error {
+	ret := _m.Called(height)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64) error); ok {
+		r0 = rf(height)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Store provides a mock function with given fields: block
 func (_m *Blocks) Store(block *flow.Block) error {
 	ret := _m.Called(block)
