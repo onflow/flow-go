@@ -69,7 +69,7 @@ func main() {
 	defer cancel()
 
 	sp := benchmark.NewStatsPusher(ctx, log, *pushgateway, "loader", prometheus.DefaultGatherer)
-	defer sp.Close()
+	defer sp.Stop()
 
 	accessNodeAddrs := strings.Split(*access, ",")
 

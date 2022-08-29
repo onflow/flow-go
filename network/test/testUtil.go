@@ -10,12 +10,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
+	p2pNetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pc "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	rcmgr "github.com/libp2p/go-libp2p-resource-manager"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -345,7 +348,8 @@ func generateLibP2PNode(
 
 	builder := p2p.NewNodeBuilder(logger, "0.0.0.0:0", key, sporkID).
 		SetConnectionManager(connManager).
-		SetPubSub(pubsub.NewGossipSub)
+		SetPubSub(pubsub.NewGossipSub).
+		SetResourceManager(NewResourceManager(t))
 
 	for _, opt := range opts {
 		opt(builder)
@@ -432,4 +436,19 @@ func networkPayloadFixture(t *testing.T, size uint) []byte {
 	require.InDelta(t, len(encodedEvent), int(size), float64(overhead))
 
 	return payload
+}
+
+// NewResourceManager creates a new resource manager for testing with huge limits.
+func NewResourceManager(t *testing.T) p2pNetwork.ResourceManager {
+	// Sadly we can not use:
+	//    rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits))
+	// Since it is broken due to numeric overflow in the resource manager:
+	// https://github.com/libp2p/go-libp2p/issues/1721
+	scalingLimits := rcmgr.DefaultLimits
+	libp2p.SetDefaultServiceLimits(&scalingLimits)
+	limiter := rcmgr.NewFixedLimiter(scalingLimits.Scale(16<<30, 1048575))
+	rm, err := rcmgr.NewResourceManager(limiter)
+	require.NoError(t, err)
+
+	return rm
 }

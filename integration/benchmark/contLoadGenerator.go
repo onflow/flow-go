@@ -223,6 +223,7 @@ func (lg *ContLoadGenerator) setupFavContract() error {
 		return err
 	}
 	<-ch
+	lg.workerStatsTracker.IncTxExecuted()
 
 	lg.favContractAddress = acc.address
 	return nil
@@ -274,6 +275,10 @@ func (lg *ContLoadGenerator) Stop() {
 	lg.workerStatsTracker.StopPrinting()
 	lg.log.Debug().Msg("stopping follower")
 	lg.follower.Stop()
+}
+
+func (lg *ContLoadGenerator) GetTxExecuted() int {
+	return lg.workerStatsTracker.GetTxExecuted()
 }
 
 func (lg *ContLoadGenerator) AvgTpsBetween(start, stop time.Time) float64 {
@@ -336,6 +341,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		return err
 	}
 	<-ch
+	lg.workerStatsTracker.IncTxExecuted()
 
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
 	result, err := WaitForTransactionResult(context.Background(), lg.flowClient, createAccountTx.ID())
@@ -452,6 +458,7 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 		return
 	}
 	<-ch
+	lg.workerStatsTracker.IncTxExecuted()
 }
 
 func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *flowAccount) error {
@@ -481,6 +488,7 @@ func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *flow
 		return err
 	}
 	<-ch
+	lg.workerStatsTracker.IncTxExecuted()
 
 	lg.log.Info().Msg("the add-key transaction for const-exec is done")
 	return nil
@@ -563,6 +571,7 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 		return
 	}
 	<-ch
+	lg.workerStatsTracker.IncTxExecuted()
 
 	log.Trace().Msg("const-exec tx suceeded")
 }
@@ -640,6 +649,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 				Hex("txID", transferTx.ID().Bytes()).
 				Dur("duration", time.Since(startTime)).
 				Msg("transaction confirmed")
+			lg.workerStatsTracker.IncTxExecuted()
 			return
 		case <-time.After(slowTransactionThreshold):
 			log.Warn().
