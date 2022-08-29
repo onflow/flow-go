@@ -36,26 +36,39 @@ const defaultVoteQueueCapacity = 1000
 // defaultTimeoutObjectsQueueCapacity maximum capacity of timeout objects queue
 const defaultTimeoutObjectsQueueCapacity = 1000
 
+const defaultOutboundMessageChannelCapacity = 100
+
+// sendMessageFunc is a function which sends a message over the network.
+type sendMessageFunc func() error
+
 // Engine is a wrapper struct for `Core` which implements consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
-	log                        zerolog.Logger
-	mempool                    module.MempoolMetrics
-	metrics                    module.EngineMetrics
-	me                         module.Local
-	headers                    storage.Headers
-	payloads                   storage.Payloads
-	tracer                     module.Tracer
-	state                      protocol.State
-	prov                       network.Engine
-	core                       *Core
-	pendingBlocks              engine.MessageStore
-	pendingVotes               engine.MessageStore
-	pendingTimeouts            engine.MessageStore
-	messageHandler             *engine.MessageHandler
+	log      zerolog.Logger
+	mempool  module.MempoolMetrics
+	metrics  module.EngineMetrics
+	me       module.Local
+	headers  storage.Headers
+	payloads storage.Payloads
+	tracer   module.Tracer
+	state    protocol.State
+	prov     network.Engine
+	core     *Core
+	// queues for inbound messsages
+	pendingBlocks   engine.MessageStore
+	pendingVotes    engine.MessageStore
+	pendingTimeouts engine.MessageStore
+	messageHandler  *engine.MessageHandler
+	// internal channels for outbound messages
+	outboundProposals chan *messages.BlockProposal
+	outboundVotes     chan *messages.BlockVote
+	outboundTimeouts  chan *messages.TimeoutObject
+	// tracking finalized view
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
 	con                        network.Conduit
+
+	cm *component.ComponentManager
 	component.Component
 }
 
@@ -168,6 +181,9 @@ func NewEngine(
 		pendingBlocks:              pendingBlocks,
 		pendingVotes:               pendingVotes,
 		pendingTimeouts:            pendingTimeouts,
+		outboundProposals:          make(chan *messages.BlockProposal, defaultOutboundMessageChannelCapacity),
+		outboundVotes:              make(chan *messages.BlockVote, defaultOutboundMessageChannelCapacity),
+		outboundTimeouts:           make(chan *messages.TimeoutObject, defaultOutboundMessageChannelCapacity),
 		state:                      core.state,
 		tracer:                     core.tracer,
 		prov:                       prov,
@@ -183,10 +199,11 @@ func NewEngine(
 	}
 
 	// create the component manager and worker threads
-	eng.Component = component.NewComponentManagerBuilder().
-		AddWorker(eng.loop).
+	eng.cm = component.NewComponentManagerBuilder().
+		AddWorker(eng.processMessagesLoop).
 		AddWorker(eng.finalizationProcessingLoop).
 		Build()
+	eng.Component = eng.cm
 
 	return eng, nil
 }
@@ -198,7 +215,7 @@ func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 	return e
 }
 
-// Start starts the Hotstuff event loop, then the compliance engine worker threads.
+// Start starts the Hotstuff event processMessagesLoop, then the compliance engine worker threads.
 func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	if e.core.hotstuff == nil {
 		ctx.Throw(fmt.Errorf("must initialize compliance engine with hotstuff engine"))
@@ -216,12 +233,14 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 // Ready returns a ready channel that is closed once the engine has fully started.
 // For the consensus engine, we wait for hotstuff to start.
 func (e *Engine) Ready() <-chan struct{} {
+	// TODO leaky
 	return util.AllReady(e.Component, e.core.hotstuff)
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
+	// TODO leaky
 	return util.AllDone(e.Component, e.core.hotstuff)
 }
 
@@ -239,8 +258,8 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 	return nil
 }
 
-// loop processes available block, vote, and timeout messages as they are queued.
-func (e *Engine) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// processMessagesLoop processes available block, vote, and timeout messages as they are queued.
+func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	for {
@@ -289,7 +308,7 @@ func (e *Engine) processAvailableMessages() error {
 			continue
 		}
 
-		// when there is no more messages in the queue, back to the loop to wait
+		// when there is no more messages in the queue, back to the processMessagesLoop to wait
 		// for the next incoming message to arrive.
 		return nil
 	}
@@ -313,18 +332,18 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		SigData: sigData,
 	}
 
-	// TODO: this is a hot-fix to mitigate the effects of the following Unicast call blocking occasionally
-	// TODO(jordan) can we remove this?
-	e.unit.Launch(func() {
+	// spawn a goroutine to asynchronously send the vote
+	// we do this so that network operations do not block the HotStuff EventLoop
+	go func() {
 		// send the vote the desired recipient
 		err := e.con.Unicast(vote, recipientID)
 		if err != nil {
-			log.Warn().Err(err).Msg("could not send vote")
+			log.Err(err).Msg("could not send vote")
 			return
 		}
 		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
 		log.Info().Msg("block vote transmitted")
-	})
+	}()
 
 	return nil
 }
@@ -356,8 +375,10 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("could not get consensus recipients: %w", err)
 	}
 
-	e.unit.Launch(func() {
-		// create the proposal message for the collection
+	// spawn a goroutine to asynchronously broadcast the timeout object
+	// we do this so that network operations do not block the HotStuff EventLoop
+	go func() {
+		// create the timeout message
 		msg := &messages.TimeoutObject{
 			View:       timeout.View,
 			NewestQC:   timeout.NewestQC,
@@ -370,7 +391,7 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 			return
 		}
 		if err != nil {
-			log.Error().Err(err).Msg("could not broadcast timeout")
+			log.Err(err).Msg("could not broadcast timeout")
 			return
 		}
 
@@ -379,7 +400,7 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 		// TODO(active-pacemaker): update metrics
 		//e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 		//e.core.collectionMetrics.ClusterBlockProposed(block)
-	})
+	}()
 
 	return nil
 }
@@ -435,9 +456,17 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		return fmt.Errorf("could not get consensus recipients: %w", err)
 	}
 
-	e.unit.LaunchAfter(delay, func() {
+	// spawn a goroutine to asynchronously broadcast the proposal - we do this
+	// to introduce a pre-proposal delay without blocking the Hotstuff EventLoop thread
+	go func() {
+		select {
+		case <-time.After(delay):
+		case <-e.cm.ShutdownSignal():
+			return
+		}
 
-		go e.core.hotstuff.SubmitProposal(header, parent.View)
+		// TODO previous this spawned a goroutine - is this necessary for some reason?
+		defer e.core.hotstuff.SubmitProposal(header, parent.View)
 
 		// NOTE: some fields are not needed for the message
 		// - proposer ID is conveyed over the network message
@@ -453,17 +482,17 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			return
 		}
 		if err != nil {
-			log.Error().Err(err).Msg("could not send proposal message")
+			log.Err(err).Msg("could not send proposal message")
 		}
 
 		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
 
 		log.Info().Msg("block proposal broadcasted")
 
-		// submit the proposal to the provider engine to forward it to other
-		// node roles
+		// submit the proposal to the provider engine to forward it to other node roles
+		// TODO remove Engine API use
 		e.prov.SubmitLocal(proposal)
-	})
+	}()
 
 	return nil
 }
