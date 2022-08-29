@@ -116,7 +116,6 @@ func (n *Network) UnRegisterChannel(channel channels.Channel) error {
 // will report feedBack as true if a message was consumed in some happy path and false if a message was not useful. Currently this
 // fun is a no-op.
 func (n *Network) SendReputationFeedback(id peer.ID, messageID string, topic channels.Topic, feedBack bool) {
-	return
 }
 
 // submit is called when the attached Engine to the channel is sending an event to an

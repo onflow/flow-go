@@ -320,9 +320,14 @@ func (n *Network) UnRegisterChannel(channel channels.Channel) error {
 
 // SendReputationFeedback reports reputation feedback to libP2P for a message received and processed by an message engine. The message engine
 // will report feedBack as true if a message was consumed in some happy path and false if a message was not useful. Currently this
-// fun is a no-op.
+// fun is a no-op and will log a message.
 func (n *Network) SendReputationFeedback(id peer.ID, messageID string, topic channels.Topic, feedBack bool) {
-	return
+	n.logger.Debug().
+		Str("peer_id", id.Pretty()).
+		Str("message_id", messageID).
+		Str("topic", topic.String()).
+		Bool("feedback", feedBack).
+		Msg("sending libP2P reputation feedback for message")
 }
 
 func (n *Network) Identities() flow.IdentityList {
