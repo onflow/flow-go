@@ -3,7 +3,6 @@ package access_test
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"testing"
 
@@ -559,9 +558,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := flow.IdentifierList(enIdentities.NodeIDs())
 
-		epoch := new(protocol.Epoch)
-		epoch.On("ClusterByChainID").Return(nil, fmt.Errorf("error"))
-		suite.epochQuery.On("Current").Return(epoch)
 		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot, nil)
 
 		// create block -> collection -> transactions
