@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // wintermuteTimeout corresponds to the timeout the wintermute orchestrator have to conduct the attack.
@@ -20,7 +19,6 @@ type WintermuteTestSuite struct {
 }
 
 func TestWintermuteAttackTestSuite(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
 	suite.Run(t, new(WintermuteTestSuite))
 }
 
