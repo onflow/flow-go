@@ -84,17 +84,14 @@ func NewEventHandler(
 // No errors are expected during normal operation.
 func (e *EventHandler) OnReceiveQc(qc *flow.QuorumCertificate) error {
 	curView := e.paceMaker.CurView()
-
 	log := e.log.With().
 		Uint64("cur_view", curView).
 		Uint64("qc_view", qc.View).
 		Hex("qc_block_id", qc.BlockID[:]).
 		Logger()
-
+	log.Debug().Msg("received QC")
 	e.notifier.OnQcConstructedFromVotes(curView, qc)
 	defer e.notifier.OnEventProcessed()
-
-	log.Debug().Msg("received QC")
 
 	newViewEvent, err := e.paceMaker.ProcessQC(qc)
 	if err != nil {
@@ -104,9 +101,9 @@ func (e *EventHandler) OnReceiveQc(qc *flow.QuorumCertificate) error {
 		log.Debug().Msg("QC didn't trigger view change, nothing to do")
 		return nil
 	}
-	log.Debug().Msg("QC triggered view change, starting new view now")
 
 	// current view has changed, go to new view
+	log.Debug().Msg("QC triggered view change, starting new view now")
 	return e.proposeForNewViewIfPrimary()
 }
 
@@ -116,17 +113,14 @@ func (e *EventHandler) OnReceiveQc(qc *flow.QuorumCertificate) error {
 // No errors are expected during normal operation.
 func (e *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 	curView := e.paceMaker.CurView()
-
 	log := e.log.With().
 		Uint64("cur_view", curView).
 		Uint64("tc_view", tc.View).
 		Uint64("tc_newest_qc_view", tc.NewestQC.View).
 		Hex("tc_newest_qc_block_id", tc.NewestQC.BlockID[:]).
 		Logger()
-
-	defer e.notifier.OnEventProcessed()
-
 	log.Debug().Msg("received TC")
+	defer e.notifier.OnEventProcessed()
 
 	newViewEvent, err := e.paceMaker.ProcessTC(tc)
 	if err != nil {
@@ -136,9 +130,9 @@ func (e *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 		log.Debug().Msg("TC didn't trigger view change, nothing to do")
 		return nil
 	}
-	log.Debug().Msg("TC triggered view change, starting new view now")
 
 	// current view has changed, go to new view
+	log.Debug().Msg("TC triggered view change, starting new view now")
 	return e.proposeForNewViewIfPrimary()
 }
 
@@ -149,7 +143,6 @@ func (e *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	block := proposal.Block
 	curView := e.paceMaker.CurView()
-
 	log := e.log.With().
 		Uint64("cur_view", curView).
 		Uint64("block_view", block.View).
@@ -157,10 +150,9 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		Uint64("qc_view", block.QC.View).
 		Hex("proposer_id", block.ProposerID[:]).
 		Logger()
-
+	log.Debug().Msg("proposal received from compliance engine")
 	e.notifier.OnReceiveProposal(curView, proposal)
 	defer e.notifier.OnEventProcessed()
-	log.Debug().Msg("proposal forwarded from compliance engine")
 
 	// ignore stale proposals
 	if block.View < e.forks.FinalizedView() {
@@ -198,6 +190,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	if err != nil {
 		return fmt.Errorf("failed processing current block: %w", err)
 	}
+	log.Debug().Msg("proposal processed from compliance engine")
 
 	// nothing to do if this proposal is for current view
 	if proposal.Block.View == e.paceMaker.CurView() {
@@ -367,29 +360,29 @@ func (e *EventHandler) processPendingBlocks() error {
 // No errors are expected during normal operation.
 func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	start := time.Now() // track the start time
-
 	curView := e.paceMaker.CurView()
-
 	currentLeader, err := e.committee.LeaderForView(curView)
 	if err != nil {
 		return fmt.Errorf("failed to determine primary for new view %d: %w", curView, err)
 	}
-
 	log := e.log.With().
 		Uint64("cur_view", curView).
-		Hex("leader_id", currentLeader[:]).Logger()
-	log.Debug().
 		Uint64("finalized_view", e.forks.FinalizedView()).
-		Msg("entering new view")
-	e.notifier.OnEnteringView(curView, currentLeader)
+		Hex("leader_id", currentLeader[:]).Logger()
 
+	// check that I am the primary for this view and that I haven't already proposed; otherwise there is nothing to do
 	if e.committee.Self() != currentLeader {
 		return nil
 	}
-	log.Debug().Msg("generating block proposal as leader")
+	for _, p := range e.forks.GetProposalsForView(curView) {
+		if p.Block.ProposerID == e.committee.Self() {
+			log.Debug().Msg("already proposed for current view")
+			return nil
+		}
+	}
 
-	// as the leader of the current view,
-	// build the block proposal for the current view
+	// attempt to generate proposal:
+	e.notifier.OnEnteringView(curView, currentLeader)
 	newestQC := e.paceMaker.NewestQC()
 	lastViewTC := e.paceMaker.LastViewTC()
 
@@ -402,13 +395,14 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 			Hex("block_id", newestQC.BlockID[:]).Msg("haven't synced the latest block yet; can't propose")
 		return nil
 	}
+	log.Debug().Msg("generating proposal as leader")
 
 	// Sanity checks to make sure that resulting proposal is valid:
-	// * in its proposal, leader for view N needs to present evidence that has legitimately entered view N
-	// To do that he includes QC or TC for view N-1. Note that the PaceMaker advances to view N only after observing QC or TC from view N-1.
-	// moreover QC and TC are processed always together. As EventHandler is used strictly single-threaded without reentrancy,
-	// we must have a QC or TC for the prior view (curView-1). Failing one of these sanity checks
-	// is a symptom of state corruption or a severe implementation bug.
+	// In its proposal, the leader for view N needs to present evidence that it has legitimately entered view N.
+	// As evidence, we include a QC or TC for view N-1, which should always be available as the PaceMaker advances
+	// to view N only after observing a QC or TC from view N-1. Moreover QC and TC are always processed together. As
+	// EventHandler is strictly single-threaded without reentrancy, we must have a QC or TC for the prior view (curView-1).
+	// Failing one of these sanity checks is a symptom of state corruption or a severe implementation bug.
 	if newestQC.View+1 != curView {
 		if lastViewTC == nil {
 			return fmt.Errorf("possible state corruption, expected lastViewTC to be not nil")
@@ -429,6 +423,14 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
 	e.notifier.OnProposingBlock(proposal)
+
+	// we want to store created proposal in forks to make sure that we don't create more proposals for
+	// current view. Due to asynchronous nature of our design it's possible that after creating proposal
+	// we will be asked to propose again for same view.
+	err = e.forks.AddProposal(proposal)
+	if err != nil {
+		return fmt.Errorf("could not add newly created proposal (%v): %w", proposal.Block.BlockID, err)
+	}
 
 	block := proposal.Block
 	log.Debug().

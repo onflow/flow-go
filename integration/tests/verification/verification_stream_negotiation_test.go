@@ -8,13 +8,11 @@ import (
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestVerificationStreamNegotiation enables gzip stream compression only between execution and verification nodes, while the
 // rest of network runs on plain libp2p streams. It evaluates that network operates on its happy path concerning verification functionality.
 func TestVerificationStreamNegotiation(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
 	s := new(VerificationStreamNegotiationSuite)
 	s.PreferredUnicasts = string(unicast.GzipCompressionUnicast) // enables gzip stream compression between execution and verification node
 	suite.Run(t, s)

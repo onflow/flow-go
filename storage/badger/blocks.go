@@ -35,7 +35,7 @@ func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		err := b.headers.storeTx(block.Header)(tx)
 		if err != nil {
-			return fmt.Errorf("could not store header: %w", err)
+			return fmt.Errorf("could not store header %v: %w", block.Header.ID(), err)
 		}
 		err = b.payloads.storeTx(block.ID(), block.Payload)(tx)
 		if err != nil {
