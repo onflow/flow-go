@@ -1,7 +1,6 @@
 package epochs
 
 import (
-	"github.com/onflow/flow-go/utils/unittest"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -10,7 +9,6 @@ import (
 )
 
 func TestEpochJoinAndLeaveLN(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker, missing next epoch")
 	suite.Run(t, new(EpochJoinAndLeaveLNSuite))
 }
 

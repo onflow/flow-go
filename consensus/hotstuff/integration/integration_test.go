@@ -55,6 +55,8 @@ func TestThreeInstances(t *testing.T) {
 	require.NoError(t, err)
 
 	// set up three instances that are exactly the same
+	// since we don't block any messages we should have enough data to advance in happy path
+	// for that reason we will block all TO related communication.
 	instances := make([]*Instance, 0, num)
 	for n := 0; n < num; n++ {
 		in := NewInstance(t,
@@ -63,6 +65,7 @@ func TestThreeInstances(t *testing.T) {
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
 			WithStopCondition(ViewFinalized(finalView)),
+			WithIncomingTimeoutObjects(BlockAllTimeoutObjects),
 		)
 		instances = append(instances, in)
 	}
