@@ -503,11 +503,11 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 
 			vm := fvm.NewVirtualMachine(rt)
 
-			fvmOptions := append([]fvm.Option{}, node.FvmOptions...)
+			fvmOptions := append([]fvm.Option{fvm.WithLogger(node.Logger)}, node.FvmOptions...)
 			if e.exeConf.extensiveTracing {
 				fvmOptions = append(fvmOptions, fvm.WithExtensiveTracing())
 			}
-			vmCtx := fvm.NewContext(node.Logger, fvmOptions...)
+			vmCtx := fvm.NewContext(fvmOptions...)
 
 			ledgerViewCommitter := committer.NewLedgerViewCommitter(ledgerStorage, node.Tracer)
 			manager, err := computation.New(

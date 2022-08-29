@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rs/zerolog"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -112,7 +110,7 @@ func TestContractInvoker(t *testing.T) {
 				"functionName",
 				[]cadence.Value{},
 				[]sema.Type{},
-				zerolog.Nop())
+			)
 
 			env := &fvmMock.Environment{}
 			vm := &fvm.VirtualMachine{

@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
@@ -58,9 +57,8 @@ func TestAccountFreezing(t *testing.T) {
 		require.False(t, frozen)
 
 		rt := fvm.NewInterpreterRuntime(runtime.Config{})
-		log := zerolog.Nop()
 		vm := fvm.NewVirtualMachine(rt)
-		txInvoker := fvm.NewTransactionInvoker(log)
+		txInvoker := fvm.NewTransactionInvoker()
 
 		code := fmt.Sprintf(`
 			transaction {
@@ -74,7 +72,7 @@ func TestAccountFreezing(t *testing.T) {
 		tx.AddAuthorizer(chain.ServiceAddress())
 		proc := fvm.Transaction(&tx, 0)
 
-		context := fvm.NewContext(log, fvm.WithChain(chain))
+		context := fvm.NewContext(fvm.WithChain(chain))
 
 		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
 		require.NoError(t, err)
@@ -121,12 +119,12 @@ func TestAccountFreezing(t *testing.T) {
 		proc := fvm.Transaction(
 			&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{address}, Payer: address},
 			programsStorage.NextTxIndexForTestingOnly())
-		context := fvm.NewContext(zerolog.Nop(),
+		context := fvm.NewContext(
 			fvm.WithServiceAccount(false),
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
-				fvm.NewTransactionInvoker(zerolog.Nop())))
+				fvm.NewTransactionInvoker()))
 
 		err = vm.Run(context, proc, st.ViewForTestingOnly(), programsStorage)
 		require.NoError(t, err)
@@ -254,12 +252,12 @@ func TestAccountFreezing(t *testing.T) {
 		procFrozen := fvm.Transaction(
 			&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{frozenAddress}, Payer: frozenAddress},
 			programsStorage.NextTxIndexForTestingOnly())
-		context := fvm.NewContext(zerolog.Nop(),
+		context := fvm.NewContext(
 			fvm.WithServiceAccount(false),
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
-				fvm.NewTransactionInvoker(zerolog.Nop())))
+				fvm.NewTransactionInvoker()))
 
 		err := vm.Run(context, procFrozen, st.ViewForTestingOnly(), programsStorage)
 		require.NoError(t, err)
@@ -370,10 +368,9 @@ func TestAccountFreezing(t *testing.T) {
 	t.Run("service account cannot freeze itself", func(t *testing.T) {
 
 		rt := fvm.NewInterpreterRuntime(runtime.Config{})
-		log := zerolog.Nop()
 		vm := fvm.NewVirtualMachine(rt)
 		// create default context
-		context := fvm.NewContext(log)
+		context := fvm.NewContext()
 		programsStorage := programs.NewEmptyPrograms()
 
 		ledger := testutil.RootBootstrappedLedger(vm, context)
@@ -478,13 +475,13 @@ func TestAccountFreezing(t *testing.T) {
 			}
 		`)
 
-		context := fvm.NewContext(zerolog.Nop(),
+		context := fvm.NewContext(
 			fvm.WithServiceAccount(false),
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
 				fvm.NewTransactionVerifier(-1),
-				fvm.NewTransactionInvoker(zerolog.Nop())))
+				fvm.NewTransactionInvoker()))
 
 		// freeze account
 
@@ -501,8 +498,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		proc := fvm.Transaction(tx, 0)
 
-		log := zerolog.Nop()
-		txInvoker := fvm.NewTransactionInvoker(log)
+		txInvoker := fvm.NewTransactionInvoker()
 		err := txInvoker.Process(vm, &context, proc, st, programsStorage)
 		require.NoError(t, err)
 

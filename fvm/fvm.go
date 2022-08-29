@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -103,7 +102,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
 func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, stTxn *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
-	invoker := NewTransactionInvoker(zerolog.Nop())
+	invoker := NewTransactionInvoker()
 
 	// do not deduct fees or check storage in meta transactions
 	ctx := NewContextFromParent(parentCtx,

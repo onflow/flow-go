@@ -640,11 +640,11 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	logger := zerolog.Nop()
 
 	opts = append(opts, fvm.WithChain(chain))
+	opts = append(opts, fvm.WithLogger(logger))
 	opts = append(opts, fvm.WithBlocks(&environment.NoopBlockFinder{}))
 
 	fvmContext :=
 		fvm.NewContext(
-			logger,
 			opts...,
 		)
 

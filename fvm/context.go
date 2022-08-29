@@ -46,8 +46,8 @@ type Context struct {
 }
 
 // NewContext initializes a new execution context with the provided options.
-func NewContext(logger zerolog.Logger, opts ...Option) Context {
-	return newContext(defaultContext(logger), opts...)
+func NewContext(opts ...Option) Context {
+	return newContext(defaultContext(), opts...)
 }
 
 // NewContextFromParent spawns a child execution context with the provided options.
@@ -71,7 +71,7 @@ const (
 	DefaultEventCollectionByteSizeLimit = 256_000        // 256KB
 )
 
-func defaultContext(logger zerolog.Logger) Context {
+func defaultContext() Context {
 	return Context{
 		Chain:                             flow.Mainnet.Chain(),
 		Blocks:                            nil,
@@ -94,12 +94,12 @@ func defaultContext(logger zerolog.Logger) Context {
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
-			NewTransactionInvoker(logger),
+			NewTransactionInvoker(),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvoker(),
 		},
-		Logger: logger,
+		Logger: zerolog.Nop(),
 	}
 }
 
@@ -144,6 +144,14 @@ func WithComputationLimit(limit uint64) Option {
 func WithMemoryLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.MemoryLimit = limit
+		return ctx
+	}
+}
+
+// WithLogger sets the context logger
+func WithLogger(logger zerolog.Logger) Option {
+	return func(ctx Context) Context {
+		ctx.Logger = logger
 		return ctx
 	}
 }
