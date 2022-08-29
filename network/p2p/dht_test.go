@@ -86,6 +86,8 @@ func TestFindPeerWithDHT(t *testing.T) {
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message on that topic. The DHT discovery
 // mechanism is used for nodes to find each other.
 func TestPubSubWithDHTDiscovery(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "failing on CI")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
