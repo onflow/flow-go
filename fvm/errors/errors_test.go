@@ -2,6 +2,7 @@ package errors
 
 import (
 	"fmt"
+	"github.com/rs/zerolog"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -35,5 +36,44 @@ func TestErrorHandling(t *testing.T) {
 		txErr, vmErr := SplitErrorTypes(e1)
 		require.Nil(t, txErr)
 		require.NotNil(t, vmErr)
+	})
+}
+
+func TestFirstOrFailure(t *testing.T) {
+	e1 := fmt.Errorf("some error 1")
+	e2 := fmt.Errorf("some error 2")
+	f1 := &UnknownFailure{e1}
+	f2 := &UnknownFailure{e1}
+	l := zerolog.Nop()
+
+	t.Run("nil, nil -> nil", func(t *testing.T) {
+		err := FirstOrFailure(l, nil, nil)
+		require.Equal(t, nil, err)
+	})
+	t.Run("e, nil -> nil", func(t *testing.T) {
+		err := FirstOrFailure(l, e1, nil)
+		require.Equal(t, e1, err)
+	})
+
+	t.Run("nil, e -> nil", func(t *testing.T) {
+		err := FirstOrFailure(l, nil, e2)
+		require.Equal(t, e2, err)
+	})
+
+	t.Run("e, e -> nil", func(t *testing.T) {
+		err := FirstOrFailure(l, e1, e2)
+		require.Equal(t, e1, err)
+	})
+	t.Run("f, e -> nil", func(t *testing.T) {
+		err := FirstOrFailure(l, f1, e2)
+		require.Equal(t, f1, err)
+	})
+	t.Run("f, f -> nil", func(t *testing.T) {
+		err := FirstOrFailure(l, f1, f2)
+		require.Equal(t, f1, err)
+	})
+	t.Run("e, f -> nil", func(t *testing.T) {
+		err := FirstOrFailure(l, e1, f2)
+		require.Equal(t, f2, err)
 	})
 }

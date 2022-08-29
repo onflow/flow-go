@@ -54,6 +54,11 @@ func (i *TransactionInvoker) Process(
 		blockHeight = ctx.BlockHeader.Height
 	}
 
+	logger := i.logger.With().
+		Str("txHash", txIDStr).
+		Uint64("blockHeight", blockHeight).
+		Logger()
+
 	nestedTxnId, err := sth.BeginNestedTransaction()
 	if err != nil {
 		return err
@@ -69,28 +74,33 @@ func (i *TransactionInvoker) Process(
 		if sth.NumNestedTransactions() > 1 {
 			err := sth.RestartNestedTransaction(nestedTxnId)
 			if err != nil {
-				processErr = fmt.Errorf(
-					"cannot restart nested transaction: %w",
-					err,
+				processErr = errors.FirstOrFailure(
+					logger,
+					processErr,
+					fmt.Errorf(
+						"cannot restart nested transaction: %w",
+						err,
+					),
 				)
 			}
 
 			msg := "transaction has unexpected nested transactions"
-			i.logger.Error().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
+			logger.Error().
 				Msg(msg)
 
 			proc.Err = errors.NewFVMInternalErrorf(msg)
 			proc.Logs = make([]string, 0)
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
-
 		}
 
 		err := sth.Commit(nestedTxnId)
 		if err != nil {
-			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", err)
+			processErr = errors.FirstOrFailure(
+				logger,
+				processErr,
+				fmt.Errorf("transaction invocation failed when merging state: %w", err),
+			)
 		}
 	}()
 
@@ -182,9 +192,7 @@ func (i *TransactionInvoker) Process(
 		}
 
 		// log transaction as failed
-		i.logger.Info().
-			Str("txHash", txIDStr).
-			Uint64("blockHeight", blockHeight).
+		logger.Info().
 			Msg("transaction executed with error")
 
 		// TODO(patrick): make env reusable on error
@@ -196,9 +204,7 @@ func (i *TransactionInvoker) Process(
 
 		// if fee deduction fails just do clean up and exit
 		if feesError != nil {
-			i.logger.Info().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
+			logger.Info().
 				Msg("transaction fee deduction executed with error")
 
 			txError = feesError

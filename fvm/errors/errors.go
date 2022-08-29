@@ -2,6 +2,7 @@ package errors
 
 import (
 	stdErrors "errors"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/errors"
@@ -84,4 +85,45 @@ func HandleRuntimeError(err error) error {
 
 	// All other errors are non-fatal Cadence errors.
 	return NewCadenceRuntimeError(&runErr)
+}
+
+// FirstOrFailure returns:
+// - nil, if both errors are nil
+// - the non-nil error, if only one is nil
+// - the first error, if the second is not a failure, or both are a failure
+// - the second error otherwise
+// In case both err1 and err2 are non-nil, the one that is hidden gets logged.
+func FirstOrFailure(logger zerolog.Logger, err1 error, err2 error) error {
+	// if either is nil, return the other
+	// this is not hiding any errors
+	if (err1 == nil) != (err2 == nil) {
+		if err1 != nil {
+			return err1
+		}
+		return err2
+	}
+
+	// both are nil return nil
+	if err1 == nil {
+		return nil
+	}
+
+	// if first error is a failure or second is not a failure, return first error, hide the second
+	var failure Failure
+	if As(err1, &failure) || !As(err2, &failure) {
+		logger.
+			Error().
+			Err(err2).
+			Msg("New error occurred while handling error. " +
+				"Continuing with original error. This was the new error.")
+		return err1
+	}
+
+	// first error is not a failure and second is a failure, return second error, hide the first
+	logger.
+		Error().
+		Err(err1).
+		Msg("New failure occurred while handling error. " +
+			"Continuing with failure. This was the original error.")
+	return err2
 }
