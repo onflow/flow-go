@@ -77,14 +77,14 @@ func TestGenerateTestMatrix(t *testing.T) {
 	// should be 3 groups in test matrix: abc, ghi, rest
 	require.Equal(t, 3, len(testMatrix))
 
-	require.Equal(t, "abc", testMatrix[0].name)
+	require.Equal(t, "abc", testMatrix[0].Name)
 	require.Equal(t, "github.com/onflow/flow-go/abc github.com/onflow/flow-go/abc/def github.com/onflow/flow-go/abc/def/ghi",
-		testMatrix[0].packages)
+		testMatrix[0].Packages)
 
-	require.Equal(t, "ghi", testMatrix[1].name)
-	require.Equal(t, "github.com/onflow/flow-go/ghi", testMatrix[1].packages)
+	require.Equal(t, "ghi", testMatrix[1].Name)
+	require.Equal(t, "github.com/onflow/flow-go/ghi", testMatrix[1].Packages)
 
-	require.Equal(t, "rest", testMatrix[2].name)
+	require.Equal(t, "rest", testMatrix[2].Name)
 	require.Equal(t, "github.com/onflow/flow-go/def github.com/onflow/flow-go/def/abc github.com/onflow/flow-go/jkl github.com/onflow/flow-go/mno/abc github.com/onflow/flow-go/pqr github.com/onflow/flow-go/stu github.com/onflow/flow-go/vwx github.com/onflow/flow-go/vwx/ghi github.com/onflow/flow-go/yz",
-		testMatrix[2].packages)
+		testMatrix[2].Packages)
 }

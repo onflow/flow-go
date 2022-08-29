@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"golang.org/x/tools/go/packages"
 	"os"
@@ -8,10 +9,12 @@ import (
 )
 
 const flowPackagePrefix = "github.com/onflow/flow-go/"
+const testMatrixFile = "test_matrix.json"
 
+// testMatrix represents a single GitHub Actions test matrix combination that consists of a name and a list of flow-go packages associated with that name.
 type testMatrix struct {
-	name     string
-	packages string
+	Name     string `json:"name"`
+	Packages string `json:"packages"`
 }
 
 // Generates a list of packages to test that will be passed to GitHub Actions
@@ -27,16 +30,18 @@ func main() {
 
 	targetPackages, seenPackages := listTargetPackages(os.Args[1:], allFlowPackages)
 
-	println(fmt.Sprint("targetPackages lengh=", len(targetPackages)))
-
 	restPackages := listRestPackages(allFlowPackages, seenPackages)
 
-	fmt.Sprint("restPackages length: ", len(restPackages))
-
 	fmt.Println("finished generating package list")
-	// generate JSON output that will be read in by CI matrix
-	generateTestMatrix(targetPackages, restPackages)
 
+	// generate JSON output that will be read in by CI matrix
+	testMatrix := generateTestMatrix(targetPackages, restPackages)
+	testMatrixBytes, err := json.MarshalIndent(testMatrix, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	os.WriteFile(testMatrixFile, testMatrixBytes, 0666)
+	fmt.Println("finished writing test matrix to", testMatrixFile)
 }
 
 func generateTestMatrix(targetPackages map[string][]string, restPackages []string) []testMatrix {
@@ -45,16 +50,16 @@ func generateTestMatrix(targetPackages map[string][]string, restPackages []strin
 
 	for names := range targetPackages {
 		targetTestMatrix := testMatrix{
-			name:     names,
-			packages: strings.Join(targetPackages[names], " "),
+			Name:     names,
+			Packages: strings.Join(targetPackages[names], " "),
 		}
 		testMatrices = append(testMatrices, targetTestMatrix)
 	}
 
 	// add the "rest" packages after all target packages added
 	restTestMatrix := testMatrix{
-		name:     "rest",
-		packages: strings.Join(restPackages, " "),
+		Name:     "rest",
+		Packages: strings.Join(restPackages, " "),
 	}
 
 	testMatrices = append(testMatrices, restTestMatrix)
