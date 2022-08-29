@@ -3,6 +3,8 @@ package environment
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/runtime/stdlib"
+
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/errors"
@@ -88,11 +90,11 @@ func (NoopBlockFinder) ByHeightFrom(_ uint64, _ *flow.Header) (*flow.Header, err
 	return nil, nil
 }
 
-func RuntimeBlockFromHeader(header *flow.Header) runtime.Block {
+func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
 	return runtime.Block{
 		Height:    header.Height,
 		View:      header.View,
-		Hash:      runtime.BlockHash(header.ID()),
+		Hash:      stdlib.BlockHash(header.ID()),
 		Timestamp: header.Timestamp.UnixNano(),
 	}
 }

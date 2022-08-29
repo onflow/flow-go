@@ -991,7 +991,7 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	stakingKey := StakingPrivKeyByIdentifier(nodeID)
 	identity := flow.Identity{
 		NodeID:        nodeID,
-		Address:       fmt.Sprintf("address-%x", nodeID[0:7]),
+		Address:       fmt.Sprintf("address-%x:0", nodeID[0:7]),
 		Role:          flow.RoleConsensus,
 		Weight:        1000,
 		StakingPubKey: stakingKey.PublicKey(),
@@ -2086,9 +2086,9 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 	return results
 }
 
-func AllowAllPeerFilter() func(peer.ID) bool {
-	return func(_ peer.ID) bool {
-		return true
+func AllowAllPeerFilter() func(peer.ID) error {
+	return func(_ peer.ID) error {
+		return nil
 	}
 }
 

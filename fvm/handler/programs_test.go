@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -113,7 +115,7 @@ func Test_Programs(t *testing.T) {
 
 	stTxn := state.NewStateTransaction(mainView, state.DefaultParameters())
 
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	vm := fvm.NewVirtualMachine(rt)
 	programs := programsStorage.NewEmptyPrograms()
 

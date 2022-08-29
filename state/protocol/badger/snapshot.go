@@ -483,7 +483,7 @@ func (q *EpochQuery) Current() protocol.Epoch {
 	epoch, err := inmem.NewCommittedEpoch(setup, commit)
 	if err != nil {
 		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-		return invalid.NewEpochf("could not convert current epoch: %s", err.Error())
+		return invalid.NewEpochf("could not convert current epoch at block %x: %s", q.snap.blockID, err.Error())
 	}
 	return epoch
 }
