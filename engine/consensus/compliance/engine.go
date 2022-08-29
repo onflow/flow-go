@@ -1,7 +1,6 @@
 package compliance
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -18,9 +17,10 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -28,7 +28,7 @@ import (
 )
 
 // defaultBlockQueueCapacity maximum capacity of block proposals queue
-const defaultBlockQueueCapacity = 10000
+const defaultBlockQueueCapacity = 10_000
 
 // defaultVoteQueueCapacity maximum capacity of block votes queue
 const defaultVoteQueueCapacity = 1000
@@ -39,8 +39,6 @@ const defaultTimeoutObjectsQueueCapacity = 1000
 // Engine is a wrapper struct for `Core` which implements consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
-	unit                       *engine.Unit
-	lm                         *lifecycle.LifecycleManager
 	log                        zerolog.Logger
 	mempool                    module.MempoolMetrics
 	metrics                    module.EngineMetrics
@@ -58,10 +56,11 @@ type Engine struct {
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
 	con                        network.Conduit
-	stopHotstuff               context.CancelFunc
+	component.Component
 }
 
 var _ hotstuff.Communicator = (*Engine)(nil)
+var _ network.MessageProcessor = (*Engine)(nil)
 
 func NewEngine(
 	log zerolog.Logger,
@@ -160,8 +159,6 @@ func NewEngine(
 	)
 
 	eng := &Engine{
-		unit:                       engine.NewUnit(),
-		lm:                         lifecycle.NewLifecycleManager(),
 		log:                        log.With().Str("compliance", "engine").Logger(),
 		me:                         me,
 		mempool:                    core.mempool,
@@ -185,6 +182,12 @@ func NewEngine(
 		return nil, fmt.Errorf("could not register core: %w", err)
 	}
 
+	// create the component manager and worker threads
+	eng.Component = component.NewComponentManagerBuilder().
+		AddWorker(eng.loop).
+		AddWorker(eng.finalizationProcessingLoop).
+		Build()
+
 	return eng, nil
 }
 
@@ -195,69 +198,31 @@ func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 	return e
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For consensus engine, this is true once the underlying consensus
-// algorithm has started.
-func (e *Engine) Ready() <-chan struct{} {
+// Start starts the Hotstuff event loop, then the compliance engine worker threads.
+func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	if e.core.hotstuff == nil {
-		panic("must initialize compliance engine with hotstuff engine")
+		ctx.Throw(fmt.Errorf("must initialize compliance engine with hotstuff engine"))
 	}
-	e.lm.OnStart(func() {
-		e.unit.Launch(e.loop)
-		e.unit.Launch(e.finalizationProcessingLoop)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		signalerCtx, hotstuffErrChan := irrecoverable.WithSignaler(ctx)
-		e.stopHotstuff = cancel
+	e.log.Info().Msg("starting hotstuff")
+	e.core.hotstuff.Start(ctx)
+	e.log.Info().Msg("hotstuff started")
 
-		// TODO: this workaround for handling fatal HotStuff errors is required only
-		//  because this engine and epochmgr do not use the Component pattern yet
-		e.unit.Launch(func() {
-			e.handleHotStuffError(hotstuffErrChan)
-		})
+	e.log.Info().Msg("starting compliance engine")
+	e.Component.Start(ctx)
+	e.log.Info().Msg("compliance engine started")
+}
 
-		e.core.hotstuff.Start(signalerCtx)
-		// wait for request handler to startup
-
-		<-e.core.hotstuff.Ready()
-	})
-	return e.lm.Started()
+// Ready returns a ready channel that is closed once the engine has fully started.
+// For the consensus engine, we wait for hotstuff to start.
+func (e *Engine) Ready() <-chan struct{} {
+	return util.AllReady(e.Component, e.core.hotstuff)
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	e.lm.OnStop(func() {
-		e.log.Info().Msg("shutting down hotstuff eventloop")
-		e.stopHotstuff()
-		<-e.core.hotstuff.Done()
-		e.log.Info().Msg("all components have been shut down")
-		<-e.unit.Done()
-	})
-	return e.lm.Stopped()
-}
-
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.ProcessLocal(event)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := e.Process(channel, originID, event)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.messageHandler.Process(e.me.NodeID(), event)
+	return util.AllDone(e.Component, e.core.hotstuff)
 }
 
 // Process processes the given event from the node with the given origin ID in
@@ -274,25 +239,29 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 	return nil
 }
 
-func (e *Engine) loop() {
+// loop processes available block, vote, and timeout messages as they are queued.
+func (e *Engine) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-e.messageHandler.GetNotifier():
+			// TODO expected errors?
 			err := e.processAvailableMessages()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+				ctx.Throw(err)
 			}
 		}
 	}
 }
 
+// processAvailableMessages processes any available messages until the message queue is empty.
+// TODO error docs
 func (e *Engine) processAvailableMessages() error {
 
 	for {
-		// TODO prioritization
-		// eg: msg := engine.SelectNextMessage()
 		msg, ok := e.pendingBlocks.Get()
 		if ok {
 			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal))
@@ -345,6 +314,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	}
 
 	// TODO: this is a hot-fix to mitigate the effects of the following Unicast call blocking occasionally
+	// TODO(jordan) can we remove this?
 	e.unit.Launch(func() {
 		// send the vote the desired recipient
 		err := e.con.Unicast(vote, recipientID)
@@ -515,32 +485,15 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
-func (e *Engine) finalizationProcessingLoop() {
+func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
 	finalizationNotifier := e.finalizationEventsNotifier.Channel()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-finalizationNotifier:
 			e.core.ProcessFinalizedView(e.finalizedView.Value())
-		}
-	}
-}
-
-// handleHotStuffError accepts the error channel from the HotStuff component and
-// crashes the node if any error is detected.
-// TODO: this function should be removed in favour of refactoring this engine and
-//  the epochmgr engine to use the Component pattern, so that irrecoverable errors
-//  can be bubbled all the way to the node scaffold
-func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
-	for {
-		select {
-		case <-e.unit.Quit():
-			return
-		case err := <-hotstuffErrs:
-			if err != nil {
-				e.log.Fatal().Err(err).Msg("encountered fatal error in HotStuff")
-			}
 		}
 	}
 }

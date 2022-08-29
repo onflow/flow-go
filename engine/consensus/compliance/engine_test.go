@@ -202,6 +202,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 
 // TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
 // was submitted from network layer.
+// TODO remove - no longer relevant
 func (cs *ComplianceSuite) TestProcessUnsupportedMessageType() {
 	invalidEvent := uint64(42)
 	err := cs.engine.Process("ch", unittest.IdentifierFixture(), invalidEvent)
