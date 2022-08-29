@@ -10,7 +10,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/libp2p/go-libp2p-core/transport"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -50,11 +49,13 @@ func DefaultLibP2PNodeFactory(
 
 	return func(ctx context.Context) (*Node, error) {
 		connManager := NewConnManager(log, metrics)
-		connGater := NewConnGater(log, func(pid peer.ID) bool {
-			_, found := idProvider.ByPeerID(pid)
 
-			return found
-		})
+		// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
+		peerFilter := notEjectedPeerFilter(idProvider)
+		connGater := NewConnGater(log,
+			WithOnInterceptPeerDialFilters([]PeerFilter{peerFilter}),
+			WithOnInterceptSecuredFilters([]PeerFilter{peerFilter}),
+		)
 
 		builder := NewNodeBuilder(log, address, flowKey, sporkId).
 			SetBasicResolver(resolver).
