@@ -14,6 +14,7 @@ CONSENSUS_DELAY=800ms
 COLLECTION_DELAY=950ms
 
 PROFILER=false
+PROFILE_UPLOADER=false
 TRACING=true
 EXTENSIVE_TRACING=false
 CADENCE_TRACING=false
@@ -45,6 +46,7 @@ else
 		-epoch-staking-phase-length=$(STAKINGLEN) \
 		-epoch-dkg-phase-length=$(DKGLEN) \
 		-profiler=$(PROFILER) \
+		-profile-uploader=$(PROFILE_UPLOADER) \
 		-tracing=$(TRACING) \
 		-cadence-tracing=$(CADENCE_TRACING) \
 		-extensive-tracing=$(EXTENSIVE_TRACING) \

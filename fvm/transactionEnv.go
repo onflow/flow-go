@@ -295,7 +295,7 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 			flowAddress,
 			payer)
 		if invokeErr != nil {
-			return address, errors.HandleRuntimeError(invokeErr)
+			return address, invokeErr
 		}
 	}
 
