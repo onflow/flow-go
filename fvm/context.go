@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -16,7 +15,7 @@ import (
 type Context struct {
 	Chain   flow.Chain
 	Blocks  environment.Blocks
-	Metrics handler.MetricsReporter
+	Metrics environment.MetricsReporter
 	Tracer  module.Tracer
 	// DisableMemoryAndInteractionLimits will override memory and interaction
 	// limits and set them to MaxUint64, effectively disabling these limits.
@@ -75,7 +74,7 @@ func defaultContext(logger zerolog.Logger) Context {
 	return Context{
 		Chain:                             flow.Mainnet.Chain(),
 		Blocks:                            nil,
-		Metrics:                           &handler.NoopMetricsReporter{},
+		Metrics:                           environment.NoopMetricsReporter{},
 		Tracer:                            nil,
 		DisableMemoryAndInteractionLimits: false,
 		ComputationLimit:                  DefaultComputationLimit,
@@ -222,7 +221,7 @@ func WithBlocks(blocks environment.Blocks) Option {
 // WithMetricsReporter sets the metrics collector for a virtual machine context.
 //
 // A metrics collector is used to gather metrics reported by the Cadence runtime.
-func WithMetricsReporter(mr handler.MetricsReporter) Option {
+func WithMetricsReporter(mr environment.MetricsReporter) Option {
 	return func(ctx Context) Context {
 		if mr != nil {
 			ctx.Metrics = mr
