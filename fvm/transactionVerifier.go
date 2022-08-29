@@ -77,7 +77,16 @@ func (v *TransactionVerifier) verifyTransaction(
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
 
-	err = v.checkAccountsAreNotFrozen(tx, accounts)
+	// TODO(Janez): move disabling limits out of the verifier. Verifier should not be metered anyway.
+	// TODO(Janez): verification is part of inclusion fees, not execution fees.
+	
+	// check accounts uses the state, but if the limits are too low, this might fail.
+	// we shouldn't fail here if the limits are too low as fee deduction won't happen
+	sth.WithAllLimitsDisabled(
+		func() {
+			err = v.checkAccountsAreNotFrozen(tx, accounts)
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
@@ -86,8 +95,18 @@ func (v *TransactionVerifier) verifyTransaction(
 		return nil
 	}
 
+	// Skip checking limits when getting the public keys
+	getPublicKey := func(address flow.Address, keyIndex uint64) (pub flow.AccountPublicKey, err error) {
+		sth.WithAllLimitsDisabled(
+			func() {
+				pub, err = accounts.GetPublicKey(address, keyIndex)
+			},
+		)
+		return
+	}
+
 	payloadWeights, proposalKeyVerifiedInPayload, err = v.verifyAccountSignatures(
-		accounts,
+		getPublicKey,
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
 		tx.ProposalKey,
@@ -101,7 +120,7 @@ func (v *TransactionVerifier) verifyTransaction(
 	var proposalKeyVerifiedInEnvelope bool
 
 	envelopeWeights, proposalKeyVerifiedInEnvelope, err = v.verifyAccountSignatures(
-		accounts,
+		getPublicKey,
 		tx.EnvelopeSignatures,
 		tx.EnvelopeMessage(),
 		tx.ProposalKey,
@@ -142,7 +161,7 @@ func (v *TransactionVerifier) verifyTransaction(
 }
 
 func (v *TransactionVerifier) verifyAccountSignatures(
-	accounts state.Accounts,
+	getPublicKey func(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error),
 	signatures []flow.TransactionSignature,
 	message []byte,
 	proposalKey flow.ProposalKey,
@@ -156,7 +175,7 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 
 	for _, txSig := range signatures {
 
-		accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyIndex)
+		accountKey, err := getPublicKey(txSig.Address, txSig.KeyIndex)
 		if err != nil {
 			return nil, false, errorBuilder(txSig, err)
 		}
