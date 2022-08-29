@@ -49,15 +49,18 @@ type Suite struct {
 	client      *testnet.Client
 
 	// Epoch config (lengths in views)
-	StakingAuctionLen uint64
-	DKGPhaseLen       uint64
-	EpochLen          uint64
+	StakingAuctionLen          uint64
+	DKGPhaseLen                uint64
+	EpochLen                   uint64
+	EpochCommitSafetyThreshold uint64
 }
 
 // SetupTest is run automatically by the testing framework before each test case.
 func (s *Suite) SetupTest() {
+
+	minEpochLength := s.StakingAuctionLen + s.DKGPhaseLen*3 + 20
 	// ensure epoch lengths are set correctly
-	require.Greater(s.T(), s.EpochLen, s.StakingAuctionLen+s.DKGPhaseLen*3)
+	require.Greater(s.T(), s.EpochLen, minEpochLength+s.EpochCommitSafetyThreshold, "epoch too short")
 
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
@@ -79,8 +82,10 @@ func (s *Suite) SetupTest() {
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
+		// we disable requiring approvals on epoch tests, because it increases time-to-seal
+		// which can interferes with the time-sensitive DKG and cause test flakiness
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 0)),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 0)),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
@@ -103,7 +108,7 @@ func (s *Suite) SetupTest() {
 		ghostNode,
 	}
 
-	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen)
+	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen, s.EpochCommitSafetyThreshold)
 
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
@@ -830,7 +835,8 @@ func (s *DynamicEpochTransitionSuite) SetupTest() {
 	// joining/leaving nodes
 	s.StakingAuctionLen = 200
 	s.DKGPhaseLen = 50
-	s.EpochLen = 380
+	s.EpochLen = 500
+	s.EpochCommitSafetyThreshold = 50
 
 	// run the generic setup, which starts up the network
 	s.Suite.SetupTest()
