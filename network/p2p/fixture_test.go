@@ -145,7 +145,7 @@ func nodeFixture(
 	if parameters.peerFilter != nil {
 		filters := []p2p.PeerFilter{parameters.peerFilter}
 		// set parameters.peerFilter as the default peerFilter for both callbacks
-		connGater := p2p.NewConnGater(parameters.logger, p2p.WithOnInterceptPeerDialFilters(filters), p2p.WithOnInterceptSecuredFilters(filters))
+		connGater := p2p.NewConnGater(parameters.logger, p2p.WithOnInterceptPeerDialFilters(filters...), p2p.WithOnInterceptSecuredFilters(filters...))
 		builder.SetConnectionGater(connGater)
 	}
 
