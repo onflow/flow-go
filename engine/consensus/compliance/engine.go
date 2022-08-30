@@ -36,11 +36,6 @@ const defaultVoteQueueCapacity = 1000
 // defaultTimeoutObjectsQueueCapacity maximum capacity of timeout objects queue
 const defaultTimeoutObjectsQueueCapacity = 1000
 
-const defaultOutboundMessageChannelCapacity = 100
-
-// sendMessageFunc is a function which sends a message over the network.
-type sendMessageFunc func() error
-
 // Engine is a wrapper struct for `Core` which implements consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
@@ -59,10 +54,6 @@ type Engine struct {
 	pendingVotes    engine.MessageStore
 	pendingTimeouts engine.MessageStore
 	messageHandler  *engine.MessageHandler
-	// internal channels for outbound messages
-	outboundProposals chan *messages.BlockProposal
-	outboundVotes     chan *messages.BlockVote
-	outboundTimeouts  chan *messages.TimeoutObject
 	// tracking finalized view
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
@@ -70,6 +61,9 @@ type Engine struct {
 
 	cm *component.ComponentManager
 	component.Component
+	// signals for startup and shutdown
+	ready <-chan struct{}
+	done  <-chan struct{}
 }
 
 var _ hotstuff.Communicator = (*Engine)(nil)
@@ -181,9 +175,6 @@ func NewEngine(
 		pendingBlocks:              pendingBlocks,
 		pendingVotes:               pendingVotes,
 		pendingTimeouts:            pendingTimeouts,
-		outboundProposals:          make(chan *messages.BlockProposal, defaultOutboundMessageChannelCapacity),
-		outboundVotes:              make(chan *messages.BlockVote, defaultOutboundMessageChannelCapacity),
-		outboundTimeouts:           make(chan *messages.TimeoutObject, defaultOutboundMessageChannelCapacity),
 		state:                      core.state,
 		tracer:                     core.tracer,
 		prov:                       prov,
@@ -204,6 +195,10 @@ func NewEngine(
 		AddWorker(eng.finalizationProcessingLoop).
 		Build()
 	eng.Component = eng.cm
+
+	// create ready/done channels
+	eng.ready = util.AllReady(eng.cm, eng.core.hotstuff)
+	eng.done = util.AllDone(eng.cm, eng.core.hotstuff)
 
 	return eng, nil
 }
@@ -233,15 +228,13 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 // Ready returns a ready channel that is closed once the engine has fully started.
 // For the consensus engine, we wait for hotstuff to start.
 func (e *Engine) Ready() <-chan struct{} {
-	// TODO leaky
-	return util.AllReady(e.Component, e.core.hotstuff)
+	return e.ready
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	// TODO leaky
-	return util.AllDone(e.Component, e.core.hotstuff)
+	return e.done
 }
 
 // Process processes the given event from the node with the given origin ID in
