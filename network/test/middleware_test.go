@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -334,7 +333,10 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	// create message with about 400bytes (300 random bytes + 100bytes message info)
 	b := make([]byte, 300)
-	rand.Read(b)
+	for i, _ := range b {
+		b[i] = byte('X')
+	}
+
 	msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, string(b))
 
 	// update the addresses
