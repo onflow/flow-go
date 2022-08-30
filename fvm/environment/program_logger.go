@@ -53,6 +53,7 @@ func NewProgramLogger(
 ) *ProgramLogger {
 	return &ProgramLogger{
 		tracer:                tracer,
+		logger:                logger,
 		cadenceLoggingEnabled: cadenceLoggingEnabled,
 		logs:                  nil,
 		reporter:              reporter,
