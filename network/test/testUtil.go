@@ -268,7 +268,6 @@ type optsConfig struct {
 	idOpts                       []func(*flow.Identity)
 	dhtPrefix                    string
 	dhtOpts                      []dht.Option
-	peerManagerOpts              []p2p.Option
 	connectionGating             bool
 	streamsRateLimiter           unicast.RateLimiter
 	bandwidthRateLimiter         unicast.RateLimiter
