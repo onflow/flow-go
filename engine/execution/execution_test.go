@@ -69,9 +69,7 @@ func TestExecutionFlow(t *testing.T) {
 	unittest.RequireReturnsBefore(t, func() {
 		exeNode.Ready(ctx)
 	}, 1*time.Second, "could not start execution node on time")
-	defer unittest.RequireReturnsBefore(t, func() {
-		exeNode.Done(cancel)
-	}, 1*time.Second, "could not stop execution node on time")
+	defer exeNode.Done(cancel)
 
 	genesis, err := exeNode.State.AtHeight(0).Head()
 	require.NoError(t, err)
@@ -378,13 +376,10 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	exe1Node := testutil.ExecutionNode(t, hub, exe1ID, identities, 27, chainID)
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	unittest.RequireReturnsBefore(t, func() {
 		exe1Node.Ready(ctx)
 	}, 1*time.Second, "could not start execution node on time")
-	defer unittest.RequireReturnsBefore(t, func() {
-		exe1Node.Done(cancel)
-	}, 1*time.Second, "could not stop execution node on time")
+	defer exe1Node.Done(cancel)
 
 	genesis, err := exe1Node.State.AtHeight(0).Head()
 	require.NoError(t, err)
@@ -538,9 +533,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	unittest.RequireReturnsBefore(t, func() {
 		exeNode.Ready(ctx)
 	}, 1*time.Second, "could not start execution node on time")
-	defer unittest.RequireReturnsBefore(t, func() {
-		exeNode.Done(cancel)
-	}, 1*time.Second, "could not stop execution node on time")
+	defer exeNode.Done(cancel)
 
 	verification1Node := testutil.GenericNodeFromParticipants(t, hub, ver1ID, identities, chainID)
 	defer verification1Node.Done()

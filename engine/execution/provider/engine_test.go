@@ -11,6 +11,7 @@ import (
 	_ "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	state "github.com/onflow/flow-go/engine/execution/state/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -324,7 +325,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("reply to chunk data pack request only when authorized", func(t *testing.T) {
-		currentAuthorizedState := true
+		currentAuthorizedState := atomic.Bool{}
+		currentAuthorizedState.Store(true)
 		ps := mockprotocol.NewState(t)
 		ss := mockprotocol.NewSnapshot(t)
 		net := mocknetwork.NewNetwork(t)
@@ -342,7 +344,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			ps,
 			execState,
 			metrics.NewNoopCollector(),
-			func(_ flow.Identifier) (bool, error) { return currentAuthorizedState, nil },
+			func(_ flow.Identifier) (bool, error) { return currentAuthorizedState.Load(), nil },
 			requestQueue,
 			DefaultChunkDataPackRequestWorker,
 			DefaultChunkDataPackQueryTimeout,
@@ -388,7 +390,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.Eventually(t, func() bool {
 			return requestQueue.Size() == uint(0) // ensuring first request has been picked up from the queue.
 		}, 1*time.Second, 100*time.Millisecond)
-		currentAuthorizedState = false
+		currentAuthorizedState.Store(false)
 
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
 		require.Eventually(t, func() bool {
