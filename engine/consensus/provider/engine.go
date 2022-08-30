@@ -103,7 +103,7 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 
 // broadcastProposal is used when we want to broadcast a local block to the rest  of the
 // network (non-consensus nodes). We broadcast to consensus nodes in compliance engine.
-// TODO error handline - differentiate expected errors in Snapshot
+// TODO error handling - differentiate expected errors in Snapshot
 func (e *Engine) broadcastProposal(proposal *messages.BlockProposal) error {
 
 	// sanity check: we should only broadcast proposals that we proposed here
