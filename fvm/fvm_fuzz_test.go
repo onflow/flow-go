@@ -49,7 +49,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			// set the memory limit
 			ctx.MemoryLimit = memoryLimit
 			// run the transaction
-			tx := fvm.Transaction(txBody, 1)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			require.NotPanics(t, func() {
 				err = vm.Run(ctx, tx, view, programs)
@@ -209,7 +209,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 			return err
 		}
 
-		tx := fvm.Transaction(txBody, 0)
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 		err = vm.Run(ctx, tx, view, programs)
 
@@ -238,7 +238,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		)
 		require.NoError(tb, err)
 
-		tx = fvm.Transaction(txBody, 0)
+		tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 		err = vm.Run(ctx, tx, view, programs)
 		if err != nil {
