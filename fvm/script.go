@@ -107,6 +107,12 @@ func (proc *ScriptProcedure) MemoryLimit(ctx Context) uint64 {
 	return memoryLimit
 }
 
+func (proc *ScriptProcedure) ShouldDisableMemoryAndInteractionLimits(
+	ctx Context,
+) bool {
+	return ctx.DisableMemoryAndInteractionLimits
+}
+
 type ScriptInvoker struct{}
 
 func NewScriptInvoker() ScriptInvoker {

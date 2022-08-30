@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -126,6 +127,7 @@ func nodeFixture(
 
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := p2p.NewConnManager(parameters.logger, noopMetrics)
+	resourceManager := test.NewResourceManager(t)
 
 	builder := p2p.NewNodeBuilder(parameters.logger, parameters.address, parameters.key, sporkID).
 		SetConnectionManager(connManager).
@@ -137,10 +139,13 @@ func nodeFixture(
 				noopMetrics,
 				parameters.dhtOptions...,
 			)
-		})
+		}).
+		SetResourceManager(resourceManager)
 
 	if parameters.peerFilter != nil {
-		connGater := p2p.NewConnGater(parameters.logger, parameters.peerFilter)
+		filters := []p2p.PeerFilter{parameters.peerFilter}
+		// set parameters.peerFilter as the default peerFilter for both callbacks
+		connGater := p2p.NewConnGater(parameters.logger, p2p.WithOnInterceptPeerDialFilters(filters), p2p.WithOnInterceptSecuredFilters(filters))
 		builder.SetConnectionGater(connGater)
 	}
 
