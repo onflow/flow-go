@@ -120,7 +120,7 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 				Msg("rejecting message")
 			return pubsub.ValidationReject
 		}
-		
+
 		rawMsg.ValidatorData = TopicValidatorData{
 			Message:           &msg,
 			DecodedMsgPayload: decodedMsgPayload,
