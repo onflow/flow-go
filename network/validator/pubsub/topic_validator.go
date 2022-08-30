@@ -98,20 +98,20 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 
 		// Convert message payload to a known message type
 		decodedMsgPayload, err := c.Decode(msg.Payload)
-		if codec.IsErrUnknownMsgCode(err) {
+		switch {
+		case err == nil:
+			break
+		case codec.IsErrUnknownMsgCode(err):
 			// slash peer if message contains unknown message code byte
 			slashingViolationsConsumer.OnUnknownMsgTypeError(violation(from, msg, err))
 			return pubsub.ValidationReject
-		}
-		if codec.IsErrMsgUnmarshal(err) {
+		case codec.IsErrMsgUnmarshal(err):
 			// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
 			slashingViolationsConsumer.OnInvalidMsgError(violation(from, msg, err))
 			return pubsub.ValidationReject
-		}
-
-		// unexpected error condition. this indicates there's a bug
-		// don't crash as a result of external inputs since that creates a DoS vector.
-		if err != nil {
+		default:
+			// unexpected error condition. this indicates there's a bug
+			// don't crash as a result of external inputs since that creates a DoS vector.
 			log.
 				Error().
 				Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
@@ -120,7 +120,7 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 				Msg("rejecting message")
 			return pubsub.ValidationReject
 		}
-
+		
 		rawMsg.ValidatorData = TopicValidatorData{
 			Message:           &msg,
 			DecodedMsgPayload: decodedMsgPayload,
