@@ -664,7 +664,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 		peerFilter = m.isProtocolParticipant()
 	}
 
-	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, validators...)
+	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, m.slashingViolationsConsumer, validators...)
 	if err != nil {
 		return fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
 	}
