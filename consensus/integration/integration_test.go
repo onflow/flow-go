@@ -49,7 +49,7 @@ func Test3Nodes(t *testing.T) {
 
 	runNodes(signalerCtx, nodes)
 
-	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
+	unittest.RequireCloseBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -72,7 +72,7 @@ func Test5Nodes(t *testing.T) {
 
 	runNodes(signalerCtx, nodes)
 
-	<-stopper.stopped
+	unittest.RequireCloseBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
 
 	header, err := nodes[0].state.Final().Head()
 	require.NoError(t, err)
@@ -130,7 +130,6 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 	}
 
 	// reverse all views to start from lower view to higher view
-
 	low2high := make([]uint64, 0)
 	for i := len(views) - 1; i >= 0; i-- {
 		low2high = append(low2high, views[i])
@@ -138,27 +137,35 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 	return low2high
 }
 
+// BlockOrDelayFunc is a function for deciding whether a message (or other event) should be
+// blocked or delayed. The first return value specifies whether the event should be dropped
+// entirely (return value `true`) or should be delivered (return value `false`). The second
+// return value specifies the delay by which the message should be delivered.
+// Implementations must be CONCURRENCY SAFE.
 type BlockOrDelayFunc func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration)
 
-// block nothing
-func blockNothing(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+// blockNothing specifies that _all_ messages should be delivered without delay.
+// I.e. this function returns always `false` (no blocking), `0` (no delay).
+func blockNothing(_ network.Channel, _ interface{}, _, _ *Node) (bool, time.Duration) {
 	return false, 0
 }
 
-// block all messages sent by or received by a list of denied nodes
+// blockNodes specifies that all messages sent or received by any member of the `denyList`
+// should be dropped, i.e. we return `true` (block message), `0` (no delay).
+// For nodes _not_ in the `denyList`,  we return `false` (no blocking), `0` (no delay).
 func blockNodes(denyList ...*Node) BlockOrDelayFunc {
 	blackList := make(map[flow.Identifier]*Node, len(denyList))
 	for _, n := range denyList {
 		blackList[n.id.ID()] = n
 	}
+	// no concurrency protection needed as blackList is only read but not modified
 	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
-		block, notBlock := true, false
 		if _, ok := blackList[sender.id.ID()]; ok {
-			return block, 0
+			return true, 0
 		}
 		if _, ok := blackList[receiver.id.ID()]; ok {
-			return block, 0
+			return true, 0
 		}
-		return notBlock, 0
+		return false, 0
 	}
 }
