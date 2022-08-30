@@ -12,7 +12,9 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/chainsync"
+	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -39,7 +41,7 @@ type Engine struct {
 	me      module.Local
 	con     network.Conduit
 	blocks  storage.Blocks
-	comp    network.Engine // compliance layer engine
+	comp    consensus.ComplianceProcessor
 
 	pollInterval         time.Duration
 	scanInterval         time.Duration
@@ -61,7 +63,7 @@ func New(
 	net network.Network,
 	me module.Local,
 	blocks storage.Blocks,
-	comp network.Engine, // TODO replace Engine with interface
+	comp consensus.ComplianceProcessor,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
 	participantsProvider identifier.IdentifierProvider,
@@ -303,12 +305,15 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 
 	for _, block := range res.Blocks {
 		if !e.core.HandleBlock(block.Header) {
-			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
+			e.log.Debug().Uint64("height", block.Header.Height).Msg("block does not need processing")
 			continue
 		}
+		// pass the block to the compliance layer
+		e.comp.IngestBlock(&events.SyncedBlock{
+			OriginID: originID,
+			Block:    block,
+		})
 	}
-
-	e.comp.SubmitLocal(res)
 }
 
 // checkLoop will regularly scan for items that need requesting.

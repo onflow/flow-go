@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
+	consensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -50,7 +51,7 @@ type SyncSuite struct {
 	state        *protocol.State
 	snapshot     *protocol.Snapshot
 	blocks       *storage.Blocks
-	comp         *mocknetwork.Engine
+	comp         *consensus.ComplianceProcessor
 	core         *module.SyncCore
 	e            *Engine
 }
@@ -156,8 +157,8 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up compliance engine mock
-	ss.comp = &mocknetwork.Engine{}
-	ss.comp.On("SubmitLocal", mock.Anything).Return()
+	ss.comp = &consensus.ComplianceProcessor{}
+	ss.comp.On("IngestBlock", mock.Anything).Return()
 
 	// set up sync core
 	ss.core = &module.SyncCore{}
@@ -415,12 +416,11 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	ss.core.On("HandleBlock", unprocessable.Header).Return(false)
 	res.Blocks = append(res.Blocks, &unprocessable)
 
-	ss.comp.On("SubmitLocal", mock.Anything).Run(func(args mock.Arguments) {
+	ss.comp.On("IngestBlock", mock.Anything).Run(func(args mock.Arguments) {
 		res := args.Get(0).(*events.SyncedBlock)
 		ss.Assert().Equal(&processable, res.Block)
 		ss.Assert().Equal(originID, res.OriginID)
-	},
-	)
+	})
 
 	ss.e.onBlockResponse(originID, res)
 	ss.comp.AssertExpectations(ss.T())
