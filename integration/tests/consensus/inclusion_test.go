@@ -6,6 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
@@ -14,9 +18,6 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestCollectionGuaranteeInclusion(t *testing.T) {
@@ -42,11 +43,7 @@ func (is *InclusionSuite) Collection() *client.GhostClient {
 }
 
 func (is *InclusionSuite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "inclusion.go").
-		Str("testcase", is.T().Name()).
-		Logger()
-	is.log = logger
+	is.log = unittest.LoggerForTest(is.Suite.T(), zerolog.InfoLevel)
 	is.log.Info().Msgf("================> SetupTest")
 
 	// seed random generator

@@ -30,13 +30,13 @@ func (cnb *CorruptedNodeBuilder) Initialize() error {
 		return fmt.Errorf("could not initilized flow node builder: %w", err)
 	}
 
-	cnb.enqueueCorruptibleConduitFactory() // initializes corrupted conduit factory (ccf).
+	cnb.enqueueNetworkingLayer() // initializes corrupted networking layer.
 
 	return nil
 }
 
-func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
-	cnb.FlowNodeBuilder.OverrideComponent(cmd.ConduitFactoryComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
+	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()
 		if cnb.FlowNodeBuilder.BaseConfig.BindAddr != cmd.NotSet {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
@@ -48,19 +48,29 @@ func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
 		}
 
 		address := net.JoinHostPort(host, strconv.Itoa(CorruptibleConduitFactoryPort))
+		ccf := corruptible.NewCorruptibleConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
 
-		ccf := corruptible.NewCorruptibleConduitFactory(
-			cnb.FlowNodeBuilder.Logger,
-			cnb.FlowNodeBuilder.RootChainID,
-			cnb.FlowNodeBuilder.Me,
-			cnb.FlowNodeBuilder.CodecFactory(), address)
+		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupted conduit factory initiated")
 
-		cnb.FlowNodeBuilder.ConduitFactory = ccf
-		node.Logger.Info().Hex("node_id", logging.ID(node.NodeID)).Str("address", address).Msg("corrupted conduit factory initiated")
-		return ccf, nil
-	})
+		flowNetwork, err := cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, ccf)
+		if err != nil {
+			return nil, fmt.Errorf("could not initiate flow network: %w", err)
+		}
 
-	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, cnb.FlowNodeBuilder.ConduitFactory)
+		// initializes corruptible network that acts as a wrapper around the original flow network of the node, hence
+		// allowing a remote attacker to control the ingress and egress traffic of the node.
+		corruptibleNetwork, err := corruptible.NewCorruptNetwork(
+			cnb.Logger,
+			cnb.RootChainID,
+			address,
+			cnb.Me,
+			cnb.CodecFactory(),
+			flowNetwork,
+			ccf)
+		if err != nil {
+			return nil, fmt.Errorf("could not create corruptible network: %w", err)
+		}
+		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", address).Msg("corruptible network initiated")
+		return corruptibleNetwork, nil
 	})
 }

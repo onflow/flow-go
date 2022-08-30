@@ -75,7 +75,6 @@ type Engine struct {
 	collections       storage.Collections
 	transactions      storage.Transactions
 	executionReceipts storage.ExecutionReceipts
-	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
 	// metrics
@@ -155,7 +154,6 @@ func New(
 		transactions:               transactions,
 		executionResults:           executionResults,
 		executionReceipts:          executionReceipts,
-		maxReceiptHeight:           0,
 		transactionMetrics:         transactionMetrics,
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
@@ -187,6 +185,43 @@ func New(
 	}
 
 	return e, nil
+}
+
+func (e *Engine) Start(parent irrecoverable.SignalerContext) {
+	rootBlock, err := e.state.Params().Root()
+	if err != nil {
+		parent.Throw(fmt.Errorf("failed to get root block: %w", err))
+	}
+
+	// if spork root snapshot
+	rootSnapshot := e.state.AtBlockID(rootBlock.ID())
+
+	isSporkRootSnapshot, err := protocol.IsSporkRootSnapshot(rootSnapshot)
+	if err != nil {
+		parent.Throw(fmt.Errorf("could not check if root snapshot is a spork root snapshot: %w", err))
+	}
+
+	// This is useful for dynamically bootstrapped access node, they will request missing collections. In order to ensure all txs
+	// from the missing collections can be verified, we must ensure they are referencing to known blocks.
+	// That's why we set the full block height to be rootHeight + TransactionExpiry, so that we only request missing collections
+	// in blocks above that height.
+	if isSporkRootSnapshot {
+		// for snapshot with a single block in the sealing segment the first full block is the root block.
+		err := e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
+		if err != nil {
+			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
+		}
+	} else {
+		// for midspork snapshots with a sealing segment that has more than 1 block add the transaction expiry to the root block height to avoid
+		// requesting resources for blocks below the expiry.
+		firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
+		err := e.blocks.InsertLastFullBlockHeightIfNotExists(firstFullHeight)
+		if err != nil {
+			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
+		}
+	}
+
+	e.ComponentManager.Start(parent)
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -379,6 +414,19 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 		}
 	}
 
+	// skip requesting collections, if this block is below the last full block height
+	// this means that either we have already received these collections, or the block
+	// may contain unverifiable guarantees (in case this node has just joined the network)
+	lastFullBlockHeight, err := e.blocks.GetLastFullBlockHeight()
+	if err != nil {
+		return fmt.Errorf("could not get last full block height: %w", err)
+	}
+
+	if block.Header.Height <= lastFullBlockHeight {
+		e.log.Info().Msgf("skipping requesting collections for finalized block below last full block height (%d<=%d)", block.Header.Height, lastFullBlockHeight)
+		return nil
+	}
+
 	// queue requesting each of the collections from the collection node
 	e.requestCollectionsInFinalizedBlock(block.Payload.Guarantees)
 
@@ -416,6 +464,7 @@ func (e *Engine) trackFinalizedMetricForBlock(hb *model.Block) {
 
 	if ti, found := e.blocksToMarkExecuted.ByID(hb.BlockID); found {
 		e.trackExecutedMetricForBlock(block, ti)
+		e.transactionMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
 		e.blocksToMarkExecuted.Remove(hb.BlockID)
 	}
 }
@@ -427,33 +476,29 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 		return fmt.Errorf("failed to store execution receipt: %w", err)
 	}
 
-	block, err := e.blocks.ByID(r.ExecutionResult.BlockID)
-	if err != nil {
-		return fmt.Errorf("failed to lookup block while handling receipt: %w", err)
-	}
-
-	if block.Header.Height > e.maxReceiptHeight {
-		e.transactionMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
-		e.maxReceiptHeight = block.Header.Height
-	}
-
-	e.trackExecutedMetricForReceipt(r)
+	e.trackExecutionReceiptMetrics(r)
 	return nil
 }
 
-func (e *Engine) trackExecutedMetricForReceipt(r *flow.ExecutionReceipt) {
+func (e *Engine) trackExecutionReceiptMetrics(r *flow.ExecutionReceipt) {
 	// TODO add actual execution time to execution receipt?
 	now := time.Now().UTC()
 
 	// retrieve the block
 	b, err := e.blocks.ByID(r.ExecutionResult.BlockID)
+
 	if errors.Is(err, storage.ErrNotFound) {
 		e.blocksToMarkExecuted.Add(r.ExecutionResult.BlockID, now)
 		return
-	} else if err != nil {
+	}
+
+	if err != nil {
 		e.log.Warn().Err(err).Msg("could not track tx executed metric: executed block not found locally")
 		return
 	}
+
+	e.transactionMetrics.UpdateExecutionReceiptMaxHeight(b.Header.Height)
+
 	e.trackExecutedMetricForBlock(b, now)
 }
 

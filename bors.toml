@@ -2,7 +2,9 @@
 # for why we need to explicitly list all statuses
 
 status = [
-  "Lint",
+  "Lint (./)",
+  "Lint (./integration/)",
+  "Lint (./crypto/)",
   "Unit Tests",
   "Integration Tests (integration-mvp)",
   "Integration Tests (integration-ghost)",
@@ -13,30 +15,6 @@ status = [
   "Integration Tests (integration-consensus)",
   "Integration Tests (integration-execution)",
   "Integration Tests (integration-verification)",
-  "Generate Flaky Test Summary (unit)",
-  "Generate Flaky Test Summary (unit-crypto)",
-  "Generate Flaky Test Summary (unit-integration)",
-  "Generate Flaky Test Summary (integration-mvp)",
-  "Generate Flaky Test Summary (integration-ghost)",
-  "Generate Flaky Test Summary (integration-network)",
-  "Generate Flaky Test Summary (integration-epochs)",
-  "Generate Flaky Test Summary (integration-access)",
-  "Generate Flaky Test Summary (integration-collection)",
-  "Generate Flaky Test Summary (integration-consensus)",
-  "Generate Flaky Test Summary (integration-execution)",
-  "Generate Flaky Test Summary (integration-verification)",
-  "Generate Skipped Test Summary (unit)",
-  "Generate Skipped Test Summary (unit-crypto)",
-  "Generate Skipped Test Summary (unit-integration)",
-  "Generate Skipped Test Summary (integration-mvp)",
-  "Generate Skipped Test Summary (integration-ghost)",
-  "Generate Skipped Test Summary (integration-network)",
-  "Generate Skipped Test Summary (integration-epochs)",
-  "Generate Skipped Test Summary (integration-access)",
-  "Generate Skipped Test Summary (integration-collection)",
-  "Generate Skipped Test Summary (integration-consensus)",
-  "Generate Skipped Test Summary (integration-execution)",
-  "Generate Skipped Test Summary (integration-verification)",
 ]
 
 delete_merged_branches = true

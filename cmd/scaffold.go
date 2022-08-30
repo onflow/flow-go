@@ -31,10 +31,12 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
@@ -43,7 +45,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/profiler"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
@@ -52,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -78,6 +80,7 @@ type Metrics struct {
 	Cache          module.CacheMetrics
 	Mempool        module.MempoolMetrics
 	CleanCollector module.CleanerMetrics
+	Bitswap        module.BitswapMetrics
 }
 
 type Storage = storage.All
@@ -158,11 +161,9 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringSliceVar(&fnb.BaseConfig.PreferredUnicastProtocols, "preferred-unicast-protocols", nil, "preferred unicast protocols in ascending order of preference")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultReceiveCacheSize,
 		"incoming message cache size at networking layer")
+	fnb.flags.BoolVar(&fnb.BaseConfig.NetworkConnectionPruning, "networking-connection-pruning", defaultConfig.NetworkConnectionPruning, "enabling connection trimming")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
-	fnb.flags.StringVar(&fnb.BaseConfig.TopologyProtocolName, "topology", defaultConfig.TopologyProtocolName, "networking overlay topology")
-	fnb.flags.Float64Var(&fnb.BaseConfig.TopologyEdgeProbability, "topology-edge-probability", defaultConfig.TopologyEdgeProbability,
-		"pairwise edge probability between nodes in topology")
 
 	// dynamic node startup flags
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey, "dynamic-startup-access-publickey", "", "the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
@@ -263,15 +264,11 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Component(ConduitFactoryComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		cf := conduit.NewDefaultConduitFactory()
-		fnb.ConduitFactory = cf
-		node.Logger.Info().Hex("node_id", logging.ID(node.NodeID)).Msg("default conduit factory initiated")
-
-		return cf, nil
-	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return fnb.InitFlowNetworkWithConduitFactory(node, fnb.ConduitFactory)
+		cf := conduit.NewDefaultConduitFactory()
+		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
+
+		return fnb.InitFlowNetworkWithConduitFactory(node, cf)
 	})
 }
 
@@ -333,8 +330,8 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.BaseConfig.NodeRole,
 	)
 
-	// run peer manager with the specified interval and let it also prune connections
-	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
+	peerManagerFactory := p2p.PeerManagerFactory(fnb.NetworkConnectionPruning, fnb.PeerUpdateInterval)
+
 	mwOpts = append(mwOpts,
 		p2p.WithPeerManager(peerManagerFactory),
 		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
@@ -345,30 +342,23 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		mwOpts = append(mwOpts, p2p.WithPeerManagerFilters(peerManagerFilters))
 	}
 
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger)
+
 	fnb.Middleware = p2p.NewMiddleware(
 		fnb.Logger,
 		libP2PNodeFactory,
 		fnb.Me.NodeID(),
 		fnb.Metrics.Network,
+		fnb.Metrics.Bitswap,
 		fnb.SporkID,
 		fnb.BaseConfig.UnicastMessageTimeout,
 		fnb.IDTranslator,
 		fnb.CodecFactory(),
+		slashingViolationsConsumer,
 		mwOpts...,
 	)
 
 	subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
-
-	topologyFactory, err := topology.Factory(topology.Name(fnb.TopologyProtocolName))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve topology factory for %s: %w", fnb.TopologyProtocolName, err)
-	}
-	top, err := topologyFactory(fnb.NodeID, fnb.Logger, fnb.State, fnb.TopologyEdgeProbability)
-	if err != nil {
-		return nil, fmt.Errorf("could not create topology: %w", err)
-	}
-	topologyCache := topology.NewCache(fnb.Logger, top)
-
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 	if fnb.HeroCacheMetricsEnable {
 		heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
@@ -378,23 +368,24 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.Logger,
 		heroCacheCollector)
 
-	err = node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+	err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
 	if err != nil {
 		return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 	}
 
 	// creates network instance
-	net, err := p2p.NewNetwork(fnb.Logger,
-		fnb.CodecFactory(),
-		fnb.Me,
-		func() (network.Middleware, error) { return fnb.Middleware, nil },
-		topologyCache,
-		subscriptionManager,
-		fnb.Metrics.Network,
-		fnb.IdentityProvider,
-		receiveCache,
-		p2p.WithConduitFactory(cf),
-	)
+	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+		Logger:              fnb.Logger,
+		Codec:               fnb.CodecFactory(),
+		Me:                  fnb.Me,
+		MiddlewareFactory:   func() (network.Middleware, error) { return fnb.Middleware, nil },
+		Topology:            topology.NewFullyConnectedTopology(),
+		SubscriptionManager: subscriptionManager,
+		Metrics:             fnb.Metrics.Network,
+		IdentityProvider:    fnb.IdentityProvider,
+		ReceiveCache:        receiveCache,
+		Options:             []p2p.NetworkOptFunction{p2p.WithConduitFactory(cf)},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
@@ -564,6 +555,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Cache:          metrics.NewNoopCollector(),
 		Mempool:        metrics.NewNoopCollector(),
 		CleanCollector: metrics.NewNoopCollector(),
+		Bitswap:        metrics.NewNoopCollector(),
 	}
 	if fnb.BaseConfig.MetricsEnabled {
 		fnb.MetricsRegisterer = prometheus.DefaultRegisterer
@@ -579,6 +571,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 			Cache:          metrics.NewNoopCollector(),
 			CleanCollector: metrics.NewCleanerCollector(),
 			Mempool:        mempools,
+			Bitswap:        metrics.NewBitswapCollector(),
 		}
 
 		// registers mempools as a Component so that its Ready method is invoked upon startup
@@ -957,7 +950,7 @@ func (fnb *FlowNodeBuilder) initLocal() {
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
-	blockFinder := fvm.NewBlockFinder(fnb.Storage.Headers)
+	blockFinder := environment.NewBlockFinder(fnb.Storage.Headers)
 	vmOpts := []fvm.Option{
 		fvm.WithChain(fnb.RootChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
@@ -972,6 +965,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	fnb.FvmOptions = vmOpts
 }
 
+// handleModules initializes the given module.
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	err := v.fn(fnb.NodeConfig)
 	if err != nil {
@@ -979,6 +973,17 @@ func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	}
 
 	fnb.Logger.Info().Str("module", v.name).Msg("module initialization complete")
+	return nil
+}
+
+// handleModules initializes all modules that have been enqueued on this node builder.
+func (fnb *FlowNodeBuilder) handleModules() error {
+	for _, f := range fnb.modules {
+		if err := fnb.handleModule(f); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -1213,6 +1218,25 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) N
 	return fnb.Component(name, f)
 }
 
+// OverrideModule adds given builder function to the modules set of the node builder. If a builder function with that name
+// already exists, it will be overridden.
+func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
+	for i := 0; i < len(fnb.modules); i++ {
+		if fnb.modules[i].name == name {
+			// found module with the name, override it.
+			fnb.modules[i] = namedModuleFunc{
+				fn:   f,
+				name: name,
+			}
+
+			return fnb
+		}
+	}
+
+	// no module found with the same name, hence just adding it.
+	return fnb.Module(name, f)
+}
+
 // RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
 // interface, and calls the provided error handler when an irrecoverable error is encountered.
 // Use RestartableComponent if the component is not critical to the node's safe operation and
@@ -1279,7 +1303,7 @@ func WithMetricsEnabled(enabled bool) Option {
 	}
 }
 
-func WithSyncCoreConfig(syncConfig synchronization.Config) Option {
+func WithSyncCoreConfig(syncConfig chainsync.Config) Option {
 	return func(config *BaseConfig) {
 		config.SyncCoreConfig = syncConfig
 	}
@@ -1400,8 +1424,6 @@ func (fnb *FlowNodeBuilder) onStart() error {
 
 	fnb.initLogger()
 
-	fnb.initProfiler()
-
 	fnb.initDB()
 	fnb.initSecretsDB()
 
@@ -1417,6 +1439,8 @@ func (fnb *FlowNodeBuilder) onStart() error {
 
 	fnb.initState()
 
+	fnb.initProfiler()
+
 	fnb.initFvmOptions()
 
 	for _, f := range fnb.postInitFns {
@@ -1428,10 +1452,8 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	fnb.EnqueueAdminServerInit()
 
 	// run all modules
-	for _, f := range fnb.modules {
-		if err := fnb.handleModule(f); err != nil {
-			return err
-		}
+	if err := fnb.handleModules(); err != nil {
+		return fmt.Errorf("could not handle modules: %w", err)
 	}
 
 	// run all components

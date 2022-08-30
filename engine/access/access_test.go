@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
+
 	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/access"
@@ -30,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -73,16 +74,17 @@ func (suite *Suite) SetupTest() {
 	suite.net = new(mocknetwork.Network)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
+	suite.snapshot.On("SealingSegment").Return(&flow.SealingSegment{Blocks: unittest.BlockFixtures(2)}, nil).Maybe()
 
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
+
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
 	params.On("Root").Return(header, nil)
 	suite.state.On("Params").Return(params).Maybe()
-
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 
@@ -285,8 +287,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, nil)
-		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, nil)
+		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
 
 		backend := backend.New(suite.state,
 			nil,
@@ -556,6 +558,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := flow.IdentifierList(enIdentities.NodeIDs())
 
+		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot, nil)
+
 		// create block -> collection -> transactions
 		block, collection := suite.createChain()
 
@@ -585,7 +589,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -630,17 +634,17 @@ func (suite *Suite) TestGetSealedTransaction() {
 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
+		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
+		err = blocks.Store(&block)
+		require.NoError(suite.T(), err)
+		suite.snapshot.On("Head").Return(block.Header, nil).Twice()
+
 		background, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		ctx, _ := irrecoverable.WithSignaler(background)
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
-
-		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-		err = blocks.Store(&block)
-		require.NoError(suite.T(), err)
-		suite.snapshot.On("Head").Return(block.Header, nil).Once()
 
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
@@ -688,7 +692,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		suite.backend = backend.New(suite.state,
 			suite.collClient,

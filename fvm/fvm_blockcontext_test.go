@@ -940,7 +940,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -993,7 +993,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1054,7 +1054,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1092,7 +1092,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1129,7 +1129,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1483,7 +1483,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		// execute the transaction
-		tx := fvm.Transaction(txBody, 0)
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 		err = vm.Run(ctx, tx, ledger, programs)
 		require.NoError(t, err)
@@ -1686,7 +1686,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
@@ -1734,7 +1734,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
@@ -1775,7 +1775,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1812,7 +1812,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1820,7 +1820,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				require.IsType(t, &errors.CadenceRuntimeError{}, tx.Err)
 
 				// send it again
-				tx = fvm.Transaction(txBody, 0)
+				tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)

@@ -28,29 +28,68 @@ type mapKey struct {
 // it holds draft of updates and captures
 // all register touches
 type State struct {
-	view                  View
-	meter                 meter.Meter
-	updatedAddresses      map[flow.Address]struct{}
-	updateSize            map[mapKey]uint64
+	view             View
+	meter            meter.Meter
+	updatedAddresses map[flow.Address]struct{}
+	updateSize       map[mapKey]uint64
+	stateLimits
+	ReadCounter       uint64
+	WriteCounter      uint64
+	TotalBytesRead    uint64
+	TotalBytesWritten uint64
+}
+
+type stateLimits struct {
 	maxKeySizeAllowed     uint64
 	maxValueSizeAllowed   uint64
 	maxInteractionAllowed uint64
-	ReadCounter           uint64
-	WriteCounter          uint64
-	TotalBytesRead        uint64
-	TotalBytesWritten     uint64
 }
 
-func defaultState(view View, meter meter.Meter) *State {
-	return &State{
-		view:                  view,
-		meter:                 meter,
-		updatedAddresses:      make(map[flow.Address]struct{}),
-		updateSize:            make(map[mapKey]uint64),
-		maxKeySizeAllowed:     DefaultMaxKeySize,
-		maxValueSizeAllowed:   DefaultMaxValueSize,
-		maxInteractionAllowed: DefaultMaxInteractionSize,
+type StateParameters struct {
+	meter.MeterParameters
+
+	stateLimits
+}
+
+func DefaultParameters() StateParameters {
+	return StateParameters{
+		MeterParameters: meter.DefaultParameters(),
+		stateLimits: stateLimits{
+			maxKeySizeAllowed:     DefaultMaxKeySize,
+			maxValueSizeAllowed:   DefaultMaxValueSize,
+			maxInteractionAllowed: DefaultMaxInteractionSize,
+		},
 	}
+}
+
+// WithMeterParameters sets the state's meter parameters
+func (params StateParameters) WithMeterParameters(
+	meterParams meter.MeterParameters,
+) StateParameters {
+	newParams := params
+	newParams.MeterParameters = meterParams
+	return newParams
+}
+
+// WithMaxKeySizeAllowed sets limit on max key size
+func (params StateParameters) WithMaxKeySizeAllowed(limit uint64) StateParameters {
+	newParams := params
+	newParams.maxKeySizeAllowed = limit
+	return newParams
+}
+
+// WithMaxValueSizeAllowed sets limit on max value size
+func (params StateParameters) WithMaxValueSizeAllowed(limit uint64) StateParameters {
+	newParams := params
+	newParams.maxValueSizeAllowed = limit
+	return newParams
+}
+
+// WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
+func (params StateParameters) WithMaxInteractionSizeAllowed(limit uint64) StateParameters {
+	newParams := params
+	newParams.maxInteractionAllowed = limit
+	return newParams
 }
 
 func (s *State) View() View {
@@ -64,35 +103,25 @@ func (s *State) Meter() meter.Meter {
 type StateOption func(st *State) *State
 
 // NewState constructs a new state
-func NewState(view View, meter meter.Meter, opts ...StateOption) *State {
-	ctx := defaultState(view, meter)
-	for _, applyOption := range opts {
-		ctx = applyOption(ctx)
-	}
-	return ctx
-}
-
-// WithMaxKeySizeAllowed sets limit on max key size
-func WithMaxKeySizeAllowed(limit uint64) func(st *State) *State {
-	return func(st *State) *State {
-		st.maxKeySizeAllowed = limit
-		return st
+func NewState(view View, params StateParameters) *State {
+	m := meter.NewMeter(params.MeterParameters)
+	return &State{
+		view:             view,
+		meter:            m,
+		updatedAddresses: make(map[flow.Address]struct{}),
+		updateSize:       make(map[mapKey]uint64),
+		stateLimits:      params.stateLimits,
 	}
 }
 
-// WithMaxValueSizeAllowed sets limit on max value size
-func WithMaxValueSizeAllowed(limit uint64) func(st *State) *State {
-	return func(st *State) *State {
-		st.maxValueSizeAllowed = limit
-		return st
-	}
-}
-
-// WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
-func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
-	return func(st *State) *State {
-		st.maxInteractionAllowed = limit
-		return st
+// NewChild generates a new child state
+func (s *State) NewChild() *State {
+	return &State{
+		view:             s.view.NewChild(),
+		meter:            s.meter.NewChild(),
+		updatedAddresses: make(map[flow.Address]struct{}),
+		updateSize:       make(map[mapKey]uint64),
+		stateLimits:      s.stateLimits,
 	}
 }
 
@@ -212,24 +241,13 @@ func (s *State) MemoryIntensities() meter.MeteredMemoryIntensities {
 }
 
 // TotalMemoryEstimate returns total memory used
-func (s *State) TotalMemoryEstimate() uint {
+func (s *State) TotalMemoryEstimate() uint64 {
 	return s.meter.TotalMemoryEstimate()
 }
 
 // TotalMemoryLimit returns total memory limit
 func (s *State) TotalMemoryLimit() uint {
-	return s.meter.TotalMemoryLimit()
-}
-
-// NewChild generates a new child state
-func (s *State) NewChild() *State {
-	return NewState(
-		s.view.NewChild(),
-		s.meter.NewChild(),
-		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
-		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
-		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),
-	)
+	return uint(s.meter.TotalMemoryLimit())
 }
 
 // MergeState applies the changes from a the given view to this view.

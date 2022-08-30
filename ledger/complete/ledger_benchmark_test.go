@@ -9,11 +9,11 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
@@ -53,7 +53,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 	led, err := complete.NewLedger(diskWal, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(steps+1), checkpointDistance, checkpointsToKeep)
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(steps+1), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -73,8 +73,8 @@ func benchmarkStorage(steps int, b *testing.B) {
 	state := led.InitialState()
 	for i := 0; i < steps; i++ {
 
-		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-		values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+		keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+		values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 		totalRegOperation += len(keys)
 
@@ -117,7 +117,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		totalProofSize += len(proof)
 
 		start = time.Now()
-		p, _ := encoding.DecodeTrieBatchProof(proof)
+		p, _ := ledger.DecodeTrieBatchProof(proof)
 
 		// construct a partial trie using proofs
 		_, err = ptrie.NewPSMT(ledger.RootHash(newState), p)
@@ -149,7 +149,7 @@ func BenchmarkTrieUpdate(b *testing.B) {
 	// key updates per iteration
 	const (
 		numInsPerStep      = 10000
-		keyNumberOfParts   = 10
+		keyNumberOfParts   = 3
 		keyPartMinByteSize = 1
 		keyPartMaxByteSize = 100
 		valueMaxByteSize   = 32
@@ -172,7 +172,7 @@ func BenchmarkTrieUpdate(b *testing.B) {
 	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -184,8 +184,8 @@ func BenchmarkTrieUpdate(b *testing.B) {
 
 	state := led.InitialState()
 
-	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+	keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 	update, err := ledger.NewUpdate(state, keys, values)
 	if err != nil {
@@ -230,7 +230,7 @@ func BenchmarkTrieRead(b *testing.B) {
 	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -242,8 +242,8 @@ func BenchmarkTrieRead(b *testing.B) {
 
 	state := led.InitialState()
 
-	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+	keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 	update, err := ledger.NewUpdate(state, keys, values)
 	if err != nil {
@@ -297,7 +297,7 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -309,8 +309,8 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 
 	state := led.InitialState()
 
-	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+	keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 	update, err := ledger.NewUpdate(state, keys, values)
 	if err != nil {
@@ -381,7 +381,7 @@ func BenchmarkTrieProve(b *testing.B) {
 	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -393,8 +393,8 @@ func BenchmarkTrieProve(b *testing.B) {
 
 	state := led.InitialState()
 
-	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+	keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 	update, err := ledger.NewUpdate(state, keys, values)
 	if err != nil {

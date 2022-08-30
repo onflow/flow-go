@@ -64,11 +64,7 @@ func (s *Suite) MetricsPort() string {
 // - One verification node
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", s.T().Name()).
-		Logger()
-	s.log = logger
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 
 	blockRateFlag := "--block-rate-delay=1ms"

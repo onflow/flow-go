@@ -16,6 +16,11 @@ type ContractUpdateKey struct {
 	Name    string
 }
 
+type ModifiedSets struct {
+	ContractUpdateKeys []ContractUpdateKey
+	FrozenAccounts     []common.Address
+}
+
 type ContractUpdate struct {
 	ContractUpdateKey
 	Code []byte
@@ -36,6 +41,8 @@ type Programs struct {
 	programs map[common.LocationID]*ProgramEntry
 	parent   *Programs
 	cleaned  bool
+
+	txIndex uint32
 }
 
 func NewEmptyPrograms() *Programs {
@@ -51,9 +58,20 @@ func (p *Programs) ChildPrograms() *Programs {
 	}
 }
 
+func (p *Programs) NextTxIndexForTestingOnly() uint32 {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.txIndex
+}
+
+func (p *Programs) GetForTestingOnly(location common.AddressLocation) (*interpreter.Program, *state.State, bool) {
+	return p.Get(location)
+}
+
 // Get returns stored program, state which contains changes which correspond to loading this program,
 // and boolean indicating if the value was found
-func (p *Programs) Get(location common.Location) (*interpreter.Program, *state.State, bool) {
+func (p *Programs) Get(location common.AddressLocation) (*interpreter.Program, *state.State, bool) {
 	entry, parent := p.get(location)
 	if entry != nil {
 		return entry.Program, entry.State, true
@@ -66,14 +84,14 @@ func (p *Programs) Get(location common.Location) (*interpreter.Program, *state.S
 	return nil, nil, false
 }
 
-func (p *Programs) get(location common.Location) (*ProgramEntry, *Programs) {
+func (p *Programs) get(location common.AddressLocation) (*ProgramEntry, *Programs) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.programs[location.ID()], p.parent
 }
 
-func (p *Programs) Set(location common.Location, program *interpreter.Program, state *state.State) {
+func (p *Programs) Set(location common.AddressLocation, program *interpreter.Program, state *state.State) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -93,7 +111,21 @@ func (p *Programs) HasChanges() bool {
 	return len(p.programs) > 0 || p.cleaned
 }
 
-func (p *Programs) unsafeForceCleanup() {
+func (p *Programs) Cleanup(modifiedSets ModifiedSets) {
+	if len(modifiedSets.ContractUpdateKeys) == 0 &&
+		len(modifiedSets.FrozenAccounts) == 0 {
+		return
+	}
+
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.txIndex++
+
+	// In mature system, we would track dependencies between contracts
+	// and invalidate only affected ones, possibly setting them to
+	// nil so they will override parent's data, but for now
+	// just throw everything away and use a special flag for this
 	p.cleaned = true
 
 	// Stop using parent's data to prevent
@@ -102,38 +134,4 @@ func (p *Programs) unsafeForceCleanup() {
 
 	// start with empty storage
 	p.programs = make(map[common.LocationID]*ProgramEntry)
-}
-
-// ForceCleanup is used to force a complete cleanup
-// It exists temporarily to facilitate a temporary measure which can retry
-// a transaction in case checking fails
-// It should be gone when the extra retry is gone
-func (p *Programs) ForceCleanup() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	p.unsafeForceCleanup()
-}
-
-func (p *Programs) Cleanup(changedContracts []ContractUpdateKey) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	// In mature system, we would track dependencies between contracts
-	// and invalidate only affected ones, possibly setting them to
-	// nil so they will override parent's data, but for now
-	// just throw everything away and use a special flag for this
-	if len(changedContracts) > 0 {
-		p.unsafeForceCleanup()
-		return
-	}
-
-	// However, if none of the programs were changed
-	// we remove all the non AddressLocation data
-	// (those are temporary tx related entries)
-	for id, entry := range p.programs {
-		if _, is := entry.Location.(common.AddressLocation); !is {
-			delete(p.programs, id)
-		}
-	}
 }

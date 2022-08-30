@@ -10,11 +10,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 func TestObserver(t *testing.T) {
@@ -25,6 +29,7 @@ type ObserverSuite struct {
 	suite.Suite
 	net      *testnet.FlowNetwork
 	teardown func()
+	local    map[string]struct{}
 }
 
 func (suite *ObserverSuite) TearDownTest() {
@@ -32,6 +37,18 @@ func (suite *ObserverSuite) TearDownTest() {
 }
 
 func (suite *ObserverSuite) SetupTest() {
+	suite.local = map[string]struct{}{
+		"Ping":                           {},
+		"GetLatestBlockHeader":           {},
+		"GetBlockHeaderByID":             {},
+		"GetBlockHeaderByHeight":         {},
+		"GetLatestBlock":                 {},
+		"GetBlockByID":                   {},
+		"GetBlockByHeight":               {},
+		"GetLatestProtocolStateSnapshot": {},
+		"GetNetworkParameters":           {},
+	}
+
 	nodeConfigs := []testnet.NodeConfig{
 		// access node with unstaked nodes supported
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel), func(nc *testnet.NodeConfig) {
@@ -63,7 +80,7 @@ func (suite *ObserverSuite) SetupTest() {
 	ctx := context.Background()
 	suite.net.Start(ctx)
 
-	stop, err := suite.net.AddObserver(ctx, &testnet.ObserverConfig{
+	stop, err := suite.net.AddObserver(suite.T(), ctx, &testnet.ObserverConfig{
 		ObserverName:            "observer_1",
 		ObserverImage:           "gcr.io/flow-container-registry/observer:latest",
 		AccessName:              "access_1",
@@ -93,20 +110,12 @@ func (suite *ObserverSuite) TestObserverConnection() {
 	t := suite.T()
 
 	// get an observer client
-	observer, err := suite.getClient("0.0.0.0:9000")
+	observer, err := suite.getObserverClient()
 	assert.NoError(t, err)
 
 	// ping the observer while the access container is running
 	_, err = observer.Ping(ctx, &accessproto.PingRequest{})
 	assert.NoError(t, err)
-
-	// stop the upstream access container
-	err = suite.net.StopContainerByName(ctx, "access_1")
-	assert.NoError(t, err)
-
-	// ping the observer when access container is stopped
-	_, err = observer.Ping(ctx, &accessproto.PingRequest{})
-	assert.Error(t, err)
 }
 
 func (suite *ObserverSuite) TestObserverWithoutAccess() {
@@ -115,20 +124,43 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 	t := suite.T()
 
 	// get an observer client
-	observer, err := suite.getClient("0.0.0.0:9000")
+	observer, err := suite.getObserverClient()
 	assert.NoError(t, err)
 
 	// stop the upstream access container
 	err = suite.net.StopContainerByName(ctx, "access_1")
 	assert.NoError(t, err)
 
-	// verify that we receive errors from all rpcs
-	for _, rpc := range suite.getRPCs() {
-		t.Run(rpc.name, func(t *testing.T) {
-			err := rpc.call(ctx, observer)
-			assert.Error(t, err)
-		})
-	}
+	t.Run("HandledByUpstream", func(t *testing.T) {
+		// verify that we receive errors from all rpcs handled upstream
+		for _, rpc := range suite.getRPCs() {
+			if _, local := suite.local[rpc.name]; local {
+				continue
+			}
+			t.Run(rpc.name, func(t *testing.T) {
+				err := rpc.call(ctx, observer)
+				assert.Error(t, err)
+			})
+		}
+	})
+
+	t.Run("HandledByObserver", func(t *testing.T) {
+		// verify that we receive not found errors or no error from all rpcs handled locally
+		for _, rpc := range suite.getRPCs() {
+			if _, local := suite.local[rpc.name]; !local {
+				continue
+			}
+			t.Run(rpc.name, func(t *testing.T) {
+				err := rpc.call(ctx, observer)
+				if err == nil {
+					return
+				}
+				code := status.Code(err)
+				assert.Equal(t, codes.NotFound, code)
+			})
+		}
+	})
+
 }
 
 func (suite *ObserverSuite) TestObserverCompareRPCs() {
@@ -136,14 +168,17 @@ func (suite *ObserverSuite) TestObserverCompareRPCs() {
 	t := suite.T()
 
 	// get an observer and access client
-	observer, err := suite.getClient("0.0.0.0:9000")
+	observer, err := suite.getObserverClient()
 	assert.NoError(t, err)
 
-	access, err := suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
+	access, err := suite.getAccessClient()
 	assert.NoError(t, err)
 
 	// verify that both clients return the same errors
 	for _, rpc := range suite.getRPCs() {
+		if _, local := suite.local[rpc.name]; local {
+			continue
+		}
 		t.Run(rpc.name, func(t *testing.T) {
 			accessErr := rpc.call(ctx, access)
 			observerErr := rpc.call(ctx, observer)
@@ -152,9 +187,17 @@ func (suite *ObserverSuite) TestObserverCompareRPCs() {
 	}
 }
 
+func (suite *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
+	return suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
+}
+
+func (suite *ObserverSuite) getObserverClient() (accessproto.AccessAPIClient, error) {
+	return suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.ObserverPorts[testnet.ObserverNodeAPIPort]))
+}
+
 func (suite *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {
 	// helper func to create an access client
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +222,9 @@ func (suite *ObserverSuite) getRPCs() []RPCTest {
 			return err
 		}},
 		{name: "GetBlockHeaderByID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetBlockHeaderByID(ctx, &accessproto.GetBlockHeaderByIDRequest{})
+			_, err := client.GetBlockHeaderByID(ctx, &accessproto.GetBlockHeaderByIDRequest{
+				Id: make([]byte, 32),
+			})
 			return err
 		}},
 		{name: "GetBlockHeaderByHeight", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
@@ -191,7 +236,7 @@ func (suite *ObserverSuite) getRPCs() []RPCTest {
 			return err
 		}},
 		{name: "GetBlockByID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetBlockByID(ctx, &accessproto.GetBlockByIDRequest{})
+			_, err := client.GetBlockByID(ctx, &accessproto.GetBlockByIDRequest{Id: make([]byte, 32)})
 			return err
 		}},
 		{name: "GetBlockByHeight", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
@@ -199,7 +244,7 @@ func (suite *ObserverSuite) getRPCs() []RPCTest {
 			return err
 		}},
 		{name: "GetCollectionByID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetCollectionByID(ctx, &accessproto.GetCollectionByIDRequest{})
+			_, err := client.GetCollectionByID(ctx, &accessproto.GetCollectionByIDRequest{Id: make([]byte, 32)})
 			return err
 		}},
 		{name: "SendTransaction", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {

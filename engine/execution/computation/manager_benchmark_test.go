@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -15,13 +17,21 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/executiondatasync/tracker"
+	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	state_synchronization "github.com/onflow/flow-go/module/state_synchronization/mock"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -77,7 +87,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 	tracer, err := trace.NewTracer(zerolog.Nop(), "", "", 4)
 	require.NoError(b, err)
 
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{}))
 
 	chain := flow.Emulator.Chain()
 	execCtx := fvm.NewContext(
@@ -101,26 +111,32 @@ func BenchmarkComputeBlock(b *testing.B) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
+
+	prov := exedataprovider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
 	// TODO(rbtz): add real ledger
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), tracer, zerolog.Nop(), committer.NewNoopViewCommitter())
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), tracer, zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(b, err)
 
 	programsCache, err := NewProgramsCache(1000)
 	require.NoError(b, err)
-
-	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
-
-	eCache := new(state_synchronization.ExecutionDataCIDCache)
-	eCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("state_synchronization.BlobTree"))
 
 	engine := &Manager{
 		blockComputer: blockComputer,
 		tracer:        tracer,
 		me:            me,
 		programsCache: programsCache,
-		eds:           eds,
-		edCache:       eCache,
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -132,39 +148,39 @@ func BenchmarkComputeBlock(b *testing.B) {
 		Header:  &flow.Header{},
 		Payload: &flow.Payload{},
 	}
-	for _, cols := range []int{1, 4, 16} {
-		for _, txes := range []int{16, 32, 64, 128} {
-			cols := cols
-			txes := txes
-			b.Run(fmt.Sprintf("%d/cols/%d/txes", cols, txes), func(b *testing.B) {
-				b.StopTimer()
-				b.ResetTimer()
 
-				var elapsed time.Duration
-				for i := 0; i < b.N; i++ {
-					executableBlock := createBlock(b, parentBlock, accs, cols, txes)
-					parentBlock = executableBlock.Block
+	const (
+		cols = 16
+		txes = 128
+	)
 
-					b.StartTimer()
-					start := time.Now()
-					res, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
-					elapsed += time.Since(start)
-					b.StopTimer()
+	b.Run(fmt.Sprintf("%d/cols/%d/txes", cols, txes), func(b *testing.B) {
+		b.StopTimer()
+		b.ResetTimer()
 
-					require.NoError(b, err)
-					for j, r := range res.TransactionResults {
-						// skip system transactions
-						if j >= cols*txes {
-							break
-						}
-						require.Emptyf(b, r.ErrorMessage, "Transaction %d failed", j)
-					}
+		var elapsed time.Duration
+		for i := 0; i < b.N; i++ {
+			executableBlock := createBlock(b, parentBlock, accs, cols, txes)
+			parentBlock = executableBlock.Block
+
+			b.StartTimer()
+			start := time.Now()
+			res, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+			elapsed += time.Since(start)
+			b.StopTimer()
+
+			require.NoError(b, err)
+			for j, r := range res.TransactionResults {
+				// skip system transactions
+				if j >= cols*txes {
+					break
 				}
-				totalTxes := int64(cols) * int64(txes) * int64(b.N)
-				b.ReportMetric(float64(elapsed.Nanoseconds()/totalTxes/int64(time.Microsecond)), "us/tx")
-			})
+				require.Emptyf(b, r.ErrorMessage, "Transaction %d failed", j)
+			}
 		}
-	}
+		totalTxes := int64(cols) * int64(txes) * int64(b.N)
+		b.ReportMetric(float64(elapsed.Nanoseconds()/totalTxes/int64(time.Microsecond)), "us/tx")
+	})
 }
 
 func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colNum int, txNum int) *entity.ExecutableBlock {
