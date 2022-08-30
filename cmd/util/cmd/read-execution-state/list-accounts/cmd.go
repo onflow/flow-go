@@ -12,6 +12,7 @@ import (
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -98,7 +99,7 @@ func run(*cobra.Command, []string) {
 	})
 
 	stTxn := state.NewStateTransaction(ldg, state.DefaultParameters())
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 	finalGenerator := state.NewStateBoundAddressGenerator(stTxn, chain)
 	finalState := finalGenerator.Bytes()
 

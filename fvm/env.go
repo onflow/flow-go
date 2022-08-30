@@ -85,7 +85,7 @@ type commonEnv struct {
 	sth         *state.StateHolder
 	vm          *VirtualMachine
 	programs    *handler.ProgramsHandler
-	accounts    state.Accounts
+	accounts    environment.Accounts
 	accountKeys *handler.AccountKeyHandler
 	contracts   *handler.ContractHandler
 

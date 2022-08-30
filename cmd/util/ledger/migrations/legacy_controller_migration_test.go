@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/environment"
 	fvmstate "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -57,13 +58,13 @@ func TestLegacyControllerMigration(t *testing.T) {
 			createPayloadKeyWithLegacyController(address1, KeyStorageUsed, false),
 			utils.Uint64ToBinary(1)),
 		*ledger.NewPayload(
-			createPayloadKeyWithLegacyController(address1, fvmstate.ContractKey("CoreContract"), true),
+			createPayloadKeyWithLegacyController(address1, environment.ContractKey("CoreContract"), true),
 			utils.Uint64ToBinary(2)),
 		*ledger.NewPayload(
 			createPayloadKeyWithLegacyController(address1, fvmstate.KeyContractNames, true),
 			utils.Uint64ToBinary(3)),
 		*ledger.NewPayload(
-			createPayloadKeyWithLegacyController(address2, fvmstate.KeyPublicKey(1), true),
+			createPayloadKeyWithLegacyController(address2, environment.KeyPublicKey(1), true),
 			utils.Uint64ToBinary(4)),
 		*ledger.NewPayload(
 			createPayloadKeyWithLegacyController(address2, KeyPublicKeyCount, true),
@@ -72,9 +73,9 @@ func TestLegacyControllerMigration(t *testing.T) {
 
 	expectedKeys := []ledger.Key{
 		createMigratedPayloadKey(address1, KeyStorageUsed),
-		createMigratedPayloadKey(address1, fvmstate.ContractKey("CoreContract")),
+		createMigratedPayloadKey(address1, environment.ContractKey("CoreContract")),
 		createMigratedPayloadKey(address1, fvmstate.KeyContractNames),
-		createMigratedPayloadKey(address2, fvmstate.KeyPublicKey(1)),
+		createMigratedPayloadKey(address2, environment.KeyPublicKey(1)),
 		createMigratedPayloadKey(address2, KeyPublicKeyCount),
 	}
 
