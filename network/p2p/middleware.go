@@ -88,7 +88,7 @@ type Middleware struct {
 	validators                   []network.MessageValidator
 	peerManagerFactory           PeerManagerFactoryFunc
 	peerManager                  *PeerManager
-	peerManagerFilters           PeerFilters
+	peerManagerFilters           []PeerFilter
 	unicastMessageTimeout        time.Duration
 	idTranslator                 IDTranslator
 	previousProtocolStatePeers   []peer.AddrInfo
@@ -122,7 +122,7 @@ func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 
 // WithPeerManagerFilters sets a list of p2p.PeerFilter funcs that are used to
 // filter out peers provided by the peer manager PeersProvider.
-func WithPeerManagerFilters(peerManagerFilters PeerFilters) MiddlewareOption {
+func WithPeerManagerFilters(peerManagerFilters []PeerFilter) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.peerManagerFilters = peerManagerFilters
 	}
@@ -219,6 +219,7 @@ func NewMiddleware(
 
 	mw.Component = cm
 
+	// set unicast rate limited peer func to no-op
 	if mw.onUnicastRateLimitedPeerFunc == nil {
 		mw.onUnicastRateLimitedPeerFunc = func(peerID peer.ID) {}
 	}
@@ -362,9 +363,29 @@ func (m *Middleware) start(ctx context.Context) error {
 }
 
 // topologyPeers callback used by the peer manager to get the list of peer ID's
-// which this node should be directly connected to as peers.
+// which this node should be directly connected to as peers. The peer ID list
+// returned will be filtered through any configured m.peerManagerFilters.
 func (m *Middleware) topologyPeers() peer.IDSlice {
-	return m.peerIDs(m.ov.Topology().NodeIDs())
+	peerIDs := make([]peer.ID, 0)
+	for _, id := range m.peerIDs(m.ov.Topology().NodeIDs()) {
+		peerAllowed := true
+		for _, filter := range m.peerManagerFilters {
+			if err := filter(id); err != nil {
+				m.log.Debug().
+					Str("peer_id", id.Pretty()).
+					Msg("filtering topology peer")
+
+				peerAllowed = false
+				break
+			}
+		}
+
+		if peerAllowed {
+			peerIDs = append(peerIDs, id)
+		}
+	}
+
+	return peerIDs
 }
 
 // stop will end the execution of the middleware and wait for it to end.
@@ -501,6 +522,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// check if unicast stream creation is rate limited for peer
 	if !m.unicastStreamAllowed(remotePeer) {
+		log.Warn().Msg(UnicastStreamRateLimited)
 		m.onUnicastRateLimitedPeerFunc(remotePeer)
 		return
 	}

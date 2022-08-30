@@ -20,14 +20,14 @@ var _ connmgr.ConnectionGater = (*ConnGater)(nil)
 type ConnGaterOption func(*ConnGater)
 
 // WithOnInterceptPeerDialFilters sets peer filters for outbound connections.
-func WithOnInterceptPeerDialFilters(filters []PeerFilter) ConnGaterOption {
+func WithOnInterceptPeerDialFilters(filters ...PeerFilter) ConnGaterOption {
 	return func(c *ConnGater) {
 		c.onInterceptPeerDialFilters = filters
 	}
 }
 
 // WithOnInterceptSecuredFilters sets peer filters for inbound secured connections.
-func WithOnInterceptSecuredFilters(filters []PeerFilter) ConnGaterOption {
+func WithOnInterceptSecuredFilters(filters ...PeerFilter) ConnGaterOption {
 	return func(c *ConnGater) {
 		c.onInterceptSecuredFilters = filters
 	}

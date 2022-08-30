@@ -283,25 +283,21 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
 	}
 
-	idProviderPeerFilter := func(pid peer.ID) bool {
-		_, found := fnb.IdentityProvider.ByPeerID(pid)
-		return found
-	}
-
-	connGaterPeerDialFilters := p2p.PeerFilters{idProviderPeerFilter}
-	connGaterInterceptSecureFilters := p2p.PeerFilters{idProviderPeerFilter}
-
-	peerManagerFilters := p2p.PeerFilters{}
+	connGaterPeerDialFilters := make([]p2p.PeerFilter, 0)
+	connGaterInterceptSecureFilters := make([]p2p.PeerFilter, 0)
+	peerManagerFilters := make([]p2p.PeerFilter, 0)
 
 	// setup unicast stream rate limiter
 	if fnb.BaseConfig.UnicastStreamCreationRateLimit > 0 && fnb.BaseConfig.UnicastStreamCreationBurstLimit > 0 {
 		unicastStreamsRateLimiter := unicast.NewStreamsRateLimiter(rate.Limit(fnb.BaseConfig.UnicastStreamCreationRateLimit), fnb.BaseConfig.UnicastStreamCreationBurstLimit)
 		mwOpts = append(mwOpts, p2p.WithUnicastStreamRateLimiter(unicastStreamsRateLimiter))
 
+		// avoid connection gating and pruning during dry run
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
+			f := rateLimiterPeerFilter(unicastStreamsRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
-			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, unicastStreamsRateLimiter.IsRateLimited)
-			peerManagerFilters = append(peerManagerFilters, unicastStreamsRateLimiter.IsRateLimited)
+			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, f)
+			peerManagerFilters = append(peerManagerFilters, f)
 		}
 	}
 
@@ -310,10 +306,12 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		unicastBandwidthRateLimiter := unicast.NewBandWidthRateLimiter(rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit), fnb.BaseConfig.UnicastBandwidthBurstLimit)
 		mwOpts = append(mwOpts, p2p.WithUnicastStreamRateLimiter(unicastBandwidthRateLimiter))
 
+		// avoid connection gating and pruning during dry run
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
+			f := rateLimiterPeerFilter(unicastBandwidthRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
-			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, unicastBandwidthRateLimiter.IsRateLimited)
-			peerManagerFilters = append(peerManagerFilters, unicastBandwidthRateLimiter.IsRateLimited)
+			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, f)
+			peerManagerFilters = append(peerManagerFilters, f)
 		}
 	}
 
@@ -323,11 +321,11 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.NetworkKey,
 		fnb.SporkID,
 		fnb.IdentityProvider,
-		connGaterPeerDialFilters,
-		connGaterInterceptSecureFilters,
 		fnb.Metrics.Network,
 		fnb.Resolver,
 		fnb.BaseConfig.NodeRole,
+		connGaterPeerDialFilters,
+		connGaterInterceptSecureFilters,
 	)
 
 	peerManagerFactory := p2p.PeerManagerFactory(fnb.NetworkConnectionPruning, fnb.PeerUpdateInterval)
@@ -337,7 +335,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
 	)
 
-	// add peer manager filters to middle ware via options if any are available
+	// peerManagerFilters are used by the peerManager via the middleware to filter peers from the topology.
 	if len(peerManagerFilters) > 0 {
 		mwOpts = append(mwOpts, p2p.WithPeerManagerFilters(peerManagerFilters))
 	}
@@ -1536,4 +1534,14 @@ func loadSecretsEncryptionKey(dir string, myID flow.Identifier) ([]byte, error) 
 		return nil, fmt.Errorf("could not read secrets db encryption key (path=%s): %w", path, err)
 	}
 	return data, nil
+}
+
+func rateLimiterPeerFilter(rateLimiter unicast.RateLimiter) p2p.PeerFilter {
+	return func(p peer.ID) error {
+		if rateLimiter.IsRateLimited(p) {
+			return fmt.Errorf("peer is rate limited")
+		}
+
+		return nil
+	}
 }

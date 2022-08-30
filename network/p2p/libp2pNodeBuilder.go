@@ -45,6 +45,8 @@ func DefaultLibP2PNodeFactory(
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
 	role string,
+	onInterceptPeerDialFilters,
+	onInterceptSecuredFilters []PeerFilter,
 ) LibP2PFactoryFunc {
 
 	return func(ctx context.Context) (*Node, error) {
@@ -52,9 +54,11 @@ func DefaultLibP2PNodeFactory(
 
 		// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
 		peerFilter := notEjectedPeerFilter(idProvider)
+		peerFilters := []PeerFilter{peerFilter}
+
 		connGater := NewConnGater(log,
-			WithOnInterceptPeerDialFilters([]PeerFilter{peerFilter}),
-			WithOnInterceptSecuredFilters([]PeerFilter{peerFilter}),
+			WithOnInterceptPeerDialFilters(append(peerFilters, onInterceptPeerDialFilters...)...),
+			WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)...),
 		)
 
 		builder := NewNodeBuilder(log, address, flowKey, sporkId).
