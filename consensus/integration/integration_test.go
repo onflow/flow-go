@@ -72,7 +72,7 @@ func Test5Nodes(t *testing.T) {
 
 	runNodes(signalerCtx, nodes)
 
-	unittest.RequireCloseBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
+	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
 
 	header, err := nodes[0].state.Final().Head()
 	require.NoError(t, err)
@@ -81,6 +81,12 @@ func Test5Nodes(t *testing.T) {
 	require.Equal(t, uint64(0), header.View)
 
 	allViews := allFinalizedViews(t, nodes[1:])
+	if t.Failed() {
+		for i, views := range allViews {
+			t.Log("node", i, "final views: ", views)
+		}
+	}
+
 	assertSafety(t, allViews)
 
 	stopNodes(t, cancel, nodes)
