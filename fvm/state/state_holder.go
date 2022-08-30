@@ -331,8 +331,11 @@ func (s *StateHolder) DisableAllLimitEnforcements() {
 	s.enforceLimits = false
 }
 
-// WithAllLimitsDisabled runs f with limits disabled
-func (s *StateHolder) WithAllLimitsDisabled(f func()) {
+// RunWithAllLimitsDisabled runs f with limits disabled
+func (s *StateHolder) RunWithAllLimitsDisabled(f func()) {
+	if f == nil {
+		return
+	}
 	current := s.enforceLimits
 	s.enforceLimits = false
 	f()

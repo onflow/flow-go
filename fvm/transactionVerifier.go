@@ -79,10 +79,10 @@ func (v *TransactionVerifier) verifyTransaction(
 
 	// TODO(Janez): move disabling limits out of the verifier. Verifier should not be metered anyway.
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
-	
+
 	// check accounts uses the state, but if the limits are too low, this might fail.
 	// we shouldn't fail here if the limits are too low as fee deduction won't happen
-	sth.WithAllLimitsDisabled(
+	sth.RunWithAllLimitsDisabled(
 		func() {
 			err = v.checkAccountsAreNotFrozen(tx, accounts)
 		},
@@ -95,18 +95,9 @@ func (v *TransactionVerifier) verifyTransaction(
 		return nil
 	}
 
-	// Skip checking limits when getting the public keys
-	getPublicKey := func(address flow.Address, keyIndex uint64) (pub flow.AccountPublicKey, err error) {
-		sth.WithAllLimitsDisabled(
-			func() {
-				pub, err = accounts.GetPublicKey(address, keyIndex)
-			},
-		)
-		return
-	}
-
 	payloadWeights, proposalKeyVerifiedInPayload, err = v.verifyAccountSignatures(
-		getPublicKey,
+		sth,
+		accounts,
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
 		tx.ProposalKey,
@@ -120,7 +111,8 @@ func (v *TransactionVerifier) verifyTransaction(
 	var proposalKeyVerifiedInEnvelope bool
 
 	envelopeWeights, proposalKeyVerifiedInEnvelope, err = v.verifyAccountSignatures(
-		getPublicKey,
+		sth,
+		accounts,
 		tx.EnvelopeSignatures,
 		tx.EnvelopeMessage(),
 		tx.ProposalKey,
@@ -160,8 +152,19 @@ func (v *TransactionVerifier) verifyTransaction(
 	return nil
 }
 
+// getPublicKey skips checking limits when getting the public key
+func (v *TransactionVerifier) getPublicKey(sth *state.StateHolder, accounts state.Accounts, address flow.Address, keyIndex uint64) (pub flow.AccountPublicKey, err error) {
+	sth.RunWithAllLimitsDisabled(
+		func() {
+			pub, err = accounts.GetPublicKey(address, keyIndex)
+		},
+	)
+	return
+}
+
 func (v *TransactionVerifier) verifyAccountSignatures(
-	getPublicKey func(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error),
+	sth *state.StateHolder,
+	accounts state.Accounts,
 	signatures []flow.TransactionSignature,
 	message []byte,
 	proposalKey flow.ProposalKey,
@@ -175,7 +178,7 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 
 	for _, txSig := range signatures {
 
-		accountKey, err := getPublicKey(txSig.Address, txSig.KeyIndex)
+		accountKey, err := v.getPublicKey(sth, accounts, txSig.Address, txSig.KeyIndex)
 		if err != nil {
 			return nil, false, errorBuilder(txSig, err)
 		}
@@ -266,7 +269,7 @@ func (v *TransactionVerifier) checkSignatureDuplications(tx *flow.TransactionBod
 	return nil
 }
 
-func (c *TransactionVerifier) checkAccountsAreNotFrozen(
+func (v *TransactionVerifier) checkAccountsAreNotFrozen(
 	tx *flow.TransactionBody,
 	accounts state.Accounts,
 ) error {

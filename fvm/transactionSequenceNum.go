@@ -44,7 +44,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	defer func() {
 		// Skip checking limits when merging the public key sequence number
-		sth.WithAllLimitsDisabled(func() {
+		sth.RunWithAllLimitsDisabled(func() {
 			mergeError := sth.Commit(nestedTxnId)
 			if mergeError != nil {
 				panic(mergeError)
@@ -61,7 +61,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 
 	// Skip checking limits when getting the public key
-	sth.WithAllLimitsDisabled(func() {
+	sth.RunWithAllLimitsDisabled(func() {
 		accountKey, err = accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	})
 	if err != nil {
@@ -85,13 +85,13 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	accountKey.SeqNumber++
 
 	// Skip checking limits when setting the public key sequence number
-	sth.WithAllLimitsDisabled(func() {
+	sth.RunWithAllLimitsDisabled(func() {
 		_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	})
 	if err != nil {
 		// NOTE: we need to disable limits during restart or else restart may
 		// fail on merging.
-		sth.WithAllLimitsDisabled(func() { _ = sth.RestartNestedTransaction(nestedTxnId) })
+		sth.RunWithAllLimitsDisabled(func() { _ = sth.RestartNestedTransaction(nestedTxnId) })
 		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
 
