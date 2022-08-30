@@ -118,9 +118,11 @@ func TestContractInvoker(t *testing.T) {
 					invokeContractFunction: tc.contractFunction,
 				},
 			}
+			vmCtx := fvm.NewContext()
 
 			env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
 			env.On("VM").Return(vm)
+			env.On("Context").Return(&vmCtx)
 
 			value, err := invoker.Invoke(env)
 
