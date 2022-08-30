@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/messages"
 )
 
@@ -14,4 +15,6 @@ type ProposalProvider interface {
 // It is used to ingest blocks received through other means than the HotStuff happy path,
 // like the block synchronization engine.
 type ComplianceProcessor interface {
+	// IngestBlock ingests and queues the block for later processing by the compliance layer.
+	IngestBlock(block *events.SyncedBlock)
 }

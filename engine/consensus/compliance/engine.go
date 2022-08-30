@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
@@ -47,7 +48,7 @@ type Engine struct {
 	payloads storage.Payloads
 	tracer   module.Tracer
 	state    protocol.State
-	prov     network.Engine // TODO replace Engine with interface
+	prov     consensus.ProposalProvider
 	core     *Core
 	// queues for inbound messsages
 	pendingBlocks   engine.MessageStore
@@ -66,14 +67,15 @@ type Engine struct {
 	done  <-chan struct{}
 }
 
-var _ hotstuff.Communicator = (*Engine)(nil)
 var _ network.MessageProcessor = (*Engine)(nil)
+var _ hotstuff.Communicator = (*Engine)(nil)
+var _ consensus.ComplianceProcessor = (*Engine)(nil)
 
 func NewEngine(
 	log zerolog.Logger,
 	net network.Network,
 	me module.Local,
-	prov network.Engine,
+	prov consensus.ProposalProvider,
 	core *Core) (*Engine, error) {
 
 	// FIFO queue for block proposals
@@ -235,6 +237,25 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.done
+}
+
+// IngestBlock ingests and queues the block for later processing by the compliance layer.
+func (e *Engine) IngestBlock(block *events.SyncedBlock) {
+	stored := e.pendingBlocks.Put(&engine.Message{
+		OriginID: block.OriginID,
+		Payload: &messages.BlockProposal{
+			Payload: block.Block.Payload,
+			Header:  block.Block.Header,
+		},
+	})
+	// log a warning if we drop a block due to the compliance engine message store being full
+	if !stored {
+		e.log.Warn().
+			Hex("block_id", logging.Entity(block.Block)).
+			Uint64("block_view", block.Block.Header.View).
+			Uint64("block_height", block.Block.Header.Height).
+			Msg("dropping synced block")
+	}
 }
 
 // Process processes the given event from the node with the given origin ID in
@@ -483,8 +504,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		log.Info().Msg("block proposal broadcasted")
 
 		// submit the proposal to the provider engine to forward it to other node roles
-		// TODO remove Engine API use
-		e.prov.SubmitLocal(proposal)
+		e.prov.ProvideProposal(proposal)
 	}()
 
 	return nil
@@ -509,6 +529,7 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
 func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
+
 	finalizationNotifier := e.finalizationEventsNotifier.Channel()
 	for {
 		select {

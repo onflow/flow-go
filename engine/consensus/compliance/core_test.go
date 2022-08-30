@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	consensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	realModule "github.com/onflow/flow-go/module"
@@ -60,7 +61,7 @@ type ComplianceCoreSuite struct {
 	snapshot          *protocol.Snapshot
 	con               *mocknetwork.Conduit
 	net               *mocknetwork.Network
-	prov              *mocknetwork.Engine
+	prov              *consensus.ProposalProvider
 	pending           *module.PendingBlockBuffer
 	hotstuff          *module.HotStuff
 	sync              *module.BlockRequester
@@ -194,8 +195,8 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	)
 
 	// set up the provider engine
-	cs.prov = &mocknetwork.Engine{}
-	cs.prov.On("SubmitLocal", mock.Anything).Return()
+	cs.prov = &consensus.ProposalProvider{}
+	cs.prov.On("ProvideProposal", mock.Anything).Return()
 
 	// set up pending module mock
 	cs.pending = &module.PendingBlockBuffer{}
@@ -222,12 +223,6 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.pending.On("Size").Return(uint(0))
 	cs.pending.On("PruneByView", mock.Anything).Return()
 
-	closed := func() <-chan struct{} {
-		channel := make(chan struct{})
-		close(channel)
-		return channel
-	}()
-
 	// set up hotstuff module mock
 	cs.hotstuff = module.NewHotStuff(cs.T())
 
@@ -237,7 +232,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// set up synchronization module mock
 	cs.sync = &module.BlockRequester{}
 	cs.sync.On("RequestBlock", mock.Anything, mock.Anything).Return(nil)
-	cs.sync.On("Done", mock.Anything).Return(closed)
+	cs.sync.On("Done", mock.Anything).Return(unittest.ClosedChannel())
 
 	// set up no-op metrics mock
 	cs.metrics = metrics.NewNoopCollector()
