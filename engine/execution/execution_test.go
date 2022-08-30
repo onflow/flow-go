@@ -66,7 +66,6 @@ func TestExecutionFlow(t *testing.T) {
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21, chainID)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	exeNode.Ready(ctx)
 	unittest.RequireReturnsBefore(t, func() {
 		exeNode.Ready(ctx)
 	}, 1*time.Second, "could not start execution node on time")
@@ -535,7 +534,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21, chainID)
 	ctx, cancel := context.WithCancel(context.Background())
-	exeNode.Ready(ctx)
+
 	unittest.RequireReturnsBefore(t, func() {
 		exeNode.Ready(ctx)
 	}, 1*time.Second, "could not start execution node on time")
