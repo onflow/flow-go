@@ -70,6 +70,7 @@ type commonEnv struct {
 	*environment.CryptoLibrary
 	*environment.BlockInfo
 	environment.TransactionInfo
+	environment.EventEmitter
 
 	// TODO(patrick): rm
 	ctx Context
