@@ -47,7 +47,7 @@ type Engine struct {
 	payloads storage.Payloads
 	tracer   module.Tracer
 	state    protocol.State
-	prov     network.Engine
+	prov     network.Engine // TODO replace Engine with interface
 	core     *Core
 	// queues for inbound messsages
 	pendingBlocks   engine.MessageStore

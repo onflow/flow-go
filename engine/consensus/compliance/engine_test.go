@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -200,20 +199,6 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 	cs.voteAggregator.AssertExpectations(cs.T())
 }
 
-// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
-// was submitted from network layer.
-// TODO remove - no longer relevant
-func (cs *ComplianceSuite) TestProcessUnsupportedMessageType() {
-	invalidEvent := uint64(42)
-	err := cs.engine.Process("ch", unittest.IdentifierFixture(), invalidEvent)
-	// shouldn't result in error since byzantine inputs are expected
-	require.NoError(cs.T(), err)
-	// in case of local processing error cannot be consumed since all inputs are trusted
-	err = cs.engine.ProcessLocal(invalidEvent)
-	require.Error(cs.T(), err)
-	require.True(cs.T(), engine.IsIncompatibleInputTypeError(err))
-}
-
 // TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
 // Tests the whole processing pipeline.
 func (cs *ComplianceSuite) TestOnFinalizedBlock() {
@@ -230,3 +215,6 @@ func (cs *ComplianceSuite) TestOnFinalizedBlock() {
 			return cs.pending.AssertCalled(cs.T(), "PruneByView", finalizedBlock.View)
 		}, time.Second, time.Millisecond*20)
 }
+
+// TestLifecycle tests starting and stopping the engine.
+func (cs *ComplianceSuite) TestLifecycle() {}

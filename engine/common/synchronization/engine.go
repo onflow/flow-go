@@ -61,7 +61,7 @@ func New(
 	net network.Network,
 	me module.Local,
 	blocks storage.Blocks,
-	comp network.Engine,
+	comp network.Engine, // TODO replace Engine with interface
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
 	participantsProvider identifier.IdentifierProvider,
