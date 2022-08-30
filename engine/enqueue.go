@@ -15,9 +15,13 @@ type Message struct {
 }
 
 // MessageStore is the interface to abstract how messages are buffered in memory before
-// being handled by the engine
+// being handled by the engine.
 type MessageStore interface {
+	// Put adds the message to the message store. It returns true if the message
+	// is stored, and false if it is dropped.
 	Put(*Message) bool
+	// Get retrieves the next message from the message store. It returns true if
+	// a message is retrieved, and false if the message store is empty.
 	Get() (*Message, bool)
 }
 
