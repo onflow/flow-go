@@ -27,7 +27,6 @@ var _ runtime.Interface = &TransactionEnv{}
 type TransactionEnv struct {
 	commonEnv
 
-	eventHandler     *handler.EventHandler
 	addressGenerator flow.AddressGenerator
 	tx               *flow.TransactionBody
 	txIndex          uint32
@@ -44,14 +43,11 @@ func NewTransactionEnvironment(
 	traceSpan otelTrace.Span,
 ) *TransactionEnv {
 
+	txID := tx.ID()
 	accounts := state.NewAccounts(sth)
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	// TODO set the flags on context
-	eventHandler := handler.NewEventHandler(ctx.Chain,
-		ctx.ServiceEventCollectionEnabled,
-		ctx.EventCollectionByteSizeLimit,
-	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	tracer := environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
 	meter := environment.NewMeter(sth)
@@ -83,6 +79,16 @@ func NewTransactionEnvironment(
 				tx.Authorizers,
 				ctx.Chain.ServiceAddress(),
 			),
+			EventEmitter: environment.NewEventEmitter(
+				tracer,
+				meter,
+				ctx.Chain,
+				txID,
+				txIndex,
+				tx.Payer,
+				ctx.ServiceEventCollectionEnabled,
+				ctx.EventCollectionByteSizeLimit,
+			),
 			ctx:            ctx,
 			sth:            sth,
 			vm:             vm,
@@ -93,10 +99,9 @@ func NewTransactionEnvironment(
 		},
 
 		addressGenerator: generator,
-		eventHandler:     eventHandler,
 		tx:               tx,
 		txIndex:          txIndex,
-		txID:             tx.ID(),
+		txID:             txID,
 	}
 
 	// TODO(patrick): rm this hack
@@ -221,25 +226,6 @@ func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code [
 		e,
 		address,
 		string(code[:]))
-}
-
-func (e *TransactionEnv) EmitEvent(event cadence.Event) error {
-	defer e.StartExtensiveTracingSpanFromRoot(trace.FVMEnvEmitEvent).End()
-
-	err := e.MeterComputation(meter.ComputationKindEmitEvent, 1)
-	if err != nil {
-		return fmt.Errorf("emit event failed: %w", err)
-	}
-
-	return e.eventHandler.EmitEvent(event, e.txID, e.txIndex, e.tx.Payer)
-}
-
-func (e *TransactionEnv) Events() []flow.Event {
-	return e.eventHandler.Events()
-}
-
-func (e *TransactionEnv) ServiceEvents() []flow.Event {
-	return e.eventHandler.ServiceEvents()
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
