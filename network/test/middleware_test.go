@@ -333,7 +333,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	// create message with about 400bytes (300 random bytes + 100bytes message info)
 	b := make([]byte, 300)
-	for i, _ := range b {
+	for i := range b {
 		b[i] = byte('X')
 	}
 
