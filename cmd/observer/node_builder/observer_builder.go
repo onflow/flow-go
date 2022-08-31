@@ -1003,9 +1003,13 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		// build the rpc engine
-		engineBuilder.WithNewHandler(proxy)
-		engineBuilder.WithLegacy()
-		builder.RpcEng = engineBuilder.Build()
+		builder.RpcEng, err = engineBuilder.
+			WithNewHandler(proxy).
+			WithLegacy().
+			Build()
+		if err != nil {
+			return nil, err
+		}
 		return builder.RpcEng, nil
 	})
 }
