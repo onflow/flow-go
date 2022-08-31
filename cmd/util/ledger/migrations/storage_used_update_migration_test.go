@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/environment"
 	state2 "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 
@@ -23,7 +24,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 	address1 := flow.HexToAddress("0x1")
 
 	t.Run("fix storage used", func(t *testing.T) {
-		status := state2.NewAccountStatus()
+		status := environment.NewAccountStatus()
 		status.SetStorageUsed(1)
 		payload := []ledger.Payload{
 			// TODO (ramtin) add more registers
@@ -35,7 +36,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		migratedPayload, err := mig.Migrate(payload)
 		require.NoError(t, err)
 
-		migratedStatus, err := state2.AccountStatusFromBytes(migratedPayload[0].Value())
+		migratedStatus, err := environment.AccountStatusFromBytes(migratedPayload[0].Value())
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
@@ -43,7 +44,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 	})
 
 	t.Run("fix storage used if used to high", func(t *testing.T) {
-		status := state2.NewAccountStatus()
+		status := environment.NewAccountStatus()
 		status.SetStorageUsed(10000)
 		payload := []ledger.Payload{
 			*ledger.NewPayload(
@@ -54,7 +55,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		migratedPayload, err := mig.Migrate(payload)
 		require.NoError(t, err)
 
-		migratedStatus, err := state2.AccountStatusFromBytes(migratedPayload[0].Value())
+		migratedStatus, err := environment.AccountStatusFromBytes(migratedPayload[0].Value())
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
@@ -62,7 +63,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 	})
 
 	t.Run("do not fix storage used if storage used ok", func(t *testing.T) {
-		status := state2.NewAccountStatus()
+		status := environment.NewAccountStatus()
 		status.SetStorageUsed(40)
 		payload := []ledger.Payload{
 			*ledger.NewPayload(
@@ -73,7 +74,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		migratedPayload, err := mig.Migrate(payload)
 		require.NoError(t, err)
 
-		migratedStatus, err := state2.AccountStatusFromBytes(migratedPayload[0].Value())
+		migratedStatus, err := environment.AccountStatusFromBytes(migratedPayload[0].Value())
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))

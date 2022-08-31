@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -127,7 +128,7 @@ type balanceProcessor struct {
 	balanceScript []byte
 	momentsScript []byte
 
-	accounts state.Accounts
+	accounts environment.Accounts
 
 	rwa        ReportWriter
 	rwc        ReportWriter
@@ -148,7 +149,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		v,
 		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
 	)
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 
 	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, prog)
 

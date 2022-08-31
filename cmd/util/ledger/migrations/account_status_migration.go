@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/environment"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 )
@@ -34,27 +35,27 @@ const (
 // find any account with frozen flags.
 type AccountStatusMigration struct {
 	logger    zerolog.Logger
-	statuses  map[string]*fvmState.AccountStatus
+	statuses  map[string]*environment.AccountStatus
 	keyCounts map[string]uint64
 }
 
 func NewAccountStatusMigration(logger zerolog.Logger) *AccountStatusMigration {
 	return &AccountStatusMigration{
 		logger:    logger,
-		statuses:  make(map[string]*fvmState.AccountStatus),
+		statuses:  make(map[string]*environment.AccountStatus),
 		keyCounts: make(map[string]uint64),
 	}
 }
 
-func (as *AccountStatusMigration) getOrInitStatus(owner []byte) *fvmState.AccountStatus {
+func (as *AccountStatusMigration) getOrInitStatus(owner []byte) *environment.AccountStatus {
 	st, exist := as.statuses[string(owner)]
 	if !exist {
-		return fvmState.NewAccountStatus()
+		return environment.NewAccountStatus()
 	}
 	return st
 }
 
-func (as *AccountStatusMigration) setStatus(owner []byte, st *fvmState.AccountStatus) {
+func (as *AccountStatusMigration) setStatus(owner []byte, st *environment.AccountStatus) {
 	as.statuses[string(owner)] = st
 }
 
