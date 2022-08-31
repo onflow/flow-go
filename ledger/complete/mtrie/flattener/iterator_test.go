@@ -26,6 +26,32 @@ func TestEmptyTrie(t *testing.T) {
 	require.True(t, nil == itr.Value())
 }
 
+func TestTrieWithOneNode(t *testing.T) {
+	emptyTrie := trie.NewEmptyMTrie()
+
+	// key: 0000...
+	p1 := testutils.PathByUint8(1)
+	v1 := testutils.LightPayload8('A', 'a')
+
+	paths := []ledger.Path{p1}
+	payloads := []ledger.Payload{*v1}
+
+	testTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+	require.NoError(t, err)
+
+	itr := flattener.NewNodeIterator(testTrie.RootNode())
+	// by default Value returns nil, even if there is node
+	require.Nil(t, itr.Value())
+
+	// has one node
+	require.Equal(t, true, itr.Next())
+	require.NotNil(t, itr.Value())
+
+	// no more node
+	require.Equal(t, false, itr.Next())
+	require.Nil(t, itr.Value())
+}
+
 func TestPopulatedTrie(t *testing.T) {
 	emptyTrie := trie.NewEmptyMTrie()
 
