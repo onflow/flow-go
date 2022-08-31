@@ -35,6 +35,11 @@ type Environment interface {
 
 	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
 	StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span
+
+	BorrowCadenceRuntime() *ReusableCadenceRuntime
+	ReturnCadenceRuntime(*ReusableCadenceRuntime)
+
+	SetAccountFrozen(address common.Address, frozen bool) error
 }
 
 // TODO(patrick): refactor this into an object
@@ -96,6 +101,14 @@ func (env *commonEnv) Context() *Context {
 
 func (env *commonEnv) VM() *VirtualMachine {
 	return env.vm
+}
+
+func (env *commonEnv) BorrowCadenceRuntime() *ReusableCadenceRuntime {
+	return env.ctx.ReusableCadenceRuntimePool.Borrow(env.fullEnv)
+}
+
+func (env *commonEnv) ReturnCadenceRuntime(reusable *ReusableCadenceRuntime) {
+	env.ctx.ReusableCadenceRuntimePool.Return(reusable)
 }
 
 func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
