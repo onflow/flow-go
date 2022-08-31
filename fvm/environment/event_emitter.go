@@ -7,7 +7,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	metering "github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -91,7 +90,7 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	defer emitter.tracer.StartExtensiveTracingSpanFromRoot(
 		trace.FVMEnvEmitEvent).End()
 
-	err := emitter.meter.MeterComputation(metering.ComputationKindEmitEvent, 1)
+	err := emitter.meter.MeterComputation(ComputationKindEmitEvent, 1)
 	if err != nil {
 		return fmt.Errorf("emit event failed: %w", err)
 	}
