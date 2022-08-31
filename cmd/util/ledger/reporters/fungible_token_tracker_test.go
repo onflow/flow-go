@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
@@ -30,8 +28,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 	chain := flow.Testnet.Chain()
 	view := migrations.NewView(payloads)
 
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(

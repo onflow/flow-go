@@ -185,9 +185,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithEpochConfig(epochConfig),
 		}
 
-		rt := fvm.NewInterpreterRuntime(runtime.Config{})
 		chain := flow.Localnet.Chain()
-		vm := fvm.NewVirtualMachine(rt)
+		vm := fvm.NewVM()
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
 		}
@@ -342,9 +341,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("service events are emitted", func(t *testing.T) {
-		execCtx := fvm.NewContext(fvm.WithServiceEventCollectionEnabled(), fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(), //we don't need to check signatures or sequence numbers
-		))
+		execCtx := fvm.NewContext(
+			fvm.WithServiceEventCollectionEnabled(),
+			fvm.WithTransactionProcessors(
+				//we don't need to check signatures or sequence numbers
+				fvm.NewTransactionInvoker(),
+			),
+		)
 
 		collectionCount := 2
 		transactionsPerCollection := 2
@@ -405,7 +408,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.NewVirtualMachine(emittingRuntime)
+		execCtx = fvm.NewContextFromParent(
+			execCtx,
+			fvm.WithReusableCadenceRuntimePool(
+				fvm.NewCustomReusableCadenceRuntimePool(
+					0,
+					func() runtime.Runtime {
+						return emittingRuntime
+					})))
+
+		vm := fvm.NewVM()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := new(mocktracker.Storage)
@@ -473,7 +485,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.NewVirtualMachine(rt)
+		execCtx = fvm.NewContextFromParent(
+			execCtx,
+			fvm.WithReusableCadenceRuntimePool(
+				fvm.NewCustomReusableCadenceRuntimePool(
+					0,
+					func() runtime.Runtime {
+						return rt
+					})))
+
+		vm := fvm.NewVM()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := new(mocktracker.Storage)
@@ -560,7 +581,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.NewVirtualMachine(rt)
+		execCtx = fvm.NewContextFromParent(
+			execCtx,
+			fvm.WithReusableCadenceRuntimePool(
+				fvm.NewCustomReusableCadenceRuntimePool(
+					0,
+					func() runtime.Runtime {
+						return rt
+					})))
+
+		vm := fvm.NewVM()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := new(mocktracker.Storage)
@@ -726,8 +756,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	address := flow.HexToAddress("1234")
 	fag := &FixedAddressGenerator{Address: address}
 
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 	execCtx := fvm.NewContext()
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
@@ -791,8 +820,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		fvm.WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
-	runtime := fvm.NewInterpreterRuntime(runtime.Config{})
-	vm := fvm.NewVirtualMachine(runtime)
+	vm := fvm.NewVM()
 
 	rag := &RandomAddressGenerator{}
 

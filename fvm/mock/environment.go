@@ -911,22 +911,6 @@ func (_m *Environment) UpdateAccountContractCode(address common.Address, name st
 	return r0
 }
 
-// VM provides a mock function with given fields:
-func (_m *Environment) VM() *fvm.VirtualMachine {
-	ret := _m.Called()
-
-	var r0 *fvm.VirtualMachine
-	if rf, ok := ret.Get(0).(func() *fvm.VirtualMachine); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*fvm.VirtualMachine)
-		}
-	}
-
-	return r0
-}
-
 // ValidatePublicKey provides a mock function with given fields: key
 func (_m *Environment) ValidatePublicKey(key *stdlib.PublicKey) error {
 	ret := _m.Called(key)

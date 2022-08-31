@@ -60,8 +60,7 @@ func (vmt vmTest) withContextOptions(opts ...fvm.Option) vmTest {
 }
 
 func createChainAndVm(chainID flow.ChainID) (flow.Chain, *fvm.VirtualMachine) {
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-	return chainID.Chain(), fvm.NewVirtualMachine(rt)
+	return chainID.Chain(), fvm.NewVM()
 }
 
 func (vmt vmTest) run(
@@ -145,7 +144,7 @@ func (vmt bootstrappedVmTest) run(
 	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
-		f(t, fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{})), vmt.chain, vmt.ctx, vmt.view.NewChild(), vmt.programs.ChildPrograms())
+		f(t, fvm.NewVM(), vmt.chain, vmt.ctx, vmt.view.NewChild(), vmt.programs.ChildPrograms())
 	}
 }
 
