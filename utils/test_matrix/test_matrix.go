@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"golang.org/x/tools/go/packages"
 	"os"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
 const flowPackagePrefix = "github.com/onflow/flow-go/"
@@ -40,7 +41,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	os.WriteFile(testMatrixFile, testMatrixBytes, 0666)
+	err = os.WriteFile(testMatrixFile, testMatrixBytes, 0666)
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println("finished writing test matrix to", testMatrixFile)
 }
 

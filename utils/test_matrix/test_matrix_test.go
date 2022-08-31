@@ -1,7 +1,10 @@
 package main
 
-import "testing"
-import "github.com/stretchr/testify/require"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 // Can't have a const []string so resorting to using a test helper function.
 func getAllFlowPackages() []string {
