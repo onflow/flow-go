@@ -277,8 +277,8 @@ func (tb *TransactionBody) SignEnvelope(
 // and hasher.
 //
 // This function returns an error if:
-//  - crypto.InvalidInputsError if the private key cannot sign with the given hasher
-//  - other error if an unexpected error occurs
+//   - crypto.InvalidInputsError if the private key cannot sign with the given hasher
+//   - other error if an unexpected error occurs
 func (tb *TransactionBody) Sign(
 	message []byte,
 	privateKey crypto.PrivateKey,

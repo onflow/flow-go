@@ -166,9 +166,10 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
 // A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
-// flow.Identity           ---> peer.AddrInfo
-//    |-- Address          --->   |-- []multiaddr.Multiaddr
-//    |-- NetworkPublicKey --->   |-- ID
+//
+//	flow.Identity        ---> peer.AddrInfo
+//	|-- Address          --->   |-- []multiaddr.Multiaddr
+//	|-- NetworkPublicKey --->   |-- ID
 func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	ip, port, key, err := NetworkingInfo(identity)
 	if err != nil {

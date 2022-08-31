@@ -30,7 +30,6 @@ const rootSnapshotBucketURL = "https://storage.googleapis.com/flow-genesis-boots
 // When we perform a spork, the network is instantiated with a new protocol state which
 // in general is inconsistent with the state in the FlowEpoch smart contract. The resetEpoch
 // transaction is the mechanism for re-synchronizing these two states.
-//
 var resetCmd = &cobra.Command{
 	Use:   "reset-tx-args",
 	Short: "Generates `resetEpoch` JSON transaction arguments",
@@ -139,13 +138,12 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 // getStakingAuctionEndView determines the staking auction end view from the
 // epoch based on DKG timing.
 //
-//   Staking  Setup
-//            DKG1  DKG2  DKG3
-// |---------|-----|-----|-----|----
-//           ^     ^     ^-dkgPhase2FinalView
-//           |     `-dkgPhase1FinalView
-//           `-stakingEndView
-//
+//	  Staking  Setup
+//	           DKG1  DKG2  DKG3
+//	|---------|-----|-----|-----|----
+//	          ^     ^     ^-dkgPhase2FinalView
+//	          |     `-dkgPhase1FinalView
+//	          `-stakingEndView
 func getStakingAuctionEndView(epoch protocol.Epoch) (uint64, error) {
 	dkgPhase1FinalView, err := epoch.DKGPhase1FinalView()
 	if err != nil {
