@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
@@ -547,7 +546,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 
 		someHash := updatedTrie.RootNode().LeftChild().Hash() // Hash of left child
 
-		file, err := ioutil.TempFile(dir, "temp-checkpoint")
+		file, err := os.CreateTemp(dir, "temp-checkpoint")
 		filepath := file.Name()
 		require.NoError(t, err)
 
@@ -565,7 +564,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 		})
 
 		t.Run("detects modified data", func(t *testing.T) {
-			b, err := ioutil.ReadFile(filepath)
+			b, err := os.ReadFile(filepath)
 			require.NoError(t, err)
 
 			index := bytes.Index(b, someHash[:])

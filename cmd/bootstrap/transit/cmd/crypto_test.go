@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,7 +16,7 @@ const nodeID string = "000000000000000000000000000000000000000000000000000000000
 func TestEndToEnd(t *testing.T) {
 
 	// Create a temp directory to work as "bootstrap"
-	bootdir, err := ioutil.TempDir("", "bootstrap.*")
+	bootdir, err := os.MkdirTemp("", "bootstrap.*")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +31,7 @@ func TestEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to write dir for random beacon file: %s", err)
 	}
-	err = ioutil.WriteFile(randomBeaconPath, []byte("test data"), 0644)
+	err = os.WriteFile(randomBeaconPath, []byte("test data"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write random beacon file: %s", err)
 	}
@@ -60,7 +59,7 @@ func TestEndToEnd(t *testing.T) {
 }
 
 func TestSha256(t *testing.T) {
-	tmpFile, err := ioutil.TempFile(os.TempDir(), "prefix-")
+	tmpFile, err := os.CreateTemp(os.TempDir(), "prefix-")
 	assert.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
