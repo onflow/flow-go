@@ -109,8 +109,8 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-#    - name: Prep environment
-#      run: make install-tools tidy
+    - name: Prep environment
+      run: make install-tools tidy
     - name: Run tests (${{ matrix.targets.name }})
       if: github.actor != 'bors[bot]'
       run: make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
