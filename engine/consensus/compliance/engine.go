@@ -520,7 +520,6 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			return
 		}
 
-		// TODO move into goroutine
 		// Retrieve all consensus nodes (excluding myself).
 		// CAUTION: We must include also nodes with weight zero, because otherwise
 		//          new consensus nodes for the next epoch are left out.
