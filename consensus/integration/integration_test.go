@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ func runNodes(signalerCtx irrecoverable.SignalerContext, nodes []*Node) {
 			n.committee.Start(signalerCtx)
 			n.voteAggregator.Start(signalerCtx)
 			n.timeoutAggregator.Start(signalerCtx)
+			n.compliance.Start(signalerCtx)
 			<-util.AllReady(n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync)
 		}(n)
 	}
@@ -40,21 +42,20 @@ func Test3Nodes(t *testing.T) {
 	stopper := NewStopper(5, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, start, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	start()
 
-	runNodes(signalerCtx, nodes)
-
-	unittest.RequireCloseBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
+	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
 
 	allViews := allFinalizedViews(t, nodes)
+	for i, views := range allViews {
+		fmt.Println(i, views)
+	}
 	assertSafety(t, allViews)
 
-	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
@@ -64,13 +65,11 @@ func Test5Nodes(t *testing.T) {
 	stopper := NewStopper(2, 1)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, start, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockNodes(nodes[0]))
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	runNodes(signalerCtx, nodes)
+	start()
 
 	unittest.RequireCloseBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
 
@@ -83,7 +82,6 @@ func Test5Nodes(t *testing.T) {
 	allViews := allFinalizedViews(t, nodes[1:])
 	assertSafety(t, allViews)
 
-	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 

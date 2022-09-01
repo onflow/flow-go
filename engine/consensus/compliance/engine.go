@@ -229,10 +229,6 @@ func NewEngine(
 		Build()
 	eng.Component = eng.cm
 
-	// create ready/done channels
-	eng.ready = util.AllReady(eng.cm, eng.core.hotstuff)
-	eng.done = util.AllDone(eng.cm, eng.core.hotstuff)
-
 	return eng, nil
 }
 
@@ -240,6 +236,11 @@ func NewEngine(
 // called before the engine can start.
 func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 	e.core.hotstuff = hot
+
+	// create ready/done channels
+	e.ready = util.AllReady(e.cm, e.core.hotstuff)
+	e.done = util.AllDone(e.cm, e.core.hotstuff)
+
 	return e
 }
 

@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -30,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
+	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -39,6 +41,7 @@ import (
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -47,7 +50,6 @@ import (
 	msig "github.com/onflow/flow-go/module/signature"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -146,11 +148,7 @@ type Node struct {
 	state             *bprotocol.MutableState
 	headers           *storage.Headers
 	net               *Network
-}
-
-func (n *Node) Shutdown() {
-	<-n.sync.Done()
-	<-n.compliance.Done()
+	cancel            context.CancelFunc
 }
 
 // epochInfo is a helper structure for storing epoch information such as counter and final view
@@ -191,7 +189,7 @@ func createNodes(
 	participants *ConsensusParticipants,
 	rootSnapshot protocol.Snapshot,
 	stopper *Stopper,
-) ([]*Node, *Hub) {
+) ([]*Node, func(), *Hub) {
 	consensus, err := rootSnapshot.Identities(filter.HasRole(flow.RoleConsensus))
 	require.NoError(t, err)
 
@@ -224,7 +222,21 @@ func createNodes(
 		nodes = append(nodes, node)
 	}
 
-	return nodes, hub
+	// create a context which will be used for all nodes
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	// create a function to return which the test case can use to start the nodes
+	start := func() {
+		runNodes(signalerCtx, nodes)
+	}
+
+	// register a function to stop all nodes once the Stopper determines the test is safe to stop
+	stopper.WithStopFunc(func() {
+		stopNodes(t, cancel, nodes)
+	})
+
+	return nodes, start, hub
 }
 
 func createRootQC(t *testing.T, root *flow.Block, participantData *run.ParticipantData) *flow.QuorumCertificate {
@@ -448,8 +460,8 @@ func createNode(
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
 
-	prov := &mocknetwork.Engine{}
-	prov.On("SubmitLocal", mock.Anything).Return(nil)
+	prov := &mockconsensus.ProposalProvider{}
+	prov.On("ProvideProposal", mock.Anything).Maybe()
 
 	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector)
 	require.NoError(t, err)
@@ -576,7 +588,6 @@ func createNode(
 		consensus.WithInitialTimeout(hotstuffTimeout),
 		consensus.WithMinTimeout(hotstuffTimeout),
 	)
-
 	require.NoError(t, err)
 
 	comp = comp.WithConsensus(hot)

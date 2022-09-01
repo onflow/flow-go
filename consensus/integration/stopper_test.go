@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"fmt"
 	"sync"
 
 	"go.uber.org/atomic"
@@ -21,6 +20,7 @@ type Stopper struct {
 	stopping       *atomic.Bool
 	finalizedCount uint
 	tolerate       int
+	stopFunc       func()
 	stopped        chan struct{}
 }
 
@@ -52,6 +52,11 @@ func (s *Stopper) AddNode(n *Node) *StopperConsumer {
 	return stopConsumer
 }
 
+// WithStopFunc adds a function to use to stop
+func (s *Stopper) WithStopFunc(stop func()) {
+	s.stopFunc = stop
+}
+
 func (s *Stopper) onFinalizedTotal(id flow.Identifier, total uint) {
 	s.Lock()
 	defer s.Unlock()
@@ -70,25 +75,14 @@ func (s *Stopper) onFinalizedTotal(id flow.Identifier, total uint) {
 	}
 }
 
+// stopAll signals that all nodes should be stopped be closing the `stopped` channel.
+// NOTE: it is the responsibility of the testing code listening on the channel to
+// actually stop the nodes.
 func (s *Stopper) stopAll() {
-	// only allow one process to stop all nodes,
-	// and stop them exactly once
+	// only allow one process to stop all nodes, and stop them exactly once
 	if !s.stopping.CAS(false, true) {
 		return
 	}
-
-	fmt.Println("stopping all nodes")
-
-	// wait until all nodes has been shut down
-	var wg sync.WaitGroup
-	for _, node := range s.nodes {
-		wg.Add(1)
-		go func(node *Node) {
-			node.Shutdown()
-			wg.Done()
-		}(node)
-	}
-	wg.Wait()
-
+	s.stopFunc()
 	close(s.stopped)
 }
