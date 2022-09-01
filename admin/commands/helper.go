@@ -1,6 +1,11 @@
 package commands
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"errors"
+)
+
+var ErrValidatorReqDataFormat error = errors.New("wrong input format: expected JSON")
 
 func ConvertToInterfaceList(list interface{}) ([]interface{}, error) {
 	var resultList []interface{}

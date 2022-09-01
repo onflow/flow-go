@@ -226,6 +226,9 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		AdminCommand("trigger-checkpoint", func(config *NodeConfig) commands.AdminCommand {
 			return executionCommands.NewTriggerCheckpointCommand(toTriggerCheckpoint)
 		}).
+		AdminCommand("stop-at-height", func(config *NodeConfig) commands.AdminCommand {
+			return executionCommands.NewStopAtHeightCommand(toTriggerCheckpoint)
+		}).
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand()
 		}).
