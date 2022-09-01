@@ -1,7 +1,6 @@
 package fvm
 
 import (
-	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/cadence"
@@ -18,7 +17,6 @@ type ContractFunctionInvoker struct {
 	functionName     string
 	arguments        []cadence.Value
 	argumentTypes    []sema.Type
-	logger           zerolog.Logger
 	logSpanAttrs     []attribute.KeyValue
 }
 
@@ -27,14 +25,12 @@ func NewContractFunctionInvoker(
 	functionName string,
 	arguments []cadence.Value,
 	argumentTypes []sema.Type,
-	logger zerolog.Logger,
 ) *ContractFunctionInvoker {
 	return &ContractFunctionInvoker{
 		contractLocation: contractLocation,
 		functionName:     functionName,
 		arguments:        arguments,
 		argumentTypes:    argumentTypes,
-		logger:           logger,
 		logSpanAttrs: []attribute.KeyValue{
 			attribute.String("transaction.ContractFunctionCall", contractLocation.String()+"."+functionName),
 		},
@@ -64,7 +60,7 @@ func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error)
 	if err != nil {
 		// this is an error coming from Cadendce runtime, so it must be handled first.
 		err = errors.HandleRuntimeError(err)
-		i.logger.
+		env.Context().Logger.
 			Info().
 			Err(err).
 			Str("contract", i.contractLocation.String()).

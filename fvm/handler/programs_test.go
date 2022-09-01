@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -137,9 +136,8 @@ func Test_Programs(t *testing.T) {
 	fmt.Printf("Account created\n")
 
 	context := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithContractDeploymentRestricted(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker()),
 		fvm.WithCadenceLogging(true))
 
 	var contractAView *delta.View = nil
