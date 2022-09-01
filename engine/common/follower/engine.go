@@ -24,6 +24,11 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// Engine follows and maintains the local copy of the protocol state. It is a
+// passive (read-only) version of the compliance engine. The compliance engine
+// is employed by consensus nodes (active consensus participants) where the
+// Follower engine is employed by all other node roles.
+// TODO use ComponentManager, message queues https://github.com/dapperlabs/flow-go/issues/6173
 type Engine struct {
 	unit           *engine.Unit
 	log            zerolog.Logger
