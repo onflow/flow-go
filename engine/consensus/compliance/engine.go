@@ -262,8 +262,8 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	// NOTE: this will create long-lived goroutines each time Ready is called
-	// Since Ready is called infrequently, that is OK. If the call frequency changes, change this code.
+	// NOTE: this will create long-lived goroutines each time Done is called
+	// Since Done is called infrequently, that is OK. If the call frequency changes, change this code.
 	return util.AllDone(e.cm, e.core.hotstuff)
 }
 

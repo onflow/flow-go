@@ -148,7 +148,6 @@ type Node struct {
 	state             *bprotocol.MutableState
 	headers           *storage.Headers
 	net               *Network
-	cancel            context.CancelFunc
 }
 
 // epochInfo is a helper structure for storing epoch information such as counter and final view

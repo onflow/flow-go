@@ -54,7 +54,7 @@ func (s *Stopper) AddNode(n *Node) *StopperConsumer {
 	return stopConsumer
 }
 
-// WithStopFunc adds a function to use to stop
+// WithStopFunc adds a function to use to stop all nodes (typically the cancel function of the context used to start them).
 func (s *Stopper) WithStopFunc(stop func()) {
 	s.stopFunc = stop
 }
@@ -79,9 +79,7 @@ func (s *Stopper) onFinalizedTotal(id flow.Identifier, total uint) {
 	}
 }
 
-// stopAll signals that all nodes should be stopped be closing the `stopped` channel.
-// NOTE: it is the responsibility of the testing code listening on the channel to
-// actually stop the nodes.
+// stopAll stops all registered nodes, using the provided stopFunc.
 func (s *Stopper) stopAll() {
 	// only allow one process to stop all nodes, and stop them exactly once
 	if !s.stopping.CAS(false, true) {
@@ -90,6 +88,7 @@ func (s *Stopper) stopAll() {
 	if s.stopFunc == nil {
 		panic("Stopper used without a stopFunc - use WithStopFunc to specify how to stop nodes once stop condition is reached")
 	}
+	fmt.Println("stopping all nodes...")
 	s.stopFunc()
 	close(s.stopped)
 }
