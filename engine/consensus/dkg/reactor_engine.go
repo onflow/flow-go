@@ -75,8 +75,7 @@ func NewReactorEngine(
 }
 
 // Ready implements the module ReadyDoneAware interface. It returns a channel
-// that will close when the engine has successfully
-// started.
+// that will close when the engine has successfully started.
 func (e *ReactorEngine) Ready() <-chan struct{} {
 	return e.unit.Ready(func() {
 		// If we are starting up in the EpochSetup phase, try to start the DKG.
@@ -90,11 +89,6 @@ func (e *ReactorEngine) Ready() <-chan struct{} {
 			e.log.Fatal().Err(err).Msg("failed to check epoch phase when starting DKG reactor engine")
 			return
 		}
-		if phase != flow.EpochPhaseSetup {
-			// start up in a non-setup phase - this is the typical path
-			return
-		}
-
 		currentCounter, err := snap.Epochs().Current().Counter()
 		if err != nil {
 			// unexpected storage-level error
@@ -108,7 +102,14 @@ func (e *ReactorEngine) Ready() <-chan struct{} {
 			return
 		}
 
-		e.startDKGForEpoch(currentCounter, first)
+		// If we start up in EpochSetup phase, attempt to start the DKG in case it wasn't started previously
+		if phase == flow.EpochPhaseSetup {
+			e.startDKGForEpoch(currentCounter, first)
+		}
+		// If we start up in EpochCommitted phase, ensure the DKG end state is set correctly.
+		if phase == flow.EpochPhaseCommitted {
+			e.handleEpochCommittedPhaseStarted(currentCounter, first)
+		}
 	})
 }
 
@@ -132,9 +133,10 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 	e.handleEpochCommittedPhaseStarted(currentEpochCounter, first)
 }
 
-// startDKGForEpoch starts the DKG instance for the given epoch, only if we have
-// never started the DKG during setup phase for the given epoch. This allows consensus nodes which
-// boot from a state snapshot within the EpochSetup phase to run the DKG.
+// startDKGForEpoch attempts to start the DKG instance for the given epoch,
+// only if we have never started the DKG during setup phase for the given epoch.
+// This allows consensus nodes which boot from a state snapshot within the
+// EpochSetup phase to run the DKG.
 //
 // It starts a new controller for the epoch and registers the triggers to regularly
 // query the DKG smart-contract and transition between phases at the specified views.
@@ -285,7 +287,9 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	if errors.Is(err, storage.ErrNotFound) {
 		log.Warn().Msg("checking beacon key consistency: no key found")
 		err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateNoKey)
-		if err != nil {
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			e.log.Warn().Err(err).Msg("failed to set dkg end state - already set")
+		} else if err != nil {
 			log.Fatal().Err(err).Msg("failed to set dkg end state")
 		}
 		return
@@ -309,19 +313,24 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 			Str("canonical_beacon_pub_key", nextDKGPubKey.String()).
 			Msg("checking beacon key consistency: locally computed beacon public key does not match beacon public key for next epoch")
 		err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateInconsistentKey)
-		if err != nil {
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			e.log.Warn().Err(err).Msg("failed to set dkg end state - already set")
+		} else if err != nil {
 			log.Fatal().Err(err).Msg("failed to set dkg end state")
 		}
 		return
 	}
 
 	err = e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateSuccess)
-	if err != nil {
+	if errors.Is(err, storage.ErrAlreadyExists) {
+		e.log.Warn().Err(err).Msg("failed to set dkg end state - already set")
+	} else if err != nil {
 		e.log.Fatal().Err(err).Msg("failed to set dkg")
 	}
 	log.Info().Msgf("successfully ended DKG, my beacon pub key for epoch %d is %s", nextEpochCounter, localPubKey)
 }
 
+// TODO document error returns
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
 	currEpoch := e.State.AtBlockID(firstBlockID).Epochs().Current()
 	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().Next()
