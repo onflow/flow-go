@@ -31,8 +31,8 @@ func (l *testLog) Reset() {
 	l.logs = []string{}
 }
 
-func newTestReadyDone(logger *testLog, name string) *testReadyDone {
-	return &testReadyDone{
+func newMockReadyDone(logger *testLog, name string) *mockReadyDone {
+	return &mockReadyDone{
 		name:    name,
 		logger:  logger,
 		readyFn: func(string) {},
@@ -42,7 +42,7 @@ func newTestReadyDone(logger *testLog, name string) *testReadyDone {
 	}
 }
 
-type testReadyDone struct {
+type mockReadyDone struct {
 	name   string
 	logger *testLog
 
@@ -58,7 +58,7 @@ type testReadyDone struct {
 	stopOnce  sync.Once
 }
 
-func (c *testReadyDone) Ready() <-chan struct{} {
+func (c *mockReadyDone) Ready() <-chan struct{} {
 	c.startOnce.Do(func() {
 		go func() {
 			c.readyFn(c.name)
@@ -71,7 +71,7 @@ func (c *testReadyDone) Ready() <-chan struct{} {
 	return c.ready
 }
 
-func (c *testReadyDone) Done() <-chan struct{} {
+func (c *mockReadyDone) Done() <-chan struct{} {
 	c.stopOnce.Do(func() {
 		go func() {
 			c.doneFn(c.name)
@@ -84,8 +84,8 @@ func (c *testReadyDone) Done() <-chan struct{} {
 	return c.done
 }
 
-func newTestComponent(logger *testLog, name string) *testComponent {
-	return &testComponent{
+func newMockComponent(logger *testLog, name string) *mockComponent {
+	return &mockComponent{
 		name:    name,
 		logger:  logger,
 		readyFn: func(string) {},
@@ -96,7 +96,7 @@ func newTestComponent(logger *testLog, name string) *testComponent {
 	}
 }
 
-type testComponent struct {
+type mockComponent struct {
 	name   string
 	logger *testLog
 
@@ -108,7 +108,7 @@ type testComponent struct {
 	done  chan struct{}
 }
 
-func (c *testComponent) Start(ctx irrecoverable.SignalerContext) {
+func (c *mockComponent) Start(ctx irrecoverable.SignalerContext) {
 	c.startFn(ctx, c.name)
 	c.logger.Logf("%s started", c.name)
 
@@ -127,10 +127,10 @@ func (c *testComponent) Start(ctx irrecoverable.SignalerContext) {
 	}()
 }
 
-func (c *testComponent) Ready() <-chan struct{} {
+func (c *mockComponent) Ready() <-chan struct{} {
 	return c.ready
 }
 
-func (c *testComponent) Done() <-chan struct{} {
+func (c *mockComponent) Done() <-chan struct{} {
 	return c.done
 }
