@@ -69,7 +69,7 @@ func NewProxiedReadyDoneAware() *ProxiedReadyDoneAware {
 // Init can only be called once.
 //
 // IMPORTANT: the proxied ReadyDoneAware implementation must be idempotent since the Ready and Done
-// methods will be called immediately in when calling Init.
+// methods will be called immediately when calling Init.
 func (n *ProxiedReadyDoneAware) Init(rda ReadyDoneAware) {
 	n.initOnce.Do(func() {
 		go func() {
