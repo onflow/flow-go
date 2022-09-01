@@ -129,7 +129,9 @@ type ExecutionNode struct {
 	diskWAL                 *wal.DiskWAL
 	blockDataUploaders      []uploader.Uploader
 	executionDataStore      execution_data.ExecutionDataStore
-	toTriggerCheckpoint     *atomic.Bool // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	toTriggerCheckpoint     *atomic.Bool   // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	stopAtHeight            *atomic.Uint64 // stop the node at given block height
+	stopAtHeightCrash       *atomic.Bool   // if node stops at height, does it crash or not
 	executionDataDatastore  *badger.Datastore
 	executionDataPruner     *pruner.Pruner
 	executionDataBlobstore  blobs.Blobstore
@@ -150,7 +152,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return executionCommands.NewTriggerCheckpointCommand(exeNode.toTriggerCheckpoint)
 		}).
 		AdminCommand("stop-at-height", func(config *NodeConfig) commands.AdminCommand {
-			return executionCommands.NewStopAtHeightCommand(toTriggerCheckpoint)
+			return executionCommands.NewStopAtHeightCommand(exeNode.stopAtHeight, exeNode.stopAtHeightCrash)
 		}).
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand()
@@ -604,6 +606,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				exeNode.checkAuthorizedAtBlock,
 				exeNode.exeConf.pauseExecution,
 				exeNode.executionDataPruner,
+				exeNode.stopAtHeight,
+				exeNode.stopAtHeightCrash,
 			)
 
 			// TODO: we should solve these mutual dependencies better

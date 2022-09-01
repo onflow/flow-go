@@ -10,6 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -69,6 +70,8 @@ type Engine struct {
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	pauseExecution         bool
 	executionDataPruner    *pruner.Pruner
+	stopAtHeight           *atomic.Uint64
+	stopAtHeightCrash      *atomic.Bool
 }
 
 func New(
@@ -95,6 +98,8 @@ func New(
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pauseExecution bool,
 	pruner *pruner.Pruner,
+	stopAtHeight *atomic.Uint64,
+	stopAtHeightCrash *atomic.Bool,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -128,6 +133,8 @@ func New(
 		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
 		pauseExecution:         pauseExecution,
 		executionDataPruner:    pruner,
+		stopAtHeight:           stopAtHeight,
+		stopAtHeightCrash:      stopAtHeightCrash,
 	}
 
 	// move to state syncing engine
