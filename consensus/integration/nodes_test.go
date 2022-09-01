@@ -180,16 +180,13 @@ func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
 	return infos
 }
 
-// n - the total number of nodes to be created
-// finalizedCount - the number of finalized blocks before stopping the tests
-// tolerate - the number of node to tolerate that don't need to reach the finalization count
-// 						before stopping the tests
-func createNodes(
-	t *testing.T,
-	participants *ConsensusParticipants,
-	rootSnapshot protocol.Snapshot,
-	stopper *Stopper,
-) ([]*Node, func(), *Hub) {
+// createNodes creates consensus nodes based on the input ConsensusParticipants info.
+// All nodes will be started using a common parent context.
+// Each node is connected to the Stopper, which will cancel the context when the
+// stopping condition is reached.
+// The list of created nodes, the common network hub, and a function which starts
+// all the nodes together, is returned.
+func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot protocol.Snapshot, stopper *Stopper) (nodes []*Node, hub *Hub, startNodes func()) {
 	consensus, err := rootSnapshot.Identities(filter.HasRole(flow.RoleConsensus))
 	require.NoError(t, err)
 
@@ -213,8 +210,8 @@ func createNodes(
 			}
 		})
 
-	hub := NewNetworkHub()
-	nodes := make([]*Node, 0, len(consensus))
+	hub = NewNetworkHub()
+	nodes = make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
 		consensusParticipant := participants.Lookup(identity.NodeID)
 		require.NotNil(t, consensusParticipant)
@@ -227,7 +224,7 @@ func createNodes(
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
 	// create a function to return which the test case can use to start the nodes
-	start := func() {
+	startNodes = func() {
 		runNodes(signalerCtx, nodes)
 	}
 
@@ -236,7 +233,7 @@ func createNodes(
 		stopNodes(t, cancel, nodes)
 	})
 
-	return nodes, start, hub
+	return nodes, hub, startNodes
 }
 
 func createRootQC(t *testing.T, root *flow.Block, participantData *run.ParticipantData) *flow.QuorumCertificate {

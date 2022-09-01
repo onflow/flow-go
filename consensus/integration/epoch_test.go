@@ -47,7 +47,7 @@ func TestUnweightedNode(t *testing.T) {
 		10_000,
 	)
 
-	nodes, start, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
@@ -83,7 +83,7 @@ func TestStaticEpochTransition(t *testing.T) {
 		4,
 	)
 
-	nodes, start, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
@@ -138,7 +138,7 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 		4,
 	)
 
-	nodes, start, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
@@ -189,7 +189,7 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 		4,
 	)
 
-	nodes, start, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 

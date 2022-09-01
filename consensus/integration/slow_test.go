@@ -17,7 +17,7 @@ func TestMessagesLost(t *testing.T) {
 	stopper := NewStopper(50, 0)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, start, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockNodesFirstMessages(10, nodes[0]))
 
@@ -37,7 +37,7 @@ func TestMessagesLostAcrossNetwork(t *testing.T) {
 	stopper := NewStopper(50, 0)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, start, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockReceiverMessagesRandomly(0.1))
 
@@ -59,7 +59,7 @@ func TestDelay(t *testing.T) {
 	stopper := NewStopper(50, 0)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, start, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(delayReceiverMessagesByRange(hotstuffTimeout/10, hotstuffTimeout/2))
 
@@ -79,7 +79,7 @@ func TestOneNodeBehind(t *testing.T) {
 	stopper := NewStopper(50, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, start, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(func(channelID network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		if receiver == nodes[0] {
@@ -111,7 +111,7 @@ func TestTimeoutRebroadcast(t *testing.T) {
 	stopper := NewStopper(10, 0)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, start, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	// nodeID -> view -> numTimeoutMessages
 	lock := new(sync.Mutex)

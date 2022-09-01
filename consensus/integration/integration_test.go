@@ -42,7 +42,7 @@ func Test3Nodes(t *testing.T) {
 	stopper := NewStopper(5, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, start, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
@@ -65,7 +65,7 @@ func Test5Nodes(t *testing.T) {
 	stopper := NewStopper(2, 1)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, start, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockNodes(nodes[0]))
 
