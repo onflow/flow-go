@@ -68,7 +68,7 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		require.Equal(t, len(v), 0)
 
 		// merge to parent
-		err = st.MergeState(stChild, true)
+		err = st.MergeState(stChild)
 		require.NoError(t, err)
 
 		// read key3 on parent
@@ -187,7 +187,7 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Equal(t, st.InteractionUsed(), uint64(0))
 
 	// commit
-	err = st.MergeState(stChild, true)
+	err = st.MergeState(stChild)
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(3))
 
