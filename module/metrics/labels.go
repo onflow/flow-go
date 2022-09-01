@@ -1,19 +1,18 @@
 package metrics
 
 const (
-	LabelChannel        = "topic"
-	LabelChain          = "chain"
-	LabelProposer       = "proposer"
-	EngineLabel         = "engine"
-	LabelResource       = "resource"
-	LabelMessage        = "message"
-	LabelNodeID         = "nodeid"
-	LabelNodeAddress    = "nodeaddress"
-	LabelNodeRole       = "noderole"
-	LabelNodeInfo       = "nodeinfo"
-	LabelNodeVersion    = "nodeversion"
-	LabelPriority       = "priority"
-	LabelUnknownMsgType = "unknown"
+	LabelChannel     = "topic"
+	LabelChain       = "chain"
+	LabelProposer    = "proposer"
+	EngineLabel      = "engine"
+	LabelResource    = "resource"
+	LabelMessage     = "message"
+	LabelNodeID      = "nodeid"
+	LabelNodeAddress = "nodeaddress"
+	LabelNodeRole    = "noderole"
+	LabelNodeInfo    = "nodeinfo"
+	LabelNodeVersion = "nodeversion"
+	LabelPriority    = "priority"
 )
 
 const (

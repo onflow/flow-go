@@ -5,11 +5,13 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
+	unknown                     = "unknown"
 	unAuthorizedSenderViolation = "unauthorized_sender"
 	unknownMsgTypeViolation     = "unknown_message_type"
 	invalidMsgViolation         = "invalid_message"
@@ -32,18 +34,32 @@ func NewSlashingViolationsConsumer(log zerolog.Logger, metrics module.NetworkSec
 }
 
 func (c *Consumer) logOffense(networkOffense string, violation *Violation) {
+	// if violation fails before the message is decoded the violation.MsgType will be unknown
+	if violation.MsgType == "" {
+		violation.MsgType = unknown
+	}
+
+	// if violation fails for an unknown peer violation.Identity will be nil
+	role := unknown
+	nodeID := flow.ZeroID
+	if violation.Identity != nil {
+		role = violation.Identity.Role.String()
+		nodeID = violation.Identity.NodeID
+	}
+
 	e := c.log.Error().
 		Str("peer_id", violation.PeerID).
 		Str("networking_offense", networkOffense).
 		Str("message_type", violation.MsgType).
 		Str("channel", violation.Channel.String()).
-		Bool("unicast_message", violation.IsUnicast)
-
-	if violation.Identity != nil {
-		e = e.Str("role", violation.Identity.Role.String()).Hex("sender_id", logging.ID(violation.Identity.NodeID))
-	}
+		Bool("unicast_message", violation.IsUnicast).
+		Str("role", role).
+		Hex("sender_id", logging.ID(nodeID))
 
 	e.Msg(fmt.Sprintf("potential slashable offense: %s", violation.Err))
+
+	// capture unauthorized message count metric
+	c.metrics.OnUnauthorizedMessage(role, violation.MsgType, violation.Channel.String(), networkOffense)
 }
 
 // OnUnAuthorizedSenderError logs an error for unauthorized sender error
