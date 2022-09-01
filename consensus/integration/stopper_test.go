@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"fmt"
 	"sync"
 
 	"go.uber.org/atomic"
