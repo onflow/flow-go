@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -139,7 +140,7 @@ type ExecutionNode struct {
 	executionDataBlobstore        blobs.Blobstore
 	executionDataTracker          tracker.Storage
 }
-e.FlowNodeBuilder.
+
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 	exeNode := &ExecutionNode{
 		exeConf:             builder.exeConf,
@@ -338,11 +339,11 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("GCP block data uploader", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// Since RetryableAsyncUploader relies on executionDataService so we should create
 			// it after execution data service is fully setup.
-			if e.exeConf.enableBlockDataUpload && e.exeConf.gcpBucketName != "" {
+			if exeNode.exeConf.enableBlockDataUpload && exeNode.exeConf.gcpBucketName != "" {
 				logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
 				gcpBucketUploader, err := uploader.NewGCPBucketUploader(
 					context.Background(),
-					e.exeConf.gcpBucketName,
+					exeNode.exeConf.gcpBucketName,
 					logger,
 				)
 				if err != nil {
@@ -354,38 +355,38 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 					blockdataUploaderRetryTimeout,
 					blockDataUploaderMaxRetry,
 					logger,
-					collector,
+					exeNode.collector,
 				)
 
-				bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, executionDataDatastore)
+				bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore)
 				if err != nil {
 					return nil, fmt.Errorf("could not register blob service: %w", err)
 				}
 
-				events = storage.NewEvents(node.Metrics.Cache, node.DB)
-				commits = storage.NewCommits(node.Metrics.Cache, node.DB)
-				computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
-				collections = storage.NewCollections(node.DB, transactions)
-				transactions = storage.NewTransactions(node.Metrics.Cache, node.DB)
-				txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, e.exeConf.transactionResultsCacheSize)
+				exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
+				exeNode.commits = storage.NewCommits(node.Metrics.Cache, node.DB)
+				exeNode.computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
+				exeNode.transactions = storage.NewTransactions(node.Metrics.Cache, node.DB)
+				exeNode.collections = storage.NewCollections(node.DB, exeNode.transactions)
+				exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
 
 				// Setting up RetryableUploader for GCP uploader
 				retryableUploader := uploader.NewBadgerRetryableUploaderWrapper(
 					asyncUploader,
 					node.Storage.Blocks,
-					commits,
-					collections,
-					events,
-					results,
-					txResults,
-					computationResultUploadStatus,
+					exeNode.commits,
+					exeNode.collections,
+					exeNode.events,
+					exeNode.results,
+					exeNode.txResults,
+					exeNode.computationResultUploadStatus,
 					execution_data.NewDownloader(bs),
-					collector)
+					exeNode.collector)
 				if retryableUploader == nil {
 					return nil, errors.New("failed to create ComputationResult upload status store")
 				}
 
-				blockDataUploaders = append(blockDataUploaders, retryableUploader)
+				exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, retryableUploader)
 
 				return retryableUploader, nil
 			}
@@ -396,7 +397,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return &module.NoopReadyDoneAware{}, nil
 		}).
 		Component("S3 block data uploader", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			if e.exeConf.enableBlockDataUpload && e.exeConf.s3BucketName != "" {
+			if exeNode.exeConf.enableBlockDataUpload && exeNode.exeConf.s3BucketName != "" {
 				logger := node.Logger.With().Str("component_name", "s3_block_data_uploader").Logger()
 
 				ctx := context.Background()
@@ -409,7 +410,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				s3Uploader := uploader.NewS3Uploader(
 					ctx,
 					client,
-					e.exeConf.s3BucketName,
+					exeNode.exeConf.s3BucketName,
 					logger,
 				)
 				asyncUploader := uploader.NewAsyncUploader(
@@ -417,12 +418,12 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 					blockdataUploaderRetryTimeout,
 					blockDataUploaderMaxRetry,
 					logger,
-					collector,
+					exeNode.collector,
 				)
 
 				// We are not enabling RetryableUploader for S3 uploader for now. When we need upload
 				// retry for multiple uploaders, we will need to use different BadgerDB key prefix.
-				blockDataUploaders = append(blockDataUploaders, asyncUploader)
+				exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, asyncUploader)
 
 				return asyncUploader, nil
 			}
@@ -494,9 +495,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
-			exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
 			exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
-			exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
 
 			exeNode.executionState = state.NewExecutionState(
 				exeNode.ledgerStorage,
@@ -638,7 +637,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				exeNode.checkAuthorizedAtBlock,
 				exeNode.exeConf.pauseExecution,
 				exeNode.executionDataPruner,
-				blockDataUploaders, // TODO: initilized here?
+				exeNode.blockDataUploaders, // TODO: initilized here?
 			)
 
 			// TODO: we should solve these mutual dependencies better
