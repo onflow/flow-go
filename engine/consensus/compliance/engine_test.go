@@ -25,11 +25,12 @@ import (
 )
 
 func TestComplianceEngine(t *testing.T) {
-	suite.Run(t, new(ComplianceSuite))
+	suite.Run(t, new(EngineSuite))
 }
 
-type ComplianceSuite struct {
-	ComplianceCoreSuite
+// EngineSuite tests the compliance engine.
+type EngineSuite struct {
+	CommonSuite
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -37,11 +38,11 @@ type ComplianceSuite struct {
 	engine *Engine
 }
 
-func (cs *ComplianceSuite) SetupTest() {
-	cs.ComplianceCoreSuite.SetupTest()
+func (cs *EngineSuite) SetupTest() {
+	cs.CommonSuite.SetupTest()
 	cs.hotstuff.On("Start", mock.Anything)
-	cs.hotstuff.On("Ready", mock.Anything).Return(unittest.ClosedChannel())
-	cs.hotstuff.On("Done", mock.Anything).Return(unittest.ClosedChannel())
+	cs.hotstuff.On("Ready", mock.Anything).Return(unittest.ClosedChannel()).Maybe()
+	cs.hotstuff.On("Done", mock.Anything).Return(unittest.ClosedChannel()).Maybe()
 
 	e, err := NewEngine(unittest.Logger(), cs.net, cs.me, cs.prov, cs.core)
 	require.NoError(cs.T(), err)
@@ -55,7 +56,7 @@ func (cs *ComplianceSuite) SetupTest() {
 }
 
 // TearDownTest stops the engine and checks there are no errors thrown to the SignallerContext.
-func (cs *ComplianceSuite) TearDownTest() {
+func (cs *EngineSuite) TearDownTest() {
 	cs.cancel()
 	<-cs.engine.Done()
 	select {
@@ -66,7 +67,7 @@ func (cs *ComplianceSuite) TearDownTest() {
 }
 
 // TestSendVote tests that single vote can be sent and properly processed
-func (cs *ComplianceSuite) TestSendVote() {
+func (cs *EngineSuite) TestSendVote() {
 	// create parameters to send a vote
 	blockID := unittest.IdentifierFixture()
 	view := rand.Uint64()
@@ -96,7 +97,7 @@ func (cs *ComplianceSuite) TestSendVote() {
 }
 
 // TestBroadcastProposalWithDelay tests broadcasting proposals with different inputs
-func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
+func (cs *EngineSuite) TestBroadcastProposalWithDelay() {
 
 	// add execution node to participants to make sure we exclude them from broadcast
 	cs.participants = append(cs.participants, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))
@@ -176,7 +177,7 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 
 // TestSubmittingMultipleVotes tests that we can send multiple votes and they
 // are queued and processed in expected way
-func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
+func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	voteCount := 15
@@ -234,7 +235,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 
 // TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
 // Tests the whole processing pipeline.
-func (cs *ComplianceSuite) TestOnFinalizedBlock() {
+func (cs *EngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
 	cs.head = finalizedBlock
 
