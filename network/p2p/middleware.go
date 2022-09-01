@@ -59,6 +59,10 @@ const (
 	LargeMsgUnicastTimeout = 1000 * time.Second
 )
 
+var (
+	_ network.Middleware = (*Middleware)(nil)
+)
+
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
