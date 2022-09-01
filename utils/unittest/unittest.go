@@ -2,7 +2,6 @@ package unittest
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"math"
 	"os"
 	"os/exec"
@@ -306,7 +305,7 @@ func AssertErrSubstringMatch(t testing.TB, expected, actual error) {
 }
 
 func TempDir(t testing.TB) string {
-	dir, err := ioutil.TempDir("", "flow-testing-temp-")
+	dir, err := os.MkdirTemp("", "flow-testing-temp-")
 	require.NoError(t, err)
 	return dir
 }
