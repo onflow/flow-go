@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type PassThroughTestSuite struct {
@@ -15,7 +14,6 @@ type PassThroughTestSuite struct {
 }
 
 func TestPassThrough(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
 	suite.Run(t, new(PassThroughTestSuite))
 }
 

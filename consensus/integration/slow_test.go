@@ -1,98 +1,165 @@
-//go:build timesensitivetest
-// +build timesensitivetest
-
-// This file includes a few time sensitive tests. They might pass on your powerful local machine
-// but fail on slow CI machine.
-// For now, these tests are only for local. Run it with the build tag on:
-// > go test --tags=relic,timesensitivetest ./...
-
 package integration_test
 
 import (
+	"context"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// verify if a node lost some messages, it's still able to catch up.
+// TestMessagesLost verifies if a node lost some messages, it's still able to catch up.
 func TestMessagesLost(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker, needs some liveness logic to broadcast missing entries")
+	stopper := NewStopper(50, 0)
+	participantsData := createConsensusIdentities(t, 5)
+	rootSnapshot := createRootSnapshot(t, participantsData)
+	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
-	nodes, stopper, hub := createNodes(t, 5, 1000)
+	hub.WithFilter(blockNodesFirstMessages(10, nodes[0]))
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	hub.WithFilter(blockNodesForFirstNMessages(50, nodes[0]))
-	runNodes(nodes)
+	runNodes(signalerCtx, nodes)
 
-	<-stopper.stopped
+	unittest.RequireCloseBefore(t, stopper.stopped, time.Minute, "expect to stop before timeout")
 
-	for i := range nodes {
-		printState(t, nodes, i)
-	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 60)
+
+	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
-// verify if each receiver lost 10% messages, the network can still reach consensus
+// TestMessagesLostAcrossNetwork verifies if each receiver lost 10% messages, the network can still reach consensus.
 func TestMessagesLostAcrossNetwork(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker, needs some liveness logic to broadcast missing entries")
+	stopper := NewStopper(50, 0)
+	participantsData := createConsensusIdentities(t, 5)
+	rootSnapshot := createRootSnapshot(t, participantsData)
+	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
-	nodes, stopper, hub := createNodes(t, 5, 1500)
+	hub.WithFilter(blockReceiverMessagesRandomly(0.1))
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	hub.WithFilter(blockReceiverMessagesByPercentage(10))
-	runNodes(nodes)
+	runNodes(signalerCtx, nodes)
 
-	<-stopper.stopped
+	unittest.RequireCloseBefore(t, stopper.stopped, time.Minute, "expect to stop before timeout")
 
-	for i := range nodes {
-		printState(t, nodes, i)
-	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 50)
+
+	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
-// verify if each receiver receive delayed messages, the network can still reach consensus
-// the delay might skip some blocks, so should expect to see some gaps in the finalized views
-// like this:
-// [1 2 3 4 10 11 12 17 20 21 22 23 28 31 33 36 39 44 47 53 58 61 62 79 80 88 89 98 101 106 108 111 115 116 119 120 122 123 124 126 127 128 129 130 133 134 135 138 141 142 143 144]
+// TestDelay verifies that we still reach consensus even if _all_ messages are significantly
+// delayed. Due to the delay, some proposals might be orphaned. The message delay is sampled
+// for each message from the interval [0.1*hotstuffTimeout, 0.5*hotstuffTimeout].
 func TestDelay(t *testing.T) {
-
-	nodes, stopper, hub := createNodes(t, 5, 1500)
+	unittest.SkipUnless(t, unittest.TEST_LONG_RUNNING, "could run for a while depending on what messages are being dropped")
+	stopper := NewStopper(50, 0)
+	participantsData := createConsensusIdentities(t, 5)
+	rootSnapshot := createRootSnapshot(t, participantsData)
+	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(delayReceiverMessagesByRange(hotstuffTimeout/10, hotstuffTimeout/2))
-	runNodes(nodes)
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	<-stopper.stopped
+	runNodes(signalerCtx, nodes)
 
-	for i := range nodes {
-		printState(t, nodes, i)
-	}
+	unittest.RequireCloseBefore(t, stopper.stopped, time.Minute, "expect to stop before timeout")
+
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 60)
+
+	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
-// verify that if a node always
+// TestOneNodeBehind verifies that if one node (here node 0) consistently experiences a significant
+// delay receiving messages beyond the hotstuff timeout, the committee still can reach consensus.
 func TestOneNodeBehind(t *testing.T) {
-	nodes, stopper, hub := createNodes(t, 5, 1500)
+	stopper := NewStopper(50, 0)
+	participantsData := createConsensusIdentities(t, 3)
+	rootSnapshot := createRootSnapshot(t, participantsData)
+	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
-	hub.WithFilter(func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	hub.WithFilter(func(channelID network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		if receiver == nodes[0] {
 			return false, hotstuffTimeout + time.Millisecond
 		}
 		// no block or delay to other nodes
 		return false, 0
 	})
-	runNodes(nodes)
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	<-stopper.stopped
+	runNodes(signalerCtx, nodes)
 
-	for i := range nodes {
-		printState(t, nodes, i)
-	}
+	unittest.RequireCloseBefore(t, stopper.stopped, time.Minute, "expect to stop before timeout")
+
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 60)
+
+	stopNodes(t, cancel, nodes)
+	cleanupNodes(nodes)
+}
+
+// TestTimeoutRebroadcast drops
+// * all proposals at view 5
+// * the first timeout object per view for _every_ sender
+// In this configuration, the _initial_ broadcast is insufficient for replicas to make
+// progress in view 5 (neither in the happy path, because the proposal is always dropped
+// nor on the unhappy path for the _first_ attempt to broadcast timeout objects). We
+// expect that replica will eventually broadcast its timeout object again.
+func TestTimeoutRebroadcast(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker, this test requires rebroadcast of timeout objects")
+	stopper := NewStopper(10, 0)
+	participantsData := createConsensusIdentities(t, 5)
+	rootSnapshot := createRootSnapshot(t, participantsData)
+	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+
+	// nodeID -> view -> numTimeoutMessages
+	lock := new(sync.Mutex)
+	blockedTimeoutObjectsTracker := make(map[flow.Identifier]map[uint64]uint64)
+	hub.WithFilter(func(channelID network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		switch m := event.(type) {
+		case *messages.BlockProposal:
+			return m.Header.View == 5, 0 // drop proposals only for view 5
+		case *messages.TimeoutObject:
+			// drop first timeout object for every sender for every view
+			lock.Lock()
+			blockedPerView, found := blockedTimeoutObjectsTracker[sender.id.NodeID]
+			if !found {
+				blockedPerView = make(map[uint64]uint64)
+				blockedTimeoutObjectsTracker[sender.id.NodeID] = blockedPerView
+			}
+			blocked := blockedPerView[m.View] + 1
+			blockedPerView[m.View] = blocked
+			lock.Unlock()
+			return blocked == 1, 0
+		}
+		// no block or delay to other nodes
+		return false, 0
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	runNodes(signalerCtx, nodes)
+
+	unittest.RequireCloseBefore(t, stopper.stopped, 10*time.Second, "expect to stop before timeout")
+
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+
+	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }

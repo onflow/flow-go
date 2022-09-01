@@ -27,7 +27,6 @@ import (
 const defaultTimeout = time.Second * 10
 
 func TestMVP_Network(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
 		Str("testfile", "suite.go").
 		Str("testcase", t.Name()).
