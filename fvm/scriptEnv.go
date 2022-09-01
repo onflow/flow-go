@@ -3,7 +3,6 @@ package fvm
 import (
 	"context"
 
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 var _ runtime.Interface = &ScriptEnv{}
@@ -31,7 +29,7 @@ func NewScriptEnvironment(
 	programs *programs.Programs,
 ) *ScriptEnv {
 
-	accounts := state.NewAccounts(sth)
+	accounts := environment.NewAccounts(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	tracer := environment.NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
@@ -60,6 +58,7 @@ func NewScriptEnvironment(
 				fvmContext.Blocks,
 			),
 			TransactionInfo: environment.NoTransactionInfo{},
+			EventEmitter:    environment.NoEventEmitter{},
 			ctx:             fvmContext,
 			sth:             sth,
 			vm:              vm,
@@ -83,14 +82,6 @@ func NewScriptEnvironment(
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
 	return env
-}
-
-func (e *ScriptEnv) EmitEvent(_ cadence.Event) error {
-	return errors.NewOperationNotSupportedError("EmitEvent")
-}
-
-func (e *ScriptEnv) Events() []flow.Event {
-	return []flow.Event{}
 }
 
 // Block Environment Functions
@@ -121,4 +112,8 @@ func (e *ScriptEnv) UpdateAccountContractCode(_ runtime.Address, _ string, _ []b
 
 func (e *ScriptEnv) RemoveAccountContractCode(_ runtime.Address, _ string) (err error) {
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
+}
+
+func (e *ScriptEnv) SetAccountFrozen(address common.Address, frozen bool) error {
+	return errors.NewOperationNotSupportedError("SetAccountFrozen")
 }

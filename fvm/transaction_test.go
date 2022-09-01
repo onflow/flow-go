@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -31,7 +32,7 @@ func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []
 	b := flow.HexToAddress("5678")
 
 	//create accounts
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 	err := accounts.Create(aPubKeys, a)
 	require.NoError(t, err)
 	err = accounts.Create(bPubKeys, b)
@@ -48,7 +49,7 @@ func TestAccountFreezing(t *testing.T) {
 	t.Run("setFrozenAccount can be enabled", func(t *testing.T) {
 
 		address, _, st := makeTwoAccounts(t, nil, nil)
-		accounts := state.NewAccounts(st)
+		accounts := environment.NewAccounts(st)
 		programsStorage := programs.NewEmptyPrograms()
 
 		// account should no be frozen
@@ -85,7 +86,7 @@ func TestAccountFreezing(t *testing.T) {
 
 	t.Run("freezing account triggers program cache eviction", func(t *testing.T) {
 		address, _, st := makeTwoAccounts(t, nil, nil)
-		accounts := state.NewAccounts(st)
+		accounts := environment.NewAccounts(st)
 		programsStorage := programs.NewEmptyPrograms()
 
 		// account should no be frozen
@@ -223,7 +224,7 @@ func TestAccountFreezing(t *testing.T) {
 	t.Run("code from frozen account cannot be loaded", func(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
-		accounts := state.NewAccounts(st)
+		accounts := environment.NewAccounts(st)
 		programsStorage := programs.NewEmptyPrograms()
 
 		rt := fvm.NewInterpreterRuntime(runtime.Config{})
@@ -416,7 +417,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
-		accountsService := state.NewAccounts(state.NewStateTransaction(
+		accountsService := environment.NewAccounts(state.NewStateTransaction(
 			ledger,
 			state.DefaultParameters(),
 		))
@@ -447,7 +448,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.Error(t, tx.Err)
 
-		accountsService = state.NewAccounts(state.NewStateTransaction(
+		accountsService = environment.NewAccounts(state.NewStateTransaction(
 			ledger,
 			state.DefaultParameters(),
 		))
@@ -460,7 +461,7 @@ func TestAccountFreezing(t *testing.T) {
 	t.Run("frozen account fail just tx, not execution", func(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
-		accounts := state.NewAccounts(st)
+		accounts := environment.NewAccounts(st)
 		programsStorage := programs.NewEmptyPrograms()
 
 		rt := fvm.NewInterpreterRuntime(runtime.Config{})

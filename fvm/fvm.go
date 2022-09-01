@@ -27,6 +27,7 @@ func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
+	// TODO(patrick): move this into ReusableCadenceRuntime
 	Runtime runtime.Runtime
 }
 

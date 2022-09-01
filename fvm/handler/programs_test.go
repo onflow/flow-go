@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	programsStorage "github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -118,7 +119,7 @@ func Test_Programs(t *testing.T) {
 	vm := fvm.NewVirtualMachine(rt)
 	programs := programsStorage.NewEmptyPrograms()
 
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 
 	err := accounts.Create(nil, addressA)
 	require.NoError(t, err)
@@ -193,7 +194,7 @@ func Test_Programs(t *testing.T) {
 
 		loadedCode := false
 		viewExecA := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			if key == state.ContractKey("A") {
+			if key == environment.ContractKey("A") {
 				loadedCode = true
 			}
 
@@ -229,7 +230,7 @@ func Test_Programs(t *testing.T) {
 		// execute transaction again, this time make sure it doesn't load code
 		viewExecA2 := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			//this time we fail if a read of code occurs
-			require.NotEqual(t, key, state.ContractKey("A"))
+			require.NotEqual(t, key, environment.ContractKey("A"))
 
 			return mainView.Peek(owner, key)
 		})
@@ -329,8 +330,8 @@ func Test_Programs(t *testing.T) {
 		// execute transaction again, this time make sure it doesn't load code
 		viewExecB2 := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			//this time we fail if a read of code occurs
-			require.NotEqual(t, key, state.ContractKey("A"))
-			require.NotEqual(t, key, state.ContractKey("B"))
+			require.NotEqual(t, key, environment.ContractKey("A"))
+			require.NotEqual(t, key, environment.ContractKey("B"))
 
 			return mainView.Peek(owner, key)
 		})
@@ -357,7 +358,7 @@ func Test_Programs(t *testing.T) {
 		// only because contract B has been called
 
 		viewExecA := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			require.NotEqual(t, key, state.ContractKey("A"))
+			require.NotEqual(t, key, environment.ContractKey("A"))
 			return mainView.Peek(owner, key)
 		})
 

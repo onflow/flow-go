@@ -123,6 +123,9 @@ func TestContractInvoker(t *testing.T) {
 			env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
 			env.On("VM").Return(vm)
 			env.On("Context").Return(&vmCtx)
+			env.On("BorrowCadenceRuntime", mock.Anything).Return(
+				fvm.NewReusableCadenceRuntime())
+			env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
 			value, err := invoker.Invoke(env)
 
