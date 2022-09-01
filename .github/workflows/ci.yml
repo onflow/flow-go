@@ -69,7 +69,7 @@ jobs:
     name: Create Dynamic Test Matrix
     runs-on: ubuntu-latest
     outputs:
-      dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -79,17 +79,16 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Set Test Matrix
-        id: set-test-matrix
-        run: go run utils/test_matrix/test_matrix.go network engine access admin util
+        id: set-matrix
+        run: go run utils/test_matrix/test_matrix.go network engine access admin utils
 
   unit-test:
-    name: Unit Tests
+    name: Unit Tests (${{ matrix.targets.name }})
+    needs: create-dynamic-test-matrix
     strategy:
       fail-fast: false
       matrix:
-        make:
-          - make unittest-main-no-engine
-          - make unittest-main-engine
+        targets: ${{ fromJson(needs.create-dynamic-test-matrix.outputs.matrix) }}
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
@@ -99,20 +98,18 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Prep environment
-      run: make install-tools tidy
-    - name: Run tests
+    - name: Run tests (${{ matrix.targets.name }})
       if: github.actor != 'bors[bot]'
-      run: ${{ matrix.make }}
+      run: make -e GO_TEST_TARGET="${{ matrix.targets.packages }}" ci
       env:
         RACE_DETECTOR: 1
-    - name: Run tests (Bors)
+    - name: Run tests (${{ matrix.targets.name }}) (Bors)
       if: github.actor == 'bors[bot]'
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 25
         max_attempts: 3
-        command: ${{ matrix.make }}
+        command: make -e GO_TEST_TARGET="${{ matrix.targets.packages }}" ci
     - name: Upload coverage report
       uses: codecov/codecov-action@v3
       with:
@@ -125,17 +122,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        make:
-          - make -C integration access-tests
-          - make -C integration bft-tests
-          - make -C integration collection-tests
-          - make -C integration consensus-tests
-          - make -C integration epochs-tests
-          - make -C integration execution-tests
-          - make -C integration ghost-tests
-          - make -C integration mvp-tests
-          - make -C integration network-tests
-          - make -C integration verification-tests
+        test-category:
+          - integration-bft
+          - integration-mvp
+          - integration-ghost
+          - integration-network
+          - integration-epochs
+          - integration-access
+          - integration-collection
+          - integration-consensus
+          - integration-execution
+          - integration-verification
+    env:
+      TEST_CATEGORY: ${{ matrix.test-category }}
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
@@ -151,7 +150,7 @@ jobs:
       run: make docker-build-flow
     - name: Run tests
       if: github.actor != 'bors[bot]'
-      run: ${{ matrix.make }}
+      run: ./tools/test_monitor/run-tests.sh
       env:
         RACE_DETECTOR: 1
     - name: Run tests (Bors)
@@ -160,7 +159,7 @@ jobs:
       with:
         timeout_minutes: 15
         max_attempts: 2
-        command: ${{ matrix.make }}
+        command: ./tools/test_monitor/run-tests.sh
 
   localnet-test:
     name: Localnet Compatibility Tests With Flow-CLI Client and Observer
