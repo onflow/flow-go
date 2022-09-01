@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/admin/commands"
-	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -435,7 +434,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			builder.PeerManagerDependencies = append(builder.PeerManagerDependencies, bsDependable)
 			return nil
 		}).
-		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("execution data downloader", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 			bs, err = node.Network.RegisterBlobService(channels.ExecutionDataService, ds)
 			if err != nil {
@@ -677,9 +676,6 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 	builder.
 		AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
 			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
-		}).
-		AdminCommand("read-execution-data", func(conf *cmd.NodeConfig) commands.AdminCommand {
-			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataService)
 		})
 
 	// if this is an access node that supports public followers, enqueue the public network
