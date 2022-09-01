@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 )
@@ -25,6 +26,10 @@ type TransactionCollector struct {
 	transactionResultDuration  *prometheus.HistogramVec
 	scriptSize                 prometheus.Histogram
 	transactionSize            prometheus.Histogram
+	maxReceiptHeight           prometheus.Gauge
+
+	// used to skip heights that are lower than the current max height
+	maxReceiptHeightValue counters.StrictMonotonousCounter
 }
 
 func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
@@ -111,6 +116,13 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "histogram for the transaction size in kb of scripts used in GetTransactionResult",
 		}),
+		maxReceiptHeight: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "max_receipt_height",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemIngestion,
+			Help:      "gauge to track the maximum block height of execution receipts received",
+		}),
+		maxReceiptHeightValue: counters.NewMonotonousCounter(0),
 	}
 
 	return tc
@@ -180,7 +192,7 @@ func (tc *TransactionCollector) TransactionFinalized(txID flow.Identifier, when 
 
 	// remove transaction timing from mempool if finalized and executed
 	if !t.Finalized.IsZero() && !t.Executed.IsZero() {
-		tc.transactionTimings.Rem(txID)
+		tc.transactionTimings.Remove(txID)
 	}
 }
 
@@ -202,7 +214,7 @@ func (tc *TransactionCollector) TransactionExecuted(txID flow.Identifier, when t
 
 	// remove transaction timing from mempool if finalized and executed
 	if !t.Finalized.IsZero() && !t.Executed.IsZero() {
-		tc.transactionTimings.Rem(txID)
+		tc.transactionTimings.Remove(txID)
 	}
 }
 
@@ -266,5 +278,11 @@ func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
 		return
 	}
 	tc.transactionSubmission.WithLabelValues("expired").Inc()
-	tc.transactionTimings.Rem(txID)
+	tc.transactionTimings.Remove(txID)
+}
+
+func (tc *TransactionCollector) UpdateExecutionReceiptMaxHeight(height uint64) {
+	if tc.maxReceiptHeightValue.Set(height) {
+		tc.maxReceiptHeight.Set(float64(height))
+	}
 }

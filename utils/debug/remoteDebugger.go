@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm"
@@ -42,9 +43,8 @@ func (v *DebugInfo) RegistersReadCollapseSlabReads() []RegisterInfo {
 func NewRemoteDebugger(
 	grpcAddress string,
 	chain flow.Chain,
-	logger zerolog.Logger,
-) *RemoteDebugger {
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	logger zerolog.Logger) *RemoteDebugger {
+	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{}))
 
 	// no signature processor here
 	ctx := fvm.NewContext(

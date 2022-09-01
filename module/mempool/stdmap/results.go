@@ -27,9 +27,9 @@ func (r *Results) Add(result *flow.ExecutionResult) bool {
 	return added
 }
 
-// Rem will remove a result by ID.
-func (r *Results) Rem(resultID flow.Identifier) bool {
-	removed := r.Backend.Rem(resultID)
+// Remove will remove a result by ID.
+func (r *Results) Remove(resultID flow.Identifier) bool {
+	removed := r.Backend.Remove(resultID)
 	return removed
 }
 

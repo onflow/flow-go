@@ -19,15 +19,16 @@ import (
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
@@ -56,7 +57,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	exeNode := testutil.GenericNodeFromParticipants(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
 
-	exeChunkDataConduit, err := exeNode.Net.Register(network.ProvideChunks, exeEngine)
+	exeChunkDataConduit, err := exeNode.Net.Register(channels.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
 
 	replied := make(map[flow.Identifier]struct{})
@@ -66,7 +67,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 
 	mu := &sync.Mutex{} // making testify Run thread-safe
 
-	exeEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
+	exeEngine.On("Process", testifymock.AnythingOfType("channels.Channel"), testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -177,11 +178,10 @@ func SetupMockConsensusNode(t *testing.T,
 	}
 
 	// creates a hasher for spock
-	hasher := crypto.NewBLSKMAC(encoding.SPOCKTag)
-
+	hasher := msig.NewBLSHasher(msig.SPOCKTag)
 	mu := &sync.Mutex{} // making testify mock thread-safe
 
-	conEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
+	conEngine.On("Process", testifymock.AnythingOfType("channels.Channel"), testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -234,7 +234,7 @@ func SetupMockConsensusNode(t *testing.T,
 			wg.Done()
 		}).Return(nil)
 
-	_, err := conNode.Net.Register(network.ReceiveApprovals, conEngine)
+	_, err := conNode.Net.Register(channels.ReceiveApprovals, conEngine)
 	assert.Nil(t, err)
 
 	return &conNode, conEngine, wg
@@ -410,7 +410,7 @@ func MockLastSealedHeight(state *mockprotocol.State, height uint64) {
 	header := unittest.BlockHeaderFixture()
 	header.Height = height
 	state.On("Sealed").Return(snapshot)
-	snapshot.On("Head").Return(&header, nil)
+	snapshot.On("Head").Return(header, nil)
 }
 
 func NewVerificationHappyPathTest(t *testing.T,
@@ -457,7 +457,7 @@ func withConsumers(t *testing.T,
 	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup, *sync.WaitGroup),
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
-	tracer := &trace.NoopTracer{}
+	tracer := trace.NewNoopTracer()
 
 	// bootstraps system with one node of each role.
 	s, verID, participants := bootstrapSystem(t, tracer, authorized)

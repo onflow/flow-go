@@ -18,8 +18,8 @@ type View interface {
 // TODO Rename this to Storage
 // and remove reference to flow.RegisterValue and use byte[]
 type Ledger interface {
-	Set(owner, controller, key string, value flow.RegisterValue) error
-	Get(owner, controller, key string) (flow.RegisterValue, error)
-	Touch(owner, controller, key string) error
-	Delete(owner, controller, key string) error
+	Set(owner, key string, value flow.RegisterValue) error
+	Get(owner, key string) (flow.RegisterValue, error)
+	Touch(owner, key string) error
+	Delete(owner, key string) error
 }

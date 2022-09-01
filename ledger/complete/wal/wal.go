@@ -3,7 +3,6 @@ package wal
 import (
 	"fmt"
 	"sort"
-	"time"
 
 	prometheusWAL "github.com/m4ksio/wal/wal"
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/utils/io"
 )
 
 const SegmentSize = 32 * 1024 * 1024
@@ -24,10 +22,7 @@ type DiskWAL struct {
 	forestCapacity int
 	pathByteSize   int
 	log            zerolog.Logger
-	// disk size reading can be time consuming, so limit how often its read
-	diskUpdateLimiter *time.Ticker
-	metrics           module.WALMetrics
-	dir               string
+	dir            string
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
@@ -37,14 +32,12 @@ func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module
 		return nil, err
 	}
 	return &DiskWAL{
-		wal:               w,
-		paused:            false,
-		forestCapacity:    forestCapacity,
-		pathByteSize:      pathByteSize,
-		log:               logger,
-		diskUpdateLimiter: time.NewTicker(5 * time.Second),
-		metrics:           metrics,
-		dir:               dir,
+		wal:            w,
+		paused:         false,
+		forestCapacity: forestCapacity,
+		pathByteSize:   pathByteSize,
+		log:            logger,
+		dir:            dir,
 	}, nil
 }
 
@@ -56,36 +49,26 @@ func (w *DiskWAL) UnpauseRecord() {
 	w.paused = false
 }
 
-func (w *DiskWAL) RecordUpdate(update *ledger.TrieUpdate) error {
+// RecordUpdate writes the trie update to the write ahead log on disk.
+// if write ahead logging is not paused, it returns the file num (write ahead log) that the trie update was written to.
+// if write ahead logging is enabled, the second returned value is false, otherwise it's true, meaning WAL is disabled.
+func (w *DiskWAL) RecordUpdate(update *ledger.TrieUpdate) (segmentNum int, skipped bool, err error) {
 	if w.paused {
-		return nil
+		return 0, true, nil
 	}
 
 	bytes := EncodeUpdate(update)
 
-	_, err := w.wal.Log(bytes)
+	locations, err := w.wal.Log(bytes)
 
 	if err != nil {
-		return fmt.Errorf("error while recording update in LedgerWAL: %w", err)
+		return 0, false, fmt.Errorf("error while recording update in LedgerWAL: %w", err)
+	}
+	if len(locations) != 1 {
+		return 0, false, fmt.Errorf("error while recording update in LedgerWAL: got %d location, expect 1 location", len(locations))
 	}
 
-	select {
-	case <-w.diskUpdateLimiter.C:
-		diskSize, err := w.DiskSize()
-		if err != nil {
-			w.log.Warn().Err(err).Msg("error while checking forest disk size")
-		} else {
-			w.metrics.DiskSize(diskSize)
-		}
-	default: //don't block
-	}
-
-	return nil
-}
-
-// DiskSize returns the amount of disk space used by the storage (in bytes)
-func (w *DiskWAL) DiskSize() (uint64, error) {
-	return io.DirSize(w.dir)
+	return locations[0].Segment, false, nil
 }
 
 func (w *DiskWAL) RecordDelete(rootHash ledger.RootHash) error {
@@ -117,7 +100,6 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 			return err
 		},
 		func(rootHash ledger.RootHash) error {
-			forest.RemoveTrie(rootHash)
 			return nil
 		},
 	)
@@ -337,7 +319,7 @@ type LedgerWAL interface {
 	NewCheckpointer() (*Checkpointer, error)
 	PauseRecord()
 	UnpauseRecord()
-	RecordUpdate(update *ledger.TrieUpdate) error
+	RecordUpdate(update *ledger.TrieUpdate) (int, bool, error)
 	RecordDelete(rootHash ledger.RootHash) error
 	ReplayOnForest(forest *mtrie.Forest) error
 	Segments() (first, last int, err error)

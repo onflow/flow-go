@@ -3,7 +3,7 @@ package cmd
 import (
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/utils/io"
+	flowIO "github.com/onflow/flow-go/utils/io"
 )
 
 // rootSnapshotBucketURL is a format string for the location of the root snapshot file in GCP.
@@ -30,7 +30,6 @@ const rootSnapshotBucketURL = "https://storage.googleapis.com/flow-genesis-boots
 // When we perform a spork, the network is instantiated with a new protocol state which
 // in general is inconsistent with the state in the FlowEpoch smart contract. The resetEpoch
 // transaction is the mechanism for re-synchronizing these two states.
-//
 var resetCmd = &cobra.Command{
 	Use:   "reset-tx-args",
 	Short: "Generates `resetEpoch` JSON transaction arguments",
@@ -139,13 +138,12 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 // getStakingAuctionEndView determines the staking auction end view from the
 // epoch based on DKG timing.
 //
-//   Staking  Setup
-//            DKG1  DKG2  DKG3
-// |---------|-----|-----|-----|----
-//           ^     ^     ^-dkgPhase2FinalView
-//           |     `-dkgPhase1FinalView
-//           `-stakingEndView
-//
+//	  Staking  Setup
+//	           DKG1  DKG2  DKG3
+//	|---------|-----|-----|-----|----
+//	          ^     ^     ^-dkgPhase2FinalView
+//	          |     `-dkgPhase1FinalView
+//	          `-stakingEndView
 func getStakingAuctionEndView(epoch protocol.Epoch) (uint64, error) {
 	dkgPhase1FinalView, err := epoch.DKGPhase1FinalView()
 	if err != nil {
@@ -225,7 +223,7 @@ func getSnapshotFromBucket(url string) (*inmem.Snapshot, error) {
 	}
 	defer res.Body.Close()
 
-	bz, err := ioutil.ReadAll(res.Body)
+	bz, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("could not read from response body (url=%s): %w", url, err)
 	}
@@ -253,7 +251,7 @@ func getSnapshotFromLocalBootstrapDir(path string) (*inmem.Snapshot, error) {
 	}
 
 	// read root protocol-snapshot.json
-	bz, err := io.ReadFile(path)
+	bz, err := flowIO.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not read root snapshot file: %w", err)
 	}

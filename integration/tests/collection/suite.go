@@ -4,11 +4,12 @@ import (
 	"context"
 	"time"
 
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/convert"
@@ -60,13 +61,9 @@ type CollectorSuite struct {
 // and clusters and starts the network.
 //
 // NOTE: This must be called explicitly by each test, since nodes/clusters vary
-//       between test cases.
+// between test cases.
 func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", suite.T().Name()).
-		Logger()
-	suite.log = logger
+	suite.log = unittest.LoggerForTest(suite.Suite.T(), zerolog.InfoLevel)
 	suite.log.Info().Msg("================> SetupTest")
 
 	var (

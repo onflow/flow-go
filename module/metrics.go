@@ -319,18 +319,22 @@ type LedgerMetrics interface {
 }
 
 type WALMetrics interface {
-	// DiskSize records the amount of disk space used by the storage (in bytes)
-	DiskSize(uint64)
 }
 
-type ExecutionDataServiceMetrics interface {
-	ExecutionDataAddStarted()
+type RateLimitedBlockstoreMetrics interface {
+	BytesRead(int)
+}
 
-	ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeSize uint64)
-
-	ExecutionDataGetStarted()
-
-	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize uint64)
+type BitswapMetrics interface {
+	Peers(prefix string, n int)
+	Wantlist(prefix string, n int)
+	BlobsReceived(prefix string, n uint64)
+	DataReceived(prefix string, n uint64)
+	BlobsSent(prefix string, n uint64)
+	DataSent(prefix string, n uint64)
+	DupBlobsReceived(prefix string, n uint64)
+	DupDataReceived(prefix string, n uint64)
+	MessagesReceived(prefix string, n uint64)
 }
 
 type ExecutionDataRequesterMetrics interface {
@@ -367,12 +371,46 @@ type ProviderMetrics interface {
 	ChunkDataPackRequested()
 }
 
+type ExecutionDataProviderMetrics interface {
+	RootIDComputed(duration time.Duration, numberOfChunks int)
+	AddBlobsSucceeded(duration time.Duration, totalSize uint64)
+	AddBlobsFailed()
+}
+
+type ExecutionDataRequesterV2Metrics interface {
+	FulfilledHeight(blockHeight uint64)
+	ReceiptSkipped()
+	RequestSucceeded(blockHeight uint64, duration time.Duration, totalSize uint64, numberOfAttempts int)
+	RequestFailed(duration time.Duration, retryable bool)
+	RequestCanceled()
+	ResponseDropped()
+}
+
+type ExecutionDataPrunerMetrics interface {
+	Pruned(height uint64, duration time.Duration)
+}
+
 type AccessMetrics interface {
 	// TotalConnectionsInPool updates the number connections to collection/execution nodes stored in the pool, and the size of the pool
 	TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)
 
-	// ConnectionFromPoolRetrieved tracks the number of times a connection to a collection/execution node is retrieved from the connection pool
-	ConnectionFromPoolRetrieved()
+	// ConnectionFromPoolReused tracks the number of times a connection to a collection/execution node is reused from the connection pool
+	ConnectionFromPoolReused()
+
+	// ConnectionAddedToPool tracks the number of times a collection/execution node is added to the connection pool
+	ConnectionAddedToPool()
+
+	// NewConnectionEstablished tracks the number of times a new grpc connection is established
+	NewConnectionEstablished()
+
+	// ConnectionFromPoolInvalidated tracks the number of times a cached grpc connection is invalidated and closed
+	ConnectionFromPoolInvalidated()
+
+	// ConnectionFromPoolUpdated tracks the number of times a cached connection is updated
+	ConnectionFromPoolUpdated()
+
+	// ConnectionFromPoolEvicted tracks the number of times a cached connection is evicted from the cache
+	ConnectionFromPoolEvicted()
 }
 
 type ExecutionMetrics interface {
@@ -422,6 +460,8 @@ type ExecutionMetrics interface {
 	ExecutionBlockDataUploadStarted()
 
 	ExecutionBlockDataUploadFinished(dur time.Duration)
+
+	UpdateCollectionMaxHeight(height uint64)
 }
 
 type BackendScriptsMetrics interface {
@@ -451,6 +491,9 @@ type TransactionMetrics interface {
 
 	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
 	TransactionSubmissionFailed()
+
+	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
+	UpdateExecutionReceiptMaxHeight(height uint64)
 }
 
 type PingMetrics interface {

@@ -8,8 +8,8 @@ import (
 	"math"
 	"time"
 
-	glog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -120,7 +120,7 @@ func (c *Core) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
 	}
 
 	childReceipts := c.pendingReceipts.ByPreviousResultID(resultID)
-	c.pendingReceipts.Rem(receipt.ID())
+	c.pendingReceipts.Remove(receipt.ID())
 
 	for _, childReceipt := range childReceipts {
 		// recursively processing the child receipts
@@ -163,10 +163,12 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 
 	receiptSpan, _, isSampled := c.tracer.StartBlockSpan(context.Background(), receipt.ExecutionResult.BlockID, trace.CONMatchProcessReceipt)
 	if isSampled {
-		receiptSpan.LogFields(glog.String("result_id", receipt.ExecutionResult.ID().String()))
-		receiptSpan.LogFields(glog.String("executor", receipt.ExecutorID.String()))
+		receiptSpan.SetAttributes(
+			attribute.String("result_id", receipt.ExecutionResult.ID().String()),
+			attribute.String("executor", receipt.ExecutorID.String()),
+		)
 	}
-	defer receiptSpan.Finish()
+	defer receiptSpan.End()
 
 	initialState, finalState, err := getStartAndEndStates(receipt)
 	if err != nil {
@@ -207,7 +209,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 
 	childSpan := c.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchProcessReceiptVal)
 	err = c.receiptValidator.Validate(receipt)
-	childSpan.Finish()
+	childSpan.End()
 
 	if engine.IsUnverifiableInputError(err) {
 		// If previous result is missing, we can't validate this receipt.

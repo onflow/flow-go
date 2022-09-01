@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -229,7 +228,7 @@ func readPayloadV0FromReader(reader io.Reader, scratch []byte) (*ledger.Payload,
 	}
 
 	// Decode and copy payload
-	payload, err := encoding.DecodePayloadWithoutPrefix(scratch, false, 0)
+	payload, err := ledger.DecodePayloadWithoutPrefix(scratch, false, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode payload: %w", err)
 	}
