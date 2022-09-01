@@ -63,8 +63,10 @@ func NewBadgerRetryableUploaderWrapper(
 
 	// When Upload() is successful, the ComputationResult upload status in BadgerDB will be updated to true
 	onCompleteCB := func(computationResult *execution.ComputationResult, err error) {
-		if computationResult == nil || computationResult.ExecutableBlock != nil {
-			log.Warn().Msg("nil ComputationResult parameter or nil ComputationResult.ExecutableBlock")
+		if computationResult == nil || computationResult.ExecutableBlock == nil ||
+			computationResult.ExecutableBlock.Block == nil {
+			log.Warn().Msg("nil ComputationResult or nil ComputationResult.ExecutableBlock or " +
+				"computationResult.ExecutableBlock.Block")
 			return
 		}
 
@@ -110,8 +112,9 @@ func (b *BadgerRetryableUploaderWrapper) Done() <-chan struct{} {
 }
 
 func (b *BadgerRetryableUploaderWrapper) Upload(computationResult *execution.ComputationResult) error {
-	if computationResult == nil || computationResult.ExecutableBlock == nil {
-		return errors.New("ComputationResult or its ExecutableBlock is nil when Upload() is called")
+	if computationResult == nil || computationResult.ExecutableBlock == nil ||
+		computationResult.ExecutableBlock.Block == nil {
+		return errors.New("ComputationResult or its ExecutableBlock(or its Block) is nil when Upload() is called")
 	}
 
 	// Before upload we store ComputationResult upload status to BadgerDB as false before upload is done.
@@ -135,35 +138,25 @@ func (b *BadgerRetryableUploaderWrapper) RetryUpload() error {
 	for _, blockID := range blockIDs {
 		wg.Add(1)
 		go func(blockID flow.Identifier) {
-			// Load stored ComputationResult upload status from BadgerDB
-			wasUploadCompleted, cr_err := b.uploadStatusStore.ByID(blockID)
-			if cr_err != nil {
-				log.Error().Err(cr_err).Msgf(
-					"Failed to load ComputationResult from local DB with BlockID %s", blockID)
-				retErr = cr_err
+			var cr_err error
+			retComputationResult, err := b.reconstructComputationResult(blockID)
+			if err != nil {
+				err = cr_err
+				log.Error().Err(err).Msgf(
+					"failed to reconstruct ComputationResult with BlockID %s", blockID)
 				return
 			}
 
-			if !wasUploadCompleted {
-				retComputationResult, err := b.reconstructComputationResult(blockID)
-				if err != nil {
-					err = cr_err
-					log.Error().Err(err).Msgf(
-						"failed to reconstruct ComputationResult with BlockID %s", blockID)
-					return
-				}
-
-				// Do Upload
-				if cr_err = b.uploader.Upload(retComputationResult); cr_err != nil {
-					log.Error().Err(cr_err).Msgf(
-						"Failed to update ComputationResult with BlockID %s", blockID)
-					retErr = cr_err
-				}
-
-				b.metrics.ExecutionComputationResultUploadRetried()
-
-				wg.Done()
+			// Do Upload
+			if cr_err = b.uploader.Upload(retComputationResult); cr_err != nil {
+				log.Error().Err(cr_err).Msgf(
+					"Failed to update ComputationResult with BlockID %s", blockID)
+				retErr = cr_err
 			}
+
+			b.metrics.ExecutionComputationResultUploadRetried()
+
+			wg.Done()
 		}(blockID)
 	}
 	wg.Wait()
