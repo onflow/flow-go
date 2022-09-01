@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
 	fvmMock "github.com/onflow/flow-go/fvm/mock"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -105,13 +106,6 @@ func TestContractInvoker(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			invoker := fvm.NewContractFunctionInvoker(
-				common.AddressLocation{},
-				"functionName",
-				[]cadence.Value{},
-				[]sema.Type{},
-			)
-
 			env := &fvmMock.Environment{}
 			vm := &fvm.VirtualMachine{
 				Runtime: &TestInterpreterRuntime{
@@ -127,7 +121,13 @@ func TestContractInvoker(t *testing.T) {
 				fvm.NewReusableCadenceRuntime())
 			env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
-			value, err := invoker.Invoke(env)
+			invoker := fvm.NewContractFunctionInvoker(env)
+			value, err := invoker.Invoke(
+				fvm.ContractFunctionSpec{
+					FunctionName: "functionName",
+				},
+				flow.Address{},
+				[]cadence.Value{})
 
 			tc.require(t, value, err)
 		})
