@@ -5,6 +5,10 @@ COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
 VERSION := $(shell git describe --tags --abbrev=2 --match "v*" --match "secure-cadence*" 2>/dev/null)
 
+# By default, this will run all tests in all packages, but we have a way to override this in CI so that we can
+# dynamically split up CI jobs into smaller jobs that can be run in parallel
+GO_TEST_PACKAGES := ./...
+
 # Image tag: if image tag is not set, set it with version (or short commit if empty)
 ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${VERSION}
@@ -50,19 +54,10 @@ cmd/util/util:
 ############################################################################################
 # CAUTION: DO NOT MODIFY THESE TARGETS! DOING SO WILL BREAK THE FLAKY TEST MONITOR
 
-.PHONY: unittest-main-no-engine
-unittest-main-no-engine:
-	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic `go list ./... | grep -v -e flow-go/engine`
-
-# engine unit tests take a relatively long time to run so we want to isolate them into a separate target that can be run as a separate CI job
-.PHONY: unittest-main-engine
-unittest-main-engine:
-	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic `go list ./... | grep -e flow-go/engine`
-
 .PHONY: unittest-main
 unittest-main:
 	# test all packages with Relic library enabled
-	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
+	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic GO_TEST_PACKAGES
 
 .PHONY: install-mock-generators
 install-mock-generators:
