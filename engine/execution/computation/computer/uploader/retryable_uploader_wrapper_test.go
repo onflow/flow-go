@@ -225,7 +225,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 }
 
 // createTestBadgerRetryableUploaderWrapper() create BadgerRetryableUploaderWrapper instance with given
-// 	AsyncUploader instance and proper mock storage and EDS interfaces.
+// AsyncUploader instance and proper mock storage and EDS interfaces.
 func createTestBadgerRetryableUploaderWrapper(asyncUploader *AsyncUploader) *BadgerRetryableUploaderWrapper {
 	mockBlocksStorage := new(storageMock.Blocks)
 	mockBlocksStorage.On("ByID", mock.Anything).Return(nil, nil)
