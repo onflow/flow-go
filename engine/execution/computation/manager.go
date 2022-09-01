@@ -38,6 +38,10 @@ func SetUploaderEnabled(enabled bool) {
 	log.Info().Msgf("changed uploadEnabled to %v", enabled)
 }
 
+func GetUploaderEnabled() bool {
+	return uploadEnabled
+}
+
 type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
 	GetAccount(fvm.Context, flow.Address, state.View, *programs.Programs) (*flow.Account, error)
