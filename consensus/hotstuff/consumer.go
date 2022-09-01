@@ -11,9 +11,9 @@ import (
 // finalization algorithm makes the respective steps.
 //
 // Implementations must:
-//   * be concurrency safe
-//   * be non-blocking
-//   * handle repetition of the same events (with some processing overhead).
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
 type FinalizationConsumer interface {
 
 	// OnBlockIncorporated notifications are produced by the Finalization Logic
@@ -44,9 +44,9 @@ type FinalizationConsumer interface {
 // in the order in which the HotStuff algorithm makes the respective steps.
 //
 // Implementations must:
-//   * be concurrency safe
-//   * be non-blocking
-//   * handle repetition of the same events (with some processing overhead).
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
 type Consumer interface {
 	FinalizationConsumer
 
@@ -161,9 +161,9 @@ type Consumer interface {
 // in the order in which the HotStuff algorithm makes the respective steps.
 //
 // Implementations must:
-//   * be concurrency safe
-//   * be non-blocking
-//   * handle repetition of the same events (with some processing overhead).
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
 type QCCreatedConsumer interface {
 	// OnQcConstructedFromVotes notifications are produced by the VoteAggregator
 	// component, whenever it constructs a QC from votes.

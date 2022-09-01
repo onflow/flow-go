@@ -460,7 +460,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-//  (1) Informs sealing.Core about finalization of respective block.
+// (1) Informs sealing.Core about finalization of respective block.
+//
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
@@ -484,9 +485,10 @@ func (e *Engine) finalizationProcessingLoop() {
 
 // handleHotStuffError accepts the error channel from the HotStuff component and
 // crashes the node if any error is detected.
+//
 // TODO: this function should be removed in favour of refactoring this engine and
-//  the epochmgr engine to use the Component pattern, so that irrecoverable errors
-//  can be bubbled all the way to the node scaffold
+// the epochmgr engine to use the Component pattern, so that irrecoverable errors
+// can be bubbled all the way to the node scaffold
 func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
 	for {
 		select {
