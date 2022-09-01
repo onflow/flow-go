@@ -1,4 +1,4 @@
-package state_test
+package environment_test
 
 import (
 	"bytes"
@@ -7,12 +7,12 @@ import (
 	"github.com/onflow/atree"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/environment"
 )
 
 func TestAccountStatus(t *testing.T) {
 
-	s := state.NewAccountStatus()
+	s := environment.NewAccountStatus()
 	require.False(t, s.IsAccountFrozen())
 
 	t.Run("test frozen flag set/reset", func(t *testing.T) {
@@ -43,7 +43,7 @@ func TestAccountStatus(t *testing.T) {
 
 	t.Run("test serialization", func(t *testing.T) {
 		b := append([]byte(nil), s.ToBytes()...)
-		clone, err := state.AccountStatusFromBytes(b)
+		clone, err := environment.AccountStatusFromBytes(b)
 		require.NoError(t, err)
 		require.Equal(t, s.IsAccountFrozen(), clone.IsAccountFrozen())
 		require.Equal(t, s.StorageIndex(), clone.StorageIndex())
@@ -51,7 +51,7 @@ func TestAccountStatus(t *testing.T) {
 		require.Equal(t, s.StorageUsed(), clone.StorageUsed())
 
 		// invalid size bytes
-		_, err = state.AccountStatusFromBytes([]byte{1, 2})
+		_, err = environment.AccountStatusFromBytes([]byte{1, 2})
 		require.Error(t, err)
 	})
 }

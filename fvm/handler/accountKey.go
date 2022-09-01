@@ -10,15 +10,15 @@ import (
 	fgcrypto "github.com/onflow/flow-go/crypto"
 	fghash "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // AccountKeyHandler handles all interaction
 // with account keys such as get/set/revoke
 type AccountKeyHandler struct {
-	accounts state.Accounts
+	accounts environment.Accounts
 }
 
 // NewAccountPublicKey construct an account public key given a runtime public key.
@@ -58,7 +58,7 @@ func NewAccountPublicKey(publicKey *runtime.PublicKey,
 	}, nil
 }
 
-func NewAccountKeyHandler(accounts state.Accounts) *AccountKeyHandler {
+func NewAccountKeyHandler(accounts environment.Accounts) *AccountKeyHandler {
 	return &AccountKeyHandler{
 		accounts: accounts,
 	}
