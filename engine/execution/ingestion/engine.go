@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -23,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -35,14 +37,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
-
-var uploadEnabled = true
-
-func SetUploaderEnabled(enabled bool) {
-	uploadEnabled = enabled
-
-	log.Info().Msgf("Ingestion Engine: changed uploadEnabled to %v", enabled)
-}
 
 // An Engine receives and saves incoming blocks.
 type Engine struct {
@@ -75,6 +69,8 @@ type Engine struct {
 	syncFast               bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	pauseExecution         bool
+	executionDataPruner    *pruner.Pruner
+	uploaders              []uploader.Uploader
 }
 
 func New(
@@ -100,6 +96,8 @@ func New(
 	syncFast bool,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pauseExecution bool,
+	pruner *pruner.Pruner,
+	uploaders []uploader.Uploader,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -132,6 +130,8 @@ func New(
 		syncFast:               syncFast,
 		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
 		pauseExecution:         pauseExecution,
+		executionDataPruner:    pruner,
+		uploaders:              uploaders,
 	}
 
 	// move to state syncing engine
@@ -149,8 +149,8 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	if !e.pauseExecution {
-		if uploadEnabled {
-			if err := e.computationManager.RetryUpload(); err != nil {
+		if computation.GetUploaderEnabled() {
+			if err := e.retryUpload(); err != nil {
 				e.log.Warn().Msg("failed to re-upload all ComputationResults")
 			}
 		}
@@ -450,7 +450,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
 
 	span, _, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
-	defer span.Finish()
+	defer span.End()
 
 	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
 	if err != nil {
@@ -582,7 +582,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	startedAt := time.Now()
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
-	defer span.Finish()
+	defer span.End()
 
 	view := e.execState.NewView(*executableBlock.StartState)
 
@@ -654,6 +654,10 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	err = e.onBlockExecuted(executableBlock, finalState)
 	if err != nil {
 		e.log.Err(err).Msg("failed in process block's children")
+	}
+
+	if e.executionDataPruner != nil {
+		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
 	}
 }
 
@@ -826,7 +830,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 	collID := collection.ID()
 
 	span, _, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
-	defer span.Finish()
+	defer span.End()
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
@@ -1130,7 +1134,7 @@ func (e *Engine) handleComputationResult(
 ) (flow.StateCommitment, *flow.ExecutionReceipt, error) {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEHandleComputationResult)
-	defer span.Finish()
+	defer span.End()
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
@@ -1162,7 +1166,7 @@ func (e *Engine) saveExecutionResults(
 ) (*flow.ExecutionReceipt, error) {
 
 	span, childCtx := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
-	defer span.Finish()
+	defer span.End()
 
 	originalState := startState
 
@@ -1245,6 +1249,16 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 				Msg("extensive log: executed tx content")
 		}
 	}
+}
+
+func (e *Engine) retryUpload() (err error) {
+	for _, u := range e.uploaders {
+		switch retryableUploaderWraper := u.(type) {
+		case uploader.RetryableUploaderWrapper:
+			err = retryableUploaderWraper.RetryUpload()
+		}
+	}
+	return err
 }
 
 func GenerateExecutionReceipt(

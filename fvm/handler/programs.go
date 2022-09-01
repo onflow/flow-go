@@ -26,15 +26,20 @@ type ProgramsHandler struct {
 	viewsStack   []stackEntry
 	Programs     *programs.Programs
 	initialState *state.State
+
+	// NOTE: non-address programs are not reusable across transactions, hence
+	// they are kept out of the shared program cache.
+	nonAddressPrograms map[common.LocationID]*interpreter.Program
 }
 
 // NewProgramsHandler construts a new ProgramHandler
 func NewProgramsHandler(programs *programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
 	return &ProgramsHandler{
-		masterState:  stateHolder,
-		viewsStack:   nil,
-		Programs:     programs,
-		initialState: stateHolder.State(),
+		masterState:        stateHolder,
+		viewsStack:         nil,
+		Programs:           programs,
+		initialState:       stateHolder.State(),
+		nonAddressPrograms: map[common.LocationID]*interpreter.Program{},
 	}
 }
 
@@ -44,9 +49,12 @@ func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Pro
 		return nil
 	}
 
-	// we track only for AddressLocation, so for anything other simply put a value
-	if _, is := location.(common.AddressLocation); !is {
-		h.Programs.Set(location, program, nil)
+	address, ok := location.(common.AddressLocation)
+
+	// program cache track only for AddressLocation, so for anything other
+	// simply put a value
+	if !ok {
+		h.nonAddressPrograms[location.ID()] = program
 		return nil
 	}
 
@@ -62,9 +70,9 @@ func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Pro
 		return fmt.Errorf("set called for type %s while last get was for %s", location.String(), last.location.String())
 	}
 
-	h.Programs.Set(location, program, last.state)
+	h.Programs.Set(address, program, last.state)
 
-	err := h.mergeState(last.state, h.masterState.EnforceInteractionLimits())
+	err := h.mergeState(last.state, h.masterState.EnforceLimits())
 
 	return err
 }
@@ -86,7 +94,15 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 		return nil, false
 	}
 
-	program, view, has := h.Programs.Get(location)
+	address, ok := location.(common.AddressLocation)
+
+	// program cache track only for AddressLocation
+	if !ok {
+		prog, ok := h.nonAddressPrograms[location.ID()]
+		return prog, ok
+	}
+
+	program, view, has := h.Programs.Get(address)
 	if has {
 		if view != nil { // handle view not set (ie. for non-address locations
 			// don't enforce limits while merging a cached view
@@ -97,11 +113,6 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 			}
 		}
 		return program, true
-	}
-
-	// we track only for AddressLocation
-	if _, is := location.(common.AddressLocation); !is {
-		return nil, false
 	}
 
 	parentState := h.masterState.State()
@@ -130,13 +141,13 @@ func (h *ProgramsHandler) Cleanup() error {
 
 	for i := stackLen - 1; i > 0; i-- {
 		entry := h.viewsStack[i]
-		err := h.viewsStack[i-1].state.MergeState(entry.state, h.masterState.EnforceInteractionLimits())
+		err := h.viewsStack[i-1].state.MergeState(entry.state, h.masterState.EnforceLimits())
 		if err != nil {
 			return fmt.Errorf("cannot merge state while cleanup: %w", err)
 		}
 	}
 
-	err := h.initialState.MergeState(h.viewsStack[0].state, h.masterState.EnforceInteractionLimits())
+	err := h.initialState.MergeState(h.viewsStack[0].state, h.masterState.EnforceLimits())
 	if err != nil {
 		return err
 	}

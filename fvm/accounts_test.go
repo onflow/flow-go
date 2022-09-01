@@ -21,7 +21,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) flow.Address {
+func createAccount(
+	t *testing.T,
+	vm *fvm.VirtualMachine,
+	chain flow.Chain,
+	ctx fvm.Context,
+	view state.View,
+	programs *programs.Programs,
+) flow.Address {
 	ctx = fvm.NewContextFromParent(
 		ctx,
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
@@ -31,7 +38,7 @@ func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx f
 		SetScript([]byte(createAccountTransaction)).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx := fvm.Transaction(txBody, 0)
+	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 	err := vm.Run(ctx, tx, view, programs)
 	require.NoError(t, err)
@@ -82,7 +89,7 @@ func addAccountKey(
 		AddArgument(cadencePublicKey).
 		AddAuthorizer(address)
 
-	tx := fvm.Transaction(txBody, 0)
+	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 	err = vm.Run(ctx, tx, view, programs)
 	require.NoError(t, err)
@@ -111,7 +118,7 @@ func addAccountCreator(
 		SetScript(script).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx := fvm.Transaction(txBody, 0)
+	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 	err := vm.Run(ctx, tx, view, programs)
 	require.NoError(t, err)
@@ -139,7 +146,7 @@ func removeAccountCreator(
 		SetScript(script).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx := fvm.Transaction(txBody, 0)
+	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 	err := vm.Run(ctx, tx, view, programs)
 	require.NoError(t, err)
@@ -350,7 +357,7 @@ func TestCreateAccount(t *testing.T) {
 					SetScript([]byte(createAccountTransaction)).
 					AddAuthorizer(payer)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -381,7 +388,7 @@ func TestCreateAccount(t *testing.T) {
 					SetScript([]byte(createMultipleAccountsTransaction)).
 					AddAuthorizer(payer)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -425,7 +432,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 					SetScript([]byte(createAccountTransaction)).
 					AddAuthorizer(payer)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -442,7 +449,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 					SetScript([]byte(createAccountTransaction)).
 					AddAuthorizer(chain.ServiceAddress())
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -463,7 +470,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 					SetPayer(payer).
 					AddAuthorizer(payer)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -483,7 +490,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 					SetScript([]byte(createAccountTransaction)).
 					AddAuthorizer(payer)
 
-				validTx := fvm.Transaction(txBody, 0)
+				validTx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err := vm.Run(ctx, validTx, view, programs)
 				require.NoError(t, err)
@@ -492,7 +499,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 				removeAccountCreator(t, vm, chain, ctx, view, programs, payer)
 
-				invalidTx := fvm.Transaction(txBody, 0)
+				invalidTx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, invalidTx, view, programs)
 				require.NoError(t, err)
@@ -562,7 +569,7 @@ func TestAddAccountKey(t *testing.T) {
 						AddArgument(cadencePublicKey).
 						AddAuthorizer(address)
 
-					tx := fvm.Transaction(txBody, 0)
+					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 					err = vm.Run(ctx, tx, view, programs)
 					require.NoError(t, err)
@@ -604,7 +611,7 @@ func TestAddAccountKey(t *testing.T) {
 						AddArgument(publicKey2Arg).
 						AddAuthorizer(address)
 
-					tx := fvm.Transaction(txBody, 0)
+					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 					err = vm.Run(ctx, tx, view, programs)
 					require.NoError(t, err)
@@ -646,7 +653,7 @@ func TestAddAccountKey(t *testing.T) {
 						AddArgument(invalidPublicKeyArg).
 						AddAuthorizer(address)
 
-					tx := fvm.Transaction(txBody, 0)
+					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 					err = vm.Run(ctx, tx, view, programs)
 					require.NoError(t, err)
@@ -699,7 +706,7 @@ func TestAddAccountKey(t *testing.T) {
 						AddArgument(publicKey2Arg).
 						AddAuthorizer(address)
 
-					tx := fvm.Transaction(txBody, 0)
+					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 					err = vm.Run(ctx, tx, view, programs)
 					require.NoError(t, err)
@@ -763,7 +770,7 @@ func TestAddAccountKey(t *testing.T) {
 							AddArgument(publicKeyArg).
 							AddAuthorizer(address)
 
-						tx := fvm.Transaction(txBody, 0)
+						tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 						err = vm.Run(ctx, tx, view, programs)
 						require.NoError(t, err)
@@ -825,7 +832,7 @@ func TestRemoveAccountKey(t *testing.T) {
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
-					for i, keyIndex := range []int{-1, keyCount, keyCount + 1} {
+					for _, keyIndex := range []int{-1, keyCount, keyCount + 1} {
 						keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 						require.NoError(t, err)
 
@@ -834,7 +841,7 @@ func TestRemoveAccountKey(t *testing.T) {
 							AddArgument(keyIndexArg).
 							AddAuthorizer(address)
 
-						tx := fvm.Transaction(txBody, uint32(i))
+						tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 						err = vm.Run(ctx, tx, view, programs)
 						require.NoError(t, err)
@@ -880,7 +887,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						AddArgument(keyIndexArg).
 						AddAuthorizer(address)
 
-					tx := fvm.Transaction(txBody, 0)
+					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 					err = vm.Run(ctx, tx, view, programs)
 					require.NoError(t, err)
@@ -931,7 +938,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						AddArgument(keyIndexArg).
 						AddAuthorizer(address)
 
-					tx := fvm.Transaction(txBody, 0)
+					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 					err = vm.Run(ctx, tx, view, programs)
 					require.NoError(t, err)
@@ -991,7 +998,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						txBody.AddArgument(keyIndexArg)
 					}
 
-					tx := fvm.Transaction(txBody, 0)
+					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 					err = vm.Run(ctx, tx, view, programs)
 					require.NoError(t, err)
@@ -1032,7 +1039,7 @@ func TestGetAccountKey(t *testing.T) {
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
-				for i, keyIndex := range []int{-1, keyCount, keyCount + 1} {
+				for _, keyIndex := range []int{-1, keyCount, keyCount + 1} {
 					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 					require.NoError(t, err)
 
@@ -1041,7 +1048,7 @@ func TestGetAccountKey(t *testing.T) {
 						AddArgument(keyIndexArg).
 						AddAuthorizer(address)
 
-					tx := fvm.Transaction(txBody, uint32(i))
+					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 					err = vm.Run(ctx, tx, view, programs)
 					require.NoError(t, err)
@@ -1078,7 +1085,7 @@ func TestGetAccountKey(t *testing.T) {
 					AddArgument(keyIndexArg).
 					AddAuthorizer(address)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1130,7 +1137,7 @@ func TestGetAccountKey(t *testing.T) {
 					AddArgument(keyIndexArg).
 					AddAuthorizer(address)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1183,7 +1190,7 @@ func TestGetAccountKey(t *testing.T) {
 					txBody.AddArgument(keyIndexArg)
 				}
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1233,7 +1240,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1285,7 +1292,7 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, _ state.View, programs *programs.Programs) {
 				address := chain.ServiceAddress()
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
@@ -1295,7 +1302,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, address)))
 
-				view = delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+				view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 					if key == state.KeyAccountStatus {
 						return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
 					}
@@ -1323,7 +1330,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1387,7 +1394,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1429,7 +1436,7 @@ func TestGetStorageCapacity(t *testing.T) {
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1497,14 +1504,14 @@ func TestGetStorageCapacity(t *testing.T) {
 					}
 				`, address)))
 
-				view = delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+				newview := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 					if key == state.KeyAccountStatus {
 						return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
 					}
 					return nil, nil
 				})
 
-				err := vm.Run(ctx, script, view, programs)
+				err := vm.Run(ctx, script, newview, programs)
 				require.ErrorContains(t, err, fmt.Sprintf("error getting register %s, %s", address.Hex(), state.KeyAccountStatus))
 			}),
 	)

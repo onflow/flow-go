@@ -7,31 +7,30 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
-	"github.com/onflow/flow-go/apiproxy"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 )
 
-// NewRPCEngineBuilder helps to build a new RPC engine.
-func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
-	return &RPCEngineBuilder{
-		Engine:               engine,
-		signerIndicesDecoder: signature.NewNoopBlockSignerDecoder(),
-	}
-}
-
 type RPCEngineBuilder struct {
 	*Engine
-
-	router               *apiproxy.FlowAccessAPIRouter // this is set through `WithRouting`; or nil if not explicitly specified
+	handler              accessproto.AccessAPIServer // Use the parent interface instead of implementation, so that we can assign it to proxy.
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
 }
 
-// WithRouting specifies that the given router should be used as primary access API.
-// Returns self-reference for chaining.
-func (builder *RPCEngineBuilder) WithRouting(router *apiproxy.FlowAccessAPIRouter) *RPCEngineBuilder {
-	builder.router = router
-	return builder
+// NewRPCEngineBuilder helps to build a new RPC engine.
+func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
+	decoder := signature.NewNoopBlockSignerDecoder()
+
+	// the default handler will use the engine.backend implementation
+	return &RPCEngineBuilder{
+		Engine:               engine,
+		signerIndicesDecoder: decoder,
+		handler:              access.NewHandler(engine.backend, engine.chain, access.WithBlockSignerDecoder(decoder)),
+	}
+}
+
+func (builder *RPCEngineBuilder) Handler() accessproto.AccessAPIServer {
+	return builder.handler
 }
 
 // WithBlockSignerDecoder specifies that signer indices in block headers should be translated
@@ -39,6 +38,11 @@ func (builder *RPCEngineBuilder) WithRouting(router *apiproxy.FlowAccessAPIRoute
 // Returns self-reference for chaining.
 func (builder *RPCEngineBuilder) WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) *RPCEngineBuilder {
 	builder.signerIndicesDecoder = signerIndicesDecoder
+	return builder
+}
+
+func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPIServer) *RPCEngineBuilder {
+	builder.handler = handler
 	return builder
 }
 
@@ -68,15 +72,7 @@ func (builder *RPCEngineBuilder) WithMetrics() *RPCEngineBuilder {
 }
 
 func (builder *RPCEngineBuilder) Build() *Engine {
-	var localAPIServer accessproto.AccessAPIServer = access.NewHandler(builder.backend, builder.chain, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
-
-	if builder.router != nil {
-		builder.router.SetLocalAPI(localAPIServer)
-		localAPIServer = builder.router
-	}
-
-	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, localAPIServer)
-	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer, localAPIServer)
-
+	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, builder.handler)
+	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer, builder.handler)
 	return builder.Engine
 }

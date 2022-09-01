@@ -18,44 +18,64 @@ on:
 env:
   GO_VERSION: 1.18
 
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   golangci:
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: [./, ./integration/, ./crypto/]
     name: Lint
     runs-on: ubuntu-latest
     steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: ${{ env.GO_VERSION }}
-    - name: Checkout repo
-      uses: actions/checkout@v2
+        cache: true
     - name: Build relic
       run: make crypto_setup_gopath
+    - name: Run go generate
+      run: go generate
+      working-directory: ${{ matrix.dir }}
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v2
+      uses: golangci/golangci-lint-action@v3
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: v1.45
+        version: v1.47
         args: -v --build-tags relic
+        working-directory: ${{ matrix.dir }}
         # https://github.com/golangci/golangci-lint-action/issues/244
-        skip-pkg-cache: true
-        # Make sure we get accurate results
-        # Some of these may be needed if observer code is integrated: only-new-issues: true, skip-build-cache: true
+        skip-cache: true
+
+  shell-check:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
     - name: Run ShellCheck
-      uses: ludeeus/action-shellcheck@master
+      uses: ludeeus/action-shellcheck@203a3fd018dfe73f8ae7e3aa8da2c149a5f41c33
       with:
         scandir: './crypto'
         ignore: 'relic'
+
   unit-test:
     name: Unit Tests
     runs-on: ubuntu-latest
     steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: ${{ env.GO_VERSION }}
-    - name: Checkout repo
-      uses: actions/checkout@v2
+        cache: true
     - name: Run tests
       if: github.actor != 'bors[bot]'
       run: make ci
@@ -67,7 +87,7 @@ jobs:
         max_attempts: 3
         command: make ci
     - name: Upload coverage report
-      uses: codecov/codecov-action@v2
+      uses: codecov/codecov-action@v3
       with:
         file: ./coverage.txt
         flags: unittests
@@ -93,12 +113,13 @@ jobs:
       TEST_CATEGORY: ${{ matrix.test-category }}
     runs-on: ubuntu-latest
     steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: ${{ env.GO_VERSION }}
-    - name: Checkout repo
-      uses: actions/checkout@v2
+        cache: true
     - name: Build relic
       run: make crypto_setup_gopath
     - name: Docker build
@@ -113,18 +134,20 @@ jobs:
         timeout_minutes: 15
         max_attempts: 2
         command: ./tools/test_monitor/run-tests.sh
+
   localnet-test:
     name: Localnet Compatibility Tests With Flow-CLI Client and Observer
     strategy:
       fail-fast: false
     runs-on: ubuntu-latest
     steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: ${{ env.GO_VERSION }}
-    - name: Checkout repo
-      uses: actions/checkout@v2
+        cache: true
     - name: Build relic and other tools
       run: make install-tools
     - name: Install Flow Client In Docker

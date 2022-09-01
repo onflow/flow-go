@@ -1,8 +1,6 @@
 name: Flaky Test Debug
 
 on:
-  schedule:
-    - cron: '0 */1 * * *' # every 1 hour
   push:
     branches:
       - '**/*flaky-test*'
@@ -10,13 +8,26 @@ env:
   GO_VERSION: 1.18
 
 jobs:
+  unit-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Run tests
+        if: github.actor != 'bors[bot]'
+        run: make ci
   integration-test:
     name: Integration Tests
     strategy:
       fail-fast: false
       matrix:
         test-category:
-          - integration-epochs
+          - integration-bft
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
     runs-on: ubuntu-latest

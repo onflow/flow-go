@@ -97,9 +97,9 @@ func run(*cobra.Command, []string) {
 		return values[0], nil
 	})
 
-	sth := state.NewStateHolder(state.NewState(ldg))
-	accounts := state.NewAccounts(sth)
-	finalGenerator := state.NewStateBoundAddressGenerator(sth, chain)
+	stTxn := state.NewStateTransaction(ldg, state.DefaultParameters())
+	accounts := state.NewAccounts(stTxn)
+	finalGenerator := state.NewStateBoundAddressGenerator(stTxn, chain)
 	finalState := finalGenerator.Bytes()
 
 	generator := chain.NewAddressGenerator()

@@ -66,9 +66,11 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	defer rwm.Close()
 
 	l := migrations.NewView(payload)
-	st := state.NewState(l, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
-	sth := state.NewStateHolder(st)
-	gen := state.NewStateBoundAddressGenerator(sth, r.Chain)
+	stTxn := state.NewStateTransaction(
+		l,
+		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
+	)
+	gen := state.NewStateBoundAddressGenerator(stTxn, r.Chain)
 
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
 
@@ -126,7 +128,6 @@ type balanceProcessor struct {
 	momentsScript []byte
 
 	accounts state.Accounts
-	st       *state.State
 
 	rwa        ReportWriter
 	rwc        ReportWriter
@@ -141,21 +142,19 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	prog := programs.NewEmptyPrograms()
 
 	v := view.NewChild()
-	st := state.NewState(v, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
-	sth := state.NewStateHolder(st)
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		v,
+		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
+	)
+	accounts := state.NewAccounts(stTxn)
 
-	env, err := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, prog)
-	if err != nil {
-		panic(err)
-	}
+	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, prog)
 
 	return &balanceProcessor{
 		vm:       vm,
 		ctx:      ctx,
 		view:     v,
 		accounts: accounts,
-		st:       st,
 		prog:     prog,
 		intf:     env,
 	}

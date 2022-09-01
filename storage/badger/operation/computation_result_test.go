@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TesUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
+func TesInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := generateComputationResult(t)
 		expectedId := expected.ExecutableBlock.ID()
@@ -58,6 +58,38 @@ func TesUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 	})
 }
 
+func TesUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		expected := generateComputationResult(t)
+		expectedId := expected.ExecutableBlock.ID()
+
+		t.Run("Upsert ComputationResult", func(t *testing.T) {
+			// first upsert as false
+			testUploadStatusVal := false
+
+			err := db.Update(UpsertComputationResultUploadStatus(expectedId, testUploadStatusVal))
+			require.NoError(t, err)
+
+			var actualUploadStatus bool
+			err = db.View(GetComputationResultUploadStatus(expectedId, &actualUploadStatus))
+			require.NoError(t, err)
+
+			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
+
+			// upsert to true
+			testUploadStatusVal = true
+			err = db.Update(UpsertComputationResultUploadStatus(expectedId, testUploadStatusVal))
+			require.NoError(t, err)
+
+			// check if value is updated
+			err = db.View(GetComputationResultUploadStatus(expectedId, &actualUploadStatus))
+			require.NoError(t, err)
+
+			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
+		})
+	})
+}
+
 func TestRemoveComputationResultUploadStatus(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := generateComputationResult(t)
@@ -90,7 +122,7 @@ func TestListComputationResults(t *testing.T) {
 			generateComputationResult(t),
 			generateComputationResult(t),
 		}
-		t.Run("List all ComputationResult", func(t *testing.T) {
+		t.Run("List all ComputationResult with status True", func(t *testing.T) {
 			expectedIDs := make(map[string]bool, 0)
 			// Store a list of ComputationResult instances first
 			for _, cr := range expected {
@@ -102,7 +134,7 @@ func TestListComputationResults(t *testing.T) {
 
 			// Get the list of IDs of stored ComputationResult
 			crIDs := make([]flow.Identifier, 0)
-			err := db.View(GetAllComputationResultIDs(&crIDs))
+			err := db.View(GetBlockIDsByStatus(&crIDs, true))
 			require.NoError(t, err)
 			crIDsStrMap := make(map[string]bool, 0)
 			for _, crID := range crIDs {

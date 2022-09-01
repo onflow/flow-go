@@ -146,22 +146,16 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, n := range nodes {
-		// defines a func to read from the subscription
-		subReader := func(s *pubsub.Subscription) {
+		s, err := n.Subscribe(topic, codec, unittest.AllowAllPeerFilter())
+		require.NoError(t, err)
+
+		go func(s *pubsub.Subscription, nodeID peer.ID) {
 			msg, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, msg)
 			assert.Equal(t, data, msg.Data)
-			ch <- n.Host().ID()
-		}
-
-		// Subscribes to the test topic
-		s, err := n.Subscribe(topic, codec, unittest.AllowAllPeerFilter())
-		require.NoError(t, err)
-
-		// kick off the reader
-		go subReader(s)
-
+			ch <- nodeID
+		}(s, n.Host().ID())
 	}
 
 	// fullyConnectedGraph checks that each node is directly connected to all the other nodes
@@ -197,7 +191,7 @@ loop:
 					missing = append(missing, n.Host().ID())
 				}
 			}
-			assert.Fail(t, "messages not received by some nodes", "%v", missing)
+			assert.Failf(t, "messages not received by some nodes", "%+v", missing)
 			break loop
 		}
 	}

@@ -7,34 +7,42 @@ import (
 )
 
 // InsertComputationResult addes given instance of ComputationResult into local BadgerDB.
-func InsertComputationResultUploadStatus(computationResultID flow.Identifier,
+func InsertComputationResultUploadStatus(blockID flow.Identifier,
 	wasUploadCompleted bool) func(*badger.Txn) error {
-	return insert(makePrefix(codeComputationResults, computationResultID), wasUploadCompleted)
+	return insert(makePrefix(codeComputationResults, blockID), wasUploadCompleted)
 }
 
 // UpdateComputationResult updates given existing instance of ComputationResult in local BadgerDB.
-func UpdateComputationResultUploadStatus(computationResultID flow.Identifier,
+func UpdateComputationResultUploadStatus(blockID flow.Identifier,
 	wasUploadCompleted bool) func(*badger.Txn) error {
-	return update(makePrefix(codeComputationResults, computationResultID), wasUploadCompleted)
+	return update(makePrefix(codeComputationResults, blockID), wasUploadCompleted)
+}
+
+// UpsertComputationResult upserts given existing instance of ComputationResult in local BadgerDB.
+func UpsertComputationResultUploadStatus(blockID flow.Identifier,
+	wasUploadCompleted bool) func(*badger.Txn) error {
+	return upsert(makePrefix(codeComputationResults, blockID), wasUploadCompleted)
 }
 
 // RemoveComputationResult removes an instance of ComputationResult with given ID.
 func RemoveComputationResultUploadStatus(
-	computationResultID flow.Identifier) func(*badger.Txn) error {
-	return remove(makePrefix(codeComputationResults, computationResultID))
+	blockID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeComputationResults, blockID))
 }
 
 // GetComputationResult returns stored ComputationResult instance with given ID.
-func GetComputationResultUploadStatus(computationResultID flow.Identifier,
+func GetComputationResultUploadStatus(blockID flow.Identifier,
 	wasUploadCompleted *bool) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeComputationResults, computationResultID), wasUploadCompleted)
+	return retrieve(makePrefix(codeComputationResults, blockID), wasUploadCompleted)
 }
 
-// GetAllComputationResultIDs returns all IDs of stored ComputationResult instances.
-func GetAllComputationResultIDs(computationResultIDs *[]flow.Identifier) func(*badger.Txn) error {
+// GetBlockIDsByStatus returns all IDs of stored ComputationResult instances.
+func GetBlockIDsByStatus(blockIDs *[]flow.Identifier,
+	targetUploadStatus bool) func(*badger.Txn) error {
 	return traverse(makePrefix(codeComputationResults), func() (checkFunc, createFunc, handleFunc) {
+		var currKey flow.Identifier
 		check := func(key []byte) bool {
-			*computationResultIDs = append(*computationResultIDs, flow.HashToID(key[1:]))
+			currKey = flow.HashToID(key[1:])
 			return true
 		}
 
@@ -44,6 +52,9 @@ func GetAllComputationResultIDs(computationResultIDs *[]flow.Identifier) func(*b
 		}
 
 		handle := func() error {
+			if blockIDs != nil && wasUploadCompleted == targetUploadStatus {
+				*blockIDs = append(*blockIDs, currKey)
+			}
 			return nil
 		}
 		return check, create, handle

@@ -149,12 +149,12 @@ func (k *kmac128) Reset() {
 func (k *kmac128) ComputeHash(data []byte) Hash {
 	cshake := k.ShakeHash.Clone()
 	cshake.Reset()
-	cshake.Write(k.initBlock)
-	cshake.Write(data)
-	cshake.Write(rightEncode(uint64(k.outputSize * 8)))
+	_, _ = cshake.Write(k.initBlock)
+	_, _ = cshake.Write(data)
+	_, _ = cshake.Write(rightEncode(uint64(k.outputSize * 8)))
 	// read the cshake output
 	h := make([]byte, k.outputSize)
-	cshake.Read(h)
+	_, _ = cshake.Read(h)
 	return h
 }
 
@@ -162,10 +162,10 @@ func (k *kmac128) ComputeHash(data []byte) Hash {
 // It does not reset the state to allow further writing.
 func (k *kmac128) SumHash() Hash {
 	cshake := k.ShakeHash.Clone()
-	cshake.Write(rightEncode(uint64(k.outputSize * 8)))
+	_, _ = cshake.Write(rightEncode(uint64(k.outputSize * 8)))
 	// read the cshake output
 	h := make([]byte, k.outputSize)
-	cshake.Read(h)
+	_, _ = cshake.Read(h)
 	return h
 }
 

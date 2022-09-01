@@ -1,12 +1,9 @@
 package badger
 
 import (
-	"errors"
-
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -20,23 +17,16 @@ func NewComputationResultUploadStatus(db *badger.DB) *ComputationResultUploadSta
 	}
 }
 
-func (c *ComputationResultUploadStatus) Upsert(executionDataId flow.Identifier,
+func (c *ComputationResultUploadStatus) Upsert(blockID flow.Identifier,
 	wasUploadCompleted bool) error {
-	_, err := c.ByID(executionDataId)
-	if errors.Is(err, storage.ErrNotFound) {
-		return operation.RetryOnConflict(c.db.Update,
-			operation.InsertComputationResultUploadStatus(executionDataId, wasUploadCompleted))
-	} else if err != nil {
-		return err
-	}
-
-	return operation.RetryOnConflict(c.db.Update,
-		operation.UpdateComputationResultUploadStatus(executionDataId, wasUploadCompleted))
+	return operation.RetryOnConflict(c.db.Update, func(btx *badger.Txn) error {
+		return operation.UpsertComputationResultUploadStatus(blockID, wasUploadCompleted)(btx)
+	})
 }
 
-func (c *ComputationResultUploadStatus) GetAllIDs() ([]flow.Identifier, error) {
+func (c *ComputationResultUploadStatus) GetIDsByUploadStatus(targetUploadStatus bool) ([]flow.Identifier, error) {
 	ids := make([]flow.Identifier, 0)
-	err := c.db.View(operation.GetAllComputationResultIDs(&ids))
+	err := c.db.View(operation.GetBlockIDsByStatus(&ids, targetUploadStatus))
 	return ids, err
 }
 

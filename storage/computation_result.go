@@ -10,15 +10,15 @@ import (
 //  - true as upload completed
 //
 type ComputationResultUploadStatus interface {
-	// Upsert inserts or updates ComputationResult into persistent storage with given ID.
-	Upsert(computationResultID flow.Identifier, wasUploadCompleted bool) error
+	// Upsert upserts omputationResult into persistent storage with given BlockID.
+	Upsert(blockID flow.Identifier, wasUploadCompleted bool) error
 
-	// GetAllIDs returns all IDs of stored ComputationResult upload status.
-	GetAllIDs() ([]flow.Identifier, error)
+	// GetIDsByUploadStatus returns BlockIDs whose upload status matches with targetUploadStatus
+	GetIDsByUploadStatus(targetUploadStatus bool) ([]flow.Identifier, error)
 
-	// ByID returns the upload status of ComputationResult with given ID.
-	ByID(computationResultID flow.Identifier) (bool, error)
+	// ByID returns the upload status of ComputationResult with given BlockID.
+	ByID(blockID flow.Identifier) (bool, error)
 
-	// Remove removes an instance of ComputationResult with given ID.
-	Remove(computationResultID flow.Identifier) error
+	// Remove removes an instance of ComputationResult with given BlockID.
+	Remove(blockID flow.Identifier) error
 }

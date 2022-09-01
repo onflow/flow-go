@@ -19,8 +19,10 @@ import (
 )
 
 func TestContract_ChildMergeFunctionality(t *testing.T) {
-	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		utils.NewSimpleView(),
+		state.DefaultParameters())
+	accounts := state.NewAccounts(stTxn)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
 	err := accounts.Create(nil, address)
@@ -93,8 +95,10 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 }
 
 func TestContract_AuthorizationFunctionality(t *testing.T) {
-	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		utils.NewSimpleView(),
+		state.DefaultParameters())
+	accounts := state.NewAccounts(stTxn)
 
 	authAdd := flow.HexToAddress("01")
 	rAdd := runtime.Address(authAdd)
@@ -212,8 +216,10 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 
 func TestContract_DeploymentVouchers(t *testing.T) {
 
-	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		utils.NewSimpleView(),
+		state.DefaultParameters())
+	accounts := state.NewAccounts(stTxn)
 
 	addressWithVoucher := flow.HexToAddress("01")
 	addressWithVoucherRuntime := runtime.Address(addressWithVoucher)
@@ -269,8 +275,10 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 
 func TestContract_ContractUpdate(t *testing.T) {
 
-	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		utils.NewSimpleView(),
+		state.DefaultParameters())
+	accounts := state.NewAccounts(stTxn)
 
 	flowAddress := flow.HexToAddress("01")
 	runtimeAddress := runtime.Address(flowAddress)
@@ -375,8 +383,10 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 
 func TestContract_ContractRemoval(t *testing.T) {
 
-	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		utils.NewSimpleView(),
+		state.DefaultParameters())
+	accounts := state.NewAccounts(stTxn)
 
 	flowAddress := flow.HexToAddress("01")
 	runtimeAddress := runtime.Address(flowAddress)

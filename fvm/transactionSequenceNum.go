@@ -33,13 +33,13 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMSeqNumCheckTransaction)
-		defer span.Finish()
+		defer span.End()
 	}
 
 	parentState := sth.State()
 	childState := sth.NewChild()
 	defer func() {
-		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
+		if mergeError := parentState.MergeState(childState, sth.EnforceLimits()); mergeError != nil {
 			panic(mergeError)
 		}
 		sth.SetActiveState(parentState)

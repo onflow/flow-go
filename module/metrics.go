@@ -321,14 +321,20 @@ type LedgerMetrics interface {
 type WALMetrics interface {
 }
 
-type ExecutionDataServiceMetrics interface {
-	ExecutionDataAddStarted()
+type RateLimitedBlockstoreMetrics interface {
+	BytesRead(int)
+}
 
-	ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeSize uint64)
-
-	ExecutionDataGetStarted()
-
-	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize uint64)
+type BitswapMetrics interface {
+	Peers(prefix string, n int)
+	Wantlist(prefix string, n int)
+	BlobsReceived(prefix string, n uint64)
+	DataReceived(prefix string, n uint64)
+	BlobsSent(prefix string, n uint64)
+	DataSent(prefix string, n uint64)
+	DupBlobsReceived(prefix string, n uint64)
+	DupDataReceived(prefix string, n uint64)
+	MessagesReceived(prefix string, n uint64)
 }
 
 type ExecutionDataRequesterMetrics interface {
@@ -363,6 +369,25 @@ type ProviderMetrics interface {
 	// ChunkDataPackRequested is executed every time a chunk data pack request is arrived at execution node.
 	// It increases the request counter by one.
 	ChunkDataPackRequested()
+}
+
+type ExecutionDataProviderMetrics interface {
+	RootIDComputed(duration time.Duration, numberOfChunks int)
+	AddBlobsSucceeded(duration time.Duration, totalSize uint64)
+	AddBlobsFailed()
+}
+
+type ExecutionDataRequesterV2Metrics interface {
+	FulfilledHeight(blockHeight uint64)
+	ReceiptSkipped()
+	RequestSucceeded(blockHeight uint64, duration time.Duration, totalSize uint64, numberOfAttempts int)
+	RequestFailed(duration time.Duration, retryable bool)
+	RequestCanceled()
+	ResponseDropped()
+}
+
+type ExecutionDataPrunerMetrics interface {
+	Pruned(height uint64, duration time.Duration)
 }
 
 type AccessMetrics interface {

@@ -33,7 +33,8 @@ func SealingAndVerificationHappyPathTest(
 	rootBlockId flow.Identifier) ([]*flow.ExecutionReceipt, []*flow.ResultApproval) {
 
 	// wait for next height finalized (potentially first height), called blockA, just to make sure consensus progresses.
-	blockA := blockState.WaitForHighestFinalizedProgress(t)
+	currentFinalized := blockState.HighestFinalizedHeight()
+	blockA := blockState.WaitForHighestFinalizedProgress(t, currentFinalized)
 	t.Logf("blockA generated, height: %v ID: %v\n", blockA.Header.Height, blockA.Header.ID())
 
 	// sends a transaction

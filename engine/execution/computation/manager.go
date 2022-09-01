@@ -9,23 +9,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ipfs/go-cid"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
-
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/debug"
@@ -37,7 +35,11 @@ var uploadEnabled = true
 func SetUploaderEnabled(enabled bool) {
 	uploadEnabled = enabled
 
-	log.Info().Msgf("ComputationManager: changed uploadEnabled to %v", enabled)
+	log.Info().Msgf("changed uploadEnabled to %v", enabled)
+}
+
+func GetUploaderEnabled() bool {
+	return uploadEnabled
 }
 
 type VirtualMachine interface {
@@ -53,7 +55,6 @@ type ComputationManager interface {
 		view state.View,
 	) (*execution.ComputationResult, error)
 	GetAccount(addr flow.Address, header *flow.Header, view state.View) (*flow.Account, error)
-	RetryUpload() error
 }
 
 var DefaultScriptLogThreshold = 1 * time.Second
@@ -75,11 +76,8 @@ type Manager struct {
 	scriptLogThreshold       time.Duration
 	scriptExecutionTimeLimit time.Duration
 	uploaders                []uploader.Uploader
-	eds                      state_synchronization.ExecutionDataService
-	edCache                  state_synchronization.ExecutionDataCIDCache
-
-	rngLock *sync.Mutex
-	rng     *rand.Rand
+	rngLock                  *sync.Mutex
+	rng                      *rand.Rand
 }
 
 func New(
@@ -95,8 +93,7 @@ func New(
 	scriptLogThreshold time.Duration,
 	scriptExecutionTimeLimit time.Duration,
 	uploaders []uploader.Uploader,
-	eds state_synchronization.ExecutionDataService,
-	edCache state_synchronization.ExecutionDataCIDCache,
+	executionDataProvider *provider.Provider,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -107,6 +104,7 @@ func New(
 		tracer,
 		log.With().Str("component", "block_computer").Logger(),
 		committer,
+		executionDataProvider,
 	)
 
 	if err != nil {
@@ -131,11 +129,8 @@ func New(
 		scriptLogThreshold:       scriptLogThreshold,
 		scriptExecutionTimeLimit: scriptExecutionTimeLimit,
 		uploaders:                uploaders,
-		eds:                      eds,
-		edCache:                  edCache,
-
-		rngLock: &sync.Mutex{},
-		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
+		rngLock:                  &sync.Mutex{},
+		rng:                      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	return &e, nil
@@ -286,73 +281,32 @@ func (e *Manager) ComputeBlock(
 	}
 
 	e.programsCache.Set(block.ID(), toInsert)
-
 	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("programs cache updated")
 
-	group, uploadCtx := errgroup.WithContext(ctx)
-	var rootID flow.Identifier
-	var blobTree [][]cid.Cid
-
-	group.Go(func() error {
-		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEAddToExecutionDataService)
-		defer span.Finish()
-
-		var collections []*flow.Collection
-		for _, collection := range result.ExecutableBlock.Collections() {
-			collections = append(collections, &flow.Collection{
-				Transactions: collection.Transactions,
-			})
-		}
-
-		ed := &state_synchronization.ExecutionData{
-			BlockID:     block.ID(),
-			Collections: collections,
-			Events:      result.Events,
-			TrieUpdates: result.TrieUpdates,
-		}
-
-		var err error
-		rootID, blobTree, err = e.eds.Add(uploadCtx, ed)
-
-		return err
-	})
-
 	if uploadEnabled {
-		// RetryableAsyncUploader depends on the rootID from EDS to keep track of upload
-		// status in BadgerDB, so we will need to wait for the previous EDS goroutine to
-		// complete then to retrieve rootID. Since we don't wait for all uploaders to complete
-		// uploading here, it should have minimal performance impact here.
-		err = group.Wait()
-		if err != nil {
-			return nil, fmt.Errorf("failed to upload block result to EDS: %w", err)
-		}
-		result.ExecutionDataID = rootID
+		var group errgroup.Group
 
 		for _, uploader := range e.uploaders {
 			uploader := uploader
 
 			group.Go(func() error {
 				span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEUploadCollections)
-				defer span.Finish()
+				defer span.End()
 
 				return uploader.Upload(result)
 			})
 		}
-	}
 
-	err = group.Wait()
+		err = group.Wait()
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload block result: %w", err)
+		if err != nil {
+			return nil, fmt.Errorf("failed to upload block result: %w", err)
+		}
 	}
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
-
-	e.edCache.Insert(block.Block.Header, blobTree)
-	e.log.Info().Hex("block_id", logging.Entity(block.Block)).Hex("execution_data_id", rootID[:]).Msg("execution data ID computed")
-	result.ExecutionDataID = rootID
 
 	return result, nil
 }
@@ -368,15 +322,4 @@ func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, vie
 	}
 
 	return account, nil
-}
-
-func (e *Manager) RetryUpload() (err error) {
-	for _, u := range e.uploaders {
-		switch u.(type) {
-		case uploader.RetryableUploader:
-			retryableUploader := u.(uploader.RetryableUploader)
-			err = retryableUploader.RetryUpload()
-		}
-	}
-	return err
 }

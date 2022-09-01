@@ -24,7 +24,7 @@ func TestUpsertAndRetrieveComputationResult(t *testing.T) {
 		crStorage := bstorage.NewComputationResultUploadStatus(db)
 		crId := expected.ExecutableBlock.ID()
 
-		// True case - insert
+		// True case - upsert
 		testUploadStatus := true
 		err := crStorage.Upsert(crId, testUploadStatus)
 		require.NoError(t, err)
@@ -71,8 +71,7 @@ func TestRemoveComputationResults(t *testing.T) {
 
 func TestListComputationResults(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		t.Run("List all ComputationResult", func(t *testing.T) {
-
+		t.Run("List all ComputationResult with given status", func(t *testing.T) {
 			expected := [...]*execution.ComputationResult{
 				generateComputationResult(t),
 				generateComputationResult(t),
@@ -87,9 +86,19 @@ func TestListComputationResults(t *testing.T) {
 				err := crStorage.Upsert(crId, true)
 				require.NoError(t, err)
 			}
+			// Add in entries with non-targeted status
+			unexpected := [...]*execution.ComputationResult{
+				generateComputationResult(t),
+				generateComputationResult(t),
+			}
+			for _, cr := range unexpected {
+				crId := cr.ExecutableBlock.ID()
+				err := crStorage.Upsert(crId, false)
+				require.NoError(t, err)
+			}
 
 			// Get the list of IDs for stored instances
-			crIDs, err := crStorage.GetAllIDs()
+			crIDs, err := crStorage.GetIDsByUploadStatus(true)
 			require.NoError(t, err)
 
 			crIDsStrMap := make(map[string]bool, 0)

@@ -10,13 +10,12 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/ghost/client"
-	"github.com/onflow/flow-go/insecure/attacknetwork"
+	"github.com/onflow/flow-go/insecure/orchestrator"
 	"github.com/onflow/flow-go/insecure/wintermute"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,9 +40,9 @@ type Suite struct {
 	corruptedVnIds flow.IdentifierList
 	honestVN       flow.Identifier // honest verification node
 
-	PreferredUnicasts string // preferred unicast protocols between execution and verification nodes.
-	Orchestrator      *wintermute.Orchestrator
-	attackNet         *attacknetwork.AttackNetwork
+	PreferredUnicasts   string // preferred unicast protocols between execution and verification nodes.
+	Orchestrator        *wintermute.Orchestrator
+	orchestratorNetwork *orchestrator.Network
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -179,37 +178,37 @@ func (s *Suite) SetupSuite() {
 
 	s.Orchestrator = wintermute.NewOrchestrator(logger, s.net.CorruptedIdentities().NodeIDs(), s.net.Identities())
 
-	// start attack network
-	codec := cbor.NewCodec()
-	connector := attacknetwork.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
-	attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
+	// start orchestrator network
+	codec := unittest.NetworkCodec()
+	connector := orchestrator.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
+	orchestratorNetwork, err := orchestrator.NewOrchestratorNetwork(s.log,
 		codec,
 		s.Orchestrator,
 		connector,
 		s.net.CorruptedIdentities())
 	require.NoError(s.T(), err)
-	s.attackNet = attackNetwork
+	s.orchestratorNetwork = orchestratorNetwork
 
 	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
 		case err := <-errChan:
-			s.T().Error("attackNetwork startup encountered fatal error", err)
+			s.T().Error("orchestratorNetwork startup encountered fatal error", err)
 		case <-ctx.Done():
 			return
 		}
 	}()
 
-	attackNetwork.Start(attackCtx)
-	unittest.RequireCloseBefore(s.T(), attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
+	orchestratorNetwork.Start(attackCtx)
+	unittest.RequireCloseBefore(s.T(), orchestratorNetwork.Ready(), 1*time.Second, "could not start orchestrator network on time")
 
 	// starts tracking blocks by the ghost node
 	s.Track(s.T(), ctx, s.Ghost())
 }
 
-// TearDownSuite tears down the test network of Flow as well as the BFT testing attack network.
+// TearDownSuite tears down the test network of Flow as well as the BFT testing orchestrator network.
 func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	s.cancel()
-	unittest.RequireCloseBefore(s.T(), s.attackNet.Done(), 1*time.Second, "could not stop attack network on time")
+	unittest.RequireCloseBefore(s.T(), s.orchestratorNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
 }
