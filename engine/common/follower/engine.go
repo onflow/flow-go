@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -40,6 +41,9 @@ type Engine struct {
 	sync           module.BlockRequester
 	tracer         module.Tracer
 }
+
+var _ consensus.ComplianceProcessor = (*Engine)(nil)
+var _ network.MessageProcessor = (*Engine)(nil)
 
 func New(
 	log zerolog.Logger,
@@ -166,6 +170,11 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
+}
+
+// IngestBlock ingests and queues the block for later processing by the compliance layer.
+func (e *Engine) IngestBlock(block *events.SyncedBlock) {
+	e.SubmitLocal(block)
 }
 
 func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBlock) error {
