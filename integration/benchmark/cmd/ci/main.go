@@ -37,15 +37,16 @@ type LoadCase struct {
 // This struct is used for uploading data to BigQuery, changes here should
 // remain in sync with tps_results_schema.json
 type dataSlice struct {
-	GoVersion           string
-	OsVersion           string
-	GitSha              string
-	StartTime           time.Time
-	EndTime             time.Time
-	InputTps            float64
-	OutputTps           float64
-	ProStartTransaction float64
-	ProEndTransaction   float64
+	GoVersion    string
+	OsVersion    string
+	GitSha       string
+	StartTime    time.Time
+	EndTime      time.Time
+	InputTps     float64
+	OutputTps    float64
+	BeforeExTxs  int
+	AfterExTxs   int
+	RunStartTime time.Time
 }
 
 // Hardcoded CI values
@@ -78,8 +79,14 @@ func main() {
 
 	// Version and Commit Info
 	gitSha := build.Commit()
+
 	goVersion := runtime.Version()
 	osVersion := runtime.GOOS + runtime.GOARCH
+
+	runStartTime := time.Now()
+	if gitSha == "undefined" {
+		gitSha = runStartTime.String()
+	}
 
 	chainID := flowsdk.Emulator
 
@@ -126,7 +133,7 @@ func main() {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
 	}
 
-	// run load
+	// prepare load generator
 	log.Info().Str("load_type", loadType).Int("tps", loadCase.tps).Dur("duration", loadCase.duration).Msgf("Running load case...")
 
 	loaderMetrics.SetTPSConfigured(loadCase.tps)
@@ -163,57 +170,56 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to init loader")
 	}
+
+	// run load
 	lg.Start()
 
-	testStartTime := time.Now()
+	// prepare data slices
+	dataSlices := make([]dataSlice, 0)
+	go func() {
+		leadDuration, _ := time.ParseDuration(*leadTime)
+		sliceDuration, _ := time.ParseDuration(*sliceSize)
+
+		// wait through lead duration.
+		time.Sleep(leadDuration)
+
+		// grab time into start time
+		startTime := time.Now()
+		// grab total executed transactions into start transactions
+		startExecutedTransactions := lg.GetTxExecuted()
+
+		for !lg.Stopped {
+			time.Sleep(sliceDuration)
+
+			endTime := time.Now()
+			endExecutedTransaction := lg.GetTxExecuted()
+
+			// calculate this slice
+			inputTps := lg.AvgTpsBetween(startTime, endTime)
+			outputTps := float64(endExecutedTransaction-startExecutedTransactions) / sliceDuration.Seconds()
+			slice := dataSlice{
+				GitSha:       gitSha,
+				GoVersion:    goVersion,
+				OsVersion:    osVersion,
+				StartTime:    startTime,
+				EndTime:      endTime,
+				InputTps:     inputTps,
+				OutputTps:    outputTps,
+				BeforeExTxs:  startExecutedTransactions,
+				AfterExTxs:   endExecutedTransaction,
+				RunStartTime: runStartTime}
+
+			startExecutedTransactions = endExecutedTransaction
+			startTime = endTime
+
+			dataSlices = append(dataSlices, slice)
+		}
+	}()
+
 	time.Sleep(loadCase.duration)
 	lg.Stop()
-	testEndTime := time.Now()
 
-	dataSlices := calculateTpsSlices(
-		testStartTime,
-		testEndTime,
-		*leadTime,
-		*sliceSize,
-		gitSha,
-		goVersion,
-		osVersion,
-		lg)
 	prepareDataForBigQuery(dataSlices, *ciFlag)
-}
-
-func calculateTpsSlices(start, end time.Time, leadTime, sliceTime, commit, goVersion, osVersion string, lg *benchmark.ContLoadGenerator) []dataSlice {
-	//remove the lead time on both start and end, this should remove spin-up and spin-down times
-	leadDuration, _ := time.ParseDuration(leadTime)
-	endTime := end.Add(-1 * leadDuration)
-	sliceDuration, _ := time.ParseDuration(sliceTime)
-
-	slices := make([]dataSlice, 0)
-
-	for currentTime := start.Add(leadDuration); currentTime.Add(sliceDuration).Before(endTime); currentTime = currentTime.Add(sliceDuration) {
-		sliceEndTime := currentTime.Add(sliceDuration)
-
-		inputTps := lg.AvgTpsBetween(currentTime, sliceEndTime)
-		proStart := getPrometheusTransactionAtTime(currentTime)
-		proEnd := getPrometheusTransactionAtTime(sliceEndTime)
-
-		outputTps := (proEnd - proStart) / (sliceDuration).Seconds()
-
-		slice := dataSlice{
-			GitSha:              commit,
-			GoVersion:           goVersion,
-			OsVersion:           osVersion,
-			StartTime:           currentTime,
-			EndTime:             currentTime.Add(sliceDuration),
-			InputTps:            inputTps,
-			OutputTps:           outputTps,
-			ProStartTransaction: proStart,
-			ProEndTransaction:   proEnd}
-
-		slices = append(slices, slice)
-	}
-
-	return slices
 }
 
 func prepareDataForBigQuery(slices []dataSlice, ci bool) {

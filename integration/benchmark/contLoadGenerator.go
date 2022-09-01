@@ -59,7 +59,7 @@ type ContLoadGenerator struct {
 	availableAccounts   chan *flowAccount // queue with accounts available for workers
 	workerStatsTracker  *WorkerStatsTracker
 	workers             []*Worker
-	stopped             bool
+	Stopped             bool
 	follower            TxFollower
 	availableAccountsLo int
 }
@@ -163,7 +163,7 @@ func New(
 // TODO(rbtz): make part of New
 func (lg *ContLoadGenerator) Init() error {
 	for i := 0; i < lg.loadParams.NumberOfAccounts; i += accountCreationBatchSize {
-		if lg.stopped {
+		if lg.Stopped {
 			return nil
 		}
 
@@ -269,7 +269,7 @@ func (lg *ContLoadGenerator) Start() {
 func (lg *ContLoadGenerator) Stop() {
 	defer lg.log.Debug().Msg("stopped generator")
 
-	lg.stopped = true
+	lg.Stopped = true
 	wg := sync.WaitGroup{}
 	wg.Add(len(lg.workers))
 	for _, w := range lg.workers {
