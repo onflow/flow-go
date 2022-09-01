@@ -161,6 +161,22 @@ func (_m *Environment) BLSVerifyPOP(pk *stdlib.PublicKey, s []byte) (bool, error
 	return r0, r1
 }
 
+// BorrowCadenceRuntime provides a mock function with given fields:
+func (_m *Environment) BorrowCadenceRuntime() *fvm.ReusableCadenceRuntime {
+	ret := _m.Called()
+
+	var r0 *fvm.ReusableCadenceRuntime
+	if rf, ok := ret.Get(0).(func() *fvm.ReusableCadenceRuntime); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*fvm.ReusableCadenceRuntime)
+		}
+	}
+
+	return r0
+}
+
 // Context provides a mock function with given fields:
 func (_m *Environment) Context() *fvm.Context {
 	ret := _m.Called()
@@ -678,6 +694,11 @@ func (_m *Environment) ResourceOwnerChanged(_a0 *interpreter.Interpreter, resour
 	_m.Called(_a0, resource, oldOwner, newOwner)
 }
 
+// ReturnCadenceRuntime provides a mock function with given fields: _a0
+func (_m *Environment) ReturnCadenceRuntime(_a0 *fvm.ReusableCadenceRuntime) {
+	_m.Called(_a0)
+}
+
 // RevokeAccountKey provides a mock function with given fields: address, index
 func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*stdlib.AccountKey, error) {
 	ret := _m.Called(address, index)
@@ -722,6 +743,20 @@ func (_m *Environment) RevokeEncodedAccountKey(address common.Address, index int
 	}
 
 	return r0, r1
+}
+
+// SetAccountFrozen provides a mock function with given fields: address, frozen
+func (_m *Environment) SetAccountFrozen(address common.Address, frozen bool) error {
+	ret := _m.Called(address, frozen)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(common.Address, bool) error); ok {
+		r0 = rf(address, frozen)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // SetProgram provides a mock function with given fields: _a0, _a1

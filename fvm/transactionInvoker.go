@@ -4,12 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/stdlib"
-
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
@@ -98,8 +94,8 @@ func (i *TransactionInvoker) Process(
 
 	location := common.TransactionLocation(proc.ID)
 
-	runtimeEnv := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-	declareStandardLibraryValues(runtimeEnv, env)
+	runtimeEnv := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(runtimeEnv)
 
 	var txError error
 	err = vm.Runtime.ExecuteTransaction(
@@ -246,61 +242,6 @@ func (i *TransactionInvoker) deductTransactionFees(
 		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, err)
 	}
 	return nil
-}
-
-var setAccountFrozenFunctionType = &sema.FunctionType{
-	Parameters: []*sema.Parameter{
-		{
-			Label:          sema.ArgumentLabelNotRequired,
-			Identifier:     "account",
-			TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
-		},
-		{
-			Label:          sema.ArgumentLabelNotRequired,
-			Identifier:     "frozen",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
-		},
-	},
-	ReturnTypeAnnotation: &sema.TypeAnnotation{
-		Type: sema.VoidType,
-	},
-}
-
-type StandardLibraryInterface interface {
-	SetAccountFrozen(address common.Address, frozen bool) error
-}
-
-func declareStandardLibraryValues(runtimeEnv runtime.Environment, i StandardLibraryInterface) {
-	// TODO return the errors instead of panicing
-
-	runtimeEnv.Declare(stdlib.StandardLibraryValue{
-		Name: "setAccountFrozen",
-		Type: setAccountFrozenFunctionType,
-		Kind: common.DeclarationKindFunction,
-		Value: interpreter.NewUnmeteredHostFunctionValue(
-			func(invocation interpreter.Invocation) interpreter.Value {
-				address, ok := invocation.Arguments[0].(interpreter.AddressValue)
-				if !ok {
-					panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
-						"first argument of setAccountFrozen must be an address"))
-				}
-
-				frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
-				if !ok {
-					panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
-						"second argument of setAccountFrozen must be a boolean"))
-				}
-
-				err := i.SetAccountFrozen(common.Address(address), bool(frozen))
-				if err != nil {
-					panic(err)
-				}
-
-				return interpreter.VoidValue{}
-			},
-			setAccountFrozenFunctionType,
-		),
-	})
 }
 
 // logExecutionIntensities logs execution intensities of the transaction

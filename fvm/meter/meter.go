@@ -4,6 +4,7 @@ import "github.com/onflow/cadence/runtime/common"
 
 type MetringOperationType uint
 
+// TODO(patrick): rm after emulator is updated ...
 const (
 	// [2_000, 3_000) reserved for the FVM
 	_ common.ComputationKind = iota + 2_000
