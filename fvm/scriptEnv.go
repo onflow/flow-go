@@ -113,3 +113,7 @@ func (e *ScriptEnv) UpdateAccountContractCode(_ runtime.Address, _ string, _ []b
 func (e *ScriptEnv) RemoveAccountContractCode(_ runtime.Address, _ string) (err error) {
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
 }
+
+func (e *ScriptEnv) SetAccountFrozen(address common.Address, frozen bool) error {
+	return errors.NewOperationNotSupportedError("SetAccountFrozen")
+}
