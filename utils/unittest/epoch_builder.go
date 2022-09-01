@@ -111,15 +111,16 @@ func (builder *EpochBuilder) EpochHeights(counter uint64) (*EpochHeights, bool) 
 // epoch (epoch N). We assume the latest finalized block is within staking phase
 // in epoch N.
 //
-//                 |                                  EPOCH N                                                      |
-//                 |                                                                                               |
-//     P                 A               B               C               D             E             F           G
-// +------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+
-// | ER(P-1)    |->| ER(P)      |->| ER(A)     |->| ER(B)     |->| ER(C)    |->| ER(D)    |->| ER(E)    | ER(F)    |
-// | S(ER(P-2)) |  | S(ER(P-1)) |  | S(ER(P))  |  | S(ER(A))  |  | S(ER(B)) |  | S(ER(C)) |  | S(ER(D)) | S(ER(E)) |
-// +------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+
-//                                                                             |                        |
-//                                                                             Setup                    Commit
+//	                |                                  EPOCH N                                                      |
+//	                |                                                                                               |
+//	P                 A               B               C               D             E             F           G
+//
+//	+------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+
+//	| ER(P-1)    |->| ER(P)      |->| ER(A)     |->| ER(B)     |->| ER(C)    |->| ER(D)    |->| ER(E)    | ER(F)    |
+//	| S(ER(P-2)) |  | S(ER(P-1)) |  | S(ER(P))  |  | S(ER(A))  |  | S(ER(B)) |  | S(ER(C)) |  | S(ER(D)) | S(ER(E)) |
+//	+------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+
+//	                                                                            |                        |
+//	                                                                          Setup                    Commit
 //
 // ER(X)    := ExecutionReceipt for block X
 // S(ER(X)) := Seal for the ExecutionResult contained in ER(X) (seals block X)

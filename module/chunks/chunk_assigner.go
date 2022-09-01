@@ -48,9 +48,9 @@ func (p *ChunkAssigner) Size() uint {
 
 // Assign generates the assignment
 // error returns:
-//  * NoValidChildBlockError indicates that no valid child block is known
-//    (which contains the block's source of randomness)
-//  * unexpected errors should be considered symptoms of internal bugs
+//   - NoValidChildBlockError indicates that no valid child block is known
+//     (which contains the block's source of randomness)
+//   - unexpected errors should be considered symptoms of internal bugs
 func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chunkmodels.Assignment, error) {
 	// computes a fingerprint for blockID||resultID||alpha
 	hash, err := fingerPrint(blockID, result.ID(), p.alpha)

@@ -11,8 +11,8 @@ func ReadBit(b []byte, idx int) int {
 // WriteBit assigns value `v` to the bit at index `i` in the byte array `b`.
 // The function panics, if the byte slice is too short. We follow the common
 // convention of converting between integer and boolean/bit values:
-//  * int value == 0   <=>   false   <=>   bit 0
-//  * int value != 0   <=>   true    <=>   bit 1
+//   - int value == 0   <=>   false   <=>   bit 0
+//   - int value != 0   <=>   true    <=>   bit 1
 func WriteBit(b []byte, i int, value int) {
 	if value == 0 {
 		ClearBit(b, i)

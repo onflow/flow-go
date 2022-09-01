@@ -24,12 +24,12 @@ type VertexList []*vertexContainer
 type VertexSet map[flow.Identifier]*vertexContainer
 
 // vertexContainer holds information about a tree vertex. Internally, we distinguish between
-// * FULL container: has non-nil value for vertex.
-//   Used for vertices, which have been added to the tree.
-// * EMPTY container: has NIL value for vertex.
-//   Used for vertices, which have NOT been added to the tree, but are
-//   referenced by vertices in the tree. An empty container is converted to a
-//   full container when the respective vertex is added to the tree
+//   - FULL container: has non-nil value for vertex.
+//     Used for vertices, which have been added to the tree.
+//   - EMPTY container: has NIL value for vertex.
+//     Used for vertices, which have NOT been added to the tree, but are
+//     referenced by vertices in the tree. An empty container is converted to a
+//     full container when the respective vertex is added to the tree
 type vertexContainer struct {
 	id       flow.Identifier
 	level    uint64

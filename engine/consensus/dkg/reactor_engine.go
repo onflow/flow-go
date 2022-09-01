@@ -136,7 +136,6 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 //
 // It starts a new controller for the epoch and registers the triggers to regularly
 // query the DKG smart-contract and transition between phases at the specified views.
-//
 func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow.Header) {
 
 	firstID := first.ID()
@@ -247,7 +246,6 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 //
 // CAUTION: This function is not safe for concurrent use. This is not enforced within
 // the ReactorEngine - instead we rely on the protocol event emission being single-threaded
-//
 func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uint64, firstBlock *flow.Header) {
 
 	// the DKG we have just completed produces keys that we will use in the next epoch
