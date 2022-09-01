@@ -98,7 +98,9 @@ type namedComponentFunc struct {
 // FlowNodeBuilder is the default builder struct used for all flow nodes
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
-//   PostInit handlers, if any
+//
+//	PostInit handlers, if any
+//
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
@@ -1010,6 +1012,9 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	// the dependency list must be initialized outside of the component factory.
 	for _, f := range asyncComponents {
 		err = fnb.handleComponent(f, util.AllReady(f.dependencies...), func() {})
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
