@@ -2,7 +2,6 @@ package p2p_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/metrics"
 	"sync"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"

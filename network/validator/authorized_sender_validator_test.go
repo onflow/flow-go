@@ -2,7 +2,6 @@ package validator
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module/metrics"
 	"testing"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/slashing"

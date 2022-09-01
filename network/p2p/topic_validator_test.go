@@ -3,7 +3,6 @@ package p2p_test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/module/metrics"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"

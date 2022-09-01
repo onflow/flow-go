@@ -2,7 +2,6 @@ package p2p_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/metrics"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"

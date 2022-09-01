@@ -2,10 +2,10 @@ package slashing
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module"
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
