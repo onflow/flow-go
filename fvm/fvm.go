@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -22,19 +21,13 @@ type Procedure interface {
 	ShouldDisableMemoryAndInteractionLimits(ctx Context) bool
 }
 
-func NewInterpreterRuntime(options ...runtime.Option) runtime.Runtime {
-
-	defaultOptions := []runtime.Option{
-		runtime.WithContractUpdateValidationEnabled(true),
-	}
-
-	return runtime.NewInterpreterRuntime(
-		append(defaultOptions, options...)...,
-	)
+func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
+	return runtime.NewInterpreterRuntime(config)
 }
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
+	// TODO(patrick): move this into ReusableCadenceRuntime
 	Runtime runtime.Runtime
 }
 
@@ -110,7 +103,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
 func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, stTxn *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
-	invoker := NewTransactionInvoker(zerolog.Nop())
+	invoker := NewTransactionInvoker()
 
 	// do not deduct fees or check storage in meta transactions
 	ctx := NewContextFromParent(parentCtx,

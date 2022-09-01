@@ -570,7 +570,7 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 	}
 }
 
-//  headAccessibleFromTail checks head of given entities linked list is reachable from its tail by traversing expected number of steps.
+// headAccessibleFromTail checks head of given entities linked list is reachable from its tail by traversing expected number of steps.
 func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, pool *Pool, total uint32) {
 	seen := make(map[EIndex]struct{})
 

@@ -27,7 +27,10 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
+const (
+	ReusableCadenceRuntimePoolSize    = 1000
+	SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
+)
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
@@ -46,14 +49,15 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	vm                    VirtualMachine
-	vmCtx                 fvm.Context
-	metrics               module.ExecutionMetrics
-	tracer                module.Tracer
-	log                   zerolog.Logger
-	systemChunkCtx        fvm.Context
-	committer             ViewCommitter
-	executionDataProvider *provider.Provider
+	vm                         VirtualMachine
+	vmCtx                      fvm.Context
+	metrics                    module.ExecutionMetrics
+	tracer                     module.Tracer
+	log                        zerolog.Logger
+	systemChunkCtx             fvm.Context
+	committer                  ViewCommitter
+	executionDataProvider      *provider.Provider
+	reusableCadenceRuntimePool fvm.ReusableCadenceRuntimePool
 }
 
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
@@ -63,7 +67,7 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithContractRemovalRestricted(false),
 		fvm.WithTransactionFeesEnabled(false),
 		fvm.WithServiceEventCollectionEnabled(),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(logger)),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker()),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
 	)
@@ -88,6 +92,8 @@ func NewBlockComputer(
 		systemChunkCtx:        SystemChunkContext(vmCtx, logger),
 		committer:             committer,
 		executionDataProvider: executionDataProvider,
+		reusableCadenceRuntimePool: fvm.NewReusableCadenceRuntimePool(
+			ReusableCadenceRuntimePoolSize),
 	}, nil
 }
 
@@ -128,8 +134,14 @@ func (e *blockComputer) executeBlock(
 		return nil, fmt.Errorf("executable block start state is not set")
 	}
 
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
-	systemChunkCtx := fvm.NewContextFromParent(e.systemChunkCtx, fvm.WithBlockHeader(block.Block.Header))
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(block.Block.Header),
+		fvm.WithReusableCadenceRuntimePool(e.reusableCadenceRuntimePool))
+	systemChunkCtx := fvm.NewContextFromParent(
+		e.systemChunkCtx,
+		fvm.WithBlockHeader(block.Block.Header),
+		fvm.WithReusableCadenceRuntimePool(e.reusableCadenceRuntimePool))
 	collections := block.Collections()
 
 	chunksSize := len(collections) + 1 // + 1 system chunk
@@ -399,7 +411,16 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	txView := collectionView.NewChild()
-	err := e.vm.Run(ctx, tx, txView, programs)
+	childCtx := fvm.NewContextFromParent(ctx,
+		fvm.WithLogger(ctx.Logger.With().
+			Str("tx_id", txID.String()).
+			Uint32("tx_index", txIndex).
+			Str("block_id", res.ExecutableBlock.ID().String()).
+			Uint64("height", res.ExecutableBlock.Block.Header.Height).
+			Bool("system_chunk", isSystemChunk).
+			Logger()),
+	)
+	err := e.vm.Run(childCtx, tx, txView, programs)
 	if err != nil {
 		return fmt.Errorf("failed to execute transaction %v for block %v at height %v: %w",
 			txID.String(),

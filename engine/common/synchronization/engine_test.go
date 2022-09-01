@@ -1,7 +1,7 @@
 package synchronization
 
 import (
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"testing"
 	"time"
@@ -164,7 +164,7 @@ func (ss *SyncSuite) SetupTest() {
 	ss.core = &module.SyncCore{}
 
 	// initialize the engine
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 	metrics := metrics.NewNoopCollector()
 
 	finalizedHeader, err := NewFinalizedHeaderCache(log, ss.state, pubsub.NewFinalizationDistributor())

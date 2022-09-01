@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -19,7 +20,7 @@ import (
 func TestTransactionVerification(t *testing.T) {
 	ledger := utils.NewSimpleView()
 	stTxn := state.NewStateTransaction(ledger, state.DefaultParameters())
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 
 	// create 2 accounts
 	address1 := flow.HexToAddress("1234")
@@ -189,7 +190,7 @@ func TestTransactionVerification(t *testing.T) {
 		txChecker := fvm.NewTransactionVerifier(-1)
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
-		accounts := state.NewAccounts(st)
+		accounts := environment.NewAccounts(st)
 		programsStorage := programs.NewEmptyPrograms()
 
 		// freeze account

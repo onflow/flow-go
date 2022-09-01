@@ -28,10 +28,7 @@ import (
 const defaultTimeout = time.Second * 10
 
 func TestMVP_Network(t *testing.T) {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", t.Name()).
-		Logger()
+	logger := unittest.LoggerForTest(t, zerolog.InfoLevel)
 	logger.Info().Msgf("================> START TESTING")
 	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig(), flow.Localnet)
 
@@ -49,10 +46,7 @@ func TestMVP_Network(t *testing.T) {
 }
 
 func TestMVP_Bootstrap(t *testing.T) {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", t.Name()).
-		Logger()
+	logger := unittest.LoggerForTest(t, zerolog.InfoLevel)
 	logger.Info().Msgf("================> START TESTING")
 	unittest.SkipUnless(t, unittest.TEST_TODO, "skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451")
 

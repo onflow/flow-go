@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -51,7 +51,7 @@ func TestLoadSecretsEncryptionKey(t *testing.T) {
 			require.NoError(t, err)
 			key, err := utils.GenerateSecretsDBEncryptionKey()
 			require.NoError(t, err)
-			err = ioutil.WriteFile(path, key, 0700)
+			err = os.WriteFile(path, key, 0700)
 			require.NoError(t, err)
 
 			data, err := loadSecretsEncryptionKey(dir, myID)
@@ -706,12 +706,12 @@ func TestCreateUploader(t *testing.T) {
 					case "/computeMetadata/v1/project/project-id":
 						return &http.Response{
 							StatusCode: 200,
-							Body:       ioutil.NopCloser(bytes.NewBufferString("test-project-id")),
+							Body:       io.NopCloser(bytes.NewBufferString("test-project-id")),
 						}, nil
 					case "/computeMetadata/v1/instance/id":
 						return &http.Response{
 							StatusCode: 200,
-							Body:       ioutil.NopCloser(bytes.NewBufferString("test-instance-id")),
+							Body:       io.NopCloser(bytes.NewBufferString("test-instance-id")),
 						}, nil
 					default:
 						return nil, fmt.Errorf("unexpected request: %s", req.URL.Path)

@@ -2,7 +2,6 @@ package unittest
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"math"
 	"os"
 	"os/exec"
@@ -13,8 +12,11 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/network/slashing"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -303,7 +305,7 @@ func AssertErrSubstringMatch(t testing.TB, expected, actual error) {
 }
 
 func TempDir(t testing.TB) string {
-	dir, err := ioutil.TempDir("", "flow-testing-temp-")
+	dir, err := os.MkdirTemp("", "flow-testing-temp-")
 	require.NoError(t, err)
 	return dir
 }
@@ -426,4 +428,9 @@ func CrashTestWithExpectedStatus(
 	// expect logger.Fatal() message to be pushed to stdout
 	outStr := string(outBytes)
 	require.Contains(t, outStr, expectedErrorMsg)
+}
+
+// NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware
+func NetworkSlashingViolationsConsumer(logger zerolog.Logger) slashing.ViolationsConsumer {
+	return slashing.NewSlashingViolationsConsumer(logger)
 }

@@ -1,7 +1,6 @@
 package fvm
 
 import (
-	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/cadence"
@@ -9,6 +8,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -17,7 +17,6 @@ type ContractFunctionInvoker struct {
 	functionName     string
 	arguments        []cadence.Value
 	argumentTypes    []sema.Type
-	logger           zerolog.Logger
 	logSpanAttrs     []attribute.KeyValue
 }
 
@@ -26,13 +25,12 @@ func NewContractFunctionInvoker(
 	functionName string,
 	arguments []cadence.Value,
 	argumentTypes []sema.Type,
-	logger zerolog.Logger) *ContractFunctionInvoker {
+) *ContractFunctionInvoker {
 	return &ContractFunctionInvoker{
 		contractLocation: contractLocation,
 		functionName:     functionName,
 		arguments:        arguments,
 		argumentTypes:    argumentTypes,
-		logger:           logger,
 		logSpanAttrs: []attribute.KeyValue{
 			attribute.String("transaction.ContractFunctionCall", contractLocation.String()+"."+functionName),
 		},
@@ -45,7 +43,8 @@ func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error)
 	span.SetAttributes(i.logSpanAttrs...)
 	defer span.End()
 
-	predeclaredValues := valueDeclarations(env)
+	runtimeEnv := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(runtimeEnv)
 
 	value, err := env.VM().Runtime.InvokeContractFunction(
 		i.contractLocation,
@@ -53,13 +52,15 @@ func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error)
 		i.arguments,
 		i.argumentTypes,
 		runtime.Context{
-			Interface:         env,
-			PredeclaredValues: predeclaredValues,
+			Interface:   env,
+			Environment: runtimeEnv,
 		},
 	)
 
 	if err != nil {
-		i.logger.
+		// this is an error coming from Cadendce runtime, so it must be handled first.
+		err = errors.HandleRuntimeError(err)
+		env.Context().Logger.
 			Info().
 			Err(err).
 			Str("contract", i.contractLocation.String()).

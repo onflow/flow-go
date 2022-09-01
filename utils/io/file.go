@@ -3,7 +3,6 @@ package io
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -17,7 +16,7 @@ func ReadFile(path string) ([]byte, error) {
 		return nil, fmt.Errorf("could not get absolution path: %w", err)
 	}
 
-	data, err := ioutil.ReadFile(absPath)
+	data, err := os.ReadFile(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read file: %w", err)
 	}
@@ -36,7 +35,7 @@ func FileExists(filename string) bool {
 // CopyDirectory recursively copies a directory.
 // From https://stackoverflow.com/questions/51779243/copy-a-folder-in-go
 func CopyDirectory(scrDir, dest string) error {
-	entries, err := ioutil.ReadDir(scrDir)
+	entries, err := os.ReadDir(scrDir)
 	if err != nil {
 		return err
 	}
@@ -76,9 +75,14 @@ func CopyDirectory(scrDir, dest string) error {
 			return err
 		}
 
-		isSymlink := entry.Mode()&os.ModeSymlink != 0
+		fInfo, err := entry.Info()
+		if err != nil {
+			return err
+		}
+
+		isSymlink := fInfo.Mode()&os.ModeSymlink != 0
 		if !isSymlink {
-			if err := os.Chmod(destPath, entry.Mode()); err != nil {
+			if err := os.Chmod(destPath, fInfo.Mode()); err != nil {
 				return err
 			}
 		}

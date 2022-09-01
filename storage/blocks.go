@@ -32,6 +32,10 @@ type Blocks interface {
 	// included in.
 	IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error
 
+	// InsertLastFullBlockHeightIfNotExists inserts the FullBlockHeight index if it does not already exist.
+	// Calling this function multiple times is a no-op and returns no expected errors.
+	InsertLastFullBlockHeightIfNotExists(height uint64) error
+
 	// UpdateLastFullBlockHeight updates the FullBlockHeight index
 	// The FullBlockHeight index indicates that block for which all collections have been received
 	UpdateLastFullBlockHeight(height uint64) error

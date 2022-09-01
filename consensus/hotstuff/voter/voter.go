@@ -39,10 +39,11 @@ func New(
 // In order to ensure that only a safe node will be voted, Voter will ask Forks whether a vote is a safe node or not.
 // The curView is taken as input to ensure Voter will only vote for proposals at current view and prevent double voting.
 // Returns:
-//  * (vote, nil): On the _first_ block for the current view that is safe to vote for.
-//    Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
-//  * (nil, model.NoVoteError): If the voter decides that it does not want to vote for the given block.
-//    This is a sentinel error and _expected_ during normal operation.
+//   - (vote, nil): On the _first_ block for the current view that is safe to vote for.
+//     Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
+//   - (nil, model.NoVoteError): If the voter decides that it does not want to vote for the given block.
+//     This is a sentinel error and _expected_ during normal operation.
+//
 // All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model.Vote, error) {
 	// sanity checks:

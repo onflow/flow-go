@@ -12,7 +12,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,6 +20,7 @@ import (
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -50,7 +50,7 @@ func (vmt vmTest) withContextOptions(opts ...fvm.Option) vmTest {
 }
 
 func createChainAndVm(chainID flow.ChainID) (flow.Chain, *fvm.VirtualMachine) {
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	return chainID.Chain(), fvm.NewVirtualMachine(rt)
 }
 
@@ -66,7 +66,7 @@ func (vmt vmTest) run(
 
 		opts := append(baseOpts, vmt.contextOptions...)
 
-		ctx := fvm.NewContext(zerolog.Nop(), opts...)
+		ctx := fvm.NewContext(opts...)
 
 		view := utils.NewSimpleView()
 
@@ -159,7 +159,6 @@ func TestHashing(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -410,10 +409,9 @@ func TestWithServiceAccount(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctxA := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
 	)
 
@@ -453,10 +451,9 @@ func TestEventLimits(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
 	)
 
@@ -490,11 +487,10 @@ func TestEventLimits(t *testing.T) {
 	`
 
 	ctx = fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithEventCollectionSizeLimit(2),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
 	)
 
@@ -1189,7 +1185,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
 			meter.ExecutionEffortWeights{
-				meter.ComputationKindCreateAccount: (fvm.DefaultComputationLimit + 1) << meter.MeterExecutionInternalPrecisionBytes,
+				environment.ComputationKindCreateAccount: (fvm.DefaultComputationLimit + 1) << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -1223,7 +1219,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
 			meter.ExecutionEffortWeights{
-				meter.ComputationKindCreateAccount: 100_000_000 << meter.MeterExecutionInternalPrecisionBytes,
+				environment.ComputationKindCreateAccount: 100_000_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -1258,7 +1254,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
 			meter.ExecutionEffortWeights{
-				meter.ComputationKindCreateAccount: 100_000_000 << meter.MeterExecutionInternalPrecisionBytes,
+				environment.ComputationKindCreateAccount: 100_000_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -1367,7 +1363,6 @@ func TestStorageUsed(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Testnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -1403,7 +1398,7 @@ func TestStorageUsed(t *testing.T) {
 	require.NoError(t, err)
 
 	simpleView := utils.NewSimpleView()
-	status := state.NewAccountStatus()
+	status := environment.NewAccountStatus()
 	status.SetStorageUsed(5)
 	err = simpleView.Set(string(address), state.KeyAccountStatus, status.ToBytes())
 	require.NoError(t, err)
@@ -1422,10 +1417,9 @@ func TestEnforcingComputationLimit(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Testnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
 	)
 

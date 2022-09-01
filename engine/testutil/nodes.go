@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -558,14 +560,14 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 
 	vm := fvm.NewVirtualMachine(rt)
 
 	blockFinder := environment.NewBlockFinder(node.Headers)
 
 	vmCtx := fvm.NewContext(
-		node.Log,
+		fvm.WithLogger(node.Log),
 		fvm.WithChain(node.ChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 	)
@@ -861,14 +863,14 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.VerifierEngine == nil {
-		rt := fvm.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime(runtime.Config{})
 
 		vm := fvm.NewVirtualMachine(rt)
 
 		blockFinder := environment.NewBlockFinder(node.Headers)
 
 		vmCtx := fvm.NewContext(
-			node.Log,
+			fvm.WithLogger(node.Log),
 			fvm.WithChain(node.ChainID.Chain()),
 			fvm.WithBlocks(blockFinder),
 		)

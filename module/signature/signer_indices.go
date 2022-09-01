@@ -11,52 +11,58 @@ import (
 // EncodeSignerToIndicesAndSigType encodes the given stakingSigners and beaconSigners into bit vectors for
 // signer indices and sig types.
 // PREREQUISITES:
-//  * The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
-//  * The inputs `stakingSigners` and `beaconSigners` are treated as sets, i.e. they
-//    should not contain any duplicates.
-//  * A node can be listed in either `stakingSigners` or `beaconSigners`. A node appearing in both lists
-//    constitutes an illegal input.
-//  * `stakingSigners` must be a subset of `canonicalIdentifiers`
-//  * `beaconSigners` must be a subset of `canonicalIdentifiers`
+//   - The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
+//   - The inputs `stakingSigners` and `beaconSigners` are treated as sets, i.e. they
+//     should not contain any duplicates.
+//   - A node can be listed in either `stakingSigners` or `beaconSigners`. A node appearing in both lists
+//     constitutes an illegal input.
+//   - `stakingSigners` must be a subset of `canonicalIdentifiers`
+//   - `beaconSigners` must be a subset of `canonicalIdentifiers`
 //
 // RETURN VALUES:
-//  *  `signerIndices` is a bit vector. Let signerIndices[i] denote the ith bit of `signerIndices`.
-//                             ┌ 1 if and only if canonicalIdentifiers[i] is in `stakingSigners` or `beaconSigners`
-//          signerIndices[i] = └ 0 otherwise
-//      Let `n` be the length of `canonicalIdentifiers`. `signerIndices` contains at least `n` bits, though, we
-//      right-pad it with tailing zeros to full bytes.
-//  * `sigTypes` is a bit vector. Let sigTypes[i] denote the ith bit of `sigTypes`
-//                        ┌ 1 if and only if the ith signer is in `beaconSigners`
-//          sigTypes[i] = └ 0 if and only if the ith signer is in `stakingSigners`
+//
+//   - `signerIndices` is a bit vector. Let signerIndices[i] denote the ith bit of `signerIndices`.
+//
+//     .                            ┌ 1 if and only if canonicalIdentifiers[i] is in `stakingSigners` or `beaconSigners`
+//     .         signerIndices[i] = └ 0 otherwise
+//
+//     Let `n` be the length of `canonicalIdentifiers`. `signerIndices` contains at least `n` bits, though, we
+//     right-pad it with tailing zeros to full bytes.
+//
+//   - `sigTypes` is a bit vector. Let sigTypes[i] denote the ith bit of `sigTypes`
+//     .                       ┌ 1 if and only if the ith signer is in `beaconSigners`
+//     .         sigTypes[i] = └ 0 if and only if the ith signer is in `stakingSigners`
 //     (Per prerequisite, we require that no signer is listed in both `beaconSigners` and `stakingSigners`)
 //
 // Example:
 // As an example consider the case where we have a committee C of 10 nodes in canonical oder
-//            C = [A,B,C,D,E,F,G,H,I,J]
+//
+//	C = [A,B,C,D,E,F,G,H,I,J]
+//
 // where nodes [B,F] are stakingSigners and beaconSigners are [C,E,G,I,J].
-//  * First return parameter: `signerIndices`
-//    - We start with a bit vector v that has |C| number of bits
-//    - If a node contributed either as staking signer or beacon signer,
-//      we set the respective bit to 1:
-//          [A,B,C,D,E,F,G,H,I,J]
-//             ↓ ↓   ↓ ↓ ↓   ↓ ↓
-//           0,1,1,0,1,1,1,0,1,1
-//    - Lastly, right-pad the resulting bit vector with 0 to full bytes. We have 10 committee members,
-//      so we pad to 2 bytes:
-//           01101110 11000000
-//  * second return parameter: `sigTypes`
-//    - Here, we restrict our focus on the signers, which we encoded in the previous step.
-//      In our example, nodes [B,C,E,F,G,I,J] signed in canonical order. This is exactly the same order,
-//      as we have represented the signer in the last step.
-//    - For these 5 nodes in their canonical order, we encode each node's signature type as
-// 			bit-value 1: node was in beaconSigners
-// 			bit-value 0: node was in stakingSigners
-//      This results in the bit vector
-//            [B,C,E,F,G,I,J]
-//             ↓ ↓ ↓ ↓ ↓ ↓ ↓
-//             0,1,0,1,1,1,1
-//    - Again, we right-pad with zeros to full bytes, As we only had 7 signers, the sigType slice is 1byte long
-//             01011110
+//  1. First return parameter: `signerIndices`
+//     - We start with a bit vector v that has |C| number of bits
+//     - If a node contributed either as staking signer or beacon signer,
+//     we set the respective bit to 1:
+//     .         [A,B,C,D,E,F,G,H,I,J]
+//     .            ↓ ↓   ↓ ↓ ↓   ↓ ↓
+//     .          0,1,1,0,1,1,1,0,1,1
+//     - Lastly, right-pad the resulting bit vector with 0 to full bytes. We have 10 committee members,
+//     so we pad to 2 bytes:
+//     .          01101110 11000000
+//  2. second return parameter: `sigTypes`
+//     - Here, we restrict our focus on the signers, which we encoded in the previous step.
+//     In our example, nodes [B,C,E,F,G,I,J] signed in canonical order. This is exactly the same order,
+//     as we have represented the signer in the last step.
+//     - For these 5 nodes in their canonical order, we encode each node's signature type as
+//     .        bit-value 1: node was in beaconSigners
+//     .        bit-value 0: node was in stakingSigners
+//     This results in the bit vector
+//     .            [B,C,E,F,G,I,J]
+//     .             ↓ ↓ ↓ ↓ ↓ ↓ ↓
+//     .             0,1,0,1,1,1,1
+//     - Again, we right-pad with zeros to full bytes, As we only had 7 signers, the sigType slice is 1byte long
+//     .            01011110
 //
 // the signer indices is prefixed with a checksum of the canonicalIdentifiers, which can be used by the decoder
 // to verify if the decoder is using the same canonicalIdentifiers as the encoder to decode the signer indices.
@@ -116,10 +122,10 @@ func EncodeSignerToIndicesAndSigType(
 // DecodeSigTypeToStakingAndBeaconSigners decodes the bit-vector `sigType` to the set of
 // staking signer identities (`stakingSigners`) and the set of beacon signer identities (`beaconSigners`).
 // Prerequisite:
-//  * The input `signers` must be the set of signers in their canonical order.
+//   - The input `signers` must be the set of signers in their canonical order.
 //
 // Expected Error returns during normal operations:
-//  * signature.IsInvalidSigTypesError if the given `sigType` does not encode a valid sequence of signature types
+//   - signature.IsInvalidSigTypesError if the given `sigType` does not encode a valid sequence of signature types
 func DecodeSigTypeToStakingAndBeaconSigners(
 	signers flow.IdentityList,
 	sigType []byte,
@@ -147,31 +153,33 @@ func DecodeSigTypeToStakingAndBeaconSigners(
 
 // EncodeSignersToIndices encodes the given signerIDs into compacted bit vector.
 // PREREQUISITES:
-//  * The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
-//  * The input `signerIDs` represents a set, i.e. it should not contain any duplicates.
-//  * `signerIDs` must be a subset of `canonicalIdentifiers`
+//   - The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
+//   - The input `signerIDs` represents a set, i.e. it should not contain any duplicates.
+//   - `signerIDs` must be a subset of `canonicalIdentifiers`
 //
 // RETURN VALUE:
-//  *  `signerIndices` is a bit vector. Let signerIndices[i] denote the ith bit of `signerIndices`.
-//                             ┌ 1 if and only if canonicalIdentifiers[i] is in `signerIDs`
-//          signerIndices[i] = └ 0 otherwise
-//      Let `n` be the length of `canonicalIdentifiers`. `signerIndices` contains at least `n` bits, though, we
-//      right-pad it with tailing zeros to full bytes.
+//   - `signerIndices` is a bit vector. Let signerIndices[i] denote the ith bit of `signerIndices`.
+//     .                             ┌ 1 if and only if canonicalIdentifiers[i] is in `signerIDs`
+//     .          signerIndices[i] = └ 0 otherwise
+//     Let `n` be the length of `canonicalIdentifiers`. `signerIndices` contains at least `n` bits, though, we
+//     right-pad it with tailing zeros to full bytes.
 //
 // Example:
 // As an example consider the case where we have a committee C of 10 nodes in canonical oder
-//            C = [A,B,C,D,E,F,G,H,I,J]
+//
+//	C = [A,B,C,D,E,F,G,H,I,J]
+//
 // where nodes [B,F] are stakingSigners, and beaconSigners are [C,E,G,I,J].
-//  * First return parameter: QC.signerIndices
-//    - We start with a bit vector v that has |C| number of bits
-//    - If a node contributed either as staking signer or beacon signer,
-//      we set the respective bit to 1:
-//          [A,B,C,D,E,F,G,H,I,J]
-//             ↓ ↓   ↓ ↓ ↓   ↓ ↓
-//           0,1,1,0,1,1,1,0,1,1
-//    - Lastly, right-pad the resulting bit vector with 0 to full bytes. We have 10 committee members,
-//      so we pad to 2 bytes:
-//           01101110 11000000
+//  1. First return parameter: QC.signerIndices
+//     - We start with a bit vector v that has |C| number of bits
+//     - If a node contributed either as staking signer or beacon signer,
+//     we set the respective bit to 1:
+//     .          [A,B,C,D,E,F,G,H,I,J]
+//     .             ↓ ↓   ↓ ↓ ↓   ↓ ↓
+//     .           0,1,1,0,1,1,1,0,1,1
+//     - Lastly, right-pad the resulting bit vector with 0 to full bytes. We have 10 committee members,
+//     so we pad to 2 bytes:
+//     .           01101110 11000000
 //
 // ERROR RETURNS
 // During normal operations, no error returns are expected. This is because encoding signer sets is generally
@@ -211,7 +219,7 @@ func EncodeSignersToIndices(
 
 // DecodeSignerIndicesToIdentifiers decodes the given compacted bit vector into signerIDs
 // Prerequisite:
-//  * The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
+//   - The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
 //
 // Expected Error returns during normal operations:
 // * signature.InvalidSignerIndicesError if the given index vector `prefixed` does not encode a valid set of signers
@@ -268,7 +276,7 @@ func decodeSignerIndices(
 
 // DecodeSignerIndicesToIdentities decodes the given compacted bit vector into node Identities.
 // Prerequisite:
-//  * The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
+//   - The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
 //
 // Expected Error returns during normal operations:
 // * signature.InvalidSignerIndicesError if the given index vector `prefixed` does not encode a valid set of signers
@@ -290,12 +298,13 @@ func DecodeSignerIndicesToIdentities(
 
 // validPadding verifies that `bitVector` satisfies the following criteria
 //  1. The `bitVector`'s length [in bytes], must be the _minimal_ possible length such that it can hold
-//    `numUsedBits` number of bits. Otherwise, we return an `ErrIncompatibleBitVectorLength`.
+//     `numUsedBits` number of bits. Otherwise, we return an `ErrIncompatibleBitVectorLength`.
 //  2. If `numUsedBits` is _not_ an integer-multiple of 8, `bitVector` is padded with tailing bits. Per
 //     convention, these bits must be zero. Otherwise, we return an `ErrIllegallyPaddedBitVector`.
+//
 // Expected Error returns during normal operations:
-//  * ErrIncompatibleBitVectorLength if the vector has the wrong length
-//  * ErrIllegallyPaddedBitVector if the vector is padded with bits other than 0
+//   - ErrIncompatibleBitVectorLength if the vector has the wrong length
+//   - ErrIllegallyPaddedBitVector if the vector is padded with bits other than 0
 func validPadding(bitVector []byte, numUsedBits int) error {
 	// Verify condition 1:
 	l := len(bitVector)

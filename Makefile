@@ -53,7 +53,7 @@ cmd/util/util:
 .PHONY: unittest-main
 unittest-main:
 	# test all packages with Relic library enabled
-	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
+	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
 
 .PHONY: install-mock-generators
 install-mock-generators:
@@ -121,7 +121,7 @@ verfiy-mocks: generate-mocks
 	git diff --exit-code
 
 .PHONY: generate-mocks
-generate-mocks:
+generate-mocks: install-mock-generators
 	mockery --name '(Connector|PingInfoProvider)' --dir=network/p2p --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
 	mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Local,Requester
@@ -205,7 +205,7 @@ ci-benchmark: install-tools
 # Runs unit tests, test coverage, lint in Docker (for mac)
 .PHONY: docker-ci
 docker-ci:
-	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
+	docker run --env RACE_DETECTOR=$(RACE_DETECTOR) --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
 		-v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \

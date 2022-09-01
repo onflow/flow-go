@@ -50,11 +50,7 @@ func (s *ConsensusFollowerSuite) TearDownTest() {
 }
 
 func (suite *ConsensusFollowerSuite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "unstaked.go").
-		Str("testcase", suite.T().Name()).
-		Logger()
-	suite.log = logger
+	suite.log = unittest.LoggerForTest(suite.Suite.T(), zerolog.InfoLevel)
 	suite.log.Info().Msg("================> SetupTest")
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.buildNetworkConfig()

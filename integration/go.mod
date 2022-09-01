@@ -14,13 +14,13 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.2.0
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/onflow/cadence v0.24.2-0.20220725165711-427397199cef
+	github.com/onflow/cadence v0.26.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220720151516-797b149ceaaa
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220720151516-797b149ceaaa
-	github.com/onflow/flow-emulator v0.33.4-0.20220708171627-a9c955cd26c6
+	github.com/onflow/flow-emulator v0.35.1-0.20220830173823-dcedbb70687a
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
-	github.com/onflow/flow-go v0.25.13-0.20220708171206-7015f054a69f
-	github.com/onflow/flow-go-sdk v0.26.5-0.20220629191626-900f9f91bffc
+	github.com/onflow/flow-go v0.26.14-test-synchronization.0.20220829184930-82493852fa22
+	github.com/onflow/flow-go-sdk v0.27.0
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
 	github.com/plus3it/gorecurcopy v0.0.1
@@ -163,7 +163,7 @@ require (
 	github.com/libp2p/go-libp2p-peerstore v0.7.1 // indirect
 	github.com/libp2p/go-libp2p-pubsub v0.7.1-0.20220701163738-60cf38003244 // indirect
 	github.com/libp2p/go-libp2p-record v0.1.3 // indirect
-	github.com/libp2p/go-libp2p-resource-manager v0.5.1 // indirect
+	github.com/libp2p/go-libp2p-resource-manager v0.5.3 // indirect
 	github.com/libp2p/go-libp2p-tls v0.4.1 // indirect
 	github.com/libp2p/go-msgio v0.2.0 // indirect
 	github.com/libp2p/go-nat v0.1.0 // indirect
@@ -262,7 +262,7 @@ require (
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/exp v0.0.0-20220426173459-3bcf042a4bf5 // indirect
-	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
+	golang.org/x/mod v0.6.0-dev.0.20220818022119-ed83ed61efb9 // indirect
 	golang.org/x/net v0.0.0-20220630215102-69896b714898 // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29 // indirect

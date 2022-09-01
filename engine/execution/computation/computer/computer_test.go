@@ -54,7 +54,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("single collection", func(t *testing.T) {
 
-		execCtx := fvm.NewContext(zerolog.Nop())
+		execCtx := fvm.NewContext()
 
 		vm := new(computermock.VirtualMachine)
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -117,9 +117,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
 
-		execCtx := fvm.NewContext(
-			zerolog.Nop(),
-		)
+		execCtx := fvm.NewContext()
 
 		vm := new(computermock.VirtualMachine)
 		committer := new(computermock.ViewCommitter)
@@ -187,7 +185,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithEpochConfig(epochConfig),
 		}
 
-		rt := fvm.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime(runtime.Config{})
 		chain := flow.Localnet.Chain()
 		vm := fvm.NewVirtualMachine(rt)
 		baseOpts := []fvm.Option{
@@ -195,7 +193,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 
 		opts := append(baseOpts, contextOptions...)
-		ctx := fvm.NewContext(zerolog.Nop(), opts...)
+		ctx := fvm.NewContext(opts...)
 		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
@@ -244,7 +242,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
-		execCtx := fvm.NewContext(zerolog.Nop())
+		execCtx := fvm.NewContext()
 
 		vm := new(computermock.VirtualMachine)
 		committer := new(computermock.ViewCommitter)
@@ -344,8 +342,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("service events are emitted", func(t *testing.T) {
-		execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithServiceEventCollectionEnabled(), fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()), //we don't need to check signatures or sequence numbers
+		execCtx := fvm.NewContext(fvm.WithServiceEventCollectionEnabled(), fvm.WithTransactionProcessors(
+			fvm.NewTransactionInvoker(), //we don't need to check signatures or sequence numbers
 		))
 
 		collectionCount := 2
@@ -445,7 +443,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
 
-		execCtx := fvm.NewContext(zerolog.Nop())
+		execCtx := fvm.NewContext()
 
 		address := common.Address{0x1}
 		contractLocation := common.AddressLocation{
@@ -502,7 +500,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, state.NewAccountStatus().ToBytes())
+		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
@@ -511,13 +509,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("failing transactions do not store programs", func(t *testing.T) {
-
-		logger := zerolog.Nop()
-
 		execCtx := fvm.NewContext(
-			logger,
 			fvm.WithTransactionProcessors(
-				fvm.NewTransactionInvoker(logger),
+				fvm.NewTransactionInvoker(),
 			),
 		)
 
@@ -591,7 +585,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, state.NewAccountStatus().ToBytes())
+		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
@@ -732,9 +726,9 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	address := flow.HexToAddress("1234")
 	fag := &FixedAddressGenerator{Address: address}
 
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	vm := fvm.NewVirtualMachine(rt)
-	execCtx := fvm.NewContext(zerolog.Nop())
+	execCtx := fvm.NewContext()
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
 
@@ -745,7 +739,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		return ledger.Get(owner, key)
 	})
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 
 	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
 	// as freeze check should happen before a transaction signature is checked
@@ -793,12 +787,11 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 func Test_ExecutingSystemCollection(t *testing.T) {
 
 	execCtx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(flow.Localnet.Chain()),
 		fvm.WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
-	runtime := fvm.NewInterpreterRuntime()
+	runtime := fvm.NewInterpreterRuntime(runtime.Config{})
 	vm := fvm.NewVirtualMachine(runtime)
 
 	rag := &RandomAddressGenerator{}

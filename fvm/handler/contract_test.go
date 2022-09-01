@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/programs"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/handler"
 	stateMock "github.com/onflow/flow-go/fvm/mock/state"
 	"github.com/onflow/flow-go/fvm/state"
@@ -22,7 +23,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	stTxn := state.NewStateTransaction(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
 	err := accounts.Create(nil, address)
@@ -98,7 +99,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 	stTxn := state.NewStateTransaction(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 
 	authAdd := flow.HexToAddress("01")
 	rAdd := runtime.Address(authAdd)
@@ -219,7 +220,7 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 	stTxn := state.NewStateTransaction(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 
 	addressWithVoucher := flow.HexToAddress("01")
 	addressWithVoucherRuntime := runtime.Address(addressWithVoucher)
@@ -278,7 +279,7 @@ func TestContract_ContractUpdate(t *testing.T) {
 	stTxn := state.NewStateTransaction(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 
 	flowAddress := flow.HexToAddress("01")
 	runtimeAddress := runtime.Address(flowAddress)
@@ -386,7 +387,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 	stTxn := state.NewStateTransaction(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 
 	flowAddress := flow.HexToAddress("01")
 	runtimeAddress := runtime.Address(flowAddress)

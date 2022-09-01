@@ -3,6 +3,7 @@ package fvm
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -36,16 +37,19 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		defer span.End()
 	}
 
-	parentState := sth.State()
-	childState := sth.NewChild()
+	nestedTxnId, err := sth.BeginNestedTransaction()
+	if err != nil {
+		return err
+	}
+
 	defer func() {
-		if mergeError := parentState.MergeState(childState, sth.EnforceLimits()); mergeError != nil {
+		mergeError := sth.Commit(nestedTxnId)
+		if mergeError != nil {
 			panic(mergeError)
 		}
-		sth.SetActiveState(parentState)
 	}()
 
-	accounts := state.NewAccounts(sth)
+	accounts := environment.NewAccounts(sth)
 	proposalKey := proc.Transaction.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
@@ -72,8 +76,13 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {
-		childState.View().DropDelta()
+		// NOTE: we need to disable limits during restart or else restart may
+		// fail on merging.
+		sth.DisableAllLimitEnforcements()
+		_ = sth.RestartNestedTransaction(nestedTxnId)
+		sth.EnableAllLimitEnforcements()
 		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
+
 	return nil
 }

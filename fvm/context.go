@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -16,7 +15,7 @@ import (
 type Context struct {
 	Chain   flow.Chain
 	Blocks  environment.Blocks
-	Metrics handler.MetricsReporter
+	Metrics environment.MetricsReporter
 	Tracer  module.Tracer
 	// DisableMemoryAndInteractionLimits will override memory and interaction
 	// limits and set them to MaxUint64, effectively disabling these limits.
@@ -43,11 +42,12 @@ type Context struct {
 	TransactionProcessors         []TransactionProcessor
 	ScriptProcessors              []ScriptProcessor
 	Logger                        zerolog.Logger
+	ReusableCadenceRuntimePool    ReusableCadenceRuntimePool
 }
 
 // NewContext initializes a new execution context with the provided options.
-func NewContext(logger zerolog.Logger, opts ...Option) Context {
-	return newContext(defaultContext(logger), opts...)
+func NewContext(opts ...Option) Context {
+	return newContext(defaultContext(), opts...)
 }
 
 // NewContextFromParent spawns a child execution context with the provided options.
@@ -71,11 +71,11 @@ const (
 	DefaultEventCollectionByteSizeLimit = 256_000        // 256KB
 )
 
-func defaultContext(logger zerolog.Logger) Context {
+func defaultContext() Context {
 	return Context{
 		Chain:                             flow.Mainnet.Chain(),
 		Blocks:                            nil,
-		Metrics:                           &handler.NoopMetricsReporter{},
+		Metrics:                           environment.NoopMetricsReporter{},
 		Tracer:                            nil,
 		DisableMemoryAndInteractionLimits: false,
 		ComputationLimit:                  DefaultComputationLimit,
@@ -94,12 +94,13 @@ func defaultContext(logger zerolog.Logger) Context {
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
-			NewTransactionInvoker(logger),
+			NewTransactionInvoker(),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvoker(),
 		},
-		Logger: logger,
+		Logger:                     zerolog.Nop(),
+		ReusableCadenceRuntimePool: NewReusableCadenceRuntimePool(0),
 	}
 }
 
@@ -144,6 +145,14 @@ func WithComputationLimit(limit uint64) Option {
 func WithMemoryLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.MemoryLimit = limit
+		return ctx
+	}
+}
+
+// WithLogger sets the context logger
+func WithLogger(logger zerolog.Logger) Option {
+	return func(ctx Context) Context {
+		ctx.Logger = logger
 		return ctx
 	}
 }
@@ -222,7 +231,7 @@ func WithBlocks(blocks environment.Blocks) Option {
 // WithMetricsReporter sets the metrics collector for a virtual machine context.
 //
 // A metrics collector is used to gather metrics reported by the Cadence runtime.
-func WithMetricsReporter(mr handler.MetricsReporter) Option {
+func WithMetricsReporter(mr environment.MetricsReporter) Option {
 	return func(ctx Context) Context {
 		if mr != nil {
 			ctx.Metrics = mr
@@ -305,6 +314,15 @@ func WithAccountStorageLimit(enabled bool) Option {
 func WithTransactionFeesEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.TransactionFeesEnabled = enabled
+		return ctx
+	}
+}
+
+// WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
+// use for creating the cadence runtime.
+func WithReusableCadenceRuntimePool(pool ReusableCadenceRuntimePool) Option {
+	return func(ctx Context) Context {
+		ctx.ReusableCadenceRuntimePool = pool
 		return ctx
 	}
 }

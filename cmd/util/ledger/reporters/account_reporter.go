@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -70,7 +71,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 		l,
 		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
 	)
-	gen := state.NewStateBoundAddressGenerator(stTxn, r.Chain)
+	gen := environment.NewAccountCreator(stTxn, r.Chain)
 
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
 
@@ -127,7 +128,7 @@ type balanceProcessor struct {
 	balanceScript []byte
 	momentsScript []byte
 
-	accounts state.Accounts
+	accounts environment.Accounts
 
 	rwa        ReportWriter
 	rwc        ReportWriter
@@ -137,8 +138,10 @@ type balanceProcessor struct {
 }
 
 func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{}))
+	ctx := fvm.NewContext(
+		fvm.WithChain(chain),
+		fvm.WithMemoryAndInteractionLimitsDisabled())
 	prog := programs.NewEmptyPrograms()
 
 	v := view.NewChild()
@@ -146,7 +149,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		v,
 		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
 	)
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 
 	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, prog)
 
