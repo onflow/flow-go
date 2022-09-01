@@ -45,6 +45,7 @@ func (cs *ComplianceSuite) SetupTest() {
 
 	e, err := NewEngine(unittest.Logger(), cs.net, cs.me, cs.prov, cs.core)
 	require.NoError(cs.T(), err)
+	e.WithConsensus(cs.hotstuff)
 	cs.engine = e
 
 	cs.ctx, cs.cancel, cs.errs = irrecoverable.WithSignallerAndCancel(context.Background())
