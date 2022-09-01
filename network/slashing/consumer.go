@@ -52,7 +52,7 @@ func (c *Consumer) OnUnknownMsgTypeError(violation *Violation) {
 }
 
 // OnInvalidMsgError logs an error for messages that contained payloads that could not
-//	// be unmarshalled into the message type denoted by message code byte.
+// be unmarshalled into the message type denoted by message code byte.
 func (c *Consumer) OnInvalidMsgError(violation *Violation) {
 	c.logOffense(invalidMsgViolation, violation)
 }

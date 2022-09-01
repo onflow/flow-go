@@ -16,10 +16,10 @@ import (
 //
 // A MTrie is a thin wrapper around a the trie's root Node. An MTrie implements the
 // logic for forming MTrie-graphs from the elementary nodes. Specifically:
-//   * how Nodes (graph vertices) form a Trie,
-//   * how register values are read from the trie,
-//   * how Merkle proofs are generated from a trie, and
-//   * how a new Trie with updated values is generated.
+//   - how Nodes (graph vertices) form a Trie,
+//   - how register values are read from the trie,
+//   - how Merkle proofs are generated from a trie, and
+//   - how a new Trie with updated values is generated.
 //
 // `MTrie`s are _immutable_ data structures. Updating register values is implemented through
 // copy-on-write, which creates a new `MTrie`. For minimal memory consumption, all sub-tries
@@ -29,7 +29,7 @@ import (
 // MTrie expects that for a specific path, the register's key never changes.
 //
 // DEFINITIONS and CONVENTIONS:
-//   * HEIGHT of a node v in a tree is the number of edges on the longest downward path
+//   - HEIGHT of a node v in a tree is the number of edges on the longest downward path
 //     between v and a tree leaf. The height of a tree is the height of its root.
 //     The height of a Trie is always the height of the fully-expanded tree.
 type MTrie struct {
@@ -104,10 +104,11 @@ func (mt *MTrie) String() string {
 // UNSAFE: requires _all_ paths to have a length of mt.Height bits.
 // CAUTION: while getting payload value sizes, `paths` is permuted IN-PLACE for optimized processing.
 // Return:
-//  * `sizes` []int
+//   - `sizes` []int
 //     For each path, the corresponding payload value size is written into sizes. AFTER
 //     the size operation completes, the order of `path` and `sizes` are such that
 //     for `path[i]` the corresponding register value size is referenced by `sizes[i]`.
+//
 // TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeValueSizes(paths []ledger.Path) []int {
 	sizes := make([]int, len(paths)) // pre-allocate slice for the result
@@ -115,11 +116,11 @@ func (mt *MTrie) UnsafeValueSizes(paths []ledger.Path) []int {
 	return sizes
 }
 
-// valueSizes returns value sizes of all the registers in `paths`` in subtree with `head` as root node.
+// valueSizes returns value sizes of all the registers in `paths“ in subtree with `head` as root node.
 // For each `path[i]`, the corresponding value size is written into `sizes[i]` for the same index `i`.
 // CAUTION:
-//  * while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
-//  * unchecked requirement: all paths must go through the `head` node
+//   - while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
+//   - unchecked requirement: all paths must go through the `head` node
 func valueSizes(sizes []int, paths []ledger.Path, head *node.Node) {
 	// check for empty paths
 	if len(paths) == 0 {
@@ -234,10 +235,11 @@ func readSinglePayload(path ledger.Path, head *node.Node) *ledger.Payload {
 // UNSAFE: requires _all_ paths to have a length of mt.Height bits.
 // CAUTION: while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
 // Return:
-//  * `payloads` []*ledger.Payload
+//   - `payloads` []*ledger.Payload
 //     For each path, the corresponding payload is written into payloads. AFTER
 //     the read operation completes, the order of `path` and `payloads` are such that
 //     for `path[i]` the corresponding register value is referenced by 0`payloads[i]`.
+//
 // TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
 	payloads := make([]*ledger.Payload, len(paths)) // pre-allocate slice for the result
@@ -248,8 +250,8 @@ func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
 // read reads all the registers in subtree with `head` as root node. For each
 // `path[i]`, the corresponding payload is written into `payloads[i]` for the same index `i`.
 // CAUTION:
-//  * while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
-//  * unchecked requirement: all paths must go through the `head` node
+//   - while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
+//   - unchecked requirement: all paths must go through the `head` node
 func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 	// check for empty paths
 	if len(paths) == 0 {
@@ -311,16 +313,19 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 
 // NewTrieWithUpdatedRegisters constructs a new trie containing all registers from the parent trie,
 // and returns:
-//   * updated trie
-//   * max depth touched during update (this isn't affected by prune flag)
-//   * error
+//   - updated trie
+//   - max depth touched during update (this isn't affected by prune flag)
+//   - error
+//
 // The key-value pairs specify the registers whose values are supposed to hold updated values
 // compared to the parent trie. Constructing the new trie is done in a COPY-ON-WRITE manner:
-//   * The original trie remains unchanged.
-//   * subtries that remain unchanged are from the parent trie instead of copied.
+//   - The original trie remains unchanged.
+//   - subtries that remain unchanged are from the parent trie instead of copied.
+//
 // UNSAFE: method requires the following conditions to be satisfied:
-//   * keys are NOT duplicated
-//   * requires _all_ paths to have a length of mt.Height bits.
+//   - keys are NOT duplicated
+//   - requires _all_ paths to have a length of mt.Height bits.
+//
 // CAUTION: `updatedPaths` and `updatedPayloads` are permuted IN-PLACE for optimized processing.
 // CAUTION: MTrie expects that for a specific path, the payload's key never changes.
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
@@ -360,18 +365,19 @@ type updateResult struct {
 }
 
 // update traverses the subtree, updates the stored registers, and returns:
-//   * new or original node (n)
-//   * allocated register count delta in subtrie (allocatedRegCountDelta)
-//   * allocated register size delta in subtrie (allocatedRegSizeDelta)
-//   * lowest height reached during recursive update in subtrie (lowestHeightTouched)
+//   - new or original node (n)
+//   - allocated register count delta in subtrie (allocatedRegCountDelta)
+//   - allocated register size delta in subtrie (allocatedRegSizeDelta)
+//   - lowest height reached during recursive update in subtrie (lowestHeightTouched)
+//
 // allocatedRegCountDelta and allocatedRegSizeDelta are used to compute updated
 // trie's allocated register count and size.  lowestHeightTouched is used to
 // compute max depth touched during update.
 // CAUTION: while updating, `paths` and `payloads` are permuted IN-PLACE for optimized processing.
 // UNSAFE: method requires the following conditions to be satisfied:
-//   * paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
+//   - paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
 //     (excluding the bit at index headHeight)
-//   * paths are NOT duplicated
+//   - paths are NOT duplicated
 func update(
 	nodeHeight int, parentNode *node.Node,
 	paths []ledger.Path, payloads []ledger.Payload, compactLeaf *node.Node,
@@ -569,7 +575,7 @@ func (mt *MTrie) UnsafeProofs(paths []ledger.Path) *ledger.TrieBatchProof {
 // the provided `proofs` slice
 // CAUTION: while updating, `paths` and `proofs` are permuted IN-PLACE for optimized processing.
 // UNSAFE: method requires the following conditions to be satisfied:
-//   * paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
+//   - paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
 //     (excluding the bit at index headHeight)
 func prove(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
 	// check for empty paths
@@ -741,10 +747,10 @@ func (mt *MTrie) IsAValidTrie() bool {
 // The comparison of paths is only based on the bit at bitIndex, the function therefore assumes all paths have
 // equal bits from 0 to bitIndex-1
 //
-//  For instance, if `paths` contains the following 3 paths, and bitIndex is `1`:
-//  [[0,0,1,1], [0,1,0,1], [0,0,0,1]]
-//  then `splitByPath` returns 2 and updates `paths` into:
-//  [[0,0,1,1], [0,0,0,1], [0,1,0,1]]
+//	For instance, if `paths` contains the following 3 paths, and bitIndex is `1`:
+//	[[0,0,1,1], [0,1,0,1], [0,0,0,1]]
+//	then `splitByPath` returns 2 and updates `paths` into:
+//	[[0,0,1,1], [0,0,0,1], [0,1,0,1]]
 func splitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) int {
 	i := 0
 	for j, path := range paths {

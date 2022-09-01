@@ -44,7 +44,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	chain := flow.Mainnet.Chain()
 	vm := fvm.NewVirtualMachine(rt)
-	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
@@ -196,7 +196,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	chain := flow.Emulator.Chain()
 	vm := fvm.NewVirtualMachine(rt)
-	execCtx := fvm.NewContext(zerolog.Nop(),
+	execCtx := fvm.NewContext(
 		fvm.WithBlockHeader(block.Header),
 		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: &block}}),
 		fvm.WithChain(chain))

@@ -35,28 +35,28 @@ type Proof struct {
 // validateFormat validates the format and size of elements of the proof (syntax check)
 //
 // A valid proof as to satisfy the following consistency conditions:
-// 1. A valid inclusion proof represents a full path through the merkle tree.
-//    We separate the path into a sequence of interim vertices and a tailing leaf.
-//    For interim vertex (with index i, counted from the root node) along the path,
-//    the proof as to contain the following information:
-//      (i) whether the vertex is a short node (InterimNodeTypes[i] == 1) or
-//          a full node (InterimNodeTypes[i] == 0)
+//  1. A valid inclusion proof represents a full path through the merkle tree.
+//     We separate the path into a sequence of interim vertices and a tailing leaf.
+//     For interim vertex (with index i, counted from the root node) along the path,
+//     the proof as to contain the following information:
+//     (i) whether the vertex is a short node (InterimNodeTypes[i] == 1) or
+//     a full node (InterimNodeTypes[i] == 0)
 //     (ii) for each short node, we need the number of bits in the node's key segment
-//          (entry in ShortPathLengths)
-//    (iii) for a full node, we need the hash of the sibling that is _not_ on the path
-//          (entry in SiblingHashes)
-//    Hence, len(ShortPathLengths) + len(SiblingHashes) specifies how many _interim_
-//    vertices are on the merkle path. Consequently, we require the same number of _bits_
-//    in InterimNodeTypes. Therefore, we know that InterimNodeTypes should have a length
-//    of `(numberBits+7)>>3` _bytes_, and the remaining padding bits must be zeros.
-// 2. The key length (measured in bytes) has to be in the interval [1, maxKeyLength].
-//    Furthermore, each interim vertex on the merkle path represents:
-//    * either a single bit in case of a full node:
-//      we expect InterimNodeTypes[i] == 0
-//    * a positive number of bits in case of a short node:
-//      we expect InterimNodeTypes[i] == 1
-//      and the number of bits is non-zero and encoded in the respective element of ShortPathLengths
-//    Hence, the total key length _in bits_ should be: len(SiblingHashes) + sum(ShortPathLengths)
+//     (entry in ShortPathLengths)
+//     (iii) for a full node, we need the hash of the sibling that is _not_ on the path
+//     (entry in SiblingHashes)
+//     Hence, len(ShortPathLengths) + len(SiblingHashes) specifies how many _interim_
+//     vertices are on the merkle path. Consequently, we require the same number of _bits_
+//     in InterimNodeTypes. Therefore, we know that InterimNodeTypes should have a length
+//     of `(numberBits+7)>>3` _bytes_, and the remaining padding bits must be zeros.
+//  2. The key length (measured in bytes) has to be in the interval [1, maxKeyLength].
+//     Furthermore, each interim vertex on the merkle path represents:
+//     * either a single bit in case of a full node:
+//     we expect InterimNodeTypes[i] == 0
+//     * a positive number of bits in case of a short node:
+//     we expect InterimNodeTypes[i] == 1
+//     and the number of bits is non-zero and encoded in the respective element of ShortPathLengths
+//     Hence, the total key length _in bits_ should be: len(SiblingHashes) + sum(ShortPathLengths)
 func (p *Proof) validateFormat() error {
 
 	// step1 - validate the key as the very first step
@@ -121,9 +121,9 @@ func (p *Proof) validateFormat() error {
 // Verify verifies the proof by constructing the hash values bottom up and cross-check
 // the constructed root hash with the given one. For valid proofs, `nil` is returned.
 // During normal operations, the following error returns are expected:
-//  * MalformedProofError if the proof has a syntactically invalid structure
-//  * InvalidProofError if the proof is syntactically valid, but the reconstructed
-//    root hash does not match the expected value.
+//   - MalformedProofError if the proof has a syntactically invalid structure
+//   - InvalidProofError if the proof is syntactically valid, but the reconstructed
+//     root hash does not match the expected value.
 func (p *Proof) Verify(expectedRootHash []byte) error {
 
 	// first validate the format of the proof

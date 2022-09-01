@@ -38,7 +38,6 @@ func InvokeDeductTransactionFeesContract(
 			cadence.UFix64(executionEffort),
 		},
 		deductTransactionFeesInvocationArgumentTypes,
-		env.Context().Logger,
 	)
 	return invoker.Invoke(env)
 }
@@ -68,7 +67,6 @@ func InvokeSetupNewAccountContract(
 			cadence.BytesToAddress(payer.Bytes()),
 		},
 		setupNewAccountInvocationArgumentTypes,
-		env.Context().Logger,
 	)
 	return invoker.Invoke(env)
 }
@@ -94,7 +92,6 @@ func InvokeAccountAvailableBalanceContract(
 			cadence.BytesToAddress(address.Bytes()),
 		},
 		accountAvailableBalanceInvocationArgumentTypes,
-		env.Context().Logger,
 	)
 	return invoker.Invoke(env)
 }
@@ -119,7 +116,6 @@ func InvokeAccountBalanceContract(
 			cadence.BytesToAddress(address.Bytes()),
 		},
 		accountBalanceInvocationArgumentTypes,
-		env.Context().Logger,
 	)
 	return invoker.Invoke(env)
 }
@@ -145,7 +141,6 @@ func InvokeAccountStorageCapacityContract(
 			cadence.BytesToAddress(address.Bytes()),
 		},
 		accountStorageCapacityInvocationArgumentTypes,
-		env.Context().Logger,
 	)
 	return invoker.Invoke(env)
 }
@@ -176,7 +171,6 @@ func InvokeAccountsStorageCapacity(
 				int64(len(arrayValues)),
 			),
 		},
-		env.Context().Logger,
 	)
 	return invoker.Invoke(env)
 }
@@ -204,7 +198,6 @@ func InvokeUseContractAuditVoucherContract(
 			cadence.String(code),
 		},
 		useContractAuditVoucherInvocationArgumentTypes,
-		env.Context().Logger,
 	)
 	resultCdc, err := invoker.Invoke(env)
 	if err != nil {

@@ -20,17 +20,17 @@ const overCapacityThreshold = 128
 // into the memory pool upon creation to change the strategy of eviction.
 // The ejection policy is executed from within the thread that serves the
 // mempool. Implementations should adhere to the following convention:
-//  * The ejector function has the freedom to eject _multiple_ elements.
-//  * In a single `eject` call, it must eject as many elements to statistically
-//    keep the mempool size within the desired limit.
-//  * The ejector _might_ (for performance reasons) retain more elements in the
-//    mempool than the targeted capacity.
-//  * The ejector _must_ notify the `Backend.ejectionCallbacks` for _each_
-//    element it removes from the mempool.
-//  * Implementations do _not_ need to be concurrency safe. The Backend handles
-//    concurrency (specifically, it locks the mempool during ejection).
-//  * The implementation should be non-blocking (though, it is allowed to
-//    take a bit of time; the mempool will just be locked during this time).
+//   - The ejector function has the freedom to eject _multiple_ elements.
+//   - In a single `eject` call, it must eject as many elements to statistically
+//     keep the mempool size within the desired limit.
+//   - The ejector _might_ (for performance reasons) retain more elements in the
+//     mempool than the targeted capacity.
+//   - The ejector _must_ notify the `Backend.ejectionCallbacks` for _each_
+//     element it removes from the mempool.
+//   - Implementations do _not_ need to be concurrency safe. The Backend handles
+//     concurrency (specifically, it locks the mempool during ejection).
+//   - The implementation should be non-blocking (though, it is allowed to
+//     take a bit of time; the mempool will just be locked during this time).
 type BatchEjectFunc func(b *Backend) bool
 type EjectFunc func(b *Backend) (flow.Identifier, flow.Entity, bool)
 
@@ -157,7 +157,7 @@ func (q *LRUEjector) Untrack(entityID flow.Identifier) {
 }
 
 // Eject implements EjectFunc for LRUEjector. It finds the entity with the lowest sequence number (i.e.,
-//the oldest entity). It also untracks.  This is using a linear search
+// the oldest entity). It also untracks.  This is using a linear search
 func (q *LRUEjector) Eject(b *Backend) (flow.Identifier, flow.Entity, bool) {
 	q.Lock()
 	defer q.Unlock()

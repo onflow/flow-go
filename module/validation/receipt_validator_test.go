@@ -274,9 +274,9 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
 // within one block payload are accepted, where the receipts are building on
 // top of each other (i.e. their results form a chain).
 // Say B(A) means block B has receipt for A:
-// * we have such chain in storage: G <- A <- B(A) <- C
-// * if a child block of C payload contains receipts and results for (B,C)
-//   it should be accepted as valid
+//   - we have such chain in storage: G <- A <- B(A) <- C
+//   - if a child block of C payload contains receipts and results for (B,C)
+//     it should be accepted as valid
 func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 	// assuming signatures are all good
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
@@ -478,11 +478,13 @@ func (s *ReceiptValidationSuite) TestValidationReceiptForIncorporatedResult() {
 // TestValidationReceiptWithoutIncorporatedResult verifies that receipts must commit
 // to results that are included in the respective fork. Specifically, we test that
 // the counter-example is rejected:
-//  * we have the chain in storage: G <- A <- B
-//                                        ^- C(Result[A], ReceiptMeta[A])
-//    here, block C contains the result _and_ the receipt Meta-data for block A
-//  * now receive the new block X: G <- A <- B <- X(ReceiptMeta[A])
-//    Note that X only contains the receipt for A, but _not_ the result.
+//   - we have the chain in storage:
+//     .                                  G <- A <- B
+//     .                                        ^- C(Result[A], ReceiptMeta[A])
+//     here, block C contains the result _and_ the receipt Meta-data for block A
+//   - now receive the new block X: G <- A <- B <- X(ReceiptMeta[A])
+//     Note that X only contains the receipt for A, but _not_ the result.
+//
 // Block X must be considered invalid, because confirming validity of
 // ReceiptMeta[A] requires information _not_ included in the fork.
 func (s *ReceiptValidationSuite) TestValidationReceiptWithoutIncorporatedResult() {
@@ -521,21 +523,26 @@ func (s *ReceiptValidationSuite) TestValidationReceiptWithoutIncorporatedResult(
 // TestPayloadWithExecutionFork checks that the Receipt Validator only
 // accepts results that decent from the sealed result. Specifically, we test that
 // the counter-example is rejected:
-//  * we have the chain in storage:
-//     S <- A(Result[S]_1, Result[S]_2, ReceiptMeta[S]_1, ReceiptMeta[S]_2)
-//            <- B(Seal for Result[S]_2)
-//               <- X(Result[A]_1, Result[A]_2, Result[A]_3,
-//                    ReceiptMeta[A]_1, ReceiptMeta[A]_2, ReceiptMeta[A]_3)
-//  * Note that we are explicitly testing the handling of an execution fork _before_
-//    and _after_ the sealed result
-//       Blocks:      S  <-----------   A
-//      Results:   Result[S]_1  <-  Result[A]_1  :: the root of this execution tree conflicts with sealed result
-//                 Result[S]_2  <-  Result[A]_2  :: the root of this execution tree is sealed
-//                              ^-  Result[A]_3
+//
+//   - we have the chain in storage:
+//
+//     .     S <- A(Result[S]_1, Result[S]_2, ReceiptMeta[S]_1, ReceiptMeta[S]_2)
+//     .            <- B(Seal for Result[S]_2)
+//     .               <- X(Result[A]_1, Result[A]_2, Result[A]_3,
+//     .                    ReceiptMeta[A]_1, ReceiptMeta[A]_2, ReceiptMeta[A]_3)
+//
+//   - Note that we are explicitly testing the handling of an execution fork _before_
+//     and _after_ the sealed result
+//
+//     .       Blocks:      S  <-----------   A
+//     .      Results:   Result[S]_1  <-  Result[A]_1  :: the root of this execution tree conflicts with sealed result
+//     .                 Result[S]_2  <-  Result[A]_2  :: the root of this execution tree is sealed
+//     .                              ^-  Result[A]_3
+//
 // Expected Behaviour:
-// In the fork which X extends, Result[S]_2 has been sealed. Hence, it should be
-//   (i) illegal to include Result[A]_1, because it is _not_ derived from the sealed result.
-//  (ii) legal to include only results Result[A]_2 and Result[A]_3, as they are derived from the sealed result.
+// In the fork which X extends, Result[S]_2 has been sealed. Hence, it should be:
+// (i) illegal to include Result[A]_1, because it is _not_ derived from the sealed result.
+// (ii) legal to include only results Result[A]_2 and Result[A]_3, as they are derived from the sealed result.
 func (s *ReceiptValidationSuite) TestPayloadWithExecutionFork() {
 	// assuming signatures are all good
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
@@ -593,11 +600,12 @@ func (s *ReceiptValidationSuite) TestPayloadWithExecutionFork() {
 
 // TestMultiLevelExecutionTree verifies that a result is accepted that
 // extends a multi-level execution tree :
-//  * Let S be the latest sealed block
-//  * we have the chain in storage:
+//   - Let S be the latest sealed block
+//   - we have the chain in storage:
 //     S <- A <- B(Result[A], ReceiptMeta[A]) <- C(Result[B], ReceiptMeta[B])
-//  * now receive the new block X:
+//   - now receive the new block X:
 //     S <- A <- B(Result[A], ReceiptMeta[A]) <- C(Result[B], ReceiptMeta[B]) <- X(Result[C], ReceiptMeta[C])
+//
 // Block X should be considered valid, as it extends the
 // Execution Tree with root latest sealed Result (i.e. result sealed for S)
 func (s *ReceiptValidationSuite) TestMultiLevelExecutionTree() {
@@ -644,9 +652,9 @@ func (s *ReceiptValidationSuite) TestMultiLevelExecutionTree() {
 // Test that validator will reject payloads that contain receipts for blocks that
 // are not on the fork
 //
-// B1<--B2<--B3
-//      |
-//      +----B4{R(B3)}
+//	B1<--B2<--B3
+//	     |
+//	     +----B4{R(B3)}
 func (s *ReceiptValidationSuite) TestValidationReceiptsBlockNotOnFork() {
 	// create block2
 	block2 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)

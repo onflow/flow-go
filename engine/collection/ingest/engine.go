@@ -219,10 +219,10 @@ func (e *Engine) processAvailableMessages(ctx context.Context) error {
 // from outside the system or routed from another collection node.
 //
 // Returns:
-// * engine.UnverifiableInputError if the reference block is unknown or if the
-//   node is not a member of any cluster in the reference epoch.
-// * engine.InvalidInputError if the transaction is invalid.
-// * other error for any other unexpected error condition.
+//   - engine.UnverifiableInputError if the reference block is unknown or if the
+//     node is not a member of any cluster in the reference epoch.
+//   - engine.InvalidInputError if the transaction is invalid.
+//   - other error for any other unexpected error condition.
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBody) error {
 
 	defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
@@ -291,10 +291,10 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 // between expected and unexpected cases.
 //
 // Returns:
-// * engine.UnverifiableInputError when this node is not in any cluster because it is not
-//   a member of the reference epoch. This is an expected condition and the transaction
-//   should be discarded.
-// * other error for any other, unexpected error condition.
+//   - engine.UnverifiableInputError when this node is not in any cluster because it is not
+//     a member of the reference epoch. This is an expected condition and the transaction
+//     should be discarded.
+//   - other error for any other, unexpected error condition.
 func (e *Engine) getLocalCluster(refEpoch protocol.Epoch) (flow.IdentityList, error) {
 	epochCounter, err := refEpoch.Counter()
 	if err != nil {

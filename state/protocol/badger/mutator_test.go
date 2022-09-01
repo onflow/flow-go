@@ -564,7 +564,6 @@ func TestExtendReceiptsValid(t *testing.T) {
 //
 // B8 is the final block of the epoch.
 // B9 is the first block of the NEXT epoch.
-//
 func TestExtendEpochTransitionValid(t *testing.T) {
 	// create a event consumer to test epoch transition events
 	consumer := new(mockprotocol.Consumer)
@@ -848,10 +847,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 // we should be able to have conflicting forks with two different instances of
 // the same service event for the same epoch
 //
-//         /--B1<--B3(R1)<--B5(S1)<--B7
-// ROOT <--+
-//         \--B2<--B4(R2)<--B6(S2)<--B8
-//
+//	         /--B1<--B3(R1)<--B5(S1)<--B7
+//	ROOT <--+
+//	         \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendConflictingEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
@@ -961,10 +959,9 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 // we should be able to have conflicting forks with two DUPLICATE instances of
 // the same service event for the same epoch
 //
-//         /--B1<--B3(R1)<--B5(S1)<--B7
-// ROOT <--+
-//         \--B2<--B4(R2)<--B6(S2)<--B8
-//
+//	        /--B1<--B3(R1)<--B5(S1)<--B7
+//	ROOT <--+
+//	        \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendDuplicateEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
