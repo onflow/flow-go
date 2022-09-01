@@ -82,17 +82,6 @@ jobs:
         id: set-test-matrix
         run: go run utils/test_matrix/test_matrix.go network engine access admin utils
 
-  use-dynamic-test-matrix:
-    name: Use Dynamic Test Matrix
-    needs: create-dynamic-test-matrix
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
-    steps:
-      - name: Echo Matrix
-        run: echo name is ${{ matrix.targets.name }} packages are ${{ matrix.targets.packages }}
-
   unit-test:
     name: Unit Tests
     needs: create-dynamic-test-matrix
