@@ -89,7 +89,7 @@ jobs:
       fail-fast: false
       matrix:
         targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
