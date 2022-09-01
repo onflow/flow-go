@@ -75,7 +75,15 @@ func (i *TransactionInvoker) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
+
+		// backwards compatibility to enable rolling deploy
+		enforceLimits := sth.EnforceInteractionLimits()
+		if (ctx.Chain.ChainID() == flow.Mainnet && blockHeight > uint64(36419249)) ||
+			(ctx.Chain.ChainID() == flow.Testnet && blockHeight > uint64(78354421)) {
+			enforceLimits = false
+		}
+
+		if mergeError := parentState.MergeState(childState, enforceLimits); mergeError != nil {
 			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
