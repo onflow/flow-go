@@ -442,6 +442,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
 
+			// add blobservice into ReadyDoneAware dependency passed to peer manager
+			// this configures peer manager to wait for the blobservice to be ready before starting
+			bsDependable.Init(bs)
+
 			builder.ExecutionDataDownloader = execution_data.NewDownloader(bs)
 
 			return builder.ExecutionDataDownloader, nil
