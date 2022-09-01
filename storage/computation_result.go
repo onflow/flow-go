@@ -6,9 +6,8 @@ import (
 
 // ComputationResultUploadStatus interface defines storage operations for upload status
 // of given ComputationResult instance:
-//	- false as upload not completed
-//  - true as upload completed
-//
+// - false as upload not completed
+// - true as upload completed
 type ComputationResultUploadStatus interface {
 	// Upsert upserts omputationResult into persistent storage with given BlockID.
 	Upsert(blockID flow.Identifier, wasUploadCompleted bool) error
