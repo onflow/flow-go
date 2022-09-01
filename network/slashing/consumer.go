@@ -2,6 +2,7 @@ package slashing
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module"
 
 	"github.com/rs/zerolog"
 
@@ -18,12 +19,16 @@ const (
 // Consumer is a struct that logs a message for any slashable offences.
 // This struct will be updated in the future when slashing is implemented.
 type Consumer struct {
-	log zerolog.Logger
+	log     zerolog.Logger
+	metrics module.NetworkSecurityMetrics
 }
 
 // NewSlashingViolationsConsumer returns a new Consumer
-func NewSlashingViolationsConsumer(log zerolog.Logger) *Consumer {
-	return &Consumer{log.With().Str("module", "network_slashing_consumer").Logger()}
+func NewSlashingViolationsConsumer(log zerolog.Logger, metrics module.NetworkSecurityMetrics) *Consumer {
+	return &Consumer{
+		log:     log.With().Str("module", "network_slashing_consumer").Logger(),
+		metrics: metrics,
+	}
 }
 
 func (c *Consumer) logOffense(networkOffense string, violation *Violation) {
@@ -52,6 +57,7 @@ func (c *Consumer) OnUnknownMsgTypeError(violation *Violation) {
 }
 
 // OnInvalidMsgError logs an error for messages that contained payloads that could not
+//
 //	// be unmarshalled into the message type denoted by message code byte.
 func (c *Consumer) OnInvalidMsgError(violation *Violation) {
 	c.logOffense(invalidMsgViolation, violation)

@@ -2,6 +2,7 @@ package p2p_test
 
 import (
 	"context"
+	"github.com/onflow/flow-go/module/metrics"
 	"testing"
 	"time"
 
@@ -148,7 +149,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, n := range nodes {
-		s, err := n.Subscribe(topic, codec, unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger()))
+		s, err := n.Subscribe(topic, codec, unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 		require.NoError(t, err)
 
 		go func(s *pubsub.Subscription, nodeID peer.ID) {

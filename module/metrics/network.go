@@ -318,11 +318,11 @@ func (nc *NetworkCollector) OnDNSLookupRequestDropped() {
 }
 
 // OnUnauthorizedMessage tracks the number of unauthorized messages seen on the network.
-func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic string) {
+func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense string) {
 	if msgType == "" {
 		msgType = LabelUnknownMsgType
 	}
-	nc.unAuthorizedMessagesCount.WithLabelValues(role, msgType, topic).Inc()
+	nc.unAuthorizedMessagesCount.WithLabelValues(role, msgType, topic, offense).Inc()
 }
 
 // OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.

@@ -275,7 +275,7 @@ func (m *Middleware) start(ctx context.Context) error {
 		return fmt.Errorf("could not start middleware: overlay must be configured by calling SetOverlay before middleware can be started")
 	}
 
-	m.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, m.ov.Identity, m.metrics)
+	m.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, m.ov.Identity)
 
 	libP2PNode, err := m.libP2PNodeFactory(ctx)
 	if err != nil {

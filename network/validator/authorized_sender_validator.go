@@ -3,8 +3,6 @@ package validator
 import (
 	"errors"
 
-	"github.com/onflow/flow-go/module"
-
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
@@ -27,16 +25,14 @@ type AuthorizedSenderValidator struct {
 	log                        zerolog.Logger
 	slashingViolationsConsumer slashing.ViolationsConsumer
 	getIdentity                GetIdentityFunc
-	metrics                    module.NetworkSecurityMetrics
 }
 
 // NewAuthorizedSenderValidator returns a new AuthorizedSenderValidator
-func NewAuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, getIdentity GetIdentityFunc, metrics module.NetworkSecurityMetrics) *AuthorizedSenderValidator {
+func NewAuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, getIdentity GetIdentityFunc) *AuthorizedSenderValidator {
 	return &AuthorizedSenderValidator{
 		log:                        log.With().Str("component", "authorized_sender_validator").Logger(),
 		slashingViolationsConsumer: slashingViolationsConsumer,
 		getIdentity:                getIdentity,
-		metrics:                    metrics,
 	}
 }
 

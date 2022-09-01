@@ -98,7 +98,9 @@ type namedComponentFunc struct {
 // FlowNodeBuilder is the default builder struct used for all flow nodes
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
-//   PostInit handlers, if any
+//
+//	PostInit handlers, if any
+//
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
@@ -291,7 +293,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
 	)
 
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger)
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
 	fnb.Middleware = p2p.NewMiddleware(
 		fnb.Logger,
 		libP2PNodeFactory,
