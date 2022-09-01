@@ -22,14 +22,13 @@ import (
 //     they must both be on the same fork.
 //
 // Essentially it converts the termination condition into two statements:
-//
-//	 (i) The height of the lowest block that should be visited.
-//	(ii) A consistency check `ConfirmTerminalReached` for the lowest visited block.
-//	     This check is predominantly useful in case both `head` and `lowestBlock`
-//	     are specified by their ID. It allows to enforce that `head` and `lowestBlock`
-//	     are both on the same fork and error otherwise.
-//	     However, the precise implementation of `ConfirmTerminalReached` is left to
-//	     the Terminal. Other, more elaborate conditions are possible.
+//   - (i) The height of the lowest block that should be visited.
+//   - (ii) A consistency check `ConfirmTerminalReached` for the lowest visited block.
+//     This check is predominantly useful in case both `head` and `lowestBlock`
+//     are specified by their ID. It allows to enforce that `head` and `lowestBlock`
+//     are both on the same fork and error otherwise.
+//     However, the precise implementation of `ConfirmTerminalReached` is left to
+//     the Terminal. Other, more elaborate conditions are possible.
 type Terminal interface {
 	// LowestHeightToVisit computes the height of the lowest block that should be visited
 	LowestHeightToVisit(headers storage.Headers) (uint64, error)

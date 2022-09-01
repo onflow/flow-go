@@ -34,7 +34,8 @@ func (builder *RPCEngineBuilder) Handler() accessproto.AccessAPIServer {
 
 // WithBlockSignerDecoder specifies that signer indices in block headers should be translated
 // to full node IDs with the given decoder.
-// Caution: you can inject either a `BlockSignerDecoder` (via method `WithBlockSignerDecoder`)
+// Caution:
+// you can inject either a `BlockSignerDecoder` (via method `WithBlockSignerDecoder`)
 // or an `AccessAPIServer` (via method `WithNewHandler`); but not both. If both are
 // specified, the builder will error during the build step.
 //
@@ -45,7 +46,8 @@ func (builder *RPCEngineBuilder) WithBlockSignerDecoder(signerIndicesDecoder hot
 }
 
 // WithNewHandler specifies that the given `AccessAPIServer` should be used for serving API queries.
-// Caution: you can inject either a `BlockSignerDecoder` (via method `WithBlockSignerDecoder`)
+// Caution:
+// you can inject either a `BlockSignerDecoder` (via method `WithBlockSignerDecoder`)
 // or an `AccessAPIServer` (via method `WithNewHandler`); but not both. If both are
 // specified, the builder will error during the build step.
 //

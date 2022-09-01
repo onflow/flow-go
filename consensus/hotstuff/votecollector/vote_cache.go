@@ -31,8 +31,6 @@ type voteContainer struct {
 //     If this is the case, we consider the vote a duplicate and drop it.
 //     If v and v0 have different BlockIDs, the voter is equivocating and
 //     we return a model.DoubleVoteError
-//
-// .
 type VotesCache struct {
 	lock          sync.RWMutex
 	view          uint64

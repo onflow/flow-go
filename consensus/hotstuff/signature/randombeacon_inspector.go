@@ -78,7 +78,8 @@ func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) 
 // Returns:
 //   - (true, nil) if the signature has been added, and enough shares have been collected.
 //   - (false, nil) if the signature has been added, but not enough shares were collected.
-//   - (false, error) if there is any exception adding the signature share.
+//
+// The following errors are expected during normal operations:
 //   - model.InvalidSignerError if signerIndex is invalid (out of the valid range)
 //   - model.DuplicatedSignerError if the signer has been already added
 //   - other error if there is an unexpected exception.

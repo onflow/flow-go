@@ -408,19 +408,17 @@ func TestSplitByPath(t *testing.T) {
 // An edge case can now arise when unallocating a previously allocated leaf (see vertex '■' in the illustration below):
 //
 //   - Before the update, both children of the leaf are nil (because it is a leaf)
-//
 //   - After the update-algorithm updated the sub-Trie with root ■, both children of the updated vertex are
 //     also nil. But the sub-trie has now changed: the register previously represented by ■ is now gone.
 //
-//     This case must be explicitly handled by the update algorithm:
+// This case must be explicitly handled by the update algorithm:
 //
 //   - (i)  If the vertex is an interim node, i.e. it had at least one child, it is legal to re-use the vertex if neither
 //     of its child-subtries were affected by the update.
-//
 //   - (ii) If the vertex is a leaf, only checking that neither child-subtries were affected by the update is insufficient.
 //     This is because the register the leaf represents might itself be affected by the update.
 //
-//     Condition (ii) is particularly subtle, if there are register updates in the subtrie of the leaf:
+// Condition (ii) is particularly subtle, if there are register updates in the subtrie of the leaf:
 //
 //   - From an API perspective, it is a legal operation to set an unallocated register to nil (essentially a no-op).
 //

@@ -111,8 +111,8 @@ func (builder *EpochBuilder) EpochHeights(counter uint64) (*EpochHeights, bool) 
 // epoch (epoch N). We assume the latest finalized block is within staking phase
 // in epoch N.
 //
-//	            |                                  EPOCH N                                                      |
-//	            |                                                                                               |
+//	                |                                  EPOCH N                                                      |
+//	                |                                                                                               |
 //	P                 A               B               C               D             E             F           G
 //
 //	+------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+

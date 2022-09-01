@@ -945,9 +945,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 
 // TestPayloadReceipts_SkipDuplicatedReceipts tests the receipt selection:
 // Expectation: we check that the Builder provides a ReceiptFilter which
-//
-//	filters out duplicated receipts.
-//
+// filters out duplicated receipts.
 // Comment:
 // While the receipt selection itself is performed by the ExecutionTree, the Builder
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
@@ -1016,7 +1014,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipReceiptsForSealedBlock() {
 // receipts than the configured maxReceiptCount.
 func (bs *BuilderSuite) TestPayloadReceipts_BlockLimit() {
 
-	//	Populate the mempool with 5 valid receipts
+	// Populate the mempool with 5 valid receipts
 	receipts := []*flow.ExecutionReceipt{}
 	metas := []*flow.ExecutionReceiptMeta{}
 	expectedResults := []*flow.ExecutionResult{}

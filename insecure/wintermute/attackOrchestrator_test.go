@@ -263,8 +263,7 @@ func mockOrchestratorNetworkForCorruptedExecutionResult(
 }
 
 // TestRespondingWithCorruptedAttestation evaluates when the Wintermute orchestrator receives a chunk data pack request from a CORRUPTED
-//
-//	verification node for a CORRUPTED chunk, it replies that with a result approval attestation.
+// verification node for a CORRUPTED chunk, it replies that with a result approval attestation.
 func TestRespondingWithCorruptedAttestation(t *testing.T) {
 	totalChunks := 10
 	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)

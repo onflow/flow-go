@@ -450,11 +450,10 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 //     S <- A{..} <- B{..} <- C{..} <- D{..} <- X
 //
 // We test the two distinct failure cases:
-// (i) illegal to seal Result[A]_2, because it is _not_ derived from the sealed result
-// (we verify checking of the payload seals with respect to the existing seals)
-//
-// (ii) illegal to seal Result[A]_1 followed by Result[B]_2, as Result[B]_2 not _not_ derived
-// from the sealed result (we verify checking of the payload seals with respect to each other)
+//   - (i) illegal to seal Result[A]_2, because it is _not_ derived from the sealed result
+//     (we verify checking of the payload seals with respect to the existing seals)
+//   - (ii) illegal to seal Result[A]_1 followed by Result[B]_2, as Result[B]_2 not _not_ derived
+//     from the sealed result (we verify checking of the payload seals with respect to each other)
 //
 // In addition, we also run a valid test case to confirm the proper construction of the test
 func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {

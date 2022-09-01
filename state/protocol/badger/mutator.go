@@ -693,13 +693,10 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // epoch in its respective fork. We do this by comparing the block's view to
 // the Epoch data from its parent. If the block's view is _larger_ than the
 // final View of the parent's epoch, the block starts a new Epoch.
-// case (a): block is in same Epoch as parent.
-//
-//	the parent's EpochStatus.CurrentEpoch also applies for the current block
-//
-// case (b): block starts new Epoch in its respective fork.
-//
-//	the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
+//   - case (a): block is in same Epoch as parent.
+//     the parent's EpochStatus.CurrentEpoch also applies for the current block
+//   - case (b): block starts new Epoch in its respective fork.
+//     the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
 //
 // As the parent was a valid extension of the chain, by induction, the parent satisfies all
 // consistency requirements of the protocol.
