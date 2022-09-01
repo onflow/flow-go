@@ -2,7 +2,7 @@ package tracker
 
 import (
 	"crypto/rand"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -24,7 +24,7 @@ func randomCid() cid.Cid {
 // height, and their associated tracking data, should be removed from the database.
 func TestPrune(t *testing.T) {
 	expectedPrunedCIDs := make(map[cid.Cid]struct{})
-	storageDir, err := ioutil.TempDir("/tmp", "prune_test")
+	storageDir, err := os.MkdirTemp("/tmp", "prune_test")
 	require.NoError(t, err)
 	storage, err := OpenStorage(storageDir, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
 		_, ok := expectedPrunedCIDs[c]
@@ -84,7 +84,7 @@ func TestPrune(t *testing.T) {
 // TestPruneNonLatestHeight test that when pruning a height at which a CID exists,
 // if that CID also exists at another height above the pruned height, the CID should not be pruned.
 func TestPruneNonLatestHeight(t *testing.T) {
-	storageDir, err := ioutil.TempDir("/tmp", "prune_test")
+	storageDir, err := os.MkdirTemp("/tmp", "prune_test")
 	require.NoError(t, err)
 	storage, err := OpenStorage(storageDir, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
 		assert.Fail(t, "unexpected CID pruned: %s", c.String())
