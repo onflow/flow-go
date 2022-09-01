@@ -199,7 +199,7 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 		service,
 		blueprints.IsContractDeploymentRestrictedPath,
 		runtime.Context{
-			Interface: e,
+			Interface:   e,
 			Environment: runtimeEnv,
 		},
 	)
