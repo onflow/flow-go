@@ -202,3 +202,5 @@ func (nc *NoopCollector) PrunedBlockByHeight(status *chainsync.Status)          
 func (nc *NoopCollector) PrunedBlocks(totalByHeight, totalById, storedByHeight, storedById int) {}
 func (nc *NoopCollector) RangeRequested(ran chainsync.Range)                                    {}
 func (nc *NoopCollector) BatchRequested(batch chainsync.Batch)                                  {}
+func (nc *NoopCollector) OnUnauthorizedMessage(role, msgType, topic string)                     {}
+func (nc *NoopCollector) OnRateLimitedUnicastMessage(role, msgType, topic string)               {}
