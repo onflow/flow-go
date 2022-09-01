@@ -68,9 +68,6 @@ type Engine struct {
 
 	cm *component.ComponentManager
 	component.Component
-	// signals for startup and shutdown
-	ready <-chan struct{}
-	done  <-chan struct{}
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -236,11 +233,6 @@ func NewEngine(
 // called before the engine can start.
 func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 	e.core.hotstuff = hot
-
-	// create ready/done channels
-	e.ready = util.AllReady(e.cm, e.core.hotstuff)
-	e.done = util.AllDone(e.cm, e.core.hotstuff)
-
 	return e
 }
 
@@ -262,13 +254,17 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 // Ready returns a ready channel that is closed once the engine has fully started.
 // For the consensus engine, we wait for hotstuff to start.
 func (e *Engine) Ready() <-chan struct{} {
-	return e.ready
+	// NOTE: this will create long-lived goroutines each time Ready is called
+	// Since Ready is called infrequently, that is OK. If the call frequency changes, change this code.
+	return util.AllReady(e.cm, e.core.hotstuff)
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	return e.done
+	// NOTE: this will create long-lived goroutines each time Ready is called
+	// Since Ready is called infrequently, that is OK. If the call frequency changes, change this code.
+	return util.AllDone(e.cm, e.core.hotstuff)
 }
 
 // IngestBlock ingests and queues the block for later processing by the compliance layer.
