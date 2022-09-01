@@ -25,10 +25,10 @@ type kmac128 struct {
 const cSHAKE128BlockSize = 168
 
 // NewKMAC_128 returns a new KMAC instance
-// - key is the KMAC key (the key size is compared to the security level, although
-//	the parameter is used as a domain tag in Flow and not as a security key).
-// - customizer is the customization string. It can be left empty if no customizer
-//   is required.
+//   - key is the KMAC key (the key size is compared to the security level, although
+//     the parameter is used as a domain tag in Flow and not as a security key).
+//   - customizer is the customization string. It can be left empty if no customizer
+//     is required.
 func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) {
 	var k kmac128
 	if outputSize < 0 {

@@ -25,8 +25,9 @@ func TestDKG(t *testing.T) {
 
 // optimal threshold (t) to allow the largest number of malicious participants (m)
 // assuming the protocol requires:
-//   m<=t for unforgeability
-//   n-m>=t+1 for robustness
+//
+//	m<=t for unforgeability
+//	n-m>=t+1 for robustness
 func optimalThreshold(size int) int {
 	return (size - 1) / 2
 }
