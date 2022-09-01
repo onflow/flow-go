@@ -11,6 +11,7 @@ import (
 
 const flowPackagePrefix = "github.com/onflow/flow-go/"
 const testMatrixFile = "test_matrix.json"
+const ciMatrixName = "dynamicMatrix"
 
 // testMatrix represents a single GitHub Actions test matrix combination that consists of a name and a list of flow-go packages associated with that name.
 type testMatrix struct {
@@ -20,8 +21,6 @@ type testMatrix struct {
 
 // Generates a list of packages to test that will be passed to GitHub Actions
 func main() {
-	fmt.Println("*** Test Matrix Generator ***")
-
 	if len(os.Args) == 1 {
 		fmt.Println("must have at least 1 package listed")
 		return
@@ -33,11 +32,11 @@ func main() {
 
 	restPackages := listRestPackages(allFlowPackages, seenPackages)
 
-	fmt.Println("finished generating package list")
+	testMatrix := generateTestMatrix(targetPackages, restPackages)
 
 	// generate JSON output that will be read in by CI matrix
-	testMatrix := generateTestMatrix(targetPackages, restPackages)
-	testMatrixBytes, err := json.MarshalIndent(testMatrix, "", "  ")
+	// can't use json.MarshalIndent because fromJSON() in CI can’t read JSON with any spaces
+	testMatrixBytes, err := json.Marshal(testMatrix)
 	if err != nil {
 		panic(err)
 	}
@@ -45,7 +44,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("finished writing test matrix to", testMatrixFile)
+
+	// this string will be read by CI to generate groups of tests to run in separate CI jobs
+	testMatrixStr := "::set-output name=" + ciMatrixName + "::" + string(testMatrixBytes)
+
+	// very important to add newline character at the end of the compacted JSON - otherwise fromJSON() in CI will throw unmarshalling error
+	fmt.Println(testMatrixStr)
 }
 
 func generateTestMatrix(targetPackages map[string][]string, restPackages []string) []testMatrix {
