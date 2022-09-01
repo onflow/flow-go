@@ -3,6 +3,7 @@ package fvm
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -48,7 +49,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		}
 	}()
 
-	accounts := state.NewAccounts(sth)
+	accounts := environment.NewAccounts(sth)
 	proposalKey := proc.Transaction.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)

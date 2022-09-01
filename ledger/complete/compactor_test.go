@@ -2,7 +2,6 @@ package complete
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -133,11 +132,13 @@ func TestCompactor(t *testing.T) {
 				// continue
 			case <-time.After(60 * time.Second):
 				// Log segment and checkpoint files
-				files, err := ioutil.ReadDir(dir)
+				files, err := os.ReadDir(dir)
 				require.NoError(t, err)
 
 				for _, file := range files {
-					fmt.Printf("%s, size %d\n", file.Name(), file.Size())
+					info, err := file.Info()
+					require.NoError(t, err)
+					fmt.Printf("%s, size %d\n", file.Name(), info.Size())
 				}
 
 				assert.FailNow(t, "timed out")
@@ -334,11 +335,13 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 			// continue
 		case <-time.After(60 * time.Second):
 			// Log segment and checkpoint files
-			files, err := ioutil.ReadDir(dir)
+			files, err := os.ReadDir(dir)
 			require.NoError(t, err)
 
 			for _, file := range files {
-				fmt.Printf("%s, size %d\n", file.Name(), file.Size())
+				info, err := file.Info()
+				require.NoError(t, err)
+				fmt.Printf("%s, size %d\n", file.Name(), info.Size())
 			}
 
 			// This assert can be flaky because of speed fluctuations (GitHub CI slowdowns, etc.).

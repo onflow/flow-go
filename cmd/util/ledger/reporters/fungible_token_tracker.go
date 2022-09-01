@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -142,7 +143,7 @@ func (r *FungibleTokenTracker) worker(
 
 		view := migrations.NewView(j.payloads)
 		stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-		accounts := state.NewAccounts(stTxn)
+		accounts := environment.NewAccounts(stTxn)
 		storage := cadenceRuntime.NewStorage(
 			&migrations.AccountsAtreeLedger{Accounts: accounts},
 			nil,

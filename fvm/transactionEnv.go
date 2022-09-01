@@ -43,8 +43,8 @@ func NewTransactionEnvironment(
 ) *TransactionEnv {
 
 	txID := tx.ID()
-	accounts := state.NewAccounts(sth)
-	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
+	accounts := environment.NewAccounts(sth)
+	generator := environment.NewAccountCreator(sth, ctx.Chain)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	// TODO set the flags on context
 	accountKeys := handler.NewAccountKeyHandler(accounts)
