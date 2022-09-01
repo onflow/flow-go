@@ -29,7 +29,7 @@ func NewScriptEnvironment(
 	programs *programs.Programs,
 ) *ScriptEnv {
 
-	accounts := state.NewAccounts(sth)
+	accounts := environment.NewAccounts(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	tracer := environment.NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)

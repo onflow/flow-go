@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -44,8 +43,8 @@ func NewTransactionEnvironment(
 ) *TransactionEnv {
 
 	txID := tx.ID()
-	accounts := state.NewAccounts(sth)
-	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
+	accounts := environment.NewAccounts(sth)
+	generator := environment.NewAccountCreator(sth, ctx.Chain)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	// TODO set the flags on context
 	accountKeys := handler.NewAccountKeyHandler(accounts)
@@ -269,7 +268,7 @@ func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) e
 func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvCreateAccount).End()
 
-	err = e.MeterComputation(meter.ComputationKindCreateAccount, 1)
+	err = e.MeterComputation(environment.ComputationKindCreateAccount, 1)
 	if err != nil {
 		return address, err
 	}
@@ -308,7 +307,7 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte) error {
 	defer e.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
 
-	err := e.MeterComputation(meter.ComputationKindAddEncodedAccountKey, 1)
+	err := e.MeterComputation(environment.ComputationKindAddEncodedAccountKey, 1)
 	if err != nil {
 		return fmt.Errorf("add encoded account key failed: %w", err)
 	}
@@ -337,7 +336,7 @@ func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey
 func (e *TransactionEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
-	err = e.MeterComputation(meter.ComputationKindRevokeEncodedAccountKey, 1)
+	err = e.MeterComputation(environment.ComputationKindRevokeEncodedAccountKey, 1)
 	if err != nil {
 		return publicKey, fmt.Errorf("revoke encoded account key failed: %w", err)
 	}
@@ -370,7 +369,7 @@ func (e *TransactionEnv) AddAccountKey(
 ) {
 	defer e.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
 
-	err := e.MeterComputation(meter.ComputationKindAddAccountKey, 1)
+	err := e.MeterComputation(environment.ComputationKindAddAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("add account key failed: %w", err)
 	}
@@ -392,7 +391,7 @@ func (e *TransactionEnv) AddAccountKey(
 func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
-	err := e.MeterComputation(meter.ComputationKindRevokeAccountKey, 1)
+	err := e.MeterComputation(environment.ComputationKindRevokeAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("revoke account key failed: %w", err)
 	}
@@ -403,7 +402,7 @@ func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvUpdateAccountContractCode).End()
 
-	err = e.MeterComputation(meter.ComputationKindUpdateAccountContractCode, 1)
+	err = e.MeterComputation(environment.ComputationKindUpdateAccountContractCode, 1)
 	if err != nil {
 		return fmt.Errorf("update account contract code failed: %w", err)
 	}
@@ -424,7 +423,7 @@ func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name
 func (e *TransactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountContractCode).End()
 
-	err = e.MeterComputation(meter.ComputationKindRemoveAccountContractCode, 1)
+	err = e.MeterComputation(environment.ComputationKindRemoveAccountContractCode, 1)
 	if err != nil {
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}

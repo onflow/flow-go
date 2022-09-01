@@ -2,7 +2,7 @@ package run
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -22,7 +22,7 @@ func TestGenerateExecutionState(t *testing.T) {
 	require.NoError(t, err)
 
 	pk := sk.PublicKey(42)
-	bootstrapDir, err := ioutil.TempDir("/tmp", "flow-integration-bootstrap")
+	bootstrapDir, err := os.MkdirTemp("/tmp", "flow-integration-bootstrap")
 	require.NoError(t, err)
 	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
 	commit, err := GenerateExecutionState(
