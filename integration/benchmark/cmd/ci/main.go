@@ -188,31 +188,34 @@ func main() {
 		// grab total executed transactions into start transactions
 		startExecutedTransactions := lg.GetTxExecuted()
 
+		t := time.NewTicker(sliceDuration)
 		for !lg.Stopped {
-			time.Sleep(sliceDuration)
 
-			endTime := time.Now()
-			endExecutedTransaction := lg.GetTxExecuted()
+			select {
+			case <-t.C:
+				endTime := time.Now()
+				endExecutedTransaction := lg.GetTxExecuted()
 
-			// calculate this slice
-			inputTps := lg.AvgTpsBetween(startTime, endTime)
-			outputTps := float64(endExecutedTransaction-startExecutedTransactions) / sliceDuration.Seconds()
-			slice := dataSlice{
-				GitSha:       gitSha,
-				GoVersion:    goVersion,
-				OsVersion:    osVersion,
-				StartTime:    startTime,
-				EndTime:      endTime,
-				InputTps:     inputTps,
-				OutputTps:    outputTps,
-				BeforeExTxs:  startExecutedTransactions,
-				AfterExTxs:   endExecutedTransaction,
-				RunStartTime: runStartTime}
+				// calculate this slice
+				inputTps := lg.AvgTpsBetween(startTime, endTime)
+				outputTps := float64(endExecutedTransaction-startExecutedTransactions) / sliceDuration.Seconds()
+				slice := dataSlice{
+					GitSha:       gitSha,
+					GoVersion:    goVersion,
+					OsVersion:    osVersion,
+					StartTime:    startTime,
+					EndTime:      endTime,
+					InputTps:     inputTps,
+					OutputTps:    outputTps,
+					BeforeExTxs:  startExecutedTransactions,
+					AfterExTxs:   endExecutedTransaction,
+					RunStartTime: runStartTime}
 
-			startExecutedTransactions = endExecutedTransaction
-			startTime = endTime
+				startExecutedTransactions = endExecutedTransaction
+				startTime = endTime
 
-			dataSlices = append(dataSlices, slice)
+				dataSlices = append(dataSlices, slice)
+			}
 		}
 	}()
 
