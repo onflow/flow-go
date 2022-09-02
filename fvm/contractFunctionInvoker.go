@@ -69,7 +69,7 @@ func (i *ContractFunctionInvoker) Invoke(
 	if err != nil {
 		// this is an error coming from Cadendce runtime, so it must be handled first.
 		err = errors.HandleRuntimeError(err)
-		i.env.Context().Logger.
+		i.env.Logger().
 			Info().
 			Err(err).
 			Str("contract", contractLocation.String()).

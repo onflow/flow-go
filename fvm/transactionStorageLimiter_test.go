@@ -21,10 +21,10 @@ import (
 func TestTransactionStorageLimiter_Process(t *testing.T) {
 	owner := flow.HexToAddress("1")
 	t.Run("capacity > storage -> OK", func(t *testing.T) {
-		ctx := &fvm.Context{LimitAccountStorage: true, Chain: flow.Mainnet.Chain()}
+		chain := flow.Mainnet.Chain()
 		env := &fvmmock.Environment{}
-		env.On("Context").Return(ctx)
-		env.On("AccountFreezeEnabled").Return(false)
+		env.On("Chain").Return(chain)
+		env.On("LimitAccountStorage").Return(true)
 		env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(99), nil)
 		env.On("VM", mock.Anything).Return(&fvm.VirtualMachine{
@@ -45,10 +45,10 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("capacity = storage -> OK", func(t *testing.T) {
-		ctx := &fvm.Context{LimitAccountStorage: true, Chain: flow.Mainnet.Chain()}
+		chain := flow.Mainnet.Chain()
 		env := &fvmmock.Environment{}
-		env.On("Context").Return(ctx)
-		env.On("AccountFreezeEnabled").Return(false)
+		env.On("Chain").Return(chain)
+		env.On("LimitAccountStorage").Return(true)
 		env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(100), nil)
 		env.On("VM", mock.Anything).Return(&fvm.VirtualMachine{
@@ -69,10 +69,10 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
 	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
-		ctx := &fvm.Context{LimitAccountStorage: true, Chain: flow.Mainnet.Chain()}
+		chain := flow.Mainnet.Chain()
 		env := &fvmmock.Environment{}
-		env.On("Context").Return(ctx)
-		env.On("AccountFreezeEnabled").Return(false)
+		env.On("Chain").Return(chain)
+		env.On("LimitAccountStorage").Return(true)
 		env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(101), nil)
 		env.On("VM", mock.Anything).Return(&fvm.VirtualMachine{
@@ -93,10 +93,10 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
 	t.Run("if ctx LimitAccountStorage false-> OK", func(t *testing.T) {
-		ctx := &fvm.Context{LimitAccountStorage: false, Chain: flow.Mainnet.Chain()}
+		chain := flow.Mainnet.Chain()
 		env := &fvmmock.Environment{}
-		env.On("Context").Return(ctx)
-		env.On("AccountFreezeEnabled").Return(false)
+		env.On("Chain").Return(chain)
+		env.On("LimitAccountStorage").Return(false)
 		env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
 		env.On("GetStorageCapacity", mock.Anything).Return(uint64(100), nil)
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(101), nil)
@@ -118,10 +118,10 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("non existing accounts or any other errors on fetching storage used -> Not OK", func(t *testing.T) {
-		ctx := &fvm.Context{LimitAccountStorage: true, Chain: flow.Mainnet.Chain()}
+		chain := flow.Mainnet.Chain()
 		env := &fvmmock.Environment{}
-		env.On("Context").Return(ctx)
-		env.On("AccountFreezeEnabled").Return(false)
+		env.On("Chain").Return(chain)
+		env.On("LimitAccountStorage").Return(true)
 		env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(0), errors.NewAccountNotFoundError(owner))
 		env.On("VM", mock.Anything).Return(&fvm.VirtualMachine{
