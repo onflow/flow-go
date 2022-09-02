@@ -13,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -199,17 +198,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				exeNode.executionDataTracker,
 			)
 
-			rt := fvm.NewInterpreterRuntime(runtime.Config{
-				TracingEnabled: exeNode.exeConf.cadenceTracing,
-			})
-
-			vm := fvm.NewVirtualMachine(rt)
-
-			fvmOptions := append([]fvm.Option{fvm.WithLogger(node.Logger)}, node.FvmOptions...)
-			if exeNode.exeConf.extensiveTracing {
-				fvmOptions = append(fvmOptions, fvm.WithExtensiveTracing())
-			}
-			vmCtx := fvm.NewContext(fvmOptions...)
+			vmCtx := fvm.NewContext(node.FvmOptions...)
 
 			ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
 			manager, err := computation.New(
@@ -218,14 +207,11 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				node.Tracer,
 				node.Me,
 				node.State,
-				vm,
 				vmCtx,
-				exeNode.exeConf.cadenceExecutionCache,
 				ledgerViewCommitter,
-				exeNode.exeConf.scriptLogThreshold,
-				exeNode.exeConf.scriptExecutionTimeLimit,
 				exeNode.blockDataUploaders,
 				executionDataProvider,
+				exeNode.exeConf.computationConfig,
 			)
 			if err != nil {
 				return nil, err
@@ -291,7 +277,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			blockView := exeNode.executionState.NewView(stateCommit)
 
 			// Get the epoch counter from the smart contract at the last executed block.
-			contractEpochCounter, err := getContractEpochCounter(vm, vmCtx, blockView)
+			contractEpochCounter, err := getContractEpochCounter(exeNode.computationManager.VM(), vmCtx, blockView)
 			// Failing to fetch the epoch counter from the smart contract is a fatal error.
 			if err != nil {
 				return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s: %w", blockID.String(), err)
@@ -866,7 +852,7 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 }
 
 // getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the view provided.
-func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, view *delta.View) (uint64, error) {
+func getContractEpochCounter(vm computation.VirtualMachine, vmCtx fvm.Context, view *delta.View) (uint64, error) {
 	// Get the address of the FlowEpoch smart contract
 	sc, err := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
 	if err != nil {

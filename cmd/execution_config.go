@@ -26,8 +26,6 @@ type ExecutionConfig struct {
 	checkpointDistance                   uint
 	checkpointsToKeep                    uint
 	stateDeltasLimit                     uint
-	cadenceExecutionCache                uint
-	cadenceTracing                       bool
 	chunkDataPackCacheSize               uint
 	chunkDataPackRequestsCacheSize       uint32
 	requestInterval                      time.Duration
@@ -36,10 +34,7 @@ type ExecutionConfig struct {
 	syncFast                             bool
 	syncThreshold                        int
 	extensiveLog                         bool
-	extensiveTracing                     bool
 	pauseExecution                       bool
-	scriptLogThreshold                   time.Duration
-	scriptExecutionTimeLimit             time.Duration
 	chunkDataPackQueryTimeout            time.Duration
 	chunkDataPackDeliveryTimeout         time.Duration
 	enableBlockDataUpload                bool
@@ -52,6 +47,8 @@ type ExecutionConfig struct {
 	blobstoreRateLimit                   int
 	blobstoreBurstLimit                  int
 	chunkDataPackRequestWorkers          uint
+
+	computationConfig computation.ComputationConfig
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -66,16 +63,16 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.UintVar(&exeConf.checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
 	flags.UintVar(&exeConf.checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 	flags.UintVar(&exeConf.stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
-	flags.UintVar(&exeConf.cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize,
+	flags.UintVar(&exeConf.computationConfig.ProgramsCacheSize, "cadence-execution-cache", computation.DefaultProgramsCacheSize,
 		"cache size for Cadence execution")
-	flags.BoolVar(&exeConf.extensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
-	flags.BoolVar(&exeConf.cadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
+	flags.BoolVar(&exeConf.computationConfig.ExtensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
+	flags.BoolVar(&exeConf.computationConfig.CadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
 	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
-	flags.DurationVar(&exeConf.scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
+	flags.DurationVar(&exeConf.computationConfig.ScriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
 		"threshold for logging script execution")
-	flags.DurationVar(&exeConf.scriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit,
+	flags.DurationVar(&exeConf.computationConfig.ScriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit,
 		"script execution time limit")
 	flags.StringVar(&exeConf.preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 	flags.UintVar(&exeConf.transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")

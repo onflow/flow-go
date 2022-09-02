@@ -32,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
-	"github.com/onflow/flow-go/fvm"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -206,7 +205,7 @@ type ExecutionNode struct {
 	SyncEngine          *synchronization.Engine
 	Compactor           *complete.Compactor
 	BadgerDB            *badger.DB
-	VM                  *fvm.VirtualMachine
+	VM                  computation.VirtualMachine
 	ExecutionState      state.ExecutionState
 	Ledger              ledger.Ledger
 	LevelDbDir          string

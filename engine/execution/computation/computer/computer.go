@@ -28,7 +28,6 @@ import (
 )
 
 const (
-	ReusableCadenceRuntimePoolSize    = 1000
 	SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
 )
 
@@ -49,15 +48,14 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	vm                         VirtualMachine
-	vmCtx                      fvm.Context
-	metrics                    module.ExecutionMetrics
-	tracer                     module.Tracer
-	log                        zerolog.Logger
-	systemChunkCtx             fvm.Context
-	committer                  ViewCommitter
-	executionDataProvider      *provider.Provider
-	reusableCadenceRuntimePool fvm.ReusableCadenceRuntimePool
+	vm                    VirtualMachine
+	vmCtx                 fvm.Context
+	metrics               module.ExecutionMetrics
+	tracer                module.Tracer
+	log                   zerolog.Logger
+	systemChunkCtx        fvm.Context
+	committer             ViewCommitter
+	executionDataProvider *provider.Provider
 }
 
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
@@ -92,8 +90,6 @@ func NewBlockComputer(
 		systemChunkCtx:        SystemChunkContext(vmCtx, logger),
 		committer:             committer,
 		executionDataProvider: executionDataProvider,
-		reusableCadenceRuntimePool: fvm.NewReusableCadenceRuntimePool(
-			ReusableCadenceRuntimePoolSize),
 	}, nil
 }
 
@@ -136,12 +132,10 @@ func (e *blockComputer) executeBlock(
 
 	blockCtx := fvm.NewContextFromParent(
 		e.vmCtx,
-		fvm.WithBlockHeader(block.Block.Header),
-		fvm.WithReusableCadenceRuntimePool(e.reusableCadenceRuntimePool))
+		fvm.WithBlockHeader(block.Block.Header))
 	systemChunkCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
-		fvm.WithBlockHeader(block.Block.Header),
-		fvm.WithReusableCadenceRuntimePool(e.reusableCadenceRuntimePool))
+		fvm.WithBlockHeader(block.Block.Header))
 	collections := block.Collections()
 
 	chunksSize := len(collections) + 1 // + 1 system chunk

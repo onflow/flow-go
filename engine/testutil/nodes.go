@@ -572,10 +572,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
-	vm := fvm.NewVirtualMachine(rt)
-
 	blockFinder := environment.NewBlockFinder(node.Headers)
 
 	vmCtx := fvm.NewContext(
@@ -605,14 +601,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Tracer,
 		node.Me,
 		node.State,
-		vm,
 		vmCtx,
-		computation.DefaultProgramsCacheSize,
 		committer,
-		computation.DefaultScriptLogThreshold,
-		computation.DefaultScriptExecutionTimeLimit,
 		nil,
 		prov,
+		computation.ComputationConfig{
+			ProgramsCacheSize:        computation.DefaultProgramsCacheSize,
+			ScriptLogThreshold:       computation.DefaultScriptLogThreshold,
+			ScriptExecutionTimeLimit: computation.DefaultScriptExecutionTimeLimit,
+		},
 	)
 	require.NoError(t, err)
 
@@ -703,7 +700,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		RequestEngine:       requestEngine,
 		ReceiptsEngine:      pusherEngine,
 		BadgerDB:            node.PublicDB,
-		VM:                  vm,
+		VM:                  computationEngine.VM(),
 		ExecutionState:      execState,
 		Ledger:              ls,
 		LevelDbDir:          dbDir,
