@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go
 
-go 1.18
+go 1.19
 
 require (
 	cloud.google.com/go/compute v1.6.1
