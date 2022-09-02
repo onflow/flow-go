@@ -299,3 +299,5 @@ require (
 //replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
 
 replace github.com/onflow/flow-go => ../
+
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.24.2-0.20220902180802-a01312333461
