@@ -47,15 +47,6 @@ func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error)
 
 	predeclaredValues := valueDeclarations(env)
 
-	ctx := env.Context()
-
-	var blockHeight uint64
-	if ctx.BlockHeader != nil {
-		blockHeight = ctx.BlockHeader.Height
-	}
-
-	chainID := ctx.Chain.ChainID()
-
 	value, err := env.VM().Runtime.InvokeContractFunction(
 		i.contractLocation,
 		i.functionName,
@@ -64,11 +55,7 @@ func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error)
 		runtime.Context{
 			Interface:         env,
 			PredeclaredValues: predeclaredValues,
-			CheckerOptions: []sema.Option{
-				sema.WithAllowResourceInvalidationAfterPotentialJump(
-					allowResourceInvalidationAfterPotentialJump(chainID, blockHeight),
-				),
-			},
+			CheckerOptions:    env.Context().CheckerOptions(),
 		},
 	)
 

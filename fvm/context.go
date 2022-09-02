@@ -1,6 +1,7 @@
 package fvm
 
 import (
+	"github.com/onflow/cadence/runtime/sema"
 	"math"
 
 	"github.com/rs/zerolog"
@@ -28,7 +29,7 @@ type Context struct {
 	MaxNumOfTxRetries                    uint8
 	BlockHeader                          *flow.Header
 	ServiceAccountEnabled                bool
-	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
+	// Deprecated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
 	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
 	RestrictContractDeployment    bool
 	RestrictContractRemoval       bool
@@ -42,6 +43,25 @@ type Context struct {
 	TransactionProcessors         []TransactionProcessor
 	ScriptProcessors              []ScriptProcessor
 	Logger                        zerolog.Logger
+}
+
+func (c Context) CheckerOptions() []sema.Option {
+
+	if c.BlockHeader != nil {
+		chainID := c.Chain.ChainID()
+		blockHeight := c.BlockHeader.Height
+
+		// backwards compatibility to enable rolling deploy
+		if (chainID == flow.Mainnet && blockHeight > 1) ||
+			(chainID == flow.Testnet && blockHeight > 1) {
+
+			return nil
+		}
+	}
+
+	return []sema.Option{
+		sema.WithAllowResourceInvalidationAfterPotentialJump(true),
+	}
 }
 
 // NewContext initializes a new execution context with the provided options.

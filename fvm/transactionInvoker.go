@@ -52,7 +52,6 @@ func (i *TransactionInvoker) Process(
 		blockHeight = ctx.BlockHeader.Height
 	}
 
-	var env *TransactionEnv
 	var txError error
 
 	parentState := sth.State()
@@ -108,16 +107,12 @@ func (i *TransactionInvoker) Process(
 			Interface:         env,
 			Location:          location,
 			PredeclaredValues: predeclaredValues,
-			CheckerOptions: []sema.Option{
-				sema.WithAllowResourceInvalidationAfterPotentialJump(
-					allowResourceInvalidationAfterPotentialJump(chainID, blockHeight),
-				),
-			},
+			CheckerOptions:    ctx.CheckerOptions(),
 		},
 	)
 	if err != nil {
-		var interactionLimiExceededErr *errors.LedgerInteractionLimitExceededError
-		if errors.As(err, &interactionLimiExceededErr) {
+		var interactionLimitExceededErr *errors.LedgerInteractionLimitExceededError
+		if errors.As(err, &interactionLimitExceededErr) {
 			// If it is this special interaction limit error, just set it directly as the tx error
 			txError = err
 		} else {
@@ -222,17 +217,6 @@ func (i *TransactionInvoker) Process(
 	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
 
 	return txError
-}
-
-func allowResourceInvalidationAfterPotentialJump(chainID flow.ChainID, blockHeight uint64) bool {
-	// backwards compatibility to enable rolling deploy
-	if (chainID == flow.Mainnet && blockHeight > 1) ||
-		(chainID == flow.Testnet && blockHeight > 1) {
-
-		return false
-	}
-
-	return true
 }
 
 func (i *TransactionInvoker) deductTransactionFees(

@@ -3,8 +3,6 @@ package fvm
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/cadence/runtime/sema"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -126,13 +124,6 @@ func (i ScriptInvoker) Process(
 		return err
 	}
 
-	chainID := ctx.Chain.ChainID()
-
-	var blockHeight uint64
-	if ctx.BlockHeader != nil {
-		blockHeight = ctx.BlockHeader.Height
-	}
-
 	location := common.ScriptLocation(proc.ID)
 	value, err := vm.Runtime.ExecuteScript(
 		runtime.Script{
@@ -140,13 +131,9 @@ func (i ScriptInvoker) Process(
 			Arguments: proc.Arguments,
 		},
 		runtime.Context{
-			Interface: env,
-			Location:  location,
-			CheckerOptions: []sema.Option{
-				sema.WithAllowResourceInvalidationAfterPotentialJump(
-					allowResourceInvalidationAfterPotentialJump(chainID, blockHeight),
-				),
-			},
+			Interface:      env,
+			Location:       location,
+			CheckerOptions: ctx.CheckerOptions(),
 		},
 	)
 
