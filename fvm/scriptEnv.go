@@ -59,6 +59,10 @@ func NewScriptEnvironment(
 			),
 			TransactionInfo: environment.NoTransactionInfo{},
 			EventEmitter:    environment.NoEventEmitter{},
+			ValueStore: environment.NewValueStore(
+				tracer,
+				meter,
+				accounts),
 			ContractReader: environment.NewContractReader(
 				tracer,
 				meter,
