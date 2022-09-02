@@ -91,6 +91,7 @@ require (
 	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
 	golang.org/x/text v0.3.7
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
+	golang.org/x/tools v0.1.11
 	google.golang.org/api v0.81.0
 	google.golang.org/genproto v0.0.0-20220519153652-3a47de7e79bd
 	google.golang.org/grpc v1.46.2
@@ -99,8 +100,6 @@ require (
 	gotest.tools v2.2.0+incompatible
 	pgregory.net/rapid v0.4.7
 )
-
-require golang.org/x/tools v0.1.11
 
 require (
 	cloud.google.com/go v0.100.2 // indirect

@@ -10,7 +10,6 @@ import (
 )
 
 const flowPackagePrefix = "github.com/onflow/flow-go/"
-const testMatrixFile = "test_matrix.json"
 const ciMatrixName = "dynamicMatrix"
 
 // testMatrix represents a single GitHub Actions test matrix combination that consists of a name and a list of flow-go packages associated with that name.
@@ -22,7 +21,7 @@ type testMatrix struct {
 // Generates a list of packages to test that will be passed to GitHub Actions
 func main() {
 	if len(os.Args) == 1 {
-		fmt.Println("must have at least 1 package listed")
+		fmt.Fprintln(os.Stderr, "must have at least 1 package listed")
 		return
 	}
 
@@ -37,10 +36,6 @@ func main() {
 	// generate JSON output that will be read in by CI matrix
 	// can't use json.MarshalIndent because fromJSON() in CI can’t read JSON with any spaces
 	testMatrixBytes, err := json.Marshal(testMatrix)
-	if err != nil {
-		panic(err)
-	}
-	err = os.WriteFile(testMatrixFile, testMatrixBytes, 0666)
 	if err != nil {
 		panic(err)
 	}

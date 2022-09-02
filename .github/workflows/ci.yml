@@ -83,7 +83,7 @@ jobs:
         run: go run utils/test_matrix/test_matrix.go access admin cmd engine module network utils
 
   unit-test:
-    name: Unit Tests
+    name: Unit Tests (${{ matrix.targets.name }})
     needs: create-dynamic-test-matrix
     strategy:
       fail-fast: false
