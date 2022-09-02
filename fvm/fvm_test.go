@@ -1597,7 +1597,7 @@ func TestEnforcingComputationLimit(t *testing.T) {
 func TestStorageCapacity(t *testing.T) {
 	t.Run("Storage capacity updates on FLOW transfer", newVMTest().
 		withContextOptions(
-			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker()),
 			fvm.WithCadenceLogging(true),
 		).
 		withBootstrapProcedureOptions(
