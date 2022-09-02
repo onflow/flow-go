@@ -6,6 +6,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -62,7 +63,7 @@ func (v *TransactionVerifier) verifyTransaction(
 	}
 
 	tx := proc.Transaction
-	accounts := state.NewAccounts(sth)
+	accounts := environment.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
 		err := errors.NewInvalidAddressErrorf(tx.Payer, "payer address is invalid")
 		return fmt.Errorf("transaction verification failed: %w", err)
@@ -153,7 +154,12 @@ func (v *TransactionVerifier) verifyTransaction(
 }
 
 // getPublicKey skips checking limits when getting the public key
-func (v *TransactionVerifier) getPublicKey(sth *state.StateHolder, accounts state.Accounts, address flow.Address, keyIndex uint64) (pub flow.AccountPublicKey, err error) {
+func (v *TransactionVerifier) getPublicKey(
+	sth *state.StateHolder,
+	accounts environment.Accounts,
+	address flow.Address,
+	keyIndex uint64,
+) (pub flow.AccountPublicKey, err error) {
 	sth.RunWithAllLimitsDisabled(
 		func() {
 			pub, err = accounts.GetPublicKey(address, keyIndex)
@@ -164,7 +170,7 @@ func (v *TransactionVerifier) getPublicKey(sth *state.StateHolder, accounts stat
 
 func (v *TransactionVerifier) verifyAccountSignatures(
 	sth *state.StateHolder,
-	accounts state.Accounts,
+	accounts environment.Accounts,
 	signatures []flow.TransactionSignature,
 	message []byte,
 	proposalKey flow.ProposalKey,
@@ -271,7 +277,7 @@ func (v *TransactionVerifier) checkSignatureDuplications(tx *flow.TransactionBod
 
 func (v *TransactionVerifier) checkAccountsAreNotFrozen(
 	tx *flow.TransactionBody,
-	accounts state.Accounts,
+	accounts environment.Accounts,
 ) error {
 	for _, authorizer := range tx.Authorizers {
 		err := accounts.CheckAccountNotFrozen(authorizer)

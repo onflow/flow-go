@@ -21,7 +21,7 @@ func (d TransactionStorageLimiter) CheckLimits(
 	env Environment,
 	addresses []flow.Address,
 ) error {
-	if !env.Context().LimitAccountStorage {
+	if !env.LimitAccountStorage() {
 		return nil
 	}
 

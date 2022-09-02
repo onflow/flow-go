@@ -58,7 +58,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.NewVirtualMachine(rt)
-	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
 	require.NoError(t, err)
@@ -215,7 +215,7 @@ func TestExecuteScript(t *testing.T) {
 
 	logger := zerolog.Nop()
 
-	execCtx := fvm.NewContext(logger)
+	execCtx := fvm.NewContext(fvm.WithLogger(logger))
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
@@ -280,7 +280,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 
 	logger := zerolog.Nop()
 
-	execCtx := fvm.NewContext(logger)
+	execCtx := fvm.NewContext(fvm.WithLogger(logger))
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
@@ -340,7 +340,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 
 func TestExecuteScripPanicsAreHandled(t *testing.T) {
 
-	ctx := fvm.NewContext(zerolog.Nop())
+	ctx := fvm.NewContext()
 
 	vm := &PanickingVM{}
 
@@ -387,7 +387,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 
 func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 
-	ctx := fvm.NewContext(zerolog.Nop())
+	ctx := fvm.NewContext()
 
 	vm := &LongRunningVM{duration: 2 * time.Millisecond}
 
@@ -434,7 +434,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 
 func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
-	ctx := fvm.NewContext(zerolog.Nop())
+	ctx := fvm.NewContext()
 
 	vm := &LongRunningVM{duration: 0}
 
@@ -543,7 +543,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		nil,
 		nil,
 		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{})),
-		fvm.NewContext(zerolog.Nop()),
+		fvm.NewContext(),
 		DefaultProgramsCacheSize,
 		committer.NewNoopViewCommitter(),
 		DefaultScriptLogThreshold,
@@ -582,7 +582,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		nil,
 		nil,
 		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{})),
-		fvm.NewContext(zerolog.Nop()),
+		fvm.NewContext(),
 		DefaultProgramsCacheSize,
 		committer.NewNoopViewCommitter(),
 		DefaultScriptLogThreshold,
@@ -625,7 +625,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	timeout := 10 * time.Second
 	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{}))
 	chain := flow.Mainnet.Chain()
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	ctx := fvm.NewContext(fvm.WithChain(chain))
 	manager, _ := New(
 		zerolog.Nop(),
 		metrics.NewExecutionCollector(ctx.Tracer),

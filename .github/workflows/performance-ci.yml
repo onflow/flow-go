@@ -18,7 +18,7 @@ on:
 env:
   BIGQUERY_DATASET: production_src_flow_tps_metrics
   BIGQUERY_TABLE: TpsSlices
-  GO_VERSION: 1.18
+  GO_VERSION: 1.19
 
 jobs:
   upload-tps-slices:

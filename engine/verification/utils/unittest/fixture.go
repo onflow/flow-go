@@ -261,7 +261,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		blocks := new(fvmMock.Blocks)
 
 		execCtx := fvm.NewContext(
-			log,
+			fvm.WithLogger(log),
 			fvm.WithChain(chain),
 			fvm.WithBlocks(blocks),
 		)

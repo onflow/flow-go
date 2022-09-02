@@ -254,7 +254,7 @@ func (c *NonErroringComponent) Done() <-chan struct{} {
 	return c.done
 }
 
-//tests that after starting a component that generates, an expected error is received
+// tests that after starting a component that generates, an expected error is received
 func TestRunComponentStartupError(t *testing.T) {
 	componentFactory := func() (component.Component, error) {
 		return NewStartupErroringComponent(), nil
@@ -273,7 +273,7 @@ func TestRunComponentStartupError(t *testing.T) {
 	require.True(t, called)
 }
 
-//tests repeatedly restarting a component during an error that occurs while shutting down
+// tests repeatedly restarting a component during an error that occurs while shutting down
 func TestRunComponentShutdownError(t *testing.T) {
 	componentFactory := func() (component.Component, error) {
 		//shutdown the component after some time - simulate an error during shutdown

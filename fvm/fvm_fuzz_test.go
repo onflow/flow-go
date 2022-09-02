@@ -51,7 +51,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			// set the interaction limit
 			ctx.MaxStateInteractionSize = interactionLimit
 			// run the transaction
-			tx := fvm.Transaction(txBody, 1)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			require.NotPanics(t, func() {
 				err = vm.Run(ctx, tx, view, programs)
@@ -84,8 +84,10 @@ type transactionType struct {
 
 var fuzzTransactionTypes = []transactionType{
 	{
+		// Token transfer of 0 tokens.
+		// should succeed if no limits are hit.
+		// fees should be deducted no matter what.
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
-			// token transfer
 			txBody := transferTokensTx(tctx.chain).
 				AddAuthorizer(tctx.address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(0))). // 0 value transferred
@@ -113,8 +115,10 @@ var fuzzTransactionTypes = []transactionType{
 		},
 	},
 	{
+		// Token transfer of too many tokens.
+		// Should never succeed.
+		// fees should be deducted no matter what.
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
-			// failed token transfer
 			txBody := transferTokensTx(tctx.chain).
 				AddAuthorizer(tctx.address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(2 * tctx.addressFunds))). // too much value transferred
@@ -140,6 +144,9 @@ var fuzzTransactionTypes = []transactionType{
 		},
 	},
 	{
+		// Transaction that calls panic.
+		// Should never succeed.
+		// fees should be deducted no matter what.
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
 			// empty transaction
 			txBody := flow.NewTransactionBody().SetScript([]byte("transaction(){prepare(){};execute{panic(\"some panic\")}}"))
@@ -241,7 +248,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 			return err
 		}
 
-		tx := fvm.Transaction(txBody, 0)
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 		err = vm.Run(ctx, tx, view, programs)
 
@@ -270,7 +277,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		)
 		require.NoError(tb, err)
 
-		tx = fvm.Transaction(txBody, 0)
+		tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 		err = vm.Run(ctx, tx, view, programs)
 		if err != nil {

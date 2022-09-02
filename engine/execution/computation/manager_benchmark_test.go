@@ -91,7 +91,6 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	chain := flow.Emulator.Chain()
 	execCtx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),

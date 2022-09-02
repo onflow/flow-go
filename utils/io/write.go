@@ -3,7 +3,6 @@ package io
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -16,7 +15,7 @@ func WriteFile(path string, data []byte) error {
 		return fmt.Errorf("could not create output dir: %w", err)
 	}
 
-	err = ioutil.WriteFile(path, data, 0644)
+	err = os.WriteFile(path, data, 0644)
 	if err != nil {
 		return fmt.Errorf("could not write file: %w", err)
 	}
@@ -26,7 +25,7 @@ func WriteFile(path string, data []byte) error {
 
 // WriteText writes a byte array to the file at the given path.
 func WriteText(path string, data []byte) error {
-	err := ioutil.WriteFile(path, data, 0644)
+	err := os.WriteFile(path, data, 0644)
 	if err != nil {
 		return fmt.Errorf("could not write file: %w", err)
 	}

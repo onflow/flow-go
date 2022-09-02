@@ -900,17 +900,22 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 // executed, the chained structure allows us to only check the head of each queue to see if
 // any block becomes executable.
 // for instance we have one queue whose head is A:
-// A <- B <- C
-//   ^- D <- E
+//
+//	A <- B <- C
+//	  ^- D <- E
+//
 // If we receive E <- F, then we will add it to the queue:
-// A <- B <- C
-//   ^- D <- E <- F
+//
+//	A <- B <- C
+//	  ^- D <- E <- F
+//
 // Even through there are 6 blocks, we only need to check if block A becomes executable.
 // when the parent block isn't in the queue, we add it as a new queue. for instance, if
 // we receive H <- G, then the queues will become:
-// A <- B <- C
-//   ^- D <- E
-// G
+//
+//	A <- B <- C
+//	  ^- D <- E
+//	G
 func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool, bool) {
 	for _, queue := range queues.All() {
 		if stored, isNew := queue.TryAdd(blockify); stored {

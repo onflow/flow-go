@@ -8,16 +8,15 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,14 +26,22 @@ import (
 // Environment accepts a context and a virtual machine instance and provides
 // cadence runtime interface methods to the runtime.
 type Environment interface {
-	// TODO(patrick): stop exposing Context()
-	Context() *Context
-
 	VM() *VirtualMachine
 	runtime.Interface
 
+	Chain() flow.Chain
+
+	LimitAccountStorage() bool
+
 	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
 	StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span
+
+	Logger() *zerolog.Logger
+
+	BorrowCadenceRuntime() *ReusableCadenceRuntime
+	ReturnCadenceRuntime(*ReusableCadenceRuntime)
+
+	SetAccountFrozen(address common.Address, frozen bool) error
 }
 
 // TODO(patrick): refactor this into an object
@@ -70,6 +77,8 @@ type commonEnv struct {
 	*environment.CryptoLibrary
 	*environment.BlockInfo
 	environment.TransactionInfo
+	environment.EventEmitter
+	*environment.ContractReader
 
 	// TODO(patrick): rm
 	ctx Context
@@ -79,7 +88,7 @@ type commonEnv struct {
 	sth         *state.StateHolder
 	vm          *VirtualMachine
 	programs    *handler.ProgramsHandler
-	accounts    state.Accounts
+	accounts    environment.Accounts
 	accountKeys *handler.AccountKeyHandler
 	contracts   *handler.ContractHandler
 
@@ -89,12 +98,24 @@ type commonEnv struct {
 	fullEnv Environment
 }
 
-func (env *commonEnv) Context() *Context {
-	return &env.ctx
+func (env *commonEnv) Chain() flow.Chain {
+	return env.ctx.Chain
+}
+
+func (env *commonEnv) LimitAccountStorage() bool {
+	return env.ctx.LimitAccountStorage
 }
 
 func (env *commonEnv) VM() *VirtualMachine {
 	return env.vm
+}
+
+func (env *commonEnv) BorrowCadenceRuntime() *ReusableCadenceRuntime {
+	return env.ctx.ReusableCadenceRuntimePool.Borrow(env.fullEnv)
+}
+
+func (env *commonEnv) ReturnCadenceRuntime(reusable *ReusableCadenceRuntime) {
+	env.ctx.ReusableCadenceRuntimePool.Return(reusable)
 }
 
 func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
@@ -120,7 +141,7 @@ func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
 	}
 	valueByteSize = len(v)
 
-	err = env.MeterComputation(meter.ComputationKindGetValue, uint(valueByteSize))
+	err = env.MeterComputation(environment.ComputationKindGetValue, uint(valueByteSize))
 	if err != nil {
 		return nil, fmt.Errorf("get value failed: %w", err)
 	}
@@ -138,7 +159,7 @@ func (env *commonEnv) SetValue(owner, key, value []byte) error {
 	}
 	defer span.End()
 
-	err := env.MeterComputation(meter.ComputationKindSetValue, uint(len(value)))
+	err := env.MeterComputation(environment.ComputationKindSetValue, uint(len(value)))
 	if err != nil {
 		return fmt.Errorf("set value failed: %w", err)
 	}
@@ -157,7 +178,7 @@ func (env *commonEnv) SetValue(owner, key, value []byte) error {
 func (env *commonEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 	defer env.StartSpanFromRoot(trace.FVMEnvValueExists).End()
 
-	err = env.MeterComputation(meter.ComputationKindValueExists, 1)
+	err = env.MeterComputation(environment.ComputationKindValueExists, 1)
 	if err != nil {
 		return false, fmt.Errorf("check value existence failed: %w", err)
 	}
@@ -173,7 +194,7 @@ func (env *commonEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 func (env *commonEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
 	defer env.StartSpanFromRoot(trace.FVMEnvGetStorageUsed).End()
 
-	err = env.MeterComputation(meter.ComputationKindGetStorageUsed, 1)
+	err = env.MeterComputation(environment.ComputationKindGetStorageUsed, 1)
 	if err != nil {
 		return value, fmt.Errorf("get storage used failed: %w", err)
 	}
@@ -201,7 +222,7 @@ func (env *commonEnv) GetStorageCapacity(
 ) {
 	defer env.StartSpanFromRoot(trace.FVMEnvGetStorageCapacity).End()
 
-	err = env.MeterComputation(meter.ComputationKindGetStorageCapacity, 1)
+	err = env.MeterComputation(environment.ComputationKindGetStorageCapacity, 1)
 	if err != nil {
 		return 0, fmt.Errorf("get storage capacity failed: %w", err)
 	}
@@ -227,7 +248,7 @@ func (env *commonEnv) GetAccountBalance(
 ) {
 	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
 
-	err = env.MeterComputation(meter.ComputationKindGetAccountBalance, 1)
+	err = env.MeterComputation(environment.ComputationKindGetAccountBalance, 1)
 	if err != nil {
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
@@ -247,7 +268,7 @@ func (env *commonEnv) GetAccountAvailableBalance(
 ) {
 	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
 
-	err = env.MeterComputation(meter.ComputationKindGetAccountAvailableBalance, 1)
+	err = env.MeterComputation(environment.ComputationKindGetAccountAvailableBalance, 1)
 	if err != nil {
 		return 0, fmt.Errorf("get account available balance failed: %w", err)
 	}
@@ -262,149 +283,10 @@ func (env *commonEnv) GetAccountAvailableBalance(
 	return result.ToGoValue().(uint64), nil
 }
 
-func (env *commonEnv) GetAccountContractNames(address runtime.Address) ([]string, error) {
-	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountContractNames).End()
-
-	err := env.MeterComputation(meter.ComputationKindGetAccountContractNames, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get account contract names failed: %w", err)
-	}
-
-	a := flow.Address(address)
-
-	freezeError := env.accounts.CheckAccountNotFrozen(a)
-	if freezeError != nil {
-		return nil, fmt.Errorf("get account contract names failed: %w", freezeError)
-	}
-
-	return env.accounts.GetContractNames(a)
-}
-
-func (env *commonEnv) ResolveLocation(
-	identifiers []runtime.Identifier,
-	location runtime.Location,
-) ([]runtime.ResolvedLocation, error) {
-	defer env.StartExtensiveTracingSpanFromRoot(trace.FVMEnvResolveLocation).End()
-
-	err := env.MeterComputation(meter.ComputationKindResolveLocation, 1)
-	if err != nil {
-		return nil, fmt.Errorf("resolve location failed: %w", err)
-	}
-
-	addressLocation, isAddress := location.(common.AddressLocation)
-
-	// if the location is not an address location, e.g. an identifier location
-	// (`import Crypto`), then return a single resolved location which declares
-	// all identifiers.
-	if !isAddress {
-		return []runtime.ResolvedLocation{
-			{
-				Location:    location,
-				Identifiers: identifiers,
-			},
-		}, nil
-	}
-
-	// if the location is an address,
-	// and no specific identifiers where requested in the import statement,
-	// then fetch all identifiers at this address
-	if len(identifiers) == 0 {
-		address := flow.Address(addressLocation.Address)
-
-		err := env.accounts.CheckAccountNotFrozen(address)
-		if err != nil {
-			return nil, fmt.Errorf("resolving location's account frozen check failed: %w", err)
-		}
-
-		contractNames, err := env.contracts.GetContractNames(
-			addressLocation.Address)
-		if err != nil {
-			return nil, fmt.Errorf("resolving location failed: %w", err)
-		}
-
-		// if there are no contractNames deployed,
-		// then return no resolved locations
-		if len(contractNames) == 0 {
-			return nil, nil
-		}
-
-		identifiers = make([]ast.Identifier, len(contractNames))
-
-		for i := range identifiers {
-			identifiers[i] = runtime.Identifier{
-				Identifier: contractNames[i],
-			}
-		}
-	}
-
-	// return one resolved location per identifier.
-	// each resolved location is an address contract location
-	resolvedLocations := make([]runtime.ResolvedLocation, len(identifiers))
-	for i := range resolvedLocations {
-		identifier := identifiers[i]
-		resolvedLocations[i] = runtime.ResolvedLocation{
-			Location: common.AddressLocation{
-				Address: addressLocation.Address,
-				Name:    identifier.Identifier,
-			},
-			Identifiers: []runtime.Identifier{identifier},
-		}
-	}
-
-	return resolvedLocations, nil
-}
-
-func (env *commonEnv) GetCode(location runtime.Location) ([]byte, error) {
-	defer env.StartSpanFromRoot(trace.FVMEnvGetCode).End()
-
-	err := env.MeterComputation(meter.ComputationKindGetCode, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get code failed: %w", err)
-	}
-
-	contractLocation, ok := location.(common.AddressLocation)
-	if !ok {
-		return nil, errors.NewInvalidLocationErrorf(location, "expecting an AddressLocation, but other location types are passed")
-	}
-
-	address := flow.Address(contractLocation.Address)
-
-	err = env.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return nil, fmt.Errorf("get code failed: %w", err)
-	}
-
-	add, err := env.contracts.GetContract(contractLocation.Address, contractLocation.Name)
-	if err != nil {
-		return nil, fmt.Errorf("get code failed: %w", err)
-	}
-
-	return add, nil
-}
-
-func (env *commonEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
-	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountContractCode).End()
-
-	err = env.MeterComputation(meter.ComputationKindGetAccountContractCode, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get account contract code failed: %w", err)
-	}
-
-	code, err = env.GetCode(common.AddressLocation{
-		Address: address,
-		Name:    name,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("get account contract code failed: %w", err)
-	}
-
-	return code, nil
-}
-
 func (env *commonEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
 	defer env.StartSpanFromRoot(trace.FVMEnvGetProgram).End()
 
-	err := env.MeterComputation(meter.ComputationKindGetProgram, 1)
+	err := env.MeterComputation(environment.ComputationKindGetProgram, 1)
 	if err != nil {
 		return nil, fmt.Errorf("get program failed: %w", err)
 	}
@@ -429,7 +311,7 @@ func (env *commonEnv) GetProgram(location common.Location) (*interpreter.Program
 func (env *commonEnv) SetProgram(location common.Location, program *interpreter.Program) error {
 	defer env.StartSpanFromRoot(trace.FVMEnvSetProgram).End()
 
-	err := env.MeterComputation(meter.ComputationKindSetProgram, 1)
+	err := env.MeterComputation(environment.ComputationKindSetProgram, 1)
 	if err != nil {
 		return fmt.Errorf("set program failed: %w", err)
 	}
@@ -472,7 +354,7 @@ func (commonEnv) ResourceOwnerChanged(
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
 func (env *commonEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	err := env.MeterComputation(meter.ComputationKindAllocateStorageIndex, 1)
+	err := env.MeterComputation(environment.ComputationKindAllocateStorageIndex, 1)
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("allocate storage index failed: %w", err)
 	}
@@ -498,7 +380,7 @@ func (env *commonEnv) GetAccountKey(
 ) {
 	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
 
-	err := env.MeterComputation(meter.ComputationKindGetAccountKey, 1)
+	err := env.MeterComputation(environment.ComputationKindGetAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("get account key failed: %w", err)
 	}
