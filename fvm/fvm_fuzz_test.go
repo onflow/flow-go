@@ -82,8 +82,10 @@ type transactionType struct {
 
 var fuzzTransactionTypes = []transactionType{
 	{
+		// Token transfer of 0 tokens.
+		// should succeed if no limits are hit.
+		// fees should be deducted no matter what.
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
-			// token transfer
 			txBody := transferTokensTx(tctx.chain).
 				AddAuthorizer(tctx.address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(0))). // 0 value transferred
@@ -110,8 +112,10 @@ var fuzzTransactionTypes = []transactionType{
 		},
 	},
 	{
+		// Token transfer of too many tokens.
+		// Should never succeed.
+		// fees should be deducted no matter what.
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
-			// failed token transfer
 			txBody := transferTokensTx(tctx.chain).
 				AddAuthorizer(tctx.address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(2 * tctx.addressFunds))). // too much value transferred
@@ -136,6 +140,9 @@ var fuzzTransactionTypes = []transactionType{
 		},
 	},
 	{
+		// Transaction that calls panic.
+		// Should never succeed.
+		// fees should be deducted no matter what.
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
 			txBody := flow.NewTransactionBody().SetScript([]byte("transaction(){prepare(){};execute{panic(\"some panic\")}}"))
 			txBody.SetProposalKey(tctx.address, 0, 0)
