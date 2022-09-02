@@ -24,6 +24,7 @@ import (
 )
 
 func TestExecutionStateSync(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky as it constantly runs into badger errors or blob not found errors")
 	suite.Run(t, new(ExecutionStateSyncSuite))
 }
 
