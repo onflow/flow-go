@@ -58,6 +58,8 @@ func (i *TransactionInvoker) Process(
 	parentState := sth.State()
 	childState := sth.NewChild()
 
+	chainID := ctx.Chain.ChainID()
+
 	defer func() {
 		// an extra check for state holder health, this should never happen
 		if childState != sth.State() {
@@ -78,8 +80,8 @@ func (i *TransactionInvoker) Process(
 
 		// backwards compatibility to enable rolling deploy
 		enforceLimits := sth.EnforceInteractionLimits()
-		if (ctx.Chain.ChainID() == flow.Mainnet && blockHeight > uint64(36419249)) ||
-			(ctx.Chain.ChainID() == flow.Testnet && blockHeight > uint64(78354421)) {
+		if (chainID == flow.Mainnet && blockHeight > uint64(36419249)) ||
+			(chainID == flow.Testnet && blockHeight > uint64(78354421)) {
 			enforceLimits = false
 		}
 
@@ -97,9 +99,6 @@ func (i *TransactionInvoker) Process(
 
 	location := common.TransactionLocation(proc.ID)
 
-	// TODO: true before certain block height
-	const allowResourceInvalidationAfterPotentialJump = false
-
 	err = vm.Runtime.ExecuteTransaction(
 		runtime.Script{
 			Source:    proc.Transaction.Script,
@@ -111,7 +110,7 @@ func (i *TransactionInvoker) Process(
 			PredeclaredValues: predeclaredValues,
 			CheckerOptions: []sema.Option{
 				sema.WithAllowResourceInvalidationAfterPotentialJump(
-					allowResourceInvalidationAfterPotentialJump,
+					allowResourceInvalidationAfterPotentialJump(chainID, blockHeight),
 				),
 			},
 		},
@@ -223,6 +222,17 @@ func (i *TransactionInvoker) Process(
 	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
 
 	return txError
+}
+
+func allowResourceInvalidationAfterPotentialJump(chainID flow.ChainID, blockHeight uint64) bool {
+	// backwards compatibility to enable rolling deploy
+	if (chainID == flow.Mainnet && blockHeight > 1) ||
+		(chainID == flow.Testnet && blockHeight > 1) {
+
+		return false
+	}
+
+	return true
 }
 
 func (i *TransactionInvoker) deductTransactionFees(
