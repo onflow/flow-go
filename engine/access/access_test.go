@@ -74,7 +74,6 @@ func (suite *Suite) SetupTest() {
 	suite.net = new(mocknetwork.Network)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
-	suite.snapshot.On("SealingSegment").Return(&flow.SealingSegment{Blocks: unittest.BlockFixtures(2)}, nil).Maybe()
 
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
@@ -558,8 +557,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := flow.IdentifierList(enIdentities.NodeIDs())
 
-		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot, nil)
-
 		// create block -> collection -> transactions
 		block, collection := suite.createChain()
 
@@ -868,6 +865,9 @@ func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	epochs.On("Current").Return(epoch)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs)
+	snap.On("SealingSegment").Return(&flow.SealingSegment{Blocks: unittest.BlockFixtures(2)}, nil).Maybe()
+
+	suite.state.On("AtBlockID", mock.Anything).Return(snap).Once() // initial height lookup in ingestion engine
 	suite.state.On("AtBlockID", refBlockID).Return(snap)
 
 	return block, collection
