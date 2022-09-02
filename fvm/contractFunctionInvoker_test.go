@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rs/zerolog"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -18,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
 	fvmMock "github.com/onflow/flow-go/fvm/mock"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -107,27 +106,28 @@ func TestContractInvoker(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			invoker := fvm.NewContractFunctionInvoker(
-				common.AddressLocation{},
-				"functionName",
-				[]cadence.Value{},
-				[]sema.Type{},
-				zerolog.Nop())
-
 			env := &fvmMock.Environment{}
 			vm := &fvm.VirtualMachine{
 				Runtime: &TestInterpreterRuntime{
 					invokeContractFunction: tc.contractFunction,
 				},
 			}
+			vmCtx := fvm.NewContext()
 
 			env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
 			env.On("VM").Return(vm)
+			env.On("Context").Return(&vmCtx)
 			env.On("BorrowCadenceRuntime", mock.Anything).Return(
 				fvm.NewReusableCadenceRuntime())
 			env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
-			value, err := invoker.Invoke(env)
+			invoker := fvm.NewContractFunctionInvoker(env)
+			value, err := invoker.Invoke(
+				fvm.ContractFunctionSpec{
+					FunctionName: "functionName",
+				},
+				flow.Address{},
+				[]cadence.Value{})
 
 			tc.require(t, value, err)
 		})

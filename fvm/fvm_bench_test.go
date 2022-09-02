@@ -151,8 +151,9 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithChain(chain),
+		fvm.WithLogger(logger),
 	}
-	fvmContext := fvm.NewContext(logger, opts...)
+	fvmContext := fvm.NewContext(opts...)
 
 	collector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -303,7 +304,7 @@ type logExtractor struct {
 }
 
 type txWeights struct {
-	TXHash                string `json:"txHash"`
+	TXHash                string `json:"tx_id"`
 	LedgerInteractionUsed uint64 `json:"ledgerInteractionUsed"`
 	ComputationUsed       uint   `json:"computationUsed"`
 	MemoryEstimate        uint   `json:"memoryEstimate"`

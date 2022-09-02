@@ -3,7 +3,7 @@ package util_test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -102,9 +102,9 @@ func TestExampleSelectFilter(t *testing.T) {
 	require.NoError(t, err)
 
 	// enable to update test case if there is change in the models.Block struct
-	// _ = ioutil.WriteFile("example_select_filter.json", marshalled, 0644)
+	// _ = os.WriteFile("example_select_filter.json", marshalled, 0644)
 
-	byteValue, err := ioutil.ReadFile("example_select_filter.json")
+	byteValue, err := os.ReadFile("example_select_filter.json")
 	require.NoError(t, err)
 
 	require.Equal(t, string(byteValue), string(marshalled))

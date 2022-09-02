@@ -35,10 +35,10 @@ func TestFungibleTokenTracker(t *testing.T) {
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
 	}
-	ctx := fvm.NewContext(zerolog.Nop(), opts...)
+	ctx := fvm.NewContext(opts...)
 	bootstrapOptions := []fvm.BootstrapProcedureOption{
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),

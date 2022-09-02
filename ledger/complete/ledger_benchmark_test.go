@@ -22,7 +22,9 @@ import (
 
 // GENERAL COMMENT:
 // running this test with
-//   go test -bench=.  -benchmem
+//
+//	go test -bench=.  -benchmem
+//
 // will track the heap allocations for the Benchmarks
 func BenchmarkStorage(b *testing.B) { benchmarkStorage(100, b) }
 

@@ -9,8 +9,8 @@ type ProviderMetrics struct {
 	mock.Mock
 }
 
-// ChunkDataPackRequested provides a mock function with given fields:
-func (_m *ProviderMetrics) ChunkDataPackRequested() {
+// ChunkDataPackRequestProcessed provides a mock function with given fields:
+func (_m *ProviderMetrics) ChunkDataPackRequestProcessed() {
 	_m.Called()
 }
 

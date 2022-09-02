@@ -3,7 +3,6 @@ package fvm
 import (
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,7 +58,7 @@ func TestReusableCadanceRuntimePoolSharing(t *testing.T) {
 	default:
 	}
 
-	ctx := NewContext(zerolog.Logger{}, WithReusableCadenceRuntimePool(pool))
+	ctx := NewContext(WithReusableCadenceRuntimePool(pool))
 
 	entry := ctx.ReusableCadenceRuntimePool.Borrow(nil)
 	require.NotNil(t, entry)
