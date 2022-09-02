@@ -21,6 +21,8 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/module/mempool/queue"
+
 	"github.com/onflow/flow-go/admin/commands"
 	executionCommands "github.com/onflow/flow-go/admin/commands/execution"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
@@ -453,7 +455,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			}
 			exeNode.computationManager = manager
 
-			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chdpCacheSize)
+			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
@@ -477,17 +479,23 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				node.Tracer,
 			)
 
+			var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if node.HeroCacheMetricsEnable {
+				chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
+			}
+			chdpReqQueue := queue.NewChunkDataPackRequestQueue(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
 			exeNode.providerEngine, err = exeprovider.New(
 				node.Logger,
 				node.Tracer,
 				node.Network,
 				node.State,
-				node.Me,
 				exeNode.executionState,
 				exeNode.collector,
 				exeNode.checkAuthorizedAtBlock,
-				exeNode.exeConf.chdpQueryTimeout,
-				exeNode.exeConf.chdpDeliveryTimeout,
+				chdpReqQueue,
+				exeNode.exeConf.chunkDataPackRequestWorkers,
+				exeNode.exeConf.chunkDataPackQueryTimeout,
+				exeNode.exeConf.chunkDataPackDeliveryTimeout,
 			)
 			if err != nil {
 				return nil, err
