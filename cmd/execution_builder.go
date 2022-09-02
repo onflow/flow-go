@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -105,37 +106,41 @@ type ExecutionNode struct {
 	builder *FlowNodeBuilder // This is needed for accessing the ShutdownFunc
 	exeConf *ExecutionConfig
 
-	collector               module.ExecutionMetrics
-	executionState          state.ExecutionState
-	followerState           protocol.MutableState
-	committee               hotstuff.Committee
-	ledgerStorage           *ledger.Ledger
-	events                  *storage.Events
-	serviceEvents           *storage.ServiceEvents
-	txResults               *storage.TransactionResults
-	results                 *storage.ExecutionResults
-	myReceipts              *storage.MyExecutionReceipts
-	providerEngine          *exeprovider.Engine
-	checkerEng              *checker.Engine
-	syncCore                *chainsync.Core
-	pendingBlocks           *buffer.PendingBlocks // used in follower engine
-	deltas                  *ingestion.Deltas
-	syncEngine              *synchronization.Engine
-	followerEng             *followereng.Engine // to sync blocks from consensus nodes
-	computationManager      *computation.Manager
-	collectionRequester     *requester.Engine
-	ingestionEng            *ingestion.Engine
-	finalizationDistributor *pubsub.FinalizationDistributor
-	finalizedHeader         *synchronization.FinalizedHeaderCache
-	checkAuthorizedAtBlock  func(blockID flow.Identifier) (bool, error)
-	diskWAL                 *wal.DiskWAL
-	blockDataUploaders      []uploader.Uploader
-	executionDataStore      execution_data.ExecutionDataStore
-	toTriggerCheckpoint     *atomic.Bool // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
-	executionDataDatastore  *badger.Datastore
-	executionDataPruner     *pruner.Pruner
-	executionDataBlobstore  blobs.Blobstore
-	executionDataTracker    tracker.Storage
+	collector                     module.ExecutionMetrics
+	executionState                state.ExecutionState
+	followerState                 protocol.MutableState
+	committee                     hotstuff.Committee
+	ledgerStorage                 *ledger.Ledger
+	events                        *storage.Events
+	serviceEvents                 *storage.ServiceEvents
+	txResults                     *storage.TransactionResults
+	results                       *storage.ExecutionResults
+	myReceipts                    *storage.MyExecutionReceipts
+	computationResultUploadStatus *storage.ComputationResultUploadStatus
+	commits                       *storage.Commits
+	collections                   *storage.Collections
+	transactions                  *storage.Transactions
+	providerEngine                *exeprovider.Engine
+	checkerEng                    *checker.Engine
+	syncCore                      *chainsync.Core
+	pendingBlocks                 *buffer.PendingBlocks // used in follower engine
+	deltas                        *ingestion.Deltas
+	syncEngine                    *synchronization.Engine
+	followerEng                   *followereng.Engine // to sync blocks from consensus nodes
+	computationManager            *computation.Manager
+	collectionRequester           *requester.Engine
+	ingestionEng                  *ingestion.Engine
+	finalizationDistributor       *pubsub.FinalizationDistributor
+	finalizedHeader               *synchronization.FinalizedHeaderCache
+	checkAuthorizedAtBlock        func(blockID flow.Identifier) (bool, error)
+	diskWAL                       *wal.DiskWAL
+	blockDataUploaders            []uploader.Uploader
+	executionDataStore            execution_data.ExecutionDataStore
+	toTriggerCheckpoint           *atomic.Bool // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	executionDataDatastore        *badger.Datastore
+	executionDataPruner           *pruner.Pruner
+	executionDataBlobstore        blobs.Blobstore
+	executionDataTracker          tracker.Storage
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -164,8 +169,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", exeNode.LoadSyncCore).
 		Module("execution receipts storage", exeNode.LoadExecutionReceiptsStorage).
 		Module("pending block cache", exeNode.LoadPendingBlockCache).
-		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
-		Component("S3 block data uploader", exeNode.LoadS3BlockDataUploader).
 		Module("state exeNode.deltas mempool", exeNode.LoadDeltasMempool).
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
@@ -173,6 +176,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
+		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
+		Component("S3 block data uploader", exeNode.LoadS3BlockDataUploader).
 		Component("provider engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			opts := []network.BlobServiceOption{}
 
@@ -381,6 +386,8 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 	module.ReadyDoneAware,
 	error,
 ) {
+	// Since RetryableAsyncUploaderWrapper relies on executionDataService so we should create
+	// it after execution data service is fully setup.
 	if exeNode.exeConf.enableBlockDataUpload && exeNode.exeConf.gcpBucketName != "" {
 		logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
 		gcpBucketUploader, err := uploader.NewGCPBucketUploader(
@@ -400,9 +407,37 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			exeNode.collector,
 		)
 
-		exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, asyncUploader)
+		bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore)
+		if err != nil {
+			return nil, fmt.Errorf("could not register blob service: %w", err)
+		}
 
-		return asyncUploader, nil
+		exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
+		exeNode.commits = storage.NewCommits(node.Metrics.Cache, node.DB)
+		exeNode.computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
+		exeNode.collections = storage.NewCollections(node.DB, exeNode.transactions)
+		exeNode.transactions = storage.NewTransactions(node.Metrics.Cache, node.DB)
+		exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
+
+		// Setting up RetryableUploader for GCP uploader
+		retryableUploader := uploader.NewBadgerRetryableUploaderWrapper(
+			asyncUploader,
+			node.Storage.Blocks,
+			exeNode.commits,
+			exeNode.collections,
+			exeNode.events,
+			exeNode.results,
+			exeNode.txResults,
+			exeNode.computationResultUploadStatus,
+			execution_data.NewDownloader(bs),
+			exeNode.collector)
+		if retryableUploader == nil {
+			return nil, errors.New("failed to create ComputationResult upload status store")
+		}
+
+		exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, retryableUploader)
+
+		return retryableUploader, nil
 	}
 
 	// Since we don't have conditional component creation, we just use Noop one.
@@ -440,6 +475,9 @@ func (exeNode *ExecutionNode) LoadS3BlockDataUploader(
 			logger,
 			exeNode.collector,
 		)
+
+		// We are not enabling RetryableUploader for S3 uploader for now. When we need upload
+		// retry for multiple uploaders, we will need to use different BadgerDB key prefix.
 		exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, asyncUploader)
 
 		return asyncUploader, nil
@@ -678,6 +716,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.checkAuthorizedAtBlock,
 		exeNode.exeConf.pauseExecution,
 		exeNode.executionDataPruner,
+		exeNode.blockDataUploaders,
 	)
 
 	// TODO: we should solve these mutual dependencies better
