@@ -361,17 +361,15 @@ func (e *ScriptExecutionTimedOutError) Code() ErrorCode {
 
 // An CouldNotGetExecutionParameterFromStateError indicates that computation has exceeded its limit.
 type CouldNotGetExecutionParameterFromStateError struct {
-	address    string
-	domain     string
-	identifier string
+	address string
+	path    string
 }
 
 // NewCouldNotGetExecutionParameterFromStateError constructs a new CouldNotGetExecutionParameterFromStateError
-func NewCouldNotGetExecutionParameterFromStateError(address, domain, identifier string) *CouldNotGetExecutionParameterFromStateError {
+func NewCouldNotGetExecutionParameterFromStateError(address, path string) *CouldNotGetExecutionParameterFromStateError {
 	return &CouldNotGetExecutionParameterFromStateError{
-		address:    address,
-		domain:     domain,
-		identifier: identifier,
+		address: address,
+		path:    path,
 	}
 }
 
@@ -382,11 +380,10 @@ func (e CouldNotGetExecutionParameterFromStateError) Code() ErrorCode {
 
 func (e CouldNotGetExecutionParameterFromStateError) Error() string {
 	return fmt.Sprintf(
-		"%s could not get execution parameter from the state (address: %s path: %s/%s)",
+		"%s could not get execution parameter from the state (address: %s path: %s)",
 		e.Code().String(),
 		e.address,
-		e.domain,
-		e.identifier,
+		e.path,
 	)
 }
 
