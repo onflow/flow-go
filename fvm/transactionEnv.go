@@ -92,13 +92,14 @@ func NewTransactionEnvironment(
 				tracer,
 				meter,
 				accounts),
-			ctx:            ctx,
-			sth:            sth,
-			vm:             vm,
-			programs:       programsHandler,
-			accounts:       accounts,
-			accountKeys:    accountKeys,
-			frozenAccounts: nil,
+			SystemContracts: NewSystemContracts(),
+			ctx:             ctx,
+			sth:             sth,
+			vm:              vm,
+			programs:        programsHandler,
+			accounts:        accounts,
+			accountKeys:     accountKeys,
+			frozenAccounts:  nil,
 		},
 
 		addressGenerator: generator,
@@ -106,6 +107,8 @@ func NewTransactionEnvironment(
 		txIndex:          txIndex,
 		txID:             txID,
 	}
+
+	env.SystemContracts.SetEnvironment(env)
 
 	// TODO(patrick): rm this hack
 	env.AccountInterface = env
@@ -226,10 +229,7 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 }
 
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
-	return InvokeUseContractAuditVoucherContract(
-		e,
-		address,
-		string(code[:]))
+	return e.UseContractAuditVoucher(address, string(code[:]))
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
@@ -280,10 +280,7 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		_, invokeErr := InvokeSetupNewAccountContract(
-			e,
-			flowAddress,
-			payer)
+		_, invokeErr := e.SetupNewAccount(flowAddress, payer)
 		if invokeErr != nil {
 			return address, invokeErr
 		}

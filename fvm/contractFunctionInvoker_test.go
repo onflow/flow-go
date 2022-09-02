@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-func TestContractInvoker(t *testing.T) {
+func TestSystemContractsInvoke(t *testing.T) {
 
 	type testCase struct {
 		name             string
@@ -113,20 +113,25 @@ func TestContractInvoker(t *testing.T) {
 				},
 			}
 			logger := zerolog.Logger{}
+			chain := flow.Mainnet.Chain()
 
 			env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
 			env.On("VM").Return(vm)
+			env.On("Chain").Return(chain)
 			env.On("Logger").Return(&logger)
 			env.On("BorrowCadenceRuntime", mock.Anything).Return(
 				fvm.NewReusableCadenceRuntime())
 			env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
-			invoker := fvm.NewContractFunctionInvoker(env)
+			invoker := fvm.NewSystemContracts()
+			invoker.SetEnvironment(env)
 			value, err := invoker.Invoke(
 				fvm.ContractFunctionSpec{
+					AddressFromChain: func(_ flow.Chain) flow.Address {
+						return flow.Address{}
+					},
 					FunctionName: "functionName",
 				},
-				flow.Address{},
 				[]cadence.Value{})
 
 			tc.require(t, value, err)
