@@ -3,6 +3,7 @@ package fvm
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -125,6 +126,9 @@ func (i ScriptInvoker) Process(
 		return err
 	}
 
+	// TODO: true before certain block height
+	const allowResourceInvalidationAfterPotentialJump = false
+
 	location := common.ScriptLocation(proc.ID)
 	value, err := vm.Runtime.ExecuteScript(
 		runtime.Script{
@@ -134,6 +138,11 @@ func (i ScriptInvoker) Process(
 		runtime.Context{
 			Interface: env,
 			Location:  location,
+			CheckerOptions: []sema.Option{
+				sema.WithAllowResourceInvalidationAfterPotentialJump(
+					allowResourceInvalidationAfterPotentialJump,
+				),
+			},
 		},
 	)
 

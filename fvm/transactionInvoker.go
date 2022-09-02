@@ -97,6 +97,9 @@ func (i *TransactionInvoker) Process(
 
 	location := common.TransactionLocation(proc.ID)
 
+	// TODO: true before certain block height
+	const allowResourceInvalidationAfterPotentialJump = false
+
 	err = vm.Runtime.ExecuteTransaction(
 		runtime.Script{
 			Source:    proc.Transaction.Script,
@@ -106,6 +109,11 @@ func (i *TransactionInvoker) Process(
 			Interface:         env,
 			Location:          location,
 			PredeclaredValues: predeclaredValues,
+			CheckerOptions: []sema.Option{
+				sema.WithAllowResourceInvalidationAfterPotentialJump(
+					allowResourceInvalidationAfterPotentialJump,
+				),
+			},
 		},
 	)
 	if err != nil {

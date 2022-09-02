@@ -47,6 +47,9 @@ func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error)
 
 	predeclaredValues := valueDeclarations(env)
 
+	// TODO: true before certain block height
+	const allowResourceInvalidationAfterPotentialJump = false
+
 	value, err := env.VM().Runtime.InvokeContractFunction(
 		i.contractLocation,
 		i.functionName,
@@ -55,6 +58,9 @@ func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error)
 		runtime.Context{
 			Interface:         env,
 			PredeclaredValues: predeclaredValues,
+			CheckerOptions: []sema.Option{
+				sema.WithAllowResourceInvalidationAfterPotentialJump(allowResourceInvalidationAfterPotentialJump),
+			},
 		},
 	)
 
