@@ -108,7 +108,7 @@ func (vmt vmTest) bootstrapWith(
 
 	opts := append(baseOpts, vmt.contextOptions...)
 
-	ctx := fvm.NewContext(zerolog.Nop(), opts...)
+	ctx := fvm.NewContext(opts...)
 
 	view := utils.NewSimpleView()
 
