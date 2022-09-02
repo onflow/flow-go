@@ -45,8 +45,9 @@ func WriteJSON(path string, data interface{}) error {
 
 	return WriteFile(path, bz)
 }
+
 // TerminateOnFullDisk panics if the input error is (or wraps) the system "out of disk
-// space" error. It's a no-op for any other error, or nil. 
+// space" error. It's a no-op for any other error, or nil.
 func TerminateOnFullDisk(err error) error {
 	if err != nil && errors.Is(err, syscall.ENOSPC) {
 		panic(fmt.Sprintf("disk full, terminating node: %s", err.Error()))
