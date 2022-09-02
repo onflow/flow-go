@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	runtimeerrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/sema"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -112,11 +112,11 @@ func TestContractInvoker(t *testing.T) {
 					invokeContractFunction: tc.contractFunction,
 				},
 			}
-			vmCtx := fvm.NewContext()
+			logger := zerolog.Logger{}
 
 			env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
 			env.On("VM").Return(vm)
-			env.On("Context").Return(&vmCtx)
+			env.On("Logger").Return(&logger)
 			env.On("BorrowCadenceRuntime", mock.Anything).Return(
 				fvm.NewReusableCadenceRuntime())
 			env.On("ReturnCadenceRuntime", mock.Anything).Return()

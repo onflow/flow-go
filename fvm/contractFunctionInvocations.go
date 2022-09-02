@@ -29,7 +29,7 @@ func InvokeDeductTransactionFeesContract(
 ) (cadence.Value, error) {
 	return NewContractFunctionInvoker(env).Invoke(
 		deductTransactionFeeSpec,
-		FlowFeesAddress(env.Context().Chain),
+		FlowFeesAddress(env.Chain()),
 		[]cadence.Value{
 			cadence.BytesToAddress(payer.Bytes()),
 			cadence.UFix64(inclusionEffort),
@@ -57,7 +57,7 @@ func InvokeSetupNewAccountContract(
 ) (cadence.Value, error) {
 	return NewContractFunctionInvoker(env).Invoke(
 		setupNewAccountSpec,
-		env.Context().Chain.ServiceAddress(),
+		env.Chain().ServiceAddress(),
 		[]cadence.Value{
 			cadence.BytesToAddress(flowAddress.Bytes()),
 			cadence.BytesToAddress(payer.Bytes()),
@@ -81,7 +81,7 @@ func InvokeAccountAvailableBalanceContract(
 ) (cadence.Value, error) {
 	return NewContractFunctionInvoker(env).Invoke(
 		accountAvailableBalanceSpec,
-		env.Context().Chain.ServiceAddress(),
+		env.Chain().ServiceAddress(),
 		[]cadence.Value{
 			cadence.BytesToAddress(address.Bytes()),
 		},
@@ -104,7 +104,7 @@ func InvokeAccountBalanceContract(
 ) (cadence.Value, error) {
 	return NewContractFunctionInvoker(env).Invoke(
 		accountBalanceInvocationSpec,
-		env.Context().Chain.ServiceAddress(),
+		env.Chain().ServiceAddress(),
 		[]cadence.Value{
 			cadence.BytesToAddress(address.Bytes()),
 		},
@@ -127,7 +127,7 @@ func InvokeAccountStorageCapacityContract(
 ) (cadence.Value, error) {
 	return NewContractFunctionInvoker(env).Invoke(
 		accountStorageCapacitySpec,
-		env.Context().Chain.ServiceAddress(),
+		env.Chain().ServiceAddress(),
 		[]cadence.Value{
 			cadence.BytesToAddress(address.Bytes()),
 		},
@@ -157,7 +157,7 @@ func InvokeAccountsStorageCapacity(
 				),
 			},
 		},
-		env.Context().Chain.ServiceAddress(),
+		env.Chain().ServiceAddress(),
 		[]cadence.Value{
 			cadence.NewArray(arrayValues),
 		},
@@ -182,7 +182,7 @@ func InvokeUseContractAuditVoucherContract(
 ) (bool, error) {
 	resultCdc, err := NewContractFunctionInvoker(env).Invoke(
 		useContractAuditVoucherSpec,
-		env.Context().Chain.ServiceAddress(),
+		env.Chain().ServiceAddress(),
 		[]cadence.Value{
 			cadence.BytesToAddress(address.Bytes()),
 			cadence.String(code),

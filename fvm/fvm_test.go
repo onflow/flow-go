@@ -30,6 +30,16 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// from 18.8.2022
+var mainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
+	common.ComputationKindStatement:          1569,
+	common.ComputationKindLoop:               1569,
+	common.ComputationKindFunctionInvocation: 1569,
+	meter.ComputationKindGetValue:            808,
+	meter.ComputationKindCreateAccount:       2837670,
+	meter.ComputationKindSetValue:            765,
+}
+
 type vmTest struct {
 	bootstrapOptions []fvm.BootstrapProcedureOption
 	contextOptions   []fvm.Option
@@ -82,6 +92,60 @@ func (vmt vmTest) run(
 		require.NoError(t, err)
 
 		f(t, vm, chain, ctx, view, programs)
+	}
+}
+
+// bootstrapWith executes the bootstrap procedure and the custom bootstrap function
+// and returns a prepared bootstrappedVmTest with all the state needed
+func (vmt vmTest) bootstrapWith(
+	bootstrap func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) error,
+) (bootstrappedVmTest, error) {
+	chain, vm := createChainAndVm(flow.Testnet)
+
+	baseOpts := []fvm.Option{
+		fvm.WithChain(chain),
+	}
+
+	opts := append(baseOpts, vmt.contextOptions...)
+
+	ctx := fvm.NewContext(opts...)
+
+	view := utils.NewSimpleView()
+
+	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+	}
+
+	programs := programs.NewEmptyPrograms()
+
+	bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
+
+	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view, programs)
+	if err != nil {
+		return bootstrappedVmTest{}, err
+	}
+
+	err = bootstrap(vm, chain, ctx, view, programs)
+	if err != nil {
+		return bootstrappedVmTest{}, err
+	}
+
+	return bootstrappedVmTest{chain, ctx, view, programs}, nil
+}
+
+type bootstrappedVmTest struct {
+	chain    flow.Chain
+	ctx      fvm.Context
+	view     state.View
+	programs *programs.Programs
+}
+
+// run Runs a test from the bootstrapped state, without changing the bootstrapped state
+func (vmt bootstrappedVmTest) run(
+	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
+) func(t *testing.T) {
+	return func(t *testing.T) {
+		f(t, fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{})), vmt.chain, vmt.ctx, vmt.view.NewChild(), vmt.programs.ChildPrograms())
 	}
 }
 
@@ -738,9 +802,9 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "If tx fails because of gas limit reached, fee deduction events are emitted",
 			fundWith:      txFees + transferAmount,
 			tryToTransfer: transferAmount,
-			gasLimit:      uint64(10),
+			gasLimit:      uint64(2),
 			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
-				require.ErrorContains(t, tx.Err, "computation exceeds limit (10)")
+				require.ErrorContains(t, tx.Err, "computation exceeds limit (2)")
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
@@ -962,6 +1026,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		t.Run(fmt.Sprintf("Transaction Fees %d: %s", i, tc.name), newVMTest().withBootstrapProcedureOptions(
 			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 			fvm.WithExecutionMemoryLimit(math.MaxUint64),
+			fvm.WithExecutionEffortWeights(mainnetExecutionEffortWeights),
+			fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 		).run(
@@ -976,6 +1042,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 			fvm.WithExecutionMemoryLimit(math.MaxUint64),
+			fvm.WithExecutionEffortWeights(mainnetExecutionEffortWeights),
+			fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
