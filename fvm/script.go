@@ -126,8 +126,12 @@ func (i ScriptInvoker) Process(
 		return err
 	}
 
-	// TODO: true before certain block height
-	const allowResourceInvalidationAfterPotentialJump = false
+	chainID := ctx.Chain.ChainID()
+
+	var blockHeight uint64
+	if ctx.BlockHeader != nil {
+		blockHeight = ctx.BlockHeader.Height
+	}
 
 	location := common.ScriptLocation(proc.ID)
 	value, err := vm.Runtime.ExecuteScript(
@@ -140,7 +144,7 @@ func (i ScriptInvoker) Process(
 			Location:  location,
 			CheckerOptions: []sema.Option{
 				sema.WithAllowResourceInvalidationAfterPotentialJump(
-					allowResourceInvalidationAfterPotentialJump,
+					allowResourceInvalidationAfterPotentialJump(chainID, blockHeight),
 				),
 			},
 		},
