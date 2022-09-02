@@ -39,7 +39,7 @@ func (d TransactionStorageLimiter) CheckLimits(
 		usages[i] = u
 	}
 
-	result, invokeErr := InvokeAccountsStorageCapacity(env, commonAddresses)
+	result, invokeErr := env.AccountsStorageCapacity(commonAddresses)
 
 	// This error only occurs in case of implementation errors. The InvokeAccountsStorageCapacity
 	// already handles cases where the default vault is missing.

@@ -38,6 +38,29 @@ type Environment struct {
 	mock.Mock
 }
 
+// AccountsStorageCapacity provides a mock function with given fields: addresses
+func (_m *Environment) AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error) {
+	ret := _m.Called(addresses)
+
+	var r0 cadence.Value
+	if rf, ok := ret.Get(0).(func([]common.Address) cadence.Value); ok {
+		r0 = rf(addresses)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(cadence.Value)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func([]common.Address) error); ok {
+		r1 = rf(addresses)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // AddAccountKey provides a mock function with given fields: address, publicKey, hashAlgo, weight
 func (_m *Environment) AddAccountKey(address common.Address, publicKey *stdlib.PublicKey, hashAlgo sema.HashAlgorithm, weight int) (*stdlib.AccountKey, error) {
 	ret := _m.Called(address, publicKey, hashAlgo, weight)

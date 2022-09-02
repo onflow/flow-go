@@ -15,53 +15,55 @@ import (
 // ContractFunctionSpec specify all the information, except the function's
 // address and arguments, needed to invoke the contract function.
 type ContractFunctionSpec struct {
-	LocationName  string
-	FunctionName  string
-	ArgumentTypes []sema.Type
+	AddressFromChain func(flow.Chain) flow.Address
+	LocationName     string
+	FunctionName     string
+	ArgumentTypes    []sema.Type
 }
 
-type ContractFunctionInvoker struct {
+// SystemContracts provides methods for invoking system contract functions as
+// service account.
+type SystemContracts struct {
 	env Environment
 }
 
-func NewContractFunctionInvoker(
-	env Environment,
-) *ContractFunctionInvoker {
-	return &ContractFunctionInvoker{
-		env: env,
-	}
+func NewSystemContracts() *SystemContracts {
+	return &SystemContracts{}
 }
 
-func (i *ContractFunctionInvoker) Invoke(
+func (sys *SystemContracts) SetEnvironment(env Environment) {
+	sys.env = env
+}
+
+func (sys *SystemContracts) Invoke(
 	spec ContractFunctionSpec,
-	address flow.Address,
 	arguments []cadence.Value,
 ) (
 	cadence.Value,
 	error,
 ) {
 	contractLocation := common.AddressLocation{
-		Address: common.Address(address),
+		Address: common.Address(spec.AddressFromChain(sys.env.Chain())),
 		Name:    spec.LocationName,
 	}
 
-	span := i.env.StartSpanFromRoot(trace.FVMInvokeContractFunction)
+	span := sys.env.StartSpanFromRoot(trace.FVMInvokeContractFunction)
 	span.SetAttributes(
 		attribute.String(
 			"transaction.ContractFunctionCall",
 			contractLocation.String()+"."+spec.FunctionName))
 	defer span.End()
 
-	runtimeEnv := i.env.BorrowCadenceRuntime()
-	defer i.env.ReturnCadenceRuntime(runtimeEnv)
+	runtimeEnv := sys.env.BorrowCadenceRuntime()
+	defer sys.env.ReturnCadenceRuntime(runtimeEnv)
 
-	value, err := i.env.VM().Runtime.InvokeContractFunction(
+	value, err := sys.env.VM().Runtime.InvokeContractFunction(
 		contractLocation,
 		spec.FunctionName,
 		arguments,
 		spec.ArgumentTypes,
 		runtime.Context{
-			Interface:   i.env,
+			Interface:   sys.env,
 			Environment: runtimeEnv,
 		},
 	)
@@ -69,7 +71,7 @@ func (i *ContractFunctionInvoker) Invoke(
 	if err != nil {
 		// this is an error coming from Cadendce runtime, so it must be handled first.
 		err = errors.HandleRuntimeError(err)
-		i.env.Logger().
+		sys.env.Logger().
 			Info().
 			Err(err).
 			Str("contract", contractLocation.String()).

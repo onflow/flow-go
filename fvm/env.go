@@ -42,6 +42,8 @@ type Environment interface {
 	ReturnCadenceRuntime(*ReusableCadenceRuntime)
 
 	SetAccountFrozen(address common.Address, frozen bool) error
+
+	AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error)
 }
 
 // TODO(patrick): refactor this into an object
@@ -79,6 +81,8 @@ type commonEnv struct {
 	environment.TransactionInfo
 	environment.EventEmitter
 	*environment.ContractReader
+
+	*SystemContracts
 
 	// TODO(patrick): rm
 	ctx Context
@@ -227,9 +231,7 @@ func (env *commonEnv) GetStorageCapacity(
 		return 0, fmt.Errorf("get storage capacity failed: %w", err)
 	}
 
-	result, invokeErr := InvokeAccountStorageCapacityContract(
-		env.fullEnv,
-		address)
+	result, invokeErr := env.AccountStorageCapacity(address)
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
@@ -253,7 +255,7 @@ func (env *commonEnv) GetAccountBalance(
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := InvokeAccountBalanceContract(env.fullEnv, address)
+	result, invokeErr := env.AccountBalance(address)
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
@@ -273,10 +275,7 @@ func (env *commonEnv) GetAccountAvailableBalance(
 		return 0, fmt.Errorf("get account available balance failed: %w", err)
 	}
 
-	result, invokeErr := InvokeAccountAvailableBalanceContract(
-		env.fullEnv,
-		address)
-
+	result, invokeErr := env.AccountAvailableBalance(address)
 	if invokeErr != nil {
 		return 0, invokeErr
 	}

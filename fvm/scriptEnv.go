@@ -63,15 +63,18 @@ func NewScriptEnvironment(
 				tracer,
 				meter,
 				accounts),
-			ctx:            fvmContext,
-			sth:            sth,
-			vm:             vm,
-			programs:       programsHandler,
-			accounts:       accounts,
-			accountKeys:    accountKeys,
-			frozenAccounts: nil,
+			SystemContracts: NewSystemContracts(),
+			ctx:             fvmContext,
+			sth:             sth,
+			vm:              vm,
+			programs:        programsHandler,
+			accounts:        accounts,
+			accountKeys:     accountKeys,
+			frozenAccounts:  nil,
 		},
 	}
+
+	env.SystemContracts.SetEnvironment(env)
 
 	// TODO(patrick): remove this hack
 	env.AccountInterface = env
