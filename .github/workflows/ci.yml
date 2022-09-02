@@ -80,7 +80,7 @@ jobs:
           cache: true
       - name: Set Test Matrix
         id: set-test-matrix
-        run: go run utils/test_matrix/test_matrix.go network engine access admin utils
+        run: go run utils/test_matrix/test_matrix.go access admin cmd engine module network utils
 
   unit-test:
     name: Unit Tests
@@ -89,7 +89,7 @@ jobs:
       fail-fast: false
       matrix:
         targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
-    # needed to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
+    # need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout repo
