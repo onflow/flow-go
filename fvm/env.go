@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
@@ -25,14 +26,17 @@ import (
 // Environment accepts a context and a virtual machine instance and provides
 // cadence runtime interface methods to the runtime.
 type Environment interface {
-	// TODO(patrick): stop exposing Context()
-	Context() *Context
-
 	VM() *VirtualMachine
 	runtime.Interface
 
+	Chain() flow.Chain
+
+	LimitAccountStorage() bool
+
 	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
 	StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span
+
+	Logger() *zerolog.Logger
 
 	BorrowCadenceRuntime() *ReusableCadenceRuntime
 	ReturnCadenceRuntime(*ReusableCadenceRuntime)
@@ -94,8 +98,12 @@ type commonEnv struct {
 	fullEnv Environment
 }
 
-func (env *commonEnv) Context() *Context {
-	return &env.ctx
+func (env *commonEnv) Chain() flow.Chain {
+	return env.ctx.Chain
+}
+
+func (env *commonEnv) LimitAccountStorage() bool {
+	return env.ctx.LimitAccountStorage
 }
 
 func (env *commonEnv) VM() *VirtualMachine {
