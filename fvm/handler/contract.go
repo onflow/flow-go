@@ -52,16 +52,6 @@ func NewContractHandler(
 	}
 }
 
-func (h *ContractHandler) GetContractNames(address runtime.Address) (names []string, err error) {
-	names, err = h.accounts.GetContractNames(flow.Address(address))
-	return
-}
-
-func (h *ContractHandler) GetContract(address runtime.Address, name string) (code []byte, err error) {
-	code, err = h.accounts.GetContract(name, flow.Address(address))
-	return
-}
-
 func (h *ContractHandler) SetContract(
 	address runtime.Address,
 	name string,
