@@ -1,77 +1,81 @@
 package fvm
 
 import (
-	"fmt"
-
-	"github.com/opentracing/opentracing-go"
-	traceLog "github.com/opentracing/opentracing-go/log"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
+	"go.opentelemetry.io/otel/attribute"
 
+	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
-type ContractFunctionInvoker struct {
-	contractLocation common.AddressLocation
-	functionName     string
-	arguments        []interpreter.Value
-	argumentTypes    []sema.Type
-	logger           zerolog.Logger
-	logSpanFields    []traceLog.Field
+// ContractFunctionSpec specify all the information, except the function's
+// address and arguments, needed to invoke the contract function.
+type ContractFunctionSpec struct {
+	AddressFromChain func(flow.Chain) flow.Address
+	LocationName     string
+	FunctionName     string
+	ArgumentTypes    []sema.Type
 }
 
-func NewContractFunctionInvoker(
-	contractLocation common.AddressLocation,
-	functionName string,
-	arguments []interpreter.Value,
-	argumentTypes []sema.Type,
-	logger zerolog.Logger) *ContractFunctionInvoker {
-	return &ContractFunctionInvoker{
-		contractLocation: contractLocation,
-		functionName:     functionName,
-		arguments:        arguments,
-		argumentTypes:    argumentTypes,
-		logger:           logger,
-		logSpanFields:    []traceLog.Field{traceLog.String("transaction.ContractFunctionCall", fmt.Sprintf("%s.%s", contractLocation.String(), functionName))},
-	}
+// SystemContracts provides methods for invoking system contract functions as
+// service account.
+type SystemContracts struct {
+	env Environment
 }
 
-func (i *ContractFunctionInvoker) Invoke(env Environment, parentTraceSpan opentracing.Span) (cadence.Value, error) {
-	var span opentracing.Span
+func NewSystemContracts() *SystemContracts {
+	return &SystemContracts{}
+}
 
-	ctx := env.Context()
-	if ctx.Tracer != nil && parentTraceSpan != nil {
-		span = ctx.Tracer.StartSpanFromParent(parentTraceSpan, trace.FVMInvokeContractFunction)
-		span.LogFields(
-			i.logSpanFields...,
-		)
-		defer span.Finish()
+func (sys *SystemContracts) SetEnvironment(env Environment) {
+	sys.env = env
+}
+
+func (sys *SystemContracts) Invoke(
+	spec ContractFunctionSpec,
+	arguments []cadence.Value,
+) (
+	cadence.Value,
+	error,
+) {
+	contractLocation := common.AddressLocation{
+		Address: common.Address(spec.AddressFromChain(sys.env.Chain())),
+		Name:    spec.LocationName,
 	}
 
-	predeclaredValues := valueDeclarations(ctx, env)
+	span := sys.env.StartSpanFromRoot(trace.FVMInvokeContractFunction)
+	span.SetAttributes(
+		attribute.String(
+			"transaction.ContractFunctionCall",
+			contractLocation.String()+"."+spec.FunctionName))
+	defer span.End()
 
-	value, err := env.VM().Runtime.InvokeContractFunction(
-		i.contractLocation,
-		i.functionName,
-		i.arguments,
-		i.argumentTypes,
+	runtimeEnv := sys.env.BorrowCadenceRuntime()
+	defer sys.env.ReturnCadenceRuntime(runtimeEnv)
+
+	value, err := sys.env.VM().Runtime.InvokeContractFunction(
+		contractLocation,
+		spec.FunctionName,
+		arguments,
+		spec.ArgumentTypes,
 		runtime.Context{
-			Interface:         env,
-			PredeclaredValues: predeclaredValues,
+			Interface:   sys.env,
+			Environment: runtimeEnv,
 		},
 	)
 
 	if err != nil {
-		i.logger.
+		// this is an error coming from Cadendce runtime, so it must be handled first.
+		err = errors.HandleRuntimeError(err)
+		sys.env.Logger().
 			Info().
 			Err(err).
-			Str("contract", i.contractLocation.String()).
-			Str("function", i.functionName).
+			Str("contract", contractLocation.String()).
+			Str("function", spec.FunctionName).
 			Msg("Contract function call executed with error")
 	}
 	return value, err

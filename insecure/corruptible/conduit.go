@@ -4,19 +4,23 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onflow/flow-go/network"
+
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // Conduit implements a corruptible conduit that sends all incoming events to its registered controller (i.e., factory)
 // without dispatching them to the networking layer.
 type Conduit struct {
-	ctx               context.Context
-	cancel            context.CancelFunc
-	channel           network.Channel
-	conduitController insecure.ConduitController
+	ctx              context.Context
+	cancel           context.CancelFunc
+	channel          channels.Channel
+	egressController insecure.EgressController
 }
+
+var _ network.Conduit = &Conduit{}
 
 // Publish sends the incoming events as publish events to the controller of this conduit (i.e., its factory) to handle.
 func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
@@ -24,7 +28,7 @@ func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 
-	err := c.conduitController.HandleIncomingEvent(event, c.channel, insecure.Protocol_PUBLISH, 0, targetIDs...)
+	err := c.egressController.HandleOutgoingEvent(event, c.channel, insecure.Protocol_PUBLISH, 0, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("factory could not handle the publish event: %w", err)
 	}
@@ -38,7 +42,7 @@ func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 
-	err := c.conduitController.HandleIncomingEvent(event, c.channel, insecure.Protocol_UNICAST, 0, targetID)
+	err := c.egressController.HandleOutgoingEvent(event, c.channel, insecure.Protocol_UNICAST, 0, targetID)
 	if err != nil {
 		return fmt.Errorf("factory could not handle the unicast event: %w", err)
 	}
@@ -52,7 +56,7 @@ func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Ident
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 
-	err := c.conduitController.HandleIncomingEvent(event, c.channel, insecure.Protocol_MULTICAST, uint32(num), targetIDs...)
+	err := c.egressController.HandleOutgoingEvent(event, c.channel, insecure.Protocol_MULTICAST, uint32(num), targetIDs...)
 	if err != nil {
 		return fmt.Errorf("factory could not handle the multicast event: %w", err)
 	}
@@ -68,5 +72,5 @@ func (c *Conduit) Close() error {
 	// close the conduit context
 	c.cancel()
 	// call the close function
-	return c.conduitController.EngineClosingChannel(c.channel)
+	return c.egressController.EngineClosingChannel(c.channel)
 }

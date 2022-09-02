@@ -25,10 +25,10 @@ type kmac128 struct {
 const cSHAKE128BlockSize = 168
 
 // NewKMAC_128 returns a new KMAC instance
-// - key is the KMAC key (the key size is compared to the security level, although
-//	the parameter is used as a domain tag in Flow and not as a security key).
-// - customizer is the customization string. It can be left empty if no customizer
-//   is required.
+//   - key is the KMAC key (the key size is compared to the security level, although
+//     the parameter is used as a domain tag in Flow and not as a security key).
+//   - customizer is the customization string. It can be left empty if no customizer
+//     is required.
 func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) {
 	var k kmac128
 	if outputSize < 0 {
@@ -149,12 +149,12 @@ func (k *kmac128) Reset() {
 func (k *kmac128) ComputeHash(data []byte) Hash {
 	cshake := k.ShakeHash.Clone()
 	cshake.Reset()
-	cshake.Write(k.initBlock)
-	cshake.Write(data)
-	cshake.Write(rightEncode(uint64(k.outputSize * 8)))
+	_, _ = cshake.Write(k.initBlock)
+	_, _ = cshake.Write(data)
+	_, _ = cshake.Write(rightEncode(uint64(k.outputSize * 8)))
 	// read the cshake output
 	h := make([]byte, k.outputSize)
-	cshake.Read(h)
+	_, _ = cshake.Read(h)
 	return h
 }
 
@@ -162,10 +162,10 @@ func (k *kmac128) ComputeHash(data []byte) Hash {
 // It does not reset the state to allow further writing.
 func (k *kmac128) SumHash() Hash {
 	cshake := k.ShakeHash.Clone()
-	cshake.Write(rightEncode(uint64(k.outputSize * 8)))
+	_, _ = cshake.Write(rightEncode(uint64(k.outputSize * 8)))
 	// read the cshake output
 	h := make([]byte, k.outputSize)
-	cshake.Read(h)
+	_, _ = cshake.Read(h)
 	return h
 }
 

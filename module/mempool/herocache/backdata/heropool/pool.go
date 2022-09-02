@@ -11,6 +11,7 @@ type EjectionMode string
 const (
 	RandomEjection = EjectionMode("random-ejection")
 	LRUEjection    = EjectionMode("lru-ejection")
+	NoEjection     = EjectionMode("no-ejection")
 )
 
 // EIndex is data type representing an entity index in Pool.
@@ -85,34 +86,41 @@ func (p *Pool) initFreeEntities() {
 	}
 }
 
-// Add writes given entity into a poolEntity on the underlying entities linked-list. Return value is
-// the index at which given entity is written on entities linked-list so that it can be accessed directly later.
+// Add writes given entity into a poolEntity on the underlying entities linked-list.
 //
-// Boolean returned value determines whether an ejection happened to add this entity.
-func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (EIndex, bool) {
-	entityIndex, ejection := p.sliceIndexForEntity()
-	p.poolEntities[entityIndex].entity = entity
-	p.poolEntities[entityIndex].id = entityId
-	p.poolEntities[entityIndex].owner = owner
-	p.poolEntities[entityIndex].node.next.setUndefined()
-	p.poolEntities[entityIndex].node.prev.setUndefined()
+// The first boolean return value (slotAvailable) says whether pool has an available slot. Pool goes out of available slots if
+// it is full and no ejection is set.
+//
+// If the pool has an available slot (either empty or by ejection), then the second boolean returned value (ejectionOccurred)
+// determines whether an ejection happened to make one slot free or not. Ejection happens if there is no available
+// slot, and there is an ejection mode set.
+func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (i EIndex, slotAvailable bool, ejectionOccurred bool) {
+	entityIndex, slotAvailable, ejectionHappened := p.sliceIndexForEntity()
+	if slotAvailable {
+		p.poolEntities[entityIndex].entity = entity
+		p.poolEntities[entityIndex].id = entityId
+		p.poolEntities[entityIndex].owner = owner
+		p.poolEntities[entityIndex].node.next.setUndefined()
+		p.poolEntities[entityIndex].node.prev.setUndefined()
 
-	if p.used.head.isUndefined() {
-		// used list is empty, hence setting head of used list to current entityIndex.
-		p.used.head.setPoolIndex(entityIndex)
-		p.poolEntities[p.used.head.getSliceIndex()].node.prev.setUndefined()
+		if p.used.head.isUndefined() {
+			// used list is empty, hence setting head of used list to current entityIndex.
+			p.used.head.setPoolIndex(entityIndex)
+			p.poolEntities[p.used.head.getSliceIndex()].node.prev.setUndefined()
+		}
+
+		if !p.used.tail.isUndefined() {
+			// links new entity to the tail
+			p.connect(p.used.tail, entityIndex)
+		}
+
+		// since we are appending to the used list, entityIndex also acts as tail of the list.
+		p.used.tail.setPoolIndex(entityIndex)
+
+		p.size++
 	}
 
-	if !p.used.tail.isUndefined() {
-		// links new entity to the tail
-		p.connect(p.used.tail, entityIndex)
-	}
-
-	// since we are appending to the used list, entityIndex also acts as tail of the list.
-	p.used.tail.setPoolIndex(entityIndex)
-
-	p.size++
-	return entityIndex, ejection
+	return entityIndex, slotAvailable, ejectionHappened
 }
 
 // Get returns entity corresponding to the entity index from the underlying list.
@@ -134,27 +142,46 @@ func (p Pool) All() []PoolEntity {
 	return all
 }
 
-// sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
-// The boolean returned value determines whether an ejection happened to make one slot free or not.
-func (p *Pool) sliceIndexForEntity() (EIndex, bool) {
-	ejection := false
+// Head returns the head of used items. Assuming no ejection happened and pool never goes beyond limit, Head returns
+// the first inserted element.
+func (p Pool) Head() (flow.Entity, bool) {
+	if p.used.head.isUndefined() {
+		return nil, false
+	}
+	e := p.poolEntities[p.used.head.getSliceIndex()]
+	return e.Entity(), true
+}
 
+// sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
+//
+// The first boolean return value (hasAvailableSlot) says whether pool has an available slot.
+// Pool goes out of available slots if it is full and no ejection is set.
+//
+// If the pool has an available slot (either empty or by ejection), then the second boolean returned value
+// (ejectionOccurred) determines whether an ejection happened to make one slot free or not.
+// Ejection happens if there is no available slot, and there is an ejection mode set.
+func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectionOccurred bool) {
 	if p.free.head.isUndefined() {
-		ejection = true
 		// the free list is empty, so we are out of space, and we need to eject.
-		if p.ejectionMode == RandomEjection {
-			// we only eject randomly when the pool is full and random ejection is on.
-			randomIndex := EIndex(rand.Uint32() % p.size)
-			p.invalidateEntityAtIndex(randomIndex)
-		} else {
+		switch p.ejectionMode {
+		case NoEjection:
+			// pool is set for no ejection, hence, no slice index is selected, abort immediately.
+			return 0, false, false
+		case LRUEjection:
 			// LRU ejection
 			// the used head is the oldest entity, so we turn the used head to a free head here.
 			p.invalidateUsedHead()
+			return p.claimFreeHead(), true, true
+		case RandomEjection:
+			// we only eject randomly when the pool is full and random ejection is on.
+			randomIndex := EIndex(rand.Uint32() % p.size)
+			p.invalidateEntityAtIndex(randomIndex)
+			return p.claimFreeHead(), true, true
 		}
 	}
 
 	// claiming the head of free list as the slice index for the next entity to be added
-	return p.claimFreeHead(), ejection
+	return p.claimFreeHead(), true, false // returning false for no ejection.
 }
 
 // Size returns total number of entities that this list maintains.
@@ -233,8 +260,8 @@ func (p *Pool) claimFreeHead() EIndex {
 	return oldFreeHeadIndex
 }
 
-// Rem removes entity corresponding to given getSliceIndex from the list.
-func (p *Pool) Rem(sliceIndex EIndex) {
+// Remove removes entity corresponding to given getSliceIndex from the list.
+func (p *Pool) Remove(sliceIndex EIndex) {
 	p.invalidateEntityAtIndex(sliceIndex)
 }
 

@@ -2,7 +2,6 @@ package fvm_test
 
 import (
 	"crypto/rand"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -13,8 +12,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -23,15 +20,25 @@ import (
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+// from 18.8.2022
+var mainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
+	common.ComputationKindStatement:          1569,
+	common.ComputationKindLoop:               1569,
+	common.ComputationKindFunctionInvocation: 1569,
+	meter.ComputationKindGetValue:            808,
+	meter.ComputationKindCreateAccount:       2837670,
+	meter.ComputationKindSetValue:            765,
+}
 
 type vmTest struct {
 	bootstrapOptions []fvm.BootstrapProcedureOption
@@ -53,7 +60,7 @@ func (vmt vmTest) withContextOptions(opts ...fvm.Option) vmTest {
 }
 
 func createChainAndVm(chainID flow.ChainID) (flow.Chain, *fvm.VirtualMachine) {
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	return chainID.Chain(), fvm.NewVirtualMachine(rt)
 }
 
@@ -69,7 +76,7 @@ func (vmt vmTest) run(
 
 		opts := append(baseOpts, vmt.contextOptions...)
 
-		ctx := fvm.NewContext(zerolog.Nop(), opts...)
+		ctx := fvm.NewContext(opts...)
 
 		view := utils.NewSimpleView()
 
@@ -85,6 +92,60 @@ func (vmt vmTest) run(
 		require.NoError(t, err)
 
 		f(t, vm, chain, ctx, view, programs)
+	}
+}
+
+// bootstrapWith executes the bootstrap procedure and the custom bootstrap function
+// and returns a prepared bootstrappedVmTest with all the state needed
+func (vmt vmTest) bootstrapWith(
+	bootstrap func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) error,
+) (bootstrappedVmTest, error) {
+	chain, vm := createChainAndVm(flow.Testnet)
+
+	baseOpts := []fvm.Option{
+		fvm.WithChain(chain),
+	}
+
+	opts := append(baseOpts, vmt.contextOptions...)
+
+	ctx := fvm.NewContext(opts...)
+
+	view := utils.NewSimpleView()
+
+	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+	}
+
+	programs := programs.NewEmptyPrograms()
+
+	bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
+
+	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view, programs)
+	if err != nil {
+		return bootstrappedVmTest{}, err
+	}
+
+	err = bootstrap(vm, chain, ctx, view, programs)
+	if err != nil {
+		return bootstrappedVmTest{}, err
+	}
+
+	return bootstrappedVmTest{chain, ctx, view, programs}, nil
+}
+
+type bootstrappedVmTest struct {
+	chain    flow.Chain
+	ctx      fvm.Context
+	view     state.View
+	programs *programs.Programs
+}
+
+// run Runs a test from the bootstrapped state, without changing the bootstrapped state
+func (vmt bootstrappedVmTest) run(
+	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
+) func(t *testing.T) {
+	return func(t *testing.T) {
+		f(t, fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{})), vmt.chain, vmt.ctx, vmt.view.NewChild(), vmt.programs.ChildPrograms())
 	}
 }
 
@@ -121,7 +182,7 @@ func TestPrograms(t *testing.T) {
 					)
 					require.NoError(t, err)
 
-					tx := fvm.Transaction(txBody, uint32(i))
+					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 					err = vm.Run(txCtx, tx, view, programs)
 					require.NoError(t, err)
@@ -162,7 +223,6 @@ func TestHashing(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -305,7 +365,7 @@ func TestHashing(t *testing.T) {
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
-				require.Equal(t, "627d7e8fe50384601ca550ceecb61c23e9cbde7feb75ae6b53227f128f2dc3b78b543a044058403e4822f88cb7040d90d588c9e8575f0de3012fe7edaf02b9997a8a5fad234d21b2af359ec3abaeaf4a7ef60e5f04623a983bd5e071f4113678710e910d48ac4d1713073a707ab9057867e0ba32aca6b33010b1d20b8006dd25", result)
+				require.Equal(t, "44dc46111abacfe2bb4a04cea4805aad03f84e4849f138cc3ed431478472b185548628e96d0c963b21ebaf17132d73fc13031eb82d5f4cbe3b6047ff54d20e8d663904373d73348b97ce18305ebc56114cb7e7394e486684007f78aa59abc5d0a8f6bae6bd186db32528af80857cd12112ce6960be29c96074df9c4aaed5b0e6", result)
 			},
 		},
 		{
@@ -315,7 +375,7 @@ func TestHashing(t *testing.T) {
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
-				require.Equal(t, "dc6889f9ca46803a9c7759068989dfc3cffe632fd991e25f6589603c73b7891e2f4736eebe5248f211bbddaa3d763b1b9318185eaf3ab3bfd6f159f345c3148795e4ff3ad376c98d5616febebcf4520ca2a83dda4be2f98b1ead9fb5a622355305b156e06db173a9e1d7af973b11acc1e714cd3aa0fb367dfaadc5a957b4742b", result)
+				require.Equal(t, "de7d9aa24274fa12c98cce5c09eea0634108ead2e91828b9a9a450e878088393e3e63eb4b19834f579ce215b00a9915919b67a71dab1112560319e6e1e5e9ad0fb670e8a09d586508c84547cee7ddbe8c9362c996846154865eb271bdc4523dbcdbdae5a77391fb54374f37534c8bb2281589cb2e3d62742596cdad7e4f9f35c", result)
 			},
 		},
 	}
@@ -413,10 +473,9 @@ func TestWithServiceAccount(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctxA := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
 	)
 
@@ -456,10 +515,9 @@ func TestEventLimits(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
 	)
 
@@ -493,11 +551,10 @@ func TestEventLimits(t *testing.T) {
 	`
 
 	ctx = fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithEventCollectionSizeLimit(2),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
 	)
 
@@ -508,7 +565,7 @@ func TestEventLimits(t *testing.T) {
 
 	programs := programs.NewEmptyPrograms()
 
-	tx := fvm.Transaction(txBody, 0)
+	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 	err := vm.Run(ctx, tx, ledger, programs)
 	require.NoError(t, err)
 
@@ -525,7 +582,7 @@ func TestEventLimits(t *testing.T) {
 
 	t.Run("With limits", func(t *testing.T) {
 		txBody.Payer = unittest.RandomAddressFixture()
-		tx := fvm.Transaction(txBody, 0)
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 		err := vm.Run(ctx, tx, ledger, programs)
 		require.NoError(t, err)
 
@@ -535,7 +592,7 @@ func TestEventLimits(t *testing.T) {
 
 	t.Run("With service account as payer", func(t *testing.T) {
 		txBody.Payer = chain.ServiceAddress()
-		tx := fvm.Transaction(txBody, 0)
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 		err := vm.Run(ctx, tx, ledger, programs)
 		require.NoError(t, err)
 
@@ -571,7 +628,7 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 			require.NoError(t, err)
 			txBody.AddEnvelopeSignature(accounts[0], 0, sig)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
@@ -743,11 +800,11 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		},
 		{
 			name:          "If tx fails because of gas limit reached, fee deduction events are emitted",
-			fundWith:      fundingAmount,
-			tryToTransfer: 2 * fundingAmount,
-			gasLimit:      uint64(10),
+			fundWith:      txFees + transferAmount,
+			tryToTransfer: transferAmount,
+			gasLimit:      uint64(2),
 			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
-				require.Error(t, tx.Err)
+				require.ErrorContains(t, tx.Err, "computation exceeds limit (2)")
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
@@ -884,7 +941,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
@@ -918,7 +975,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			tx = fvm.Transaction(txBody, 0)
+			tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
@@ -949,7 +1006,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			tx = fvm.Transaction(txBody, 1)
+			tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
@@ -969,6 +1026,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		t.Run(fmt.Sprintf("Transaction Fees %d: %s", i, tc.name), newVMTest().withBootstrapProcedureOptions(
 			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 			fvm.WithExecutionMemoryLimit(math.MaxUint64),
+			fvm.WithExecutionEffortWeights(mainnetExecutionEffortWeights),
+			fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 		).run(
@@ -983,6 +1042,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 			fvm.WithExecutionMemoryLimit(math.MaxUint64),
+			fvm.WithExecutionEffortWeights(mainnetExecutionEffortWeights),
+			fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
@@ -999,8 +1060,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionEffortWeights{
-				common.ComputationKindLoop: 100_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+			meter.ExecutionEffortWeights{
+				common.ComputationKindLoop: 100_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -1024,7 +1085,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
@@ -1033,7 +1094,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	))
 
 	memoryWeights := make(map[common.MemoryKind]uint64)
-	for k, v := range weightedMeter.DefaultMemoryWeights {
+	for k, v := range meter.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}
 	memoryWeights[common.MemoryKindBoolValue] = 20_000_000_000
@@ -1073,7 +1134,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
@@ -1109,17 +1170,17 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
-			require.Equal(t, uint64(0), tx.MemoryEstimate)
+			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
 
 			require.NoError(t, tx.Err)
 		},
 	))
 
 	memoryWeights = make(map[common.MemoryKind]uint64)
-	for k, v := range weightedMeter.DefaultMemoryWeights {
+	for k, v := range meter.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}
 	memoryWeights[common.MemoryKindBreakStatement] = 1_000_000
@@ -1175,7 +1236,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 			// There are 100 breaks and each break uses 1_000_000 memory
@@ -1191,8 +1252,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionEffortWeights{
-				meter.ComputationKindCreateAccount: (fvm.DefaultComputationLimit + 1) << weightedMeter.MeterExecutionInternalPrecisionBytes,
+			meter.ExecutionEffortWeights{
+				environment.ComputationKindCreateAccount: (fvm.DefaultComputationLimit + 1) << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -1212,7 +1273,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
@@ -1225,8 +1286,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionEffortWeights{
-				meter.ComputationKindCreateAccount: 100_000_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+			meter.ExecutionEffortWeights{
+				environment.ComputationKindCreateAccount: 100_000_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -1247,7 +1308,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
@@ -1260,8 +1321,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionEffortWeights{
-				meter.ComputationKindCreateAccount: 100_000_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+			meter.ExecutionEffortWeights{
+				environment.ComputationKindCreateAccount: 100_000_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -1281,7 +1342,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
@@ -1295,9 +1356,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionEffortWeights{
-				common.ComputationKindStatement:          1 << weightedMeter.MeterExecutionInternalPrecisionBytes,
-				common.ComputationKindLoop:               0,
+			meter.ExecutionEffortWeights{
+				common.ComputationKindStatement:          0,
+				common.ComputationKindLoop:               1 << meter.MeterExecutionInternalPrecisionBytes,
 				common.ComputationKindFunctionInvocation: 0,
 			},
 		),
@@ -1309,7 +1370,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			// Use the maximum amount of computation so that the transaction still passes.
 			loops := uint64(997)
-			maxExecutionEffort := uint64(999)
+			maxExecutionEffort := uint64(997)
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 				transaction() {prepare(signer: AuthAccount){var i=0;  while i < %d {i = i +1 } } execute{}}
@@ -1322,13 +1383,13 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 			require.NoError(t, tx.Err)
 
-			// expected used is number of loops + 2 invocations.
-			assert.Equal(t, loops+2, tx.ComputationUsed)
+			// expected used is number of loops.
+			assert.Equal(t, loops, tx.ComputationUsed)
 
 			// increasing the number of loops should fail the transaction.
 			loops = loops + 1
@@ -1344,13 +1405,13 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err = testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
 			require.NoError(t, err)
 
-			tx = fvm.Transaction(txBody, 0)
+			tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
-			require.Error(t, tx.Err)
+			require.ErrorContains(t, tx.Err, "computation exceeds limit (997)")
 			// computation used should the actual computation used.
-			assert.Equal(t, loops+2, tx.ComputationUsed)
+			assert.Equal(t, loops, tx.ComputationUsed)
 
 			for _, event := range tx.Events {
 				// the fee deduction event should only contain the max gas worth of execution effort.
@@ -1370,7 +1431,6 @@ func TestStorageUsed(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Testnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -1405,11 +1465,10 @@ func TestStorageUsed(t *testing.T) {
 	address, err := hex.DecodeString("2a3c4c2581cef731")
 	require.NoError(t, err)
 
-	storageUsed := make([]byte, 8)
-	binary.BigEndian.PutUint64(storageUsed, 5)
-
 	simpleView := utils.NewSimpleView()
-	err = simpleView.Set(string(address), "", state.KeyStorageUsed, storageUsed)
+	status := environment.NewAccountStatus()
+	status.SetStorageUsed(5)
+	err = simpleView.Set(string(address), state.KeyAccountStatus, status.ToBytes())
 	require.NoError(t, err)
 
 	script := fvm.Script(code)
@@ -1426,10 +1485,9 @@ func TestEnforcingComputationLimit(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Testnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
 	)
 
@@ -1571,8 +1629,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to contracts are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1610,7 +1668,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				_ = testutil.SignPayload(txBody, account, privateKey)
 				_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 				err = vm.Run(subCtx, tx, view, programs)
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
@@ -1630,8 +1688,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to contracts are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1669,7 +1727,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				_ = testutil.SignPayload(txBody, account, privateKey)
 				_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 				err = vm.Run(subCtx, tx, view, programs)
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
@@ -1688,8 +1746,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to contracts are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1736,8 +1794,8 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to public keys are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1772,8 +1830,8 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to public keys are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)

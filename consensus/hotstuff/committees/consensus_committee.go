@@ -91,9 +91,9 @@ func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*
 
 // LeaderForView returns the node ID of the leader for the given view. Returns
 // the following errors:
-//  * epoch containing the requested view has not been set up (protocol.ErrNextEpochNotSetup)
-//  * epoch is too far in the past (leader.InvalidViewError)
-//  * any other error indicates an unexpected internal error
+//   - epoch containing the requested view has not been set up (protocol.ErrNextEpochNotSetup)
+//   - epoch is too far in the past (leader.InvalidViewError)
+//   - any other error indicates an unexpected internal error
 func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 
 	// try to retrieve the leader from a pre-computed LeaderSelection
@@ -215,8 +215,8 @@ func (c *Consensus) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
 // precomputedLeaderForView retrieves the leader from the precomputed
 // LeaderSelection in `c.leaders`
 // Error returns:
-//   * errSelectionNotComputed [sentinel error] if there is no Epoch for view stored in `c.leaders`
-//   * unspecific error in case of unexpected problems and bugs
+//   - errSelectionNotComputed [sentinel error] if there is no Epoch for view stored in `c.leaders`
+//   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) precomputedLeaderForView(view uint64) (flow.Identifier, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

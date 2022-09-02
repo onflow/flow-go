@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	msig "github.com/onflow/flow-go/module/signature"
 )
 
 func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, error) {
@@ -22,7 +23,7 @@ func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byt
 			return nil, errors.NewValueErrorf(err.Error(), "verification failed")
 		}
 	case hash.KMAC128:
-		hasher = crypto.NewBLSKMAC(tag)
+		hasher = msig.NewBLSHasher(tag)
 	default:
 		err := errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
 		return nil, fmt.Errorf("hashing failed: %w", err)
@@ -123,11 +124,12 @@ func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) error {
 // The signature/hash function combinations accepted are:
 //   - ECDSA (on both curves P-256 and secp256k1) with any of SHA2-256/SHA3-256/Keccak256.
 //   - BLS (on BLS12-381 curve) with the specific KMAC128 for BLS.
+//
 // The tag is applied to the message depending on the hash function used.
 //
 // The function errors:
-//  - NewValueErrorf for any user error
-//  - panic for any other unexpected error
+//   - NewValueErrorf for any user error
+//   - panic for any other unexpected error
 func VerifySignatureFromRuntime(
 	signature []byte,
 	tag string,
@@ -179,7 +181,7 @@ func VerifySignatureFromRuntime(
 			return false, errors.NewValueErrorf(err.Error(), "runtime verification failed")
 		}
 	case hash.KMAC128:
-		hasher = crypto.NewBLSKMAC(tag)
+		hasher = msig.NewBLSHasher(tag)
 	default:
 		return false, errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
 	}
@@ -202,11 +204,12 @@ func VerifySignatureFromRuntime(
 //
 // The signature/hash function combinations accepted are:
 //   - ECDSA (on both curves P-256 and secp256k1) with any of SHA2-256/SHA3-256.
+//
 // The tag is applied to the message as a constant length prefix.
 //
 // The function errors:
-//  - NewValueErrorf for any user error
-//  - panic for any other unexpected error
+//   - NewValueErrorf for any user error
+//   - panic for any other unexpected error
 func VerifySignatureFromTransaction(
 	signature []byte,
 	message []byte,

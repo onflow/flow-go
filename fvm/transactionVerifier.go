@@ -3,9 +3,10 @@ package fvm
 import (
 	"fmt"
 
-	"github.com/opentracing/opentracing-go/log"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -55,14 +56,14 @@ func (v *TransactionVerifier) verifyTransaction(
 ) error {
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMVerifyTransaction)
-		span.LogFields(
-			log.String("transaction.ID", proc.ID.String()),
+		span.SetAttributes(
+			attribute.String("transaction.ID", proc.ID.String()),
 		)
-		defer span.Finish()
+		defer span.End()
 	}
 
 	tx := proc.Transaction
-	accounts := state.NewAccounts(sth)
+	accounts := environment.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
 		err := errors.NewInvalidAddressErrorf(tx.Payer, "payer address is invalid")
 		return fmt.Errorf("transaction verification failed: %w", err)
@@ -145,7 +146,7 @@ func (v *TransactionVerifier) verifyTransaction(
 }
 
 func (v *TransactionVerifier) verifyAccountSignatures(
-	accounts state.Accounts,
+	accounts environment.Accounts,
 	signatures []flow.TransactionSignature,
 	message []byte,
 	proposalKey flow.ProposalKey,
@@ -252,7 +253,7 @@ func (v *TransactionVerifier) checkSignatureDuplications(tx *flow.TransactionBod
 
 func (c *TransactionVerifier) checkAccountsAreNotFrozen(
 	tx *flow.TransactionBody,
-	accounts state.Accounts,
+	accounts environment.Accounts,
 ) error {
 	for _, authorizer := range tx.Authorizers {
 		err := accounts.CheckAccountNotFrozen(authorizer)

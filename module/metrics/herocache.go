@@ -41,6 +41,10 @@ func NetworkDnsIpCacheMetricsFactory(registrar prometheus.Registerer) *HeroCache
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDnsIpCache, registrar)
 }
 
+func ChunkDataPackRequestQueueMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceExecution, ResourceChunkDataPackRequests, registrar)
+}
+
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer, epoch uint64) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceCollection, fmt.Sprintf("%s_%d", ResourceTransaction, epoch), registrar)
 }

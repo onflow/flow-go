@@ -20,24 +20,23 @@ import (
 func runtimeNano() int64
 
 // Resolver is a cache-based dns resolver for libp2p.
-// - DNS cache implementation notes:
-//   - Generic / possibly expected functionality NOT implemented:
+// DNS cache implementation notes:
+//  1. Generic / possibly expected functionality NOT implemented:
 //     - Caches domains for TTL seconds as given by upstream DNS resolver, e.g. [1].
 //     - Possibly pre-expire cached domains so no connection time resolve delay.
-//   - Actual / pragmatic functionality implemented below:
+//  2. Actual / pragmatic functionality implemented below:
 //     - Caches domains for global (not individual domain record TTL) TTL seconds.
 //     - Cached IP is returned even if cached entry expired; so no connection time resolve delay.
 //     - Detecting expired cached domain triggers async DNS lookup to refresh cached entry.
+//
 // [1] https://en.wikipedia.org/wiki/Name_server#Caching_name_server
 type Resolver struct {
-	c              *cache
-	res            madns.BasicResolver // underlying resolver
-	collector      module.ResolverMetrics
-	processingIPs  map[string]struct{} // ongoing ip lookups through underlying resolver
-	processingTXTs map[string]struct{} // ongoing txt lookups through underlying resolver
-	ipRequests     chan *lookupIPRequest
-	txtRequests    chan *lookupTXTRequest
-	logger         zerolog.Logger
+	c           *cache
+	res         madns.BasicResolver // underlying resolver
+	collector   module.ResolverMetrics
+	ipRequests  chan *lookupIPRequest
+	txtRequests chan *lookupTXTRequest
+	logger      zerolog.Logger
 	component.Component
 	cm *component.ComponentManager
 }

@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -143,7 +142,6 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Testnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -264,7 +262,6 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -423,7 +420,6 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	t.Run("account update with set code fails if not signed by service account if dis-allowed in the state", func(t *testing.T) {
 		ctx := fvm.NewContext(
-			zerolog.Nop(),
 			fvm.WithChain(chain),
 			fvm.WithCadenceLogging(true),
 			fvm.WithContractDeploymentRestricted(false),
@@ -720,7 +716,6 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -827,7 +822,6 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -940,7 +934,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -993,7 +987,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1054,12 +1048,12 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
-				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
+				assert.Equal(t, (&errors.LedgerInteractionLimitExceededError{}).Code(), tx.Err.Code())
 			}))
 
 	t.Run("Using to much interaction but not failing because of service account", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
@@ -1092,7 +1086,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1102,7 +1096,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction fails but does not panic", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(
 			fvm.WithTransactionProcessors(
-				fvm.NewTransactionInvoker(zerolog.Nop()),
+				fvm.NewTransactionInvoker(),
 			),
 		).
 		run(
@@ -1129,12 +1123,12 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 				require.Error(t, tx.Err)
-				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
+				assert.Equal(t, (&errors.LedgerInteractionLimitExceededError{}).Code(), tx.Err.Code())
 			}))
 }
 
@@ -1153,7 +1147,6 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -1295,7 +1288,6 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -1454,7 +1446,6 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -1483,7 +1474,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		// execute the transaction
-		tx := fvm.Transaction(txBody, 0)
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 		err = vm.Run(ctx, tx, ledger, programs)
 		require.NoError(t, err)
@@ -1551,12 +1542,11 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 	chain, vm := createChainAndVm(flow.Mainnet)
 
-	header := flow.Header{Height: 42}
+	header := &flow.Header{Height: 42}
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
-		fvm.WithBlockHeader(&header),
+		fvm.WithBlockHeader(header),
 		fvm.WithCadenceLogging(true),
 	)
 
@@ -1599,7 +1589,6 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	chain, vm := createChainAndVm(flow.MonotonicEmulator)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 	)
 
@@ -1686,7 +1675,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
@@ -1734,7 +1723,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
@@ -1775,7 +1764,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1812,7 +1801,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
@@ -1820,7 +1809,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				require.IsType(t, &errors.CadenceRuntimeError{}, tx.Err)
 
 				// send it again
-				tx = fvm.Transaction(txBody, 0)
+				tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)

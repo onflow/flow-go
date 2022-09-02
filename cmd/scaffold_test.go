@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,15 +14,20 @@ import (
 	"testing"
 	"time"
 
+	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -44,7 +51,7 @@ func TestLoadSecretsEncryptionKey(t *testing.T) {
 			require.NoError(t, err)
 			key, err := utils.GenerateSecretsDBEncryptionKey()
 			require.NoError(t, err)
-			err = ioutil.WriteFile(path, key, 0700)
+			err = os.WriteFile(path, key, 0700)
 			require.NoError(t, err)
 
 			data, err := loadSecretsEncryptionKey(dir, myID)
@@ -210,6 +217,64 @@ func TestOverrideComponent(t *testing.T) {
 		"component 2 ready",
 		"component 3 initialized",
 		"component 3 ready",
+	}, logs)
+
+	cancel()
+	<-cm.Done()
+}
+
+func TestOverrideModules(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	nb := FlowNode("scaffold test")
+	nb.componentBuilder = component.NewComponentManagerBuilder()
+
+	logger := &testLog{}
+
+	name1 := "module 1"
+	nb.Module(name1, func(nodeConfig *NodeConfig) error {
+		logger.Logf("%s initialized", name1)
+		return nil
+	})
+
+	name2 := "module 2"
+	nb.Module(name2, func(nodeConfig *NodeConfig) error {
+		logger.Logf("%s initialized", name2)
+		return nil
+	})
+
+	name3 := "module 3"
+	nb.Module(name3, func(nodeConfig *NodeConfig) error {
+		logger.Logf("%s initialized", name3)
+		return nil
+	})
+
+	// Overrides second module
+	nb.OverrideModule(name2, func(nodeConfig *NodeConfig) error {
+		logger.Logf("%s overridden", name2)
+		return nil
+	})
+
+	err := nb.handleModules()
+	assert.NoError(t, err)
+
+	cm := nb.componentBuilder.Build()
+	require.NoError(t, err)
+
+	cm.Start(signalerCtx)
+
+	<-cm.Ready()
+
+	logs := logger.logs
+
+	assert.Len(t, logs, 3)
+
+	// components are initialized in a specific order, so check that the order is correct
+	assert.Equal(t, []string{
+		"module 1 initialized",
+		"module 2 overridden", // overridden version of 2 should be initialized.
+		"module 3 initialized",
 	}, logs)
 
 	cancel()
@@ -627,4 +692,58 @@ func (c *testComponent) Ready() <-chan struct{} {
 
 func (c *testComponent) Done() <-chan struct{} {
 	return c.done
+}
+
+func TestCreateUploader(t *testing.T) {
+	t.Parallel()
+	t.Run("create uploader", func(t *testing.T) {
+		t.Parallel()
+		nb := FlowNode("scaffold_uploader")
+		mockHttp := &http.Client{
+			Transport: &mockRoundTripper{
+				DoFunc: func(req *http.Request) (*http.Response, error) {
+					switch req.URL.Path {
+					case "/computeMetadata/v1/project/project-id":
+						return &http.Response{
+							StatusCode: 200,
+							Body:       io.NopCloser(bytes.NewBufferString("test-project-id")),
+						}, nil
+					case "/computeMetadata/v1/instance/id":
+						return &http.Response{
+							StatusCode: 200,
+							Body:       io.NopCloser(bytes.NewBufferString("test-instance-id")),
+						}, nil
+					default:
+						return nil, fmt.Errorf("unexpected request: %s", req.URL.Path)
+					}
+				},
+			},
+		}
+
+		testClient := gcemd.NewClient(mockHttp)
+		uploader, err := nb.createGCEProfileUploader(
+			testClient,
+
+			option.WithoutAuthentication(),
+			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, uploader)
+
+		uploaderImpl, ok := uploader.(*profiler.UploaderImpl)
+		require.True(t, ok)
+
+		assert.Equal(t, "test-project-id", uploaderImpl.Deployment.ProjectId)
+		assert.Equal(t, "unknown-scaffold_uploader", uploaderImpl.Deployment.Target)
+		assert.Equal(t, "test-instance-id", uploaderImpl.Deployment.Labels["instance"])
+		assert.Equal(t, "undefined-undefined", uploaderImpl.Deployment.Labels["version"])
+	})
+}
+
+type mockRoundTripper struct {
+	DoFunc func(req *http.Request) (*http.Response, error)
+}
+
+func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m.DoFunc(req)
 }

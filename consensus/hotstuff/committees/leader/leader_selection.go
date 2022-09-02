@@ -88,7 +88,7 @@ func (l LeaderSelection) newInvalidViewError(view uint64) InvalidViewError {
 // rng - the deterministic source of randoms
 // count - the number of leader selections to be pre-generated and cached.
 // identities - the identities that contain the weight info, which is used as probability for
-//							the identity to be selected as leader.
+// the identity to be selected as leader.
 func ComputeLeaderSelection(
 	firstView uint64,
 	rng random.Rand,

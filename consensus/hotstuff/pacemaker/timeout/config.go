@@ -9,9 +9,9 @@ import (
 
 // Config contains the configuration parameters for ExponentialIncrease-LinearDecrease
 // timeout.Controller
-// - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
-//   this results in exponential growing timeout duration on multiple subsequent timeouts
-// - on progress: MULTIPLICATIVE timeout decrease
+//   - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
+//     this results in exponential growing timeout duration on multiple subsequent timeouts
+//   - on progress: MULTIPLICATIVE timeout decrease
 type Config struct {
 	// ReplicaTimeout is the duration of a view before we time out [MILLISECONDS]
 	// ReplicaTimeout is the only variable quantity
@@ -111,10 +111,10 @@ func NewConfig(
 
 // StandardVoteAggregationTimeoutFraction calculates a standard value for the VoteAggregationTimeoutFraction in case a block delay is used.
 // The motivation for the standard value is as follows:
-//  * the next primary receives the block it ideally would extend at some time t
-//  * the best guess the primary has, when other nodes would receive the block is at time t as well
-//  * the primary needs to get its block to the other replicas, before they time out:
-//    the primary uses its own timeout as estimator for the other replicas' timeout
+//   - the next primary receives the block it ideally would extend at some time t
+//   - the best guess the primary has, when other nodes would receive the block is at time t as well
+//   - the primary needs to get its block to the other replicas, before they time out:
+//     the primary uses its own timeout as estimator for the other replicas' timeout
 func StandardVoteAggregationTimeoutFraction(minReplicaTimeout time.Duration, blockRateDelay time.Duration) float64 {
 	standardVoteAggregationTimeoutFraction := 0.5
 	minReplicaTimeoutMS := float64(minReplicaTimeout.Milliseconds())

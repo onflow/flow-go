@@ -5,32 +5,19 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // DefaultConduitFactory is a wrapper around the network Adapter.
 // It directly passes the incoming messages to the corresponding methods of the
 // network Adapter.
 type DefaultConduitFactory struct {
-	*component.ComponentManager
 	adapter network.Adapter
 }
 
 func NewDefaultConduitFactory() *DefaultConduitFactory {
-	d := &DefaultConduitFactory{}
-	// worker added so conduit factory doesn't immediately shut down when it's started
-	cm := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-
-			<-ctx.Done()
-		}).Build()
-
-	d.ComponentManager = cm
-
-	return d
+	return &DefaultConduitFactory{}
 }
 
 // RegisterAdapter sets the Adapter component of the factory.
@@ -48,7 +35,7 @@ func (d *DefaultConduitFactory) RegisterAdapter(adapter network.Adapter) error {
 
 // NewConduit creates a conduit on the specified channel.
 // Prior to creating any conduit, the factory requires an Adapter to be registered with it.
-func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel network.Channel) (network.Conduit, error) {
+func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel channels.Channel) (network.Conduit, error) {
 	if d.adapter == nil {
 		return nil, fmt.Errorf("could not create a new conduit, missing a registered network adapter")
 	}
@@ -69,7 +56,7 @@ func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel network.
 type Conduit struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
-	channel network.Channel
+	channel channels.Channel
 	adapter network.Adapter
 }
 

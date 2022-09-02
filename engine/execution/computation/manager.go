@@ -9,27 +9,35 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ipfs/go-cid"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
-
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
+)
+
+const (
+	DefaultScriptLogThreshold       = 1 * time.Second
+	DefaultScriptExecutionTimeLimit = 10 * time.Second
+
+	MaxScriptErrorMessageSize = 1000 // 1000 chars
+
+	ReusableCadenceRuntimePoolSize = 1000
 )
 
 var uploadEnabled = true
@@ -38,6 +46,10 @@ func SetUploaderEnabled(enabled bool) {
 	uploadEnabled = enabled
 
 	log.Info().Msgf("changed uploadEnabled to %v", enabled)
+}
+
+func GetUploaderEnabled() bool {
+	return uploadEnabled
 }
 
 type VirtualMachine interface {
@@ -55,10 +67,20 @@ type ComputationManager interface {
 	GetAccount(addr flow.Address, header *flow.Header, view state.View) (*flow.Account, error)
 }
 
-var DefaultScriptLogThreshold = 1 * time.Second
-var DefaultScriptExecutionTimeLimit = 10 * time.Second
+type ComputationConfig struct {
+	CadenceTracing           bool
+	ExtensiveTracing         bool
+	ProgramsCacheSize        uint
+	ScriptLogThreshold       time.Duration
+	ScriptExecutionTimeLimit time.Duration
 
-const MaxScriptErrorMessageSize = 1000 // 1000 chars
+	// When NewCustomVirtualMachine is nil, the manager will create a standard
+	// fvm virtual machine via fvm.NewVirtualMachine.  Otherwise, the manager
+	// will create a virtual machine using this function.
+	//
+	// Note that this is primarily used for testing.
+	NewCustomVirtualMachine func() VirtualMachine
+}
 
 // Manager manages computation and execution
 type Manager struct {
@@ -74,11 +96,8 @@ type Manager struct {
 	scriptLogThreshold       time.Duration
 	scriptExecutionTimeLimit time.Duration
 	uploaders                []uploader.Uploader
-	eds                      state_synchronization.ExecutionDataService
-	edCache                  state_synchronization.ExecutionDataCIDCache
-
-	rngLock *sync.Mutex
-	rng     *rand.Rand
+	rngLock                  *sync.Mutex
+	rng                      *rand.Rand
 }
 
 func New(
@@ -87,17 +106,35 @@ func New(
 	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
-	vm VirtualMachine,
 	vmCtx fvm.Context,
-	programsCacheSize uint,
 	committer computer.ViewCommitter,
-	scriptLogThreshold time.Duration,
-	scriptExecutionTimeLimit time.Duration,
 	uploaders []uploader.Uploader,
-	eds state_synchronization.ExecutionDataService,
-	edCache state_synchronization.ExecutionDataCIDCache,
+	executionDataProvider *provider.Provider,
+	params ComputationConfig,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
+
+	var vm VirtualMachine
+	if params.NewCustomVirtualMachine != nil {
+		vm = params.NewCustomVirtualMachine()
+	} else {
+		rt := runtime.NewInterpreterRuntime(
+			runtime.Config{
+				TracingEnabled: params.CadenceTracing,
+			})
+
+		vm = fvm.NewVirtualMachine(rt)
+	}
+
+	options := []fvm.Option{
+		fvm.WithReusableCadenceRuntimePool(
+			fvm.NewReusableCadenceRuntimePool(ReusableCadenceRuntimePoolSize)),
+	}
+	if params.ExtensiveTracing {
+		options = append(options, fvm.WithExtensiveTracing())
+	}
+
+	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
 		vm,
@@ -106,13 +143,14 @@ func New(
 		tracer,
 		log.With().Str("component", "block_computer").Logger(),
 		committer,
+		executionDataProvider,
 	)
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot create block computer: %w", err)
 	}
 
-	programsCache, err := NewProgramsCache(programsCacheSize)
+	programsCache, err := NewProgramsCache(params.ProgramsCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create programs cache: %w", err)
 	}
@@ -127,17 +165,18 @@ func New(
 		vmCtx:                    vmCtx,
 		blockComputer:            blockComputer,
 		programsCache:            programsCache,
-		scriptLogThreshold:       scriptLogThreshold,
-		scriptExecutionTimeLimit: scriptExecutionTimeLimit,
+		scriptLogThreshold:       params.ScriptLogThreshold,
+		scriptExecutionTimeLimit: params.ScriptExecutionTimeLimit,
 		uploaders:                uploaders,
-		eds:                      eds,
-		edCache:                  edCache,
-
-		rngLock: &sync.Mutex{},
-		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
+		rngLock:                  &sync.Mutex{},
+		rng:                      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	return &e, nil
+}
+
+func (e *Manager) VM() VirtualMachine {
+	return e.vm
 }
 
 func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Programs {
@@ -274,6 +313,8 @@ func (e *Manager) ComputeBlock(
 		return nil, fmt.Errorf("failed to execute block: %w", err)
 	}
 
+	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("block result computed")
+
 	toInsert := blockPrograms
 
 	// if we have item from cache and there were no changes
@@ -283,61 +324,32 @@ func (e *Manager) ComputeBlock(
 	}
 
 	e.programsCache.Set(block.ID(), toInsert)
-
-	group, uploadCtx := errgroup.WithContext(ctx)
-	var rootID flow.Identifier
-	var blobTree [][]cid.Cid
-
-	group.Go(func() error {
-		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEAddToExecutionDataService)
-		defer span.Finish()
-
-		var collections []*flow.Collection
-		for _, collection := range result.ExecutableBlock.Collections() {
-			collections = append(collections, &flow.Collection{
-				Transactions: collection.Transactions,
-			})
-		}
-
-		ed := &state_synchronization.ExecutionData{
-			BlockID:     block.ID(),
-			Collections: collections,
-			Events:      result.Events,
-			TrieUpdates: result.TrieUpdates,
-		}
-
-		var err error
-		rootID, blobTree, err = e.eds.Add(uploadCtx, ed)
-
-		return err
-	})
+	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("programs cache updated")
 
 	if uploadEnabled {
+		var group errgroup.Group
+
 		for _, uploader := range e.uploaders {
 			uploader := uploader
 
 			group.Go(func() error {
 				span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEUploadCollections)
-				defer span.Finish()
+				defer span.End()
 
 				return uploader.Upload(result)
 			})
 		}
-	}
 
-	err = group.Wait()
+		err = group.Wait()
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload block result: %w", err)
+		if err != nil {
+			return nil, fmt.Errorf("failed to upload block result: %w", err)
+		}
 	}
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
-
-	e.edCache.Insert(block.Block.Header, blobTree)
-	e.log.Info().Hex("block_id", logging.Entity(block.Block)).Hex("execution_data_id", rootID[:]).Msg("execution data ID computed")
-	result.ExecutionDataID = rootID
 
 	return result, nil
 }

@@ -2,7 +2,7 @@ package eventloop
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -41,7 +41,7 @@ func (s *EventLoopTestSuite) SetupTest() {
 	s.eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C).Maybe()
 	s.eh.On("OnLocalTimeout").Return(nil).Maybe()
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 
 	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), s.eh, time.Time{})
 	require.NoError(s.T(), err)
@@ -73,12 +73,12 @@ func (s *EventLoopTestSuite) TestReadyDone() {
 // Test_SubmitQC tests that submitted proposal is eventually sent to event handler for processing
 func (s *EventLoopTestSuite) Test_SubmitProposal() {
 	proposal := unittest.BlockHeaderFixture()
-	expectedProposal := model.ProposalFromFlow(&proposal, proposal.View-1)
+	expectedProposal := model.ProposalFromFlow(proposal, proposal.View-1)
 	processed := atomic.NewBool(false)
 	s.eh.On("OnReceiveProposal", expectedProposal).Run(func(args mock.Arguments) {
 		processed.Store(true)
 	}).Return(nil).Once()
-	s.eventLoop.SubmitProposal(&proposal, proposal.View-1)
+	s.eventLoop.SubmitProposal(proposal, proposal.View-1)
 	require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
 	s.eh.AssertExpectations(s.T())
 }
@@ -107,7 +107,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 		processed.Store(true)
 	}).Return(nil).Once()
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 
 	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), eh, time.Time{})
 	require.NoError(t, err)
@@ -136,7 +136,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 		defer wg.Done()
 		for !processed.Load() {
 			proposal := unittest.BlockHeaderFixture()
-			eventLoop.SubmitProposal(&proposal, proposal.View-1)
+			eventLoop.SubmitProposal(proposal, proposal.View-1)
 		}
 	}()
 
@@ -157,7 +157,7 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 
 	metrics := metrics.NewNoopCollector()
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 
 	startTimeDuration := 2 * time.Second
 	startTime := time.Now().Add(startTimeDuration)
@@ -177,8 +177,8 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 	unittest.RequireCloseBefore(t, eventLoop.Ready(), 100*time.Millisecond, "event loop not started")
 
 	parentBlock := unittest.BlockHeaderFixture()
-	block := unittest.BlockHeaderWithParentFixture(&parentBlock)
-	eventLoop.SubmitProposal(&block, parentBlock.View)
+	block := unittest.BlockHeaderWithParentFixture(parentBlock)
+	eventLoop.SubmitProposal(block, parentBlock.View)
 
 	unittest.RequireCloseBefore(t, done, startTimeDuration+100*time.Millisecond, "proposal wasn't received")
 	cancel()

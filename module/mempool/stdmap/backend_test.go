@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestAddRem(t *testing.T) {
+func TestAddRemove(t *testing.T) {
 	item1 := unittest.MockEntityFixture()
 	item2 := unittest.MockEntityFixture()
 
@@ -41,7 +41,7 @@ func TestAddRem(t *testing.T) {
 		})
 
 		t.Run("should be able to remove first", func(t *testing.T) {
-			removed := pool.Rem(item1.ID())
+			removed := pool.Remove(item1.ID())
 			assert.True(t, removed)
 			size := pool.Size()
 			assert.EqualValues(t, uint(1), size)
@@ -181,7 +181,7 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 }
 
 // TestBackend_Multiple_OnEjectionCallbacks verifies that the Backend
-//  handles multiple ejection callbacks correctly
+// handles multiple ejection callbacks correctly
 func TestBackend_Multiple_OnEjectionCallbacks(t *testing.T) {
 	// ejection callback counts number of calls
 	calls := uint64(0)

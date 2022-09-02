@@ -87,7 +87,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	// returning everything correctly, using the created header
 	// as head of the protocol state
 	state.On("Final").Return(final)
-	final.On("Head").Return(&head, nil)
+	final.On("Head").Return(head, nil)
 	final.On("Identity", mock.Anything).Return(
 		func(nodeID flow.Identifier) *flow.Identity {
 			identity, _ := suite.finalIdentities.ByNodeID(nodeID)
@@ -128,14 +128,14 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	)
 
 	// we need to return the head as it's also used as reference block
-	headers.On("ByBlockID", head.ID()).Return(&head, nil)
+	headers.On("ByBlockID", head.ID()).Return(head, nil)
 
 	// only used for metrics, nobody cares
 	pool.On("Size").Return(uint(0))
 
 	ingest := NewCore(unittest.Logger(), tracer, metrics, state, headers, pool)
 
-	suite.head = &head
+	suite.head = head
 	suite.final = final
 	suite.ref = ref
 	suite.headers = headers
@@ -219,7 +219,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeExpired() {
 	// create an alternative block
 	header := unittest.BlockHeaderFixture()
 	header.Height = suite.head.Height - flow.DefaultTransactionExpiry - 1
-	suite.headers.On("ByBlockID", header.ID()).Return(&header, nil)
+	suite.headers.On("ByBlockID", header.ID()).Return(header, nil)
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state

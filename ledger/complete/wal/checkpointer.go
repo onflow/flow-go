@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
@@ -45,6 +47,10 @@ const VersionV4 uint16 = 0x04
 // See EncodeNode() and EncodeTrie() for more details.
 const VersionV5 uint16 = 0x05
 
+// MaxVersion is the latest checkpoint version we support.
+// Need to update MaxVersion when creating a newer version.
+const MaxVersion = VersionV5
+
 const (
 	encMagicSize     = 2
 	encVersionSize   = 2
@@ -61,7 +67,7 @@ const defaultBufioReadSize = 1024 * 32
 
 // defaultBufioWriteSize replaces the default bufio buffer size of 4096 bytes.
 // defaultBufioWriteSize can be increased to 8KiB, 16KiB, 32KiB, etc. if it
-//  improves performance on typical EN hardware.
+// improves performance on typical EN hardware.
 const defaultBufioWriteSize = 1024 * 32
 
 type Checkpointer struct {
@@ -275,8 +281,9 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 // StoreCheckpoint writes the given tries to checkpoint file, and also appends
 // a CRC32 file checksum for integrity check.
 // Checkpoint file consists of a flattened forest. Specifically, it consists of:
-//   * a list of encoded nodes, where references to other nodes are by list index.
-//   * a list of encoded tries, each referencing their respective root node by index.
+//   - a list of encoded nodes, where references to other nodes are by list index.
+//   - a list of encoded tries, each referencing their respective root node by index.
+//
 // Referencing to other nodes by index 0 is a special case, meaning nil.
 //
 // As an important property, the nodes are listed in an order which satisfies
@@ -307,47 +314,92 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 		return fmt.Errorf("cannot write checkpoint header: %w", err)
 	}
 
-	// allNodes contains all unique nodes of given tries and their index
+	// Nodes are serialized in two steps to save memory.
+	// 1. serialize nodes in subtries (tries with root at subtrieLevel).
+	// 2. serialize remaining nodes (from trie root to subtrie root).
+	// Using subtries saves memory because we only need to track unique nodes
+	// of subtries instead of unique nodes of the entire trie.
+	// NOTE: nodes are serialized in order of Descendents-First-Relationship.
+
+	// subtrieLevel is number of edges from trie root to subtrie root.
+	// Trie root is at level 0.
+	const subtrieLevel = 4
+
+	// subtrieCount is number of subtries at subtrieLevel.
+	const subtrieCount = 1 << subtrieLevel
+
+	// subtrieRoots is an array with subtrieCount elements
+	// in breadth-first order at subtrieLevel.
+	// Each element is a list of all subtrie roots of the same path.
+	// For example, if subtrieLevel is 4, then
+	// - subtrieRoots[0] is a list all subtrie roots at path [0,0,0,0]
+	// - subtrieRoots[1] is a list all subtrie roots at path [0,0,0,1]
+	// - subtrieRoots[subtrieCount-1] is a list of all subtrie roots at path [1,1,1,1]
+	var subtrieRoots [subtrieCount][]*node.Node
+	for i := 0; i < len(subtrieRoots); i++ {
+		subtrieRoots[i] = make([]*node.Node, len(tries))
+	}
+
+	// Populate subtrieRoots
+	for trieIndex, t := range tries {
+		subtries := getNodesAtLevel(t.RootNode(), subtrieLevel)
+		for subtrieIndex, subtrieRoot := range subtries {
+			subtrieRoots[subtrieIndex][trieIndex] = subtrieRoot
+		}
+	}
+
+	// topLevelNodes contains all unique nodes of given tries
+	// from root to subtrie root and their index
 	// (ordered by node traversal sequence).
 	// Index 0 is a special case with nil node.
-	allNodes := make(map[*node.Node]uint64)
-	allNodes[nil] = 0
+	topLevelNodes := make(map[*node.Node]uint64, 1<<(subtrieLevel+1))
+	topLevelNodes[nil] = 0
 
-	// Serialize all unique nodes
-	nodeCounter := uint64(1) // start from 1, as 0 marks nil node
-	for _, t := range tries {
+	// nodeCounter is counter for all unique nodes.
+	// It starts from 1, as 0 marks nil node.
+	nodeCounter := uint64(1)
 
-		// Traverse all unique nodes for trie t.
-		for itr := flattener.NewUniqueNodeIterator(t, allNodes); itr.Next(); {
-			n := itr.Value()
+	// estimatedSubtrieNodeCount is rough estimate of number of nodes in subtrie,
+	// assuming trie is a full binary tree.  estimatedSubtrieNodeCount is used
+	// to preallocate traversedSubtrieNodes for memory efficiency.
+	estimatedSubtrieNodeCount := 0
+	if len(tries) > 0 {
+		estimatedTrieNodeCount := 2*int(tries[0].AllocatedRegCount()) - 1
+		estimatedSubtrieNodeCount = estimatedTrieNodeCount / subtrieCount
+	}
 
-			allNodes[n] = nodeCounter
-			nodeCounter++
+	// Serialize subtrie nodes
+	for _, subTrieRoot := range subtrieRoots {
+		// traversedSubtrieNodes contains all unique nodes of subtries of the same path and their index.
+		traversedSubtrieNodes := make(map[*node.Node]uint64, estimatedSubtrieNodeCount)
+		// Index 0 is a special case with nil node.
+		traversedSubtrieNodes[nil] = 0
 
-			var lchildIndex, rchildIndex uint64
-
-			if lchild := n.LeftChild(); lchild != nil {
-				var found bool
-				lchildIndex, found = allNodes[lchild]
-				if !found {
-					hash := lchild.Hash()
-					return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
-				}
+		for _, root := range subTrieRoot {
+			if root == nil {
+				continue
 			}
-			if rchild := n.RightChild(); rchild != nil {
-				var found bool
-				rchildIndex, found = allNodes[rchild]
-				if !found {
-					hash := rchild.Hash()
-					return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
-				}
-			}
-
-			encNode := flattener.EncodeNode(n, lchildIndex, rchildIndex, scratch)
-			_, err = crc32Writer.Write(encNode)
+			nodeCounter, err = storeUniqueNodes(root, traversedSubtrieNodes, nodeCounter, scratch, crc32Writer)
 			if err != nil {
-				return fmt.Errorf("cannot serialize node: %w", err)
+				return err
 			}
+			// Save subtrie root node index in topLevelNodes,
+			// so when traversing top level tries
+			// (from level 0 to subtrieLevel) using topLevelNodes,
+			// node iterator skips subtrie as visited nodes.
+			topLevelNodes[root] = traversedSubtrieNodes[root]
+		}
+	}
+
+	// Serialize remaining nodes.
+	for _, t := range tries {
+		root := t.RootNode()
+		if root == nil {
+			continue
+		}
+		nodeCounter, err = storeUniqueNodes(root, topLevelNodes, nodeCounter, scratch, crc32Writer)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -356,7 +408,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 		rootNode := t.RootNode()
 
 		// Get root node index
-		rootIndex, found := allNodes[rootNode]
+		rootIndex, found := topLevelNodes[rootNode]
 		if !found {
 			rootHash := t.RootHash()
 			return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(rootHash[:]))
@@ -371,7 +423,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 
 	// Write footer with nodes count and tries count
 	footer := scratch[:encNodeCountSize+encTrieCountSize]
-	binary.BigEndian.PutUint64(footer, uint64(len(allNodes)-1)) // -1 to account for 0 node meaning nil
+	binary.BigEndian.PutUint64(footer, nodeCounter-1) // -1 to account for 0 node meaning nil
 	binary.BigEndian.PutUint16(footer[encNodeCountSize:], uint16(len(tries)))
 
 	_, err = crc32Writer.Write(footer)
@@ -389,6 +441,80 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	}
 
 	return nil
+}
+
+// storeUniqueNodes iterates and serializes unique nodes for trie with given root node.
+// It also saves unique nodes and node counter in visitedNodes map.
+// It returns nodeCounter and error (if any).
+func storeUniqueNodes(
+	root *node.Node,
+	visitedNodes map[*node.Node]uint64,
+	nodeCounter uint64,
+	scratch []byte,
+	writer io.Writer,
+) (uint64, error) {
+
+	for itr := flattener.NewUniqueNodeIterator(root, visitedNodes); itr.Next(); {
+		n := itr.Value()
+
+		visitedNodes[n] = nodeCounter
+		nodeCounter++
+
+		var lchildIndex, rchildIndex uint64
+
+		if lchild := n.LeftChild(); lchild != nil {
+			var found bool
+			lchildIndex, found = visitedNodes[lchild]
+			if !found {
+				hash := lchild.Hash()
+				return 0, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
+			}
+		}
+		if rchild := n.RightChild(); rchild != nil {
+			var found bool
+			rchildIndex, found = visitedNodes[rchild]
+			if !found {
+				hash := rchild.Hash()
+				return 0, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
+			}
+		}
+
+		encNode := flattener.EncodeNode(n, lchildIndex, rchildIndex, scratch)
+		_, err := writer.Write(encNode)
+		if err != nil {
+			return 0, fmt.Errorf("cannot serialize node: %w", err)
+		}
+	}
+
+	return nodeCounter, nil
+}
+
+// getNodesAtLevel returns 2^level nodes at given level in breadth-first order.
+// It guarantees size and order of returned nodes (nil element if no node at the position).
+// For example, given nil root and level 3, getNodesAtLevel returns a slice
+// of 2^3 nil elements.
+func getNodesAtLevel(root *node.Node, level uint) []*node.Node {
+	nodes := []*node.Node{root}
+	nodesLevel := uint(0)
+
+	// Use breadth first traversal to get all nodes at given level.
+	// If a node isn't found, a nil node is used in its place.
+	for nodesLevel < level {
+		nextLevel := nodesLevel + 1
+		nodesAtNextLevel := make([]*node.Node, 1<<nextLevel)
+
+		for i, n := range nodes {
+			if n != nil {
+				nodesAtNextLevel[i*2] = n.LeftChild()
+				nodesAtNextLevel[i*2+1] = n.RightChild()
+			}
+		}
+
+		nodes = nodesAtNextLevel
+		nodesLevel = nextLevel
+	}
+
+	return nodes
 }
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
@@ -774,6 +900,50 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 	}
 
 	return tries, nil
+}
+
+// ReadLastTrieRootHashFromCheckpoint returns last trie's root hash from checkpoint file f.
+// All returned errors indicate that the given checkpoint file is eiter corrupted or
+// incompatible.  As the function is side-effect free, all failures are simple a no-op.
+func ReadLastTrieRootHashFromCheckpoint(f *os.File) (hash.Hash, error) {
+
+	// read checkpoint version
+	header := make([]byte, headerSize)
+	n, err := f.Read(header)
+	if err != nil || n != headerSize {
+		return hash.DummyHash, errors.New("failed to read checkpoint header")
+	}
+
+	magic := binary.BigEndian.Uint16(header)
+	version := binary.BigEndian.Uint16(header[encMagicSize:])
+
+	if magic != MagicBytes {
+		return hash.DummyHash, errors.New("invalid magic bytes in checkpoint")
+	}
+
+	if version > MaxVersion {
+		return hash.DummyHash, fmt.Errorf("unsupported version %d in checkpoint", version)
+	}
+
+	if version <= 3 {
+		_, err = f.Seek(-(hash.HashLen + crc32SumSize), 2 /* relative from end */)
+		if err != nil {
+			return hash.DummyHash, errors.New("invalid checkpoint")
+		}
+	} else {
+		_, err = f.Seek(-(hash.HashLen + encNodeCountSize + encTrieCountSize + crc32SumSize), 2 /* relative from end */)
+		if err != nil {
+			return hash.DummyHash, errors.New("invalid checkpoint")
+		}
+	}
+
+	var lastTrieRootHash hash.Hash
+	n, err = f.Read(lastTrieRootHash[:])
+	if err != nil || n != hash.HashLen {
+		return hash.DummyHash, errors.New("failed to read last trie root hash from checkpoint")
+	}
+
+	return lastTrieRootHash, nil
 }
 
 // EvictAllCheckpointsFromLinuxPageCache advises Linux to evict all checkpoint files

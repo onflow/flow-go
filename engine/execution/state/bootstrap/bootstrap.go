@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
@@ -40,10 +42,14 @@ func (b *Bootstrapper) BootstrapLedger(
 	view := delta.NewView(state.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
 	programs := programs.NewEmptyPrograms()
 
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	vm := fvm.NewVirtualMachine(rt)
 
-	ctx := fvm.NewContext(b.logger, fvm.WithMaxStateInteractionSize(ledgerIntractionLimitNeededForBootstrapping), fvm.WithChain(chain))
+	ctx := fvm.NewContext(
+		fvm.WithLogger(b.logger),
+		fvm.WithMaxStateInteractionSize(ledgerIntractionLimitNeededForBootstrapping),
+		fvm.WithChain(chain),
+	)
 
 	bootstrap := fvm.Bootstrap(
 		servicePublicKey,

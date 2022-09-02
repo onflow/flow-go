@@ -14,14 +14,15 @@ import (
 // TelemetryConsumer implements the hotstuff.Consumer interface.
 // consumes outbound notifications produced by the The HotStuff state machine.
 // For this purpose, the TelemetryConsumer enriches the state machine's notifications:
-//   * the goal is to identify all events as belonging together that were emitted during
+//   - The goal is to identify all events as belonging together that were emitted during
 //     a path through the state machine.
-//   * A path through the state machine begins when:
-//      - a vote is received
-//      - a block is received
-//      - a new view is started
-//      - a timeout is processed
-//   * Each path through the state machine is identified by a unique id.
+//   - A path through the state machine begins when:
+//     -- a vote is received
+//     -- a block is received
+//     -- a new view is started
+//     -- a timeout is processed
+//   - Each path through the state machine is identified by a unique id.
+//
 // Generally, the TelemetryConsumer could export the collected data to a variety of backends.
 // For now, we export the data to a logger.
 //
