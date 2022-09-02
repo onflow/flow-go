@@ -46,26 +46,26 @@ func TestListTargetPackages(t *testing.T) {
 	require.Contains(t, seenPackages, flowPackagePrefix+"ghi")
 }
 
-func TestListRestPackages(t *testing.T) {
+func TestListOtherPackages(t *testing.T) {
 	var seenPackages = make(map[string]string)
 	seenPackages[flowPackagePrefix+"abc"] = flowPackagePrefix + "abc"
 	seenPackages[flowPackagePrefix+"ghi"] = flowPackagePrefix + "ghi"
 	seenPackages[flowPackagePrefix+"mno/abc"] = flowPackagePrefix + "mno/abc"
 	seenPackages[flowPackagePrefix+"stu"] = flowPackagePrefix + "stu"
 
-	restPackages := listRestPackages(getAllFlowPackages(), seenPackages)
+	otherPackages := listOtherPackages(getAllFlowPackages(), seenPackages)
 
-	require.Equal(t, 9, len(restPackages))
+	require.Equal(t, 9, len(otherPackages))
 
-	require.Contains(t, restPackages, flowPackagePrefix+"abc/def")
-	require.Contains(t, restPackages, flowPackagePrefix+"abc/def/ghi")
-	require.Contains(t, restPackages, flowPackagePrefix+"def")
-	require.Contains(t, restPackages, flowPackagePrefix+"def/abc")
-	require.Contains(t, restPackages, flowPackagePrefix+"jkl")
-	require.Contains(t, restPackages, flowPackagePrefix+"pqr")
-	require.Contains(t, restPackages, flowPackagePrefix+"vwx")
-	require.Contains(t, restPackages, flowPackagePrefix+"vwx/ghi")
-	require.Contains(t, restPackages, flowPackagePrefix+"yz")
+	require.Contains(t, otherPackages, flowPackagePrefix+"abc/def")
+	require.Contains(t, otherPackages, flowPackagePrefix+"abc/def/ghi")
+	require.Contains(t, otherPackages, flowPackagePrefix+"def")
+	require.Contains(t, otherPackages, flowPackagePrefix+"def/abc")
+	require.Contains(t, otherPackages, flowPackagePrefix+"jkl")
+	require.Contains(t, otherPackages, flowPackagePrefix+"pqr")
+	require.Contains(t, otherPackages, flowPackagePrefix+"vwx")
+	require.Contains(t, otherPackages, flowPackagePrefix+"vwx/ghi")
+	require.Contains(t, otherPackages, flowPackagePrefix+"yz")
 }
 
 func TestGenerateTestMatrix(t *testing.T) {
@@ -73,11 +73,11 @@ func TestGenerateTestMatrix(t *testing.T) {
 	require.Equal(t, 2, len(targetPackages))
 	require.Equal(t, 4, len(seenPackages))
 
-	restPackages := listRestPackages(getAllFlowPackages(), seenPackages)
+	otherPackages := listOtherPackages(getAllFlowPackages(), seenPackages)
 
-	testMatrix := generateTestMatrix(targetPackages, restPackages)
+	testMatrix := generateTestMatrix(targetPackages, otherPackages)
 
-	// should be 3 groups in test matrix: abc, ghi, rest
+	// should be 3 groups in test matrix: abc, ghi, other
 	require.Equal(t, 3, len(testMatrix))
 
 	require.Equal(t, "abc", testMatrix[0].Name)
@@ -87,7 +87,7 @@ func TestGenerateTestMatrix(t *testing.T) {
 	require.Equal(t, "ghi", testMatrix[1].Name)
 	require.Equal(t, "github.com/onflow/flow-go/ghi", testMatrix[1].Packages)
 
-	require.Equal(t, "rest", testMatrix[2].Name)
+	require.Equal(t, "others", testMatrix[2].Name)
 	require.Equal(t, "github.com/onflow/flow-go/def github.com/onflow/flow-go/def/abc github.com/onflow/flow-go/jkl github.com/onflow/flow-go/mno/abc github.com/onflow/flow-go/pqr github.com/onflow/flow-go/stu github.com/onflow/flow-go/vwx github.com/onflow/flow-go/vwx/ghi github.com/onflow/flow-go/yz",
 		testMatrix[2].Packages)
 }

@@ -29,9 +29,9 @@ func main() {
 
 	targetPackages, seenPackages := listTargetPackages(os.Args[1:], allFlowPackages)
 
-	restPackages := listRestPackages(allFlowPackages, seenPackages)
+	otherPackages := listOtherPackages(allFlowPackages, seenPackages)
 
-	testMatrix := generateTestMatrix(targetPackages, restPackages)
+	testMatrix := generateTestMatrix(targetPackages, otherPackages)
 
 	// generate JSON output that will be read in by CI matrix
 	// can't use json.MarshalIndent because fromJSON() in CI can’t read JSON with any spaces
@@ -47,7 +47,7 @@ func main() {
 	fmt.Println(testMatrixStr)
 }
 
-func generateTestMatrix(targetPackages map[string][]string, restPackages []string) []testMatrix {
+func generateTestMatrix(targetPackages map[string][]string, otherPackages []string) []testMatrix {
 
 	var testMatrices []testMatrix
 
@@ -59,13 +59,13 @@ func generateTestMatrix(targetPackages map[string][]string, restPackages []strin
 		testMatrices = append(testMatrices, targetTestMatrix)
 	}
 
-	// add the "rest" packages after all target packages added
-	restTestMatrix := testMatrix{
-		Name:     "rest",
-		Packages: strings.Join(restPackages, " "),
+	// add the other packages after all target packages added
+	otherTestMatrix := testMatrix{
+		Name:     "others",
+		Packages: strings.Join(otherPackages, " "),
 	}
 
-	testMatrices = append(testMatrices, restTestMatrix)
+	testMatrices = append(testMatrices, otherTestMatrix)
 
 	return testMatrices
 }
@@ -99,21 +99,21 @@ func listTargetPackages(targetPackagePrefixes []string, allFlowPackages []string
 	return targetPackages, seenPackages
 }
 
-func listRestPackages(allFlowPackages []string, seenPackages map[string]string) []string {
-	// compile "the rest" packages
-	var restPackages []string
+// listOtherPackages compiles the remaining packages that don't match any of the target packages.
+func listOtherPackages(allFlowPackages []string, seenPackages map[string]string) []string {
+	var otherPackages []string
 
 	for _, allFlowPackage := range allFlowPackages {
 		_, seen := seenPackages[allFlowPackage]
 		if !seen {
-			restPackages = append(restPackages, allFlowPackage)
+			otherPackages = append(otherPackages, allFlowPackage)
 		}
 	}
 
-	if len(restPackages) == 0 {
-		panic("rest package list can't be 0")
+	if len(otherPackages) == 0 {
+		panic("other packages list can't be 0")
 	}
-	return restPackages
+	return otherPackages
 }
 
 func listAllFlowPackages() []string {

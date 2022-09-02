@@ -15,7 +15,7 @@ status = [
   "Unit Tests (module)",
   "Unit Tests (network)",
   "Unit Tests (utils)",
-  "Unit Tests (rest)",
+  "Unit Tests (others)",
   "Integration Tests (make -C integration access-tests)",
   "Integration Tests (make -C integration bft-tests)",
   "Integration Tests (make -C integration collection-tests)",
