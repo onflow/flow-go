@@ -1,29 +1,30 @@
-package state_test
+package environment_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func Test_NewStateBoundAddressGenerator_NoError(t *testing.T) {
+func Test_NewAccountCreator_NoError(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	env := state.NewStateBoundAddressGenerator(stTxn, chain)
-	require.NotNil(t, env)
+	creator := environment.NewAccountCreator(stTxn, chain)
+	require.NotNil(t, creator)
 }
 
-func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
+func Test_NewAccountCreator_GeneratingUpdatesState(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	generator := state.NewStateBoundAddressGenerator(stTxn, chain)
-	_, err := generator.NextAddress()
+	creator := environment.NewAccountCreator(stTxn, chain)
+	_, err := creator.NextAddress()
 	require.NoError(t, err)
 
 	stateBytes, err := view.Get("", "account_address_state")
@@ -32,16 +33,16 @@ func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 	require.Equal(t, flow.BytesToAddress(stateBytes), flow.HexToAddress("01"))
 }
 
-func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
+func Test_NewAccountCreator_UsesLedgerState(t *testing.T) {
 	view := utils.NewSimpleView()
 	err := view.Set("", "account_address_state", flow.HexToAddress("01").Bytes())
 	require.NoError(t, err)
 
 	chain := flow.MonotonicEmulator.Chain()
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	generator := state.NewStateBoundAddressGenerator(stTxn, chain)
+	creator := environment.NewAccountCreator(stTxn, chain)
 
-	_, err = generator.NextAddress()
+	_, err = creator.NextAddress()
 	require.NoError(t, err)
 
 	stateBytes, err := view.Get("", "account_address_state")
@@ -49,5 +50,5 @@ func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 
 	require.Equal(t, flow.BytesToAddress(stateBytes), flow.HexToAddress("02"))
 	// counts is one unit higher than returned index (index include zero, but counts starts from 1)
-	require.Equal(t, uint64(2), generator.AddressCount())
+	require.Equal(t, uint64(2), creator.AddressCount())
 }

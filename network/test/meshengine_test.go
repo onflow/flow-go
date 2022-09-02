@@ -112,7 +112,7 @@ func (suite *MeshEngineTestSuite) TestTargetedValidators_Unicast() {
 }
 
 // TestTargetedValidators_Multicast tests if only the intended recipients in a 1-k messaging actually receive the
-//message.
+// message.
 // The messages are disseminated through the Multicast method of conduits.
 func (suite *MeshEngineTestSuite) TestTargetedValidators_Multicast() {
 	suite.targetValidatorScenario(suite.Multicast)
@@ -306,7 +306,7 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 }
 
 // messageSizeScenario provides a scenario to check if a message of maximum permissible size can be sent
-//successfully.
+// successfully.
 // It broadcasts a message from the first node to all the nodes in the identifiers list using send wrapper function.
 func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFunc, size uint) {
 	// creating engines

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -211,7 +210,7 @@ func writeJSON(path string, data interface{}) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(path, bz, 0644)
+	err = os.WriteFile(path, bz, 0644)
 	if err != nil {
 		return err
 	}

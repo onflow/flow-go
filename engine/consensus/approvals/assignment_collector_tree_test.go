@@ -247,10 +247,12 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingSealedColl
 
 // TestFinalizeForkAtLevel_ProcessableAfterSealedParent tests scenario that finalized collector becomes processable
 // after parent block gets sealed. More specifically this case:
-// P <- A <- B[ER{A}] <- C[ER{B}] <- D[ER{C}]
-//        <- E[ER{A}] <- F[ER{E}] <- G[ER{F}]
-//               |
-//           finalized
+//
+//	P <- A <- B[ER{A}] <- C[ER{B}] <- D[ER{C}]
+//	       <- E[ER{A}] <- F[ER{E}] <- G[ER{F}]
+//	              |
+//	          finalized
+//
 // Initially P was executed, B is finalized and incorporates ER for A, C incorporates ER for B, D incorporates ER for C,
 // E was forked from A and incorporates ER for A, but wasn't finalized, F incorporates ER for E, G incorporates ER for F
 // Let's take a case where we have collectors for execution results ER{A}, ER{B}, ER{C}, ER{E}, ER{F}.

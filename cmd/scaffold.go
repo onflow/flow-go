@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -98,7 +97,7 @@ type namedComponentFunc struct {
 // FlowNodeBuilder is the default builder struct used for all flow nodes
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
-//   PostInit handlers, if any
+// PostInit handlers, if any
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
@@ -375,7 +374,7 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 				if err != nil {
 					return nil, err
 				}
-				clientCAs, err := ioutil.ReadFile(node.AdminClientCAs)
+				clientCAs, err := os.ReadFile(node.AdminClientCAs)
 				if err != nil {
 					return nil, err
 				}

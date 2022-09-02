@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -37,6 +38,9 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 		envMock.On("VM").
 			Return(&vm).
 			Once()
+		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
+			fvm.NewReusableCadenceRuntime())
+		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
 	}
 
@@ -50,8 +54,7 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionMemoryWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if can't parse stored",
@@ -64,8 +67,7 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionMemoryWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if get stored returns error",
@@ -169,6 +171,9 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 		envMock.On("VM").
 			Return(&vm).
 			Once()
+		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
+			fvm.NewReusableCadenceRuntime())
+		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
 	}
 
@@ -182,8 +187,7 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionEffortWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if can't parse stored",
@@ -196,8 +200,7 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionEffortWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if get stored returns error",

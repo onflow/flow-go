@@ -133,13 +133,13 @@ func Test_EncodeSignerToIndicesAndSigType(t *testing.T) {
 
 // Test_DecodeSigTypeToStakingAndBeaconSigners uses fuzzy-testing framework Rapid to
 // test the method DecodeSigTypeToStakingAndBeaconSigners:
-// * we generate a set of authorized signer: `committeeIdentities`
-// * part of this set is sampled as staking singers: `stakingSigners`
-// * another part of `committeeIdentities` is sampled as beacon singers: `beaconSigners`
-// * we encode the set and check that the results conform to the protocol specification
-// * We encode the set using `EncodeSignerToIndicesAndSigType` (tested before) and then decode it.
-//   Thereby we should recover the original input. Caution, the order might be different,
-//   so we sort both sets.
+//   - we generate a set of authorized signer: `committeeIdentities`
+//   - part of this set is sampled as staking singers: `stakingSigners`
+//   - another part of `committeeIdentities` is sampled as beacon singers: `beaconSigners`
+//   - we encode the set and check that the results conform to the protocol specification
+//   - We encode the set using `EncodeSignerToIndicesAndSigType` (tested before) and then decode it.
+//     Thereby we should recover the original input. Caution, the order might be different,
+//     so we sort both sets.
 func Test_DecodeSigTypeToStakingAndBeaconSigners(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		// select total committee size, number of random beacon signers and number of staking signers
@@ -291,11 +291,11 @@ func Test_EncodeSignersToIndices(t *testing.T) {
 }
 
 // Test_DecodeSignerIndicesToIdentifiers uses fuzzy-testing framework Rapid to test the method DecodeSignerIndicesToIdentifiers:
-// * we generate a set of authorized signer: `identities`
-// * part of this set is sampled as signers: `signers`
-// * We encode the set using `EncodeSignersToIndices` (tested before) and then decode it.
-//   Thereby we should recover the original input. Caution, the order might be different,
-//   so we sort both sets.
+//   - we generate a set of authorized signer: `identities`
+//   - part of this set is sampled as signers: `signers`
+//   - We encode the set using `EncodeSignersToIndices` (tested before) and then decode it.
+//     Thereby we should recover the original input. Caution, the order might be different,
+//     so we sort both sets.
 func Test_DecodeSignerIndicesToIdentifiers(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		// select total committee size, number of random beacon signers and number of staking signers
@@ -371,10 +371,12 @@ func sampleSigners(
 }
 
 // correctEncoding verifies that the given indices conform to the following specification:
-//  * indices is the _smallest_ possible byte slice that contains at least `len(canonicalIdentifiers)` number of _bits_
-//  * Let indices[i] denote the ith bit of `indices`. We verify that:
-//                       ┌ 1 if and only if canonicalIdentifiers[i] is in `subset`
-//          indices[i] = └ 0 otherwise
+//   - indices is the _smallest_ possible byte slice that contains at least `len(canonicalIdentifiers)` number of _bits_
+//   - Let indices[i] denote the ith bit of `indices`. We verify that:
+//
+// .                            ┌ 1 if and only if canonicalIdentifiers[i] is in `subset`
+// .               indices[i] = └ 0 otherwise
+//
 // This function can be used to verify signer indices as well as signature type encoding
 func correctEncoding(t require.TestingT, indices []byte, canonicalIdentifiers flow.IdentifierList, subset flow.IdentifierList) {
 	// verify that indices has correct length

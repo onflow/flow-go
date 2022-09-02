@@ -101,9 +101,9 @@ func (s *feldmanVSSstate) Start(seed []byte) error {
 // key shares.
 // - the finalized private key which is the current participant's own private key share
 // - the returned erorr is :
-//    - dkgFailureError if the private key and vector are inconsistent.
-//    - other error if Start() was not called.
-//    - nil otherwise.
+//   - dkgFailureError if the private key and vector are inconsistent.
+//   - other error if Start() was not called.
+//   - nil otherwise.
 func (s *feldmanVSSstate) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
 		return nil, nil, nil, errors.New("dkg is not running")
@@ -402,7 +402,8 @@ func (s *feldmanVSSstate) verifyShare() bool {
 
 // computePublicKeys extracts the participants public keys from the verification vector
 // y[i] = Q(i+1) for all participants i, with:
-//  Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
+//
+//	Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 func (s *feldmanVSSstate) computePublicKeys() {
 	C.G2_polynomialImages(
 		(*C.ep2_st)(&s.y[0]), (C.int)(len(s.y)),

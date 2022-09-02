@@ -86,15 +86,16 @@ func AuthorizedSenderMessageValidator(log zerolog.Logger, slashingViolationsCons
 }
 
 // isAuthorizedSender performs network authorization validation. This func will assert the following;
-// 1. The node is not ejected.
-// 2. Using the message auth config
-//  A. The message is authorized to be sent on channel.
-//  B. The sender role is authorized to send message on channel.
+//  1. The node is not ejected.
+//  2. Using the message auth config
+//     A. The message is authorized to be sent on channel.
+//     B. The sender role is authorized to send message on channel.
+//
 // Expected error returns during normal operations:
-//  * ErrSenderEjected: if identity of sender is ejected from the network
-//  * message.ErrUnknownMsgType if message auth config us not found for the msg
-//  * message.ErrUnauthorizedMessageOnChannel if msg is not authorized to be sent on channel
-//  * message.ErrUnauthorizedRole if sender role is not authorized to send msg
+//   - ErrSenderEjected: if identity of sender is ejected from the network
+//   - message.ErrUnknownMsgType if message auth config us not found for the msg
+//   - message.ErrUnauthorizedMessageOnChannel if msg is not authorized to be sent on channel
+//   - message.ErrUnauthorizedRole if sender role is not authorized to send msg
 func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}) (string, error) {
 	if identity.Ejected {
 		return "", ErrSenderEjected

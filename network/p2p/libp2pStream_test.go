@@ -596,16 +596,20 @@ func TestConnectionGating(t *testing.T) {
 
 	// create 2 nodes
 	node1Peers := make(map[peer.ID]struct{})
-	node1, node1Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
-		_, ok := node1Peers[p]
-		return ok
+	node1, node1Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) error {
+		if _, ok := node1Peers[p]; !ok {
+			return fmt.Errorf("id not found: %s", p.Pretty())
+		}
+		return nil
 	}))
 	defer stopNode(t, node1)
 
 	node2Peers := make(map[peer.ID]struct{})
-	node2, node2Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
-		_, ok := node2Peers[p]
-		return ok
+	node2, node2Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) error {
+		if _, ok := node2Peers[p]; !ok {
+			return fmt.Errorf("id not found: %s", p.Pretty())
+		}
+		return nil
 	}))
 	defer stopNode(t, node2)
 

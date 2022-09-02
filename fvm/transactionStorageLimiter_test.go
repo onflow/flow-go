@@ -36,6 +36,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 				},
 			},
 		}, nil)
+		env.On("BorrowCadenceRuntime", mock.Anything).Return(
+			fvm.NewReusableCadenceRuntime())
+		env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
 		d := &fvm.TransactionStorageLimiter{}
 		err := d.CheckLimits(env, []flow.Address{owner})
@@ -57,6 +60,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 				},
 			},
 		}, nil)
+		env.On("BorrowCadenceRuntime", mock.Anything).Return(
+			fvm.NewReusableCadenceRuntime())
+		env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
 		d := &fvm.TransactionStorageLimiter{}
 		err := d.CheckLimits(env, []flow.Address{owner})
@@ -78,6 +84,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 				},
 			},
 		}, nil)
+		env.On("BorrowCadenceRuntime", mock.Anything).Return(
+			fvm.NewReusableCadenceRuntime())
+		env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
 		d := &fvm.TransactionStorageLimiter{}
 		err := d.CheckLimits(env, []flow.Address{owner})
@@ -100,6 +109,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 				},
 			},
 		}, nil)
+		env.On("BorrowCadenceRuntime", mock.Anything).Return(
+			fvm.NewReusableCadenceRuntime())
+		env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
 		d := &fvm.TransactionStorageLimiter{}
 		err := d.CheckLimits(env, []flow.Address{owner})
@@ -121,6 +133,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 				},
 			},
 		}, nil)
+		env.On("BorrowCadenceRuntime", mock.Anything).Return(
+			fvm.NewReusableCadenceRuntime())
+		env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
 		d := &fvm.TransactionStorageLimiter{}
 		err := d.CheckLimits(env, []flow.Address{owner})

@@ -18,6 +18,11 @@ const (
 	DefaultMaxKeySize         = 16_000      // ~16KB
 	DefaultMaxValueSize       = 256_000_000 // ~256MB
 	DefaultMaxInteractionSize = 20_000_000  // ~20MB
+
+	AccountKeyPrefix = "a."
+	KeyAccountStatus = AccountKeyPrefix + "s"
+	KeyCode          = "code"
+	KeyContractNames = "contract_names"
 )
 
 type mapKey struct {

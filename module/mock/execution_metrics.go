@@ -14,8 +14,8 @@ type ExecutionMetrics struct {
 	mock.Mock
 }
 
-// ChunkDataPackRequested provides a mock function with given fields:
-func (_m *ExecutionMetrics) ChunkDataPackRequested() {
+// ChunkDataPackRequestProcessed provides a mock function with given fields:
+func (_m *ExecutionMetrics) ChunkDataPackRequestProcessed() {
 	_m.Called()
 }
 
