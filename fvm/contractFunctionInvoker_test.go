@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rs/zerolog"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -112,7 +110,7 @@ func TestContractInvoker(t *testing.T) {
 				"functionName",
 				[]cadence.Value{},
 				[]sema.Type{},
-				zerolog.Nop())
+			)
 
 			env := &fvmMock.Environment{}
 			vm := &fvm.VirtualMachine{
@@ -120,9 +118,11 @@ func TestContractInvoker(t *testing.T) {
 					invokeContractFunction: tc.contractFunction,
 				},
 			}
+			vmCtx := fvm.NewContext()
 
 			env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
 			env.On("VM").Return(vm)
+			env.On("Context").Return(&vmCtx)
 			env.On("BorrowCadenceRuntime", mock.Anything).Return(
 				fvm.NewReusableCadenceRuntime())
 			env.On("ReturnCadenceRuntime", mock.Anything).Return()

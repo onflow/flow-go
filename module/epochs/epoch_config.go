@@ -45,7 +45,6 @@ func DefaultEpochConfig() EpochConfig {
 // The resulting argument has type [{String: UInt64}] which represents a list
 // of weight mappings for each cluster. The full Cluster struct is constructed
 // within the transaction in Cadence for simplicity here.
-//
 func EncodeClusterAssignments(clusterAssignments flow.AssignmentList) []byte {
 
 	weightMappingPerCluster := []cadence.Value{}

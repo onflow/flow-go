@@ -27,7 +27,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvoker := fvm.NewTransactionInvoker(log)
+		txInvoker := fvm.NewTransactionInvoker()
 
 		vm := fvm.NewVirtualMachine(rt)
 
@@ -36,7 +36,7 @@ func TestSafetyCheck(t *testing.T) {
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
-		context := fvm.NewContext(log)
+		context := fvm.NewContext(fvm.WithLogger(log))
 
 		stTxn := state.NewStateTransaction(
 			view,
@@ -60,7 +60,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvoker := fvm.NewTransactionInvoker(log)
+		txInvoker := fvm.NewTransactionInvoker()
 
 		vm := fvm.NewVirtualMachine(rt)
 
@@ -69,7 +69,7 @@ func TestSafetyCheck(t *testing.T) {
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
-		context := fvm.NewContext(log)
+		context := fvm.NewContext(fvm.WithLogger(log))
 
 		stTxn := state.NewStateTransaction(
 			view,

@@ -60,7 +60,6 @@ func TestDefaultConfig(t *testing.T) {
 
 // TestStandardVoteAggregationTimeoutFraction tests the computation of the standard
 // value for `VoteAggregationTimeoutFraction`.
-//
 func TestStandardVoteAggregationTimeoutFraction(t *testing.T) {
 	// test numerical computation for one specific parameter setting
 	f := StandardVoteAggregationTimeoutFraction(1200*time.Millisecond, 500*time.Millisecond)

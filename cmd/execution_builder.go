@@ -21,6 +21,8 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/module/mempool/queue"
+
 	"github.com/onflow/flow-go/admin/commands"
 	executionCommands "github.com/onflow/flow-go/admin/commands/execution"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
@@ -426,11 +428,11 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 
 			vm := fvm.NewVirtualMachine(rt)
 
-			fvmOptions := append([]fvm.Option{}, node.FvmOptions...)
+			fvmOptions := append([]fvm.Option{fvm.WithLogger(node.Logger)}, node.FvmOptions...)
 			if exeNode.exeConf.extensiveTracing {
 				fvmOptions = append(fvmOptions, fvm.WithExtensiveTracing())
 			}
-			vmCtx := fvm.NewContext(node.Logger, fvmOptions...)
+			vmCtx := fvm.NewContext(fvmOptions...)
 
 			ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
 			manager, err := computation.New(
@@ -453,7 +455,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			}
 			exeNode.computationManager = manager
 
-			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chdpCacheSize)
+			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
@@ -477,17 +479,23 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				node.Tracer,
 			)
 
+			var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if node.HeroCacheMetricsEnable {
+				chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
+			}
+			chdpReqQueue := queue.NewChunkDataPackRequestQueue(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
 			exeNode.providerEngine, err = exeprovider.New(
 				node.Logger,
 				node.Tracer,
 				node.Network,
 				node.State,
-				node.Me,
 				exeNode.executionState,
 				exeNode.collector,
 				exeNode.checkAuthorizedAtBlock,
-				exeNode.exeConf.chdpQueryTimeout,
-				exeNode.exeConf.chdpDeliveryTimeout,
+				chdpReqQueue,
+				exeNode.exeConf.chunkDataPackRequestWorkers,
+				exeNode.exeConf.chunkDataPackQueryTimeout,
+				exeNode.exeConf.chunkDataPackDeliveryTimeout,
 			)
 			if err != nil {
 				return nil, err
@@ -799,12 +807,12 @@ func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, view *de
 // Checkpoint file is required to restore the trie, and has to be placed in the execution
 // state folder.
 // There are two ways to generate a checkpoint file:
-// 1) From a clean state.
-// 		Refer to the code in the testcase: TestGenerateExecutionState
-// 2) From a previous execution state
-// 		This is often used when sporking the network.
-//    Use the execution-state-extract util commandline to generate a checkpoint file from
-// 		a previous checkpoint file
+//  1. From a clean state.
+//     Refer to the code in the testcase: TestGenerateExecutionState
+//  2. From a previous execution state
+//     This is often used when sporking the network.
+//     Use the execution-state-extract util commandline to generate a checkpoint file from
+//     a previous checkpoint file
 func copyBootstrapState(dir, trie string) error {
 	filename := ""
 	firstCheckpointFilename := "00000000"

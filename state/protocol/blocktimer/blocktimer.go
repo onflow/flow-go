@@ -65,8 +65,8 @@ func (b BlockTimestamp) Build(parentTimestamp time.Time) time.Time {
 // definition of valid timestamp.
 // Timestamp is valid if: Timestamp ∈ [τ + minInterval, τ + maxInterval]
 // Returns:
-//	* model.ErrInvalidBlockTimestamp - timestamp is invalid
-//  * nil - success
+//   - model.ErrInvalidBlockTimestamp - timestamp is invalid
+//   - nil - success
 func (b BlockTimestamp) Validate(parentTimestamp, currentTimestamp time.Time) error {
 	from := parentTimestamp.Add(b.minInterval)
 	to := parentTimestamp.Add(b.maxInterval)

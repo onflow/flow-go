@@ -20,6 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/module/mempool/queue"
+
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
@@ -61,7 +63,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
-	chainsync "github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -556,7 +558,17 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metricsCollector, checkAuthorizedAtBlock, 10, 10,
+		node.Log,
+		node.Tracer,
+		node.Net,
+		node.State,
+		execState,
+		metricsCollector,
+		checkAuthorizedAtBlock,
+		queue.NewChunkDataPackRequestQueue(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
+		executionprovider.DefaultChunkDataPackRequestWorker,
+		executionprovider.DefaultChunkDataPackQueryTimeout,
+		executionprovider.DefaultChunkDataPackDeliveryTimeout,
 	)
 	require.NoError(t, err)
 
@@ -567,7 +579,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	blockFinder := environment.NewBlockFinder(node.Headers)
 
 	vmCtx := fvm.NewContext(
-		node.Log,
+		fvm.WithLogger(node.Log),
 		fvm.WithChain(node.ChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 	)
@@ -869,7 +881,7 @@ func VerificationNode(t testing.TB,
 		blockFinder := environment.NewBlockFinder(node.Headers)
 
 		vmCtx := fvm.NewContext(
-			node.Log,
+			fvm.WithLogger(node.Log),
 			fvm.WithChain(node.ChainID.Chain()),
 			fvm.WithBlocks(blockFinder),
 		)

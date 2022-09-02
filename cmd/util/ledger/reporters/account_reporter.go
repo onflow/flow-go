@@ -139,7 +139,7 @@ type balanceProcessor struct {
 
 func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{}))
-	ctx := fvm.NewContext(zerolog.Nop(),
+	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithMemoryAndInteractionLimitsDisabled())
 	prog := programs.NewEmptyPrograms()
