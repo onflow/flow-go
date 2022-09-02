@@ -106,7 +106,7 @@ func (suite *ReactorEngineSuite_SetupPhase) SetupTest() {
 	suite.blocksByView = make(map[uint64]*flow.Header)
 	for view := suite.dkgStartView; view <= suite.dkgPhase3FinalView; view += dkg.DefaultPollStep {
 		header := unittest.BlockHeaderFixture(unittest.HeaderWithView(view))
-		suite.blocksByView[view] = &header
+		suite.blocksByView[view] = header
 	}
 	suite.firstBlock = suite.blocksByView[100]
 
@@ -205,7 +205,6 @@ func (suite *ReactorEngineSuite_SetupPhase) TestRunDKG_PhaseTransition() {
 // successfully when the engine starts up during the EpochSetup phase, and the
 // DKG for this epoch has not been started previously. This is the case for
 // consensus nodes joining the network at an epoch boundary.
-//
 func (suite *ReactorEngineSuite_SetupPhase) TestRunDKG_StartupInSetupPhase() {
 
 	// we are in the EpochSetup phase
@@ -235,7 +234,6 @@ func (suite *ReactorEngineSuite_SetupPhase) TestRunDKG_StartupInSetupPhase() {
 // started, when the engine starts up during the EpochSetup phase, and the DKG
 // for this epoch HAS been started previously. This will be the case for
 // consensus nodes which restart during the DKG.
-//
 func (suite *ReactorEngineSuite_SetupPhase) TestRunDKG_StartupInSetupPhase_DKGAlreadyStarted() {
 
 	// we are in the EpochSetup phase
@@ -345,7 +343,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 	epochQuery.Add(nextEpoch)
 
 	firstBlock := unittest.BlockHeaderFixture(unittest.HeaderWithView(100))
-	suite.firstBlock = &firstBlock
+	suite.firstBlock = firstBlock
 
 	suite.snap = new(protocol.Snapshot)
 	suite.snap.On("Epochs").Return(epochQuery)

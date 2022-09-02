@@ -46,6 +46,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
+	"github.com/onflow/flow-go/module/chainsync"
 	chmodule "github.com/onflow/flow-go/module/chunks"
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
@@ -55,10 +56,9 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/module/validation"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -109,7 +109,7 @@ func main() {
 		pendingReceipts              mempool.PendingReceipts
 		prov                         *provider.Engine
 		receiptRequester             *requester.Engine
-		syncCore                     *synchronization.Core
+		syncCore                     *chainsync.Core
 		comp                         *compliance.Engine
 		conMetrics                   module.ConsensusMetrics
 		mainMetrics                  module.HotstuffMetrics
@@ -340,9 +340,16 @@ func main() {
 			return nil
 		}).
 		Module("block seals mempool", func(node *cmd.NodeConfig) error {
-			// use a custom ejector so we don't eject seals that would break
+			// use a custom ejector, so we don't eject seals that would break
 			// the chain of seals
-			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), node.DB, node.Logger, sealLimit)
+			rawMempool := stdmap.NewIncorporatedResultSeals(sealLimit)
+			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, node.Storage.Receipts)
+			seals, err = consensusMempools.NewExecStateForkSuppressor(
+				multipleReceiptsFilterMempool,
+				consensusMempools.LogForkAndCrash(node.Logger),
+				node.DB,
+				node.Logger,
+			)
 			if err != nil {
 				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
 			}
@@ -358,7 +365,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Module("finalization distributor", func(node *cmd.NodeConfig) error {
@@ -440,7 +447,7 @@ func main() {
 				node.Network,
 				node.Me,
 				node.State,
-				network.RequestReceiptsByBlockID,
+				channels.RequestReceiptsByBlockID,
 				filter.HasRole(flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
 				requester.WithRetryInitial(2*time.Second),
@@ -625,7 +632,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				guarantees,
-				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
+				seals,
 				receipts,
 				node.Tracer,
 				builder.WithBlockTimer(blockTimer),

@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -39,6 +40,25 @@ type Engine struct {
 	con            network.Conduit
 	sync           module.BlockRequester
 	tracer         module.Tracer
+	channel        channels.Channel
+}
+
+type Option func(*Engine)
+
+// WithComplianceOptions sets options for the engine's compliance config
+func WithComplianceOptions(opts ...compliance.Opt) Option {
+	return func(e *Engine) {
+		for _, apply := range opts {
+			apply(&e.config)
+		}
+	}
+}
+
+// WithChannel sets the channel the follower engine will use to receive blocks.
+func WithChannel(channel channels.Channel) Option {
+	return func(e *Engine) {
+		e.channel = channel
+	}
 }
 
 func New(
@@ -55,18 +75,12 @@ func New(
 	follower module.HotStuffFollower,
 	sync module.BlockRequester,
 	tracer module.Tracer,
-	opts ...compliance.Opt,
+	opts ...Option,
 ) (*Engine, error) {
-
-	config := compliance.DefaultConfig()
-	for _, apply := range opts {
-		apply(&config)
-	}
-
 	e := &Engine{
 		unit:           engine.NewUnit(),
 		log:            log.With().Str("engine", "follower").Logger(),
-		config:         config,
+		config:         compliance.DefaultConfig(),
 		me:             me,
 		engMetrics:     engMetrics,
 		mempoolMetrics: mempoolMetrics,
@@ -78,9 +92,14 @@ func New(
 		follower:       follower,
 		sync:           sync,
 		tracer:         tracer,
+		channel:        channels.ReceiveBlocks,
 	}
 
-	con, err := net.Register(network.ReceiveBlocks, e)
+	for _, apply := range opts {
+		apply(e)
+	}
+
+	con, err := net.Register(e.channel, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine to network: %w", err)
 	}
@@ -119,7 +138,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(channel, originID, event)
 		if err != nil {
@@ -137,7 +156,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -204,7 +223,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
-	defer span.Finish()
+	defer span.End()
 
 	header := proposal.Header
 
@@ -337,7 +356,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
-	defer span.Finish()
+	defer span.End()
 
 	header := proposal.Header
 
@@ -412,7 +431,7 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessPendingChildren)
-	defer span.Finish()
+	defer span.End()
 
 	blockID := header.ID()
 

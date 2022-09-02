@@ -8,17 +8,39 @@ import (
 
 	"github.com/onflow/flow-go-sdk"
 
-	state "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/environment"
+	fvmstate "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
-func createPayloadKeyWithLegacyController(a flow.Address, key string) ledger.Key {
+const LegacyKeyPartController = 1
+
+func createPayloadKeyWithLegacyController(a flow.Address, key string, emptyController bool) ledger.Key {
+	if emptyController {
+		return ledger.Key{
+			KeyParts: []ledger.KeyPart{
+				ledger.NewKeyPart(state.KeyPartOwner, a.Bytes()),
+				ledger.NewKeyPart(LegacyKeyPartController, []byte("")),
+				ledger.NewKeyPart(state.KeyPartKey, []byte(key)),
+			},
+		}
+	}
 	return ledger.Key{
 		KeyParts: []ledger.KeyPart{
-			ledger.NewKeyPart(0, a.Bytes()),
-			ledger.NewKeyPart(1, a.Bytes()),
-			ledger.NewKeyPart(2, []byte(key)),
+			ledger.NewKeyPart(state.KeyPartOwner, a.Bytes()),
+			ledger.NewKeyPart(LegacyKeyPartController, a.Bytes()),
+			ledger.NewKeyPart(state.KeyPartKey, []byte(key)),
+		},
+	}
+}
+
+func createMigratedPayloadKey(a flow.Address, key string) ledger.Key {
+	return ledger.Key{
+		KeyParts: []ledger.KeyPart{
+			ledger.NewKeyPart(state.KeyPartOwner, a.Bytes()),
+			ledger.NewKeyPart(state.KeyPartKey, []byte(key)),
 		},
 	}
 }
@@ -32,18 +54,39 @@ func TestLegacyControllerMigration(t *testing.T) {
 	address2 := flow.HexToAddress("0x2")
 
 	payloads := []ledger.Payload{
-		{Key: createAccountPayloadKey(address1, state.KeyStorageUsed), Value: utils.Uint64ToBinary(1)},
-		{Key: createPayloadKeyWithLegacyController(address1, state.ContractKey("CoreContract")), Value: utils.Uint64ToBinary(2)},
-		{Key: createPayloadKeyWithLegacyController(address1, state.KeyContractNames), Value: utils.Uint64ToBinary(3)},
-		{Key: createPayloadKeyWithLegacyController(address2, state.KeyPublicKey(1)), Value: utils.Uint64ToBinary(4)},
-		{Key: createPayloadKeyWithLegacyController(address2, state.KeyPublicKeyCount), Value: utils.Uint64ToBinary(4)},
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, KeyStorageUsed, false),
+			utils.Uint64ToBinary(1)),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, environment.ContractKey("CoreContract"), true),
+			utils.Uint64ToBinary(2)),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, fvmstate.KeyContractNames, true),
+			utils.Uint64ToBinary(3)),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address2, environment.KeyPublicKey(1), true),
+			utils.Uint64ToBinary(4)),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address2, KeyPublicKeyCount, true),
+			utils.Uint64ToBinary(4)),
+	}
+
+	expectedKeys := []ledger.Key{
+		createMigratedPayloadKey(address1, KeyStorageUsed),
+		createMigratedPayloadKey(address1, environment.ContractKey("CoreContract")),
+		createMigratedPayloadKey(address1, fvmstate.KeyContractNames),
+		createMigratedPayloadKey(address2, environment.KeyPublicKey(1)),
+		createMigratedPayloadKey(address2, KeyPublicKeyCount),
 	}
 
 	newPayloads, err := mig.Migrate(payloads)
 	require.NoError(t, err)
-	require.Equal(t, 5, len(newPayloads))
+	require.Equal(t, len(payloads), len(newPayloads))
 
-	for _, p := range newPayloads {
-		require.Equal(t, 0, len(p.Key.KeyParts[1].Value))
+	for i, p := range newPayloads {
+		k, err := p.Key()
+		require.NoError(t, err)
+		require.Equal(t, expectedKeys[i], k)
 	}
+
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/programs"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/handler"
 	stateMock "github.com/onflow/flow-go/fvm/mock/state"
 	"github.com/onflow/flow-go/fvm/state"
@@ -19,8 +20,10 @@ import (
 )
 
 func TestContract_ChildMergeFunctionality(t *testing.T) {
-	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		utils.NewSimpleView(),
+		state.DefaultParameters())
+	accounts := environment.NewAccounts(stTxn)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
 	err := accounts.Create(nil, address)
@@ -33,7 +36,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 		nil, nil, nil)
 
 	// no contract initially
-	names, err := contractHandler.GetContractNames(rAdd)
+	names, err := accounts.GetContractNames(address)
 	require.NoError(t, err)
 	require.Equal(t, len(names), 0)
 
@@ -43,14 +46,14 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	require.True(t, contractHandler.HasUpdates())
 
 	// should not be readable from draft
-	cont, err := contractHandler.GetContract(rAdd, "testContract")
+	cont, err := accounts.GetContract("testContract", address)
 	require.NoError(t, err)
 	require.Equal(t, len(cont), 0)
 
 	// commit
 	_, err = contractHandler.Commit()
 	require.NoError(t, err)
-	cont, err = contractHandler.GetContract(rAdd, "testContract")
+	cont, err = accounts.GetContract("testContract", address)
 	require.NoError(t, err)
 	require.Equal(t, cont, []byte("ABC"))
 
@@ -64,12 +67,12 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	require.NoError(t, err)
 
 	// test contract shouldn't be there
-	cont, err = contractHandler.GetContract(rAdd, "testContract2")
+	cont, err = accounts.GetContract("testContract2", address)
 	require.NoError(t, err)
 	require.Equal(t, len(cont), 0)
 
 	// test contract should be there
-	cont, err = contractHandler.GetContract(rAdd, "testContract")
+	cont, err = accounts.GetContract("testContract", address)
 	require.NoError(t, err)
 	require.Equal(t, cont, []byte("ABC"))
 
@@ -78,7 +81,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	require.NoError(t, err)
 
 	// contract still there because no commit yet
-	cont, err = contractHandler.GetContract(rAdd, "testContract")
+	cont, err = accounts.GetContract("testContract", address)
 	require.NoError(t, err)
 	require.Equal(t, cont, []byte("ABC"))
 
@@ -87,14 +90,16 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	require.NoError(t, err)
 
 	// contract should no longer be there
-	cont, err = contractHandler.GetContract(rAdd, "testContract")
+	cont, err = accounts.GetContract("testContract", address)
 	require.NoError(t, err)
 	require.Equal(t, []byte(nil), cont)
 }
 
 func TestContract_AuthorizationFunctionality(t *testing.T) {
-	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		utils.NewSimpleView(),
+		state.DefaultParameters())
+	accounts := environment.NewAccounts(stTxn)
 
 	authAdd := flow.HexToAddress("01")
 	rAdd := runtime.Address(authAdd)
@@ -212,8 +217,10 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 
 func TestContract_DeploymentVouchers(t *testing.T) {
 
-	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		utils.NewSimpleView(),
+		state.DefaultParameters())
+	accounts := environment.NewAccounts(stTxn)
 
 	addressWithVoucher := flow.HexToAddress("01")
 	addressWithVoucherRuntime := runtime.Address(addressWithVoucher)
@@ -269,8 +276,10 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 
 func TestContract_ContractUpdate(t *testing.T) {
 
-	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		utils.NewSimpleView(),
+		state.DefaultParameters())
+	accounts := environment.NewAccounts(stTxn)
 
 	flowAddress := flow.HexToAddress("01")
 	runtimeAddress := runtime.Address(flowAddress)
@@ -375,8 +384,10 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 
 func TestContract_ContractRemoval(t *testing.T) {
 
-	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		utils.NewSimpleView(),
+		state.DefaultParameters())
+	accounts := environment.NewAccounts(stTxn)
 
 	flowAddress := flow.HexToAddress("01")
 	runtimeAddress := runtime.Address(flowAddress)

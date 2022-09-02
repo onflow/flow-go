@@ -3,7 +3,7 @@ package access
 import (
 	"context"
 	"fmt"
-	"os"
+	"path/filepath"
 	"testing"
 
 	badgerds "github.com/ipfs/go-ds-badger2"
@@ -15,18 +15,16 @@ import (
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
-	"github.com/onflow/flow-go/integration/utils"
-	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/network/compressor"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestExecutionStateSync(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky as it constantly runs into badger errors or blob not found errors")
 	suite.Run(t, new(ExecutionStateSyncSuite))
 }
 
@@ -47,12 +45,7 @@ type ExecutionStateSyncSuite struct {
 }
 
 func (s *ExecutionStateSyncSuite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "execution_state_sync_test.go").
-		Str("testcase", s.T().Name()).
-		Logger()
-
-	s.log = logger
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
@@ -137,7 +130,8 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 	checkBlocks := runBlocks / 2
 
 	// get the first block height
-	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T())
+	currentFinalized := s.BlockState.HighestFinalizedHeight()
+	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
 	s.T().Logf("got block height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// wait for the requested number of sealed blocks, then pause the network so we can inspect the dbs
@@ -146,7 +140,7 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 
 	// start an execution data service using the Access Node's execution data db
 	an := s.net.ContainerByID(s.bridgeID)
-	eds, ctx := s.nodeExecutionDataService(an)
+	eds := s.nodeExecutionDataStore(an)
 
 	// setup storage objects needed to get the execution data id
 	db, err := an.DB()
@@ -166,26 +160,16 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 
 		s.T().Logf("getting execution data for height %d, block %s, execution_data %s", header.Height, header.ID(), result.ExecutionDataID)
 
-		ed, err := eds.Get(ctx, result.ExecutionDataID)
-		assert.NoError(s.T(), err, "could not get execution data for height %v", i)
-
-		s.T().Logf("got execution data for height %d", i)
-		assert.Equal(s.T(), header.ID(), ed.BlockID)
+		ed, err := eds.GetExecutionData(s.ctx, result.ExecutionDataID)
+		if assert.NoError(s.T(), err, "could not get execution data for height %v", i) {
+			s.T().Logf("got execution data for height %d", i)
+			assert.Equal(s.T(), header.ID(), ed.BlockID)
+		}
 	}
 }
 
-func (s *ExecutionStateSyncSuite) nodeExecutionDataService(node *testnet.Container) (state_synchronization.ExecutionDataService, irrecoverable.SignalerContext) {
-	ctx, errChan := irrecoverable.WithSignaler(s.ctx)
-	go func() {
-		select {
-		case <-s.ctx.Done():
-			return
-		case err := <-errChan:
-			s.T().Errorf("irrecoverable error: %v", err)
-		}
-	}()
-
-	ds, err := badgerds.NewDatastore(node.ExecutionDataDBPath(), &badgerds.DefaultOptions)
+func (s *ExecutionStateSyncSuite) nodeExecutionDataStore(node *testnet.Container) execution_data.ExecutionDataStore {
+	ds, err := badgerds.NewDatastore(filepath.Join(node.ExecutionDataDBPath(), "blobstore"), &badgerds.DefaultOptions)
 	require.NoError(s.T(), err, "could not get execution datastore")
 
 	go func() {
@@ -195,14 +179,5 @@ func (s *ExecutionStateSyncSuite) nodeExecutionDataService(node *testnet.Contain
 		}
 	}()
 
-	blobService := utils.NewLocalBlobService(ds, utils.WithHashOnRead(true))
-	blobService.Start(ctx)
-
-	return state_synchronization.NewExecutionDataService(
-		cbor.NewCodec(),
-		compressor.NewLz4Compressor(),
-		blobService,
-		metrics.NewNoopCollector(),
-		zerolog.New(os.Stdout).With().Str("test", "execution-state-sync").Logger(),
-	), ctx
+	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)
 }

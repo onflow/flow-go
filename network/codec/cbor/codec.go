@@ -15,6 +15,8 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
+var defaultDecMode, _ = cbor.DecOptions{ExtraReturnErrors: cbor.ExtraDecErrorUnknownField}.DecMode()
+
 // Codec represents a CBOR codec for our network.
 type Codec struct {
 }
@@ -33,7 +35,7 @@ func (c *Codec) NewEncoder(w io.Writer) network.Encoder {
 
 // NewDecoder creates a new CBOR decoder with the given underlying reader.
 func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
-	dec := cbor.NewDecoder(r)
+	dec := defaultDecMode.NewDecoder(r)
 	return &Decoder{dec: dec}
 }
 
@@ -82,6 +84,9 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 // NOTE: 'what' is the 'code' name for debugging / instrumentation.
 // NOTE: 'envelope' contains 'code' & serialized / encoded 'v'.
 // i.e.  1st byte is 'code' and remaining bytes are CBOR encoded 'v'.
+// Expected error returns during normal operations:
+//   - codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
+//   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
@@ -91,15 +96,15 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
 	if err != nil {
-		return nil, fmt.Errorf("could not determine interface from code: %w", err)
+		return nil, err
 	}
 
 	// unmarshal the payload
 	//bs2 := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":wire>4(cbor)", what, code), int64(len(data))) // e.g. ~3net:wire>4(cbor)CodeEntityRequest:23
-	err = cbor.Unmarshal(data[1:], msgInterface) // all but first byte
+	err = defaultDecMode.Unmarshal(data[1:], msgInterface) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode cbor payload with message code %d aka %s: %w", data[0], what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
+		return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
 	}
 
 	return msgInterface, nil

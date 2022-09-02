@@ -1,44 +1,59 @@
 package rpc
 
 import (
+	"fmt"
+
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
-	"github.com/onflow/flow-go/apiproxy"
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 )
-
-// NewRPCEngineBuilder helps to build a new RPC engine.
-func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
-	return &RPCEngineBuilder{
-		Engine:               engine,
-		signerIndicesDecoder: signature.NewNoopBlockSignerDecoder(),
-	}
-}
 
 type RPCEngineBuilder struct {
 	*Engine
 
-	router               *apiproxy.FlowAccessAPIRouter // this is set through `WithRouting`; or nil if not explicitly specified
+	// optional parameters, only one can be set during build phase
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
+	handler              accessproto.AccessAPIServer // Use the parent interface instead of implementation, so that we can assign it to proxy.
 }
 
-// WithRouting specifies that the given router should be used as primary access API.
-// Returns self-reference for chaining.
-func (builder *RPCEngineBuilder) WithRouting(router *apiproxy.FlowAccessAPIRouter) *RPCEngineBuilder {
-	builder.router = router
-	return builder
+// NewRPCEngineBuilder helps to build a new RPC engine.
+func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
+	// the default handler will use the engine.backend implementation
+	return &RPCEngineBuilder{
+		Engine: engine,
+	}
+}
+
+func (builder *RPCEngineBuilder) Handler() accessproto.AccessAPIServer {
+	return builder.handler
 }
 
 // WithBlockSignerDecoder specifies that signer indices in block headers should be translated
 // to full node IDs with the given decoder.
+// Caution:
+// you can inject either a `BlockSignerDecoder` (via method `WithBlockSignerDecoder`)
+// or an `AccessAPIServer` (via method `WithNewHandler`); but not both. If both are
+// specified, the builder will error during the build step.
+//
 // Returns self-reference for chaining.
 func (builder *RPCEngineBuilder) WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) *RPCEngineBuilder {
 	builder.signerIndicesDecoder = signerIndicesDecoder
+	return builder
+}
+
+// WithNewHandler specifies that the given `AccessAPIServer` should be used for serving API queries.
+// Caution:
+// you can inject either a `BlockSignerDecoder` (via method `WithBlockSignerDecoder`)
+// or an `AccessAPIServer` (via method `WithNewHandler`); but not both. If both are
+// specified, the builder will error during the build step.
+//
+// Returns self-reference for chaining.
+func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPIServer) *RPCEngineBuilder {
+	builder.handler = handler
 	return builder
 }
 
@@ -67,16 +82,19 @@ func (builder *RPCEngineBuilder) WithMetrics() *RPCEngineBuilder {
 	return builder
 }
 
-func (builder *RPCEngineBuilder) Build() *Engine {
-	var localAPIServer accessproto.AccessAPIServer = access.NewHandler(builder.backend, builder.chain, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
-
-	if builder.router != nil {
-		builder.router.SetLocalAPI(localAPIServer)
-		localAPIServer = builder.router
+func (builder *RPCEngineBuilder) Build() (*Engine, error) {
+	if builder.signerIndicesDecoder != nil && builder.handler != nil {
+		return nil, fmt.Errorf("only BlockSignerDecoder (via method `WithBlockSignerDecoder`) or AccessAPIServer (via method `WithNewHandler`) can be specified but not both")
 	}
-
-	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, localAPIServer)
-	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer, localAPIServer)
-
-	return builder.Engine
+	handler := builder.handler
+	if handler == nil {
+		if builder.signerIndicesDecoder == nil {
+			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain)
+		} else {
+			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
+		}
+	}
+	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, handler)
+	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer, handler)
+	return builder.Engine, nil
 }

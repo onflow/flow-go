@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -206,10 +205,9 @@ func CreateAccountsWithSimpleAddresses(
 	chain flow.Chain,
 ) ([]flow.Address, error) {
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
 	)
 
@@ -326,7 +324,7 @@ func BytesToCadenceArray(l []byte) cadence.Array {
 // CreateAccountCreationTransaction creates a transaction which will create a new account.
 //
 // This function returns a randomly generated private key and the transaction.
-func CreateAccountCreationTransaction(t *testing.T, chain flow.Chain) (flow.AccountPrivateKey, *flow.TransactionBody) {
+func CreateAccountCreationTransaction(t testing.TB, chain flow.Chain) (flow.AccountPrivateKey, *flow.TransactionBody) {
 	accountKey, err := GenerateAccountPrivateKey()
 	require.NoError(t, err)
 	encPublicKey := accountKey.PublicKey(1000).PublicKey.Encode()

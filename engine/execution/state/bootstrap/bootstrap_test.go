@@ -25,6 +25,12 @@ func TestBootstrapLedger(t *testing.T) {
 		wal := &fixtures.NoopWAL{}
 		ls, err := completeLedger.NewLedger(wal, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
+		compactor := fixtures.NewNoopCompactor(ls)
+		<-compactor.Ready()
+		defer func() {
+			<-ls.Done()
+			<-compactor.Done()
+		}()
 
 		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
 			ls,
@@ -47,7 +53,7 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("e4b748da1215452fcaa60f5549d261bf3f76a8a6e9a8388a6d8ee73193b4e331")
+	expectedStateCommitmentBytes, _ := hex.DecodeString("57c6944485f220b5be606121b86dd7cf105f102c7d2888d93f774c02f388a82d,")
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -59,6 +65,12 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 		wal := &fixtures.NoopWAL{}
 		ls, err := completeLedger.NewLedger(wal, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
+		compactor := fixtures.NewNoopCompactor(ls)
+		<-compactor.Ready()
+		defer func() {
+			<-ls.Done()
+			<-compactor.Done()
+		}()
 
 		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
 			ls,

@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	programsStorage "github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -107,17 +109,17 @@ func Test_Programs(t *testing.T) {
 		).AddAuthorizer(address)
 	}
 
-	mainView := delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
+	mainView := delta.NewView(func(_, _ string) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 
-	sth := state.NewStateHolder(state.NewState(mainView))
+	stTxn := state.NewStateTransaction(mainView, state.DefaultParameters())
 
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	vm := fvm.NewVirtualMachine(rt)
 	programs := programsStorage.NewEmptyPrograms()
 
-	accounts := state.NewAccounts(sth)
+	accounts := environment.NewAccounts(stTxn)
 
 	err := accounts.Create(nil, addressA)
 	require.NoError(t, err)
@@ -134,9 +136,8 @@ func Test_Programs(t *testing.T) {
 	fmt.Printf("Account created\n")
 
 	context := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithContractDeploymentRestricted(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker()),
 		fvm.WithCadenceLogging(true))
 
 	var contractAView *delta.View = nil
@@ -149,7 +150,9 @@ func Test_Programs(t *testing.T) {
 		require.Empty(t, retrievedContractA)
 
 		// deploy contract A0
-		procContractA0 := fvm.Transaction(contractDeployTx("A", contractA0Code, addressA), 0)
+		procContractA0 := fvm.Transaction(
+			contractDeployTx("A", contractA0Code, addressA),
+			programs.NextTxIndexForTestingOnly())
 		err = vm.Run(context, procContractA0, mainView, programs)
 		require.NoError(t, err)
 
@@ -159,7 +162,9 @@ func Test_Programs(t *testing.T) {
 		require.Equal(t, contractA0Code, string(retrievedContractA))
 
 		// deploy contract A
-		procContractA := fvm.Transaction(updateContractTx("A", contractACode, addressA), 1)
+		procContractA := fvm.Transaction(
+			updateContractTx("A", contractACode, addressA),
+			programs.NextTxIndexForTestingOnly())
 		err = vm.Run(context, procContractA, mainView, programs)
 		require.NoError(t, err)
 		require.NoError(t, procContractA.Err)
@@ -174,22 +179,26 @@ func Test_Programs(t *testing.T) {
 	t.Run("register touches are captured for simple contract A", func(t *testing.T) {
 
 		// deploy contract A
-		procContractA := fvm.Transaction(contractDeployTx("A", contractACode, addressA), 0)
+		procContractA := fvm.Transaction(
+			contractDeployTx("A", contractACode, addressA),
+			programs.NextTxIndexForTestingOnly())
 		err := vm.Run(context, procContractA, mainView, programs)
 		require.NoError(t, err)
 
 		fmt.Println("---------- Real transaction here ------------")
 
 		// run a TX using contract A
-		procCallA := fvm.Transaction(callTx("A", addressA), 1)
+		procCallA := fvm.Transaction(
+			callTx("A", addressA),
+			programs.NextTxIndexForTestingOnly())
 
 		loadedCode := false
-		viewExecA := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == state.ContractKey("A") {
+		viewExecA := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+			if key == environment.ContractKey("A") {
 				loadedCode = true
 			}
 
-			return mainView.Peek(owner, controller, key)
+			return mainView.Peek(owner, key)
 		})
 
 		err = vm.Run(context, procCallA, viewExecA, programs)
@@ -201,7 +210,7 @@ func Test_Programs(t *testing.T) {
 		// Make sure the code has been loaded from storage
 		require.True(t, loadedCode)
 
-		_, programState, has := programs.Get(contractALocation)
+		_, programState, has := programs.GetForTestingOnly(contractALocation)
 		require.True(t, has)
 
 		// type assertion for further inspections
@@ -219,14 +228,16 @@ func Test_Programs(t *testing.T) {
 		require.NoError(t, err)
 
 		// execute transaction again, this time make sure it doesn't load code
-		viewExecA2 := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		viewExecA2 := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			//this time we fail if a read of code occurs
-			require.NotEqual(t, key, state.ContractKey("A"))
+			require.NotEqual(t, key, environment.ContractKey("A"))
 
-			return mainView.Peek(owner, controller, key)
+			return mainView.Peek(owner, key)
 		})
 
-		procCallA = fvm.Transaction(callTx("A", addressA), 2)
+		procCallA = fvm.Transaction(
+			callTx("A", addressA),
+			programs.NextTxIndexForTestingOnly())
 
 		err = vm.Run(context, procCallA, viewExecA2, programs)
 		require.NoError(t, err)
@@ -245,12 +256,14 @@ func Test_Programs(t *testing.T) {
 	t.Run("deploying another contract cleans programs storage", func(t *testing.T) {
 
 		// deploy contract B
-		procContractB := fvm.Transaction(contractDeployTx("B", contractBCode, addressB), 3)
+		procContractB := fvm.Transaction(
+			contractDeployTx("B", contractBCode, addressB),
+			programs.NextTxIndexForTestingOnly())
 		err := vm.Run(context, procContractB, mainView, programs)
 		require.NoError(t, err)
 
-		_, _, hasA := programs.Get(contractALocation)
-		_, _, hasB := programs.Get(contractBLocation)
+		_, _, hasA := programs.GetForTestingOnly(contractALocation)
+		_, _, hasB := programs.GetForTestingOnly(contractBLocation)
 
 		require.False(t, hasA)
 		require.False(t, hasB)
@@ -263,7 +276,9 @@ func Test_Programs(t *testing.T) {
 		// programs should have no entries for A and B, as per previous test
 
 		// run a TX using contract B
-		procCallB := fvm.Transaction(callTx("B", addressB), 4)
+		procCallB := fvm.Transaction(
+			callTx("B", addressB),
+			programs.NextTxIndexForTestingOnly())
 
 		viewExecB = delta.NewView(mainView.Peek)
 
@@ -272,7 +287,7 @@ func Test_Programs(t *testing.T) {
 
 		require.Contains(t, procCallB.Logs, "\"hello from B but also hello from A\"")
 
-		_, programAState, has := programs.Get(contractALocation)
+		_, programAState, has := programs.GetForTestingOnly(contractALocation)
 		require.True(t, has)
 
 		// state should be essentially the same as one which we got in tx with contract A
@@ -281,7 +296,7 @@ func Test_Programs(t *testing.T) {
 
 		compareViews(t, contractAView, deltaA)
 
-		_, programBState, has := programs.Get(contractBLocation)
+		_, programBState, has := programs.GetForTestingOnly(contractBLocation)
 		require.True(t, has)
 
 		// program B should contain all the registers used by program A, as it depends on it
@@ -290,7 +305,7 @@ func Test_Programs(t *testing.T) {
 
 		idsA, valuesA := deltaA.Delta().RegisterUpdates()
 		for i, id := range idsA {
-			v, has := deltaB.Delta().Get(id.Owner, id.Controller, id.Key)
+			v, has := deltaB.Delta().Get(id.Owner, id.Key)
 			require.True(t, has)
 
 			require.Equal(t, valuesA[i], v)
@@ -313,15 +328,17 @@ func Test_Programs(t *testing.T) {
 		// rerun transaction
 
 		// execute transaction again, this time make sure it doesn't load code
-		viewExecB2 := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		viewExecB2 := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			//this time we fail if a read of code occurs
-			require.NotEqual(t, key, state.ContractKey("A"))
-			require.NotEqual(t, key, state.ContractKey("B"))
+			require.NotEqual(t, key, environment.ContractKey("A"))
+			require.NotEqual(t, key, environment.ContractKey("B"))
 
-			return mainView.Peek(owner, controller, key)
+			return mainView.Peek(owner, key)
 		})
 
-		procCallB = fvm.Transaction(callTx("B", addressB), 5)
+		procCallB = fvm.Transaction(
+			callTx("B", addressB),
+			programs.NextTxIndexForTestingOnly())
 
 		err = vm.Run(context, procCallB, viewExecB2, programs)
 		require.NoError(t, err)
@@ -340,13 +357,15 @@ func Test_Programs(t *testing.T) {
 		// at this point programs cache should contain data for contract A
 		// only because contract B has been called
 
-		viewExecA := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			require.NotEqual(t, key, state.ContractKey("A"))
-			return mainView.Peek(owner, controller, key)
+		viewExecA := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+			require.NotEqual(t, key, environment.ContractKey("A"))
+			return mainView.Peek(owner, key)
 		})
 
 		// run a TX using contract A
-		procCallA := fvm.Transaction(callTx("A", addressA), 6)
+		procCallA := fvm.Transaction(
+			callTx("A", addressA),
+			programs.NextTxIndexForTestingOnly())
 
 		err = vm.Run(context, procCallA, viewExecA, programs)
 		require.NoError(t, err)
@@ -364,13 +383,15 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, contractBView)
 
 		// deploy contract C
-		procContractC := fvm.Transaction(contractDeployTx("C", contractCCode, addressC), 7)
+		procContractC := fvm.Transaction(
+			contractDeployTx("C", contractCCode, addressC),
+			programs.NextTxIndexForTestingOnly())
 		err := vm.Run(context, procContractC, mainView, programs)
 		require.NoError(t, err)
 
-		_, _, hasA := programs.Get(contractALocation)
-		_, _, hasB := programs.Get(contractBLocation)
-		_, _, hasC := programs.Get(contractCLocation)
+		_, _, hasA := programs.GetForTestingOnly(contractALocation)
+		_, _, hasB := programs.GetForTestingOnly(contractBLocation)
+		_, _, hasC := programs.GetForTestingOnly(contractCLocation)
 
 		require.False(t, hasA)
 		require.False(t, hasB)
@@ -379,7 +400,9 @@ func Test_Programs(t *testing.T) {
 	})
 
 	t.Run("importing C should chain-import B and A", func(t *testing.T) {
-		procCallC := fvm.Transaction(callTx("C", addressC), 8)
+		procCallC := fvm.Transaction(
+			callTx("C", addressC),
+			programs.NextTxIndexForTestingOnly())
 
 		viewExecC := delta.NewView(mainView.Peek)
 
@@ -389,7 +412,7 @@ func Test_Programs(t *testing.T) {
 		require.Contains(t, procCallC.Logs, "\"hello from C, hello from B but also hello from A\"")
 
 		// program A is the same
-		_, programAState, has := programs.Get(contractALocation)
+		_, programAState, has := programs.GetForTestingOnly(contractALocation)
 		require.True(t, has)
 
 		require.IsType(t, programAState.View(), &delta.View{})
@@ -397,7 +420,7 @@ func Test_Programs(t *testing.T) {
 		compareViews(t, contractAView, deltaA)
 
 		// program B is the same
-		_, programBState, has := programs.Get(contractBLocation)
+		_, programBState, has := programs.GetForTestingOnly(contractBLocation)
 		require.True(t, has)
 
 		require.IsType(t, programBState.View(), &delta.View{})
