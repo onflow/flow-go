@@ -86,6 +86,11 @@ emulator-build:
 	# test the fvm package compiles with Relic library disabled (required for the emulator build)
 	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
 
+.PHONY: emulator-build
+fuzz-fvm:
+	# run fuzz tests in the fvm package
+	cd ./fvm && go test -fuzz=Fuzz -run ^$$ --tags relic
+
 .PHONY: test
 test: verify-mocks emulator-build unittest
 
