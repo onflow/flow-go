@@ -178,146 +178,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
 		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
 		Component("S3 block data uploader", exeNode.LoadS3BlockDataUploader).
-		Component("provider engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			opts := []network.BlobServiceOption{}
-
-			if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
-				opts = append(opts, p2p.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
-			}
-
-			bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
-			if err != nil {
-				return nil, fmt.Errorf("failed to register blob service: %w", err)
-			}
-
-			var providerMetrics module.ExecutionDataProviderMetrics = metrics.NewNoopCollector()
-			if node.MetricsEnabled {
-				providerMetrics = metrics.NewExecutionDataProviderCollector()
-			}
-
-			executionDataProvider := exedataprovider.NewProvider(
-				node.Logger,
-				providerMetrics,
-				execution_data.DefaultSerializer,
-				bs,
-				exeNode.executionDataTracker,
-			)
-
-			vmCtx := fvm.NewContext(node.FvmOptions...)
-
-			ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
-			manager, err := computation.New(
-				node.Logger,
-				exeNode.collector,
-				node.Tracer,
-				node.Me,
-				node.State,
-				vmCtx,
-				ledgerViewCommitter,
-				exeNode.blockDataUploaders,
-				executionDataProvider,
-				exeNode.exeConf.computationConfig,
-			)
-			if err != nil {
-				return nil, err
-			}
-			exeNode.computationManager = manager
-
-			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
-			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
-
-			// Needed for gRPC server, make sure to assign to main scoped vars
-			exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
-			exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
-			exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
-
-			exeNode.executionState = state.NewExecutionState(
-				exeNode.ledgerStorage,
-				stateCommitments,
-				node.Storage.Blocks,
-				node.Storage.Headers,
-				node.Storage.Collections,
-				chunkDataPacks,
-				exeNode.results,
-				exeNode.myReceipts,
-				exeNode.events,
-				exeNode.serviceEvents,
-				exeNode.txResults,
-				node.DB,
-				node.Tracer,
-			)
-
-			var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
-			if node.HeroCacheMetricsEnable {
-				chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
-			}
-			chdpReqQueue := queue.NewChunkDataPackRequestQueue(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
-			exeNode.providerEngine, err = exeprovider.New(
-				node.Logger,
-				node.Tracer,
-				node.Network,
-				node.State,
-				exeNode.executionState,
-				exeNode.collector,
-				exeNode.checkAuthorizedAtBlock,
-				chdpReqQueue,
-				exeNode.exeConf.chunkDataPackRequestWorkers,
-				exeNode.exeConf.chunkDataPackQueryTimeout,
-				exeNode.exeConf.chunkDataPackDeliveryTimeout,
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			// Get latest executed block and a view at that block
-			ctx := context.Background()
-			_, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("cannot get the latest executed block id: %w", err)
-			}
-			stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(ctx, blockID)
-			if err != nil {
-				return nil, fmt.Errorf("cannot get the state comitment at latest executed block id %s: %w", blockID.String(), err)
-			}
-			blockView := exeNode.executionState.NewView(stateCommit)
-
-			// Get the epoch counter from the smart contract at the last executed block.
-			contractEpochCounter, err := getContractEpochCounter(exeNode.computationManager.VM(), vmCtx, blockView)
-			// Failing to fetch the epoch counter from the smart contract is a fatal error.
-			if err != nil {
-				return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s: %w", blockID.String(), err)
-			}
-
-			// Get the epoch counter form the protocol state, at the same block.
-			protocolStateEpochCounter, err := node.State.
-				AtBlockID(blockID).
-				Epochs().
-				Current().
-				Counter()
-			// Failing to fetch the epoch counter from the protocol state is a fatal error.
-			if err != nil {
-				return nil, fmt.Errorf("cannot get epoch counter from the protocol state at block %s: %w", blockID.String(), err)
-			}
-
-			l := node.Logger.With().
-				Str("component", "provider engine").
-				Uint64("contractEpochCounter", contractEpochCounter).
-				Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
-				Str("blockID", blockID.String()).
-				Logger()
-
-			if contractEpochCounter != protocolStateEpochCounter {
-				// Do not error, because immediately following a spork they will be mismatching,
-				// until the resetEpoch transaction is submitted.
-				l.Warn().
-					Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state mismatch!")
-			} else {
-				l.Info().
-					Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state match.")
-			}
-
-			return exeNode.providerEngine, nil
-		}).
+		Component("provider engine", exeNode.LoadProviderEngine).
 		Component("checker engine", exeNode.LoadCheckerEngine).
 		Component("ingestion engine", exeNode.LoadIngestionEngine).
 		Component("follower engine", exeNode.LoadFollowerEngine).
@@ -487,6 +348,152 @@ func (exeNode *ExecutionNode) LoadS3BlockDataUploader(
 	// It's functions will be once per startup/shutdown - non-measurable performance penalty
 	// blockDataUploader will stay nil and disable calling uploader at all
 	return &module.NoopReadyDoneAware{}, nil
+}
+
+func (exeNode *ExecutionNode) LoadProviderEngine(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	opts := []network.BlobServiceOption{}
+
+	if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
+		opts = append(opts, p2p.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
+	}
+
+	bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register blob service: %w", err)
+	}
+
+	var providerMetrics module.ExecutionDataProviderMetrics = metrics.NewNoopCollector()
+	if node.MetricsEnabled {
+		providerMetrics = metrics.NewExecutionDataProviderCollector()
+	}
+
+	executionDataProvider := exedataprovider.NewProvider(
+		node.Logger,
+		providerMetrics,
+		execution_data.DefaultSerializer,
+		bs,
+		exeNode.executionDataTracker,
+	)
+
+	vmCtx := fvm.NewContext(node.FvmOptions...)
+
+	ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
+	manager, err := computation.New(
+		node.Logger,
+		exeNode.collector,
+		node.Tracer,
+		node.Me,
+		node.State,
+		vmCtx,
+		ledgerViewCommitter,
+		exeNode.blockDataUploaders,
+		executionDataProvider,
+		exeNode.exeConf.computationConfig,
+	)
+	if err != nil {
+		return nil, err
+	}
+	exeNode.computationManager = manager
+
+	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
+
+	// Needed for gRPC server, make sure to assign to main scoped vars
+	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
+	exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
+	exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
+
+	exeNode.executionState = state.NewExecutionState(
+		exeNode.ledgerStorage,
+		stateCommitments,
+		node.Storage.Blocks,
+		node.Storage.Headers,
+		node.Storage.Collections,
+		chunkDataPacks,
+		exeNode.results,
+		exeNode.myReceipts,
+		exeNode.events,
+		exeNode.serviceEvents,
+		exeNode.txResults,
+		node.DB,
+		node.Tracer,
+	)
+
+	var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
+	if node.HeroCacheMetricsEnable {
+		chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
+	}
+	chdpReqQueue := queue.NewChunkDataPackRequestQueue(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
+	exeNode.providerEngine, err = exeprovider.New(
+		node.Logger,
+		node.Tracer,
+		node.Network,
+		node.State,
+		exeNode.executionState,
+		exeNode.collector,
+		exeNode.checkAuthorizedAtBlock,
+		chdpReqQueue,
+		exeNode.exeConf.chunkDataPackRequestWorkers,
+		exeNode.exeConf.chunkDataPackQueryTimeout,
+		exeNode.exeConf.chunkDataPackDeliveryTimeout,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get latest executed block and a view at that block
+	ctx := context.Background()
+	_, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get the latest executed block id: %w", err)
+	}
+	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(ctx, blockID)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get the state comitment at latest executed block id %s: %w", blockID.String(), err)
+	}
+	blockView := exeNode.executionState.NewView(stateCommit)
+
+	// Get the epoch counter from the smart contract at the last executed block.
+	contractEpochCounter, err := getContractEpochCounter(exeNode.computationManager.VM(), vmCtx, blockView)
+	// Failing to fetch the epoch counter from the smart contract is a fatal error.
+	if err != nil {
+		return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s: %w", blockID.String(), err)
+	}
+
+	// Get the epoch counter form the protocol state, at the same block.
+	protocolStateEpochCounter, err := node.State.
+		AtBlockID(blockID).
+		Epochs().
+		Current().
+		Counter()
+	// Failing to fetch the epoch counter from the protocol state is a fatal error.
+	if err != nil {
+		return nil, fmt.Errorf("cannot get epoch counter from the protocol state at block %s: %w", blockID.String(), err)
+	}
+
+	l := node.Logger.With().
+		Str("component", "provider engine").
+		Uint64("contractEpochCounter", contractEpochCounter).
+		Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
+		Str("blockID", blockID.String()).
+		Logger()
+
+	if contractEpochCounter != protocolStateEpochCounter {
+		// Do not error, because immediately following a spork they will be mismatching,
+		// until the resetEpoch transaction is submitted.
+		l.Warn().
+			Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state mismatch!")
+	} else {
+		l.Info().
+			Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state match.")
+	}
+
+	return exeNode.providerEngine, nil
 }
 
 func (exeNode *ExecutionNode) LoadDeltasMempool(node *NodeConfig) error {

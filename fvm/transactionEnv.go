@@ -88,6 +88,10 @@ func NewTransactionEnvironment(
 				ctx.ServiceEventCollectionEnabled,
 				ctx.EventCollectionByteSizeLimit,
 			),
+			ValueStore: environment.NewValueStore(
+				tracer,
+				meter,
+				accounts),
 			ContractReader: environment.NewContractReader(
 				tracer,
 				meter,
