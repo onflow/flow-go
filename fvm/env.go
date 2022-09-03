@@ -1,7 +1,6 @@
 package fvm
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/atree"
@@ -11,7 +10,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -80,6 +78,7 @@ type commonEnv struct {
 	*environment.BlockInfo
 	environment.TransactionInfo
 	environment.EventEmitter
+	*environment.ValueStore
 	*environment.ContractReader
 
 	*SystemContracts
@@ -120,79 +119,6 @@ func (env *commonEnv) BorrowCadenceRuntime() *ReusableCadenceRuntime {
 
 func (env *commonEnv) ReturnCadenceRuntime(reusable *ReusableCadenceRuntime) {
 	env.ctx.ReusableCadenceRuntimePool.Return(reusable)
-}
-
-func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
-	var valueByteSize int
-	span := env.StartSpanFromRoot(trace.FVMEnvGetValue)
-	defer func() {
-		if !trace.IsSampled(span) {
-			span.SetAttributes(
-				attribute.String("owner", hex.EncodeToString(owner)),
-				attribute.String("key", string(key)),
-				attribute.Int("valueByteSize", valueByteSize),
-			)
-		}
-		span.End()
-	}()
-
-	v, err := env.accounts.GetValue(
-		flow.BytesToAddress(owner),
-		string(key),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("get value failed: %w", err)
-	}
-	valueByteSize = len(v)
-
-	err = env.MeterComputation(environment.ComputationKindGetValue, uint(valueByteSize))
-	if err != nil {
-		return nil, fmt.Errorf("get value failed: %w", err)
-	}
-	return v, nil
-}
-
-// TODO disable SetValue for scripts, right now the view changes are discarded
-func (env *commonEnv) SetValue(owner, key, value []byte) error {
-	span := env.StartSpanFromRoot(trace.FVMEnvSetValue)
-	if !trace.IsSampled(span) {
-		span.SetAttributes(
-			attribute.String("owner", hex.EncodeToString(owner)),
-			attribute.String("key", string(key)),
-		)
-	}
-	defer span.End()
-
-	err := env.MeterComputation(environment.ComputationKindSetValue, uint(len(value)))
-	if err != nil {
-		return fmt.Errorf("set value failed: %w", err)
-	}
-
-	err = env.accounts.SetValue(
-		flow.BytesToAddress(owner),
-		string(key),
-		value,
-	)
-	if err != nil {
-		return fmt.Errorf("set value failed: %w", err)
-	}
-	return nil
-}
-
-func (env *commonEnv) ValueExists(owner, key []byte) (exists bool, err error) {
-	defer env.StartSpanFromRoot(trace.FVMEnvValueExists).End()
-
-	err = env.MeterComputation(environment.ComputationKindValueExists, 1)
-	if err != nil {
-		return false, fmt.Errorf("check value existence failed: %w", err)
-	}
-
-	v, err := env.GetValue(owner, key)
-	if err != nil {
-		return false, fmt.Errorf("check value existence failed: %w", err)
-	}
-
-	return len(v) > 0, nil
 }
 
 func (env *commonEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
