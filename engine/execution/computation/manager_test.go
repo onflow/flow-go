@@ -36,7 +36,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -54,12 +53,12 @@ import (
 var scriptLogThreshold = 1 * time.Second
 
 func TestComputeBlockWithStorage(t *testing.T) {
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.NewVirtualMachine(rt)
-	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
 	require.NoError(t, err)
@@ -216,12 +215,12 @@ func TestExecuteScript(t *testing.T) {
 
 	logger := zerolog.Nop()
 
-	execCtx := fvm.NewContext(logger)
+	execCtx := fvm.NewContext(fvm.WithLogger(logger))
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 
 	vm := fvm.NewVirtualMachine(rt)
 
@@ -259,14 +258,15 @@ func TestExecuteScript(t *testing.T) {
 		trace.NewNoopTracer(),
 		me,
 		nil,
-		vm,
 		execCtx,
-		DefaultProgramsCacheSize,
 		committer.NewNoopViewCommitter(),
-		scriptLogThreshold,
-		DefaultScriptExecutionTimeLimit,
 		nil,
 		prov,
+		ComputationConfig{
+			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ScriptLogThreshold:       scriptLogThreshold,
+			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+		},
 	)
 	require.NoError(t, err)
 
@@ -281,14 +281,10 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 
 	logger := zerolog.Nop()
 
-	execCtx := fvm.NewContext(logger)
+	execCtx := fvm.NewContext(fvm.WithLogger(logger))
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
-
-	rt := fvm.NewInterpreterRuntime()
-
-	vm := fvm.NewVirtualMachine(rt)
 
 	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return nil, fmt.Errorf("error getting register")
@@ -324,14 +320,16 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		trace.NewNoopTracer(),
 		me,
 		nil,
-		vm,
 		execCtx,
-		DefaultProgramsCacheSize,
 		committer.NewNoopViewCommitter(),
-		scriptLogThreshold,
-		DefaultScriptExecutionTimeLimit,
 		nil,
-		prov)
+		prov,
+		ComputationConfig{
+			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ScriptLogThreshold:       scriptLogThreshold,
+			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+		},
+	)
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
@@ -341,9 +339,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 
 func TestExecuteScripPanicsAreHandled(t *testing.T) {
 
-	ctx := fvm.NewContext(zerolog.Nop())
-
-	vm := &PanickingVM{}
+	ctx := fvm.NewContext()
 
 	buffer := &bytes.Buffer{}
 	log := zerolog.New(buffer)
@@ -369,14 +365,19 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		trace.NewNoopTracer(),
 		nil,
 		nil,
-		vm,
 		ctx,
-		DefaultProgramsCacheSize,
 		committer.NewNoopViewCommitter(),
-		scriptLogThreshold,
-		DefaultScriptExecutionTimeLimit,
 		nil,
-		prov)
+		prov,
+		ComputationConfig{
+			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ScriptLogThreshold:       scriptLogThreshold,
+			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			NewCustomVirtualMachine: func() VirtualMachine {
+				return &PanickingVM{}
+			},
+		},
+	)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, header, noopView())
@@ -388,9 +389,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 
 func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 
-	ctx := fvm.NewContext(zerolog.Nop())
-
-	vm := &LongRunningVM{duration: 2 * time.Millisecond}
+	ctx := fvm.NewContext()
 
 	buffer := &bytes.Buffer{}
 	log := zerolog.New(buffer)
@@ -416,14 +415,19 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		trace.NewNoopTracer(),
 		nil,
 		nil,
-		vm,
 		ctx,
-		DefaultProgramsCacheSize,
 		committer.NewNoopViewCommitter(),
-		1*time.Millisecond,
-		DefaultScriptExecutionTimeLimit,
 		nil,
-		prov)
+		prov,
+		ComputationConfig{
+			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ScriptLogThreshold:       1 * time.Millisecond,
+			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			NewCustomVirtualMachine: func() VirtualMachine {
+				return &LongRunningVM{duration: 2 * time.Millisecond}
+			},
+		},
+	)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, header, noopView())
@@ -435,9 +439,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 
 func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
-	ctx := fvm.NewContext(zerolog.Nop())
-
-	vm := &LongRunningVM{duration: 0}
+	ctx := fvm.NewContext()
 
 	buffer := &bytes.Buffer{}
 	log := zerolog.New(buffer)
@@ -463,14 +465,19 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		trace.NewNoopTracer(),
 		nil,
 		nil,
-		vm,
 		ctx,
-		DefaultProgramsCacheSize,
 		committer.NewNoopViewCommitter(),
-		1*time.Second,
-		DefaultScriptExecutionTimeLimit,
 		nil,
-		prov)
+		prov,
+		ComputationConfig{
+			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ScriptLogThreshold:       1 * time.Second,
+			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			NewCustomVirtualMachine: func() VirtualMachine {
+				return &LongRunningVM{duration: 0}
+			},
+		},
+	)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, header, noopView())
@@ -543,14 +550,15 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		trace.NewNoopTracer(),
 		nil,
 		nil,
-		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime()),
-		fvm.NewContext(zerolog.Nop()),
-		DefaultProgramsCacheSize,
+		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
-		DefaultScriptLogThreshold,
-		timeout,
 		nil,
 		nil,
+		ComputationConfig{
+			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ScriptLogThreshold:       DefaultScriptLogThreshold,
+			ScriptExecutionTimeLimit: timeout,
+		},
 	)
 
 	require.NoError(t, err)
@@ -582,14 +590,15 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		trace.NewNoopTracer(),
 		nil,
 		nil,
-		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime()),
-		fvm.NewContext(zerolog.Nop()),
-		DefaultProgramsCacheSize,
+		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
-		DefaultScriptLogThreshold,
-		timeout,
 		nil,
 		nil,
+		ComputationConfig{
+			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ScriptLogThreshold:       DefaultScriptLogThreshold,
+			ScriptExecutionTimeLimit: timeout,
+		},
 	)
 
 	require.NoError(t, err)
@@ -623,30 +632,30 @@ func TestExecuteScriptCancelled(t *testing.T) {
 
 func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
-	timeout := 1 * time.Millisecond
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	timeout := 10 * time.Second
 	chain := flow.Mainnet.Chain()
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	ctx := fvm.NewContext(fvm.WithChain(chain))
 	manager, _ := New(
 		zerolog.Nop(),
 		metrics.NewExecutionCollector(ctx.Tracer),
 		trace.NewNoopTracer(),
 		nil,
 		nil,
-		vm,
 		ctx,
-		DefaultProgramsCacheSize,
 		committer.NewNoopViewCommitter(),
-		DefaultScriptLogThreshold,
-		timeout,
 		nil,
 		nil,
+		ComputationConfig{
+			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ScriptLogThreshold:       DefaultScriptLogThreshold,
+			ScriptExecutionTimeLimit: timeout,
+		},
 	)
+	vm := manager.vm.(*fvm.VirtualMachine)
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 	programs := programs.NewEmptyPrograms()
-	st := state.NewState(view, meter.NewMeter(meter.DefaultParameters()), state.DefaultParameters())
-	sth := state.NewStateHolder(st)
-	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
+	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
+	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, programs)
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)

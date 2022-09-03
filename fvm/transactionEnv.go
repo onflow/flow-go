@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -27,12 +26,10 @@ var _ runtime.Interface = &TransactionEnv{}
 type TransactionEnv struct {
 	commonEnv
 
-	eventHandler     *handler.EventHandler
 	addressGenerator flow.AddressGenerator
 	tx               *flow.TransactionBody
 	txIndex          uint32
 	txID             flow.Identifier
-	authorizers      []runtime.Address
 }
 
 func NewTransactionEnvironment(
@@ -45,53 +42,80 @@ func NewTransactionEnvironment(
 	traceSpan otelTrace.Span,
 ) *TransactionEnv {
 
-	accounts := state.NewAccounts(sth)
-	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
-	uuidGenerator := state.NewUUIDGenerator(sth)
+	txID := tx.ID()
+	accounts := environment.NewAccounts(sth)
+	generator := environment.NewAccountCreator(sth, ctx.Chain)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	// TODO set the flags on context
-	eventHandler := handler.NewEventHandler(ctx.Chain,
-		ctx.ServiceEventCollectionEnabled,
-		ctx.EventCollectionByteSizeLimit,
-	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	tracer := environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
+	meter := environment.NewMeter(sth)
 
 	env := &TransactionEnv{
 		commonEnv: commonEnv{
 			Tracer: tracer,
+			Meter:  meter,
 			ProgramLogger: environment.NewProgramLogger(
 				tracer,
+				ctx.Logger,
 				ctx.Metrics,
 				ctx.CadenceLoggingEnabled,
 			),
+			UUIDGenerator: environment.NewUUIDGenerator(tracer, meter, sth),
 			UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
 				tracer,
 				ctx.BlockHeader,
 			),
-			ctx:            ctx,
-			sth:            sth,
-			vm:             vm,
-			programs:       programsHandler,
-			accounts:       accounts,
-			accountKeys:    accountKeys,
-			uuidGenerator:  uuidGenerator,
-			frozenAccounts: nil,
+			CryptoLibrary: environment.NewCryptoLibrary(tracer, meter),
+			BlockInfo: environment.NewBlockInfo(
+				tracer,
+				meter,
+				ctx.BlockHeader,
+				ctx.Blocks,
+			),
+			TransactionInfo: environment.NewTransactionInfo(
+				tracer,
+				tx.Authorizers,
+				ctx.Chain.ServiceAddress(),
+			),
+			EventEmitter: environment.NewEventEmitter(
+				tracer,
+				meter,
+				ctx.Chain,
+				txID,
+				txIndex,
+				tx.Payer,
+				ctx.ServiceEventCollectionEnabled,
+				ctx.EventCollectionByteSizeLimit,
+			),
+			ContractReader: environment.NewContractReader(
+				tracer,
+				meter,
+				accounts),
+			SystemContracts: NewSystemContracts(),
+			ctx:             ctx,
+			sth:             sth,
+			vm:              vm,
+			programs:        programsHandler,
+			accounts:        accounts,
+			accountKeys:     accountKeys,
+			frozenAccounts:  nil,
 		},
 
 		addressGenerator: generator,
-		eventHandler:     eventHandler,
 		tx:               tx,
 		txIndex:          txIndex,
-		txID:             tx.ID(),
+		txID:             txID,
 	}
 
+	env.SystemContracts.SetEnvironment(env)
+
 	// TODO(patrick): rm this hack
-	env.MeterInterface = env
 	env.AccountInterface = env
 	env.fullEnv = env
 
-	env.contracts = handler.NewContractHandler(accounts,
+	env.contracts = handler.NewContractHandler(
+		accounts,
 		func() bool {
 			enabled, defined := env.GetIsContractDeploymentRestricted()
 			if !defined {
@@ -125,20 +149,12 @@ func (e *TransactionEnv) TxID() flow.Identifier {
 
 // GetAccountsAuthorizedForContractUpdate returns a list of addresses authorized to update/deploy contracts
 func (e *TransactionEnv) GetAccountsAuthorizedForContractUpdate() []common.Address {
-	return e.GetAuthorizedAccounts(
-		cadence.Path{
-			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
-			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
-		})
+	return e.GetAuthorizedAccounts(blueprints.ContractDeploymentAuthorizedAddressesPath)
 }
 
 // GetAccountsAuthorizedForContractRemoval returns a list of addresses authorized to remove contracts
 func (e *TransactionEnv) GetAccountsAuthorizedForContractRemoval() []common.Address {
-	return e.GetAuthorizedAccounts(
-		cadence.Path{
-			Domain:     blueprints.ContractRemovalAuthorizedAddressesPathDomain,
-			Identifier: blueprints.ContractRemovalAuthorizedAddressesPathIdentifier,
-		})
+	return e.GetAuthorizedAccounts(blueprints.ContractRemovalAuthorizedAddressesPath)
 }
 
 // GetAuthorizedAccounts returns a list of addresses authorized by the service account.
@@ -152,10 +168,16 @@ func (e *TransactionEnv) GetAuthorizedAccounts(path cadence.Path) []common.Addre
 	service := runtime.Address(e.ctx.Chain.ServiceAddress())
 	defaultAccounts := []runtime.Address{service}
 
+	runtimeEnv := e.BorrowCadenceRuntime()
+	defer e.ReturnCadenceRuntime(runtimeEnv)
+
 	value, err := e.vm.Runtime.ReadStored(
 		service,
 		path,
-		runtime.Context{Interface: e},
+		runtime.Context{
+			Interface:   e,
+			Environment: runtimeEnv,
+		},
 	)
 
 	const warningMsg = "failed to read contract authorized accounts from service account. using default behaviour instead."
@@ -177,13 +199,16 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 	restricted, defined = false, false
 	service := runtime.Address(e.ctx.Chain.ServiceAddress())
 
+	runtimeEnv := e.BorrowCadenceRuntime()
+	defer e.ReturnCadenceRuntime(runtimeEnv)
+
 	value, err := e.vm.Runtime.ReadStored(
 		service,
-		cadence.Path{
-			Domain:     blueprints.IsContractDeploymentRestrictedPathDomain,
-			Identifier: blueprints.IsContractDeploymentRestrictedPathIdentifier,
+		blueprints.IsContractDeploymentRestrictedPath,
+		runtime.Context{
+			Interface:   e,
+			Environment: runtimeEnv,
 		},
-		runtime.Context{Interface: e},
 	)
 	if err != nil {
 		e.ctx.Logger.
@@ -204,49 +229,7 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 }
 
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
-	return InvokeUseContractAuditVoucherContract(
-		e,
-		address,
-		string(code[:]))
-}
-
-func (e *TransactionEnv) isAuthorizerServiceAccount() bool {
-	return e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress()))
-}
-
-func (e *TransactionEnv) isAuthorizer(address runtime.Address) bool {
-	for _, accountAddress := range e.getSigningAccounts() {
-		if accountAddress == address {
-			return true
-		}
-	}
-	return false
-}
-
-func (e *TransactionEnv) EmitEvent(event cadence.Event) error {
-	defer e.StartExtensiveTracingSpanFromRoot(trace.FVMEnvEmitEvent).End()
-
-	err := e.Meter(meter.ComputationKindEmitEvent, 1)
-	if err != nil {
-		return fmt.Errorf("emit event failed: %w", err)
-	}
-
-	return e.eventHandler.EmitEvent(event, e.txID, e.txIndex, e.tx.Payer)
-}
-
-func (e *TransactionEnv) Events() []flow.Event {
-	return e.eventHandler.Events()
-}
-
-func (e *TransactionEnv) ServiceEvents() []flow.Event {
-	return e.eventHandler.ServiceEvents()
-}
-
-func (e *TransactionEnv) Meter(kind common.ComputationKind, intensity uint) error {
-	if e.sth.EnforceComputationLimits() {
-		return e.sth.MeterComputation(kind, intensity)
-	}
-	return nil
+	return e.UseContractAuditVoucher(address, string(code[:]))
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
@@ -258,7 +241,7 @@ func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) e
 		return fmt.Errorf("setting account frozen failed: %w", err)
 	}
 
-	if !e.isAuthorizerServiceAccount() {
+	if !e.IsServiceAccountAuthorizer() {
 		err := errors.NewOperationAuthorizationErrorf("SetAccountFrozen", "accounts can be frozen only by transactions authorized by the service account")
 		return fmt.Errorf("setting account frozen failed: %w", err)
 	}
@@ -278,7 +261,7 @@ func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) e
 func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvCreateAccount).End()
 
-	err = e.Meter(meter.ComputationKindCreateAccount, 1)
+	err = e.MeterComputation(environment.ComputationKindCreateAccount, 1)
 	if err != nil {
 		return address, err
 	}
@@ -297,12 +280,9 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		_, invokeErr := InvokeSetupNewAccountContract(
-			e,
-			flowAddress,
-			payer)
+		_, invokeErr := e.SetupNewAccount(flowAddress, payer)
 		if invokeErr != nil {
-			return address, errors.HandleRuntimeError(invokeErr)
+			return address, invokeErr
 		}
 	}
 
@@ -317,7 +297,7 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte) error {
 	defer e.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
 
-	err := e.Meter(meter.ComputationKindAddEncodedAccountKey, 1)
+	err := e.MeterComputation(environment.ComputationKindAddEncodedAccountKey, 1)
 	if err != nil {
 		return fmt.Errorf("add encoded account key failed: %w", err)
 	}
@@ -346,7 +326,7 @@ func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey
 func (e *TransactionEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
-	err = e.Meter(meter.ComputationKindRevokeEncodedAccountKey, 1)
+	err = e.MeterComputation(environment.ComputationKindRevokeEncodedAccountKey, 1)
 	if err != nil {
 		return publicKey, fmt.Errorf("revoke encoded account key failed: %w", err)
 	}
@@ -379,7 +359,7 @@ func (e *TransactionEnv) AddAccountKey(
 ) {
 	defer e.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
 
-	err := e.Meter(meter.ComputationKindAddAccountKey, 1)
+	err := e.MeterComputation(environment.ComputationKindAddAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("add account key failed: %w", err)
 	}
@@ -401,7 +381,7 @@ func (e *TransactionEnv) AddAccountKey(
 func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
-	err := e.Meter(meter.ComputationKindRevokeAccountKey, 1)
+	err := e.MeterComputation(environment.ComputationKindRevokeAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("revoke account key failed: %w", err)
 	}
@@ -412,7 +392,7 @@ func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvUpdateAccountContractCode).End()
 
-	err = e.Meter(meter.ComputationKindUpdateAccountContractCode, 1)
+	err = e.MeterComputation(environment.ComputationKindUpdateAccountContractCode, 1)
 	if err != nil {
 		return fmt.Errorf("update account contract code failed: %w", err)
 	}
@@ -422,7 +402,7 @@ func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name
 		return fmt.Errorf("update account contract code failed: %w", err)
 	}
 
-	err = e.contracts.SetContract(address, name, code, e.getSigningAccounts())
+	err = e.contracts.SetContract(address, name, code, e.SigningAccounts())
 	if err != nil {
 		return fmt.Errorf("updating account contract code failed: %w", err)
 	}
@@ -433,7 +413,7 @@ func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name
 func (e *TransactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountContractCode).End()
 
-	err = e.Meter(meter.ComputationKindRemoveAccountContractCode, 1)
+	err = e.MeterComputation(environment.ComputationKindRemoveAccountContractCode, 1)
 	if err != nil {
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}
@@ -443,26 +423,10 @@ func (e *TransactionEnv) RemoveAccountContractCode(address runtime.Address, name
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}
 
-	err = e.contracts.RemoveContract(address, name, e.getSigningAccounts())
+	err = e.contracts.RemoveContract(address, name, e.SigningAccounts())
 	if err != nil {
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}
 
 	return nil
-}
-
-func (e *TransactionEnv) GetSigningAccounts() ([]runtime.Address, error) {
-	defer e.StartExtensiveTracingSpanFromRoot(trace.FVMEnvGetSigningAccounts).End()
-	return e.getSigningAccounts(), nil
-}
-
-func (e *TransactionEnv) getSigningAccounts() []runtime.Address {
-	if e.authorizers == nil {
-		e.authorizers = make([]runtime.Address, len(e.tx.Authorizers))
-
-		for i, auth := range e.tx.Authorizers {
-			e.authorizers[i] = runtime.Address(auth)
-		}
-	}
-	return e.authorizers
 }

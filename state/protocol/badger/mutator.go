@@ -358,10 +358,11 @@ func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*
 }
 
 // receiptExtend checks the compliance of the receipt payload.
-//   * Receipts should pertain to blocks on the fork
-//   * Receipts should not appear more than once on a fork
-//   * Receipts should pass the ReceiptValidator check
-//   * No seal has been included for the respective block in this particular fork
+//   - Receipts should pertain to blocks on the fork
+//   - Receipts should not appear more than once on a fork
+//   - Receipts should pass the ReceiptValidator check
+//   - No seal has been included for the respective block in this particular fork
+//
 // We require the receipts to be sorted by block height (within a payload).
 func (m *MutableState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
 
@@ -692,16 +693,17 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // epoch in its respective fork. We do this by comparing the block's view to
 // the Epoch data from its parent. If the block's view is _larger_ than the
 // final View of the parent's epoch, the block starts a new Epoch.
-// case (a): block is in same Epoch as parent.
-//           the parent's EpochStatus.CurrentEpoch also applies for the current block
-// case (b): block starts new Epoch in its respective fork.
-//           the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
+//   - case (a): block is in same Epoch as parent.
+//     the parent's EpochStatus.CurrentEpoch also applies for the current block
+//   - case (b): block starts new Epoch in its respective fork.
+//     the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
+//
 // As the parent was a valid extension of the chain, by induction, the parent satisfies all
 // consistency requirements of the protocol.
 //
 // Returns:
-// * errIncompleteEpochConfiguration if the epoch has ended before processing
-//   both an EpochSetup and EpochCommit event; so the new epoch can't be constructed.
+//   - errIncompleteEpochConfiguration if the epoch has ended before processing
+//     both an EpochSetup and EpochCommit event; so the new epoch can't be constructed.
 func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
 
 	parentStatus, err := m.epoch.statuses.ByBlockID(block.ParentID)
@@ -764,8 +766,8 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 // operations to insert service events for blocks that include them.
 //
 // Return values:
-//  * ops: pending database operations to persist this processing step
-//  * error: no errors expected during normal operations
+//   - ops: pending database operations to persist this processing step
+//   - error: no errors expected during normal operations
 func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transaction.Tx) error, error) {
 	var ops []func(*transaction.Tx) error
 	blockID := block.ID()
@@ -896,7 +898,6 @@ SealLoop:
 // NOTE: since a parent can have multiple children, `BlockProcessable` event
 // could be triggered multiple times for the same block.
 // NOTE: BlockProcessable should not be blocking, otherwise, it will block the follower
-//
 func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 	header, err := m.headers.ByBlockID(blockID)
 	if err != nil {

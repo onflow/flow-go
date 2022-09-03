@@ -5,7 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/fvm/handler"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -14,18 +14,19 @@ import (
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
 	Chain   flow.Chain
-	Blocks  Blocks
-	Metrics handler.MetricsReporter
+	Blocks  environment.Blocks
+	Metrics environment.MetricsReporter
 	Tracer  module.Tracer
-	// AllowContextOverrideByExecutionState is a flag telling the fvm to override certain parts of the context from the state
-	AllowContextOverrideByExecutionState bool
-	ComputationLimit                     uint64
-	MemoryLimit                          uint64
-	MaxStateKeySize                      uint64
-	MaxStateValueSize                    uint64
-	MaxStateInteractionSize              uint64
-	EventCollectionByteSizeLimit         uint64
-	BlockHeader                          *flow.Header
+	// DisableMemoryAndInteractionLimits will override memory and interaction
+	// limits and set them to MaxUint64, effectively disabling these limits.
+	DisableMemoryAndInteractionLimits bool
+	ComputationLimit                  uint64
+	MemoryLimit                       uint64
+	MaxStateKeySize                   uint64
+	MaxStateValueSize                 uint64
+	MaxStateInteractionSize           uint64
+	EventCollectionByteSizeLimit      uint64
+	BlockHeader                       *flow.Header
 	// NOTE: The ServiceAccountEnabled option is used by the playground
 	// https://github.com/onflow/flow-playground-api/blob/1ad967055f31db8f1ce88e008960e5fc14a9fbd1/compute/computer.go#L76
 	ServiceAccountEnabled bool
@@ -41,11 +42,12 @@ type Context struct {
 	TransactionProcessors         []TransactionProcessor
 	ScriptProcessors              []ScriptProcessor
 	Logger                        zerolog.Logger
+	ReusableCadenceRuntimePool    ReusableCadenceRuntimePool
 }
 
 // NewContext initializes a new execution context with the provided options.
-func NewContext(logger zerolog.Logger, opts ...Option) Context {
-	return newContext(defaultContext(logger), opts...)
+func NewContext(opts ...Option) Context {
+	return newContext(defaultContext(), opts...)
 }
 
 // NewContextFromParent spawns a child execution context with the provided options.
@@ -69,35 +71,36 @@ const (
 	DefaultEventCollectionByteSizeLimit = 256_000        // 256KB
 )
 
-func defaultContext(logger zerolog.Logger) Context {
+func defaultContext() Context {
 	return Context{
-		Chain:                                flow.Mainnet.Chain(),
-		Blocks:                               nil,
-		Metrics:                              &handler.NoopMetricsReporter{},
-		Tracer:                               nil,
-		AllowContextOverrideByExecutionState: true,
-		ComputationLimit:                     DefaultComputationLimit,
-		MemoryLimit:                          DefaultMemoryLimit,
-		MaxStateKeySize:                      state.DefaultMaxKeySize,
-		MaxStateValueSize:                    state.DefaultMaxValueSize,
-		MaxStateInteractionSize:              state.DefaultMaxInteractionSize,
-		EventCollectionByteSizeLimit:         DefaultEventCollectionByteSizeLimit,
-		BlockHeader:                          nil,
-		ServiceAccountEnabled:                true,
-		RestrictContractDeployment:           true,
-		RestrictContractRemoval:              true,
-		CadenceLoggingEnabled:                false,
-		ServiceEventCollectionEnabled:        false,
-		ExtensiveTracing:                     false,
+		Chain:                             flow.Mainnet.Chain(),
+		Blocks:                            nil,
+		Metrics:                           environment.NoopMetricsReporter{},
+		Tracer:                            nil,
+		DisableMemoryAndInteractionLimits: false,
+		ComputationLimit:                  DefaultComputationLimit,
+		MemoryLimit:                       DefaultMemoryLimit,
+		MaxStateKeySize:                   state.DefaultMaxKeySize,
+		MaxStateValueSize:                 state.DefaultMaxValueSize,
+		MaxStateInteractionSize:           state.DefaultMaxInteractionSize,
+		EventCollectionByteSizeLimit:      DefaultEventCollectionByteSizeLimit,
+		BlockHeader:                       nil,
+		ServiceAccountEnabled:             true,
+		RestrictContractDeployment:        true,
+		RestrictContractRemoval:           true,
+		CadenceLoggingEnabled:             false,
+		ServiceEventCollectionEnabled:     false,
+		ExtensiveTracing:                  false,
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
-			NewTransactionInvoker(logger),
+			NewTransactionInvoker(),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvoker(),
 		},
-		Logger: logger,
+		Logger:                     zerolog.Nop(),
+		ReusableCadenceRuntimePool: NewReusableCadenceRuntimePool(0),
 	}
 }
 
@@ -121,10 +124,11 @@ func WithGasLimit(limit uint64) Option {
 	}
 }
 
-// WithAllowContextOverrideByExecutionState sets if certain context parameters get loaded from the state or not
-func WithAllowContextOverrideByExecutionState(load bool) Option {
+// WithMemoryAndInteractionLimitsDisabled will override memory and interaction
+// limits and set them to MaxUint64, effectively disabling these limits.
+func WithMemoryAndInteractionLimitsDisabled() Option {
 	return func(ctx Context) Context {
-		ctx.AllowContextOverrideByExecutionState = load
+		ctx.DisableMemoryAndInteractionLimits = true
 		return ctx
 	}
 }
@@ -141,6 +145,14 @@ func WithComputationLimit(limit uint64) Option {
 func WithMemoryLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.MemoryLimit = limit
+		return ctx
+	}
+}
+
+// WithLogger sets the context logger
+func WithLogger(logger zerolog.Logger) Option {
+	return func(ctx Context) Context {
+		ctx.Logger = logger
 		return ctx
 	}
 }
@@ -209,7 +221,7 @@ func WithExtensiveTracing() Option {
 //
 // The VM uses the block storage provider to provide historical block information to
 // the Cadence runtime.
-func WithBlocks(blocks Blocks) Option {
+func WithBlocks(blocks environment.Blocks) Option {
 	return func(ctx Context) Context {
 		ctx.Blocks = blocks
 		return ctx
@@ -219,7 +231,7 @@ func WithBlocks(blocks Blocks) Option {
 // WithMetricsReporter sets the metrics collector for a virtual machine context.
 //
 // A metrics collector is used to gather metrics reported by the Cadence runtime.
-func WithMetricsReporter(mr handler.MetricsReporter) Option {
+func WithMetricsReporter(mr environment.MetricsReporter) Option {
 	return func(ctx Context) Context {
 		if mr != nil {
 			ctx.Metrics = mr
@@ -302,6 +314,15 @@ func WithAccountStorageLimit(enabled bool) Option {
 func WithTransactionFeesEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.TransactionFeesEnabled = enabled
+		return ctx
+	}
+}
+
+// WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
+// use for creating the cadence runtime.
+func WithReusableCadenceRuntimePool(pool ReusableCadenceRuntimePool) Option {
+	return func(ctx Context) Context {
+		ctx.ReusableCadenceRuntimePool = pool
 		return ctx
 	}
 }

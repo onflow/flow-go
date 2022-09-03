@@ -12,6 +12,10 @@ on:
       - "engine/execution/**"
       - "go.sum"
 
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   benchstat:
     name: Performance regression check
@@ -31,7 +35,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v3
         with:
-          go-version: "1.18"
+          go-version: "1.19"
           cache: true
 
       - name: Build relic

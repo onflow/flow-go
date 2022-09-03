@@ -11,8 +11,8 @@ import (
 // identityForNode ensures that `nodeID` is an authorized member of the network
 // at the given block and returns the corresponding node's full identity.
 // Error returns:
-//   * sentinel engine.InvalidInputError is nodeID is NOT an authorized member of the network
-//   * generic error indicating a fatal internal problem
+//   - sentinel engine.InvalidInputError is nodeID is NOT an authorized member of the network
+//   - generic error indicating a fatal internal problem
 func identityForNode(state protocol.State, blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 	// get the identity of the origin node
 	identity, err := state.AtBlockID(blockID).Identity(nodeID)
@@ -28,12 +28,13 @@ func identityForNode(state protocol.State, blockID flow.Identifier, nodeID flow.
 }
 
 // ensureNodeHasWeightAndRole checks whether, at the given block, `nodeID`
-//   * has _positive_ weight
-//   * and has the expected role
-//   * and is not ejected
+//   - has _positive_ weight
+//   - and has the expected role
+//   - and is not ejected
 //
 // Returns the following errors:
-//   * sentinel engine.InvalidInputError if any of the above-listed conditions are violated.
+//   - sentinel engine.InvalidInputError if any of the above-listed conditions are violated.
+//
 // Note: the method receives the identity as proof of its existence.
 // Therefore, we consider the case where the respective identity is unknown to the
 // protocol state as a symptom of a fatal implementation bug.

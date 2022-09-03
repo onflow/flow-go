@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/spf13/pflag"
 
 	flowconsensus "github.com/onflow/flow-go/consensus"
@@ -192,9 +194,13 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
-			rt := fvm.NewInterpreterRuntime()
+			rt := fvm.NewInterpreterRuntime(runtime.Config{})
 			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
+			fvmOptions := append(
+				[]fvm.Option{fvm.WithLogger(node.Logger)},
+				node.FvmOptions...,
+			)
+			vmCtx := fvm.NewContext(fvmOptions...)
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 			approvalStorage := badger.NewResultApprovals(node.Metrics.Cache, node.DB)
 			verifierEng, err = verifier.New(

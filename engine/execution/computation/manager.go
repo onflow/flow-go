@@ -10,6 +10,7 @@ import (
 	"time"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
@@ -30,12 +31,25 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const (
+	DefaultScriptLogThreshold       = 1 * time.Second
+	DefaultScriptExecutionTimeLimit = 10 * time.Second
+
+	MaxScriptErrorMessageSize = 1000 // 1000 chars
+
+	ReusableCadenceRuntimePoolSize = 1000
+)
+
 var uploadEnabled = true
 
 func SetUploaderEnabled(enabled bool) {
 	uploadEnabled = enabled
 
 	log.Info().Msgf("changed uploadEnabled to %v", enabled)
+}
+
+func GetUploaderEnabled() bool {
+	return uploadEnabled
 }
 
 type VirtualMachine interface {
@@ -53,10 +67,20 @@ type ComputationManager interface {
 	GetAccount(addr flow.Address, header *flow.Header, view state.View) (*flow.Account, error)
 }
 
-var DefaultScriptLogThreshold = 1 * time.Second
-var DefaultScriptExecutionTimeLimit = 10 * time.Second
+type ComputationConfig struct {
+	CadenceTracing           bool
+	ExtensiveTracing         bool
+	ProgramsCacheSize        uint
+	ScriptLogThreshold       time.Duration
+	ScriptExecutionTimeLimit time.Duration
 
-const MaxScriptErrorMessageSize = 1000 // 1000 chars
+	// When NewCustomVirtualMachine is nil, the manager will create a standard
+	// fvm virtual machine via fvm.NewVirtualMachine.  Otherwise, the manager
+	// will create a virtual machine using this function.
+	//
+	// Note that this is primarily used for testing.
+	NewCustomVirtualMachine func() VirtualMachine
+}
 
 // Manager manages computation and execution
 type Manager struct {
@@ -82,16 +106,35 @@ func New(
 	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
-	vm VirtualMachine,
 	vmCtx fvm.Context,
-	programsCacheSize uint,
 	committer computer.ViewCommitter,
-	scriptLogThreshold time.Duration,
-	scriptExecutionTimeLimit time.Duration,
 	uploaders []uploader.Uploader,
 	executionDataProvider *provider.Provider,
+	params ComputationConfig,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
+
+	var vm VirtualMachine
+	if params.NewCustomVirtualMachine != nil {
+		vm = params.NewCustomVirtualMachine()
+	} else {
+		rt := runtime.NewInterpreterRuntime(
+			runtime.Config{
+				TracingEnabled: params.CadenceTracing,
+			})
+
+		vm = fvm.NewVirtualMachine(rt)
+	}
+
+	options := []fvm.Option{
+		fvm.WithReusableCadenceRuntimePool(
+			fvm.NewReusableCadenceRuntimePool(ReusableCadenceRuntimePoolSize)),
+	}
+	if params.ExtensiveTracing {
+		options = append(options, fvm.WithExtensiveTracing())
+	}
+
+	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
 		vm,
@@ -107,7 +150,7 @@ func New(
 		return nil, fmt.Errorf("cannot create block computer: %w", err)
 	}
 
-	programsCache, err := NewProgramsCache(programsCacheSize)
+	programsCache, err := NewProgramsCache(params.ProgramsCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create programs cache: %w", err)
 	}
@@ -122,14 +165,18 @@ func New(
 		vmCtx:                    vmCtx,
 		blockComputer:            blockComputer,
 		programsCache:            programsCache,
-		scriptLogThreshold:       scriptLogThreshold,
-		scriptExecutionTimeLimit: scriptExecutionTimeLimit,
+		scriptLogThreshold:       params.ScriptLogThreshold,
+		scriptExecutionTimeLimit: params.ScriptExecutionTimeLimit,
 		uploaders:                uploaders,
 		rngLock:                  &sync.Mutex{},
 		rng:                      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	return &e, nil
+}
+
+func (e *Manager) VM() VirtualMachine {
+	return e.vm
 }
 
 func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Programs {

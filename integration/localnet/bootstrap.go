@@ -45,6 +45,7 @@ const (
 	DefaultObserverCount     = 0
 	DefaultNClusters         = 1
 	DefaultProfiler          = false
+	DefaultProfileUploader   = false
 	DefaultTracing           = true
 	DefaultCadenceTracing    = false
 	DefaultExtensiveTracing  = false
@@ -73,6 +74,7 @@ var (
 	numViewsInDKGPhase     uint64
 	numViewsEpoch          uint64
 	profiler               bool
+	profileUploader        bool
 	tracing                bool
 	cadenceTracing         bool
 	extesiveTracing        bool
@@ -92,6 +94,7 @@ func init() {
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
+	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
 	flag.BoolVar(&cadenceTracing, "cadence-tracing", DefaultCadenceTracing, "whether to enable the tracing in cadance")
 	flag.BoolVar(&extesiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
@@ -343,10 +346,10 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--block-rate-delay=%s", consensusDelay),
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
-		fmt.Sprintf("--chunk-alpha=1"),
-		fmt.Sprintf("--emergency-sealing-active=false"),
-		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprint("--access-node-ids=*"),
+		"--chunk-alpha=1",
+		"--emergency-sealing-active=false",
+		"--insecure-access-api=false",
+		"--access-node-ids=*",
 	)
 
 	service.Ports = []string{
@@ -361,7 +364,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int, n int)
 
 	service.Command = append(
 		service.Command,
-		fmt.Sprintf("--chunk-alpha=1"),
+		"--chunk-alpha=1",
 	)
 
 	service.Ports = []string{
@@ -382,8 +385,8 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, n int) S
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
-		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprint("--access-node-ids=*"),
+		"--insecure-access-api=false",
+		"--access-node-ids=*",
 	)
 
 	service.Ports = []string{
@@ -467,7 +470,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--upstream-node-addresses=%s:%d", DefaultAccessGatewayName, SecuredRPCPort),
 		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
-		fmt.Sprintf("--bind=0.0.0.0:0"),
+		"--bind=0.0.0.0:0",
 		fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
 		fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
@@ -496,6 +499,7 @@ func defaultService(role, dataDir, profilerDir string, i int) Service {
 			"--secretsdir=/data/secret",
 			"--loglevel=DEBUG",
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
+			fmt.Sprintf("--profile-uploader-enabled=%t", profileUploader),
 			fmt.Sprintf("--tracer-enabled=%t", tracing),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",

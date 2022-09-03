@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -29,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -50,6 +50,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -76,6 +77,7 @@ type Metrics struct {
 	Cache          module.CacheMetrics
 	Mempool        module.MempoolMetrics
 	CleanCollector module.CleanerMetrics
+	Bitswap        module.BitswapMetrics
 }
 
 type Storage = storage.All
@@ -95,7 +97,7 @@ type namedComponentFunc struct {
 // FlowNodeBuilder is the default builder struct used for all flow nodes
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
-//   PostInit handlers, if any
+// PostInit handlers, if any
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
@@ -288,15 +290,18 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
 	)
 
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger)
 	fnb.Middleware = p2p.NewMiddleware(
 		fnb.Logger,
 		libP2PNodeFactory,
 		fnb.Me.NodeID(),
 		fnb.Metrics.Network,
+		fnb.Metrics.Bitswap,
 		fnb.SporkID,
 		fnb.BaseConfig.UnicastMessageTimeout,
 		fnb.IDTranslator,
 		fnb.CodecFactory(),
+		slashingViolationsConsumer,
 		mwOpts...,
 	)
 
@@ -369,7 +374,7 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 				if err != nil {
 					return nil, err
 				}
-				clientCAs, err := ioutil.ReadFile(node.AdminClientCAs)
+				clientCAs, err := os.ReadFile(node.AdminClientCAs)
 				if err != nil {
 					return nil, err
 				}
@@ -497,6 +502,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Cache:          metrics.NewNoopCollector(),
 		Mempool:        metrics.NewNoopCollector(),
 		CleanCollector: metrics.NewNoopCollector(),
+		Bitswap:        metrics.NewNoopCollector(),
 	}
 	if fnb.BaseConfig.MetricsEnabled {
 		fnb.MetricsRegisterer = prometheus.DefaultRegisterer
@@ -512,6 +518,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 			Cache:          metrics.NewNoopCollector(),
 			CleanCollector: metrics.NewCleanerCollector(),
 			Mempool:        mempools,
+			Bitswap:        metrics.NewBitswapCollector(),
 		}
 
 		// registers mempools as a Component so that its Ready method is invoked upon startup
@@ -890,7 +897,7 @@ func (fnb *FlowNodeBuilder) initLocal() {
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
-	blockFinder := fvm.NewBlockFinder(fnb.Storage.Headers)
+	blockFinder := environment.NewBlockFinder(fnb.Storage.Headers)
 	vmOpts := []fvm.Option{
 		fvm.WithChain(fnb.RootChainID.Chain()),
 		fvm.WithBlocks(blockFinder),

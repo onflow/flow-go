@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
@@ -43,11 +44,7 @@ func (s *AccessSuite) TearDownTest() {
 }
 
 func (suite *AccessSuite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "api.go").
-		Str("testcase", suite.T().Name()).
-		Logger()
-	suite.log = logger
+	suite.log = unittest.LoggerForTest(suite.Suite.T(), zerolog.InfoLevel)
 	suite.log.Info().Msg("================> SetupTest")
 	defer func() {
 		suite.log.Info().Msg("================> Finish SetupTest")
@@ -100,7 +97,7 @@ func (suite *AccessSuite) TestAccessConnection() {
 	t := suite.T()
 	addr := "0.0.0.0:" + suite.net.AccessPorts["access-api-port"]
 
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Failed()
 	}

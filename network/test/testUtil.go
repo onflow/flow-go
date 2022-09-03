@@ -10,17 +10,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
+	p2pNetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pc "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	rcmgr "github.com/libp2p/go-libp2p-resource-manager"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -37,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -142,7 +145,7 @@ func GenerateIDs(
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, codec network.Codec, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, codec network.Codec, consumer slashing.ViolationsConsumer, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
@@ -172,10 +175,12 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			factory,
 			nodeId,
 			metrics,
+			metrics,
 			sporkID,
 			p2p.DefaultUnicastTimeout,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
 			codec,
+			consumer,
 			p2p.WithPeerManager(peerManagerFactory),
 		)
 	}
@@ -247,11 +252,12 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	logger zerolog.Logger,
 	codec network.Codec,
+	consumer slashing.ViolationsConsumer,
 	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
 	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, opts...)
-	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, opts...)
+	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, consumer, opts...)
 	return ids, mws, protectObservables, providers
 }
 
@@ -288,9 +294,10 @@ func GenerateIDsMiddlewaresNetworks(
 	n int,
 	log zerolog.Logger,
 	codec network.Codec,
+	consumer slashing.ViolationsConsumer,
 	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []network.Network, []observable.Observable) {
-	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, opts...)
+	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, consumer, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := GenerateNetworks(ctx, t, log, ids, mws, sms)
 	return ids, mws, networks, observables
@@ -341,7 +348,8 @@ func generateLibP2PNode(
 
 	builder := p2p.NewNodeBuilder(logger, "0.0.0.0:0", key, sporkID).
 		SetConnectionManager(connManager).
-		SetPubSub(pubsub.NewGossipSub)
+		SetPubSub(pubsub.NewGossipSub).
+		SetResourceManager(NewResourceManager(t))
 
 	for _, opt := range opts {
 		opt(builder)
@@ -428,4 +436,19 @@ func networkPayloadFixture(t *testing.T, size uint) []byte {
 	require.InDelta(t, len(encodedEvent), int(size), float64(overhead))
 
 	return payload
+}
+
+// NewResourceManager creates a new resource manager for testing with huge limits.
+func NewResourceManager(t *testing.T) p2pNetwork.ResourceManager {
+	// Sadly we can not use:
+	//    rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits))
+	// Since it is broken due to numeric overflow in the resource manager:
+	// https://github.com/libp2p/go-libp2p/issues/1721
+	scalingLimits := rcmgr.DefaultLimits
+	libp2p.SetDefaultServiceLimits(&scalingLimits)
+	limiter := rcmgr.NewFixedLimiter(scalingLimits.Scale(16<<30, 1048575))
+	rm, err := rcmgr.NewResourceManager(limiter)
+	require.NoError(t, err)
+
+	return rm
 }

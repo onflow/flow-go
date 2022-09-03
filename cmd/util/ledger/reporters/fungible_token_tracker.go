@@ -15,7 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
-	metering "github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -142,10 +142,8 @@ func (r *FungibleTokenTracker) worker(
 	for j := range jobs {
 
 		view := migrations.NewView(j.payloads)
-		meter := metering.NewMeter(metering.DefaultParameters())
-		st := state.NewState(view, meter, state.DefaultParameters())
-		sth := state.NewStateHolder(st)
-		accounts := state.NewAccounts(sth)
+		stTxn := state.NewStateTransaction(view, state.DefaultParameters())
+		accounts := environment.NewAccounts(stTxn)
 		storage := cadenceRuntime.NewStorage(
 			&migrations.AccountsAtreeLedger{Accounts: accounts},
 			nil,
@@ -156,7 +154,11 @@ func (r *FungibleTokenTracker) worker(
 			panic(err)
 		}
 
-		inter := &interpreter.Interpreter{}
+		inter, err := interpreter.NewInterpreter(nil, nil, &interpreter.Config{})
+		if err != nil {
+			panic(err)
+		}
+
 		for _, domain := range domains {
 			storageMap := storage.GetStorageMap(owner, domain, true)
 			itr := storageMap.Iterator(inter)
@@ -185,7 +187,10 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 
 	// because compValue.Kind == common.CompositeKindResource
 	// we could pass nil to the IsResourceKinded method
-	inter := &interpreter.Interpreter{}
+	inter, err := interpreter.NewInterpreter(nil, nil, &interpreter.Config{})
+	if err != nil {
+		panic(err)
+	}
 	if compValue.IsResourceKinded(nil) {
 		typeIDStr := string(compValue.TypeID())
 		if _, ok := r.vaultTypeIDs[typeIDStr]; ok {

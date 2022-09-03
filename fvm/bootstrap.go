@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -23,7 +24,7 @@ type BootstrapProcedure struct {
 	ctx       Context
 	sth       *state.StateHolder
 	programs  *programs.Programs
-	accounts  state.Accounts
+	accounts  environment.Accounts
 	rootBlock *flow.Header
 
 	// genesis parameters
@@ -252,8 +253,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.programs = programs
 
 	// initialize the account addressing state
-	b.accounts = state.NewAccounts(b.sth)
-	addressGenerator := state.NewStateBoundAddressGenerator(b.sth, ctx.Chain)
+	b.accounts = environment.NewAccounts(b.sth)
+	addressGenerator := environment.NewAccountCreator(b.sth, ctx.Chain)
 	b.addressGenerator = addressGenerator
 
 	service := b.createServiceAccount()
@@ -325,6 +326,10 @@ func (proc *BootstrapProcedure) ComputationLimit(_ Context) uint64 {
 
 func (proc *BootstrapProcedure) MemoryLimit(_ Context) uint64 {
 	return math.MaxUint64
+}
+
+func (proc *BootstrapProcedure) ShouldDisableMemoryAndInteractionLimits(_ Context) bool {
+	return true
 }
 
 func (b *BootstrapProcedure) createAccount(publicKeys []flow.AccountPublicKey) flow.Address {
@@ -523,7 +528,7 @@ func (b *BootstrapProcedure) deployEpoch(service, fungibleToken, flowToken, flow
 
 	context := NewContextFromParent(b.ctx,
 		WithBlockHeader(b.rootBlock),
-		WithBlocks(&NoopBlockFinder{}),
+		WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
 	txError, err := b.vm.invokeMetaTransaction(
@@ -893,10 +898,5 @@ func FungibleTokenAddress(chain flow.Chain) flow.Address {
 
 func FlowTokenAddress(chain flow.Chain) flow.Address {
 	address, _ := chain.AddressAtIndex(flowTokenAccountIndex)
-	return address
-}
-
-func FlowFeesAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(flowFeesAccountIndex)
 	return address
 }

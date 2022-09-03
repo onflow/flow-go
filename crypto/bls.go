@@ -51,7 +51,7 @@ type blsBLS12381Algo struct {
 	algo SigningAlgorithm
 }
 
-//  BLS context on the BLS 12-381 curve
+// BLS context on the BLS 12-381 curve
 var blsInstance *blsBLS12381Algo
 
 // NewExpandMsgXOFKMAC128 returns a new expand_message_xof instance for
@@ -193,8 +193,10 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	sk := newPrKeyBLSBLS12381(nil)
 
 	// maps the seed to a private key
-	// error is not checked as it is guaranteed to be nil
-	mapToZr(&sk.scalar, seed)
+	err := mapToZr(&sk.scalar, seed)
+	if err != nil {
+		return nil, invalidInputsErrorf("private key generation failed %w", err)
+	}
 	return sk, nil
 }
 

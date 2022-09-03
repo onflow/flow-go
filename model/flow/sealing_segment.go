@@ -12,15 +12,19 @@ import (
 // references the lowest block. The highest block does not need to contain this seal.
 //
 // Example 1 - E seals A:
-//   A <- B <- C <- D <- E(SA)
+//
+//	A <- B <- C <- D <- E(SA)
+//
 // The above sealing segment's last block (E) has a seal for block A, which is
 // the first block of the sealing segment.
 //
 // Example 2 - E contains no seals, but latest seal prior to E seals A:
-//   A <- B <- C <- D(SA) <- E
+//
+//	A <- B <- C <- D(SA) <- E
 //
 // Example 3 - E contains multiple seals
-//   B <- C <- D <- E(SA, SB)
+//
+//	B <- C <- D <- E(SA, SB)
 //
 // MINIMALITY REQUIREMENT:
 // Note that block B is the highest sealed block as of E. Therefore, the
@@ -37,12 +41,15 @@ import (
 // * it is possible (but not necessary) for root sealing segments to contain only the root block
 //
 // Example 1 - one self-sealing root block
-//   ROOT
+//
+//	ROOT
+//
 // The above sealing segment is the form of sealing segments within root snapshots,
 // for example those snapshots used to bootstrap a new network, or spork.
 //
 // Example 2 - one self-sealing root block followed by any number of seal-less blocks
-//   ROOT <- A <- B
+//
+//	ROOT <- A <- B
 //
 // All non-root sealing segments contain more than one block.
 // Sealing segments are in ascending height order.
@@ -395,17 +402,19 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 // As a sanity check, the method confirms that this seal is the latest seal as of the highest block.
 // In other words, this function checks that the sealing segment's history is minimal.
 // Inputs:
-//  * `blocks` is the continuous sequence of blocks that form the sealing segment
-//  * `latestSeals` holds for each block the identifier of the latest seal included in the fork as of this block
+//   - `blocks` is the continuous sequence of blocks that form the sealing segment
+//   - `latestSeals` holds for each block the identifier of the latest seal included in the fork as of this block
+//
 // CAUTION: this method is only applicable for non-root sealing segments, where at least one block
 // was sealed after the root block.
 // Examples:
-//  A <- B <- C <- D(seal_A)               ==> valid
-//  A <- B <- C <- D(seal_A) <- E()        ==> valid
-//  A <- B <- C <- D(seal_A,seal_B)        ==> invalid, because latest seal is B, but lowest block is A
-//  A <- B <- C <- D(seal_X,seal_A)        ==> valid, because it's OK for block X to be unknown
-//  A <- B <- C <- D(seal_A) <- E(seal_B)  ==> invalid, because latest seal is B, but lowest block is A
-//  A(seal_A)                              ==> invalid, because this is impossible for non-root sealing segments
+//
+//	A <- B <- C <- D(seal_A)               ==> valid
+//	A <- B <- C <- D(seal_A) <- E()        ==> valid
+//	A <- B <- C <- D(seal_A,seal_B)        ==> invalid, because latest seal is B, but lowest block is A
+//	A <- B <- C <- D(seal_X,seal_A)        ==> valid, because it's OK for block X to be unknown
+//	A <- B <- C <- D(seal_A) <- E(seal_B)  ==> invalid, because latest seal is B, but lowest block is A
+//	A(seal_A)                              ==> invalid, because this is impossible for non-root sealing segments
 //
 // The node logic requires a valid sealing segment to bootstrap. There are no
 // errors expected during normal operations.

@@ -3,7 +3,6 @@ package fvm
 import (
 	"context"
 
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 var _ runtime.Interface = &ScriptEnv{}
@@ -21,8 +19,6 @@ var _ Environment = &ScriptEnv{}
 // ScriptEnv is a read-only mostly used for executing scripts.
 type ScriptEnv struct {
 	commonEnv
-
-	reqContext context.Context
 }
 
 func NewScriptEnvironment(
@@ -33,89 +29,61 @@ func NewScriptEnvironment(
 	programs *programs.Programs,
 ) *ScriptEnv {
 
-	accounts := state.NewAccounts(sth)
-	uuidGenerator := state.NewUUIDGenerator(sth)
+	accounts := environment.NewAccounts(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	tracer := environment.NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
+	meter := environment.NewCancellableMeter(reqContext, sth)
 
 	env := &ScriptEnv{
 		commonEnv: commonEnv{
 			Tracer: tracer,
+			Meter:  meter,
 			ProgramLogger: environment.NewProgramLogger(
 				tracer,
+				fvmContext.Logger,
 				fvmContext.Metrics,
 				fvmContext.CadenceLoggingEnabled,
 			),
+			UUIDGenerator: environment.NewUUIDGenerator(tracer, meter, sth),
 			UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
 				tracer,
 				fvmContext.BlockHeader,
 			),
-			ctx:            fvmContext,
-			sth:            sth,
-			vm:             vm,
-			programs:       programsHandler,
-			accounts:       accounts,
-			accountKeys:    accountKeys,
-			uuidGenerator:  uuidGenerator,
-			frozenAccounts: nil,
+			CryptoLibrary: environment.NewCryptoLibrary(tracer, meter),
+			BlockInfo: environment.NewBlockInfo(
+				tracer,
+				meter,
+				fvmContext.BlockHeader,
+				fvmContext.Blocks,
+			),
+			TransactionInfo: environment.NoTransactionInfo{},
+			EventEmitter:    environment.NoEventEmitter{},
+			ContractReader: environment.NewContractReader(
+				tracer,
+				meter,
+				accounts),
+			SystemContracts: NewSystemContracts(),
+			ctx:             fvmContext,
+			sth:             sth,
+			vm:              vm,
+			programs:        programsHandler,
+			accounts:        accounts,
+			accountKeys:     accountKeys,
+			frozenAccounts:  nil,
 		},
-		reqContext: reqContext,
 	}
 
+	env.SystemContracts.SetEnvironment(env)
+
 	// TODO(patrick): remove this hack
-	env.MeterInterface = env
 	env.AccountInterface = env
 	env.fullEnv = env
-
-	env.contracts = handler.NewContractHandler(
-		accounts,
-		func() bool { return true },
-		func() bool { return true },
-		func() []common.Address { return []common.Address{} },
-		func() []common.Address { return []common.Address{} },
-		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
 	return env
 }
 
-func (e *ScriptEnv) EmitEvent(_ cadence.Event) error {
-	return errors.NewOperationNotSupportedError("EmitEvent")
-}
-
-func (e *ScriptEnv) Events() []flow.Event {
-	return []flow.Event{}
-}
-
-func (e *ScriptEnv) checkContext() error {
-	// in the future this context check should be done inside the cadence
-	select {
-	case <-e.reqContext.Done():
-		err := e.reqContext.Err()
-		if errors.Is(err, context.DeadlineExceeded) {
-			return errors.NewScriptExecutionTimedOutError()
-		}
-		return errors.NewScriptExecutionCancelledError(err)
-	default:
-		return nil
-	}
-}
-
-func (e *ScriptEnv) Meter(kind common.ComputationKind, intensity uint) error {
-	// this method is called on every unit of operation, so
-	// checking the context here is the most likely would capture
-	// timeouts or cancellation as soon as they happen, though
-	// we might revisit this when optimizing script execution
-	// by only checking on specific kind of Meter calls.
-	if err := e.checkContext(); err != nil {
-		return err
-	}
-
-	if e.sth.EnforceComputationLimits() {
-		return e.sth.MeterComputation(kind, intensity)
-	}
-	return nil
-}
+// Block Environment Functions
 
 func (e *ScriptEnv) CreateAccount(_ runtime.Address) (address runtime.Address, err error) {
 	return runtime.Address{}, errors.NewOperationNotSupportedError("CreateAccount")
@@ -145,6 +113,6 @@ func (e *ScriptEnv) RemoveAccountContractCode(_ runtime.Address, _ string) (err 
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
 }
 
-func (e *ScriptEnv) GetSigningAccounts() ([]runtime.Address, error) {
-	return nil, errors.NewOperationNotSupportedError("GetSigningAccounts")
+func (e *ScriptEnv) SetAccountFrozen(address common.Address, frozen bool) error {
+	return errors.NewOperationNotSupportedError("SetAccountFrozen")
 }

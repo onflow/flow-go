@@ -18,6 +18,11 @@ const (
 	DefaultMaxKeySize         = 16_000      // ~16KB
 	DefaultMaxValueSize       = 256_000_000 // ~256MB
 	DefaultMaxInteractionSize = 20_000_000  // ~20MB
+
+	AccountKeyPrefix = "a."
+	KeyAccountStatus = AccountKeyPrefix + "s"
+	KeyCode          = "code"
+	KeyContractNames = "contract_names"
 )
 
 type mapKey struct {
@@ -32,26 +37,43 @@ type State struct {
 	meter            meter.Meter
 	updatedAddresses map[flow.Address]struct{}
 	updateSize       map[mapKey]uint64
-	StateParameters
+	stateLimits
 	ReadCounter       uint64
 	WriteCounter      uint64
 	TotalBytesRead    uint64
 	TotalBytesWritten uint64
 }
 
-type StateParameters struct {
-	// TODO(patrick): nest meter parameters into this
+type stateLimits struct {
 	maxKeySizeAllowed     uint64
 	maxValueSizeAllowed   uint64
 	maxInteractionAllowed uint64
 }
 
+type StateParameters struct {
+	meter.MeterParameters
+
+	stateLimits
+}
+
 func DefaultParameters() StateParameters {
 	return StateParameters{
-		maxKeySizeAllowed:     DefaultMaxKeySize,
-		maxValueSizeAllowed:   DefaultMaxValueSize,
-		maxInteractionAllowed: DefaultMaxInteractionSize,
+		MeterParameters: meter.DefaultParameters(),
+		stateLimits: stateLimits{
+			maxKeySizeAllowed:     DefaultMaxKeySize,
+			maxValueSizeAllowed:   DefaultMaxValueSize,
+			maxInteractionAllowed: DefaultMaxInteractionSize,
+		},
 	}
+}
+
+// WithMeterParameters sets the state's meter parameters
+func (params StateParameters) WithMeterParameters(
+	meterParams meter.MeterParameters,
+) StateParameters {
+	newParams := params
+	newParams.MeterParameters = meterParams
+	return newParams
 }
 
 // WithMaxKeySizeAllowed sets limit on max key size
@@ -85,15 +107,26 @@ func (s *State) Meter() meter.Meter {
 
 type StateOption func(st *State) *State
 
-// TODO(patrick): stop passing in meter.  Create meter internally.
 // NewState constructs a new state
-func NewState(view View, meter meter.Meter, params StateParameters) *State {
+func NewState(view View, params StateParameters) *State {
+	m := meter.NewMeter(params.MeterParameters)
 	return &State{
 		view:             view,
-		meter:            meter,
+		meter:            m,
 		updatedAddresses: make(map[flow.Address]struct{}),
 		updateSize:       make(map[mapKey]uint64),
-		StateParameters:  params,
+		stateLimits:      params.stateLimits,
+	}
+}
+
+// NewChild generates a new child state
+func (s *State) NewChild() *State {
+	return &State{
+		view:             s.view.NewChild(),
+		meter:            s.meter.NewChild(),
+		updatedAddresses: make(map[flow.Address]struct{}),
+		updateSize:       make(map[mapKey]uint64),
+		stateLimits:      s.stateLimits,
 	}
 }
 
@@ -213,22 +246,13 @@ func (s *State) MemoryIntensities() meter.MeteredMemoryIntensities {
 }
 
 // TotalMemoryEstimate returns total memory used
-func (s *State) TotalMemoryEstimate() uint {
+func (s *State) TotalMemoryEstimate() uint64 {
 	return s.meter.TotalMemoryEstimate()
 }
 
 // TotalMemoryLimit returns total memory limit
 func (s *State) TotalMemoryLimit() uint {
 	return uint(s.meter.TotalMemoryLimit())
-}
-
-// NewChild generates a new child state
-func (s *State) NewChild() *State {
-	return NewState(
-		s.view.NewChild(),
-		s.meter.NewChild(),
-		s.StateParameters,
-	)
 }
 
 // MergeState applies the changes from a the given view to this view.

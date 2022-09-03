@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -62,7 +62,7 @@ func Test_WAL(t *testing.T) {
 		led, err := complete.NewLedger(diskWal, size*10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), size, checkpointDistance, checkpointsToKeep)
+		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), size, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 		require.NoError(t, err)
 
 		<-compactor.Ready()
@@ -546,7 +546,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 
 		someHash := updatedTrie.RootNode().LeftChild().Hash() // Hash of left child
 
-		file, err := ioutil.TempFile(dir, "temp-checkpoint")
+		file, err := os.CreateTemp(dir, "temp-checkpoint")
 		filepath := file.Name()
 		require.NoError(t, err)
 
@@ -564,7 +564,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 		})
 
 		t.Run("detects modified data", func(t *testing.T) {
-			b, err := ioutil.ReadFile(filepath)
+			b, err := os.ReadFile(filepath)
 			require.NoError(t, err)
 
 			index := bytes.Index(b, someHash[:])

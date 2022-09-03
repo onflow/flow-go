@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -16,6 +18,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/module/mempool/queue"
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -49,6 +54,7 @@ import (
 	vereq "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -57,7 +63,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
-	chainsync "github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -520,7 +526,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	ls, err := completeLedger.NewLedger(diskWal, capacity, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
-	compactor, err := completeLedger.NewCompactor(ls, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	compactor, err := completeLedger.NewCompactor(ls, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	require.NoError(t, err)
 
 	<-compactor.Ready() // Need to start compactor here because BootstrapLedger() updates ledger state.
@@ -552,18 +558,24 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metricsCollector, checkAuthorizedAtBlock, 10, 10,
+		node.Log,
+		node.Tracer,
+		node.Net,
+		node.State,
+		execState,
+		metricsCollector,
+		checkAuthorizedAtBlock,
+		queue.NewChunkDataPackRequestQueue(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
+		executionprovider.DefaultChunkDataPackRequestWorker,
+		executionprovider.DefaultChunkDataPackQueryTimeout,
+		executionprovider.DefaultChunkDataPackDeliveryTimeout,
 	)
 	require.NoError(t, err)
 
-	rt := fvm.NewInterpreterRuntime()
-
-	vm := fvm.NewVirtualMachine(rt)
-
-	blockFinder := fvm.NewBlockFinder(node.Headers)
+	blockFinder := environment.NewBlockFinder(node.Headers)
 
 	vmCtx := fvm.NewContext(
-		node.Log,
+		fvm.WithLogger(node.Log),
 		fvm.WithChain(node.ChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 	)
@@ -589,14 +601,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Tracer,
 		node.Me,
 		node.State,
-		vm,
 		vmCtx,
-		computation.DefaultProgramsCacheSize,
 		committer,
-		computation.DefaultScriptLogThreshold,
-		computation.DefaultScriptExecutionTimeLimit,
 		nil,
 		prov,
+		computation.ComputationConfig{
+			ProgramsCacheSize:        computation.DefaultProgramsCacheSize,
+			ScriptLogThreshold:       computation.DefaultScriptLogThreshold,
+			ScriptExecutionTimeLimit: computation.DefaultScriptExecutionTimeLimit,
+		},
 	)
 	require.NoError(t, err)
 
@@ -636,6 +649,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		false,
 		checkAuthorizedAtBlock,
 		false,
+		nil,
 		nil,
 	)
 	require.NoError(t, err)
@@ -687,7 +701,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		RequestEngine:       requestEngine,
 		ReceiptsEngine:      pusherEngine,
 		BadgerDB:            node.PublicDB,
-		VM:                  vm,
+		VM:                  computationEngine.VM(),
 		ExecutionState:      execState,
 		Ledger:              ls,
 		LevelDbDir:          dbDir,
@@ -858,14 +872,14 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.VerifierEngine == nil {
-		rt := fvm.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime(runtime.Config{})
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		blockFinder := fvm.NewBlockFinder(node.Headers)
+		blockFinder := environment.NewBlockFinder(node.Headers)
 
 		vmCtx := fvm.NewContext(
-			node.Log,
+			fvm.WithLogger(node.Log),
 			fvm.WithChain(node.ChainID.Chain()),
 			fvm.WithBlocks(blockFinder),
 		)

@@ -3,12 +3,12 @@ package complete_test
 import (
 	"math"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -21,7 +21,9 @@ import (
 
 // GENERAL COMMENT:
 // running this test with
-//   go test -bench=.  -benchmem
+//
+//	go test -bench=.  -benchmem
+//
 // will track the heap allocations for the Benchmarks
 func BenchmarkStorage(b *testing.B) { benchmarkStorage(100, b) }
 
@@ -40,11 +42,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 	rand.Seed(time.Now().UnixNano())
 
-	dir, err := os.MkdirTemp("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, steps+1, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
@@ -52,7 +50,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 	led, err := complete.NewLedger(diskWal, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(steps+1), checkpointDistance, checkpointsToKeep)
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(steps+1), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -159,11 +157,7 @@ func BenchmarkTrieUpdate(b *testing.B) {
 
 	rand.Seed(1)
 
-	dir, err := os.MkdirTemp("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
@@ -171,7 +165,7 @@ func BenchmarkTrieUpdate(b *testing.B) {
 	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -217,11 +211,7 @@ func BenchmarkTrieRead(b *testing.B) {
 
 	rand.Seed(1)
 
-	dir, err := os.MkdirTemp("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
@@ -229,7 +219,7 @@ func BenchmarkTrieRead(b *testing.B) {
 	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -284,11 +274,7 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 
 	rand.Seed(1)
 
-	dir, err := os.MkdirTemp("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
@@ -296,7 +282,7 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -368,11 +354,7 @@ func BenchmarkTrieProve(b *testing.B) {
 
 	rand.Seed(1)
 
-	dir, err := os.MkdirTemp("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
@@ -380,7 +362,7 @@ func BenchmarkTrieProve(b *testing.B) {
 	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	require.NoError(b, err)
 
 	<-compactor.Ready()

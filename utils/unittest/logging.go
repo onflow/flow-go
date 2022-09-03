@@ -4,10 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -23,7 +25,7 @@ func LogVerbose() {
 // Logger returns a zerolog
 // use -vv flag to print debugging logs for tests
 func Logger() zerolog.Logger {
-	writer := ioutil.Discard
+	writer := io.Discard
 	if *verbose {
 		writer = os.Stderr
 	}
@@ -39,8 +41,22 @@ func LoggerWithWriterAndLevel(writer io.Writer, level zerolog.Level) zerolog.Log
 	return log
 }
 
+// go:noinline
+func LoggerForTest(t *testing.T, level zerolog.Level) zerolog.Logger {
+	_, file, _, ok := runtime.Caller(1)
+	if !ok {
+		file = "???"
+	}
+	return LoggerWithLevel(level).With().
+		Str("testfile", filepath.Base(file)).Str("testcase", t.Name()).Logger()
+}
+
 func LoggerWithLevel(level zerolog.Level) zerolog.Logger {
 	return LoggerWithWriterAndLevel(os.Stderr, level)
+}
+
+func LoggerWithName(mod string) zerolog.Logger {
+	return Logger().With().Str("module", mod).Logger()
 }
 
 func NewLoggerHook() LoggerHook {
@@ -52,7 +68,7 @@ func NewLoggerHook() LoggerHook {
 
 func HookedLogger() (zerolog.Logger, LoggerHook) {
 	hook := NewLoggerHook()
-	log := zerolog.New(ioutil.Discard).Hook(hook)
+	log := zerolog.New(io.Discard).Hook(hook)
 	return log, hook
 }
 

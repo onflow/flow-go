@@ -3,7 +3,6 @@ package computer
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -28,8 +27,9 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const SystemChunkEventCollectionMaxSize = 256_000_000  // ~256MB
-const SystemChunkLedgerIntractionLimit = 1_000_000_000 // ~1GB
+const (
+	SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
+)
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
@@ -65,11 +65,9 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithContractRemovalRestricted(false),
 		fvm.WithTransactionFeesEnabled(false),
 		fvm.WithServiceEventCollectionEnabled(),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(logger)),
-		fvm.WithMaxStateInteractionSize(SystemChunkLedgerIntractionLimit),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker()),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
-		fvm.WithAllowContextOverrideByExecutionState(false), // disable reading the memory limit (and computation/memory weights) from the state
-		fvm.WithMemoryLimit(math.MaxUint64),                 // and set the memory limit to the maximum
+		fvm.WithMemoryAndInteractionLimitsDisabled(),
 	)
 }
 
@@ -132,8 +130,12 @@ func (e *blockComputer) executeBlock(
 		return nil, fmt.Errorf("executable block start state is not set")
 	}
 
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
-	systemChunkCtx := fvm.NewContextFromParent(e.systemChunkCtx, fvm.WithBlockHeader(block.Block.Header))
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(block.Block.Header))
+	systemChunkCtx := fvm.NewContextFromParent(
+		e.systemChunkCtx,
+		fvm.WithBlockHeader(block.Block.Header))
 	collections := block.Collections()
 
 	chunksSize := len(collections) + 1 // + 1 system chunk
@@ -403,7 +405,16 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	txView := collectionView.NewChild()
-	err := e.vm.Run(ctx, tx, txView, programs)
+	childCtx := fvm.NewContextFromParent(ctx,
+		fvm.WithLogger(ctx.Logger.With().
+			Str("tx_id", txID.String()).
+			Uint32("tx_index", txIndex).
+			Str("block_id", res.ExecutableBlock.ID().String()).
+			Uint64("height", res.ExecutableBlock.Block.Header.Height).
+			Bool("system_chunk", isSystemChunk).
+			Logger()),
+	)
+	err := e.vm.Run(childCtx, tx, txView, programs)
 	if err != nil {
 		return fmt.Errorf("failed to execute transaction %v for block %v at height %v: %w",
 			txID.String(),

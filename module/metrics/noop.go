@@ -16,6 +16,15 @@ func NewNoopCollector() *NoopCollector {
 	return nc
 }
 
+func (nc *NoopCollector) Peers(prefix string, n int)                                             {}
+func (nc *NoopCollector) Wantlist(prefix string, n int)                                          {}
+func (nc *NoopCollector) BlobsReceived(prefix string, n uint64)                                  {}
+func (nc *NoopCollector) DataReceived(prefix string, n uint64)                                   {}
+func (nc *NoopCollector) BlobsSent(prefix string, n uint64)                                      {}
+func (nc *NoopCollector) DataSent(prefix string, n uint64)                                       {}
+func (nc *NoopCollector) DupBlobsReceived(prefix string, n uint64)                               {}
+func (nc *NoopCollector) DupDataReceived(prefix string, n uint64)                                {}
+func (nc *NoopCollector) MessagesReceived(prefix string, n uint64)                               {}
 func (nc *NoopCollector) NetworkMessageSent(sizeBytes int, topic string, messageType string)     {}
 func (nc *NoopCollector) NetworkMessageReceived(sizeBytes int, topic string, messageType string) {}
 func (nc *NoopCollector) NetworkDuplicateMessagesDropped(topic string, messageType string)       {}
@@ -159,10 +168,12 @@ func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Tim
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                          {}
 func (nc *NoopCollector) TransactionSubmissionFailed()                                     {}
 func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                    {}
-func (nc *NoopCollector) ChunkDataPackRequested()                                          {}
+func (nc *NoopCollector) ChunkDataPackRequestProcessed()                                   {}
 func (nc *NoopCollector) ExecutionSync(syncing bool)                                       {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                 {}
 func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)               {}
+func (nc *NoopCollector) ExecutionComputationResultUploaded()                              {}
+func (nc *NoopCollector) ExecutionComputationResultUploadRetried()                         {}
 func (nc *NoopCollector) RootIDComputed(duration time.Duration, numberOfChunks int)        {}
 func (nc *NoopCollector) AddBlobsSucceeded(duration time.Duration, totalSize uint64)       {}
 func (nc *NoopCollector) AddBlobsFailed()                                                  {}

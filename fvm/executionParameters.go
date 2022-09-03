@@ -20,37 +20,23 @@ func getEnvironmentMeterParameters(
 	ctx Context,
 	view state.View,
 	programs *programs.Programs,
-	procComputationLimit uint,
-	procMemoryLimit uint64,
+	params meter.MeterParameters,
 ) (
 	meter.MeterParameters,
 	error,
 ) {
-	params := meter.DefaultParameters().
-		WithComputationLimit(procComputationLimit).
-		WithMemoryLimit(procMemoryLimit)
+	sth := state.NewStateTransaction(
+		view,
+		state.DefaultParameters().
+			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
+			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 
-	var err error
-	if ctx.AllowContextOverrideByExecutionState {
-		sth := state.NewStateHolder(
-			state.NewState(
-				view,
-				meter.NewMeter(meter.DefaultParameters()),
-				state.DefaultParameters().
-					WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-					WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-					WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize)))
+	sth.DisableAllLimitEnforcements()
 
-		sth.DisableAllLimitEnforcements()
+	env := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
 
-		env := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
-
-		params, err = fillEnvironmentMeterParameters(ctx, env, params)
-	}
-
-	// TODO(patrick): disable memory/interaction limits for service account
-
-	return params, err
+	return fillEnvironmentMeterParameters(ctx, env, params)
 }
 
 func fillEnvironmentMeterParameters(
@@ -134,10 +120,16 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	map[KindType]uint64,
 	error,
 ) {
+	runtimeEnv := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(runtimeEnv)
+
 	value, err := env.VM().Runtime.ReadStored(
 		service,
 		path,
-		runtime.Context{Interface: env},
+		runtime.Context{
+			Interface:   env,
+			Environment: runtimeEnv,
+		},
 	)
 
 	if err != nil {
@@ -150,8 +142,7 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
 		return nil, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
-			path.Domain,
-			path.Identifier)
+			path.String())
 	}
 
 	// Merge the default weights with the weights from the state.
@@ -181,10 +172,7 @@ func GetExecutionEffortWeights(
 	return getExecutionWeights(
 		env,
 		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionExecutionParametersPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier,
-		},
+		blueprints.TransactionFeesExecutionEffortWeightsPath,
 		meter.DefaultComputationWeights)
 }
 
@@ -199,10 +187,7 @@ func GetExecutionMemoryWeights(
 	return getExecutionWeights(
 		env,
 		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionExecutionParametersPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier,
-		},
+		blueprints.TransactionFeesExecutionMemoryWeightsPath,
 		meter.DefaultMemoryWeights)
 }
 
@@ -214,13 +199,16 @@ func GetExecutionMemoryLimit(
 	memoryLimit uint64,
 	err error,
 ) {
+	runtimeEnv := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(runtimeEnv)
+
 	value, err := env.VM().Runtime.ReadStored(
 		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionExecutionParametersPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionMemoryLimitPathIdentifier,
+		blueprints.TransactionFeesExecutionMemoryLimitPath,
+		runtime.Context{
+			Interface:   env,
+			Environment: runtimeEnv,
 		},
-		runtime.Context{Interface: env},
 	)
 	if err != nil {
 		// this might be fatal, return as is
@@ -232,8 +220,7 @@ func GetExecutionMemoryLimit(
 		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
 		return 0, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
-			blueprints.TransactionExecutionParametersPathDomain,
-			blueprints.TransactionFeesExecutionMemoryLimitPathIdentifier)
+			blueprints.TransactionFeesExecutionMemoryLimitPath.String())
 	}
 
 	return memoryLimitRaw.ToGoValue().(uint64), nil

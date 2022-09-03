@@ -756,6 +756,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	// it should be able to figure out the rest on its own.
 	follower, err := consensus_follower.NewConsensusFollower(followerConf.NetworkingPrivKey, bindAddr,
 		[]consensus_follower.BootstrapNodeInfo{bootstrapNodeInfo}, opts...)
+	require.NoError(t, err)
 
 	net.ConsensusFollowers[followerConf.NodeID] = follower
 }
@@ -836,7 +837,7 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 				fmt.Sprintf("--upstream-node-addresses=%s:%s", conf.AccessName, conf.AccessGRPCSecurePort),
 				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
 				fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", conf.ObserverName),
-				fmt.Sprintf("--bind=0.0.0.0:0"),
+				"--bind=0.0.0.0:0",
 				fmt.Sprintf("--rpc-addr=%s:%s", conf.ObserverName, "9000"),
 				fmt.Sprintf("--secure-rpc-addr=%s:%s", conf.ObserverName, "9001"),
 				fmt.Sprintf("--http-addr=%s:%s", conf.ObserverName, "8000"),
@@ -890,7 +891,7 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	containerID := container.ID
 	return func() {
 		// shutdown func
-		net.cli.ContainerStop(ctx, containerID, nil)
+		_ = net.cli.ContainerStop(ctx, containerID, nil)
 	}, nil
 }
 
@@ -1134,7 +1135,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 	if nodeConf.Corrupted {
 		// corrupted nodes are running with a Corrupted Conduit Factory (CCF), hence need to bind their
-		// CCF port to local host so they can be accessible by the attack network.
+		// CCF port to local host, so they can be accessible by the orchestrator network.
 		hostPort := testingdock.RandomPort(t)
 		nodeContainer.bindPort(hostPort, strconv.Itoa(cmd.CorruptibleConduitFactoryPort))
 		net.CorruptedPortMapping[nodeConf.NodeID] = hostPort
@@ -1552,76 +1553,4 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 	}
 
 	return rootBlocks, assignments, qcs, nil
-}
-
-// writePrivateKeyFiles writes the staking and machine account private key files.
-func writePrivateKeyFiles(bootstrapDir string, chainID flow.ChainID, nodeInfos []bootstrap.NodeInfo) error {
-
-	// write private key files for each node (staking key, random beacon key, machine account key)
-	//
-	// for the machine account key, we keep track of the address index to map
-	// the Flow address of the machine account to the key.
-	addressIndex := uint64(4)
-	for _, nodeInfo := range nodeInfos {
-		fmt.Println("writing private files for ", nodeInfo.NodeID)
-		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, nodeInfo.NodeID))
-
-		// retrieve private representation of the node
-		private, err := nodeInfo.Private()
-		if err != nil {
-			return err
-		}
-
-		err = WriteJSON(path, private)
-		if err != nil {
-			return err
-		}
-
-		// We use the network key for the machine account. Normally it would be
-		// a separate key.
-
-		// Accounts are generated in a known order during bootstrapping, and
-		// account addresses are deterministic based on order for a given chain
-		// configuration. During the bootstrapping we create 4 Flow accounts besides
-		// the service account (index 0) so node accounts will start at index 5.
-		//
-		// All nodes have a staking account created for them, only collection and
-		// consensus nodes have a second machine account created.
-		//
-		// The accounts are created in the same order defined by the identity list
-		// provided to BootstrapProcedure, which is the same order as this iteration.
-		if nodeInfo.Role == flow.RoleCollection || nodeInfo.Role == flow.RoleConsensus {
-			// increment the address index to account for both the staking account
-			// and the machine account.
-			// now addressIndex points to the machine account address index
-			addressIndex += 2
-		} else {
-			// increment the address index to account for the staking account
-			// we don't need to persist anything related to the staking account
-			addressIndex += 1
-			continue
-		}
-
-		accountAddress, err := chainID.Chain().AddressAtIndex(addressIndex)
-		if err != nil {
-			return err
-		}
-
-		info := bootstrap.NodeMachineAccountInfo{
-			Address:           accountAddress.HexWithPrefix(),
-			EncodedPrivateKey: private.NetworkPrivKey.Encode(),
-			KeyIndex:          0,
-			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
-			HashAlgorithm:     crypto.SHA3_256,
-		}
-
-		infoPath := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeInfo.NodeID))
-
-		err = WriteJSON(infoPath, info)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
