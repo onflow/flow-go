@@ -7,9 +7,32 @@ import (
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/module/trace"
 )
+
+// MetricsReporter captures and reports metrics to back to the execution
+// environment it is a setup passed to the context.
+type MetricsReporter interface {
+	RuntimeTransactionParsed(time.Duration)
+	RuntimeTransactionChecked(time.Duration)
+	RuntimeTransactionInterpreted(time.Duration)
+	RuntimeSetNumberOfAccounts(count uint64)
+}
+
+// NoopMetricsReporter is a MetricReporter that does nothing.
+type NoopMetricsReporter struct{}
+
+// RuntimeTransactionParsed is a noop
+func (NoopMetricsReporter) RuntimeTransactionParsed(time.Duration) {}
+
+// RuntimeTransactionChecked is a noop
+func (NoopMetricsReporter) RuntimeTransactionChecked(time.Duration) {}
+
+// RuntimeTransactionInterpreted is a noop
+func (NoopMetricsReporter) RuntimeTransactionInterpreted(time.Duration) {}
+
+// RuntimeSetNumberOfAccounts is a noop
+func (NoopMetricsReporter) RuntimeSetNumberOfAccounts(count uint64) {}
 
 type ProgramLogger struct {
 	tracer *Tracer
@@ -19,21 +42,26 @@ type ProgramLogger struct {
 	cadenceLoggingEnabled bool
 	logs                  []string
 
-	reporter handler.MetricsReporter
+	reporter MetricsReporter
 }
 
 func NewProgramLogger(
 	tracer *Tracer,
 	logger zerolog.Logger,
-	reporter handler.MetricsReporter,
+	reporter MetricsReporter,
 	cadenceLoggingEnabled bool,
 ) *ProgramLogger {
 	return &ProgramLogger{
 		tracer:                tracer,
+		logger:                logger,
 		cadenceLoggingEnabled: cadenceLoggingEnabled,
 		logs:                  nil,
 		reporter:              reporter,
 	}
+}
+
+func (logger *ProgramLogger) Logger() *zerolog.Logger {
+	return &logger.logger
 }
 
 func (logger *ProgramLogger) ImplementationDebugLog(message string) error {

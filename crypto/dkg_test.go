@@ -25,8 +25,9 @@ func TestDKG(t *testing.T) {
 
 // optimal threshold (t) to allow the largest number of malicious participants (m)
 // assuming the protocol requires:
-//   m<=t for unforgeability
-//   n-m>=t+1 for robustness
+//
+//	m<=t for unforgeability
+//	n-m>=t+1 for robustness
 func optimalThreshold(size int) int {
 	return (size - 1) / 2
 }
@@ -168,18 +169,18 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		lateChansTimeout2[i] = make(chan *message, 5*n)
 	}
 
-	// number of leaders in the protocol
-	var leaders int
+	// number of dealers in the protocol
+	var dealers int
 	if dkg == jointFeldman {
-		leaders = n
+		dealers = n
 	} else {
-		leaders = 1
+		dealers = 1
 	}
 
 	// create n processors for all participants
 	processors := make([]testDKGProcessor, 0, n)
 	for current := 0; current < n; current++ {
-		list := make([]bool, leaders)
+		list := make([]bool, dealers)
 		processors = append(processors, testDKGProcessor{
 			current:           current,
 			chans:             chans,
@@ -210,8 +211,8 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		// r1 = r2 = 0
 
 	case invalidShares:
-		r1 = mrand.Intn(leaders + 1)      // leaders with invalid shares and will get disqualified
-		r2 = mrand.Intn(leaders - r1 + 1) // leaders with invalid shares but will recover
+		r1 = mrand.Intn(dealers + 1)      // dealers with invalid shares and will get disqualified
+		r2 = mrand.Intn(dealers - r1 + 1) // dealers with invalid shares but will recover
 		h = r1
 
 		var i int
@@ -224,7 +225,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		t.Logf("%d participants will be disqualified, %d other participants will recover\n", r1, r2)
 
 	case invalidVector:
-		r1 = 1 + mrand.Intn(leaders) // leaders with invalid vector and will get disqualified
+		r1 = 1 + mrand.Intn(dealers) // dealers with invalid vector and will get disqualified
 		h = r1
 
 		// in this case r2 = 0
@@ -234,9 +235,9 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		t.Logf("%d participants will be disqualified\n", r1)
 
 	case invalidComplaint:
-		r1 = 1 + mrand.Intn(leaders-1) // participants with invalid complaints and will get disqualified.
+		r1 = 1 + mrand.Intn(dealers-1) // participants with invalid complaints and will get disqualified.
 		// r1>= 1 to have at least one malicious dealer, and r1<leadrers-1 to leave space for the trigger dealer below.
-		r2 = mrand.Intn(leaders - r1) // participants with timeouted complaints: they are considered qualified by honest participants
+		r2 = mrand.Intn(dealers - r1) // participants with timeouted complaints: they are considered qualified by honest participants
 		// but their results are invalid
 		h = r1 + r2 // r2 shouldn't be verified for protocol correctness
 
@@ -246,17 +247,17 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		for i := r1; i < r1+r2; i++ {
 			processors[i].malicious = timeoutedComplaintBroadcast
 		}
-		// The participant (r1+r2) will send wrong shares and cause the 0..r1+r2-1 leaders to send complaints.
+		// The participant (r1+r2) will send wrong shares and cause the 0..r1+r2-1 dealers to send complaints.
 		// This participant doesn't risk getting disqualified as the complaints against them
 		// are invalid and won't count. The participant doesn't even answer the complaint.
 		processors[r1+r2].malicious = invalidSharesComplainTrigger
 		t.Logf("%d participants will be disqualified, %d other participants won't be disqualified.\n", r1, r2)
 
 	case invalidComplaintAnswer:
-		r1 = 1 + mrand.Intn(leaders-1) // participants with invalid complaint answers and will get disqualified.
+		r1 = 1 + mrand.Intn(dealers-1) // participants with invalid complaint answers and will get disqualified.
 		// r1>= 1 to have at least one malicious dealer, and r1<leadrers-1 to leave space for the complaint sender.
 		h = r1
-		// the 0..r1-1 leaders will send invalid shares to n-1 to trigger complaints.
+		// the 0..r1-1 dealers will send invalid shares to n-1 to trigger complaints.
 		for i := 0; i < r1; i++ {
 			processors[i].malicious = invalidComplaintAnswerBroadcast
 		}
@@ -335,7 +336,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	// assertions and results:
 
 	// check the disqualified list for all non-disqualified participants
-	expected := make([]bool, leaders)
+	expected := make([]bool, dealers)
 	for i := 0; i < r1; i++ {
 		expected[i] = true
 	}

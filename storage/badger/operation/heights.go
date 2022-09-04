@@ -38,6 +38,12 @@ func RetrieveSealedHeight(height *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeSealedHeight), height)
 }
 
+// InsertLastCompleteBlockHeightIfNotExists inserts the last full block height if it is not already set.
+// Calling this function multiple times is a no-op and returns no expected errors.
+func InsertLastCompleteBlockHeightIfNotExists(height uint64) func(*badger.Txn) error {
+	return SkipDuplicates(InsertLastCompleteBlockHeight(height))
+}
+
 func InsertLastCompleteBlockHeight(height uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeLastCompleteBlockHeight), height)
 }

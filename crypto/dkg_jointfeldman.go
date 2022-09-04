@@ -32,7 +32,7 @@ import (
 // the private key of a BLS threshold signature scheme.
 // Using the complaints mechanism, each dealer is qualified or disqualified
 // from the protocol, and the overall key is taking into account
-// all chunks from qualified leaders.
+// all chunks from qualified dealers.
 
 // Private keys are scalar in Zr, where r is the group order of G1/G2
 // Public keys are in G2.
@@ -69,7 +69,7 @@ type JointFeldmanState struct {
 //    - size if not in [DKGMinSize, DKGMaxSize]
 //    - threshold is not in [MinimumThreshold, size-1]
 //    - myIndex is not in [0, size-1]
-//    - leaderIndex is not in [0, size-1]
+//    - dealerIndex is not in [0, size-1]
 // - (dkgInstance, nil) otherwise
 func NewJointFeldman(size int, threshold int, myIndex int,
 	processor DKGProcessor) (DKGState, error) {
@@ -153,8 +153,8 @@ func (s *JointFeldmanState) NextTimeout() error {
 // key shares.
 // - the finalized private key which is the current participant's own private key share
 //
-// The resturned error is:
-//    - dkgFailureError if the disqualified leaders exceeded the threshold.
+// The returned error is:
+//    - dkgFailureError if the disqualified dealers exceeded the threshold.
 //    - dkgInvalidStateTransitionError Start() was not called, or NextTimeout() was not called twice
 //    - nil otherwise.
 func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
@@ -196,7 +196,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 				disqualifiedTotal, s.threshold, s.size)
 	}
 
-	// wrap up the keys from qualified leaders
+	// wrap up the keys from qualified dealers
 	jointx, jointPublicKey, jointy := s.sumUpQualifiedKeys(s.size - disqualifiedTotal)
 
 	// private key of the current participant
@@ -279,7 +279,7 @@ func (s *JointFeldmanState) ForceDisqualify(participant int) error {
 	return nil
 }
 
-// sum up the 3 type of keys from all qualified leaders to end the protocol
+// sum up the 3 type of keys from all qualified dealers to end the protocol
 func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2, []pointG2) {
 	qualifiedx, qualifiedPubKey, qualifiedy := s.getQualifiedKeys(qualified)
 
@@ -301,7 +301,7 @@ func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2
 	return &jointx, &jointPublicKey, jointy
 }
 
-// get the 3 type of keys from all qualified leaders
+// get the 3 type of keys from all qualified dealers
 func (s *JointFeldmanState) getQualifiedKeys(qualified int) ([]scalar, []pointG2, [][]pointG2) {
 	qualifiedx := make([]scalar, 0, qualified)
 	qualifiedPubKey := make([]pointG2, 0, qualified)

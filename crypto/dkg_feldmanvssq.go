@@ -70,7 +70,7 @@ type complaint struct {
 //    - size if not in [DKGMinSize, DKGMaxSize]
 //    - threshold is not in [MinimumThreshold, size-1]
 //    - myIndex is not in [0, size-1]
-//    - leaderIndex is not in [0, size-1]
+//    - dealerIndex is not in [0, size-1]
 // - (dkgInstance, nil) otherwise
 func NewFeldmanVSSQual(size int, threshold int, myIndex int,
 	processor DKGProcessor, dealerIndex int) (DKGState, error) {
@@ -144,7 +144,7 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 // - the finalized private key which is the current participant's own private key share
 // This is also a timeout to receiving all complaint answers
 // - the returned erorr is :
-//    - dkgFailureError if the leader was disqualified.
+//    - dkgFailureError if the dealer was disqualified.
 //    - dkgInvalidStateTransition if Start() was not called, or NextTimeout() was not called twice
 //    - nil otherwise.
 func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) {

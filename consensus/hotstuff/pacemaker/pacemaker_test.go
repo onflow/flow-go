@@ -172,8 +172,10 @@ func Test_ProcessBlockForCurrentView(t *testing.T) {
 }
 
 // Test_FutureBlockWithQcForCurrentView tests that PaceMaker processes the block with
-//    block.qc.view = curView
-//    block.view = curView +1
+//
+//	block.qc.view = curView
+//	block.view = curView +1
+//
 // correctly. Specifically, it should induce a view change to the block.view, which
 // enables processing the block right away, i.e. switch to block.view + 1
 func Test_FutureBlockWithQcForCurrentView(t *testing.T) {
@@ -201,8 +203,10 @@ func Test_FutureBlockWithQcForCurrentView(t *testing.T) {
 }
 
 // Test_FutureBlockWithQcForCurrentView tests that PaceMaker processes the block with
-//    block.qc.view > curView
-//    block.view = block.qc.view +1
+//
+//	block.qc.view > curView
+//	block.view = block.qc.view +1
+//
 // correctly. Specifically, it should induce a view change to block.view, which
 // enables processing the block right away, i.e. switch to block.view + 1
 func Test_FutureBlockWithQcForFutureView(t *testing.T) {
@@ -228,8 +232,10 @@ func Test_FutureBlockWithQcForFutureView(t *testing.T) {
 }
 
 // Test_FutureBlockWithQcForCurrentView tests that PaceMaker processes the block with
-//    block.qc.view > curView
-//    block.view > block.qc.view +1
+//
+//	block.qc.view > curView
+//	block.view > block.qc.view +1
+//
 // correctly. Specifically, it should induce a view change to the block.qc.view +1,
 // which is not sufficient to process the block. I.e. we expect view change to block.qc.view +1
 // enables processing the block right away.

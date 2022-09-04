@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -24,7 +24,7 @@ type UseContractAuditVoucherFunc func(address runtime.Address, code []byte) (boo
 // only commit them when called so smart contract
 // updates can be delayed until end of the tx execution
 type ContractHandler struct {
-	accounts                     state.Accounts
+	accounts                     environment.Accounts
 	draftUpdates                 map[programs.ContractUpdateKey]programs.ContractUpdate
 	restrictedDeploymentEnabled  RestrictionIsEnabledFunc
 	restrictedRemovalEnabled     RestrictionIsEnabledFunc
@@ -33,7 +33,8 @@ type ContractHandler struct {
 	useContractAuditVoucher      UseContractAuditVoucherFunc
 }
 
-func NewContractHandler(accounts state.Accounts,
+func NewContractHandler(
+	accounts environment.Accounts,
 	restrictedDeploymentEnabled RestrictionIsEnabledFunc,
 	restrictedRemovalEnabled RestrictionIsEnabledFunc,
 	authorizedDeploymentAccounts AuthorizedAccountsFunc,
@@ -49,16 +50,6 @@ func NewContractHandler(accounts state.Accounts,
 		authorizedRemovalAccounts:    authorizedRemovalAccounts,
 		useContractAuditVoucher:      useContractAuditVoucher,
 	}
-}
-
-func (h *ContractHandler) GetContractNames(address runtime.Address) (names []string, err error) {
-	names, err = h.accounts.GetContractNames(flow.Address(address))
-	return
-}
-
-func (h *ContractHandler) GetContract(address runtime.Address, name string) (code []byte, err error) {
-	code, err = h.accounts.GetContract(name, flow.Address(address))
-	return
 }
 
 func (h *ContractHandler) SetContract(

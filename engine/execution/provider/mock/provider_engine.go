@@ -31,74 +31,18 @@ func (_m *ProviderEngine) BroadcastExecutionReceipt(_a0 context.Context, _a1 *fl
 	return r0
 }
 
-// Done provides a mock function with given fields:
-func (_m *ProviderEngine) Done() <-chan struct{} {
-	ret := _m.Called()
-
-	var r0 <-chan struct{}
-	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan struct{})
-		}
-	}
-
-	return r0
-}
-
-// Process provides a mock function with given fields: channel, originID, event
-func (_m *ProviderEngine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	ret := _m.Called(channel, originID, event)
+// Process provides a mock function with given fields: channel, originID, message
+func (_m *ProviderEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
+	ret := _m.Called(channel, originID, message)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(channels.Channel, flow.Identifier, interface{}) error); ok {
-		r0 = rf(channel, originID, event)
+		r0 = rf(channel, originID, message)
 	} else {
 		r0 = ret.Error(0)
 	}
 
 	return r0
-}
-
-// ProcessLocal provides a mock function with given fields: event
-func (_m *ProviderEngine) ProcessLocal(event interface{}) error {
-	ret := _m.Called(event)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(interface{}) error); ok {
-		r0 = rf(event)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// Ready provides a mock function with given fields:
-func (_m *ProviderEngine) Ready() <-chan struct{} {
-	ret := _m.Called()
-
-	var r0 <-chan struct{}
-	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan struct{})
-		}
-	}
-
-	return r0
-}
-
-// Submit provides a mock function with given fields: channel, originID, event
-func (_m *ProviderEngine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	_m.Called(channel, originID, event)
-}
-
-// SubmitLocal provides a mock function with given fields: event
-func (_m *ProviderEngine) SubmitLocal(event interface{}) {
-	_m.Called(event)
 }
 
 type mockConstructorTestingTNewProviderEngine interface {

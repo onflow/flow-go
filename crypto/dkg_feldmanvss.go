@@ -56,7 +56,7 @@ type feldmanVSSstate struct {
 //    - size if not in [DKGMinSize, DKGMaxSize]
 //    - threshold is not in [MinimumThreshold, size-1]
 //    - myIndex is not in [0, size-1]
-//    - leaderIndex is not in [0, size-1]
+//    - dealerIndex is not in [0, size-1]
 // - (dkgInstance, nil) otherwise
 func NewFeldmanVSS(size int, threshold int, myIndex int,
 	processor DKGProcessor, dealerIndex int) (DKGState, error) {
@@ -85,9 +85,9 @@ func (s *feldmanVSSstate) init() {
 }
 
 // Start triggers the protocol start for the current participant.
-// If the current participant is the leader, then the seed is used
+// If the current participant is the dealer, then the seed is used
 // to generate the secret polynomial (including the group private key).
-// If the current participant is not the leader, the seed is ignored.
+// If the current participant is not the dealer, the seed is ignored.
 //
 // The function returns:
 // - dkgInvalidStateTransitionError if the DKG instance is already running.
@@ -428,7 +428,8 @@ func (s *feldmanVSSstate) verifyShare() bool {
 
 // computePublicKeys extracts the participants public keys from the verification vector
 // y[i] = Q(i+1) for all participants i, with:
-//  Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
+//
+//	Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 func (s *feldmanVSSstate) computePublicKeys() {
 	C.G2_polynomialImages(
 		(*C.ep2_st)(&s.y[0]), (C.int)(len(s.y)),

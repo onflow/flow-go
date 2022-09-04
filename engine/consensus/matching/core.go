@@ -137,9 +137,9 @@ func (c *Core) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
 
 // processReceipt checks validity of the given receipt and adds it to the node's validated information.
 // Returns:
-// * bool: true iff receipt is new (previously unknown), and its validity can be confirmed
-// * error: any error indicates an unexpected problem in the protocol logic. The node's
-//   internal state might be corrupted. Hence, returned errors should be treated as fatal.
+//   - bool: true iff receipt is new (previously unknown), and its validity can be confirmed
+//   - error: any error indicates an unexpected problem in the protocol logic. The node's
+//     internal state might be corrupted. Hence, returned errors should be treated as fatal.
 func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	// setup logger to capture basic information about the receipt
 	log := c.log.With().
@@ -251,8 +251,8 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 
 // storeReceipt adds the receipt to the receipts mempool as well as to the persistent storage layer.
 // Return values:
-//  * bool to indicate whether the receipt is stored.
-//  * exception in case something (unexpected) went wrong
+//   - bool to indicate whether the receipt is stored.
+//   - exception in case something (unexpected) went wrong
 func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header) (bool, error) {
 	added, err := c.receipts.AddReceipt(receipt, head)
 	if err != nil {
@@ -393,8 +393,8 @@ func (c *Core) OnBlockFinalization() error {
 
 // getStartAndEndStates returns the pair: (start state commitment; final state commitment)
 // Error returns:
-//  * ErrNoChunks: if there are no chunks, i.e. the ExecutionResult is malformed
-//  * all other errors are unexpected and symptoms of node-internal problems
+//   - ErrNoChunks: if there are no chunks, i.e. the ExecutionResult is malformed
+//   - all other errors are unexpected and symptoms of node-internal problems
 func getStartAndEndStates(receipt *flow.ExecutionReceipt) (initialState flow.StateCommitment, finalState flow.StateCommitment, err error) {
 	initialState, err = receipt.ExecutionResult.InitialStateCommit()
 	if err != nil {

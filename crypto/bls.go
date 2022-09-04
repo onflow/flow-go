@@ -83,7 +83,7 @@ type blsBLS12381Algo struct {
 	algo SigningAlgorithm
 }
 
-//  BLS context on the BLS 12-381 curve
+// BLS context on the BLS 12-381 curve
 var blsInstance *blsBLS12381Algo
 
 // NewExpandMsgXOFKMAC128 returns a new expand_message_xof instance for

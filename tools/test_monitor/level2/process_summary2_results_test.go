@@ -152,9 +152,9 @@ func checkLevel2Summary(t *testing.T, actualLevel2Summary common.Level2Summary, 
 
 // check failure messages created
 // there are 2 types of scenarios:
-// 1. test summaries with no failures - these will not have a `failures` sub-directory and no more checking is needed
-// 2. test summaries with failures - these will have a `failures` sub-directory with failure messages saved
-//    in text files (1 file/failure under separate sub-directory for each test that has failures)
+//  1. test summaries with no failures - these will not have a `failures` sub-directory and no more checking is needed
+//  2. test summaries with failures - these will have a `failures` sub-directory with failure messages saved
+//     in text files (1 file/failure under separate sub-directory for each test that has failures)
 func checkFailureMessages(t *testing.T, hasFailures bool, expectedFailureMessagesPath string) {
 	if !hasFailures {
 		return
@@ -164,9 +164,9 @@ func checkFailureMessages(t *testing.T, hasFailures bool, expectedFailureMessage
 
 // check exception messages created - for tests that generated no pass / fail
 // there are 2 types of scenarios:
-// 1. test summaries with no "exception" - these will not have an `exception` sub-directory and no more checking is needed
-// 2. test summaries with exceptions - these will have an `exception` sub-directory with output messages saved
-//    in text files (1 file/exception under separate sub-directory for each test that has exceptions)
+//  1. test summaries with no "exception" - these will not have an `exception` sub-directory and no more checking is needed
+//  2. test summaries with exceptions - these will have an `exception` sub-directory with output messages saved
+//     in text files (1 file/exception under separate sub-directory for each test that has exceptions)
 func checkExceptionMessages(t *testing.T, HasExceptions bool, expectedExceptionMessagesPath string) {
 	if !HasExceptions {
 		return

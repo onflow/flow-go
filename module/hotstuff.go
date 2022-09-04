@@ -6,7 +6,7 @@ import (
 
 // HotStuff defines the interface to the core HotStuff algorithm. It includes
 // a method to start the event loop, and utilities to submit block proposals
-//  received from other replicas.
+// received from other replicas.
 type HotStuff interface {
 	ReadyDoneAware
 	Startable
@@ -33,9 +33,9 @@ type HotStuff interface {
 // the finalization rules.
 //
 // Notes:
-//   * HotStuffFollower does not handle disconnected blocks. Each block's parent must
-//	   have been previously processed by the HotStuffFollower.
-//   * HotStuffFollower internally prunes blocks below the last finalized view.
+//   - HotStuffFollower does not handle disconnected blocks. Each block's parent must
+//     have been previously processed by the HotStuffFollower.
+//   - HotStuffFollower internally prunes blocks below the last finalized view.
 //     When receiving a block proposal, it might not have the proposal's parent anymore.
 //     Nevertheless, HotStuffFollower needs the parent's view, which must be supplied
 //     in addition to the proposal.
