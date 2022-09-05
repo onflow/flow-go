@@ -223,7 +223,7 @@ func (s *blsThresholdSignatureInspector) validIndex(orig int) error {
 //  - (true, nil) if the signature is valid
 //  - (false, nil) if `orig` is valid but the signature share does not verify agaisnt
 //    the public key share and message.
-//  - (false, InvalidInputsError) if `orig` is an invalid index value
+//  - (false, invalidInputsError) if `orig` is an invalid index value
 //  - (false, error) for all other unexpected errors
 func (s *blsThresholdSignatureInspector) VerifyShare(orig int, share Signature) (bool, error) {
 	// validate index
@@ -267,7 +267,7 @@ func (s *blsThresholdSignatureInspector) enoughShares() bool {
 // HasShare checks whether the internal map contains the share of the given index.
 // This function is thread safe and locks the internal state.
 // The function returns:
-//    - (false, InvalidInputsError) if the index is invalid
+//    - (false, invalidInputsError) if the index is invalid
 //    - (false, nil) if index is valid and share is not in the map
 //    - (true, nil) if index is valid and share is in the map
 func (s *blsThresholdSignatureInspector) HasShare(orig int) (bool, error) {
@@ -297,7 +297,7 @@ func (s *blsThresholdSignatureInspector) hasShare(orig index) bool {
 // The function returns:
 //   - (true, nil) if enough signature shares were already collected and no error occurred
 //   - (false, nil) if not enough shares were collected and no error occurred
-//   - (false, InvalidInputsError) if index is invalid
+//   - (false, invalidInputsError) if index is invalid
 //   - (false, duplicatedSignerError) if a signature for the index was previously added
 func (s *blsThresholdSignatureInspector) TrustedAdd(orig int, share Signature) (bool, error) {
 	// validate index
