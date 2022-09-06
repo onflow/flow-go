@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
@@ -41,7 +40,7 @@ type Engine struct {
 	me      module.Local
 	con     network.Conduit
 	blocks  storage.Blocks
-	comp    consensus.ComplianceProcessor
+	comp    network.MessageProcessor
 
 	pollInterval         time.Duration
 	scanInterval         time.Duration
@@ -63,7 +62,7 @@ func New(
 	net network.Network,
 	me module.Local,
 	blocks storage.Blocks,
-	comp consensus.ComplianceProcessor,
+	comp network.MessageProcessor,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
 	participantsProvider identifier.IdentifierProvider,
@@ -308,11 +307,15 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 			e.log.Debug().Uint64("height", block.Header.Height).Msg("block does not need processing")
 			continue
 		}
-		// pass the block to the compliance layer
-		e.comp.IngestBlock(&events.SyncedBlock{
+		// forward the block to the compliance engine for validation and processing
+		// we use the network.MessageProcessor interface here because the block is un-validated
+		err := e.comp.Process(network.SyncCommittee, originID, &events.SyncedBlock{
 			OriginID: originID,
 			Block:    block,
 		})
+		if err != nil {
+			e.log.Err(err).Msg("received unexpected error from compliance engine")
+		}
 	}
 }
 

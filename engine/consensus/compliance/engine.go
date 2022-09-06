@@ -73,7 +73,6 @@ type Engine struct {
 
 var _ network.MessageProcessor = (*Engine)(nil)
 var _ hotstuff.Communicator = (*Engine)(nil)
-var _ consensus.ComplianceProcessor = (*Engine)(nil)
 
 func NewEngine(
 	log zerolog.Logger,
@@ -266,25 +265,6 @@ func (e *Engine) Done() <-chan struct{} {
 	// NOTE: this will create long-lived goroutines each time Done is called
 	// Since Done is called infrequently, that is OK. If the call frequency changes, change this code.
 	return util.AllDone(e.cm, e.core.hotstuff)
-}
-
-// IngestBlock ingests and queues the block for later processing by the compliance layer.
-func (e *Engine) IngestBlock(block *events.SyncedBlock) {
-	stored := e.pendingBlocks.Put(&engine.Message{
-		OriginID: block.OriginID,
-		Payload: &messages.BlockProposal{
-			Payload: block.Block.Payload,
-			Header:  block.Block.Header,
-		},
-	})
-	// log a warning if we drop a block due to the compliance engine message store being full
-	if !stored {
-		e.log.Warn().
-			Hex("block_id", logging.Entity(block.Block)).
-			Uint64("block_view", block.Block.Header.View).
-			Uint64("block_height", block.Block.Header.Height).
-			Msg("dropping synced block")
-	}
 }
 
 // Process processes the given event from the node with the given origin ID in
