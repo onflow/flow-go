@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/onflow/atree"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -107,4 +108,28 @@ func (store *ValueStore) ValueExists(
 	}
 
 	return len(v) > 0, nil
+}
+
+// AllocateStorageIndex allocates new storage index under the owner accounts
+// to store a new register.
+func (store *ValueStore) AllocateStorageIndex(
+	owner []byte,
+) (
+	atree.StorageIndex,
+	error,
+) {
+	err := store.meter.MeterComputation(ComputationKindAllocateStorageIndex, 1)
+	if err != nil {
+		return atree.StorageIndex{}, fmt.Errorf(
+			"allocate storage index failed: %w",
+			err)
+	}
+
+	v, err := store.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+	if err != nil {
+		return atree.StorageIndex{}, fmt.Errorf(
+			"storage address allocation failed: %w",
+			err)
+	}
+	return v, nil
 }
