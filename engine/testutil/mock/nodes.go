@@ -32,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
-	"github.com/onflow/flow-go/fvm"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -206,7 +205,7 @@ type ExecutionNode struct {
 	SyncEngine          *synchronization.Engine
 	Compactor           *complete.Compactor
 	BadgerDB            *badger.DB
-	VM                  *fvm.VirtualMachine
+	VM                  computation.VirtualMachine
 	ExecutionState      state.ExecutionState
 	Ledger              ledger.Ledger
 	LevelDbDir          string
@@ -215,7 +214,13 @@ type ExecutionNode struct {
 	MyExecutionReceipts storage.MyExecutionReceipts
 }
 
-func (en ExecutionNode) Ready() {
+func (en ExecutionNode) Ready(ctx context.Context) {
+	// TODO: receipt engine has been migrated to the new component interface, hence
+	// is using Start. Other engines' startup should be refactored once migrated to
+	// new interface.
+	irctx, _ := irrecoverable.WithSignaler(ctx)
+	en.ReceiptsEngine.Start(irctx)
+
 	<-util.AllReady(
 		en.Ledger,
 		en.ReceiptsEngine,
@@ -226,8 +231,12 @@ func (en ExecutionNode) Ready() {
 	)
 }
 
-func (en ExecutionNode) Done() {
-	util.AllDone(
+func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
+	// to stop all components running with a component manager.
+	cancelFunc()
+
+	// to stop all (deprecated) ready-done-aware
+	<-util.AllDone(
 		en.IngestionEngine,
 		en.IngestionEngine,
 		en.ReceiptsEngine,

@@ -91,12 +91,13 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 //
 // Note that we don't explicitly check that sealed results satisfy the sub-graph
 // check. Nevertheless, correctness in this regard is guaranteed because:
-//  * We only allow seals that correspond to ExecutionReceipts that were
-//    incorporated in this fork.
-//  * We only include ExecutionReceipts whose results pass the sub-graph check
-//    (as part of ReceiptValidator).
+//   - We only allow seals that correspond to ExecutionReceipts that were
+//     incorporated in this fork.
+//   - We only include ExecutionReceipts whose results pass the sub-graph check
+//     (as part of ReceiptValidator).
+//
 // => Therefore, only seals whose results pass the sub-graph check will be
-//    allowed.
+// allowed.
 func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
 	payload := candidate.Payload

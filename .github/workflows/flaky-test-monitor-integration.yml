@@ -9,7 +9,7 @@ on:
       - trying
 
 env:
-  GO_VERSION: 1.18
+  GO_VERSION: 1.19
 
 concurrency: 
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -64,6 +64,7 @@ jobs:
       env:
         TEST_FLAKY: true
         JSON_OUTPUT: true
+        RACE_DETECTOR: 1
     - name: Process test results
       run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
       env:

@@ -24,7 +24,7 @@ type BootstrapProcedure struct {
 	ctx       Context
 	sth       *state.StateHolder
 	programs  *programs.Programs
-	accounts  state.Accounts
+	accounts  environment.Accounts
 	rootBlock *flow.Header
 
 	// genesis parameters
@@ -253,8 +253,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.programs = programs
 
 	// initialize the account addressing state
-	b.accounts = state.NewAccounts(b.sth)
-	addressGenerator := state.NewStateBoundAddressGenerator(b.sth, ctx.Chain)
+	b.accounts = environment.NewAccounts(b.sth)
+	addressGenerator := environment.NewAccountCreator(b.sth, ctx.Chain)
 	b.addressGenerator = addressGenerator
 
 	service := b.createServiceAccount()
@@ -898,10 +898,5 @@ func FungibleTokenAddress(chain flow.Chain) flow.Address {
 
 func FlowTokenAddress(chain flow.Chain) flow.Address {
 	address, _ := chain.AddressAtIndex(flowTokenAccountIndex)
-	return address
-}
-
-func FlowFeesAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(flowFeesAccountIndex)
 	return address
 }

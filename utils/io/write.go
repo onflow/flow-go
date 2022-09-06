@@ -2,10 +2,11 @@ package io
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 // WriteFile writes a byte array to the file at the given path.
@@ -16,7 +17,7 @@ func WriteFile(path string, data []byte) error {
 		return fmt.Errorf("could not create output dir: %w", err)
 	}
 
-	err = ioutil.WriteFile(path, data, 0644)
+	err = os.WriteFile(path, data, 0644)
 	if err != nil {
 		return fmt.Errorf("could not write file: %w", err)
 	}
@@ -26,7 +27,7 @@ func WriteFile(path string, data []byte) error {
 
 // WriteText writes a byte array to the file at the given path.
 func WriteText(path string, data []byte) error {
-	err := ioutil.WriteFile(path, data, 0644)
+	err := os.WriteFile(path, data, 0644)
 	if err != nil {
 		return fmt.Errorf("could not write file: %w", err)
 	}
@@ -42,4 +43,13 @@ func WriteJSON(path string, data interface{}) error {
 	}
 
 	return WriteFile(path, bz)
+}
+
+// TerminateOnFullDisk panics if the input error is (or wraps) the system "out of disk
+// space" error. It's a no-op for any other error, or nil.
+func TerminateOnFullDisk(err error) error {
+	if err != nil && errors.Is(err, syscall.ENOSPC) {
+		panic(fmt.Sprintf("disk full, terminating node: %s", err.Error()))
+	}
+	return err
 }

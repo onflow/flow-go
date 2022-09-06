@@ -24,8 +24,8 @@ type MsgAuthConfig struct {
 // EnsureAuthorized checks if the specified role is authorized to send the message on the provided channel and
 // asserts that the message is authorized to be sent on the channel.
 // Expected error returns during normal operations:
-//  * ErrUnauthorizedMessageOnChannel: the channel is not included in the message's list of authorized channels
-//  * ErrUnauthorizedRole: the role is not included in the message's list of authorized roles for the provided channel
+//   - ErrUnauthorizedMessageOnChannel: the channel is not included in the message's list of authorized channels
+//   - ErrUnauthorizedRole: the role is not included in the message's list of authorized roles for the provided channel
 func (m MsgAuthConfig) EnsureAuthorized(role flow.Role, channel channels.Channel) error {
 	authorizedRoles, ok := m.Config[channel]
 	if !ok {
@@ -273,7 +273,7 @@ func initializeMessageAuthConfigsMap() {
 // GetMessageAuthConfig checks the underlying type and returns the correct
 // message auth Config.
 // Expected error returns during normal operations:
-//  * ErrUnknownMsgType : if underlying type of v does  not match any of the known message types
+//   - ErrUnknownMsgType : if underlying type of v does  not match any of the known message types
 func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 	switch v.(type) {
 	// consensus

@@ -90,9 +90,9 @@ func (c *CombinedSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 
 // genSigData generates the signature data for our local node for the given block.
 // It returns:
-//  - (stakingSig, nil) if there is no random beacon private key.
-//  - (stakingSig+randomBeaconSig, nil) if there is a random beacon private key.
-//  - (nil, error) if there is any exception
+//   - (stakingSig, nil) if there is no random beacon private key.
+//   - (stakingSig+randomBeaconSig, nil) if there is a random beacon private key.
+//   - (nil, error) if there is any exception
 func (c *CombinedSigner) genSigData(block *model.Block) ([]byte, error) {
 
 	// create the message to be signed and generate signatures

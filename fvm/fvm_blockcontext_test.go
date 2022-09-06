@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -143,7 +142,6 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Testnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -264,7 +262,6 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -423,7 +420,6 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	t.Run("account update with set code fails if not signed by service account if dis-allowed in the state", func(t *testing.T) {
 		ctx := fvm.NewContext(
-			zerolog.Nop(),
 			fvm.WithChain(chain),
 			fvm.WithCadenceLogging(true),
 			fvm.WithContractDeploymentRestricted(false),
@@ -720,7 +716,6 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -827,7 +822,6 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -1102,7 +1096,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction fails but does not panic", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(
 			fvm.WithTransactionProcessors(
-				fvm.NewTransactionInvoker(zerolog.Nop()),
+				fvm.NewTransactionInvoker(),
 			),
 		).
 		run(
@@ -1153,7 +1147,6 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -1295,7 +1288,6 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -1454,7 +1446,6 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -1554,7 +1545,6 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 	header := &flow.Header{Height: 42}
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithBlockHeader(header),
 		fvm.WithCadenceLogging(true),
@@ -1599,7 +1589,6 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	chain, vm := createChainAndVm(flow.MonotonicEmulator)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 	)
 

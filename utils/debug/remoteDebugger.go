@@ -26,11 +26,11 @@ func NewRemoteDebugger(grpcAddress string,
 	// no signature processor here
 	// TODO Maybe we add fee-deduction step as well
 	ctx := fvm.NewContext(
-		logger,
+		fvm.WithLogger(logger),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
 			fvm.NewTransactionSequenceNumberChecker(),
-			fvm.NewTransactionInvoker(logger),
+			fvm.NewTransactionInvoker(),
 		),
 	)
 
