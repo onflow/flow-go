@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -51,9 +50,6 @@ func Test3Nodes(t *testing.T) {
 	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
 
 	allViews := allFinalizedViews(t, nodes)
-	for i, views := range allViews {
-		fmt.Println(i, views)
-	}
 	assertSafety(t, allViews)
 
 	cleanupNodes(nodes)
