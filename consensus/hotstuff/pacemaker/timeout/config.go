@@ -13,9 +13,6 @@ import (
 //   this results in exponential growing timeout duration on multiple subsequent timeouts
 // - on progress: MULTIPLICATIVE timeout decrease
 type Config struct {
-	// ReplicaTimeout is the duration of a view before we time out [MILLISECONDS]
-	// ReplicaTimeout is the only variable quantity
-	ReplicaTimeout float64
 	// MinReplicaTimeout is the minimum the timeout can decrease to [MILLISECONDS]
 	MinReplicaTimeout float64
 	// MaxReplicaTimeout is the maximum value the timeout can increase to [MILLISECONDS]
@@ -23,9 +20,9 @@ type Config struct {
 	// TimeoutIncrease: MULTIPLICATIVE factor for increasing timeout when view
 	// change was triggered by a TC (unhappy path).
 	TimeoutIncrease float64
-	// TimeoutDecrease: MULTIPLICATIVE factor for decreasing timeout when view
-	// change was triggered by observing a QC from the previous view (happy path).
-	TimeoutDecrease float64
+	// HappyPathRounds is the number of rounds without progress where we still consider being
+	// on hot path of execution.
+	HappyPathRounds uint64
 	// BlockRateDelayMS is a delay to broadcast the proposal in order to control block production rate [MILLISECONDS]
 	BlockRateDelayMS float64
 }
@@ -36,25 +33,23 @@ var DefaultConfig = NewDefaultConfig()
 // We explicitly provide a method here, which demonstrates in-code how
 // to compute standard values from some basic quantities.
 func NewDefaultConfig() Config {
-	// the replicas will start with 60 second time out to allow all other replicas to come online
-	// once the replica's views are synchronized, the timeout will decrease to more reasonable values
-	replicaTimeout := 60 * time.Second
-
-	// the lower bound on the replicaTimeout value
+	// the lower bound on the replicaTimeout value, this is also the initial timeout with what replicas
+	// will start their execution.
 	// If HotStuff is running at full speed, 1200ms should be enough. However, we add some buffer.
 	// This value is for instant message delivery.
-	minReplicaTimeout := 2 * time.Second
-	maxReplicaTimeout := 150 * time.Second
-	timeoutIncreaseFactor := 2.0
+	minReplicaTimeout := 3 * time.Second
+	maxReplicaTimeout := 1 * time.Minute
+	timeoutIncreaseFactor := 1.2
+	// we consider that after 6 rounds we are not on hot path anymore, and we need to start increasing timeouts
+	happyPathRounds := uint64(6)
 	blockRateDelay := 0 * time.Millisecond
 
 	// the following demonstrates the computation of standard values
 	conf, err := NewConfig(
-		replicaTimeout,
 		minReplicaTimeout+blockRateDelay,
 		maxReplicaTimeout,
 		timeoutIncreaseFactor,
-		StandardTimeoutDecreaseFactor(1.0/3.0, timeoutIncreaseFactor), // resulting value is 1/sqrt(2)
+		happyPathRounds,
 		blockRateDelay,
 	)
 	if err != nil {
@@ -79,17 +74,12 @@ func NewDefaultConfig() Config {
 //  * blockRateDelay: a delay to delay the proposal broadcasting [Milliseconds]
 // Returns `model.ConfigurationError` is any of the consistency requirements is violated.
 func NewConfig(
-	startReplicaTimeout time.Duration,
 	minReplicaTimeout time.Duration,
 	maxReplicaTimeout time.Duration,
 	timeoutIncrease float64,
-	timeoutDecrease float64,
+	happyPathRounds uint64,
 	blockRateDelay time.Duration,
 ) (Config, error) {
-	if startReplicaTimeout < minReplicaTimeout {
-		return Config{}, model.NewConfigurationErrorf("startReplicaTimeout (%dms) cannot be smaller than minReplicaTimeout (%dms)",
-			startReplicaTimeout.Milliseconds(), minReplicaTimeout.Milliseconds())
-	}
 	if minReplicaTimeout < 0 {
 		return Config{}, model.NewConfigurationErrorf("minReplicaTimeout must non-negative")
 	}
@@ -99,19 +89,15 @@ func NewConfig(
 	if timeoutIncrease <= 1 {
 		return Config{}, model.NewConfigurationErrorf("TimeoutIncrease must be strictly bigger than 1")
 	}
-	if timeoutDecrease <= 0 || 1 <= timeoutDecrease {
-		return Config{}, model.NewConfigurationErrorf("timeoutDecrease must be in range (0,1)")
-	}
 	if blockRateDelay < 0 {
 		return Config{}, model.NewConfigurationErrorf("blockRateDelay must be must be non-negative")
 	}
 
 	tc := Config{
-		ReplicaTimeout:    float64(startReplicaTimeout.Milliseconds()),
 		MinReplicaTimeout: float64(minReplicaTimeout.Milliseconds()),
 		MaxReplicaTimeout: float64(maxReplicaTimeout.Milliseconds()),
 		TimeoutIncrease:   timeoutIncrease,
-		TimeoutDecrease:   timeoutDecrease,
+		HappyPathRounds:   happyPathRounds,
 		BlockRateDelayMS:  float64(blockRateDelay.Milliseconds()),
 	}
 	return tc, nil

@@ -12,10 +12,12 @@ import (
 //   this results in exponential growing timeout duration on multiple subsequent timeouts
 // - on progress: decrease timeout by subtrahend `timeoutDecrease`
 type Controller struct {
-	cfg            Config
-	timer          *time.Timer
-	timerInfo      *model.TimerInfo
-	timeoutChannel <-chan time.Time
+	cfg                   Config
+	maxExponent           float64
+	roundsWithoutProgress uint64
+	timer                 *time.Timer
+	timerInfo             *model.TimerInfo
+	timeoutChannel        <-chan time.Time
 }
 
 // NewController creates a new Controller.
@@ -25,9 +27,16 @@ func NewController(timeoutConfig Config) *Controller {
 	startChannel := make(chan time.Time)
 	close(startChannel)
 
+	// we need to calculate log_b(tmax/tmin), golang doesn't support logarithm with custom base
+	// we will apply change of base logarithm transformation to get around this:
+	// log_b(x) = log_e(x) / log_e(b)
+	maxExponent := math.Log(timeoutConfig.MaxReplicaTimeout/timeoutConfig.MinReplicaTimeout) /
+		math.Log(timeoutConfig.TimeoutIncrease)
+
 	tc := Controller{
 		cfg:            timeoutConfig,
 		timeoutChannel: startChannel,
+		maxExponent:    maxExponent,
 	}
 	return &tc
 }
@@ -66,17 +75,26 @@ func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
 
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
-	return time.Duration(t.cfg.ReplicaTimeout * 1e6)
+	step := uint64(0)
+	if t.roundsWithoutProgress > t.cfg.HappyPathRounds {
+		step = 1
+	}
+
+	exponent := math.Min(float64(t.roundsWithoutProgress*step), t.maxExponent)
+	duration := t.cfg.MinReplicaTimeout * math.Pow(t.cfg.TimeoutIncrease, exponent)
+	return time.Duration(duration * float64(time.Millisecond))
 }
 
 // OnTimeout indicates to the Controller that a view change was triggered by a TC (unhappy path).
 func (t *Controller) OnTimeout() {
-	t.cfg.ReplicaTimeout = math.Min(t.cfg.ReplicaTimeout*t.cfg.TimeoutIncrease, t.cfg.MaxReplicaTimeout)
+	t.roundsWithoutProgress++
 }
 
 // OnProgressBeforeTimeout indicates to the Controller that progress was made _before_ the timeout was reached
 func (t *Controller) OnProgressBeforeTimeout() {
-	t.cfg.ReplicaTimeout = math.Max(t.cfg.ReplicaTimeout*t.cfg.TimeoutDecrease, t.cfg.MinReplicaTimeout)
+	if t.roundsWithoutProgress > 0 {
+		t.roundsWithoutProgress--
+	}
 }
 
 // BlockRateDelay is a delay to broadcast the proposal in order to control block production rate
