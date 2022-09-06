@@ -2,6 +2,8 @@ package unittest
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // FailOnIrrecoverableError waits for either the done signal, or an error
@@ -11,10 +13,7 @@ import (
 func FailOnIrrecoverableError(t *testing.T, done <-chan struct{}, errCh <-chan error) {
 	select {
 	case <-done:
-		return
 	case err := <-errCh:
-		t.Log("observed unexpected irrecoverable error: ", err)
-		t.Fail()
-		return
+		assert.NoError(t, err, "observed unexpected irrecoverable error")
 	}
 }

@@ -51,6 +51,7 @@ func (cs *EngineSuite) SetupTest() {
 
 	cs.ctx, cs.cancel, cs.errs = irrecoverable.WithSignallerAndCancel(context.Background())
 	cs.engine.Start(cs.ctx)
+	go unittest.FailOnIrrecoverableError(cs.T(), cs.ctx.Done(), cs.errs)
 
 	unittest.AssertClosesBefore(cs.T(), cs.engine.Ready(), time.Second)
 }
@@ -58,7 +59,7 @@ func (cs *EngineSuite) SetupTest() {
 // TearDownTest stops the engine and checks there are no errors thrown to the SignallerContext.
 func (cs *EngineSuite) TearDownTest() {
 	cs.cancel()
-	<-cs.engine.Done()
+	unittest.RequireCloseBefore(cs.T(), cs.engine.Done(), time.Second, "engine failed to stop")
 	select {
 	case err := <-cs.errs:
 		assert.NoError(cs.T(), err)
@@ -91,9 +92,7 @@ func (cs *EngineSuite) TestSendVote() {
 	require.NoError(cs.T(), err, "should pass send vote")
 
 	// wait for vote to be sent
-	<-done
-	cs.cancel()
-	<-cs.engine.Done()
+	unittest.AssertClosesBefore(cs.T(), done, time.Second)
 }
 
 // TestBroadcastProposalWithDelay tests broadcasting proposals with different inputs
@@ -170,9 +169,7 @@ func (cs *EngineSuite) TestBroadcastProposalWithDelay() {
 	err := cs.engine.BroadcastProposalWithDelay(&headerFromHotstuff, 0)
 	require.NoError(cs.T(), err, "header broadcast should pass")
 
-	<-util.AllClosed(broadcasted, submitted)
-	cs.cancel()
-	<-cs.engine.Done()
+	unittest.AssertClosesBefore(cs.T(), util.AllClosed(broadcasted, submitted), time.Second)
 }
 
 // TestSubmittingMultipleVotes tests that we can send multiple votes and they
@@ -224,13 +221,6 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	assert.Eventually(cs.T(), func() bool {
 		return cs.engine.pendingVotes.(*engine.FifoMessageStore).Len() == 0
 	}, time.Second, time.Millisecond*10)
-	// stop the engine
-	cs.cancel()
-	<-cs.engine.Done()
-
-	// check that submit vote was called with correct parameters
-	cs.hotstuff.AssertExpectations(cs.T())
-	cs.voteAggregator.AssertExpectations(cs.T())
 }
 
 // TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
@@ -239,13 +229,17 @@ func (cs *EngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
 	cs.head = finalizedBlock
 
-	*cs.pending = modulemock.PendingBlockBuffer{}
-	cs.pending.On("PruneByView", finalizedBlock.View).Return(nil).Once()
-	cs.pending.On("Size").Return(uint(0)).Once()
-	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
+	*cs.pending = *modulemock.NewPendingBlockBuffer(cs.T())
+	// wait for both expected calls before ending the test
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+	cs.pending.On("PruneByView", finalizedBlock.View).
+		Run(func(_ mock.Arguments) { wg.Done() }).
+		Return(nil).Once()
+	cs.pending.On("Size").
+		Run(func(_ mock.Arguments) { wg.Done() }).
+		Return(uint(0)).Once()
 
-	require.Eventually(cs.T(),
-		func() bool {
-			return cs.pending.AssertCalled(cs.T(), "PruneByView", finalizedBlock.View)
-		}, time.Second, time.Millisecond*20)
+	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
+	unittest.AssertReturnsBefore(cs.T(), wg.Wait, time.Second, "an expected call to block buffer wasn't made")
 }

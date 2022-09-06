@@ -58,9 +58,10 @@ type Engine struct {
 	// queues for inbound messsages
 	pendingBlocks         engine.MessageStore
 	pendingRangeResponses engine.MessageStore
-	pendingVotes          engine.MessageStore
-	pendingTimeouts       engine.MessageStore
-	messageHandler        *engine.MessageHandler
+	// TODO remove pendingVotes and pendingTimeouts - we will pass these directly to the Aggregator
+	pendingVotes    engine.MessageStore
+	pendingTimeouts engine.MessageStore
+	messageHandler  *engine.MessageHandler
 	// tracking finalized view
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
