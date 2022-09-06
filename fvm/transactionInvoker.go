@@ -88,7 +88,10 @@ func (i *TransactionInvoker) Process(
 
 		}
 
-		err := sth.Commit(nestedTxnId)
+		var err error
+		sth.RunWithAllLimitsDisabled(func() {
+			err = sth.Commit(nestedTxnId)
+		})
 		if err != nil {
 			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", err)
 		}
