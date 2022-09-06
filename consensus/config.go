@@ -25,11 +25,10 @@ type HotstuffModules struct {
 
 type ParticipantConfig struct {
 	StartupTime           time.Time     // the time when consensus participant enters first view
-	TimeoutInitial        time.Duration // the initial timeout for the pacemaker
 	TimeoutMinimum        time.Duration // the minimum timeout for the pacemaker
 	TimeoutMaximum        time.Duration // the maximum timeout for the pacemaker
 	TimeoutIncreaseFactor float64       // the factor at which the timeout grows when timeouts occur
-	TimeoutDecreaseFactor float64       // the factor at which the timeout grows when timeouts occur
+	HappyPathRounds       uint64        // number of failed rounds before timeout increase
 	BlockRateDelay        time.Duration // a delay to broadcast block proposal in order to control the block production rate
 }
 
@@ -38,12 +37,6 @@ type Option func(*ParticipantConfig)
 func WithStartupTime(time time.Time) Option {
 	return func(cfg *ParticipantConfig) {
 		cfg.StartupTime = time
-	}
-}
-
-func WithInitialTimeout(timeout time.Duration) Option {
-	return func(cfg *ParticipantConfig) {
-		cfg.TimeoutInitial = timeout
 	}
 }
 
@@ -59,9 +52,9 @@ func WithTimeoutIncreaseFactor(factor float64) Option {
 	}
 }
 
-func WithTimeoutDecreaseFactor(factor float64) Option {
+func WithHappyPathRounds(happyPathRounds uint64) Option {
 	return func(cfg *ParticipantConfig) {
-		cfg.TimeoutDecreaseFactor = factor
+		cfg.HappyPathRounds = happyPathRounds
 	}
 }
 

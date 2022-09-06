@@ -59,10 +59,9 @@ func main() {
 		builderExpiryBuffer           uint
 		builderPayerRateLimit         float64
 		builderUnlimitedPayers        []string
-		hotstuffTimeout               time.Duration
 		hotstuffMinTimeout            time.Duration
 		hotstuffTimeoutIncreaseFactor float64
-		hotstuffTimeoutDecreaseFactor float64
+		hotstuffHappyPathRounds       uint64
 		blockRateDelay                time.Duration
 		startupTimeString             string
 		startupTime                   time.Time
@@ -126,16 +125,14 @@ func main() {
 			"maximum byte size of the proposed collection")
 		flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", flow.DefaultMaxCollectionTotalGas,
 			"maximum total amount of maxgas of transactions in proposed collections")
-		flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
-			"the initial timeout for the hotstuff pacemaker")
 		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond,
-			"the lower timeout bound for the hotstuff pacemaker")
+			"the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor",
 			timeout.DefaultConfig.TimeoutIncrease,
 			"multiplicative increase of timeout value in case of time out event")
-		flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor",
-			timeout.DefaultConfig.TimeoutDecrease,
-			"multiplicative decrease of timeout value in case of progress")
+		flags.Uint64Var(&hotstuffHappyPathRounds, "hotstuff-happy-path-rounds",
+			timeout.DefaultConfig.HappyPathRounds,
+			"number of failed rounds before timeout increase")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
 		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
@@ -458,10 +455,9 @@ func main() {
 
 			opts := []consensus.Option{
 				consensus.WithBlockRateDelay(blockRateDelay),
-				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
 				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
-				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
+				consensus.WithHappyPathRounds(hotstuffHappyPathRounds),
 			}
 
 			if !startupTime.IsZero() {

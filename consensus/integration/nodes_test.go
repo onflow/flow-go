@@ -573,7 +573,6 @@ func createNode(
 		rootHeader,
 		[]*flow.Header{},
 		hotstuffModules,
-		consensus.WithInitialTimeout(hotstuffTimeout),
 		consensus.WithMinTimeout(hotstuffTimeout),
 	)
 
