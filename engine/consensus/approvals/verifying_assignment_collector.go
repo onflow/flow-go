@@ -30,10 +30,11 @@ const DefaultEmergencySealingThresholdForVerification = 25
 
 // VerifyingAssignmentCollector
 // Context:
-//  * When the same result is incorporated in multiple different forks,
-//    unique verifier assignment is determined for each fork.
-//  * The assignment collector is intended to encapsulate the known
-//    assignments for a particular execution result.
+//   - When the same result is incorporated in multiple different forks,
+//     unique verifier assignment is determined for each fork.
+//   - The assignment collector is intended to encapsulate the known
+//     assignments for a particular execution result.
+//
 // VerifyingAssignmentCollector has a strict ordering of processing, before processing
 // approvals at least one incorporated result has to be processed.
 // VerifyingAssignmentCollector takes advantage of internal caching to speed up processing approvals for different assignments
@@ -115,8 +116,8 @@ func (ac *VerifyingAssignmentCollector) ProcessingStatus() ProcessingStatus {
 // ProcessIncorporatedResult starts tracking the approval for IncorporatedResult.
 // Method is idempotent.
 // Error Returns:
-//  * no errors expected during normal operation;
-//    errors might be symptoms of bugs or internal state corruption (fatal)
+//   - no errors expected during normal operation;
+//     errors might be symptoms of bugs or internal state corruption (fatal)
 func (ac *VerifyingAssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	ac.log.Debug().
 		Str("result_id", incorporatedResult.Result.ID().String()).
@@ -279,9 +280,9 @@ func (ac *VerifyingAssignmentCollector) validateApproval(approval *flow.ResultAp
 // ProcessApproval ingests Result Approvals and triggers sealing of execution result
 // when sufficient approvals have arrived.
 // Error Returns:
-//  * nil in case of success (outdated approvals might be silently discarded)
-//  * engine.InvalidInputError if the result approval is invalid
-//  * any other errors might be symptoms of bugs or internal state corruption (fatal)
+//   - nil in case of success (outdated approvals might be silently discarded)
+//   - engine.InvalidInputError if the result approval is invalid
+//   - any other errors might be symptoms of bugs or internal state corruption (fatal)
 func (ac *VerifyingAssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
 	ac.log.Debug().
 		Str("result_id", approval.Body.ExecutionResultID.String()).
@@ -383,10 +384,10 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation cons
 
 // authorizedVerifiersAtBlock pre-select all authorized Verifiers at the block that incorporates the result.
 // The method returns the set of all node IDs that:
-//   * are authorized members of the network at the given block and
-//   * have the Verification role and
-//   * have _positive_ weight and
-//   * are not ejected
+//   - are authorized members of the network at the given block and
+//   - have the Verification role and
+//   - have _positive_ weight and
+//   - are not ejected
 func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (map[flow.Identifier]*flow.Identity, error) {
 	authorizedVerifierList, err := state.AtBlockID(blockID).Identities(
 		filter.And(

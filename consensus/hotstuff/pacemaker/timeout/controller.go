@@ -8,9 +8,9 @@ import (
 )
 
 // Controller implements a timout with:
-// - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
-//   this results in exponential growing timeout duration on multiple subsequent timeouts
-// - on progress: decrease timeout by subtrahend `timeoutDecrease`
+//   - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
+//     this results in exponential growing timeout duration on multiple subsequent timeouts
+//   - on progress: decrease timeout by subtrahend `timeoutDecrease`
 type Controller struct {
 	cfg            Config
 	timer          *time.Timer

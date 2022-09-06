@@ -107,7 +107,7 @@ func NewFullConsensusState(
 func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error {
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
-	defer span.Finish()
+	defer span.End()
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
@@ -135,7 +135,7 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error {
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
-	defer span.Finish()
+	defer span.End()
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
@@ -253,7 +253,7 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckGuarantees)
-	defer span.Finish()
+	defer span.End()
 
 	header := candidate.Header
 	payload := candidate.Payload
@@ -342,7 +342,7 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*flow.Seal, error) {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
-	defer span.Finish()
+	defer span.End()
 
 	lastSeal, err := m.sealValidator.Validate(candidate)
 	if err != nil {
@@ -353,15 +353,16 @@ func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*
 }
 
 // receiptExtend checks the compliance of the receipt payload.
-//   * Receipts should pertain to blocks on the fork
-//   * Receipts should not appear more than once on a fork
-//   * Receipts should pass the ReceiptValidator check
-//   * No seal has been included for the respective block in this particular fork
+//   - Receipts should pertain to blocks on the fork
+//   - Receipts should not appear more than once on a fork
+//   - Receipts should pass the ReceiptValidator check
+//   - No seal has been included for the respective block in this particular fork
+//
 // We require the receipts to be sorted by block height (within a payload).
 func (m *MutableState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckReceipts)
-	defer span.Finish()
+	defer span.End()
 
 	err := m.receiptValidator.ValidatePayload(candidate)
 	if err != nil {
@@ -421,7 +422,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
-	defer span.Finish()
+	defer span.End()
 
 	blockID := candidate.ID()
 	latestSealID := last.ID()
@@ -495,7 +496,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// preliminaries: start tracer and retrieve full block
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorFinalize)
-	defer span.Finish()
+	defer span.End()
 	block, err := m.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve full block that should be finalized: %w", err)
@@ -609,6 +610,16 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			err = operation.SetEpochEmergencyFallbackTriggered(blockID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not set epoch fallback flag: %w", err)
+			}
+		}
+
+		// When a block is finalized, we commit the result for each seal it contains. The sealing logic
+		// guarantees that only a single, continuous execution fork is sealed. Here, we index for
+		// each block ID the ID of its _finalized_ seal.
+		for _, seal := range block.Payload.Seals {
+			err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(tx)
+			if err != nil {
+				return fmt.Errorf("could not index the seal by the sealed block ID: %w", err)
 			}
 		}
 
@@ -1011,7 +1022,6 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 // NOTE: since a parent can have multiple children, `BlockProcessable` event
 // could be triggered multiple times for the same block.
 // NOTE: BlockProcessable should not be blocking, otherwise, it will block the follower
-//
 func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 	header, err := m.headers.ByBlockID(blockID)
 	if err != nil {

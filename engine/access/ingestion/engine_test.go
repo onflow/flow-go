@@ -24,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -82,7 +82,7 @@ func (suite *Suite) SetupTest() {
 
 	net := new(mocknetwork.Network)
 	conduit := new(mocknetwork.Conduit)
-	net.On("Register", network.ReceiveReceipts, mock.Anything).
+	net.On("Register", channels.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).
 		Once()
 	suite.request = new(module.Requester)
@@ -103,8 +103,8 @@ func (suite *Suite) SetupTest() {
 
 	rpcEngBuilder, err := rpc.NewBuilder(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0, 0, false, false, nil, nil)
-	rpcEngBuilder.WithLegacy()
-	rpcEng := rpcEngBuilder.Build()
+	require.NoError(suite.T(), err)
+	rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
@@ -112,12 +112,11 @@ func (suite *Suite) SetupTest() {
 		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 
-	// stops requestMissingCollections from executing in processBackground worker
 	suite.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
-	eng.Start(irrecoverableCtx)
+	eng.ComponentManager.Start(irrecoverableCtx)
 	<-eng.Ready()
 
 	suite.eng = eng
@@ -126,6 +125,8 @@ func (suite *Suite) SetupTest() {
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (suite *Suite) TestOnFinalizedBlock() {
+	suite.blocks.On("GetLastFullBlockHeight").Return(uint64(0), nil).Once()
+
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),

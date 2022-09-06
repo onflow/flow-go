@@ -13,24 +13,24 @@ setup:
 .PHONY: relic_tests
 relic_tests:
 ifeq ($(ADX_SUPPORT), 1)
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(if $(VERBOSE),-v,)
+	go test -coverprofile=$(COVER_PROFILE) $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(if $(VERBOSE),-v,)
 else
-	CGO_CFLAGS="-D__BLST_PORTABLE__" GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(if $(VERBOSE),-v,)
+	CGO_CFLAGS="-D__BLST_PORTABLE__" go test -coverprofile=$(COVER_PROFILE) $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(if $(VERBOSE),-v,)
 endif
 
 # test all packages that do not require Relic library (all functionalities except the BLS-related ones)
 .PHONY: non_relic_tests
 non_relic_tests:
-# root package without relic 
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,)
+# root package without relic
+	go test -coverprofile=$(COVER_PROFILE) $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,)
 # sub packages
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./hash
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./random
+	go test -coverprofile=$(COVER_PROFILE) $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./hash
+	go test -coverprofile=$(COVER_PROFILE) $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./random
 
 ############################################################################################
 # CAUTION: DO NOT MODIFY THIS TARGET! DOING SO WILL BREAK THE FLAKY TEST MONITOR
 
-# runs all tests of the crypto package 
+# runs all tests of the crypto package
 .PHONY: test
 test: relic_tests non_relic_tests
 

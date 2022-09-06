@@ -92,6 +92,7 @@ const (
 	ResourceBlockVoteQueue            = "compliance_vote_queue"             // consensus node, compliance engine
 	ResourceCollectionGuaranteesQueue = "ingestion_col_guarantee_queue"     // consensus node, ingestion engine
 	ResourceChunkDataPack             = "chunk_data_pack"                   // execution node
+	ResourceChunkDataPackRequests     = "chunk_data_pack_request"           // execution node
 	ResourceEvents                    = "events"                            // execution node
 	ResourceServiceEvents             = "service_events"                    // execution node
 	ResourceTransactionResults        = "transaction_results"               // execution node
@@ -122,3 +123,5 @@ const (
 	MessageEntityRequest        = "entity_request"
 	MessageEntityResponse       = "entity_response"
 )
+
+const ExecutionDataRequestRetryable = "retryable"

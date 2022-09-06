@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -116,7 +117,7 @@ func New(
 		AddWorker(e.processQueuedTransactions).
 		Build()
 
-	conduit, err := net.Register(network.PushTransactions, e)
+	conduit, err := net.Register(channels.PushTransactions, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -128,7 +129,7 @@ func New(
 // Process processes a transaction message from the network and enqueues the
 // message. Validation and ingestion is performed in the processQueuedTransactions
 // worker.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	select {
 	case <-e.ComponentManager.ShutdownSignal():
 		e.log.Warn().Msgf("received message from %x after shut down", originID)
@@ -218,10 +219,10 @@ func (e *Engine) processAvailableMessages(ctx context.Context) error {
 // from outside the system or routed from another collection node.
 //
 // Returns:
-// * engine.UnverifiableInputError if the reference block is unknown or if the
-//   node is not a member of any cluster in the reference epoch.
-// * engine.InvalidInputError if the transaction is invalid.
-// * other error for any other unexpected error condition.
+//   - engine.UnverifiableInputError if the reference block is unknown or if the
+//     node is not a member of any cluster in the reference epoch.
+//   - engine.InvalidInputError if the transaction is invalid.
+//   - other error for any other unexpected error condition.
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBody) error {
 
 	defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
@@ -290,10 +291,10 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 // between expected and unexpected cases.
 //
 // Returns:
-// * engine.UnverifiableInputError when this node is not in any cluster because it is not
-//   a member of the reference epoch. This is an expected condition and the transaction
-//   should be discarded.
-// * other error for any other, unexpected error condition.
+//   - engine.UnverifiableInputError when this node is not in any cluster because it is not
+//     a member of the reference epoch. This is an expected condition and the transaction
+//     should be discarded.
+//   - other error for any other, unexpected error condition.
 func (e *Engine) getLocalCluster(refEpoch protocol.Epoch) (flow.IdentityList, error) {
 	epochCounter, err := refEpoch.Counter()
 	if err != nil {

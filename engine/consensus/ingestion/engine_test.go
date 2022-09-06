@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -43,8 +44,8 @@ func (s *IngestionSuite) SetupTest() {
 
 	// set up network module mock
 	s.net = &mocknetwork.Network{}
-	s.net.On("Register", netint.ReceiveGuarantees, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
+	s.net.On("Register", channels.ReceiveGuarantees, mock.Anything).Return(
+		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return s.con
 		},
 		nil,
@@ -90,7 +91,7 @@ func (s *IngestionSuite) TestSubmittingMultipleEntries() {
 			}).Return(true)
 
 			// execute the vote submission
-			_ = s.ingest.Process(netint.ProvideCollections, originID, guarantee)
+			_ = s.ingest.Process(channels.ProvideCollections, originID, guarantee)
 		}
 		wg.Done()
 	}()

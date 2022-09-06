@@ -2,7 +2,7 @@ package eventloop
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -44,7 +44,7 @@ func (s *EventLoopTestSuite) SetupTest() {
 	s.eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C).Maybe()
 	s.eh.On("OnLocalTimeout").Return(nil).Maybe()
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 
 	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), s.eh, time.Time{})
 	require.NoError(s.T(), err)
@@ -200,7 +200,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 		processed.Store(true)
 	}).Return(nil).Once()
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 
 	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), eh, time.Time{})
 	require.NoError(t, err)
@@ -250,7 +250,7 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 
 	metrics := metrics.NewNoopCollector()
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 
 	startTimeDuration := 2 * time.Second
 	startTime := time.Now().Add(startTimeDuration)

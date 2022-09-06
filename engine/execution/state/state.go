@@ -44,7 +44,7 @@ type ReadOnlyExecutionState interface {
 	HasState(flow.StateCommitment) bool
 
 	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
-	ChunkDataPackByChunkID(context.Context, flow.Identifier) (*flow.ChunkDataPack, error)
+	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
 
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
@@ -238,7 +238,7 @@ func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.St
 
 //func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
 //	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
-//	defer span.Finish()
+//	defer span.End()
 //
 //	return CommitDelta(s.ls, delta, baseState)
 //}
@@ -265,7 +265,7 @@ func (s *state) GetRegisters(
 	registerIDs []flow.RegisterID,
 ) ([]flow.RegisterValue, error) {
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegisters)
-	defer span.Finish()
+	defer span.End()
 
 	_, values, err := s.getRegisters(commit, registerIDs)
 	if err != nil {
@@ -287,7 +287,7 @@ func (s *state) GetProof(
 ) (flow.StorageProof, error) {
 
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegistersWithProofs)
-	defer span.Finish()
+	defer span.End()
 
 	query, err := makeQuery(commit, registerIDs)
 
@@ -311,7 +311,7 @@ func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Ident
 	return s.commits.ByBlockID(blockID)
 }
 
-func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
+func (s *state) ChunkDataPackByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	chunkDataPack, err := s.chunkDataPacks.ByChunkID(chunkID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve stored chunk data pack: %w", err)
@@ -322,7 +322,7 @@ func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identif
 
 func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
-	defer span.Finish()
+	defer span.End()
 
 	result, err := s.results.ByBlockID(blockID)
 	if err != nil {
@@ -345,7 +345,7 @@ func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, e
 	spew.Config.DisablePointerMethods = true
 
 	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXEStateSaveExecutionResults)
-	defer span.Finish()
+	defer span.End()
 
 	blockID := header.ID()
 
@@ -505,7 +505,7 @@ func (s *state) GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, e
 func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {
 	if s.tracer != nil {
 		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEUpdateHighestExecutedBlockIfHigher)
-		defer span.Finish()
+		defer span.End()
 	}
 
 	return operation.RetryOnConflict(s.db.Update, func(txn *badger.Txn) error {

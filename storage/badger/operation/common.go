@@ -115,6 +115,35 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 	}
 }
 
+// upsert will encode the given entity with MsgPack and upsert the binary data
+// under the given key in the badger DB.
+func upsert(key []byte, entity interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		// update the maximum key size if the inserted key is bigger
+		if uint32(len(key)) > max {
+			max = uint32(len(key))
+			err := SetMax(tx)
+			if err != nil {
+				return fmt.Errorf("could not update max tracker: %w", err)
+			}
+		}
+
+		// serialize the entity data
+		val, err := msgpack.Marshal(entity)
+		if err != nil {
+			return fmt.Errorf("could not encode entity: %w", err)
+		}
+
+		// persist the entity data into the DB
+		err = tx.Set(key, val)
+		if err != nil {
+			return fmt.Errorf("could not upsert data: %w", err)
+		}
+
+		return nil
+	}
+}
+
 // remove removes the entity with the given key, if it exists. If it doesn't
 // exist, this is a no-op.
 func remove(key []byte) func(*badger.Txn) error {
@@ -240,9 +269,9 @@ func withPrefetchValuesFalse(options *badger.IteratorOptions) {
 //
 // The iteration range uses prefix-wise semantics. Specifically, all keys that
 // meet ANY of the following conditions are included in the iteration:
-//   * have a prefix equal to the start key OR
-//   * have a prefix equal to the end key OR
-//   * have a prefix that is lexicographically between start and end
+//   - have a prefix equal to the start key OR
+//   - have a prefix equal to the end key OR
+//   - have a prefix that is lexicographically between start and end
 //
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.

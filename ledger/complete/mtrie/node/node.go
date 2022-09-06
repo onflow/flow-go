@@ -11,13 +11,14 @@ import (
 // Node defines an Mtrie node
 //
 // DEFINITIONS:
-//   * HEIGHT of a node v in a tree is the number of edges on the longest
+//   - HEIGHT of a node v in a tree is the number of edges on the longest
 //     downward path between v and a tree leaf.
 //
 // Conceptually, an MTrie is a sparse Merkle Trie, which has two node types:
-//   * INTERIM node: has at least one child (i.e. lChild or rChild is not
+//   - INTERIM node: has at least one child (i.e. lChild or rChild is not
 //     nil). Interim nodes do not store a path and have no payload.
-//   * LEAF node: has _no_ children.
+//   - LEAF node: has _no_ children.
+//
 // Per convention, we also consider nil as a leaf. Formally, nil is the generic
 // representative for any empty (sub)-trie (i.e. a trie without allocated
 // registers).
@@ -80,7 +81,7 @@ func NewLeaf(path ledger.Path,
 
 // NewInterimNode creates a new interim Node.
 // UNCHECKED requirement:
-//  * for any child `c` that is non-nil, its height must satisfy: height = c.height + 1
+//   - for any child `c` that is non-nil, its height must satisfy: height = c.height + 1
 func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	n := &Node{
 		lChild:  lchild,
@@ -96,13 +97,14 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 // we only consider the immediate children. When starting with a maximally pruned trie and
 // creating only InterimCompactifiedNodes during an update, the resulting trie remains maximally
 // pruned. Details on compactification:
-//  * If _both_ immediate children represent completely unallocated sub-tries, then the sub-trie
-//    with the new interim node is also completely empty. We return nil.
-//  * If either child is a leaf (i.e. representing a single allocated register) _and_ the other
-//    child represents a completely unallocated sub-trie, the new interim node also only holds
-//    a single allocated register. In this case, we return a compactified leaf.
+//   - If _both_ immediate children represent completely unallocated sub-tries, then the sub-trie
+//     with the new interim node is also completely empty. We return nil.
+//   - If either child is a leaf (i.e. representing a single allocated register) _and_ the other
+//     child represents a completely unallocated sub-trie, the new interim node also only holds
+//     a single allocated register. In this case, we return a compactified leaf.
+//
 // UNCHECKED requirement:
-//  * for any child `c` that is non-nil, its height must satisfy: height = c.height + 1
+//   - for any child `c` that is non-nil, its height must satisfy: height = c.height + 1
 func NewInterimCompactifiedNode(height int, lChild, rChild *Node) *Node {
 	if lChild.IsDefaultNode() {
 		lChild = nil
@@ -147,7 +149,7 @@ func (n *Node) computeHash() hash.Hash {
 	if n.lChild == nil && n.rChild == nil {
 		// if payload is non-nil, compute the hash based on the payload content
 		if n.payload != nil {
-			return ledger.ComputeCompactValue(hash.Hash(n.path), n.payload.Value, n.height)
+			return ledger.ComputeCompactValue(hash.Hash(n.path), n.payload.Value(), n.height)
 		}
 		// if payload is nil, return the default hash
 		return ledger.GetDefaultHashForHeight(n.height)

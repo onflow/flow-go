@@ -12,9 +12,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	fvm "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/rs/zerolog"
@@ -109,7 +109,12 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 	for i := 0; i < workerCount; i++ {
 		inputEG.Go(func() error {
 			for p := range payloadChan {
-				id, err := KeyToRegisterID(p.Payload.Key)
+				k, err := p.Payload.Key()
+				if err != nil {
+					log.Error().Err(err).Msg("error get payload key")
+					return err
+				}
+				id, err := KeyToRegisterID(k)
 				if err != nil {
 					log.Error().Err(err).Msg("error converting key to register ID")
 					return err
@@ -118,7 +123,7 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 					// not an address
 					continue
 				}
-				if id.Key == fvm.KeyStorageUsed {
+				if id.Key == state.KeyAccountStatus {
 					storageUsedPayloadChan <- accountStorageUsedPayload{
 						Address: id.Owner,
 						Index:   p.Index,
@@ -172,27 +177,26 @@ Loop:
 			return nil, fmt.Errorf(errStr)
 		}
 
-		id, err := KeyToRegisterID(p.Key)
+		k, err := p.Key()
+		if err != nil {
+			log.Error().Err(err).Msg("error get payload key")
+			return nil, err
+		}
+		id, err := KeyToRegisterID(k)
 		if err != nil {
 			log.Error().Err(err).Msg("error converting key to register ID")
 			return nil, err
 		}
-		if id.Key != fvm.KeyStorageUsed {
-			return nil, fmt.Errorf("this is not a storage used register")
+		if id.Key != state.KeyAccountStatus {
+			return nil, fmt.Errorf("this is not a status register")
 		}
 
-		oldUsed, _, err := utils.ReadUint64(p.Value)
+		status, err := environment.AccountStatusFromBytes(p.Value())
 		if err != nil {
-			errStr := "cannot decode storage used by address"
-			log.Error().
-				Str("address", flow.BytesToAddress([]byte(a)).Hex()).
-				Hex("storageUsed", p.Value).
-				Hex("storageUsedKey", p.Key.CanonicalForm()).
-				Err(err).
-				Msg(errStr)
-			return nil, fmt.Errorf(errStr)
+			log.Error().Err(err).Msg("error getting status")
+			return nil, err
 		}
-
+		oldUsed := status.StorageUsed()
 		if oldUsed > used {
 			storageDecreaseCount += 1
 			change = -int64(oldUsed - used)
@@ -207,8 +211,8 @@ Loop:
 		if err != nil {
 			return nil, err
 		}
-
-		payload[pIndex].Value = utils.Uint64ToBinary(used)
+		status.SetStorageUsed(used)
+		payload[pIndex] = *ledger.NewPayload(k, status.ToBytes())
 	}
 
 	m.Log.Info().

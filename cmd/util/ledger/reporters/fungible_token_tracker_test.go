@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
@@ -28,15 +30,15 @@ func TestFungibleTokenTracker(t *testing.T) {
 	chain := flow.Testnet.Chain()
 	view := migrations.NewView(payloads)
 
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	vm := fvm.NewVirtualMachine(rt)
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
 	}
-	ctx := fvm.NewContext(zerolog.Nop(), opts...)
+	ctx := fvm.NewContext(opts...)
 	bootstrapOptions := []fvm.BootstrapProcedureOption{
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),

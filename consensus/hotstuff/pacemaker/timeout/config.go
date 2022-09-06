@@ -9,9 +9,9 @@ import (
 
 // Config contains the configuration parameters for ExponentialIncrease-LinearDecrease
 // timeout.Controller
-// - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
-//   this results in exponential growing timeout duration on multiple subsequent timeouts
-// - on progress: MULTIPLICATIVE timeout decrease
+//   - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
+//     this results in exponential growing timeout duration on multiple subsequent timeouts
+//   - on progress: MULTIPLICATIVE timeout decrease
 type Config struct {
 	// ReplicaTimeout is the duration of a view before we time out [MILLISECONDS]
 	// ReplicaTimeout is the only variable quantity

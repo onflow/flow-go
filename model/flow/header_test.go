@@ -48,7 +48,7 @@ func TestHeaderFingerprint(t *testing.T) {
 		LastViewTC         interface{}
 	}
 	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
-	decHeader := flow.Header{
+	decHeader := &flow.Header{
 		ChainID:            decoded.ChainID,
 		ParentID:           decoded.ParentID,
 		Height:             decoded.Height,

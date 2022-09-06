@@ -6,9 +6,9 @@ import (
 	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/environment"
 	state2 "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -24,53 +24,69 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 	address1 := flow.HexToAddress("0x1")
 
 	t.Run("fix storage used", func(t *testing.T) {
+		status := environment.NewAccountStatus()
+		status.SetStorageUsed(1)
 		payload := []ledger.Payload{
-			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: []byte{1}},
-			{Key: createAccountPayloadKey(address1, state2.KeyStorageUsed), Value: utils.Uint64ToBinary(1)},
+			// TODO (ramtin) add more registers
+			*ledger.NewPayload(
+				createAccountPayloadKey(address1, state2.KeyAccountStatus),
+				status.ToBytes(),
+			),
 		}
 		migratedPayload, err := mig.Migrate(payload)
 		require.NoError(t, err)
 
-		migratedSize, _, err := utils.ReadUint64(migratedPayload[1].Value)
+		migratedStatus, err := environment.AccountStatusFromBytes(migratedPayload[0].Value())
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
-		require.Equal(t, uint64(48), migratedSize)
+		require.Equal(t, uint64(40), migratedStatus.StorageUsed())
 	})
 
 	t.Run("fix storage used if used to high", func(t *testing.T) {
+		status := environment.NewAccountStatus()
+		status.SetStorageUsed(10000)
 		payload := []ledger.Payload{
-			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: []byte{1}},
-			{Key: createAccountPayloadKey(address1, state2.KeyStorageUsed), Value: utils.Uint64ToBinary(10000)},
+			*ledger.NewPayload(
+				createAccountPayloadKey(address1, state2.KeyAccountStatus),
+				status.ToBytes(),
+			),
 		}
 		migratedPayload, err := mig.Migrate(payload)
 		require.NoError(t, err)
 
-		migratedSize, _, err := utils.ReadUint64(migratedPayload[1].Value)
+		migratedStatus, err := environment.AccountStatusFromBytes(migratedPayload[0].Value())
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
-		require.Equal(t, uint64(48), migratedSize)
+		require.Equal(t, uint64(40), migratedStatus.StorageUsed())
 	})
 
 	t.Run("do not fix storage used if storage used ok", func(t *testing.T) {
+		status := environment.NewAccountStatus()
+		status.SetStorageUsed(40)
 		payload := []ledger.Payload{
-			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: []byte{1}},
-			{Key: createAccountPayloadKey(address1, state2.KeyStorageUsed), Value: utils.Uint64ToBinary(55)},
+			*ledger.NewPayload(
+				createAccountPayloadKey(address1, state2.KeyAccountStatus),
+				status.ToBytes(),
+			),
 		}
 		migratedPayload, err := mig.Migrate(payload)
 		require.NoError(t, err)
 
-		migratedSize, _, err := utils.ReadUint64(migratedPayload[1].Value)
+		migratedStatus, err := environment.AccountStatusFromBytes(migratedPayload[0].Value())
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
-		require.Equal(t, uint64(48), migratedSize)
+		require.Equal(t, uint64(40), migratedStatus.StorageUsed())
 	})
 
 	t.Run("error is storage used does not exist", func(t *testing.T) {
 		payload := []ledger.Payload{
-			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: []byte{1}},
+			*ledger.NewPayload(
+				createAccountPayloadKey(address1, state2.KeyAccountStatus),
+				[]byte{1},
+			),
 		}
 		_, err := mig.Migrate(payload)
 		require.Error(t, err)

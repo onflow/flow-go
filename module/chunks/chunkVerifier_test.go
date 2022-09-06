@@ -73,7 +73,7 @@ func (s *ChunkVerifierTestSuite) SetupSuite() {
 	vm := new(vmMock)
 	systemOkVm := new(vmSystemOkMock)
 	systemBadVm := new(vmSystemBadMock)
-	vmCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(testChain.Chain()))
+	vmCtx := fvm.NewContext(fvm.WithChain(testChain.Chain()))
 
 	// system chunk runs predefined system transaction, hence we can't distinguish
 	// based on its content and we need separate VMs
@@ -270,6 +270,14 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	metricsCollector := &metrics.NoopCollector{}
 
 	f, _ := completeLedger.NewLedger(&fixtures.NoopWAL{}, 1000, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
+
+	compactor := fixtures.NewNoopCompactor(f)
+	<-compactor.Ready()
+
+	defer func() {
+		<-f.Done()
+		<-compactor.Done()
+	}()
 
 	keys := executionState.RegisterIDSToKeys(ids)
 	update, err := ledger.NewUpdate(

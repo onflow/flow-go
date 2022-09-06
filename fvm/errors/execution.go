@@ -241,24 +241,24 @@ func (e StateValueSizeLimitError) Code() ErrorCode {
 	return ErrCodeStateValueSizeLimitError
 }
 
-// LedgerIntractionLimitExceededError is returned when a tx hits the maximum ledger interaction limit
-type LedgerIntractionLimitExceededError struct {
+// LedgerInteractionLimitExceededError is returned when a tx hits the maximum ledger interaction limit
+type LedgerInteractionLimitExceededError struct {
 	used  uint64
 	limit uint64
 }
 
-// NewLedgerIntractionLimitExceededError constructs a LedgerIntractionLimitExceededError
-func NewLedgerIntractionLimitExceededError(used, limit uint64) *LedgerIntractionLimitExceededError {
-	return &LedgerIntractionLimitExceededError{used: used, limit: limit}
+// NewLedgerInteractionLimitExceededError constructs a LedgerInteractionLimitExceededError
+func NewLedgerInteractionLimitExceededError(used, limit uint64) *LedgerInteractionLimitExceededError {
+	return &LedgerInteractionLimitExceededError{used: used, limit: limit}
 }
 
-func (e *LedgerIntractionLimitExceededError) Error() string {
+func (e *LedgerInteractionLimitExceededError) Error() string {
 	return fmt.Sprintf("%s max interaction with storage has exceeded the limit (used: %d bytes, limit %d bytes)", e.Code().String(), e.used, e.limit)
 }
 
 // Code returns the error code for this error
-func (e *LedgerIntractionLimitExceededError) Code() ErrorCode {
-	return ErrCodeLedgerIntractionLimitExceededError
+func (e *LedgerInteractionLimitExceededError) Code() ErrorCode {
+	return ErrCodeLedgerInteractionLimitExceededError
 }
 
 // OperationNotSupportedError is generated when an operation (e.g. getting block info) is
@@ -361,17 +361,15 @@ func (e *ScriptExecutionTimedOutError) Code() ErrorCode {
 
 // An CouldNotGetExecutionParameterFromStateError indicates that computation has exceeded its limit.
 type CouldNotGetExecutionParameterFromStateError struct {
-	address    string
-	domain     string
-	identifier string
+	address string
+	path    string
 }
 
 // NewCouldNotGetExecutionParameterFromStateError constructs a new CouldNotGetExecutionParameterFromStateError
-func NewCouldNotGetExecutionParameterFromStateError(address, domain, identifier string) *CouldNotGetExecutionParameterFromStateError {
+func NewCouldNotGetExecutionParameterFromStateError(address, path string) *CouldNotGetExecutionParameterFromStateError {
 	return &CouldNotGetExecutionParameterFromStateError{
-		address:    address,
-		domain:     domain,
-		identifier: identifier,
+		address: address,
+		path:    path,
 	}
 }
 
@@ -382,11 +380,10 @@ func (e CouldNotGetExecutionParameterFromStateError) Code() ErrorCode {
 
 func (e CouldNotGetExecutionParameterFromStateError) Error() string {
 	return fmt.Sprintf(
-		"%s could not get execution parameter from the state (address: %s path: %s/%s)",
+		"%s could not get execution parameter from the state (address: %s path: %s)",
 		e.Code().String(),
 		e.address,
-		e.domain,
-		e.identifier,
+		e.path,
 	)
 }
 
