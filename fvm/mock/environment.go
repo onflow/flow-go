@@ -280,6 +280,22 @@ func (_m *Environment) EmitEvent(_a0 cadence.Event) error {
 	return r0
 }
 
+// FrozenAccounts provides a mock function with given fields:
+func (_m *Environment) FrozenAccounts() []common.Address {
+	ret := _m.Called()
+
+	var r0 []common.Address
+	if rf, ok := ret.Get(0).(func() []common.Address); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]common.Address)
+		}
+	}
+
+	return r0
+}
+
 // GenerateUUID provides a mock function with given fields:
 func (_m *Environment) GenerateUUID() (uint64, error) {
 	ret := _m.Called()

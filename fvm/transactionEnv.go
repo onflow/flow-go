@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -78,6 +77,10 @@ func NewTransactionEnvironment(
 		ctx.ServiceEventCollectionEnabled,
 		ctx.EventCollectionByteSizeLimit,
 	)
+	env.AccountFreezer = environment.NewAccountFreezer(
+		ctx.Chain.ServiceAddress(),
+		env.accounts,
+		env.TransactionInfo)
 	env.SystemContracts.SetEnvironment(env)
 
 	// TODO(patrick): rm this hack
@@ -200,32 +203,6 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
 	return e.UseContractAuditVoucher(address, string(code[:]))
-}
-
-func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
-
-	flowAddress := flow.Address(address)
-
-	if flowAddress == e.ctx.Chain.ServiceAddress() {
-		err := errors.NewValueErrorf(flowAddress.String(), "cannot freeze service account")
-		return fmt.Errorf("setting account frozen failed: %w", err)
-	}
-
-	if !e.IsServiceAccountAuthorizer() {
-		err := errors.NewOperationAuthorizationErrorf("SetAccountFrozen", "accounts can be frozen only by transactions authorized by the service account")
-		return fmt.Errorf("setting account frozen failed: %w", err)
-	}
-
-	err := e.accounts.SetAccountFrozen(flowAddress, frozen)
-	if err != nil {
-		return fmt.Errorf("setting account frozen failed: %w", err)
-	}
-
-	if frozen {
-		e.frozenAccounts = append(e.frozenAccounts, address)
-	}
-
-	return nil
 }
 
 func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
