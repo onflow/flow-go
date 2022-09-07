@@ -61,6 +61,7 @@ type commonEnv struct {
 	*environment.AccountKeyReader
 
 	*SystemContracts
+	handler.ContractUpdater
 
 	// TODO(patrick): rm
 	ctx Context
@@ -70,7 +71,6 @@ type commonEnv struct {
 	programs    *handler.ProgramsHandler
 	accounts    environment.Accounts
 	accountKeys *handler.AccountKeyHandler
-	contracts   *handler.ContractHandler
 
 	// TODO(patrick): rm once fully refactored
 	fullEnv Environment
@@ -296,7 +296,7 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 
 // Commit commits changes and return a list of updated keys
 func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
-	keys, err := env.contracts.Commit()
+	keys, err := env.ContractUpdater.Commit()
 	return programs.ModifiedSets{
 		ContractUpdateKeys: keys,
 		FrozenAccounts:     env.FrozenAccounts(),

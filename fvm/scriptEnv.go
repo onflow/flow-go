@@ -47,6 +47,8 @@ func NewScriptEnvironment(
 	env.AccountFreezer = environment.NoAccountFreezer{}
 	env.SystemContracts.SetEnvironment(env)
 
+	env.ContractUpdater = handler.NoContractUpdater{}
+
 	// TODO(patrick): remove this hack
 	env.accountKeys = handler.NewAccountKeyHandler(env.accounts)
 	env.fullEnv = env
@@ -74,12 +76,4 @@ func (e *ScriptEnv) AddAccountKey(_ runtime.Address, _ *runtime.PublicKey, _ run
 
 func (e *ScriptEnv) RevokeAccountKey(_ runtime.Address, _ int) (*runtime.AccountKey, error) {
 	return nil, errors.NewOperationNotSupportedError("RevokeAccountKey")
-}
-
-func (e *ScriptEnv) UpdateAccountContractCode(_ runtime.Address, _ string, _ []byte) (err error) {
-	return errors.NewOperationNotSupportedError("UpdateAccountContractCode")
-}
-
-func (e *ScriptEnv) RemoveAccountContractCode(_ runtime.Address, _ string) (err error) {
-	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
 }
