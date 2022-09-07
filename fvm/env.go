@@ -23,8 +23,9 @@ import (
 // Environment accepts a context and a virtual machine instance and provides
 // cadence runtime interface methods to the runtime.
 type Environment interface {
-	VM() *VirtualMachine
 	runtime.Interface
+
+	environment.AccountFreezer
 
 	Chain() flow.Chain
 
@@ -37,8 +38,6 @@ type Environment interface {
 
 	BorrowCadenceRuntime() *ReusableCadenceRuntime
 	ReturnCadenceRuntime(*ReusableCadenceRuntime)
-
-	SetAccountFrozen(address common.Address, frozen bool) error
 
 	AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error)
 }
@@ -55,6 +54,7 @@ type commonEnv struct {
 	*environment.BlockInfo
 	environment.TransactionInfo
 	environment.EventEmitter
+	environment.AccountFreezer
 	*environment.ValueStore
 	*environment.ContractReader
 	*environment.AccountKeyReader
@@ -70,8 +70,6 @@ type commonEnv struct {
 	accounts    environment.Accounts
 	accountKeys *handler.AccountKeyHandler
 	contracts   *handler.ContractHandler
-
-	frozenAccounts []common.Address
 
 	// TODO(patrick): rm once fully refactored
 	fullEnv Environment
@@ -133,7 +131,6 @@ func newCommonEnv(
 		vm:              vm,
 		programs:        programsHandler,
 		accounts:        accounts,
-		frozenAccounts:  nil,
 	}
 }
 
@@ -143,10 +140,6 @@ func (env *commonEnv) Chain() flow.Chain {
 
 func (env *commonEnv) LimitAccountStorage() bool {
 	return env.ctx.LimitAccountStorage
-}
-
-func (env *commonEnv) VM() *VirtualMachine {
-	return env.vm
 }
 
 func (env *commonEnv) BorrowCadenceRuntime() *ReusableCadenceRuntime {
@@ -301,7 +294,7 @@ func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
 	keys, err := env.contracts.Commit()
 	return programs.ModifiedSets{
 		ContractUpdateKeys: keys,
-		FrozenAccounts:     env.frozenAccounts,
+		FrozenAccounts:     env.FrozenAccounts(),
 	}, err
 }
 

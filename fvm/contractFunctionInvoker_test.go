@@ -107,20 +107,17 @@ func TestSystemContractsInvoke(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			env := &fvmMock.Environment{}
-			vm := &fvm.VirtualMachine{
-				Runtime: &TestInterpreterRuntime{
-					invokeContractFunction: tc.contractFunction,
-				},
-			}
 			logger := zerolog.Logger{}
 			chain := flow.Mainnet.Chain()
 
 			env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
-			env.On("VM").Return(vm)
 			env.On("Chain").Return(chain)
 			env.On("Logger").Return(&logger)
 			env.On("BorrowCadenceRuntime", mock.Anything).Return(
-				fvm.NewReusableCadenceRuntime())
+				fvm.NewReusableCadenceRuntime(
+					&TestInterpreterRuntime{
+						invokeContractFunction: tc.contractFunction,
+					}))
 			env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
 			invoker := fvm.NewSystemContracts()
