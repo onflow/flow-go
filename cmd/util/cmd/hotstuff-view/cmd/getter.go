@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 )
 
+// TODO replace with get LivenessData, SafetyData https://github.com/dapperlabs/flow-go/issues/6388
 var GetterCmd = &cobra.Command{
 	Use:   "get",
 	Short: "get hotstuff view",
