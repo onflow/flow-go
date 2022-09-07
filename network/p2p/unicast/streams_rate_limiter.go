@@ -12,17 +12,17 @@ import (
 // be created per some configured interval. A new stream is created each time a libP2P
 // node sends a direct message.
 type StreamsRateLimiterImpl struct {
-	*rateLimitedPeers
-	*limiters
-	limit rate.Limit
-	burst int
+	rateLimitedPeers *rateLimitedPeers
+	limiters         *limiters
+	limit            rate.Limit
+	burst            int
 }
 
 // NewStreamsRateLimiter returns a new StreamsRateLimiterImpl.
 func NewStreamsRateLimiter(limit rate.Limit, burst int) *StreamsRateLimiterImpl {
 	return &StreamsRateLimiterImpl{
-		rateLimitedPeers: new(rateLimitedPeers),
-		limiters:         new(limiters),
+		rateLimitedPeers: newRateLimitedPeers(),
+		limiters:         newLimiters(),
 		limit:            limit,
 		burst:            burst,
 	}
@@ -31,17 +31,29 @@ func NewStreamsRateLimiter(limit rate.Limit, burst int) *StreamsRateLimiterImpl 
 // Allow checks the cached limiter for the peer and returns limiter.Allow().
 // If a limiter is not cached for a one is created.
 func (s *StreamsRateLimiterImpl) Allow(peerID peer.ID, _ *message.Message) bool {
-	limiter := s.getOrStoreLimiter(peerID.String(), rate.NewLimiter(s.limit, s.burst))
+	limiter := s.getLimiter(peerID)
 	if !limiter.Allow() {
-		s.storeRateLimitedPeer(peerID.String())
+		s.rateLimitedPeers.store(peerID)
 		return false
 	} else {
-		s.removeRateLimitedPeer(peerID.String())
+		s.rateLimitedPeers.remove(peerID)
 		return true
 	}
 }
 
 // IsRateLimited returns true is a peer is currently rate limited.
 func (s *StreamsRateLimiterImpl) IsRateLimited(peerID peer.ID) bool {
-	return s.isRateLimited(peerID.String())
+	return s.rateLimitedPeers.exists(peerID)
+}
+
+// getLimiter returns limiter for the peerID, if a limiter does not exist one is created and stored.
+func (s *StreamsRateLimiterImpl) getLimiter(peerID peer.ID) *rate.Limiter {
+	if limiter, ok := s.limiters.get(peerID); ok {
+		return limiter
+	}
+
+	limiter := rate.NewLimiter(s.limit, s.burst)
+	s.limiters.store(peerID, limiter)
+
+	return limiter
 }

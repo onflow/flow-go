@@ -18,34 +18,65 @@ type RateLimiter interface {
 	IsRateLimited(peerID peer.ID) bool
 }
 
-// rateLimitedPeers stores an entry into the underlying sync.Map for a peer indicating the peer is currently rate limited.
+// rateLimitedPeers stores an entry into the underlying map for a peer indicating the peer is currently rate limited.
 type rateLimitedPeers struct {
-	sync.Map
+	mu    sync.RWMutex
+	peers map[peer.ID]struct{}
 }
 
-// storeRateLimitedPeer stores peeerID as key in underlying map denoting this peer as rate limited.
-func (r *rateLimitedPeers) storeRateLimitedPeer(peerID string) {
-	r.Store(peerID, struct{}{})
+func newRateLimitedPeers() *rateLimitedPeers {
+	return &rateLimitedPeers{
+		mu:    sync.RWMutex{},
+		peers: make(map[peer.ID]struct{}),
+	}
 }
 
-// removeRateLimitedPeer removes peeerID key from underlying map denoting this peer as not rate limited.
-func (r *rateLimitedPeers) removeRateLimitedPeer(peerID string) {
-	r.Delete(peerID)
-}
-
-// isRateLimited returns true if an entry for the peerID provided exists.
-func (r *rateLimitedPeers) isRateLimited(peerID string) bool {
-	_, ok := r.Load(peerID)
+// get returns ok if peerID key exists in map
+func (r *rateLimitedPeers) exists(peerID peer.ID) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	_, ok := r.peers[peerID]
 	return ok
 }
 
-// limiters stores a rate.Limiter for each peer in an underlying sync.Map.
-type limiters struct {
-	sync.Map
+// store stores peeerID as key in underlying map denoting this peer as rate limited.
+func (r *rateLimitedPeers) store(peerID peer.ID) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.peers[peerID] = struct{}{}
 }
 
-// getLimiter returns limiter for peerID.
-func (l *limiters) getOrStoreLimiter(peerID string, limiter *rate.Limiter) *rate.Limiter {
-	storedLimiter, _ := l.LoadOrStore(peerID, limiter)
-	return storedLimiter.(*rate.Limiter)
+// remove deletes peeerID key from underlying map denoting this peer as not rate limited.
+func (r *rateLimitedPeers) remove(peerID peer.ID) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.peers, peerID)
+}
+
+// limiters stores a rate.Limiter for each peer in an underlying map.
+type limiters struct {
+	mu   sync.RWMutex
+	lmap map[peer.ID]*rate.Limiter
+}
+
+func newLimiters() *limiters {
+	return &limiters{
+		mu:   sync.RWMutex{},
+		lmap: make(map[peer.ID]*rate.Limiter),
+	}
+}
+
+// get returns limiter in limiters map
+func (l *limiters) get(peerID peer.ID) (*rate.Limiter, bool) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	limiter, ok := l.lmap[peerID]
+	return limiter, ok
+}
+
+// store stores limiter in limiters map
+func (l *limiters) store(peerID peer.ID, limiter *rate.Limiter) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.lmap[peerID] = limiter
 }

@@ -12,17 +12,17 @@ import (
 // BandWidthRateLimiterImpl unicast rate limiter that limits the bandwidth that can be sent
 // by a peer per some configured interval.
 type BandWidthRateLimiterImpl struct {
-	*rateLimitedPeers
-	*limiters
-	limit rate.Limit
-	burst int
+	rateLimitedPeers *rateLimitedPeers
+	limiters         *limiters
+	limit            rate.Limit
+	burst            int
 }
 
 // NewBandWidthRateLimiter returns a new BandWidthRateLimiterImpl.
 func NewBandWidthRateLimiter(limit rate.Limit, burst int) *BandWidthRateLimiterImpl {
 	return &BandWidthRateLimiterImpl{
-		rateLimitedPeers: new(rateLimitedPeers),
-		limiters:         new(limiters),
+		rateLimitedPeers: newRateLimitedPeers(),
+		limiters:         newLimiters(),
 		limit:            limit,
 		burst:            burst,
 	}
@@ -31,18 +31,30 @@ func NewBandWidthRateLimiter(limit rate.Limit, burst int) *BandWidthRateLimiterI
 // Allow checks the cached limiter for the peer and returns limiter.AllowN(msg.Size())
 // which will check if a peer is able to send a message of msg.Size().
 // If a limiter is not cached for a one is created.
-func (s *BandWidthRateLimiterImpl) Allow(peerID peer.ID, msg *message.Message) bool {
-	limiter := s.getOrStoreLimiter(peerID.String(), rate.NewLimiter(s.limit, s.burst))
+func (b *BandWidthRateLimiterImpl) Allow(peerID peer.ID, msg *message.Message) bool {
+	limiter := b.getLimiter(peerID)
 	if !limiter.AllowN(time.Now(), msg.Size()) {
-		s.storeRateLimitedPeer(peerID.String())
+		b.rateLimitedPeers.store(peerID)
 		return false
 	} else {
-		s.removeRateLimitedPeer(peerID.String())
+		b.rateLimitedPeers.remove(peerID)
 		return true
 	}
 }
 
 // IsRateLimited returns true is a peer is currently rate limited.
-func (s *BandWidthRateLimiterImpl) IsRateLimited(peerID peer.ID) bool {
-	return s.isRateLimited(peerID.String())
+func (b *BandWidthRateLimiterImpl) IsRateLimited(peerID peer.ID) bool {
+	return b.rateLimitedPeers.exists(peerID)
+}
+
+// getLimiter returns limiter for the peerID, if a limiter does not exist one is created and stored.
+func (b *BandWidthRateLimiterImpl) getLimiter(peerID peer.ID) *rate.Limiter {
+	if limiter, ok := b.limiters.get(peerID); ok {
+		return limiter
+	}
+
+	limiter := rate.NewLimiter(b.limit, b.burst)
+	b.limiters.store(peerID, limiter)
+
+	return limiter
 }
