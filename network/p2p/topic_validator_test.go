@@ -71,11 +71,8 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
 	require.NoError(t, err)
 
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(sn1.ListPeers(topic.String())) > 0 &&
-			len(sn2.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	// let the nodes form the mesh
+	time.Sleep(time.Second)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
@@ -126,11 +123,8 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
 	require.NoError(t, err)
 
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(sn1.ListPeers(topic.String())) > 0 &&
-			len(sn2.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	// let the nodes form the mesh
+	time.Sleep(time.Second)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
@@ -202,12 +196,8 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
 	require.NoError(t, err)
 
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(sn1.ListPeers(topic.String())) > 0 &&
-			len(sn2.ListPeers(topic.String())) > 0 &&
-			len(an1.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	// let the nodes form the mesh
+	time.Sleep(time.Second)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel5s()
@@ -302,11 +292,8 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
 	require.NoError(t, err)
 
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(sn1.ListPeers(topic.String())) > 0 &&
-			len(sn2.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	// let the nodes form the mesh
+	time.Sleep(time.Second)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
@@ -376,12 +363,8 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
 	require.NoError(t, err)
 
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(sn1.ListPeers(topic.String())) > 0 &&
-			len(sn2.ListPeers(topic.String())) > 0 &&
-			len(an1.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	// let the nodes form the mesh
+	time.Sleep(time.Second)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
@@ -465,12 +448,8 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	sub3, err := ln3.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer, authorizedSenderValidator)
 	require.NoError(t, err)
 
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(ln1.ListPeers(topic.String())) > 0 &&
-			len(ln2.ListPeers(topic.String())) > 0 &&
-			len(ln3.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	// let the nodes form the mesh
+	time.Sleep(time.Second)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
