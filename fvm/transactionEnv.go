@@ -141,17 +141,10 @@ func (e *TransactionEnv) GetAuthorizedAccounts(path cadence.Path) []common.Addre
 	service := runtime.Address(e.ctx.Chain.ServiceAddress())
 	defaultAccounts := []runtime.Address{service}
 
-	runtimeEnv := e.BorrowCadenceRuntime()
-	defer e.ReturnCadenceRuntime(runtimeEnv)
+	runtime := e.BorrowCadenceRuntime()
+	defer e.ReturnCadenceRuntime(runtime)
 
-	value, err := e.vm.Runtime.ReadStored(
-		service,
-		path,
-		runtime.Context{
-			Interface:   e,
-			Environment: runtimeEnv,
-		},
-	)
+	value, err := runtime.ReadStored(service, path)
 
 	const warningMsg = "failed to read contract authorized accounts from service account. using default behaviour instead."
 
@@ -172,17 +165,12 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 	restricted, defined = false, false
 	service := runtime.Address(e.ctx.Chain.ServiceAddress())
 
-	runtimeEnv := e.BorrowCadenceRuntime()
-	defer e.ReturnCadenceRuntime(runtimeEnv)
+	runtime := e.BorrowCadenceRuntime()
+	defer e.ReturnCadenceRuntime(runtime)
 
-	value, err := e.vm.Runtime.ReadStored(
+	value, err := runtime.ReadStored(
 		service,
-		blueprints.IsContractDeploymentRestrictedPath,
-		runtime.Context{
-			Interface:   e,
-			Environment: runtimeEnv,
-		},
-	)
+		blueprints.IsContractDeploymentRestrictedPath)
 	if err != nil {
 		e.ctx.Logger.
 			Debug().

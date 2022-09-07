@@ -2,7 +2,6 @@ package fvm
 
 import (
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 	"go.opentelemetry.io/otel/attribute"
@@ -54,20 +53,15 @@ func (sys *SystemContracts) Invoke(
 			contractLocation.String()+"."+spec.FunctionName))
 	defer span.End()
 
-	runtimeEnv := sys.env.BorrowCadenceRuntime()
-	defer sys.env.ReturnCadenceRuntime(runtimeEnv)
+	runtime := sys.env.BorrowCadenceRuntime()
+	defer sys.env.ReturnCadenceRuntime(runtime)
 
-	value, err := sys.env.VM().Runtime.InvokeContractFunction(
+	value, err := runtime.InvokeContractFunction(
 		contractLocation,
 		spec.FunctionName,
 		arguments,
 		spec.ArgumentTypes,
-		runtime.Context{
-			Interface:   sys.env,
-			Environment: runtimeEnv,
-		},
 	)
-
 	if err != nil {
 		// this is an error coming from Cadendce runtime, so it must be handled first.
 		err = errors.HandleRuntimeError(err)

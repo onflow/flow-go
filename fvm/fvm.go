@@ -27,11 +27,21 @@ func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
-	// TODO(patrick): move this into ReusableCadenceRuntime
-	Runtime runtime.Runtime
+	Runtime runtime.Runtime // DEPRECATED.  DO NOT USE.
 }
 
-// NewVirtualMachine creates a new virtual machine instance with the provided runtime.
+func NewVM() *VirtualMachine {
+	return &VirtualMachine{}
+}
+
+// DEPRECATED.  DO NOT USE.
+//
+// TODO(patrick): remove after emulator is updated.
+//
+// Emulator is a special snowflake which prevents fvm from every changing its
+// APIs (integration test uses a pinned version of the emulator, which in turn
+// uses a pinned non-master version of flow-go).  This method is expose to break
+// the ridiculous circular dependency between the two builds.
 func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 	return &VirtualMachine{
 		Runtime: rt,

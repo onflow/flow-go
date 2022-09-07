@@ -23,7 +23,6 @@ import (
 // Environment accepts a context and a virtual machine instance and provides
 // cadence runtime interface methods to the runtime.
 type Environment interface {
-	VM() *VirtualMachine
 	runtime.Interface
 
 	environment.AccountFreezer
@@ -141,10 +140,6 @@ func (env *commonEnv) Chain() flow.Chain {
 
 func (env *commonEnv) LimitAccountStorage() bool {
 	return env.ctx.LimitAccountStorage
-}
-
-func (env *commonEnv) VM() *VirtualMachine {
-	return env.vm
 }
 
 func (env *commonEnv) BorrowCadenceRuntime() *ReusableCadenceRuntime {

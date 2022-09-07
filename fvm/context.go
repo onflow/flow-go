@@ -3,6 +3,7 @@ package fvm
 import (
 	"math"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -99,8 +100,10 @@ func defaultContext() Context {
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvoker(),
 		},
-		Logger:                     zerolog.Nop(),
-		ReusableCadenceRuntimePool: NewReusableCadenceRuntimePool(0),
+		Logger: zerolog.Nop(),
+		ReusableCadenceRuntimePool: NewReusableCadenceRuntimePool(
+			0,
+			runtime.Config{}),
 	}
 }
 

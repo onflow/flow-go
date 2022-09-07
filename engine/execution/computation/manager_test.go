@@ -15,7 +15,6 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -53,11 +52,9 @@ import (
 var scriptLogThreshold = 1 * time.Second
 
 func TestComputeBlockWithStorage(t *testing.T) {
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
@@ -220,9 +217,7 @@ func TestExecuteScript(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
@@ -681,10 +676,12 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	require.NoError(t, err)
 
-	v, err := vm.Runtime.ReadStored(
+	rt := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(rt)
+
+	v, err := rt.ReadStored(
 		commonAddress,
 		cadence.NewPath("storage", "x"),
-		runtime.Context{Interface: env},
 	)
 
 	// the save should not update account storage by writing the delta from the child view back to the parent
