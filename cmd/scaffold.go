@@ -92,12 +92,15 @@ type namedComponentFunc struct {
 	name string
 
 	errorHandler component.OnError
+	dependencies []module.ReadyDoneAware
 }
 
 // FlowNodeBuilder is the default builder struct used for all flow nodes
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
-//   PostInit handlers, if any
+//
+//	PostInit handlers, if any
+//
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
@@ -263,44 +266,66 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		return cf, nil
 	})
+
+	fnb.Component("libp2p node", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		myAddr := fnb.NodeConfig.Me.Address()
+		if fnb.BaseConfig.BindAddr != NotSet {
+			myAddr = fnb.BaseConfig.BindAddr
+		}
+
+		libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
+			fnb.Logger,
+			myAddr,
+			fnb.NetworkKey,
+			fnb.SporkID,
+			fnb.IdentityProvider,
+			fnb.Metrics.Network,
+			fnb.Resolver,
+			fnb.BaseConfig.NodeRole,
+			// run peer manager with the specified interval and let it also prune connections
+			p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)}),
+		)
+
+		libp2pNode, err := libP2PNodeFactory()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
+		}
+		fnb.LibP2PNode = libp2pNode
+
+		return libp2pNode, nil
+	})
+
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		return fnb.InitFlowNetworkWithConduitFactory(node, fnb.ConduitFactory)
 	})
+
+	fnb.Module("middleware dependency", func(node *NodeConfig) error {
+		fnb.middlewareDependable = module.NewProxiedReadyDoneAware()
+		fnb.PeerManagerDependencies = append(fnb.PeerManagerDependencies, fnb.middlewareDependable)
+		return nil
+	})
+
+	// peer manager won't be created until all PeerManagerDependencies are ready.
+	fnb.DependableComponent("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		return fnb.LibP2PNode.PeerManagerComponent(), nil
+	}, fnb.PeerManagerDependencies)
 }
 
 func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory) (network.Network, error) {
-	myAddr := fnb.NodeConfig.Me.Address()
-	if fnb.BaseConfig.BindAddr != NotSet {
-		myAddr = fnb.BaseConfig.BindAddr
-	}
-
-	libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
-		fnb.Logger,
-		myAddr,
-		fnb.NetworkKey,
-		fnb.SporkID,
-		fnb.IdentityProvider,
-		fnb.Metrics.Network,
-		fnb.Resolver,
-		fnb.BaseConfig.NodeRole,
-	)
 
 	var mwOpts []p2p.MiddlewareOption
 	if len(fnb.MsgValidators) > 0 {
 		mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
 	}
 
-	// run peer manager with the specified interval and let it also prune connections
-	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
 	mwOpts = append(mwOpts,
-		p2p.WithPeerManager(peerManagerFactory),
 		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
 	)
 
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger)
 	fnb.Middleware = p2p.NewMiddleware(
 		fnb.Logger,
-		libP2PNodeFactory,
+		fnb.LibP2PNode,
 		fnb.Me.NodeID(),
 		fnb.Metrics.Network,
 		fnb.Metrics.Bitswap,
@@ -355,6 +380,11 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	}
 
 	fnb.Network = net
+
+	// register middleware's ReadyDoneAware interface so other components can depend on it for startup
+	if fnb.middlewareDependable != nil {
+		fnb.middlewareDependable.Init(fnb.Middleware)
+	}
 
 	idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
 	fnb.ProtocolEvents.AddConsumer(idEvents)
@@ -954,8 +984,16 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	close(parent)
 
 	var err error
+	asyncComponents := []namedComponentFunc{}
+
 	// Run all components
 	for _, f := range fnb.components {
+		// Components with explicit dependencies are not started serially
+		if len(f.dependencies) > 0 {
+			asyncComponents = append(asyncComponents, f)
+			continue
+		}
+
 		started := make(chan struct{})
 
 		if f.errorHandler != nil {
@@ -970,6 +1008,16 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 
 		parent = started
 	}
+
+	// Components with explicit dependencies are run asynchronously, which means dependencies in
+	// the dependency list must be initialized outside of the component factory.
+	for _, f := range asyncComponents {
+		err = fnb.handleComponent(f, util.AllReady(f.dependencies...), func() {})
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -986,14 +1034,14 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 // using their ReadyDoneAware interface. After components are updated to use the idempotent
 // ReadyDoneAware interface and explicitly wait for their dependencies to be ready, we can remove
 // this channel chaining.
-func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-chan struct{}, started func()) error {
+func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, dependencies <-chan struct{}, started func()) error {
 	// Add a closure that starts the component when the node is started, and then waits for it to exit
 	// gracefully.
 	// Startup for all components will happen in parallel, and components can use their dependencies'
 	// ReadyDoneAware interface to wait until they are ready.
 	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		// wait for the previous component to be ready before starting
-		if err := util.WaitClosed(ctx, parentReady); err != nil {
+		// wait for the dependencies to be ready before starting
+		if err := util.WaitClosed(ctx, dependencies); err != nil {
 			return
 		}
 
@@ -1008,14 +1056,14 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-
 
 		// if this is a Component, use the Startable interface to start the component, otherwise
 		// Ready() will launch it.
-		component, isComponent := readyAware.(component.Component)
+		cmp, isComponent := readyAware.(component.Component)
 		if isComponent {
-			component.Start(ctx)
+			cmp.Start(ctx)
 		}
 
 		// Wait until the component is ready
 		if err := util.WaitClosed(ctx, readyAware.Ready()); err != nil {
-			// The context was cancelled. Continue to on to shutdown logic.
+			// The context was cancelled. Continue to shutdown logic.
 			logger.Warn().Msg("component startup aborted")
 
 			// Non-idempotent ReadyDoneAware components trigger shutdown by calling Done(). Don't
@@ -1147,6 +1195,26 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuild
 	fnb.components = append(fnb.components, namedComponentFunc{
 		fn:   f,
 		name: name,
+	})
+	return fnb
+}
+
+// DependableComponent adds a new component to the node that conforms to the ReadyDoneAware
+// interface. The builder will wait until all of the components in the dependencies list are ready
+// before constructing the component.
+//
+// The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
+// In both cases, the object is started when the node is run, and the node will wait for the
+// component to exit gracefully.
+//
+// IMPORTANT: Dependable components are started in parallel with no guaranteed run order, so all
+// dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
+// MUST be idempotent.
+func (fnb *FlowNodeBuilder) DependableComponent(name string, f ReadyDoneFactory, dependencies []module.ReadyDoneAware) NodeBuilder {
+	fnb.components = append(fnb.components, namedComponentFunc{
+		fn:           f,
+		name:         name,
+		dependencies: dependencies,
 	})
 	return fnb
 }

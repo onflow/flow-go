@@ -83,8 +83,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
-	ids, mws, networks, _ := GenerateIDsMiddlewaresNetworks(
-		ctx,
+	ids, nodes, mws, networks, _ := GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		suite.numNodes,
 		logger,
@@ -95,6 +94,9 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		WithPeerManagerOpts(p2p.WithInterval(time.Second)),
 	)
 	suite.networks = networks
+
+	errChan := StartNetworks(ctx, suite.T(), nodes, networks, 100*time.Millisecond)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	blobExchangeChannel := channels.Channel("blob-exchange")
 

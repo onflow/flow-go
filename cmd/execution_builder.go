@@ -211,6 +211,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		executionDataPruner           *pruner.Pruner
 		executionDataBlobstore        blobs.Blobstore
 		executionDataTracker          tracker.Storage
+		blobserviceDependable         *module.ProxiedReadyDoneAware
 	)
 
 	e.FlowNodeBuilder.
@@ -365,6 +366,11 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			executionDataStore = execution_data.NewExecutionDataStore(executionDataBlobstore, execution_data.DefaultSerializer)
 			return nil
 		}).
+		Module("blobservice peer manager dependencies", func(node *NodeConfig) error {
+			blobserviceDependable = module.NewProxiedReadyDoneAware()
+			e.PeerManagerDependencies = append(e.PeerManagerDependencies, blobserviceDependable)
+			return nil
+		}).
 		Component("execution state ledger", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 
 			// check if the execution database already exists
@@ -471,6 +477,10 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			if err != nil {
 				return nil, fmt.Errorf("failed to register blob service: %w", err)
 			}
+
+			// add blobservice into ReadyDoneAware dependency passed to peer manager
+			// this configures peer manager to wait for the blobservice to be ready before starting
+			blobserviceDependable.Init(bs)
 
 			var providerMetrics module.ExecutionDataProviderMetrics = metrics.NewNoopCollector()
 			if node.MetricsEnabled {
