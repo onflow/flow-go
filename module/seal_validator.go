@@ -12,8 +12,8 @@ import "github.com/onflow/flow-go/model/flow"
 // PREREQUISITE:
 // The SealValidator can only process blocks which are attached to the main chain
 // (without any missing ancestors). This is the case because:
-//  * the Seal validator walks the chain backwards and requires the relevant ancestors to be known and validated
-//  * the storage.Seals only holds seals for block that are attached to the main chain.
+//   - the Seal validator walks the chain backwards and requires the relevant ancestors to be known and validated
+//   - the storage.Seals only holds seals for block that are attached to the main chain.
 type SealValidator interface {
 	Validate(candidate *flow.Block) (*flow.Seal, error)
 }

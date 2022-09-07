@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/crypto
 
-go 1.18
+go 1.19
 
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.2.1

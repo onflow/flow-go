@@ -16,18 +16,14 @@ const nodeID string = "000000000000000000000000000000000000000000000000000000000
 func TestEndToEnd(t *testing.T) {
 
 	// Create a temp directory to work as "bootstrap"
-	bootdir, err := os.MkdirTemp("", "bootstrap.*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(bootdir)
+	bootdir := t.TempDir()
 
 	t.Logf("Created dir %s", bootdir)
 
 	// Create test files
 	//bootcmd.WriteText(filepath.Join(bootdir, bootstrap.PathNodeId), []byte(nodeID)
 	randomBeaconPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
-	err = os.MkdirAll(filepath.Dir(randomBeaconPath), 0755)
+	err := os.MkdirAll(filepath.Dir(randomBeaconPath), 0755)
 	if err != nil {
 		t.Fatalf("Failed to write dir for random beacon file: %s", err)
 	}

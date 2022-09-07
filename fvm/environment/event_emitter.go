@@ -29,11 +29,11 @@ type EventEmitter interface {
 var _ EventEmitter = NoEventEmitter{}
 
 // NoEventEmitter is usually used in the environment for script execution,
-// where no event should be emitted.
+// where emitting an event does nothing.
 type NoEventEmitter struct{}
 
 func (NoEventEmitter) EmitEvent(event cadence.Event) error {
-	return errors.NewOperationNotSupportedError("EmitEvent")
+	return nil
 }
 
 func (NoEventEmitter) Events() []flow.Event {

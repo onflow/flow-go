@@ -8,6 +8,9 @@ import (
 
 	"github.com/spf13/pflag"
 
+	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
+	"github.com/onflow/flow-go/module/mempool"
+
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -23,21 +26,17 @@ type ExecutionConfig struct {
 	checkpointDistance                   uint
 	checkpointsToKeep                    uint
 	stateDeltasLimit                     uint
-	cadenceExecutionCache                uint
-	cadenceTracing                       bool
-	chdpCacheSize                        uint
+	chunkDataPackCacheSize               uint
+	chunkDataPackRequestsCacheSize       uint32
 	requestInterval                      time.Duration
 	preferredExeNodeIDStr                string
 	syncByBlocks                         bool
 	syncFast                             bool
 	syncThreshold                        int
 	extensiveLog                         bool
-	extensiveTracing                     bool
 	pauseExecution                       bool
-	scriptLogThreshold                   time.Duration
-	scriptExecutionTimeLimit             time.Duration
-	chdpQueryTimeout                     uint
-	chdpDeliveryTimeout                  uint
+	chunkDataPackQueryTimeout            time.Duration
+	chunkDataPackDeliveryTimeout         time.Duration
 	enableBlockDataUpload                bool
 	gcpBucketName                        string
 	s3BucketName                         string
@@ -47,6 +46,9 @@ type ExecutionConfig struct {
 	executionDataPrunerThreshold         uint64
 	blobstoreRateLimit                   int
 	blobstoreBurstLimit                  int
+	chunkDataPackRequestWorkers          uint
+
+	computationConfig computation.ComputationConfig
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -61,15 +63,16 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.UintVar(&exeConf.checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
 	flags.UintVar(&exeConf.checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 	flags.UintVar(&exeConf.stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
-	flags.UintVar(&exeConf.cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize,
+	flags.UintVar(&exeConf.computationConfig.ProgramsCacheSize, "cadence-execution-cache", computation.DefaultProgramsCacheSize,
 		"cache size for Cadence execution")
-	flags.BoolVar(&exeConf.extensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
-	flags.BoolVar(&exeConf.cadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
-	flags.UintVar(&exeConf.chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
+	flags.BoolVar(&exeConf.computationConfig.ExtensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
+	flags.BoolVar(&exeConf.computationConfig.CadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
+	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
+	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
-	flags.DurationVar(&exeConf.scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
+	flags.DurationVar(&exeConf.computationConfig.ScriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
 		"threshold for logging script execution")
-	flags.DurationVar(&exeConf.scriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit,
+	flags.DurationVar(&exeConf.computationConfig.ScriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit,
 		"script execution time limit")
 	flags.StringVar(&exeConf.preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 	flags.UintVar(&exeConf.transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
@@ -79,10 +82,9 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&exeConf.syncThreshold, "sync-threshold", 100,
 		"the maximum number of sealed and unexecuted blocks before triggering state syncing")
 	flags.BoolVar(&exeConf.extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
-	flags.UintVar(&exeConf.chdpQueryTimeout, "chunk-data-pack-query-timeout-sec", 10,
-		"number of seconds to determine a chunk data pack query being slow")
-	flags.UintVar(&exeConf.chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10,
-		"number of seconds to determine a chunk data pack response delivery being slow")
+	flags.DurationVar(&exeConf.chunkDataPackQueryTimeout, "chunk-data-pack-query-timeout", exeprovider.DefaultChunkDataPackQueryTimeout, "timeout duration to determine a chunk data pack query being slow")
+	flags.DurationVar(&exeConf.chunkDataPackDeliveryTimeout, "chunk-data-pack-delivery-timeout", exeprovider.DefaultChunkDataPackDeliveryTimeout, "timeout duration to determine a chunk data pack response delivery being slow")
+	flags.UintVar(&exeConf.chunkDataPackRequestWorkers, "chunk-data-pack-workers", exeprovider.DefaultChunkDataPackRequestWorker, "number of workers to process chunk data pack requests")
 	flags.BoolVar(&exeConf.pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, "+
 		"but still be able to serve queries")
 	flags.BoolVar(&exeConf.enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")

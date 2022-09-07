@@ -53,8 +53,8 @@ func NewMessageHandler(log zerolog.Logger, notifier Notifier, patterns ...Patter
 // Process iterates over the internal processing patterns and determines if the payload matches.
 // The _first_ matching pattern processes the payload.
 // Returns
-//  * IncompatibleInputTypeError if no matching processor was found
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+//   - IncompatibleInputTypeError if no matching processor was found
+//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) error {
 	msg := &Message{
 		OriginID: originID,

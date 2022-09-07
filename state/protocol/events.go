@@ -18,7 +18,6 @@ import (
 //
 // NOTE: the epoch-related callbacks are only called once the fork containing
 // the relevant event has been finalized.
-//
 type Consumer interface {
 
 	// BlockFinalized is called when a block is finalized.
