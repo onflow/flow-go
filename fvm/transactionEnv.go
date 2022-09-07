@@ -43,83 +43,49 @@ func NewTransactionEnvironment(
 ) *TransactionEnv {
 
 	txID := tx.ID()
-	accounts := environment.NewAccounts(sth)
 	generator := environment.NewAccountCreator(sth, ctx.Chain)
-	programsHandler := handler.NewProgramsHandler(programs, sth)
 	// TODO set the flags on context
-	accountKeys := handler.NewAccountKeyHandler(accounts)
 	tracer := environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
 	meter := environment.NewMeter(sth)
 
 	env := &TransactionEnv{
-		commonEnv: commonEnv{
-			Tracer: tracer,
-			Meter:  meter,
-			ProgramLogger: environment.NewProgramLogger(
-				tracer,
-				ctx.Logger,
-				ctx.Metrics,
-				ctx.CadenceLoggingEnabled,
-			),
-			UUIDGenerator: environment.NewUUIDGenerator(tracer, meter, sth),
-			UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
-				tracer,
-				ctx.BlockHeader,
-			),
-			CryptoLibrary: environment.NewCryptoLibrary(tracer, meter),
-			BlockInfo: environment.NewBlockInfo(
-				tracer,
-				meter,
-				ctx.BlockHeader,
-				ctx.Blocks,
-			),
-			TransactionInfo: environment.NewTransactionInfo(
-				tracer,
-				tx.Authorizers,
-				ctx.Chain.ServiceAddress(),
-			),
-			EventEmitter: environment.NewEventEmitter(
-				tracer,
-				meter,
-				ctx.Chain,
-				txID,
-				txIndex,
-				tx.Payer,
-				ctx.ServiceEventCollectionEnabled,
-				ctx.EventCollectionByteSizeLimit,
-			),
-			ValueStore: environment.NewValueStore(
-				tracer,
-				meter,
-				accounts),
-			ContractReader: environment.NewContractReader(
-				tracer,
-				meter,
-				accounts),
-			SystemContracts: NewSystemContracts(),
-			ctx:             ctx,
-			sth:             sth,
-			vm:              vm,
-			programs:        programsHandler,
-			accounts:        accounts,
-			accountKeys:     accountKeys,
-			frozenAccounts:  nil,
-		},
-
+		commonEnv: newCommonEnv(
+			ctx,
+			vm,
+			sth,
+			programs,
+			tracer,
+			meter,
+		),
 		addressGenerator: generator,
 		tx:               tx,
 		txIndex:          txIndex,
 		txID:             txID,
 	}
 
+	env.TransactionInfo = environment.NewTransactionInfo(
+		tracer,
+		tx.Authorizers,
+		ctx.Chain.ServiceAddress(),
+	)
+	env.EventEmitter = environment.NewEventEmitter(
+		tracer,
+		meter,
+		ctx.Chain,
+		txID,
+		txIndex,
+		tx.Payer,
+		ctx.ServiceEventCollectionEnabled,
+		ctx.EventCollectionByteSizeLimit,
+	)
 	env.SystemContracts.SetEnvironment(env)
 
 	// TODO(patrick): rm this hack
-	env.AccountInterface = env
+	env.accountKeys = handler.NewAccountKeyHandler(env.accounts)
 	env.fullEnv = env
 
 	env.contracts = handler.NewContractHandler(
-		accounts,
+		env.accounts,
 		func() bool {
 			enabled, defined := env.GetIsContractDeploymentRestricted()
 			if !defined {
