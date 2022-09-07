@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -45,6 +44,7 @@ func NewScriptEnvironment(
 
 	env.TransactionInfo = environment.NoTransactionInfo{}
 	env.EventEmitter = environment.NoEventEmitter{}
+	env.AccountFreezer = environment.NoAccountFreezer{}
 	env.SystemContracts.SetEnvironment(env)
 
 	// TODO(patrick): remove this hack
@@ -82,8 +82,4 @@ func (e *ScriptEnv) UpdateAccountContractCode(_ runtime.Address, _ string, _ []b
 
 func (e *ScriptEnv) RemoveAccountContractCode(_ runtime.Address, _ string) (err error) {
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
-}
-
-func (e *ScriptEnv) SetAccountFrozen(address common.Address, frozen bool) error {
-	return errors.NewOperationNotSupportedError("SetAccountFrozen")
 }
