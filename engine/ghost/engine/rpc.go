@@ -7,8 +7,6 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-
 	"github.com/onflow/flow-go/engine"
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
 	"github.com/onflow/flow-go/model/flow"

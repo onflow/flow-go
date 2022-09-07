@@ -276,6 +276,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRa
 
 // processBlockProposal processes the given block proposal. The proposal must connect to
 // the finalized state.
+// TODO remove inRangeBlockResponse
 func (c *Core) processBlockProposal(proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 	startTime := time.Now()
 	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
@@ -333,16 +334,7 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal, inRangeBlo
 	// when the block is in range response, we should wait for hotstuff to finish processing the block,
 	// otherwise processing the next block might fail because the current block hasn't been added
 	// to protocol state yet.
-	if inRangeBlockResponse {
-		select {
-		case <-c.hotstuff.SubmitProposal(header, parent.View):
-			break
-		case <-c.hotstuff.Done():
-			break
-		}
-	} else {
-		c.hotstuff.SubmitProposal(header, parent.View)
-	}
+	c.hotstuff.SubmitProposal(header, parent.View)
 
 	return nil
 }

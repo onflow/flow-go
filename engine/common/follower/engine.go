@@ -353,6 +353,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // The function assumes that `proposal` is connected to the finalized state. By induction,
 // any children are therefore also connected to the finalized state and can be processed as well.
 // No errors are expected during normal operations.
+// TODO remove inRangeBlockResponse
 func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
@@ -409,12 +410,7 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 	log.Info().Msg("forwarding block proposal to hotstuff")
 
 	// submit the model to follower for processing
-	if inRangeBlockResponse {
-		<-e.follower.SubmitProposal(header, parent.View)
-	} else {
-		// ignore returned channel to avoid waiting
-		e.follower.SubmitProposal(header, parent.View)
-	}
+	e.follower.SubmitProposal(header, parent.View)
 
 	// check for any descendants of the block to process
 	err = e.processPendingChildren(ctx, header, inRangeBlockResponse)
