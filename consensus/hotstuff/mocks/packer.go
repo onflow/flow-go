@@ -14,13 +14,13 @@ type Packer struct {
 	mock.Mock
 }
 
-// Pack provides a mock function with given fields: blockID, sig
-func (_m *Packer) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]byte, []byte, error) {
-	ret := _m.Called(blockID, sig)
+// Pack provides a mock function with given fields: view, sig
+func (_m *Packer) Pack(view uint64, sig *hotstuff.BlockSignatureData) ([]byte, []byte, error) {
+	ret := _m.Called(view, sig)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *hotstuff.BlockSignatureData) []byte); ok {
-		r0 = rf(blockID, sig)
+	if rf, ok := ret.Get(0).(func(uint64, *hotstuff.BlockSignatureData) []byte); ok {
+		r0 = rf(view, sig)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -28,8 +28,8 @@ func (_m *Packer) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData
 	}
 
 	var r1 []byte
-	if rf, ok := ret.Get(1).(func(flow.Identifier, *hotstuff.BlockSignatureData) []byte); ok {
-		r1 = rf(blockID, sig)
+	if rf, ok := ret.Get(1).(func(uint64, *hotstuff.BlockSignatureData) []byte); ok {
+		r1 = rf(view, sig)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([]byte)
@@ -37,8 +37,8 @@ func (_m *Packer) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData
 	}
 
 	var r2 error
-	if rf, ok := ret.Get(2).(func(flow.Identifier, *hotstuff.BlockSignatureData) error); ok {
-		r2 = rf(blockID, sig)
+	if rf, ok := ret.Get(2).(func(uint64, *hotstuff.BlockSignatureData) error); ok {
+		r2 = rf(view, sig)
 	} else {
 		r2 = ret.Error(2)
 	}

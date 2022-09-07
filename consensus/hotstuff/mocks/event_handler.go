@@ -3,6 +3,7 @@
 package mocks
 
 import (
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff"
 	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
@@ -31,13 +32,13 @@ func (_m *EventHandler) OnLocalTimeout() error {
 	return r0
 }
 
-// OnQCConstructed provides a mock function with given fields: qc
-func (_m *EventHandler) OnQCConstructed(qc *flow.QuorumCertificate) error {
-	ret := _m.Called(qc)
+// OnPartialTcCreated provides a mock function with given fields: partialTC
+func (_m *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) error {
+	ret := _m.Called(partialTC)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate) error); ok {
-		r0 = rf(qc)
+	if rf, ok := ret.Get(0).(func(*hotstuff.PartialTcCreated) error); ok {
+		r0 = rf(partialTC)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -52,6 +53,34 @@ func (_m *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(*model.Proposal) error); ok {
 		r0 = rf(proposal)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// OnReceiveQc provides a mock function with given fields: qc
+func (_m *EventHandler) OnReceiveQc(qc *flow.QuorumCertificate) error {
+	ret := _m.Called(qc)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate) error); ok {
+		r0 = rf(qc)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// OnReceiveTc provides a mock function with given fields: tc
+func (_m *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
+	ret := _m.Called(tc)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.TimeoutCertificate) error); ok {
+		r0 = rf(tc)
 	} else {
 		r0 = ret.Error(0)
 	}
