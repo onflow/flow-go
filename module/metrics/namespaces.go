@@ -25,7 +25,7 @@ const (
 	subsystemDHT          = "dht"
 	subsystemBitswap      = "bitswap"
 	subsystemAuth         = "authorization"
-	subsystemRateLimiting = "rate-limiting"
+	subsystemRateLimiting = "rateLimiting"
 )
 
 // Storage subsystems represent the various components of the storage layer.
