@@ -74,18 +74,6 @@ func (e Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) 
 	return nil, fmt.Errorf("no cluster with the given chain ID %v, available chainIDs %v: %w", chainID, chainIDs, protocol.ErrClusterNotFound)
 }
 
-	for _, cluster := range e.enc.Clusters {
-		if cluster.RootBlock.Header.ChainID == chainID {
-			return Cluster{cluster}, nil
-		}
-	}
-	chainIDs := make([]string, 0, len(e.enc.Clusters))
-	for _, cluster := range e.enc.Clusters {
-		chainIDs = append(chainIDs, string(cluster.RootBlock.Header.ChainID))
-	}
-	return nil, fmt.Errorf("no cluster with the given chain ID %v, available chainIDs %v: %w", chainID, chainIDs, protocol.ErrClusterNotFound)
-}
-
 type Epochs struct {
 	enc EncodableEpochs
 }
@@ -161,10 +149,6 @@ func (es *setupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
 
 func (es *setupEpoch) ClusterByChainID(_ flow.ChainID) (protocol.Cluster, error) {
 	return nil, protocol.ErrNextEpochNotCommitted
-}
-
-func (es *setupEpoch) ClusterByChainID(_ flow.ChainID) (protocol.Cluster, error) {
-	return nil, protocol.ErrEpochNotCommitted
 }
 
 func (es *setupEpoch) DKG() (protocol.DKG, error) {
