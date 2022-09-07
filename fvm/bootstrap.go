@@ -900,8 +900,3 @@ func FlowTokenAddress(chain flow.Chain) flow.Address {
 	address, _ := chain.AddressAtIndex(flowTokenAccountIndex)
 	return address
 }
-
-func FlowFeesAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(flowFeesAccountIndex)
-	return address
-}

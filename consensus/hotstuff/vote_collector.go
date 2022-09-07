@@ -13,8 +13,8 @@ import (
 // (already cached votes as well as votes received in the future). Only votes
 // that pass de-duplication and equivocation detection are passed on. CAUTION,
 // VoteConsumer implementations must be
-//  * NON-BLOCKING and consume the votes without noteworthy delay, and
-//  * CONCURRENCY SAFE
+//   - NON-BLOCKING and consume the votes without noteworthy delay, and
+//   - CONCURRENCY SAFE
 type VoteConsumer func(vote *model.Vote)
 
 // OnQCCreated is a callback which will be used by VoteCollector to submit a QC when it's able to create it

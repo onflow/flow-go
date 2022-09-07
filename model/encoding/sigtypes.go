@@ -5,8 +5,8 @@ type SigType uint8
 
 // SigType specifies the role of the signature in the protocol.
 // Both types are aggregatable cryptographic signatures.
-//  * SigTypeRandomBeacon type is for random beacon signatures.
-//  * SigTypeStaking is for Hotstuff signatures.
+//   - SigTypeRandomBeacon type is for random beacon signatures.
+//   - SigTypeStaking is for Hotstuff signatures.
 const (
 	SigTypeStaking      SigType = 0
 	SigTypeRandomBeacon SigType = 1

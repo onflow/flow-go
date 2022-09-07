@@ -54,7 +54,7 @@ type RegisterEntry struct {
 	Value RegisterValue
 }
 
-//handy container for sorting
+// handy container for sorting
 type RegisterEntries []RegisterEntry
 
 func (d RegisterEntries) Len() int {

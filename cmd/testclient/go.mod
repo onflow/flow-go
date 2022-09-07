@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/cmd/testclient
 
-go 1.18
+go 1.19
 
 require (
 	github.com/onflow/flow-go-sdk v0.4.1

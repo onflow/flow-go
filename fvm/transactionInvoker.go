@@ -18,16 +18,13 @@ import (
 )
 
 type TransactionInvoker struct {
-	logger zerolog.Logger
 }
 
-func NewTransactionInvoker(logger zerolog.Logger) *TransactionInvoker {
-	return &TransactionInvoker{
-		logger: logger,
-	}
+func NewTransactionInvoker() TransactionInvoker {
+	return TransactionInvoker{}
 }
 
-func (i *TransactionInvoker) Process(
+func (i TransactionInvoker) Process(
 	vm *VirtualMachine,
 	ctx *Context,
 	proc *TransactionProcedure,
@@ -43,11 +40,6 @@ func (i *TransactionInvoker) Process(
 			attribute.String("transaction_id", txIDStr),
 		)
 		defer span.End()
-	}
-
-	var blockHeight uint64
-	if ctx.BlockHeader != nil {
-		blockHeight = ctx.BlockHeader.Height
 	}
 
 	nestedTxnId, err := sth.BeginNestedTransaction()
@@ -72,9 +64,7 @@ func (i *TransactionInvoker) Process(
 			}
 
 			msg := "transaction has unexpected nested transactions"
-			i.logger.Error().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
+			ctx.Logger.Error().
 				Msg(msg)
 
 			proc.Err = errors.NewFVMInternalErrorf(msg)
@@ -129,7 +119,7 @@ func (i *TransactionInvoker) Process(
 
 	// log te execution intensities here, so tha they do not contain data from storage limit checks and
 	// transaction deduction, because the payer is not charged for those.
-	i.logExecutionIntensities(sth, txIDStr)
+	i.logExecutionIntensities(ctx, sth, txIDStr)
 
 	// disable the limit checks on states
 	sth.DisableAllLimitEnforcements()
@@ -178,9 +168,7 @@ func (i *TransactionInvoker) Process(
 		}
 
 		// log transaction as failed
-		i.logger.Info().
-			Str("txHash", txIDStr).
-			Uint64("blockHeight", blockHeight).
+		ctx.Logger.Info().
 			Msg("transaction executed with error")
 
 		// TODO(patrick): make env reusable on error
@@ -192,9 +180,7 @@ func (i *TransactionInvoker) Process(
 
 		// if fee deduction fails just do clean up and exit
 		if feesError != nil {
-			i.logger.Info().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
+			ctx.Logger.Info().
 				Msg("transaction fee deduction executed with error")
 
 			txError = feesError
@@ -216,7 +202,7 @@ func (i *TransactionInvoker) Process(
 	return txError
 }
 
-func (i *TransactionInvoker) deductTransactionFees(
+func (i TransactionInvoker) deductTransactionFees(
 	env *TransactionEnv,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
@@ -232,8 +218,7 @@ func (i *TransactionInvoker) deductTransactionFees(
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be
 	// dynamic.	Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
-	_, err = InvokeDeductTransactionFeesContract(
-		env,
+	_, err = env.DeductTransactionFees(
 		proc.Transaction.Payer,
 		inclusionEffort,
 		computationUsed)
@@ -245,8 +230,8 @@ func (i *TransactionInvoker) deductTransactionFees(
 }
 
 // logExecutionIntensities logs execution intensities of the transaction
-func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txHash string) {
-	if i.logger.Debug().Enabled() {
+func (i TransactionInvoker) logExecutionIntensities(ctx *Context, sth *state.StateHolder, txHash string) {
+	if ctx.Logger.Debug().Enabled() {
 		computation := zerolog.Dict()
 		for s, u := range sth.ComputationIntensities() {
 			computation.Uint(strconv.FormatUint(uint64(s), 10), u)
@@ -255,8 +240,7 @@ func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txH
 		for s, u := range sth.MemoryIntensities() {
 			memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
-		i.logger.Info().
-			Str("txHash", txHash).
+		ctx.Logger.Info().
 			Uint64("ledgerInteractionUsed", sth.InteractionUsed()).
 			Uint("computationUsed", sth.TotalComputationUsed()).
 			Uint64("memoryEstimate", sth.TotalMemoryEstimate()).

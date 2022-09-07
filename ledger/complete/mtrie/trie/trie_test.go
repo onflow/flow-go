@@ -402,22 +402,29 @@ func TestSplitByPath(t *testing.T) {
 }
 
 // Test_DifferentiateEmptyVsLeaf tests correct behaviour for a very specific edge case for pruning:
-//  * By convention, a node in the trie is a leaf if both children are nil.
-//  * Therefore, we consider a completely unallocated subtrie also as a potential leaf.
+//   - By convention, a node in the trie is a leaf if both children are nil.
+//   - Therefore, we consider a completely unallocated subtrie also as a potential leaf.
+//
 // An edge case can now arise when unallocating a previously allocated leaf (see vertex '■' in the illustration below):
-//  * Before the update, both children of the leaf are nil (because it is a leaf)
-//  * After the update-algorithm updated the sub-Trie with root ■, both children of the updated vertex are
-//    also nil. But the sub-trie has now changed: the register previously represented by ■ is now gone.
-//    This case must be explicitly handled by the update algorithm:
-//    (i)  If the vertex is an interim node, i.e. it had at least one child, it is legal to re-use the vertex if neither
-//         of its child-subtries were affected by the update.
-//    (ii) If the vertex is a leaf, only checking that neither child-subtries were affected by the update is insufficient.
-//         This is because the register the leaf represents might itself be affected by the update.
-//    Condition (ii) is particularly subtle, if there are register updates in the subtrie of the leaf:
-//     * From an API perspective, it is a legal operation to set an unallocated register to nil (essentially a no-op).
-//     * Though, the Trie-update algorithm only realizes that the register is already unallocated, once it traverses
-//       into the respective sub-trie. When bubbling up from the recursion, nothing has changed in the children of ■
-//       but the vertex ■ itself has changed from an allocated leaf register to an unallocated register.
+//
+//   - Before the update, both children of the leaf are nil (because it is a leaf)
+//   - After the update-algorithm updated the sub-Trie with root ■, both children of the updated vertex are
+//     also nil. But the sub-trie has now changed: the register previously represented by ■ is now gone.
+//
+// This case must be explicitly handled by the update algorithm:
+//
+//   - (i)  If the vertex is an interim node, i.e. it had at least one child, it is legal to re-use the vertex if neither
+//     of its child-subtries were affected by the update.
+//   - (ii) If the vertex is a leaf, only checking that neither child-subtries were affected by the update is insufficient.
+//     This is because the register the leaf represents might itself be affected by the update.
+//
+// Condition (ii) is particularly subtle, if there are register updates in the subtrie of the leaf:
+//
+//   - From an API perspective, it is a legal operation to set an unallocated register to nil (essentially a no-op).
+//
+//   - Though, the Trie-update algorithm only realizes that the register is already unallocated, once it traverses
+//     into the respective sub-trie. When bubbling up from the recursion, nothing has changed in the children of ■
+//     but the vertex ■ itself has changed from an allocated leaf register to an unallocated register.
 func Test_DifferentiateEmptyVsLeaf(t *testing.T) {
 	//           ⋮  commonPrefix29bytes 101 ....
 	//           o
@@ -862,14 +869,15 @@ func TestValueSizesWithDuplicatePaths(t *testing.T) {
 
 // TestTrieAllocatedRegCountRegSize tests allocated register count and register size for updated trie.
 // It tests the following updates with prune flag set to true:
-//   * update empty trie with new paths and payloads
-//   * update trie with existing paths and updated payload
-//   * update trie with new paths and empty payloads
-//   * update trie with existing path and empty payload one by one until trie is empty
+//   - update empty trie with new paths and payloads
+//   - update trie with existing paths and updated payload
+//   - update trie with new paths and empty payloads
+//   - update trie with existing path and empty payload one by one until trie is empty
+//
 // It also tests the following updates with prune flag set to false:
-//   * update trie with existing path and empty payload one by one until trie is empty
-//   * update trie with removed paths and empty payloads
-//   * update trie with removed paths and non-empty payloads
+//   - update trie with existing path and empty payload one by one until trie is empty
+//   - update trie with removed paths and empty payloads
+//   - update trie with removed paths and non-empty payloads
 func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 
 	rng := &LinearCongruentialGenerator{seed: 0}
@@ -1027,11 +1035,11 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 // TestTrieAllocatedRegCountRegSizeWithMixedPruneFlag tests allocated register count and size
 // for updated trie with mixed pruning flag.
 // It tests the following updates:
-//   * step 1 : update empty trie with new paths and payloads (255 allocated registers)
-//   * step 2 : remove a payload without pruning (254 allocated registers)
-//   * step 3a: remove previously removed payload with pruning (254 allocated registers)
-//   * step 3b: update trie from step 2 with a new payload (sibling of removed payload)
-//              with pruning (255 allocated registers)
+//   - step 1 : update empty trie with new paths and payloads (255 allocated registers)
+//   - step 2 : remove a payload without pruning (254 allocated registers)
+//   - step 3a: remove previously removed payload with pruning (254 allocated registers)
+//   - step 3b: update trie from step 2 with a new payload (sibling of removed payload)
+//     with pruning (255 allocated registers)
 func TestTrieAllocatedRegCountRegSizeWithMixedPruneFlag(t *testing.T) {
 	rng := &LinearCongruentialGenerator{seed: 0}
 
