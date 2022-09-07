@@ -644,13 +644,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 		suite.snapshot.On("Head").Return(block.Header, nil).Twice()
 
-		background, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		ctx, _ := irrecoverable.WithSignaler(background)
-		ingestEng.Start(ctx)
-		<-ingestEng.Ready()
-
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
 		mb := &model.Block{

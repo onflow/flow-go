@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // This file includes functions to simulate network conditions.
@@ -23,7 +23,7 @@ func blockNodesFirstMessages(n uint64, denyList ...*Node) BlockOrDelayFunc {
 		blackList[node.id.ID()] = n
 	}
 	lock := new(sync.Mutex)
-	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		// filter only consensus messages
 		switch event.(type) {
 		case *messages.BlockProposal:
@@ -48,7 +48,7 @@ func blockNodesFirstMessages(n uint64, denyList ...*Node) BlockOrDelayFunc {
 func blockReceiverMessagesRandomly(dropProbability float32) BlockOrDelayFunc {
 	lock := new(sync.Mutex)
 	prng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		lock.Lock()
 		block := prng.Float32() < dropProbability
 		lock.Unlock()
@@ -74,12 +74,12 @@ func delayReceiverMessagesByRange(low time.Duration, high time.Duration) BlockOr
 
 	// shortcut for low = high: always return low
 	if delayRangeNs == 0 {
-		return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		return func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 			return false, low
 		}
 	}
 	// general version
-	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		lock.Lock()
 		d := prng.Int63n(delayRangeNs)
 		lock.Unlock()

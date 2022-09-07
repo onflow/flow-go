@@ -380,9 +380,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	indices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), []flow.Identifier(in.participants.NodeIDs()))
 	require.NoError(t, err)
 
-	indices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), []flow.Identifier(in.participants.NodeIDs()))
-	require.NoError(t, err)
-
 	packer := &mocks.Packer{}
 	packer.On("Pack", mock.Anything, mock.Anything).Return(indices, unittest.RandomBytes(128), nil).Maybe()
 

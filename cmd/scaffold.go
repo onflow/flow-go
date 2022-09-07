@@ -1187,25 +1187,6 @@ func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory
 	return fnb
 }
 
-// OverrideComponent adds given builder function to the components set of the node builder. If a builder function with that name
-// already exists, it will be overridden.
-func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) NodeBuilder {
-	for i := 0; i < len(fnb.components); i++ {
-		if fnb.components[i].name == name {
-			// found component with the name, override it.
-			fnb.components[i] = namedComponentFunc{
-				fn:   f,
-				name: name,
-			}
-
-			return fnb
-		}
-	}
-
-	// no component found with the same name, hence just adding it.
-	return fnb.Component(name, f)
-}
-
 // OverrideModule adds given builder function to the modules set of the node builder. If a builder function with that name
 // already exists, it will be overridden.
 func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
@@ -1223,28 +1204,6 @@ func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuild
 
 	// no module found with the same name, hence just adding it.
 	return fnb.Module(name, f)
-}
-
-// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
-// interface, and calls the provided error handler when an irrecoverable error is encountered.
-// Use RestartableComponent if the component is not critical to the node's safe operation and
-// can/should be independently restarted when an irrecoverable error is encountered.
-//
-// IMPORTANT: Since a RestartableComponent can be restarted independently of the node, the node and
-// other components must not rely on it for safe operation, and failures must be handled gracefully.
-// As such, RestartableComponents do not block the node from becoming ready, and do not block
-// subsequent components from starting serially. They do start in serial order.
-//
-// Note: The ReadyDoneFactory method may be called multiple times if the component is restarted.
-//
-// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory, errorHandler component.OnError) NodeBuilder {
-	fnb.components = append(fnb.components, namedComponentFunc{
-		fn:           f,
-		name:         name,
-		errorHandler: errorHandler,
-	})
-	return fnb
 }
 
 func (fnb *FlowNodeBuilder) PreInit(f BuilderFunc) NodeBuilder {
