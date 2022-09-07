@@ -3,7 +3,6 @@ package fvm
 import (
 	"fmt"
 
-	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
@@ -275,20 +274,6 @@ func (commonEnv) ResourceOwnerChanged(
 	common.Address,
 	common.Address,
 ) {
-}
-
-// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (env *commonEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	err := env.MeterComputation(environment.ComputationKindAllocateStorageIndex, 1)
-	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("allocate storage index failed: %w", err)
-	}
-
-	v, err := env.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
-	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
-	}
-	return v, nil
 }
 
 // GetAccountKey retrieves a public key by index from an existing account.
