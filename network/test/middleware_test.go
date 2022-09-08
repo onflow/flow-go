@@ -39,7 +39,6 @@ const testChannel = channels.TestNetworkChannel
 // https://github.com/libp2p/go-libp2p-pubsub/blob/master/tag_tracer.go
 // One way to make sure such a mesh has formed, asynchronously, in unit tests, is to wait for libp2p.GossipSubD such calls,
 // and that's what we do with tagsObserver.
-//
 type tagsObserver struct {
 	tags chan string
 	log  zerolog.Logger
@@ -64,7 +63,8 @@ func (co *tagsObserver) OnComplete() {
 type MiddlewareTestSuite struct {
 	suite.Suite
 	sync.RWMutex
-	size      int                  // used to determine number of middlewares under test
+	size      int // used to determine number of middlewares under test
+	nodes     []*p2p.Node
 	mws       []network.Middleware // used to keep track of middlewares under test
 	ov        []*mocknetwork.Overlay
 	obs       chan string // used to keep track of Protect events tagged by pubsub messages
@@ -104,7 +104,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
 
-	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
+	m.ids, m.nodes, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -122,25 +122,19 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.mwCancel = cancel
+
 	var errChan <-chan error
 	m.mwCtx, errChan = irrecoverable.WithSignaler(ctx)
 
-	mwCtx := m.mwCtx
-	go func() {
-		select {
-		case err := <-errChan:
-			m.T().Error("middlewares encountered fatal error", err)
-		case <-mwCtx.Done():
-			return
-		}
-	}()
+	go unittest.NoIrrecoverableError(m.mwCtx, m.T(), errChan)
 
 	for i, mw := range m.mws {
 		mw.SetOverlay(m.ov[i])
 		mw.Start(m.mwCtx)
-		<-mw.Ready()
+		unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, mw)
 	}
 
+	StartNodes(m.mwCtx, m.T(), m.nodes, 100*time.Millisecond)
 }
 
 // TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
@@ -162,6 +156,10 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	).Return(nil)
 	newMw.SetOverlay(overlay)
 	newMw.Start(m.mwCtx)
+	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
+
+	// start up nodes and peer managers
+	StartNodes(m.mwCtx, m.T(), libP2PNodes, 100*time.Millisecond)
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
@@ -556,9 +554,11 @@ func (m *MiddlewareTestSuite) stopMiddlewares() {
 
 	for i := 0; i < m.size; i++ {
 		unittest.RequireCloseBefore(m.T(), m.mws[i].Done(), 100*time.Millisecond, "could not stop middleware on time")
+		unittest.RequireCloseBefore(m.T(), m.nodes[i].Done(), 100*time.Millisecond, "could not stop libp2p node on time")
 	}
 
 	m.mws = nil
+	m.nodes = nil
 	m.ov = nil
 	m.ids = nil
 	m.size = 0

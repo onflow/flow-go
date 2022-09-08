@@ -3,6 +3,7 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -18,6 +19,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module/component"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -36,24 +38,31 @@ const (
 
 // Node is a wrapper around the LibP2P host.
 type Node struct {
+	component.Component
 	sync.Mutex
-	unicastManager *unicast.Manager
-	host           host.Host                               // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
-	pubSub         *pubsub.PubSub                          // reference to the libp2p PubSub component
-	logger         zerolog.Logger                          // used to provide logging
-	topics         map[channels.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs           map[channels.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
-	routing        routing.Routing
-	pCache         *protocolPeerCache
+	unicastManager     *unicast.Manager
+	host               host.Host                               // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	pubSub             *pubsub.PubSub                          // reference to the libp2p PubSub component
+	logger             zerolog.Logger                          // used to provide logging
+	topics             map[channels.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
+	subs               map[channels.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
+	routing            routing.Routing
+	pCache             *protocolPeerCache
+	peerManager        *PeerManager
+	peerManagerFactory PeerManagerFactoryFunc
 }
 
-// Stop terminates the libp2p node.
-func (n *Node) Stop() (chan struct{}, error) {
+var _ component.Component = (*Node)(nil)
+
+// stop terminates the libp2p node.
+func (n *Node) stop() error {
 	var result error
-	done := make(chan struct{})
+
 	n.logger.Debug().Msg("unsubscribing from all topics")
 	for t := range n.topics {
-		if err := n.UnSubscribe(t); err != nil {
+		err := n.UnSubscribe(t)
+		// context cancelled errors are expected while unsubscribing from topics during shutdown
+		if err != nil && !errors.Is(err, context.Canceled) {
 			result = multierror.Append(result, err)
 		}
 	}
@@ -71,31 +80,27 @@ func (n *Node) Stop() (chan struct{}, error) {
 	}
 
 	if result != nil {
-		close(done)
-		return done, result
+		return result
 	}
 
-	go func(done chan struct{}) {
-		defer close(done)
-		addrs := len(n.host.Network().ListenAddresses())
-		ticker := time.NewTicker(time.Millisecond * 2)
-		defer ticker.Stop()
-		timeout := time.After(time.Second)
-		for addrs > 0 {
-			// wait for all listen addresses to have been removed
-			select {
-			case <-timeout:
-				n.logger.Error().Int("port", addrs).Msg("listen addresses still open")
-				return
-			case <-ticker.C:
-				addrs = len(n.host.Network().ListenAddresses())
-			}
+	addrs := len(n.host.Network().ListenAddresses())
+	ticker := time.NewTicker(time.Millisecond * 2)
+	defer ticker.Stop()
+	timeout := time.After(time.Second)
+	for addrs > 0 {
+		// wait for all listen addresses to have been removed
+		select {
+		case <-timeout:
+			n.logger.Error().Int("port", addrs).Msg("listen addresses still open")
+			return nil
+		case <-ticker.C:
+			addrs = len(n.host.Network().ListenAddresses())
 		}
+	}
 
-		n.logger.Debug().Msg("libp2p node stopped successfully")
-	}(done)
+	n.logger.Debug().Msg("libp2p node stopped successfully")
 
-	return done, nil
+	return nil
 }
 
 // AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
@@ -282,6 +287,36 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 	}
 
 	return nil
+}
+
+// WithPeersProvider sets the PeersProvider for the peer manager.
+// If a peer manager factory is set, this method will build the peer manager and initialize it with
+// the provided PeersProvider.
+func (n *Node) WithPeersProvider(peersProvider PeersProvider) error {
+	if n.peerManagerFactory == nil {
+		return nil
+	}
+
+	var err error
+
+	n.peerManager, err = n.peerManagerFactory(n.host, peersProvider, n.logger)
+	if err != nil {
+		return fmt.Errorf("failed to create peer manager: %w", err)
+	}
+
+	return nil
+}
+
+// PeerManagerComponent returns the component interface of the peer manager.
+func (n *Node) PeerManagerComponent() component.Component {
+	return n.peerManager
+}
+
+// RequestPeerUpdate requests an update to the peer connections of this node using the peer manager.
+func (n *Node) RequestPeerUpdate() {
+	if n.peerManager != nil {
+		n.peerManager.RequestPeerUpdate()
+	}
 }
 
 // IsConnected returns true is address is a direct peer of this node else false

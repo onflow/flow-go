@@ -76,6 +76,19 @@ type NodeBuilder interface {
 	// and the node will wait for the component to exit gracefully.
 	Component(name string, f ReadyDoneFactory) NodeBuilder
 
+	// DependableComponent adds a new component to the node that conforms to the ReadyDoneAware
+	// interface. The builder will wait until all of the components in the dependencies list are ready
+	// before constructing the component.
+	//
+	// The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
+	// In both cases, the object is started when the node is run, and the node will wait for the
+	// component to exit gracefully.
+	//
+	// IMPORTANT: Dependable components are started in parallel with no guaranteed run order, so all
+	// dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
+	// MUST be idempotent.
+	DependableComponent(name string, f ReadyDoneFactory, dependencies []module.ReadyDoneAware) NodeBuilder
+
 	// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
 	// interface, and calls the provided error handler when an irrecoverable error is encountered.
 	// Use RestartableComponent if the component is not critical to the node's safe operation and
@@ -163,6 +176,7 @@ type BaseConfig struct {
 	HeroCacheMetricsEnable          bool
 	SyncCoreConfig                  chainsync.Config
 	CodecFactory                    func() network.Codec
+	LibP2PNode                      *p2p.Node
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
@@ -194,6 +208,11 @@ type NodeConfig struct {
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey
 	NetworkKey        crypto.PrivateKey
+
+	// list of dependencies for network peer manager startup
+	PeerManagerDependencies []module.ReadyDoneAware
+	// ReadyDoneAware implementation of the network middleware for DependableComponents
+	middlewareDependable *module.ProxiedReadyDoneAware
 
 	// ID providers
 	IdentityProvider             id.IdentityProvider
