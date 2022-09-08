@@ -1,11 +1,9 @@
 package unittest
 
 import (
-	"context"
 	"encoding/json"
 	"io/ioutil"
 	"math"
-	"math/rand"
 	"os"
 	"os/exec"
 	"regexp"
@@ -413,28 +411,4 @@ func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string,
 // SlashingViolationsConsumer returns a slashing violations consumer
 func SlashingViolationsConsumer() slashing.ViolationsConsumer {
 	return slashing.NewSlashingViolationsConsumer(Logger())
-}
-
-// NoIrrecoverableError requires that no irrecoverable errors are thrown on the provided error channel.
-func NoIrrecoverableError(ctx context.Context, t *testing.T, errChan <-chan error, msgAndArgs ...interface{}) {
-	select {
-	case <-ctx.Done():
-		return
-	case err := <-errChan:
-		if len(msgAndArgs) == 0 {
-			require.NoError(t, err, "unexpected irrecoverable error")
-		} else {
-			require.NoError(t, err, msgAndArgs...)
-		}
-	}
-}
-
-// GenerateRandomStringWithLen returns a string of random alpha characters of the provided length
-func GenerateRandomStringWithLen(commentLen uint) string {
-	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	bytes := make([]byte, commentLen)
-	for i := range bytes {
-		bytes[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(bytes)
 }

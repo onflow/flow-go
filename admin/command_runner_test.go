@@ -16,7 +16,6 @@ import (
 	"math/big"
 	"net"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -26,22 +25,19 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	pb "github.com/onflow/flow-go/admin/admin"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type CommandRunnerSuite struct {
 	suite.Suite
 
-	runner          *CommandRunner
-	bootstrapper    *CommandRunnerBootstrapper
-	httpAddress     string
-	grpcAddressSock string
+	runner       *CommandRunner
+	bootstrapper *CommandRunnerBootstrapper
+	httpAddress  string
 
 	client pb.AdminClient
 	conn   *grpc.ClientConn
@@ -59,14 +55,8 @@ func (suite *CommandRunnerSuite) SetupTest() {
 }
 
 func (suite *CommandRunnerSuite) TearDownTest() {
-	if suite.conn != nil {
-		err := suite.conn.Close()
-		suite.NoError(err)
-	}
-	if suite.grpcAddressSock != "" {
-		err := os.Remove(suite.grpcAddressSock)
-		suite.NoError(err)
-	}
+	err := suite.conn.Close()
+	suite.NoError(err)
 	suite.cancel()
 	<-suite.runner.Done()
 }
@@ -76,17 +66,21 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 	suite.cancel = cancel
 
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
-
-	suite.grpcAddressSock = fmt.Sprintf("%s/%s-flow-node-admin.sock", os.TempDir(), unittest.GenerateRandomStringWithLen(16))
-	opts = append(opts, WithGRPCAddress(suite.grpcAddressSock))
 
 	logger := zerolog.New(zerolog.NewConsoleWriter())
 	suite.runner = suite.bootstrapper.Bootstrap(logger, suite.httpAddress, opts...)
 	suite.runner.Start(signalerCtx)
 	<-suite.runner.Ready()
+	go func() {
+		select {
+		case <-ctx.Done():
+			return
+		case err := <-errChan:
+			suite.Fail("encountered unexpected error", err)
+		}
+	}()
 
-	conn, err := grpc.Dial("unix:///"+suite.runner.grpcAddress, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+	conn, err := grpc.Dial("unix:///"+suite.runner.grpcAddress, grpc.WithInsecure()) //nolint:staticcheck
 	suite.NoError(err)
 	suite.conn = conn
 	suite.client = pb.NewAdminClient(conn)

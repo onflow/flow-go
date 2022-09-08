@@ -74,13 +74,13 @@ func TestComponentsRunSerially(t *testing.T) {
 	name1 := "component 1"
 	nb.Component(name1, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name1)
-		return newMockReadyDone(logger, name1), nil
+		return newTestReadyDone(logger, name1), nil
 	})
 
 	name2 := "component 2"
 	nb.Component(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name2)
-		c := newMockComponent(logger, name2)
+		c := newTestComponent(logger, name2)
 		c.startFn = func(ctx irrecoverable.SignalerContext, name string) {
 			// add delay to test components are run serially
 			time.Sleep(5 * time.Millisecond)
@@ -91,7 +91,7 @@ func TestComponentsRunSerially(t *testing.T) {
 	name3 := "component 3"
 	nb.Component(name3, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name3)
-		return newMockReadyDone(logger, name3), nil
+		return newTestReadyDone(logger, name3), nil
 	})
 
 	err := nb.handleComponents()
@@ -175,25 +175,25 @@ func TestOverrideComponent(t *testing.T) {
 	name1 := "component 1"
 	nb.Component(name1, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name1)
-		return newMockReadyDone(logger, name1), nil
+		return newTestReadyDone(logger, name1), nil
 	})
 
 	name2 := "component 2"
 	nb.Component(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name2)
-		return newMockReadyDone(logger, name2), nil
+		return newTestReadyDone(logger, name2), nil
 	})
 
 	name3 := "component 3"
 	nb.Component(name3, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name3)
-		return newMockReadyDone(logger, name3), nil
+		return newTestReadyDone(logger, name3), nil
 	})
 
 	// Overrides second component
 	nb.OverrideComponent(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s overridden", name2)
-		return newMockReadyDone(logger, name2), nil
+		return newTestReadyDone(logger, name2), nil
 	})
 
 	err := nb.handleComponents()
@@ -281,7 +281,7 @@ func TestRestartableRestartsSuccessfully(t *testing.T) {
 	starts := 0
 	factory := func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name)
-		c := newMockComponent(logger, name)
+		c := newTestComponent(logger, name)
 		c.startFn = func(signalCtx irrecoverable.SignalerContext, name string) {
 			go func() {
 				<-c.Ready()
@@ -327,7 +327,7 @@ func TestRestartableStopsSuccessfully(t *testing.T) {
 	starts := 0
 	factory := func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name)
-		c := newMockComponent(logger, name)
+		c := newTestComponent(logger, name)
 		c.startFn = func(signalCtx irrecoverable.SignalerContext, name string) {
 			go func() {
 				<-c.Ready()
@@ -378,7 +378,7 @@ func TestRestartableWithMultipleComponents(t *testing.T) {
 		name := "component 1"
 		factory := func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			logger.Logf("%s initialized", name)
-			c := newMockReadyDone(logger, name)
+			c := newTestReadyDone(logger, name)
 			c.readyFn = func(name string) {
 				// delay to demonstrate that components are started serially
 				time.Sleep(5 * time.Millisecond)
@@ -400,7 +400,7 @@ func TestRestartableWithMultipleComponents(t *testing.T) {
 		factory := func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			defer close(c2Initialized)
 			logger.Logf("%s initialized", name)
-			c := newMockComponent(logger, name)
+			c := newTestComponent(logger, name)
 			c.startFn = func(ctx irrecoverable.SignalerContext, name string) {
 				// delay to demonstrate the RestartableComponent startup is non-blocking
 				time.Sleep(5 * time.Millisecond)
@@ -424,7 +424,7 @@ func TestRestartableWithMultipleComponents(t *testing.T) {
 		starts := 0
 		factory := func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			logger.Logf("%s initialized", name)
-			c := newMockComponent(logger, name)
+			c := newTestComponent(logger, name)
 			c.startFn = func(signalCtx irrecoverable.SignalerContext, name string) {
 				go func() {
 					<-c.Ready()
@@ -527,95 +527,113 @@ func testErrorHandler(logger *testLog, expected error) component.OnError {
 	}
 }
 
-// TestDependableComponentWaitForDependencies tests that dependable components are started after
-// their dependencies are ready
-// In this test:
-// * Components 1 & 2 are DependableComponents
-// * Component 3 is a normal Component
-// * 1 depends on 3
-// * 2 depends on 1
-// * Start order should be 3, 1, 2
-// run test 10 times to ensure order is consistent
-func TestDependableComponentWaitForDependencies(t *testing.T) {
-	for i := 0; i < 10; i++ {
-		testDependableComponentWaitForDependencies(t)
+func newTestReadyDone(logger *testLog, name string) *testReadyDone {
+	return &testReadyDone{
+		name:    name,
+		logger:  logger,
+		readyFn: func(string) {},
+		doneFn:  func(string) {},
+		ready:   make(chan struct{}),
+		done:    make(chan struct{}),
 	}
 }
 
-func testDependableComponentWaitForDependencies(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+type testReadyDone struct {
+	name   string
+	logger *testLog
 
-	nb := FlowNode("scaffold test")
-	nb.componentBuilder = component.NewComponentManagerBuilder()
+	readyFn func(string)
+	doneFn  func(string)
 
-	logger := &testLog{}
+	ready chan struct{}
+	done  chan struct{}
 
-	component1Dependable := module.NewProxiedReadyDoneAware()
-	component3Dependable := module.NewProxiedReadyDoneAware()
+	started bool
+	stopped bool
+	mu      sync.Mutex
+}
 
-	name1 := "component 1"
-	nb.DependableComponent(name1, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		logger.Logf("%s initialized", name1)
-		c := newMockComponent(logger, name1)
-		component1Dependable.Init(c)
-		return c, nil
-	}, []module.ReadyDoneAware{component3Dependable})
+func (c *testReadyDone) Ready() <-chan struct{} {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.started {
+		c.started = true
+		go func() {
+			c.readyFn(c.name)
 
-	name2 := "component 2"
-	nb.DependableComponent(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		logger.Logf("%s initialized", name2)
-		return newMockComponent(logger, name2), nil
-	}, []module.ReadyDoneAware{component1Dependable})
+			c.logger.Logf("%s ready", c.name)
+			close(c.ready)
+		}()
+	}
 
-	name3 := "component 3"
-	nb.Component(name3, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		logger.Logf("%s initialized", name3)
-		c := newMockComponent(logger, name3)
-		c.startFn = func(ctx irrecoverable.SignalerContext, name string) {
-			// add delay to test components are run serially
-			time.Sleep(5 * time.Millisecond)
-		}
-		component3Dependable.Init(c)
-		return c, nil
-	})
+	return c.ready
+}
 
-	err := nb.handleComponents()
-	require.NoError(t, err)
+func (c *testReadyDone) Done() <-chan struct{} {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.stopped {
+		c.stopped = true
+		go func() {
+			c.doneFn(c.name)
 
-	cm := nb.componentBuilder.Build()
+			c.logger.Logf("%s done", c.name)
+			close(c.done)
+		}()
+	}
 
-	cm.Start(signalerCtx)
-	<-cm.Ready()
+	return c.done
+}
 
-	cancel()
-	<-cm.Done()
+func newTestComponent(logger *testLog, name string) *testComponent {
+	return &testComponent{
+		name:    name,
+		logger:  logger,
+		readyFn: func(string) {},
+		doneFn:  func(string) {},
+		startFn: func(irrecoverable.SignalerContext, string) {},
+		ready:   make(chan struct{}),
+		done:    make(chan struct{}),
+	}
+}
 
-	logs := logger.logs
+type testComponent struct {
+	name   string
+	logger *testLog
 
-	assert.Len(t, logs, 12)
+	readyFn func(string)
+	doneFn  func(string)
+	startFn func(irrecoverable.SignalerContext, string)
 
-	// components are initialized in a specific order, so check that the order is correct
-	startLogs := logs[:len(logs)-3]
-	assert.Equal(t, []string{
-		"component 3 initialized",
-		"component 3 started",
-		"component 3 ready",
-		"component 1 initialized",
-		"component 1 started",
-		"component 1 ready",
-		"component 2 initialized",
-		"component 2 started",
-		"component 2 ready",
-	}, startLogs)
+	ready chan struct{}
+	done  chan struct{}
+}
 
-	// components are stopped via context cancellation, so the specific order is random
-	doneLogs := logs[len(logs)-3:]
-	assert.ElementsMatch(t, []string{
-		"component 1 done",
-		"component 2 done",
-		"component 3 done",
-	}, doneLogs)
+func (c *testComponent) Start(ctx irrecoverable.SignalerContext) {
+	c.startFn(ctx, c.name)
+	c.logger.Logf("%s started", c.name)
+
+	go func() {
+		c.readyFn(c.name)
+		c.logger.Logf("%s ready", c.name)
+		close(c.ready)
+	}()
+
+	go func() {
+		<-ctx.Done()
+
+		c.doneFn(c.name)
+		c.logger.Logf("%s done", c.name)
+		close(c.done)
+	}()
+}
+
+func (c *testComponent) Ready() <-chan struct{} {
+	return c.ready
+}
+
+func (c *testComponent) Done() <-chan struct{} {
+	return c.done
 }
 
 func TestCreateUploader(t *testing.T) {

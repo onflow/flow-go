@@ -38,7 +38,7 @@ func createNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 		opt(builder)
 	}
 
-	libp2pNode, err := builder.Build()
+	libp2pNode, err := builder.Build(context.TODO())
 	require.NoError(t, err)
 
 	return libp2pNode

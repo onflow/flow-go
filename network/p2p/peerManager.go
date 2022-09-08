@@ -10,9 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/engine"
 )
 
 // Connector connects to peer and disconnects from peer using the underlying networking library
@@ -28,13 +26,9 @@ type Connector interface {
 // DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections
 var DefaultPeerUpdateInterval = 10 * time.Minute
 
-var _ network.PeerManager = (*PeerManager)(nil)
-var _ component.Component = (*PeerManager)(nil)
-
 // PeerManager adds and removes connections to peers periodically and on request
 type PeerManager struct {
-	component.Component
-
+	unit               *engine.Unit
 	logger             zerolog.Logger
 	peersProvider      func() (peer.IDSlice, error) // callback to retrieve list of peers to connect to
 	peerRequestQ       chan struct{}                // a channel to queue a peer update request
@@ -58,32 +52,17 @@ type PeersProvider func() (peer.IDSlice, error)
 func NewPeerManager(logger zerolog.Logger, peersProvider PeersProvider,
 	connector Connector, options ...Option) *PeerManager {
 	pm := &PeerManager{
+		unit:               engine.NewUnit(),
 		logger:             logger,
 		peersProvider:      peersProvider,
 		connector:          connector,
 		peerRequestQ:       make(chan struct{}, 1),
 		peerUpdateInterval: DefaultPeerUpdateInterval,
 	}
-
 	// apply options
 	for _, o := range options {
 		o(pm)
 	}
-
-	pm.Component = component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// makes sure that peer update request is invoked once before returning
-			pm.RequestPeerUpdate()
-
-			ready()
-			pm.updateLoop(ctx)
-		}).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-			pm.periodicLoop(ctx)
-		}).
-		Build()
-
 	return pm
 }
 
@@ -103,45 +82,35 @@ func PeerManagerFactory(peerManagerOptions []Option, connectorOptions ...Connect
 	}
 }
 
-// updateLoop triggers an update peer request when it has been requested
-func (pm *PeerManager) updateLoop(ctx irrecoverable.SignalerContext) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
+// Ready kicks off the ambient periodic connection updates.
+func (pm *PeerManager) Ready() <-chan struct{} {
+	pm.unit.Launch(pm.updateLoop)
 
-		select {
-		case <-ctx.Done():
-			return
-		case <-pm.peerRequestQ:
-			pm.updatePeers(ctx)
-		}
-	}
-}
+	// makes sure that peer update request is invoked once before returning
+	pm.RequestPeerUpdate()
 
-// periodicLoop periodically triggers an update peer request
-func (pm *PeerManager) periodicLoop(ctx irrecoverable.SignalerContext) {
+	// also starts running it periodically
+	//
 	// add a random delay to initial launch to avoid synchronizing this
 	// potentially expensive operation across the network
 	delay := time.Duration(mrand.Int63n(pm.peerUpdateInterval.Nanoseconds()))
+	pm.unit.LaunchPeriodically(pm.RequestPeerUpdate, pm.peerUpdateInterval, delay)
 
-	ticker := time.NewTicker(pm.peerUpdateInterval)
-	defer ticker.Stop()
+	return pm.unit.Ready()
+}
 
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.After(delay):
-	}
+func (pm *PeerManager) Done() <-chan struct{} {
+	return pm.unit.Done()
+}
 
+// updateLoop triggers an update peer request when it has been requested
+func (pm *PeerManager) updateLoop() {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-pm.peerRequestQ:
+			pm.updatePeers()
+		case <-pm.unit.Quit():
 			return
-		case <-ticker.C:
-			pm.RequestPeerUpdate()
 		}
 	}
 }
@@ -158,7 +127,7 @@ func (pm *PeerManager) RequestPeerUpdate() {
 
 // updatePeers updates the peers by connecting to all the nodes provided by the peersProvider callback and disconnecting from
 // previous nodes that are no longer in the new list of nodes.
-func (pm *PeerManager) updatePeers(ctx irrecoverable.SignalerContext) {
+func (pm *PeerManager) updatePeers() {
 
 	// get all the peer ids to connect to
 	peers, err := pm.peersProvider()
@@ -172,10 +141,9 @@ func (pm *PeerManager) updatePeers(ctx irrecoverable.SignalerContext) {
 		Msg("connecting to peers")
 
 	// ask the connector to connect to all peers in the list
-	pm.connector.UpdatePeers(ctx, peers)
+	pm.connector.UpdatePeers(pm.unit.Ctx(), peers)
 }
 
-// ForceUpdatePeers initiates an update to the peer connections of this node immediately
-func (pm *PeerManager) ForceUpdatePeers(ctx irrecoverable.SignalerContext) {
-	pm.updatePeers(ctx)
+func (pm *PeerManager) ForceUpdatePeers() {
+	pm.updatePeers()
 }
