@@ -15,7 +15,7 @@ import (
 
 // pacemaker timeout
 // if your laptop is fast enough, 10 ms is enough
-const pmTimeout = 10 * time.Millisecond
+const pmTimeout = 60 * time.Millisecond
 
 // If 2 nodes are down in a 7 nodes cluster, the rest of 5 nodes can
 // still make progress and reach consensus
