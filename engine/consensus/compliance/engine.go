@@ -349,23 +349,6 @@ func (e *Engine) processAvailableMessages() error {
 
 		msg, ok = e.pendingBlocks.Get()
 		if ok {
-			blockResponse := msg.Payload.(*messages.BlockResponse)
-			for _, block := range blockResponse.Blocks {
-				// process each block and indicate it's from a range of blocks
-				err := e.core.OnBlockProposal(msg.OriginID, &messages.BlockProposal{
-					Header:  block.Header,
-					Payload: block.Payload,
-				}, true)
-
-				if err != nil {
-					return fmt.Errorf("could not handle block proposal: %w", err)
-				}
-			}
-			continue
-		}
-
-		msg, ok = e.pendingBlocks.Get()
-		if ok {
 			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal), true)
 			if err != nil {
 				return fmt.Errorf("could not handle block proposal: %w", err)
