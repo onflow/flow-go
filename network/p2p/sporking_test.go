@@ -44,7 +44,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 		"test_crosstalk_prevention_on_network_key_change",
 		withNetworkingPrivateKey(node1key),
 	)
-	defer stopNode(t, node1)
+	defer unittest.StopNode(t, node1)
 	t.Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
 	t.Logf("libp2p ID for %s: %s", id1.NodeID.String(), node1.Host().ID())
 
@@ -65,7 +65,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 
 	// stop node 2 and start it again with a different networking key but on the same IP and port
-	stopNode(t, node2)
+	unittest.StopNode(t, node2)
 
 	// start node2 with the same name, ip and port but with the new key
 	node2keyNew := generateNetworkingKey(t)
@@ -77,7 +77,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 		withNetworkingPrivateKey(node2keyNew),
 		withNetworkingAddress(id2.Address),
 	)
-	defer stopNode(t, node2)
+	defer unittest.StopNode(t, node2)
 
 	// make sure the node2 indeed came up on the old ip and port
 	assert.Equal(t, id2New.Address, id2.Address)
@@ -99,7 +99,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	// create and start node 1 on localhost and random port
 	node1, id1 := nodeFixture(t, ctx, sporkId1, "test_one_to_one_crosstalk_prevention")
 
-	defer stopNode(t, node1)
+	defer unittest.StopNode(t, node1)
 	peerInfo1, err := p2p.PeerAddressInfo(id1)
 	require.NoError(t, err)
 
@@ -111,7 +111,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 	// stop node 2 and start it again with a different libp2p protocol id to listen for
-	stopNode(t, node2)
+	unittest.StopNode(t, node2)
 
 	// start node2 with the same address and root key but different root block id
 	node2, id2New := nodeFixture(t,
@@ -121,7 +121,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 		withNetworkingAddress(id2.Address),
 	)
 
-	defer stopNode(t, node2)
+	defer unittest.StopNode(t, node2)
 
 	// make sure the node2 indeed came up on the old ip and port
 	assert.Equal(t, id2New.Address, id2.Address)
@@ -146,7 +146,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 		previousSporkId,
 		"test_one_to_k_crosstalk_prevention",
 	)
-	defer stopNode(t, node1)
+	defer unittest.StopNode(t, node1)
 
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2, id2 := nodeFixture(t,
@@ -154,7 +154,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 		previousSporkId,
 		"test_one_to_k_crosstalk_prevention",
 	)
-	defer stopNode(t, node2)
+	defer unittest.StopNode(t, node2)
 
 	pInfo2, err := p2p.PeerAddressInfo(id2)
 	require.NoError(t, err)

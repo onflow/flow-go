@@ -28,7 +28,7 @@ func TestPeerManager_Integration(t *testing.T) {
 
 	// create nodes
 	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_peer_manager", count)
-	defer stopNodes(t, nodes)
+	defer unittest.StopNodes(t, nodes)
 
 	thisNode := nodes[0]
 	topologyPeers := identities[1:]

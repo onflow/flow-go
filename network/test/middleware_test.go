@@ -40,7 +40,6 @@ const testChannel = channels.TestNetworkChannel
 // https://github.com/libp2p/go-libp2p-pubsub/blob/master/tag_tracer.go
 // One way to make sure such a mesh has formed, asynchronously, in unit tests, is to wait for libp2p.GossipSubD such calls,
 // and that's what we do with tagsObserver.
-//
 type tagsObserver struct {
 	tags chan string
 	log  zerolog.Logger
@@ -194,6 +193,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
+	defer unittest.StopNodes(m.T(), libP2PNodes)
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.
@@ -285,6 +285,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
+	defer unittest.StopNodes(m.T(), libP2PNodes)
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.

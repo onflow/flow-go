@@ -17,13 +17,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/network/slashing"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 )
 
@@ -434,4 +434,18 @@ func CrashTestWithExpectedStatus(
 // NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware
 func NetworkSlashingViolationsConsumer(logger zerolog.Logger) slashing.ViolationsConsumer {
 	return slashing.NewSlashingViolationsConsumer(logger)
+}
+
+// StopNodes stop all nodes in the input slice
+func StopNodes(t *testing.T, nodes []*p2p.Node) {
+	for _, n := range nodes {
+		StopNode(t, n)
+	}
+}
+
+// StopNode stops node
+func StopNode(t *testing.T, node *p2p.Node) {
+	done, err := node.Stop()
+	assert.NoError(t, err)
+	RequireCloseBefore(t, done, 1*time.Second, "could not stop node on ime")
 }

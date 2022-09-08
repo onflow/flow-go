@@ -17,7 +17,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
@@ -167,19 +166,6 @@ func nodeFixture(
 	return n, *identity
 }
 
-// stopNodes stop all nodes in the input slice
-func stopNodes(t *testing.T, nodes []*p2p.Node) {
-	for _, n := range nodes {
-		stopNode(t, n)
-	}
-}
-
-func stopNode(t *testing.T, node *p2p.Node) {
-	done, err := node.Stop()
-	assert.NoError(t, err)
-	unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop node on ime")
-}
-
 // generateNetworkingKey is a test helper that generates a ECDSA flow key pair.
 func generateNetworkingKey(t *testing.T) fcrypto.PrivateKey {
 	seed := unittest.SeedFixture(48)
@@ -238,7 +224,7 @@ func nodesFixture(t *testing.T, ctx context.Context, sporkID flow.Identifier, dh
 	defer func() {
 		if err != nil && nodes != nil {
 			// stops all nodes upon an error in starting even one single node
-			stopNodes(t, nodes)
+			unittest.StopNodes(t, nodes)
 			t.Fail()
 		}
 	}()
