@@ -79,8 +79,8 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
-	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, qc)
+	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
+	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC)
 	suite.Require().NoError(err)
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
 	suite.Require().NoError(err)
@@ -95,7 +95,7 @@ func (suite *BuilderSuite) SetupTest() {
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
 	seal.ResultID = result.ID()
 
-	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
+	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
 	require.NoError(suite.T(), err)
 
 	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
