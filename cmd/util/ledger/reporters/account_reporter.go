@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
@@ -124,7 +123,7 @@ type balanceProcessor struct {
 	ctx           fvm.Context
 	view          state.View
 	prog          *programs.Programs
-	intf          runtime.Interface
+	env           fvm.Environment
 	balanceScript []byte
 	momentsScript []byte
 
@@ -138,7 +137,7 @@ type balanceProcessor struct {
 }
 
 func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{}))
+	vm := fvm.NewVM()
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithMemoryAndInteractionLimitsDisabled())
@@ -159,7 +158,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		view:     v,
 		accounts: accounts,
 		prog:     prog,
-		intf:     env,
+		env:      env,
 	}
 }
 
@@ -393,12 +392,16 @@ func (c *balanceProcessor) ReadStored(address flow.Address, domain common.PathDo
 	if err != nil {
 		return nil, err
 	}
-	receiver, err := c.vm.Runtime.ReadStored(addr,
+
+	rt := c.env.BorrowCadenceRuntime()
+	defer c.env.ReturnCadenceRuntime(rt)
+
+	receiver, err := rt.ReadStored(
+		addr,
 		cadence.Path{
 			Domain:     domain.Identifier(),
 			Identifier: id,
 		},
-		runtime.Context{Interface: c.intf},
 	)
 	return receiver, err
 }

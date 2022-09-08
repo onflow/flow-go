@@ -75,7 +75,7 @@ type ComputationConfig struct {
 	ScriptExecutionTimeLimit time.Duration
 
 	// When NewCustomVirtualMachine is nil, the manager will create a standard
-	// fvm virtual machine via fvm.NewVirtualMachine.  Otherwise, the manager
+	// fvm virtual machine via fvm.NewVM.  Otherwise, the manager
 	// will create a virtual machine using this function.
 	//
 	// Note that this is primarily used for testing.
@@ -118,17 +118,16 @@ func New(
 	if params.NewCustomVirtualMachine != nil {
 		vm = params.NewCustomVirtualMachine()
 	} else {
-		rt := runtime.NewInterpreterRuntime(
-			runtime.Config{
-				TracingEnabled: params.CadenceTracing,
-			})
-
-		vm = fvm.NewVirtualMachine(rt)
+		vm = fvm.NewVM()
 	}
 
 	options := []fvm.Option{
 		fvm.WithReusableCadenceRuntimePool(
-			fvm.NewReusableCadenceRuntimePool(ReusableCadenceRuntimePoolSize)),
+			fvm.NewReusableCadenceRuntimePool(
+				ReusableCadenceRuntimePoolSize,
+				runtime.Config{
+					TracingEnabled: params.CadenceTracing,
+				})),
 	}
 	if params.ExtensiveTracing {
 		options = append(options, fvm.WithExtensiveTracing())

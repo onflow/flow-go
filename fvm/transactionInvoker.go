@@ -82,23 +82,17 @@ func (i TransactionInvoker) Process(
 
 	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
-	location := common.TransactionLocation(proc.ID)
-
-	runtimeEnv := env.BorrowCadenceRuntime()
-	defer env.ReturnCadenceRuntime(runtimeEnv)
+	rt := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(rt)
 
 	var txError error
-	err = vm.Runtime.ExecuteTransaction(
+	err = rt.ExecuteTransaction(
 		runtime.Script{
 			Source:    proc.Transaction.Script,
 			Arguments: proc.Transaction.Arguments,
 		},
-		runtime.Context{
-			Interface:   env,
-			Location:    location,
-			Environment: runtimeEnv,
-		},
-	)
+		common.TransactionLocation(proc.ID))
+
 	if err != nil {
 		var interactionLimitExceededErr *errors.LedgerInteractionLimitExceededError
 		if errors.As(err, &interactionLimitExceededErr) {

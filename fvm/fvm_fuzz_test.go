@@ -24,9 +24,9 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 	// setup initial state
 	vmt, tctx := bootstrapFuzzStateAndTxContext(f)
 
-	f.Add(uint64(0), uint64(0), uint(0))
-	f.Add(uint64(5), uint64(0), uint(0))
-	f.Fuzz(func(t *testing.T, computationLimit uint64, memoryLimit uint64, transactionType uint) {
+	f.Add(uint64(0), uint64(0), uint64(0), uint(0))
+	f.Add(uint64(5), uint64(0), uint64(0), uint(0))
+	f.Fuzz(func(t *testing.T, computationLimit uint64, memoryLimit uint64, interactionLimit uint64, transactionType uint) {
 		computationLimit %= flow.DefaultMaxTransactionGasLimit
 		transactionType %= uint(len(fuzzTransactionTypes))
 
@@ -48,6 +48,8 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 			// set the memory limit
 			ctx.MemoryLimit = memoryLimit
+			// set the interaction limit
+			ctx.MaxStateInteractionSize = interactionLimit
 			// run the transaction
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
@@ -101,6 +103,7 @@ var fuzzTransactionTypes = []transactionType{
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
+					errors.ErrCodeLedgerInteractionLimitExceededError,
 				}
 				require.Contains(t, codes, results.tx.Err.Code(), results.tx.Err.Error())
 			}
@@ -130,6 +133,7 @@ var fuzzTransactionTypes = []transactionType{
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the failed transfer
+				errors.ErrCodeLedgerInteractionLimitExceededError,
 			}
 			require.Contains(t, codes, results.tx.Err.Code(), results.tx.Err.Error())
 
@@ -144,6 +148,7 @@ var fuzzTransactionTypes = []transactionType{
 		// Should never succeed.
 		// fees should be deducted no matter what.
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
+			// empty transaction
 			txBody := flow.NewTransactionBody().SetScript([]byte("transaction(){prepare(){};execute{panic(\"some panic\")}}"))
 			txBody.SetProposalKey(tctx.address, 0, 0)
 			txBody.SetPayer(tctx.address)
@@ -154,8 +159,35 @@ var fuzzTransactionTypes = []transactionType{
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the panic
+				errors.ErrCodeLedgerInteractionLimitExceededError,
 			}
 			require.Contains(t, codes, results.tx.Err.Code(), results.tx.Err.Error())
+
+			// fees should be deducted no matter the input
+			fees, deducted := getDeductedFees(t, tctx, results)
+			require.True(t, deducted, "Fees should be deducted.")
+			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+		},
+	},
+	{
+		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
+			// create account
+			txBody := flow.NewTransactionBody().SetScript(createAccountScript).
+				AddAuthorizer(tctx.address)
+			txBody.SetProposalKey(tctx.address, 0, 0)
+			txBody.SetPayer(tctx.address)
+			return txBody
+		},
+		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
+			// if there is an error, it should be computation exceeded
+			if results.tx.Err != nil {
+				codes := []errors.ErrorCode{
+					errors.ErrCodeComputationLimitExceededError,
+					errors.ErrCodeCadenceRunTimeError,
+					errors.ErrCodeLedgerInteractionLimitExceededError,
+				}
+				require.Contains(t, codes, results.tx.Err.Code(), results.tx.Err.Error())
+			}
 
 			// fees should be deducted no matter the input
 			fees, deducted := getDeductedFees(t, tctx, results)

@@ -120,17 +120,10 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	map[KindType]uint64,
 	error,
 ) {
-	runtimeEnv := env.BorrowCadenceRuntime()
-	defer env.ReturnCadenceRuntime(runtimeEnv)
+	runtime := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(runtime)
 
-	value, err := env.VM().Runtime.ReadStored(
-		service,
-		path,
-		runtime.Context{
-			Interface:   env,
-			Environment: runtimeEnv,
-		},
-	)
+	value, err := runtime.ReadStored(service, path)
 
 	if err != nil {
 		// this might be fatal, return as is
@@ -199,17 +192,12 @@ func GetExecutionMemoryLimit(
 	memoryLimit uint64,
 	err error,
 ) {
-	runtimeEnv := env.BorrowCadenceRuntime()
-	defer env.ReturnCadenceRuntime(runtimeEnv)
+	runtime := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(runtime)
 
-	value, err := env.VM().Runtime.ReadStored(
+	value, err := runtime.ReadStored(
 		service,
-		blueprints.TransactionFeesExecutionMemoryLimitPath,
-		runtime.Context{
-			Interface:   env,
-			Environment: runtimeEnv,
-		},
-	)
+		blueprints.TransactionFeesExecutionMemoryLimitPath)
 	if err != nil {
 		// this might be fatal, return as is
 		return 0, err

@@ -28,18 +28,12 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 		path cadence.Path,
 		context runtime.Context,
 	) (cadence.Value, error)) fvm.Environment {
-		r := &TestInterpreterRuntime{
-			readStored: readStored,
-		}
-		vm := fvm.VirtualMachine{
-			Runtime: r,
-		}
 		envMock := &fvmmock.Environment{}
-		envMock.On("VM").
-			Return(&vm).
-			Once()
 		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
-			fvm.NewReusableCadenceRuntime())
+			fvm.NewReusableCadenceRuntime(
+				&TestInterpreterRuntime{
+					readStored: readStored,
+				}))
 		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
 	}
@@ -161,18 +155,12 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 		path cadence.Path,
 		context runtime.Context,
 	) (cadence.Value, error)) fvm.Environment {
-		r := &TestInterpreterRuntime{
-			readStored: readStored,
-		}
-		vm := fvm.VirtualMachine{
-			Runtime: r,
-		}
 		envMock := &fvmmock.Environment{}
-		envMock.On("VM").
-			Return(&vm).
-			Once()
 		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
-			fvm.NewReusableCadenceRuntime())
+			fvm.NewReusableCadenceRuntime(
+				&TestInterpreterRuntime{
+					readStored: readStored,
+				}))
 		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
 	}
