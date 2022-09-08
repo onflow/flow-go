@@ -41,12 +41,11 @@ type Suite struct {
 	suite.Suite
 	log zerolog.Logger
 	lib.TestnetStateTracker
-	ctx         context.Context
-	cancel      context.CancelFunc
-	net         *testnet.FlowNetwork
-	nodeConfigs []testnet.NodeConfig
-	ghostID     flow.Identifier
-	client      *testnet.Client
+	ctx     context.Context
+	cancel  context.CancelFunc
+	net     *testnet.FlowNetwork
+	ghostID flow.Identifier
+	client  *testnet.Client
 
 	// Epoch config (lengths in views)
 	StakingAuctionLen          uint64

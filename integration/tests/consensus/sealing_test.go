@@ -6,6 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/crypto"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/engine/ghost/client"
@@ -16,14 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
-
-func TestExecutionStateSealing(t *testing.T) {
-	suite.Run(t, new(SealingSuite))
-}
 
 func TestExecutionStateSealing(t *testing.T) {
 	suite.Run(t, new(SealingSuite))

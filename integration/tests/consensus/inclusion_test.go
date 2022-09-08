@@ -18,14 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
-
-func TestCollectionGuaranteeInclusion(t *testing.T) {
-	suite.Run(t, new(InclusionSuite))
-}
 
 func TestCollectionGuaranteeInclusion(t *testing.T) {
 	suite.Run(t, new(InclusionSuite))
