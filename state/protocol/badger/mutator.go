@@ -623,16 +623,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			}
 		}
 
-		// When a block is finalized, we commit the result for each seal it contains. The sealing logic
-		// guarantees that only a single, continuous execution fork is sealed. Here, we index for
-		// each block ID the ID of its _finalized_ seal.
-		for _, seal := range block.Payload.Seals {
-			err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(tx)
-			if err != nil {
-				return fmt.Errorf("could not index the seal by the sealed block ID: %w", err)
-			}
-		}
-
 		// emit protocol events within the scope of the Badger transaction to
 		// guarantee at-least-once delivery
 		// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
@@ -669,9 +659,9 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // epochFallbackTriggeredByFinalizedBlock checks whether finalizing the input block
 // would trigger epoch emergency fallback mode. In particular, we trigger epoch
 // fallback mode when finalizing a block B when:
-// 1. B is the first finalized block with view greater than or equal to the epoch
-//    commitment deadline for the current epoch.
-// 2. The next epoch has not been committed as of B.
+//  1. B is the first finalized block with view greater than or equal to the epoch
+//     commitment deadline for the current epoch.
+//  2. The next epoch has not been committed as of B.
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // See protocol.Params for more details on the epoch commitment deadline.
@@ -759,11 +749,12 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 // See handleEpochServiceEvents for details.
 //
 // Convention:
-//           A <-- ... <-- P(Seal_A) <----- B
-//                         ↑                ↑
-//           block sealing service event    first block of new Epoch phase
-//           for epoch-phase transition     (e.g. EpochSetup phase)
-//           (e.g. EpochSetup event)
+//
+//	A <-- ... <-- P(Seal_A) <----- B
+//	              ↑                ↑
+//	block sealing service event    first block of new Epoch phase
+//	for epoch-phase transition     (e.g. EpochSetup phase)
+//	(e.g. EpochSetup event)
 //
 // Per convention, protocol events for epoch phase changes are emitted when
 // the first block of the new phase (eg. EpochSetup phase) is _finalized_.
@@ -825,13 +816,13 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 // final View of the parent's epoch, the block starts a new Epoch.
 //
 // Possible outcomes:
-// 1. Block is in same Epoch as parent (block.View < epoch.FinalView)
-//    -> the parent's EpochStatus.CurrentEpoch also applies for the current block
-// 2. Block enters the next Epoch (block.View ≥ epoch.FinalView)
-//    a) HAPPY PATH: Epoch fallback is not triggered, we enter the next epoch:
-//       -> the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
-//    b) FALLBACK PATH: Epoch fallback is triggered, we continue the current epoch:
-//       -> the parent's EpochStatus.CurrentEpoch also applies for the current block
+//  1. Block is in same Epoch as parent (block.View < epoch.FinalView)
+//     -> the parent's EpochStatus.CurrentEpoch also applies for the current block
+//  2. Block enters the next Epoch (block.View ≥ epoch.FinalView)
+//     a) HAPPY PATH: Epoch fallback is not triggered, we enter the next epoch:
+//     -> the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
+//     b) FALLBACK PATH: Epoch fallback is triggered, we continue the current epoch:
+//     -> the parent's EpochStatus.CurrentEpoch also applies for the current block
 //
 // As the parent was a valid extension of the chain, by induction, the parent
 // satisfies all consistency requirements of the protocol.
@@ -839,6 +830,7 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 // Return values:
 //  1. EpochStatus for `block`
 //  2. boolean flag indicating whether we are in EECC
+//
 // No error returns are expected under normal operations
 func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, bool, error) {
 	parentStatus, err := m.epoch.statuses.ByBlockID(block.ParentID)
@@ -901,14 +893,14 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, bool
 // for a block in which a service event was emitted).
 //
 // Return values:
-//  * dbUpdates - If the service events are valid, or there are no service events,
-//    this method returns a slice of Badger operations to apply while storing the block.
-//    This includes an operation to index the epoch status for every block, and
-//    operations to insert service events for blocks that include them.
-//  * insertingCandidateTriggersEpochFallback - if inserting this block causes epoch
-//    fallback mode to be triggered, this is true. This causes flag to be set in the
-//    database and a protocol event to be emitted. This can only be true for at most
-//    one block for a given database instance.
+//   - dbUpdates - If the service events are valid, or there are no service events,
+//     this method returns a slice of Badger operations to apply while storing the block.
+//     This includes an operation to index the epoch status for every block, and
+//     operations to insert service events for blocks that include them.
+//   - insertingCandidateTriggersEpochFallback - if inserting this block causes epoch
+//     fallback mode to be triggered, this is true. This causes flag to be set in the
+//     database and a protocol event to be emitted. This can only be true for at most
+//     one block for a given database instance.
 //
 // No errors are expected during normal operation.
 // TODO: we should only consider an incorporated service fatal, and trigger EECC, on finalization of block D https://github.com/dapperlabs/flow-go/issues/6316
