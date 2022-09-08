@@ -421,6 +421,13 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 		return
 	}
 
+	stopHeight := e.stopAtHeight.Load()
+	if stopHeight > 0 && stopHeight >= b.Height {
+		// stop executing blocks, but continue to receive them
+		e.pauseExecution = true
+		return
+	}
+
 	blockID := b.ID()
 	newBlock, err := e.blocks.ByID(blockID)
 	if err != nil {
