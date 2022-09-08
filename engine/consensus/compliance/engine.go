@@ -27,20 +27,22 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// defaultRangeResponseQueueCapacity maximum capacity of block range responses queue
+// defaultRangeResponseQueueCapacity maximum capacity of inbound queue for `messages.BlockResponse`s
 const defaultRangeResponseQueueCapacity = 100
 
-// defaultBlockQueueCapacity maximum capacity of block proposals queue
+// defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
 const defaultBlockQueueCapacity = 10000
 
-// defaultVoteQueueCapacity maximum capacity of block votes queue
+// defaultVoteQueueCapacity maximum capacity of inbound queue for `messages.BlockVote`s
 const defaultVoteQueueCapacity = 1000
 
-// defaultTimeoutObjectsQueueCapacity maximum capacity of timeout objects queue
+// defaultTimeoutObjectsQueueCapacity maximum capacity of inbound queue for `messages.TimeoutObject`s
 const defaultTimeoutObjectsQueueCapacity = 1000
 
-// Engine is a wrapper struct for `Core` which implements consensus algorithm.
-// Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
+// Engine is a wrapper around `compliance.Core`. The Engine queues inbound messages, relevant
+// node-internal notifications, and manages the worker routines processing the inbound events,
+// and forwards outbound messages to the networking layer.
+// `compliance.Core` implements the actual compliance logic.
 type Engine struct {
 	unit                       *engine.Unit
 	lm                         *lifecycle.LifecycleManager
@@ -72,8 +74,9 @@ func NewEngine(
 	net network.Network,
 	me module.Local,
 	prov network.Engine,
-	core *Core) (*Engine, error) {
-
+	core *Core,
+) (*Engine, error) {
+	// Inbound FIFO queue for `messages.BlockResponse`s
 	rangeResponseQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultRangeResponseQueueCapacity),
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockResponseQueue, uint(len)) }),
@@ -93,24 +96,24 @@ func NewEngine(
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
+		return nil, fmt.Errorf("failed to create queue for inbound block proposals: %w", err)
 	}
 
 	pendingBlocks := &engine.FifoMessageStore{
 		FifoQueue: blocksQueue,
 	}
 
-	// FIFO queue for block votes
+	// Inbound FIFO queue for `messages.BlockVote`s
 	votesQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create queue for inbound approvals: %w", err)
+		return nil, fmt.Errorf("failed to create queue for inbound votes: %w", err)
 	}
 	pendingVotes := &engine.FifoMessageStore{FifoQueue: votesQueue}
 
-	// FIFO queue for timeout objects
+	// Inbound FIFO queue for `messages.TimeoutObject`s
 	// TODO(active-pacemaker): update metrics
 	timeoutObjectsQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultTimeoutObjectsQueueCapacity))
@@ -303,6 +306,7 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 	return nil
 }
 
+// loop implements the processing of inbound messages. Only returns when Engine is terminated.
 func (e *Engine) loop() {
 	for {
 		select {
@@ -317,11 +321,16 @@ func (e *Engine) loop() {
 	}
 }
 
+// processAvailableMessages processes any available messages from the inbound queues.
+// Only returns when all inbound queues are empty (or the engine is terminated).
+// No errors expected during normal operations.
 func (e *Engine) processAvailableMessages() error {
-
 	for {
-		// TODO prioritization
-		// eg: msg := engine.SelectNextMessage()
+		select {
+		case <-e.unit.Quit():
+			return nil
+		default:
+		}
 
 		msg, ok := e.pendingRangeResponses.Get()
 		if ok {
@@ -332,9 +341,8 @@ func (e *Engine) processAvailableMessages() error {
 					Header:  block.Header,
 					Payload: block.Payload,
 				})
-
 				if err != nil {
-					return fmt.Errorf("could not handle block proposal: %w", err)
+					return fmt.Errorf("could not process synced block proposal: %w", err)
 				}
 			}
 			continue
@@ -375,7 +383,6 @@ func (e *Engine) processAvailableMessages() error {
 
 // SendVote will send a vote to the desired node.
 func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
-
 	log := e.log.With().
 		Hex("block_id", blockID[:]).
 		Uint64("block_view", view).
@@ -406,7 +413,8 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	return nil
 }
 
-// BroadcastTimeout submits a timeout object to all collection nodes in our cluster
+// BroadcastTimeout submits a timeout object to all consensus nodes.
+// No errors are expected during normal operation.
 func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 	logContext := e.log.With().
 		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
@@ -417,23 +425,25 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 		logContext.
 			Uint64("last_view_tc_view", timeout.LastViewTC.View).
 			Uint64("last_view_tc_newest_qc_view", timeout.LastViewTC.NewestQC.View)
-
 	}
-
 	log := logContext.Logger()
 
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
-
-	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.Final().Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get consensus recipients: %w", err)
-	}
-
 	e.unit.Launch(func() {
+		// Retrieve all consensus nodes (excluding myself).
+		// CAUTION: We must include also nodes with weight zero, because otherwise
+		//          TCs might not be constructed at epoch switchover.
+		// Note: retrieving the final state requires a time-intensive database read.
+		//       Therefore, we execute this in a separate routine, because
+		//       `BroadcastTimeout` is directly called by the consensus core logic.
+		recipients, err := e.state.Final().Identities(filter.And(
+			filter.HasRole(flow.RoleConsensus),
+			filter.Not(filter.HasNodeID(e.me.NodeID())),
+		))
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("could not get consensus recipients for broadcasting timeout")
+		}
+
 		// create the proposal message for the collection
 		msg := &messages.TimeoutObject{
 			View:       timeout.View,
@@ -442,7 +452,7 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 			SigData:    timeout.SigData,
 		}
 
-		err := e.con.Publish(msg, recipients.NodeIDs()...)
+		err = e.con.Publish(msg, recipients.NodeIDs()...)
 		if errors.Is(err, network.EmptyTargetList) {
 			return
 		}
@@ -450,7 +460,6 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 			log.Error().Err(err).Msg("could not broadcast timeout")
 			return
 		}
-
 		log.Info().Msg("consensus timeout broadcast")
 
 		// TODO(active-pacemaker): update metrics
@@ -463,8 +472,8 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 
 // BroadcastProposalWithDelay will propagate a block proposal to all non-local consensus nodes.
 // Note the header has incomplete fields, because it was converted from a hotstuff.
+// No errors are expected during normal operation.
 func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) error {
-
 	// first, check that we are the proposer of the block
 	if header.ProposerID != e.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
@@ -503,18 +512,23 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 	log.Debug().Msg("processing proposal broadcast request from hotstuff")
 
-	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get consensus recipients: %w", err)
-	}
-
 	e.unit.LaunchAfter(delay, func() {
+		// Retrieve all consensus nodes (excluding myself).
+		// CAUTION: We must include also nodes with weight zero, because otherwise
+		//          new consensus nodes for the next epoch are left out.
+		// Note: retrieving the final state requires a time-intensive database read.
+		//       Therefore, we execute this in a separate routine, because
+		//       `BroadcastTimeout` is directly called by the consensus core logic.
+		recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
+			filter.HasRole(flow.RoleConsensus),
+			filter.Not(filter.HasNodeID(e.me.NodeID())),
+		))
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("could not get consensus recipient for broadcasting proposal")
+		}
 
-		go e.core.hotstuff.SubmitProposal(header, parent.View)
+		// forward proposal to node's local consensus instance
+		e.core.hotstuff.SubmitProposal(header, parent.View) // non-blocking
 
 		// NOTE: some fields are not needed for the message
 		// - proposer ID is conveyed over the network message
@@ -547,6 +561,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 // BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
 // Note the header has incomplete fields, because it was converted from a hotstuff.
+// No errors are expected during normal operation.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	return e.BroadcastProposalWithDelay(header, 0)
 }

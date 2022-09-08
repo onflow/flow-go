@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,7 +44,7 @@ func TestMessagesLostAcrossNetwork(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
-	hub.WithFilter(blockReceiverMessagesByPercentage(10))
+	hub.WithFilter(blockReceiverMessagesRandomly(0.1))
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
@@ -58,8 +59,9 @@ func TestMessagesLostAcrossNetwork(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-// TestDelay verifies if each receiver receive delayed messages, the network can still reach consensus
-// the delay might skip some blocks.
+// TestDelay verifies that we still reach consensus even if _all_ messages are significantly
+// delayed. Due to the delay, some proposals might be orphaned. The message delay is sampled
+// for each message from the interval [0.1*hotstuffTimeout, 0.5*hotstuffTimeout].
 func TestDelay(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_LONG_RUNNING, "could run for a while depending on what messages are being dropped")
 	stopper := NewStopper(50, 0)
@@ -82,7 +84,8 @@ func TestDelay(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-// TestOneNodeBehind verify that if a node is always behind, committee still can reach consensus.
+// TestOneNodeBehind verifies that if one node (here node 0) consistently experiences a significant
+// delay receiving messages beyond the hotstuff timeout, the committee still can reach consensus.
 func TestOneNodeBehind(t *testing.T) {
 	stopper := NewStopper(50, 0)
 	participantsData := createConsensusIdentities(t, 3)
@@ -110,9 +113,13 @@ func TestOneNodeBehind(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-// TestTimeoutRebroadcast this tests drops all proposals at view 5 so replicas can't make progress as well as every first timeout object per view.
-// Because of blocked timeout, replicas can't create TC and make progress. We expect that replica will eventually broadcast
-// its timeout object again.
+// TestTimeoutRebroadcast drops
+// * all proposals at view 5
+// * the first timeout object per view for _every_ sender
+// In this configuration, the _initial_ broadcast is insufficient for replicas to make
+// progress in view 5 (neither in the happy path, because the proposal is always dropped
+// nor on the unhappy path for the _first_ attempt to broadcast timeout objects). We
+// expect that replica will eventually broadcast its timeout object again.
 func TestTimeoutRebroadcast(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker, this test requires rebroadcast of timeout objects")
 	stopper := NewStopper(10, 0)
@@ -121,17 +128,15 @@ func TestTimeoutRebroadcast(t *testing.T) {
 	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	// nodeID -> view -> numTimeoutMessages
+	lock := new(sync.Mutex)
 	blockedTimeoutObjectsTracker := make(map[flow.Identifier]map[uint64]uint64)
 	hub.WithFilter(func(channelID network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		switch m := event.(type) {
 		case *messages.BlockProposal:
-			// drop proposal for view 5
-			if m.Header.View == 5 {
-				return true, 0
-			}
-			return false, 0
+			return m.Header.View == 5, 0 // drop proposals only for view 5
 		case *messages.TimeoutObject:
 			// drop first timeout object for every sender for every view
+			lock.Lock()
 			blockedPerView, found := blockedTimeoutObjectsTracker[sender.id.NodeID]
 			if !found {
 				blockedPerView = make(map[uint64]uint64)
@@ -139,6 +144,7 @@ func TestTimeoutRebroadcast(t *testing.T) {
 			}
 			blocked := blockedPerView[m.View] + 1
 			blockedPerView[m.View] = blocked
+			lock.Unlock()
 			return blocked == 1, 0
 		}
 		// no block or delay to other nodes

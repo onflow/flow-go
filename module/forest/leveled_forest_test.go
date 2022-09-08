@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest/mock"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // ~~~~~~~~~~~~~~~~~~~~~ Mock implementation for Vertex ~~~~~~~~~~~~~~~~~~~~~ //
@@ -25,12 +27,24 @@ func (v *VertexMock) Parent() (flow.Identifier, uint64) { return v.parentId, v.p
 
 func NewVertexMock(vertexId string, vertexLevel uint64, parentId string, parentLevel uint64) *mock.Vertex {
 	v := &mock.Vertex{}
-	v.On("VertexID").Return(string2Identifyer(vertexId))
+	v.On("VertexID").Return(string2Identifier(vertexId))
 	v.On("Level").Return(vertexLevel)
-	v.On("Parent").Return(string2Identifyer(parentId), parentLevel)
+	v.On("Parent").Return(string2Identifier(parentId), parentLevel)
 	return v
 }
 
+// FOREST:
+//                             ↙-- [A]
+//      (Genesis) ← [B] ← [C]  ←-- [D]
+//         ⋮         ⋮      ⋮        ⋮
+//         ⋮         ⋮      ⋮   (Missing1) ←---- [W]
+//         ⋮         ⋮      ⋮        ⋮        (Missing2) ← [X] ← [Y]
+//         ⋮         ⋮      ⋮        ⋮             ⋮        ⋮  ↖ [Z]
+//         ⋮         ⋮      ⋮        ⋮             ⋮        ⋮     ⋮
+// LEVEL:  0         1     2        3             4       5     6
+// Nomenclature:
+//  [B] Vertex B (internally represented as a full vertex container)
+//  (M) referenced vertex that has not been added (internally represented as empty vertex container)
 var TestVertices = map[string]*mock.Vertex{
 	"A": NewVertexMock("A", 3, "Genesis", 0),
 	"B": NewVertexMock("B", 1, "Genesis", 0),
@@ -77,19 +91,17 @@ func TestVertexIteratorOnEmpty(t *testing.T) {
 func TestLevelledForest_AddVertex(t *testing.T) {
 	F := NewLevelledForest(0)
 	v := NewVertexMock("A", 3, "Genesis", 0)
-	if err := F.VerifyVertex(v); err != nil {
-		assert.Fail(t, err.Error())
-	}
+	err := F.VerifyVertex(v)
+	require.NoError(t, err)
 	F.AddVertex(v)
-	assert.True(t, F.HasVertex(string2Identifyer("A")))
+	assert.True(t, F.HasVertex(string2Identifier("A")))
 
 	// Adding Vertex twice should be fine
 	v = NewVertexMock("A", 3, "Genesis", 0)
-	if err := F.VerifyVertex(v); err != nil {
-		assert.Fail(t, err.Error())
-	}
+	err = F.VerifyVertex(v)
+	require.NoError(t, err)
 	F.AddVertex(v)
-	assert.True(t, F.HasVertex(string2Identifyer("A")))
+	assert.True(t, F.HasVertex(string2Identifier("A")))
 }
 
 // TestLevelledForest_AcceptingGenesis checks that Levelled Forest accepts vertices
@@ -99,13 +111,13 @@ func TestLevelledForest_AcceptingGenesis(t *testing.T) {
 	// LevelledForest.LowestLevel on initial conditions
 	F := populateNewForest(t)
 	v1 := &mock.Vertex{}
-	v1.On("VertexID").Return(string2Identifyer("Root-Vertex-A_@Level0"))
+	v1.On("VertexID").Return(string2Identifier("Root-Vertex-A_@Level0"))
 	v1.On("Level").Return(uint64(0))
 	v1.On("Parent").Return(func() (flow.Identifier, uint64) { panic("Parent() should not have been called") })
 	assert.NotPanics(t, func() { F.AddVertex(v1) })
 
 	v2 := &mock.Vertex{}
-	v2.On("VertexID").Return(string2Identifyer("Root-Vertex-B_@Level0"))
+	v2.On("VertexID").Return(string2Identifier("Root-Vertex-B_@Level0"))
 	v2.On("Level").Return(uint64(0))
 	v2.On("Parent").Return(func() (flow.Identifier, uint64) { panic("Parent() should not have been called") })
 	assert.NotPanics(t, func() { F.AddVertex(v2) })
@@ -113,15 +125,15 @@ func TestLevelledForest_AcceptingGenesis(t *testing.T) {
 
 	F = populateNewForest(t)
 	err := F.PruneUpToLevel(8) // LevelledForest.LowestLevel on initial conditions
-	assert.True(t, err == nil)
+	assert.NoError(t, err)
 	v3 := &mock.Vertex{}
-	v3.On("VertexID").Return(string2Identifyer("Root-Vertex-A_@Level8"))
+	v3.On("VertexID").Return(string2Identifier("Root-Vertex-A_@Level8"))
 	v3.On("Level").Return(uint64(8))
 	v3.On("Parent").Return(func() (flow.Identifier, uint64) { panic("Parent() should not have been called") })
 	assert.NotPanics(t, func() { F.AddVertex(v3) })
 
 	v4 := &mock.Vertex{}
-	v4.On("VertexID").Return(string2Identifyer("Root-Vertex-B_@Level8"))
+	v4.On("VertexID").Return(string2Identifier("Root-Vertex-B_@Level8"))
 	v4.On("Level").Return(uint64(8))
 	v4.On("Parent").Return(func() (flow.Identifier, uint64) { panic("Parent() should not have been called") })
 	assert.NotPanics(t, func() { F.AddVertex(v4) })
@@ -135,15 +147,24 @@ func TestLevelledForest_VerifyVertex(t *testing.T) {
 
 	// KNOWN vertex but with wrong level number
 	err := F.VerifyVertex(NewVertexMock("D", 10, "C", 2))
-	assert.True(t, err != nil, err.Error())
+	assert.Error(t, err)
+	assert.True(t, IsInvalidVertexError(err))
 
 	// KNOWN vertex whose PARENT references a known vertex but with mismatching level
-	err = F.VerifyVertex(NewVertexMock("D", 10, "C", 10))
-	assert.True(t, err != nil, err.Error())
+	err = F.VerifyVertex(NewVertexMock("D", 3, "C", 1))
+	assert.Error(t, err)
+	assert.True(t, IsInvalidVertexError(err))
 
-	// adding unknown vertex whose PARENT references a known vertex but with mismatching level
+	// unknown vertex whose PARENT references a known vertex but with mismatching level
 	err = F.VerifyVertex(NewVertexMock("F", 4, "Genesis", 10))
-	assert.True(t, err != nil, err.Error())
+	assert.Error(t, err)
+	assert.True(t, IsInvalidVertexError(err))
+
+	// UNKNOWN vertex (Missing) that is already referenced as parent by an existing vertex [W]
+	// _but_ new vertex has inconsistent level compared to the parent information [W] reports
+	err = F.VerifyVertex(NewVertexMock("Missing1", 2, "Genesis", 0))
+	assert.Error(t, err)
+	assert.True(t, IsInvalidVertexError(err))
 }
 
 // TestLevelledForest_HasVertex test that vertices as correctly reported as contained in Forest
@@ -151,12 +172,12 @@ func TestLevelledForest_VerifyVertex(t *testing.T) {
 //       Vertices that references bvy known vertices but have not themselves are considered to be not in the tree.
 func TestLevelledForest_HasVertex(t *testing.T) {
 	F := populateNewForest(t)
-	assert.True(t, F.HasVertex(string2Identifyer("A")))
-	assert.True(t, F.HasVertex(string2Identifyer("B")))
-	assert.True(t, F.HasVertex(string2Identifyer("X")))
+	assert.True(t, F.HasVertex(string2Identifier("A")))
+	assert.True(t, F.HasVertex(string2Identifier("B")))
+	assert.True(t, F.HasVertex(string2Identifier("X")))
 
-	assert.False(t, F.HasVertex(string2Identifyer("Genesis")))     // Genesis block never directly added (only referenced) => unknown
-	assert.False(t, F.HasVertex(string2Identifyer("NotYetAdded"))) // Block never mentioned before
+	assert.False(t, F.HasVertex(string2Identifier("Genesis")))     // Genesis block never directly added (only referenced) => unknown
+	assert.False(t, F.HasVertex(string2Identifier("NotYetAdded"))) // Block never mentioned before
 }
 
 // TestLevelledForest_GetChildren tests that children are returned properly
@@ -164,7 +185,7 @@ func TestLevelledForest_GetChildren(t *testing.T) {
 	F := populateNewForest(t)
 
 	// testing children for Block that is contained in Tree
-	it := F.GetChildren(string2Identifyer("X"))
+	it := F.GetChildren(string2Identifier("X"))
 	expectedChildren := []*mock.Vertex{
 		TestVertices["Y"],
 		TestVertices["Z"],
@@ -172,7 +193,7 @@ func TestLevelledForest_GetChildren(t *testing.T) {
 	assert.ElementsMatch(t, expectedChildren, children2List(&it))
 
 	// testing children for referenced Block that is NOT contained in Tree
-	it = F.GetChildren(string2Identifyer("Genesis"))
+	it = F.GetChildren(string2Identifier("Genesis"))
 	expectedChildren = []*mock.Vertex{
 		TestVertices["A"],
 		TestVertices["B"],
@@ -180,7 +201,7 @@ func TestLevelledForest_GetChildren(t *testing.T) {
 	assert.ElementsMatch(t, expectedChildren, children2List(&it))
 
 	// testing children for Block that is contained in Tree but no children are known
-	it = F.GetChildren(string2Identifyer("D"))
+	it = F.GetChildren(string2Identifier("D"))
 	assert.False(t, it.HasNext())
 }
 
@@ -189,13 +210,13 @@ func TestLevelledForest_GetNumberOfChildren(t *testing.T) {
 	F := populateNewForest(t)
 
 	// testing children for Block that is contained in Tree
-	assert.Equal(t, 2, F.GetNumberOfChildren(string2Identifyer("X")))
+	assert.Equal(t, 2, F.GetNumberOfChildren(string2Identifier("X")))
 
 	// testing children for referenced Block that is NOT contained in Tree
-	assert.Equal(t, 2, F.GetNumberOfChildren(string2Identifyer("Genesis")))
+	assert.Equal(t, 2, F.GetNumberOfChildren(string2Identifier("Genesis")))
 
 	// testing children for Block that is contained in Tree but no children are known
-	assert.Equal(t, 0, F.GetNumberOfChildren(string2Identifyer("D")))
+	assert.Equal(t, 0, F.GetNumberOfChildren(string2Identifier("D")))
 }
 
 // TestLevelledForest_GetVerticesAtLevel tests that Vertex blob is returned properly
@@ -246,15 +267,15 @@ func TestLevelledForest_GetNumberOfVerticesAtLevel(t *testing.T) {
 // TestLevelledForest_GetVertex tests that Vertex blob is returned properly
 func TestLevelledForest_GetVertex(t *testing.T) {
 	F := populateNewForest(t)
-	v, exists := F.GetVertex(string2Identifyer("D"))
+	v, exists := F.GetVertex(string2Identifier("D"))
 	assert.Equal(t, TestVertices["D"], v)
 	assert.True(t, exists)
 
-	v, exists = F.GetVertex(string2Identifyer("X"))
+	v, exists = F.GetVertex(string2Identifier("X"))
 	assert.Equal(t, TestVertices["X"], v)
 	assert.True(t, exists)
 
-	v, exists = F.GetVertex(string2Identifyer("Genesis"))
+	v, exists = F.GetVertex(string2Identifier("Genesis"))
 	assert.Equal(t, (Vertex)(nil), v)
 	assert.False(t, exists)
 }
@@ -315,47 +336,54 @@ func TestLevelledForest_GetSize_DuplicatedNodes(t *testing.T) {
 func TestLevelledForest_PruneAtLevel(t *testing.T) {
 	F := populateNewForest(t)
 	err := F.PruneUpToLevel(1)
-	assert.False(t, err != nil)
-	assert.False(t, F.HasVertex(string2Identifyer("Genesis")))
-	assert.True(t, F.HasVertex(string2Identifyer("A")))
-	assert.True(t, F.HasVertex(string2Identifyer("B")))
-	assert.True(t, F.HasVertex(string2Identifyer("C")))
-	assert.True(t, F.HasVertex(string2Identifyer("D")))
-	assert.True(t, F.HasVertex(string2Identifyer("X")))
-	assert.True(t, F.HasVertex(string2Identifyer("Y")))
-	assert.True(t, F.HasVertex(string2Identifyer("Z")))
+	assert.NoError(t, err)
+	assert.False(t, F.HasVertex(string2Identifier("Genesis")))
+	assert.True(t, F.HasVertex(string2Identifier("A")))
+	assert.True(t, F.HasVertex(string2Identifier("B")))
+	assert.True(t, F.HasVertex(string2Identifier("C")))
+	assert.True(t, F.HasVertex(string2Identifier("D")))
+	assert.True(t, F.HasVertex(string2Identifier("X")))
+	assert.True(t, F.HasVertex(string2Identifier("Y")))
+	assert.True(t, F.HasVertex(string2Identifier("Z")))
 
 	err = F.PruneUpToLevel(3)
-	assert.False(t, err != nil)
-	assert.False(t, F.HasVertex(string2Identifyer("Genesis")))
-	assert.True(t, F.HasVertex(string2Identifyer("A")))
-	assert.False(t, F.HasVertex(string2Identifyer("B")))
-	assert.False(t, F.HasVertex(string2Identifyer("C")))
-	assert.True(t, F.HasVertex(string2Identifyer("D")))
-	assert.True(t, F.HasVertex(string2Identifyer("X")))
-	assert.True(t, F.HasVertex(string2Identifyer("Y")))
-	assert.True(t, F.HasVertex(string2Identifyer("Z")))
+	assert.NoError(t, err)
+	assert.False(t, F.HasVertex(string2Identifier("Genesis")))
+	assert.True(t, F.HasVertex(string2Identifier("A")))
+	assert.False(t, F.HasVertex(string2Identifier("B")))
+	assert.False(t, F.HasVertex(string2Identifier("C")))
+	assert.True(t, F.HasVertex(string2Identifier("D")))
+	assert.True(t, F.HasVertex(string2Identifier("X")))
+	assert.True(t, F.HasVertex(string2Identifier("Y")))
+	assert.True(t, F.HasVertex(string2Identifier("Z")))
 
 	err = F.PruneUpToLevel(6)
-	assert.False(t, err != nil)
-	assert.False(t, F.HasVertex(string2Identifyer("Genesis")))
-	assert.False(t, F.HasVertex(string2Identifyer("A")))
-	assert.False(t, F.HasVertex(string2Identifyer("B")))
-	assert.False(t, F.HasVertex(string2Identifyer("C")))
-	assert.False(t, F.HasVertex(string2Identifyer("D")))
-	assert.False(t, F.HasVertex(string2Identifyer("X")))
-	assert.True(t, F.HasVertex(string2Identifyer("Y")))
-	assert.True(t, F.HasVertex(string2Identifyer("Z")))
+	assert.NoError(t, err)
+	assert.False(t, F.HasVertex(string2Identifier("Genesis")))
+	assert.False(t, F.HasVertex(string2Identifier("A")))
+	assert.False(t, F.HasVertex(string2Identifier("B")))
+	assert.False(t, F.HasVertex(string2Identifier("C")))
+	assert.False(t, F.HasVertex(string2Identifier("D")))
+	assert.False(t, F.HasVertex(string2Identifier("X")))
+	assert.True(t, F.HasVertex(string2Identifier("Y")))
+	assert.True(t, F.HasVertex(string2Identifier("Z")))
 
 	// pruning at same level repeatedly should be fine
 	err = F.PruneUpToLevel(6)
-	assert.False(t, err != nil)
-	assert.True(t, F.HasVertex(string2Identifyer("Y")))
-	assert.True(t, F.HasVertex(string2Identifyer("Z")))
+	assert.NoError(t, err)
+	assert.True(t, F.HasVertex(string2Identifier("Y")))
+	assert.True(t, F.HasVertex(string2Identifier("Z")))
 
 	// checking that pruning at lower level than what is already pruned results in error
 	err = F.PruneUpToLevel(5)
-	assert.True(t, err != nil)
+	assert.Error(t, err)
+	assert.True(t, mempool.IsBelowPrunedThresholdError(err))
+}
+
+func TestIsInvalidVertexError(t *testing.T) {
+	vertex := NewVertexMock("A", 1, "B", 0)
+	err := NewInvalidVertexErrorf(vertex, "some error")
+	assert.True(t, IsInvalidVertexError(err))
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~ Helper Functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
@@ -382,7 +410,7 @@ func children2List(it *VertexIterator) []*mock.Vertex {
 	return l
 }
 
-func string2Identifyer(s string) flow.Identifier {
+func string2Identifier(s string) flow.Identifier {
 	var identifier flow.Identifier
 	copy(identifier[:], []byte(s))
 	return identifier
