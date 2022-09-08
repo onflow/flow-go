@@ -623,8 +623,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
 			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
-		rpcEng := rpcEngBuilder.WithLegacy().Build()
 		require.NoError(suite.T(), err)
+		rpcEng := rpcEngBuilder.WithLegacy().Build()
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
@@ -866,7 +866,8 @@ func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	snap.On("Epochs").Return(epochs)
 	snap.On("SealingSegment").Return(&flow.SealingSegment{Blocks: unittest.BlockFixtures(2)}, nil).Maybe()
 
-	suite.state.On("AtBlockID", mock.Anything).Return(snap)
+	suite.state.On("AtBlockID", mock.Anything).Return(snap).Once() // initial height lookup in ingestion engine
+	suite.state.On("AtBlockID", refBlockID).Return(snap)
 
 	return block, collection
 }
