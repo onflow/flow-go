@@ -52,8 +52,8 @@ func (c Context) CheckerOptions() []sema.Option {
 		blockHeight := c.BlockHeader.Height
 
 		// backwards compatibility to enable rolling deploy
-		if (chainID == flow.Mainnet && blockHeight > 1) ||
-			(chainID == flow.Testnet && blockHeight > 1) {
+		if (chainID == flow.Mainnet && blockHeight > 37_074_000) ||
+			(chainID == flow.Testnet && blockHeight > 79_131_000) {
 
 			return nil
 		}
