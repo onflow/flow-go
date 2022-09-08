@@ -91,7 +91,7 @@ func (i *TransactionInvoker) Process(
 
 	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 	if err != nil {
-		return fmt.Errorf("error creating new environment: %w", err)
+		return err
 	}
 	predeclaredValues := valueDeclarations(env)
 
