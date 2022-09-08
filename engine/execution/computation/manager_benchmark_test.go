@@ -74,7 +74,7 @@ func mustFundAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, e
 		accs.seq++
 
 		tx := fvm.Transaction(transferTx, uint32(i))
-		err = vm.Run(execCtx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(execCtx, tx, ledger)
 		require.NoError(b, err)
 		require.NoError(b, tx.Err)
 	}

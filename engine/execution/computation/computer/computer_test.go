@@ -57,7 +57,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx := fvm.NewContext()
 
 		vm := new(computermock.VirtualMachine)
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		vm.On("RunV2", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Run(func(args mock.Arguments) {
 				//ctx := args[0].(fvm.Context)
@@ -143,7 +143,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(0, 0, rag)
 		programs := programs.NewEmptyPrograms()
 
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, programs).
+		vm.On("RunV2", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Once() // just system chunk
 
@@ -187,8 +187,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		chain := flow.Localnet.Chain()
 		vm := fvm.NewVM()
+		progs := programs.NewEmptyPrograms()
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
+			fvm.WithBlockPrograms(progs),
 		}
 
 		opts := append(baseOpts, contextOptions...)
@@ -200,9 +202,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		}
-		progs := programs.NewEmptyPrograms()
 		bootstrapOpts := append(baseBootstrapOpts, bootstrapOptions...)
-		err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view, progs)
+		err := vm.RunV2(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
 		require.NoError(t, err)
 
 		comm := new(computermock.ViewCommitter)
@@ -274,7 +275,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 		programs := programs.NewEmptyPrograms()
 
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, programs).
+		vm.On("RunV2", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) {
 				tx := args[1].(*fvm.TransactionProcedure)
 
