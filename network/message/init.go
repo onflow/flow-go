@@ -10,6 +10,7 @@ func init() {
 const (
 	BlockProposal        = "BlockProposal"
 	BlockVote            = "BlockVote"
+	TimeoutObject        = "Timeout"
 	SyncRequest          = "SyncRequest"
 	SyncResponse         = "SyncResponse"
 	RangeRequest         = "RangeRequest"
@@ -17,6 +18,7 @@ const (
 	BlockResponse        = "BlockResponse"
 	ClusterBlockProposal = "ClusterBlockProposal"
 	ClusterBlockVote     = "ClusterBlockVote"
+	ClusterTimeoutObject = "ClusterTimeout"
 	ClusterBlockResponse = "ClusterBlockResponse"
 	CollectionGuarantee  = "CollectionGuarantee"
 	TransactionBody      = "TransactionBody"
