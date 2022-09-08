@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
@@ -24,22 +23,19 @@ import (
 // able to create new streams with peers even without knowing their address info beforehand.
 func TestFindPeerWithDHT(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	defer cancel()
 
 	count := 10
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
 	sporkId := unittest.IdentifierFixture()
-	dhtServerNodes, _ := nodesFixture(t, sporkId, "dht_test", 2, withDHTOptions(p2p.AsServer()))
+	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 2, withDHTOptions(p2p.AsServer()))
 	require.Len(t, dhtServerNodes, 2)
 
-	dhtClientNodes, _ := nodesFixture(t, sporkId, "dht_test", count-2, withDHTOptions(p2p.AsClient()))
+	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-2, withDHTOptions(p2p.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	startNodes(t, signalCtx, nodes, 100*time.Millisecond)
-	defer stopNodes(t, nodes, cancel, 100*time.Millisecond)
+	defer stopNodes(t, nodes)
 
 	getDhtServerAddr := func(i uint) peer.AddrInfo {
 		return peer.AddrInfo{ID: dhtServerNodes[i].Host().ID(), Addrs: dhtServerNodes[i].Host().Addrs()}
@@ -91,9 +87,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 // mechanism is used for nodes to find each other.
 func TestPubSubWithDHTDiscovery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	defer cancel()
 
 	topic := channels.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 5
@@ -116,16 +110,15 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 	// create one node running the DHT Server (mimicking the staked AN)
-	dhtServerNodes, _ := nodesFixture(t, sporkId, "dht_test", 1, withDHTOptions(p2p.AsServer()))
+	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 1, withDHTOptions(p2p.AsServer()))
 	require.Len(t, dhtServerNodes, 1)
 	dhtServerNode := dhtServerNodes[0]
 
 	// crate other nodes running the DHT Client (mimicking the unstaked ANs)
-	dhtClientNodes, _ := nodesFixture(t, sporkId, "dht_test", count-1, withDHTOptions(p2p.AsClient()))
+	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-1, withDHTOptions(p2p.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	startNodes(t, signalCtx, nodes, 100*time.Millisecond)
-	defer stopNodes(t, nodes, cancel, 100*time.Millisecond)
+	defer stopNodes(t, nodes)
 
 	// Step 2: Connect all nodes running a DHT client to the node running the DHT server
 	// This has to be done before subscribing to any topic, otherwise the node gives up on advertising

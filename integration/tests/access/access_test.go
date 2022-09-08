@@ -8,11 +8,9 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
-	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
@@ -90,29 +88,26 @@ func (suite *AccessSuite) SetupTest() {
 	suite.net.Start(suite.ctx)
 }
 
-func (suite *AccessSuite) TestAPIsAvailable() {
-	suite.T().Run("TestHTTPProxyPortOpen", func(t *testing.T) {
-		httpProxyAddress := fmt.Sprintf(":%s", suite.net.AccessPorts[testnet.AccessNodeAPIProxyPort])
+func (suite *AccessSuite) TestHTTPProxyPortOpen() {
+	httpProxyAddress := fmt.Sprintf(":%s", suite.net.AccessPorts[testnet.AccessNodeAPIProxyPort])
+	conn, err := net.DialTimeout("tcp", httpProxyAddress, 1*time.Second)
+	require.NoError(suite.T(), err, "http proxy port not open on the access node")
+	conn.Close()
+}
 
-		conn, err := net.DialTimeout("tcp", httpProxyAddress, 1*time.Second)
-		require.NoError(suite.T(), err, "http proxy port not open on the access node")
+func (suite *AccessSuite) TestAccessConnection() {
+	t := suite.T()
+	addr := "0.0.0.0:" + suite.net.AccessPorts["access-api-port"]
 
-		conn.Close()
-	})
+	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	if err != nil {
+		t.Failed()
+	}
 
-	suite.T().Run("TestAccessConnection", func(t *testing.T) {
-		grpcAddress := fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort])
+	client := accessproto.NewAccessAPIClient(conn)
 
-		conn, err := grpc.DialContext(suite.ctx, grpcAddress,
-			grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
-			grpc.WithTimeout(1*time.Second),
-		)
-		require.NoError(t, err, "failed to connect to access node")
-		defer conn.Close()
-
-		client := accessproto.NewAccessAPIClient(conn)
-
-		_, err = client.Ping(suite.ctx, &accessproto.PingRequest{})
-		assert.NoError(t, err, "failed to ping access node")
-	})
+	_, err = client.Ping(suite.ctx, &accessproto.PingRequest{})
+	if err != nil {
+		t.Failed()
+	}
 }

@@ -21,13 +21,13 @@ func TestProtocolPeerCache(t *testing.T) {
 	defer cancel()
 
 	// create three hosts, and a pcache for the first
-	h1, err := DefaultLibP2PHost("0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
+	h1, err := DefaultLibP2PHost(ctx, "0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
 	require.NoError(t, err)
 	pcache, err := newProtocolPeerCache(zerolog.Nop(), h1)
 	require.NoError(t, err)
-	h2, err := DefaultLibP2PHost("0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
+	h2, err := DefaultLibP2PHost(ctx, "0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
 	require.NoError(t, err)
-	h3, err := DefaultLibP2PHost("0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
+	h3, err := DefaultLibP2PHost(ctx, "0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
 	require.NoError(t, err)
 
 	// register each host on a separate protocol

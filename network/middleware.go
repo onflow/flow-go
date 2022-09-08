@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 )
@@ -78,17 +77,4 @@ type Overlay interface {
 type Connection interface {
 	Send(msg interface{}) error
 	Receive() (interface{}, error)
-}
-
-// PeerManager adds and removes connections to peers periodically and on request
-type PeerManager interface {
-	component.Component
-
-	// RequestPeerUpdate requests an update to the peer connections of this node.
-	// If a peer update has already been requested (either as a periodic request or an on-demand
-	// request) and is outstanding, then this call is a no-op.
-	RequestPeerUpdate()
-
-	// ForceUpdatePeers initiates an update to the peer connections of this node immediately
-	ForceUpdatePeers(irrecoverable.SignalerContext)
 }
