@@ -12,11 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
-
-	followereng "github.com/onflow/flow-go/engine/common/follower"
-	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
@@ -29,6 +24,7 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/common/follower"
+	followereng "github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
