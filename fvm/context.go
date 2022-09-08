@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -44,6 +45,7 @@ type Context struct {
 	ScriptProcessors              []ScriptProcessor
 	Logger                        zerolog.Logger
 	ReusableCadenceRuntimePool    ReusableCadenceRuntimePool
+	BlockPrograms                 *programs.Programs
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -326,6 +328,15 @@ func WithTransactionFeesEnabled(enabled bool) Option {
 func WithReusableCadenceRuntimePool(pool ReusableCadenceRuntimePool) Option {
 	return func(ctx Context) Context {
 		ctx.ReusableCadenceRuntimePool = pool
+		return ctx
+	}
+}
+
+// WithBlockPrograms sets the programs cache storage to be used by the
+// transaction/script.
+func WithBlockPrograms(programs *programs.Programs) Option {
+	return func(ctx Context) Context {
+		ctx.BlockPrograms = programs
 		return ctx
 	}
 }

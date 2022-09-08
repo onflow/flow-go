@@ -52,11 +52,6 @@ func GetUploaderEnabled() bool {
 	return uploadEnabled
 }
 
-type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
-	GetAccount(fvm.Context, flow.Address, state.View, *programs.Programs) (*flow.Account, error)
-}
-
 type ComputationManager interface {
 	ExecuteScript(context.Context, []byte, [][]byte, *flow.Header, state.View) ([]byte, error)
 	ComputeBlock(
@@ -79,7 +74,7 @@ type ComputationConfig struct {
 	// will create a virtual machine using this function.
 	//
 	// Note that this is primarily used for testing.
-	NewCustomVirtualMachine func() VirtualMachine
+	NewCustomVirtualMachine func() computer.VirtualMachine
 }
 
 // Manager manages computation and execution
@@ -89,7 +84,7 @@ type Manager struct {
 	metrics                  module.ExecutionMetrics
 	me                       module.Local
 	protoState               protocol.State
-	vm                       VirtualMachine
+	vm                       computer.VirtualMachine
 	vmCtx                    fvm.Context
 	blockComputer            computer.BlockComputer
 	programsCache            *ProgramsCache
@@ -114,7 +109,7 @@ func New(
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
-	var vm VirtualMachine
+	var vm computer.VirtualMachine
 	if params.NewCustomVirtualMachine != nil {
 		vm = params.NewCustomVirtualMachine()
 	} else {
@@ -174,7 +169,7 @@ func New(
 	return &e, nil
 }
 
-func (e *Manager) VM() VirtualMachine {
+func (e *Manager) VM() computer.VirtualMachine {
 	return e.vm
 }
 
@@ -216,8 +211,10 @@ func (e *Manager) ExecuteScript(
 	defer cancel()
 
 	script := fvm.NewScriptWithContextAndArgs(code, requestCtx, arguments...)
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
-	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithBlockPrograms(e.getChildProgramsOrEmpty(blockHeader.ID())))
 
 	err := func() (err error) {
 
@@ -253,7 +250,7 @@ func (e *Manager) ExecuteScript(
 			}
 		}()
 
-		return e.vm.Run(blockCtx, script, view, programs)
+		return e.vm.RunV2(blockCtx, script, view)
 	}()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)

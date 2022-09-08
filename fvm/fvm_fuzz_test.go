@@ -54,7 +54,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			require.NotPanics(t, func() {
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 			}, "Transaction should never result in a panic.")
 			require.NoError(t, err, "Transaction should never result in an error.")
 
@@ -250,7 +250,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 
 		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-		err = vm.Run(ctx, tx, view, programs)
+		err = vm.RunV2(ctx, tx, view)
 
 		require.NoError(tb, err)
 		accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
@@ -279,7 +279,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 
 		tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-		err = vm.Run(ctx, tx, view, programs)
+		err = vm.RunV2(ctx, tx, view)
 		if err != nil {
 			return err
 		}
