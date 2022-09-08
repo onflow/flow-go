@@ -1,4 +1,4 @@
-package state
+package environment
 
 import (
 	"bytes"
@@ -12,14 +12,11 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
-	AccountKeyPrefix  = "a."
-	KeyAccountStatus  = AccountKeyPrefix + "s"
-	KeyCode           = "code"
-	KeyContractNames  = "contract_names"
 	MaxPublicKeyCount = math.MaxUint64
 )
 
@@ -47,10 +44,10 @@ type Accounts interface {
 var _ Accounts = &StatefulAccounts{}
 
 type StatefulAccounts struct {
-	stateHolder *StateHolder
+	stateHolder *state.StateHolder
 }
 
-func NewAccounts(stateHolder *StateHolder) *StatefulAccounts {
+func NewAccounts(stateHolder *state.StateHolder) *StatefulAccounts {
 	return &StatefulAccounts{
 		stateHolder: stateHolder,
 	}
@@ -126,7 +123,7 @@ func (a *StatefulAccounts) Get(address flow.Address) (*flow.Account, error) {
 }
 
 func (a *StatefulAccounts) Exists(address flow.Address) (bool, error) {
-	accStatusBytes, err := a.GetValue(address, KeyAccountStatus)
+	accStatusBytes, err := a.GetValue(address, state.KeyAccountStatus)
 	if err != nil {
 		return false, err
 	}
@@ -156,7 +153,7 @@ func (a *StatefulAccounts) Create(publicKeys []flow.AccountPublicKey, newAddress
 	}
 
 	accountStatus := NewAccountStatus()
-	accountStatus.SetStorageUsed(uint64(RegisterSize(newAddress, KeyAccountStatus, accountStatus.ToBytes())))
+	accountStatus.SetStorageUsed(uint64(RegisterSize(newAddress, state.KeyAccountStatus, accountStatus.ToBytes())))
 
 	err = a.setAccountStatus(newAddress, accountStatus)
 	if err != nil {
@@ -311,7 +308,7 @@ func IsValidAccountKeyHashAlgo(algo hash.HashingAlgorithm) bool {
 }
 
 func ContractKey(contractName string) string {
-	return fmt.Sprintf("%s.%s", KeyCode, contractName)
+	return fmt.Sprintf("%s.%s", state.KeyCode, contractName)
 }
 
 func (a *StatefulAccounts) getContract(contractName string, address flow.Address) ([]byte, error) {
@@ -372,7 +369,7 @@ func (a *StatefulAccounts) setContractNames(contractNames contractNames, address
 	newContractNames := buf.Bytes()
 
 	var prevContractNames []byte
-	prevContractNames, err = a.GetValue(address, KeyContractNames)
+	prevContractNames, err = a.GetValue(address, state.KeyContractNames)
 	if err != nil {
 		return fmt.Errorf("cannot retrieve current contract names: %w", err)
 	}
@@ -382,7 +379,7 @@ func (a *StatefulAccounts) setContractNames(contractNames contractNames, address
 		return nil
 	}
 
-	return a.SetValue(address, KeyContractNames, newContractNames)
+	return a.SetValue(address, state.KeyContractNames, newContractNames)
 }
 
 // GetStorageUsed returns the amount of storage used in bytes by this account
@@ -417,14 +414,14 @@ func (a *StatefulAccounts) GetValue(address flow.Address, key string) (flow.Regi
 func (a *StatefulAccounts) SetValue(address flow.Address, key string, value flow.RegisterValue) error {
 	err := a.updateRegisterSizeChange(address, key, value)
 	if err != nil {
-		return fmt.Errorf("failed to update storage used by key %s on account %s: %w", PrintableKey(key), address, err)
+		return fmt.Errorf("failed to update storage used by key %s on account %s: %w", state.PrintableKey(key), address, err)
 	}
 	return a.stateHolder.Set(string(address.Bytes()), key, value, a.stateHolder.EnforceLimits())
 
 }
 
 func (a *StatefulAccounts) updateRegisterSizeChange(address flow.Address, key string, value flow.RegisterValue) error {
-	if key == KeyAccountStatus {
+	if key == state.KeyAccountStatus {
 		// size of this register is always fixed size
 		// don't double check this to save time and prevent recursion
 		return nil
@@ -451,7 +448,7 @@ func (a *StatefulAccounts) updateRegisterSizeChange(address flow.Address, key st
 		absChange := uint64(-sizeChange)
 		if absChange > oldSize {
 			// should never happen
-			return fmt.Errorf("storage used by key %s on account %s would be negative", PrintableKey(key), address.Hex())
+			return fmt.Errorf("storage used by key %s on account %s would be negative", state.PrintableKey(key), address.Hex())
 		}
 		newSize = oldSize - absChange
 	} else {
@@ -501,7 +498,7 @@ func (a *StatefulAccounts) GetContractNames(address flow.Address) ([]string, err
 
 func (a *StatefulAccounts) getContractNames(address flow.Address) (contractNames, error) {
 	// TODO return fatal error if can't fetch
-	encContractNames, err := a.GetValue(address, KeyContractNames)
+	encContractNames, err := a.GetValue(address, state.KeyContractNames)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get deployed contract names: %w", err)
 	}
@@ -571,7 +568,7 @@ func (a *StatefulAccounts) DeleteContract(contractName string, address flow.Addr
 }
 
 func (a *StatefulAccounts) getAccountStatus(address flow.Address) (*AccountStatus, error) {
-	statusBytes, err := a.GetValue(address, KeyAccountStatus)
+	statusBytes, err := a.GetValue(address, state.KeyAccountStatus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load account status for the account (%s): %w", address.String(), err)
 	}
@@ -582,7 +579,7 @@ func (a *StatefulAccounts) getAccountStatus(address flow.Address) (*AccountStatu
 }
 
 func (a *StatefulAccounts) setAccountStatus(address flow.Address, status *AccountStatus) error {
-	err := a.SetValue(address, KeyAccountStatus, status.ToBytes())
+	err := a.SetValue(address, state.KeyAccountStatus, status.ToBytes())
 	if err != nil {
 		return fmt.Errorf("failed to store the account status for account (%s): %w", address.String(), err)
 	}

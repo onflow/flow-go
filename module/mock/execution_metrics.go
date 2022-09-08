@@ -14,8 +14,8 @@ type ExecutionMetrics struct {
 	mock.Mock
 }
 
-// ChunkDataPackRequested provides a mock function with given fields:
-func (_m *ExecutionMetrics) ChunkDataPackRequested() {
+// ChunkDataPackRequestProcessed provides a mock function with given fields:
+func (_m *ExecutionMetrics) ChunkDataPackRequestProcessed() {
 	_m.Called()
 }
 
@@ -46,6 +46,16 @@ func (_m *ExecutionMetrics) ExecutionCollectionRequestRetried() {
 
 // ExecutionCollectionRequestSent provides a mock function with given fields:
 func (_m *ExecutionMetrics) ExecutionCollectionRequestSent() {
+	_m.Called()
+}
+
+// ExecutionComputationResultUploadRetried provides a mock function with given fields:
+func (_m *ExecutionMetrics) ExecutionComputationResultUploadRetried() {
+	_m.Called()
+}
+
+// ExecutionComputationResultUploaded provides a mock function with given fields:
+func (_m *ExecutionMetrics) ExecutionComputationResultUploaded() {
 	_m.Called()
 }
 

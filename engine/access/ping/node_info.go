@@ -3,7 +3,7 @@ package ping
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -34,7 +34,7 @@ func openAndReadFile(fileName string) ([]byte, error) {
 	defer jsonFile.Close()
 
 	// read
-	byteValue, err := ioutil.ReadAll(jsonFile)
+	byteValue, err := io.ReadAll(jsonFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s: %w", fileName, err)
 	}

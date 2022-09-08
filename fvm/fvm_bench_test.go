@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -144,15 +142,15 @@ type BasicBlockExecutor struct {
 }
 
 func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithChain(chain),
+		fvm.WithLogger(logger),
 	}
-	fvmContext := fvm.NewContext(logger, opts...)
+	fvmContext := fvm.NewContext(opts...)
 
 	collector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -303,7 +301,7 @@ type logExtractor struct {
 }
 
 type txWeights struct {
-	TXHash                string `json:"txHash"`
+	TXHash                string `json:"tx_id"`
 	LedgerInteractionUsed uint64 `json:"ledgerInteractionUsed"`
 	ComputationUsed       uint   `json:"computationUsed"`
 	MemoryEstimate        uint   `json:"memoryEstimate"`

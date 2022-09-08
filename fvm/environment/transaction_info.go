@@ -8,7 +8,8 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// TransactionInfo exposes information associated with the executing transaction.
+// TransactionInfo exposes information associated with the executing
+// transaction.
 //
 // Note that scripts have no associated transaction information, but must expose
 // the API in compliance with the runtime environment interface.
@@ -17,7 +18,7 @@ type TransactionInfo interface {
 
 	IsServiceAccountAuthorizer() bool
 
-	// Candence's runtime API.  Note that the script variant will return
+	// Cadence's runtime API.  Note that the script variant will return
 	// OperationNotSupportedError.
 	GetSigningAccounts() ([]runtime.Address, error)
 }

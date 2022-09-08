@@ -73,7 +73,7 @@ func (s *ChunkVerifierTestSuite) SetupSuite() {
 	vm := new(vmMock)
 	systemOkVm := new(vmSystemOkMock)
 	systemBadVm := new(vmSystemBadMock)
-	vmCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(testChain.Chain()))
+	vmCtx := fvm.NewContext(fvm.WithChain(testChain.Chain()))
 
 	// system chunk runs predefined system transaction, hence we can't distinguish
 	// based on its content and we need separate VMs

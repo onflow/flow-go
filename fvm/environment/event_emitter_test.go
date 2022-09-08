@@ -1,4 +1,4 @@
-package handler_test
+package environment_test
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/fvm/handler"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -22,7 +22,7 @@ func Test_IsServiceEvent(t *testing.T) {
 
 	t.Run("correct", func(t *testing.T) {
 		for _, event := range events.All() {
-			isServiceEvent, err := handler.IsServiceEvent(cadence.Event{
+			isServiceEvent, err := environment.IsServiceEvent(cadence.Event{
 				EventType: &cadence.EventType{
 					Location: common.AddressLocation{
 						Address: common.Address(event.Address),
@@ -36,7 +36,7 @@ func Test_IsServiceEvent(t *testing.T) {
 	})
 
 	t.Run("wrong chain", func(t *testing.T) {
-		isServiceEvent, err := handler.IsServiceEvent(cadence.Event{
+		isServiceEvent, err := environment.IsServiceEvent(cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
 					Address: common.Address(flow.Testnet.Chain().ServiceAddress()),
@@ -49,7 +49,7 @@ func Test_IsServiceEvent(t *testing.T) {
 	})
 
 	t.Run("wrong type", func(t *testing.T) {
-		isServiceEvent, err := handler.IsServiceEvent(cadence.Event{
+		isServiceEvent, err := environment.IsServiceEvent(cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
 					Address: common.Address(chain.Chain().ServiceAddress()),
@@ -60,4 +60,11 @@ func Test_IsServiceEvent(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, isServiceEvent)
 	})
+}
+
+func Test_ScriptEventEmitter(t *testing.T) {
+	// scripts use the NoEventEmitter
+	emitter := environment.NoEventEmitter{}
+	err := emitter.EmitEvent(cadence.Event{})
+	require.NoError(t, err, "script should not error when emitting events")
 }

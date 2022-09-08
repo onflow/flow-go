@@ -23,20 +23,18 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("parsing error in transaction", func(t *testing.T) {
 
-		rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvoker := fvm.NewTransactionInvoker(log)
+		txInvoker := fvm.NewTransactionInvoker()
 
-		vm := fvm.NewVirtualMachine(rt)
+		vm := fvm.NewVM()
 
 		code := `X`
 
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
-		context := fvm.NewContext(log)
+		context := fvm.NewContext(fvm.WithLogger(log))
 
 		stTxn := state.NewStateTransaction(
 			view,
@@ -56,20 +54,18 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("checking error in transaction", func(t *testing.T) {
 
-		rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvoker := fvm.NewTransactionInvoker(log)
+		txInvoker := fvm.NewTransactionInvoker()
 
-		vm := fvm.NewVirtualMachine(rt)
+		vm := fvm.NewVM()
 
 		code := `transaction(arg: X) { }`
 
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
-		context := fvm.NewContext(log)
+		context := fvm.NewContext(fvm.WithLogger(log))
 
 		stTxn := state.NewStateTransaction(
 			view,

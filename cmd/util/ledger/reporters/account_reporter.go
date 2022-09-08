@@ -12,11 +12,11 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -70,7 +70,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 		l,
 		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
 	)
-	gen := state.NewStateBoundAddressGenerator(stTxn, r.Chain)
+	gen := environment.NewAccountCreator(stTxn, r.Chain)
 
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
 
@@ -123,11 +123,11 @@ type balanceProcessor struct {
 	ctx           fvm.Context
 	view          state.View
 	prog          *programs.Programs
-	intf          runtime.Interface
+	env           fvm.Environment
 	balanceScript []byte
 	momentsScript []byte
 
-	accounts state.Accounts
+	accounts environment.Accounts
 
 	rwa        ReportWriter
 	rwc        ReportWriter
@@ -137,8 +137,10 @@ type balanceProcessor struct {
 }
 
 func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{}))
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	vm := fvm.NewVM()
+	ctx := fvm.NewContext(
+		fvm.WithChain(chain),
+		fvm.WithMemoryAndInteractionLimitsDisabled())
 	prog := programs.NewEmptyPrograms()
 
 	v := view.NewChild()
@@ -146,7 +148,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		v,
 		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
 	)
-	accounts := state.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(stTxn)
 
 	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, prog)
 
@@ -156,7 +158,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		view:     v,
 		accounts: accounts,
 		prog:     prog,
-		intf:     env,
+		env:      env,
 	}
 }
 
@@ -390,12 +392,16 @@ func (c *balanceProcessor) ReadStored(address flow.Address, domain common.PathDo
 	if err != nil {
 		return nil, err
 	}
-	receiver, err := c.vm.Runtime.ReadStored(addr,
+
+	rt := c.env.BorrowCadenceRuntime()
+	defer c.env.ReturnCadenceRuntime(rt)
+
+	receiver, err := rt.ReadStored(
+		addr,
 		cadence.Path{
 			Domain:     domain.Identifier(),
 			Identifier: id,
 		},
-		runtime.Context{Interface: c.intf},
 	)
 	return receiver, err
 }

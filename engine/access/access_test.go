@@ -623,8 +623,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
 			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
+
 		require.NoError(suite.T(), err)
-		rpcEng := rpcEngBuilder.WithLegacy().Build()
+		rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,

@@ -2037,7 +2037,7 @@ func NetworkingPrivKeyFixture() crypto.PrivateKey {
 	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
 }
 
-//StakingPrivKeyFixture returns a random BLS12381 private keyf
+// StakingPrivKeyFixture returns a random BLS12381 private keyf
 func StakingPrivKeyFixture() crypto.PrivateKey {
 	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
 }
