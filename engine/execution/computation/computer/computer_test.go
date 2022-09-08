@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -412,7 +413,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx = fvm.NewContextFromParent(
 			execCtx,
 			fvm.WithReusableCadenceRuntimePool(
-				fvm.NewCustomReusableCadenceRuntimePool(
+				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
 					func() runtime.Runtime {
 						return emittingRuntime
@@ -489,7 +490,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx = fvm.NewContextFromParent(
 			execCtx,
 			fvm.WithReusableCadenceRuntimePool(
-				fvm.NewCustomReusableCadenceRuntimePool(
+				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
 					func() runtime.Runtime {
 						return rt
@@ -585,7 +586,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx = fvm.NewContextFromParent(
 			execCtx,
 			fvm.WithReusableCadenceRuntimePool(
-				fvm.NewCustomReusableCadenceRuntimePool(
+				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
 					func() runtime.Runtime {
 						return rt

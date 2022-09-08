@@ -13,7 +13,7 @@ import (
 )
 
 var _ runtime.Interface = &ScriptEnv{}
-var _ Environment = &ScriptEnv{}
+var _ environment.Environment = &ScriptEnv{}
 
 // ScriptEnv is a read-only mostly used for executing scripts.
 type ScriptEnv struct {

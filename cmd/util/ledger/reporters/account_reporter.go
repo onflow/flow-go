@@ -122,7 +122,7 @@ type balanceProcessor struct {
 	vm            *fvm.VirtualMachine
 	ctx           fvm.Context
 	view          state.View
-	env           fvm.Environment
+	env           environment.Environment
 	balanceScript []byte
 	momentsScript []byte
 
