@@ -544,11 +544,9 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	block := unittest.BlockWithParentAndProposerFixture(t, genesis, conID.NodeID)
-	voterIndices, err := signature.EncodeSignersToIndices(
-		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+	voterIndices, err := signature.EncodeSignersToIndices([]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
 	block.Header.ParentVoterIndices = voterIndices
-	block.Header.View = 42
 	block.SetPayload(flow.Payload{})
 	proposal := unittest.ProposalFromBlock(&block)
 
