@@ -185,9 +185,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithEpochConfig(epochConfig),
 		}
 
-		rt := fvm.NewInterpreterRuntime(runtime.Config{})
 		chain := flow.Localnet.Chain()
-		vm := fvm.NewVirtualMachine(rt)
+		vm := fvm.NewVM()
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
 		}
@@ -342,9 +341,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("service events are emitted", func(t *testing.T) {
-		execCtx := fvm.NewContext(fvm.WithServiceEventCollectionEnabled(), fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(), //we don't need to check signatures or sequence numbers
-		))
+		execCtx := fvm.NewContext(
+			fvm.WithServiceEventCollectionEnabled(),
+			fvm.WithTransactionProcessors(
+				//we don't need to check signatures or sequence numbers
+				fvm.NewTransactionInvoker(),
+			),
+		)
 
 		collectionCount := 2
 		transactionsPerCollection := 2
@@ -405,7 +408,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.NewVirtualMachine(emittingRuntime)
+		execCtx = fvm.NewContextFromParent(
+			execCtx,
+			fvm.WithReusableCadenceRuntimePool(
+				fvm.NewCustomReusableCadenceRuntimePool(
+					0,
+					func() runtime.Runtime {
+						return emittingRuntime
+					})))
+
+		vm := fvm.NewVM()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := new(mocktracker.Storage)
@@ -441,48 +453,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assertEventHashesMatch(t, collectionCount+1, result)
 	})
 
-	t.Run("system transaction does not read memory limit from state", func(t *testing.T) {
-
-		weighted.DefaultMemoryWeights = weighted.ExecutionMemoryWeights{
-			0: 1, // single weight set to 1
-		}
-		execCtx := fvm.NewContext(
-			zerolog.Nop(),
-			fvm.WithMemoryLimit(10), // the context memory limit is set to 10
-		)
-
-		rt := &testRuntime{
-			executeTransaction: func(script runtime.Script, r runtime.Context) error {
-				err := r.Interface.MeterMemory(common.MemoryUsage{
-					Kind:   0,
-					Amount: 11,
-				})
-				require.NoError(t, err) // should fail if limit is taken from the default context
-
-				return nil
-			},
-			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
-				require.Fail(t, "system chunk should not read context from the state")
-				return nil, nil
-			},
-		}
-
-		vm := fvm.NewVirtualMachine(rt)
-
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
-		require.NoError(t, err)
-
-		block := generateBlock(0, 0, rag)
-
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
-
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
-		assert.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, 1) // system chunk
-	})
-
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
 
 		execCtx := fvm.NewContext()
@@ -515,7 +485,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.NewVirtualMachine(rt)
+		execCtx = fvm.NewContextFromParent(
+			execCtx,
+			fvm.WithReusableCadenceRuntimePool(
+				fvm.NewCustomReusableCadenceRuntimePool(
+					0,
+					func() runtime.Runtime {
+						return rt
+					})))
+
+		vm := fvm.NewVM()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := new(mocktracker.Storage)
@@ -602,7 +581,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.NewVirtualMachine(rt)
+		execCtx = fvm.NewContextFromParent(
+			execCtx,
+			fvm.WithReusableCadenceRuntimePool(
+				fvm.NewCustomReusableCadenceRuntimePool(
+					0,
+					func() runtime.Runtime {
+						return rt
+					})))
+
+		vm := fvm.NewVM()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := new(mocktracker.Storage)
@@ -768,8 +756,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	address := flow.HexToAddress("1234")
 	fag := &FixedAddressGenerator{Address: address}
 
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 	execCtx := fvm.NewContext()
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
@@ -833,8 +820,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		fvm.WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
-	runtime := fvm.NewInterpreterRuntime(runtime.Config{})
-	vm := fvm.NewVirtualMachine(runtime)
+	vm := fvm.NewVM()
 
 	rag := &RandomAddressGenerator{}
 
