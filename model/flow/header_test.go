@@ -64,7 +64,7 @@ func TestHeaderFingerprint(t *testing.T) {
 	}
 	decodedID := decHeader.ID()
 	assert.Equal(t, headerID, decodedID)
-	assert.Equal(t, *header, decHeader)
+	assert.Equal(t, *header, *decHeader)
 }
 
 func TestHeaderEncodingMsgpack(t *testing.T) {
