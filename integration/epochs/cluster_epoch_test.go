@@ -21,8 +21,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	"github.com/onflow/flow-go/integration/utils"
 )
 
 // Suite tests the quorum certificate voting process against the
@@ -166,9 +164,6 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 
-	signer, err := s.blockchain.ServiceKey().Signer()
-	require.NoError(s.T(), err)
-
 	s.SignAndSubmit(startVotingTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
 		[]sdkcrypto.Signer{signer, s.qcSigner})
@@ -196,9 +191,6 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 	cdcStakingPubKey, err := cadence.NewString(hex.EncodeToString(publicStakingKey.Encode()))
 	require.NoError(s.T(), err)
 	err = registerVoterTx.AddArgument(cdcStakingPubKey)
-	require.NoError(s.T(), err)
-
-	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 
 	signer, err := s.blockchain.ServiceKey().Signer()
