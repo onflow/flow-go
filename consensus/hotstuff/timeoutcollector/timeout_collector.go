@@ -45,7 +45,8 @@ func NewTimeoutCollector(view uint64,
 // were collected, the callback for partial TC will be triggered.
 // After collecting TOs from a supermajority, a TC will be created and passed to the EventLoop.
 // Expected error returns during normal operations:
-//  * timeoutcollector.ErrTimeoutForIncompatibleView - submitted timeout for incompatible view
+//   - timeoutcollector.ErrTimeoutForIncompatibleView - submitted timeout for incompatible view
+//
 // All other exceptions are symptoms of potential state corruption.
 func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 	// cache timeout

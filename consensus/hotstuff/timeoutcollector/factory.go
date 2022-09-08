@@ -31,7 +31,8 @@ func NewTimeoutCollectorFactory(notifier hotstuff.Consumer,
 
 // Create is a factory method to generate a TimeoutCollector for a given view
 // Expected error returns during normal operations:
-//  * model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known
+//   - model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known
+//
 // All other errors should be treated as exceptions.
 func (f *TimeoutCollectorFactory) Create(view uint64) (hotstuff.TimeoutCollector, error) {
 	processor, err := f.processorFactory.Create(view)
@@ -70,7 +71,8 @@ func NewTimeoutProcessorFactory(
 
 // Create is a factory method to generate a TimeoutProcessor for a given view
 // Expected error returns during normal operations:
-//  * model.ErrViewForUnknownEpoch no epoch containing the given view is known
+//   - model.ErrViewForUnknownEpoch no epoch containing the given view is known
+//
 // All other errors should be treated as exceptions.
 func (f *TimeoutProcessorFactory) Create(view uint64) (hotstuff.TimeoutProcessor, error) {
 	allParticipants, err := f.committee.IdentitiesByEpoch(view)

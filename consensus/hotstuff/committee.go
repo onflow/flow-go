@@ -27,7 +27,6 @@ import (
 // Since the voter committee is considered static over an epoch:
 // * we can query identities by view
 // * we don't need the full block ancestry prior to validating messages
-//
 type Replicas interface {
 
 	// LeaderForView returns the identity of the leader for a given view.

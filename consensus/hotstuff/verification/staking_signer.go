@@ -103,8 +103,8 @@ func (c *StakingSigner) CreateTimeout(curView uint64, newestQC *flow.QuorumCerti
 
 // genSigData generates the signature data for our local node for the given block.
 // It returns:
-//  - (stakingSig, nil) signature signed with staking key.  The sig is 48 bytes long
-//  - (nil, error) if there is any exception
+//   - (stakingSig, nil) signature signed with staking key.  The sig is 48 bytes long
+//   - (nil, error) if there is any exception
 func (c *StakingSigner) genSigData(block *model.Block) ([]byte, error) {
 	// create the message to be signed and generate signatures
 	msg := MakeVoteMessage(block.View, block.BlockID)

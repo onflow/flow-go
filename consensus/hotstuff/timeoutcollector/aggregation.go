@@ -94,9 +94,10 @@ func NewTimeoutSignatureAggregator(
 // The total weight of all collected signatures (excluding duplicates) is returned regardless
 // of any returned error.
 // Expected errors during normal operations:
-//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
-//  - model.DuplicatedSignerError if the signer has been already added
-//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
+//   - model.InvalidSignerError if signerID is invalid (not a consensus participant)
+//   - model.DuplicatedSignerError if the signer has been already added
+//   - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
+//
 // The function is thread-safe.
 func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) (totalWeight uint64, exception error) {
 	info, ok := a.idToInfo[signerID]
@@ -159,9 +160,9 @@ func (a *TimeoutSignatureAggregator) View() uint64 {
 // The resulting aggregated signature is guaranteed to be valid, as all individual
 // signatures are pre-validated before their addition.
 // Expected errors during normal operations:
-//  - model.InsufficientSignaturesError if no signatures have been added yet
-// This function is thread-safe
+//   - model.InsufficientSignaturesError if no signatures have been added yet
 //
+// This function is thread-safe
 func (a *TimeoutSignatureAggregator) Aggregate() ([]flow.Identifier, []uint64, crypto.Signature, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()

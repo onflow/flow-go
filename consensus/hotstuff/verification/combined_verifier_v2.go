@@ -48,12 +48,12 @@ func NewCombinedVerifier(committee hotstuff.Replicas, packer hotstuff.Packer) *C
 // VerifyVote verifies the validity of a combined signature from a vote.
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
-// * model.InvalidFormatError if the signature has an incompatible format.
-// * model.ErrInvalidSignature is the signature is invalid
-// * model.InvalidSignerError if signer is _not_ part of the random beacon committee
-// * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
-// * unexpected errors should be treated as symptoms of bugs or uncovered
-//   edge cases in the logic (i.e. as fatal)
+//   - model.InvalidFormatError if the signature has an incompatible format.
+//   - model.ErrInvalidSignature is the signature is invalid
+//   - model.InvalidSignerError if signer is _not_ part of the random beacon committee
+//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+//   - unexpected errors should be treated as symptoms of bugs or uncovered
+//     edge cases in the logic (i.e. as fatal)
 func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, view uint64, blockID flow.Identifier) error {
 
 	// create the to-be-signed message
@@ -113,14 +113,14 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, vie
 // VerifyQC checks the cryptographic validity of the QC's `sigData` for the
 // given block. It is the responsibility of the calling code to ensure
 // that all `signers` are authorized, without duplicates. Return values:
-//  * nil if `sigData` is cryptographically valid
-//  * model.InsufficientSignaturesError if `signers` is empty.
-//    Depending on the order of checks in the higher-level logic this error might
-//    be an indicator of an external byzantine input or an internal bug.
-//  * model.InvalidFormatError if `sigData` has an incompatible format
-//  * model.ErrInvalidSignature if a signature is invalid
-//  * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
-//  * error if running into any unexpected exception (i.e. fatal error)
+//   - nil if `sigData` is cryptographically valid
+//   - model.InsufficientSignaturesError if `signers` is empty.
+//     Depending on the order of checks in the higher-level logic this error might
+//     be an indicator of an external byzantine input or an internal bug.
+//   - model.InvalidFormatError if `sigData` has an incompatible format
+//   - model.ErrInvalidSignature if a signature is invalid
+//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+//   - error if running into any unexpected exception (i.e. fatal error)
 func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error {
 	if len(signers) == 0 {
 		return model.NewInsufficientSignaturesErrorf("empty list of signers")
@@ -180,12 +180,12 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, v
 // VerifyTC checks cryptographic validity of the TC's `sigData` w.r.t. the
 // given view. It is the responsibility of the calling code to ensure
 // that all `signers` are authorized, without duplicates. Return values:
-//  * nil if `sigData` is cryptographically valid
-//  * model.InsufficientSignaturesError if `signers is empty.
-//  * model.InvalidFormatError if `signers`/`highQCViews` have differing lengths
-//  * model.ErrInvalidSignature if a signature is invalid
-//  * unexpected errors should be treated as symptoms of bugs or uncovered
-//	  edge cases in the logic (i.e. as fatal)
+//   - nil if `sigData` is cryptographically valid
+//   - model.InsufficientSignaturesError if `signers is empty.
+//   - model.InvalidFormatError if `signers`/`highQCViews` have differing lengths
+//   - model.ErrInvalidSignature if a signature is invalid
+//   - unexpected errors should be treated as symptoms of bugs or uncovered
+//     edge cases in the logic (i.e. as fatal)
 func (c *CombinedVerifier) VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
 	return verifyTC(signers, sigData, view, highQCViews, c.timeoutObjectHasher)
 }

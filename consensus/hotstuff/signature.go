@@ -91,9 +91,10 @@ type WeightedSignatureAggregator interface {
 
 // TimeoutSignatureAggregator aggregates timeout signatures for one particular view.
 // When instantiating a TimeoutSignatureAggregator, the following information is supplied:
-//  * The view for which the aggregator collects timeouts.
-//  * For each replicas that is authorized to send a timeout at this particular view:
-//    the node ID, public staking keys, and weight
+//   - The view for which the aggregator collects timeouts.
+//   - For each replicas that is authorized to send a timeout at this particular view:
+//     the node ID, public staking keys, and weight
+//
 // Timeouts for other views or from non-authorized replicas are rejected.
 // In their TimeoutObjects, replicas include a signature over the pair (view, newestQCView),
 // where `view` is the view number the timeout is for and `newestQCView` is the view of

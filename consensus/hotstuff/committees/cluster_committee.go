@@ -139,7 +139,7 @@ func (c *Cluster) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
 // for one epoch, we don't need to check the view.
 //
 // Returns:
-//   * model.InvalidSignerError if nodeID was not listed by the Epoch Setup event as an
+//   - model.InvalidSignerError if nodeID was not listed by the Epoch Setup event as an
 //     authorized participant in this cluster
 func (c *Cluster) IdentityByEpoch(_ uint64, nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, ok := c.initialClusterMembers.ByNodeID(nodeID)

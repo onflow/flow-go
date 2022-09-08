@@ -14,11 +14,11 @@ import (
 // SafetyRules relies on hotstuff.Persister to store latest state of hotstuff.SafetyData.
 //
 // The voting rules implemented by SafetyRules are:
-// 1. Replicas vote strictly in increasing rounds
-// 2. Each block has to include a TC or a QC from the previous round.
-//   a. [Happy path] If the previous round resulted in a QC then new QC should extend it.
-//   b. [Recovery path] If the previous round did *not* result in a QC, the leader of the
-//   subsequent round *must* include a valid TC for the previous round in its block.
+//  1. Replicas vote strictly in increasing rounds
+//  2. Each block has to include a TC or a QC from the previous round.
+//     a. [Happy path] If the previous round resulted in a QC then new QC should extend it.
+//     b. [Recovery path] If the previous round did *not* result in a QC, the leader of the
+//     subsequent round *must* include a valid TC for the previous round in its block.
 //
 // NOT safe for concurrent use.
 type SafetyRules struct {
@@ -57,10 +57,11 @@ func New(
 // We expect that only well-formed proposals with valid signatures are submitted for voting.
 // The curView is taken as input to ensure SafetyRules will only vote for proposals at current view and prevent double voting.
 // Returns:
-//  * (vote, nil): On the _first_ block for the current view that is safe to vote for.
-//    Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
-//  * (nil, model.NoVoteError): If the voter decides that it does not want to vote for the given block.
-//    This is a sentinel error and _expected_ during normal operation.
+//   - (vote, nil): On the _first_ block for the current view that is safe to vote for.
+//     Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
+//   - (nil, model.NoVoteError): If the voter decides that it does not want to vote for the given block.
+//     This is a sentinel error and _expected_ during normal operation.
+//
 // All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error) {
 	block := proposal.Block
@@ -119,10 +120,11 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 // ProduceTimeout takes current view, highest locally known QC and TC (optional, must be nil if and
 // only if QC is for previous view) and decides whether to produce timeout for current view.
 // Returns:
-//  * (timeout, nil): It is safe to timeout for current view using newestQC and lastViewTC.
-//  * (nil, model.NoTimeoutError): If replica is not part of the authorized consensus committee (anymore) and
-//    therefore is not authorized to produce a valid timeout object. This sentinel error is _expected_ during
-//    normal operation, e.g. during the grace-period after Epoch switchover or after the replica self-ejected.
+//   - (timeout, nil): It is safe to timeout for current view using newestQC and lastViewTC.
+//   - (nil, model.NoTimeoutError): If replica is not part of the authorized consensus committee (anymore) and
+//     therefore is not authorized to produce a valid timeout object. This sentinel error is _expected_ during
+//     normal operation, e.g. during the grace-period after Epoch switchover or after the replica self-ejected.
+//
 // All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	lastTimeout := r.safetyData.LastTimeout
@@ -162,7 +164,7 @@ func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertif
 
 // IsSafeToVote checks if this proposal is valid in terms of voting rules, if voting for this proposal won't break safety rules.
 // Expected errors during normal operations:
-//  * NoVoteError if replica already acted during this view (either voted or generated timeout)
+//   - NoVoteError if replica already acted during this view (either voted or generated timeout)
 func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
 	blockView := proposal.Block.View
 
@@ -223,22 +225,22 @@ func (r *SafetyRules) IsSafeToTimeout(curView uint64, newestQC *flow.QuorumCerti
 //  4. [Recovery Path] If the previous round (i.e. `view -1`) did *not* result in a QC, a TC from the previous round
 //     is required to transition to `view`. The following additional consistency requirements have to be satisfied:
 //     (a) newestQC.View + 1 < view
-//         Otherwise, the replica has violated condition 3 (in case newestQC.View + 1 = view); or the replica
-//         failed to apply condition 2 (in case newestQC.View + 1 > view).
+//     Otherwise, the replica has violated condition 3 (in case newestQC.View + 1 = view); or the replica
+//     failed to apply condition 2 (in case newestQC.View + 1 > view).
 //     (b) newestQC.View ≥ lastViewTC.NewestQC.View
-//         Otherwise, the replica has violated condition 3.
+//     Otherwise, the replica has violated condition 3.
 //
 // SafetyRules has the sole signing authority and enforces adherence to these conditions. In order to generate valid
 // consensus signatures, the replica must provide the respective evidence (required QC + optional TC) to its
 // internal SafetyRules component for each consensus action that the replica wants to take:
-//  * primary signing its own proposal
-//  * replica voting for a block
-//  * replica generating a timeout message
+//   - primary signing its own proposal
+//   - replica voting for a block
+//   - replica generating a timeout message
 //
 // During normal operations, no errors are expected:
-//  * As we are expecting the blocks to be pre-validated, any failure here is a symptom of an internal bug.
-//  * When generating a timeout, the inputs are provided by node-internal components. Failure to comply with
-//    the protocol is a symptom of an internal bug.
+//   - As we are expecting the blocks to be pre-validated, any failure here is a symptom of an internal bug.
+//   - When generating a timeout, the inputs are provided by node-internal components. Failure to comply with
+//     the protocol is a symptom of an internal bug.
 func (r *SafetyRules) validateEvidenceForEnteringView(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) error {
 	// Condition 1:
 	if newestQC == nil {

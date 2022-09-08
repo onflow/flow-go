@@ -197,9 +197,9 @@ type QCCreatedConsumer interface {
 // are _no_ monotonicity guarantees w.r.t. the events' views.
 //
 // Implementations must:
-//   * be concurrency safe
-//   * be non-blocking
-//   * handle repetition of the same events (with some processing overhead).
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
 type TimeoutCollectorConsumer interface {
 	// OnTcConstructedFromTimeouts notifications are produced by the TimeoutProcessor
 	// component, whenever it constructs a TC based on TimeoutObjects from a

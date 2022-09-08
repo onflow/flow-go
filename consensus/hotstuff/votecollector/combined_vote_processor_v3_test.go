@@ -137,11 +137,12 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignatureFormat() 
 }
 
 // TestProcess_InvalidSignature tests that CombinedVoteProcessorV2 rejects invalid votes for the following scenarios:
-//  1) vote containing staking sig
-//  2) vote containing random beacon sig
+//  1. vote containing staking sig
+//  2. vote containing random beacon sig
+//
 // For each scenario, we test two sub-cases:
-//  * `SignerID` is not a valid consensus participant;
-//  * `SignerID` is valid consensus participant but the signature is cryptographically invalid
+//   - `SignerID` is not a valid consensus participant;
+//   - `SignerID` is valid consensus participant but the signature is cryptographically invalid
 func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignature() {
 	s.Run("vote with staking-sig", func() {
 		// sentinel error from `InvalidSignerError` should be wrapped as `InvalidVoteError`

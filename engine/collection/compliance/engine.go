@@ -563,8 +563,9 @@ func (e *Engine) finalizationProcessingLoop() {
 // handleHotStuffError accepts the error channel from the HotStuff component and
 // crashes the node if any error is detected.
 // TODO: this function should be removed in favour of refactoring this engine and
-//  the epochmgr engine to use the Component pattern, so that irrecoverable errors
-//  can be bubbled all the way to the node scaffold
+//
+//	the epochmgr engine to use the Component pattern, so that irrecoverable errors
+//	can be bubbled all the way to the node scaffold
 func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
 	for {
 		select {

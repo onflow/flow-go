@@ -194,8 +194,9 @@ func (s *SafetyRulesTestSuite) TestProduceVote_UpdateLockedOneChainView() {
 
 // TestProduceVote_InvalidCurrentView tests that no vote is created if `curView` has invalid values.
 // In particular, `SafetyRules` requires that:
-//  * the block's view matches `curView`
-//  * that values for `curView` are monotonously increasing
+//   - the block's view matches `curView`
+//   - that values for `curView` are monotonously increasing
+//
 // Failing any of these conditions is a symptom of an internal bug; hence `SafetyRules` should
 // _not_ return a `NoVoteError`.
 func (s *SafetyRulesTestSuite) TestProduceVote_InvalidCurrentView() {
@@ -309,10 +310,12 @@ func (s *SafetyRulesTestSuite) TestProduceVote_PersistStateException() {
 // TestProduceVote_VotingOnInvalidProposals tests different scenarios where we try to vote on unsafe blocks
 // SafetyRules contain a variety of checks to confirm that QC and TC have the desired relationship to each other.
 // In particular, we test:
-//    (i) A TC should be included in a proposal, if and only of the QC is not the prior view.
-//   (ii) When the proposal includes a TC (i.e. the QC not being for the prior view), the TC must be for the prior view.
-//  (iii) The QC in the block must have a smaller view than the block.
-//   (iv) If the block contains a TC, the TC cannot contain a newer QC than the block itself.
+//
+//	  (i) A TC should be included in a proposal, if and only of the QC is not the prior view.
+//	 (ii) When the proposal includes a TC (i.e. the QC not being for the prior view), the TC must be for the prior view.
+//	(iii) The QC in the block must have a smaller view than the block.
+//	 (iv) If the block contains a TC, the TC cannot contain a newer QC than the block itself.
+//
 // Conditions (i) - (iv) are validity requirements for the block and all blocks that SafetyRules processes
 // are supposed to be pre-validated. Hence, failing any of those conditions means we have an internal bug.
 // Consequently, we expect SafetyRules to return exceptions but _not_ `NoVoteError`, because the latter
@@ -408,8 +411,9 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 
 // TestProduceVote_VoteEquivocation tests scenario when we try to vote twice in same view. We require that replica
 // follows next rules:
-//  * replica votes once per view
-//  * replica votes in monotonously increasing views
+//   - replica votes once per view
+//   - replica votes in monotonously increasing views
+//
 // Voting twice per round on equivocating proposals is considered a byzantine behavior.
 // Expect a `model.NoVoteError` sentinel in such scenario.
 func (s *SafetyRulesTestSuite) TestProduceVote_VoteEquivocation() {
