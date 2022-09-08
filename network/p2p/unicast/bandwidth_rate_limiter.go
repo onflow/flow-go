@@ -1,8 +1,6 @@
 package unicast
 
 import (
-	"time"
-
 	"github.com/libp2p/go-libp2p-core/peer"
 	"golang.org/x/time/rate"
 
@@ -16,15 +14,17 @@ type BandWidthRateLimiterImpl struct {
 	limiters         *limiters
 	limit            rate.Limit
 	burst            int
+	now              GetTimeNow
 }
 
 // NewBandWidthRateLimiter returns a new BandWidthRateLimiterImpl.
-func NewBandWidthRateLimiter(limit rate.Limit, burst int) *BandWidthRateLimiterImpl {
+func NewBandWidthRateLimiter(limit rate.Limit, burst int, now GetTimeNow) *BandWidthRateLimiterImpl {
 	return &BandWidthRateLimiterImpl{
 		rateLimitedPeers: newRateLimitedPeers(),
 		limiters:         newLimiters(),
 		limit:            limit,
 		burst:            burst,
+		now:              now,
 	}
 }
 
@@ -33,7 +33,7 @@ func NewBandWidthRateLimiter(limit rate.Limit, burst int) *BandWidthRateLimiterI
 // If a limiter is not cached for a one is created.
 func (b *BandWidthRateLimiterImpl) Allow(peerID peer.ID, msg *message.Message) bool {
 	limiter := b.getLimiter(peerID)
-	if !limiter.AllowN(time.Now(), msg.Size()) {
+	if !limiter.AllowN(b.now(), msg.Size()) {
 		b.rateLimitedPeers.store(peerID)
 		return false
 	} else {

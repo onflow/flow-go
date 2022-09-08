@@ -1,11 +1,10 @@
 package unicast
 
 import (
-	"golang.org/x/time/rate"
-
+	"fmt"
 	"github.com/libp2p/go-libp2p-core/peer"
-
 	"github.com/onflow/flow-go/network/message"
+	"golang.org/x/time/rate"
 )
 
 // StreamsRateLimiterImpl unicast rate limiter that limits the amount of streams that can
@@ -16,15 +15,17 @@ type StreamsRateLimiterImpl struct {
 	limiters         *limiters
 	limit            rate.Limit
 	burst            int
+	now              GetTimeNow
 }
 
 // NewStreamsRateLimiter returns a new StreamsRateLimiterImpl.
-func NewStreamsRateLimiter(limit rate.Limit, burst int) *StreamsRateLimiterImpl {
+func NewStreamsRateLimiter(limit rate.Limit, burst int, now GetTimeNow) *StreamsRateLimiterImpl {
 	return &StreamsRateLimiterImpl{
 		rateLimitedPeers: newRateLimitedPeers(),
 		limiters:         newLimiters(),
 		limit:            limit,
 		burst:            burst,
+		now:              now,
 	}
 }
 
@@ -32,10 +33,11 @@ func NewStreamsRateLimiter(limit rate.Limit, burst int) *StreamsRateLimiterImpl 
 // If a limiter is not cached for a one is created.
 func (s *StreamsRateLimiterImpl) Allow(peerID peer.ID, _ *message.Message) bool {
 	limiter := s.getLimiter(peerID)
-	if !limiter.Allow() {
+	if !limiter.AllowN(s.now(), 1) {
 		s.rateLimitedPeers.store(peerID)
 		return false
 	} else {
+		fmt.Println("ALLOWED")
 		s.rateLimitedPeers.remove(peerID)
 		return true
 	}

@@ -2,6 +2,7 @@ package unicast
 
 import (
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"golang.org/x/time/rate"
@@ -17,6 +18,10 @@ type RateLimiter interface {
 	// IsRateLimited returns true if a peer is rate limited.
 	IsRateLimited(peerID peer.ID) bool
 }
+
+// GetTimeNow callback used to get the current time. This allows us to improve testing by manipulating the current time
+// as opposed to using time.Now directly.
+type GetTimeNow func() time.Time
 
 // rateLimitedPeers stores an entry into the underlying map for a peer indicating the peer is currently rate limited.
 type rateLimitedPeers struct {

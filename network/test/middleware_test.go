@@ -185,13 +185,16 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 	// limiter limit will be set to 5 events/sec the 6th event per interval will be rate limited
-	limit := rate.Limit(6)
+	limit := rate.Limit(5)
 
 	// burst per interval
 	burst := 5
 
+	// create test time
+	testtime := unittest.NewTestTime()
+
 	// setup streams rate limiter
-	streamsRateLimiter := unicast.NewStreamsRateLimiter(limit, burst)
+	streamsRateLimiter := unicast.NewStreamsRateLimiter(limit, burst, testtime.Now)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
@@ -209,11 +212,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 
 		// update hook calls
 		atomic.AddUint64(&rateLimits, 1)
-
-		// close ch after 3 rate limits
-		if rateLimits == uint64(3) {
-			close(ch)
-		}
+		close(ch)
 	}
 
 	// create middleware
@@ -247,21 +246,16 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
-	// send burst of 6 messages each second via unicast, 1 message will be rate limited every second for 3 seconds
-	// a total of 3 messages will be rate limited
-	tick := 0
-	for range time.Tick(time.Second) {
-		tick++
+	// for the duration of a simulated second we will send 6 messages. The 6th message will be
+	// rate limited.
+	start := testtime.Now()
+	end := start.Add(time.Second)
+	for testtime.Now().Before(end) {
+		err := m.mws[0].SendDirect(msg, newId.NodeID)
+		require.NoError(m.T(), err)
 
-		for i := 0; i <= 5; i++ {
-			err := m.mws[0].SendDirect(msg, newId.NodeID)
-			require.NoError(m.T(), err)
-		}
-
-		// exit tick range loop after 3 seconds
-		if tick == 3 {
-			break
-		}
+		// a message is sent every 167 milliseconds which equates to around 6 req/sec surpassing our limit
+		testtime.Advance(167 * time.Millisecond)
 	}
 
 	// wait for all rate limits before shutting down middleware
@@ -271,8 +265,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 	cancel()
 	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 
-	// expect our rate limited peer callback to be invoked 3 times
-	require.Equal(m.T(), uint64(3), rateLimits)
+	// expect our rate limited peer callback to be invoked once
+	require.Equal(m.T(), uint64(1), rateLimits)
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
@@ -282,8 +276,11 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// burst per interval
 	burst := 1000
 
+	// create test time
+	testtime := unittest.NewTestTime()
+
 	// setup bandwidth rate limiter
-	bandWidthRateLimiter := unicast.NewBandWidthRateLimiter(limit, burst)
+	bandWidthRateLimiter := unicast.NewBandWidthRateLimiter(limit, burst, testtime.Now)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
@@ -301,11 +298,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 		// update hook calls
 		atomic.AddUint64(&rateLimits, 1)
-
-		// close ch after 3 rate limits
-		if rateLimits == uint64(3) {
-			close(ch)
-		}
+		close(ch)
 	}
 
 	// create middleware
@@ -345,23 +338,17 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
-	// send 3 messages with a size around 400 bytes each second via unicast, 1 message will be rate limited every second for 3 seconds
-	// as the total number of bytes per interval will be 1200 exceeding the configured limit of 1000.
-	// a total of 3 messages will be rate limited
-	tick := 0
-	for range time.Tick(time.Second) {
-		tick++
+	// for the duration of a simulated second we will send 3 messages. Each message is about
+	// 400 bytes, the 3rd message will put our limiter over the 1000 byte limit at 1200 bytes. Thus
+	// the 3rd message should be rate limited.
+	start := testtime.Now()
+	end := start.Add(time.Second)
+	for testtime.Now().Before(end) {
+		err := m.mws[0].SendDirect(msg, newId.NodeID)
+		require.NoError(m.T(), err)
 
-		// send the message 3 times
-		for i := 0; i < 3; i++ {
-			err := m.mws[0].SendDirect(msg, newId.NodeID)
-			require.NoError(m.T(), err)
-		}
-
-		// exit tick range loop after 3 seconds
-		if tick == 3 {
-			break
-		}
+		// send 3 messages
+		testtime.Advance(334 * time.Millisecond)
 	}
 
 	// wait for all rate limits before shutting down middleware
@@ -371,8 +358,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	cancel()
 	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 
-	// expect our rate limited peer callback to be invoked 3 times
-	require.Equal(m.T(), uint64(3), rateLimits)
+	// expect our rate limited peer callback to be invoked once
+	require.Equal(m.T(), uint64(1), rateLimits)
 }
 
 func (m *MiddlewareTestSuite) createOverlay(provider *UpdatableIDProvider) *mocknetwork.Overlay {
