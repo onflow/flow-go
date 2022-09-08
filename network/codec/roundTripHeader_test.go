@@ -29,7 +29,11 @@ func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	assert.NoError(t, err)
 	decoded := decodedInterface.(*messages.BlockProposal)
 	// compare LastViewTC separately, because it is a pointer field
-	assert.Equal(t, *message.Header.LastViewTC, *decoded.Header.LastViewTC)
+	if message.Header.LastViewTC == nil {
+		assert.Equal(t, message.Header.LastViewTC, decoded.Header.LastViewTC)
+	} else {
+		assert.Equal(t, *message.Header.LastViewTC, *decoded.Header.LastViewTC)
+	}
 	// compare the rest of the header
 	// manually set LastViewTC fields to be equal to pass the Header pointer comparison
 	decoded.Header.LastViewTC = message.Header.LastViewTC

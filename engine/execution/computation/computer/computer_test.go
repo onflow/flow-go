@@ -31,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -557,8 +556,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				fvm.NewTransactionInvoker(),
 			),
 		)
-
-		address := common.Address{0x1}
 
 		address := common.Address{0x1}
 
