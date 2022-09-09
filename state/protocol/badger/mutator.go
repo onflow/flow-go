@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -119,11 +120,15 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 		return fmt.Errorf("header does not compliance the chain state: %w", err)
 	}
 
+	log.Info().Msgf("header extended for block height %v", candidate.Header.Height)
+
 	// find the last seal at the parent block
 	last, err := m.lastSealed(candidate)
 	if err != nil {
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
+
+	log.Info().Msgf("last sealed extended for block height %v", candidate.Header.Height)
 
 	// insert the block and index the last seal for the block
 	err = m.insert(ctx, candidate, last)
@@ -131,6 +136,7 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 		return fmt.Errorf("failed to insert the block: %w", err)
 	}
 
+	log.Info().Msgf("block inserted for block height %v", candidate.Header.Height)
 	return nil
 }
 
