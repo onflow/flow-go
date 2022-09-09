@@ -17,9 +17,9 @@ type Snapshot struct {
 // NewSnapshot returns a new invalid snapshot, containing an error describing why the
 // snapshot could not be retrieved. The following are expected
 // errors when constructing an invalid Snapshot:
-// * state.ErrUnknownSnapshotReference if the reference point for the snapshot
-//   (height or block ID) does not resolve to a queriable block in the state.
-// * generic error in case of unexpected critical internal corruption or bugs
+//   - state.ErrUnknownSnapshotReference if the reference point for the snapshot
+//     (height or block ID) does not resolve to a queriable block in the state.
+//   - generic error in case of unexpected critical internal corruption or bugs
 func NewSnapshot(err error) *Snapshot {
 	if errors.Is(err, state.ErrUnknownSnapshotReference) {
 		return &Snapshot{err: err}

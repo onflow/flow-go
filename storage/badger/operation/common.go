@@ -49,9 +49,9 @@ func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBat
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
 // Error returns:
-// * storage.ErrAlreadyExists if the key already exists in the database.
-// * generic error in case of unexpected failure from the database layer or
-//   encoding failure.
+//   - storage.ErrAlreadyExists if the key already exists in the database.
+//   - generic error in case of unexpected failure from the database layer or
+//     encoding failure.
 func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -92,9 +92,9 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 // update will encode the given entity with MsgPack and update the binary data
 // under the given key in the badger DB. The key must already exist.
 // Error returns:
-// * storage.ErrNotFound if the key does not already exist in the database.
-// * generic error in case of unexpected failure from the database layer or
-//   encoding failure.
+//   - storage.ErrNotFound if the key does not already exist in the database.
+//   - generic error in case of unexpected failure from the database layer or
+//     encoding failure.
 func update(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -200,9 +200,9 @@ func removeByPrefix(prefix []byte) func(*badger.Txn) error {
 // and decode it into the given entity. The provided entity needs to be a
 // pointer to an initialized entity of the correct type.
 // Error returns:
-// * storage.ErrNotFound if the key does not exist in the database
-// * generic error in case of unexpected failure from the database layer, or failure
-//   to decode an existing database value
+//   - storage.ErrNotFound if the key does not exist in the database
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
 func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
