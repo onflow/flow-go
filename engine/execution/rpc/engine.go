@@ -468,14 +468,14 @@ func (h *handler) eventResult(blockID flow.Identifier,
 	events := convert.EventsToMessages(flowEvents)
 
 	// lookup block
-	block, err := h.blocks.ByID(blockID)
+	header, err := h.headers.ByBlockID(blockID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to lookup block: %v", err)
 	}
 
 	return &execution.GetEventsForBlockIDsResponse_Result{
 		BlockId:     blockID[:],
-		BlockHeight: block.Header.Height,
+		BlockHeight: header.Height,
 		Events:      events,
 	}, nil
 }
