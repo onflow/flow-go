@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
+	testnet "github.com/onflow/flow-go/utils/unittest/network"
 )
 
 // TestPeerManager_Integration tests the correctness of integration between PeerManager and Libp2pConnector over
@@ -28,7 +29,7 @@ func TestPeerManager_Integration(t *testing.T) {
 
 	// create nodes
 	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_peer_manager", count)
-	defer unittest.StopNodes(t, nodes)
+	defer testnet.StopNodes(t, nodes)
 
 	thisNode := nodes[0]
 	topologyPeers := identities[1:]

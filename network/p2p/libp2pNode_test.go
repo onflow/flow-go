@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
+	testnet "github.com/onflow/flow-go/utils/unittest/network"
 )
 
 // TestMultiAddress evaluates correct translations from
@@ -61,7 +62,7 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 		"test_single_node_life_cycle",
 	)
 
-	unittest.StopNode(t, node)
+	testnet.StopNode(t, node)
 }
 
 // TestGetPeerInfo evaluates the deterministic translation between the nodes address and
@@ -95,7 +96,7 @@ func TestAddPeers(t *testing.T) {
 
 	// create nodes
 	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_add_peers", count)
-	defer unittest.StopNodes(t, nodes)
+	defer testnet.StopNodes(t, nodes)
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, identity := range identities[1:] {
@@ -118,7 +119,7 @@ func TestRemovePeers(t *testing.T) {
 	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_remove_peers", count)
 	peerInfos, errs := p2p.PeerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
-	defer unittest.StopNodes(t, nodes)
+	defer testnet.StopNodes(t, nodes)
 
 	// add nodes two and three to the first node as its peers
 	for _, pInfo := range peerInfos[1:] {
@@ -148,7 +149,7 @@ func TestConnGater(t *testing.T) {
 		}
 		return nil
 	}))
-	defer unittest.StopNode(t, node1)
+	defer testnet.StopNode(t, node1)
 	node1Info, err := p2p.PeerAddressInfo(identity1)
 	assert.NoError(t, err)
 
@@ -159,7 +160,7 @@ func TestConnGater(t *testing.T) {
 		}
 		return nil
 	}))
-	defer unittest.StopNode(t, node2)
+	defer testnet.StopNode(t, node2)
 	node2Info, err := p2p.PeerAddressInfo(identity2)
 	assert.NoError(t, err)
 

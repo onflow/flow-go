@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
+	testnet "github.com/onflow/flow-go/utils/unittest/network"
 )
 
 // TestFindPeerWithDHT checks that if a node is configured to participate in the DHT, it is
@@ -35,7 +36,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-2, withDHTOptions(p2p.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	defer unittest.StopNodes(t, nodes)
+	defer testnet.StopNodes(t, nodes)
 
 	getDhtServerAddr := func(i uint) peer.AddrInfo {
 		return peer.AddrInfo{ID: dhtServerNodes[i].Host().ID(), Addrs: dhtServerNodes[i].Host().Addrs()}
@@ -120,7 +121,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-1, withDHTOptions(p2p.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	defer unittest.StopNodes(t, nodes)
+	defer testnet.StopNodes(t, nodes)
 
 	// Step 2: Connect all nodes running a DHT client to the node running the DHT server
 	// This has to be done before subscribing to any topic, otherwise the node gives up on advertising

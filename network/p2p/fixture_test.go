@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/test"
 	"github.com/onflow/flow-go/utils/unittest"
+	testnet "github.com/onflow/flow-go/utils/unittest/network"
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
@@ -224,7 +225,7 @@ func nodesFixture(t *testing.T, ctx context.Context, sporkID flow.Identifier, dh
 	defer func() {
 		if err != nil && nodes != nil {
 			// stops all nodes upon an error in starting even one single node
-			unittest.StopNodes(t, nodes)
+			testnet.StopNodes(t, nodes)
 			t.Fail()
 		}
 	}()
