@@ -32,4 +32,6 @@ type Environment interface {
 	ReturnCadenceRuntime(*reusableRuntime.ReusableCadenceRuntime)
 
 	AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error)
+
+	Reset()
 }

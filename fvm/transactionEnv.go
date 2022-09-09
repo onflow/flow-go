@@ -49,7 +49,6 @@ func NewTransactionEnvironment(
 	env := &TransactionEnv{
 		commonEnv: newCommonEnv(
 			ctx,
-			vm,
 			sth,
 			programs,
 			tracer,

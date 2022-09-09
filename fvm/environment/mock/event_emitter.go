@@ -45,6 +45,11 @@ func (_m *EventEmitter) Events() []flow.Event {
 	return r0
 }
 
+// Reset provides a mock function with given fields:
+func (_m *EventEmitter) Reset() {
+	_m.Called()
+}
+
 // ServiceEvents provides a mock function with given fields:
 func (_m *EventEmitter) ServiceEvents() []flow.Event {
 	ret := _m.Called()
