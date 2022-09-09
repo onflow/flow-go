@@ -2,6 +2,8 @@ package integration
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 	"sync"
 	"testing"
 	"time"
@@ -278,6 +280,68 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 	// check that all instances have the same finalized block
 	ref := instances[0]
 	assert.Less(t, finalView-uint64(2*numPass+numFail), ref.forks.FinalizedBlock().View, "expect instance 0 should made enough progress, but didn't")
+	finalizedViews := FinalizedViews(ref)
+	for i := 1; i < numPass; i++ {
+		assert.Equal(t, ref.forks.FinalizedBlock(), instances[i].forks.FinalizedBlock(), "instance %d should have same finalized block as first instance")
+		assert.Equal(t, finalizedViews, FinalizedViews(instances[i]), "instance %d should have same finalized view as first instance")
+	}
+}
+
+// TestDelayedClusterStartup this test case checks a realistic scenario where nodes are started asynchronously.
+// This test heavily relies on timeout rebroadcast since it's very likely that nodes will be started in different times
+// and new nodes will miss messages from old nodes.
+func TestDelayedClusterStartup(t *testing.T) {
+	numPass := 4
+	finalView := uint64(20)
+
+	// generate the seven hotstuff participants
+	participants := unittest.IdentityListFixture(numPass)
+	instances := make([]*Instance, 0, numPass)
+	root := DefaultRoot()
+	// set block rate delay to be bigger than minimal timeout
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, 6, 0)
+	require.NoError(t, err)
+
+	// set up instances that work fully
+	timeoutObjectGenerated := make(map[flow.Identifier]struct{}, 0)
+	for n := 0; n < numPass; n++ {
+		in := NewInstance(t,
+			WithRoot(root),
+			WithParticipants(participants),
+			WithLocalID(participants[n].NodeID),
+			WithTimeouts(timeouts),
+			WithStopCondition(ViewReached(finalView)),
+			WithOutgoingVotes(func(vote *model.Vote) bool {
+				return vote.View == 1
+			}),
+			WithOutgoingTimeoutObjects(func(object *model.TimeoutObject) bool {
+				timeoutObjectGenerated[object.SignerID] = struct{}{}
+				// start allowing timeouts when every node has generated one
+				// when nodes will broadcast again, it will go through
+				return len(timeoutObjectGenerated) != numPass
+			}),
+		)
+		instances = append(instances, in)
+	}
+
+	// connect the communicators of the instances together
+	Connect(instances)
+
+	// start each node only after previous one has started
+	var wg sync.WaitGroup
+	for _, in := range instances {
+		wg.Add(1)
+		go func(in *Instance) {
+			err := in.Run()
+			require.True(t, errors.Is(err, errStopCondition))
+			wg.Done()
+		}(in)
+	}
+	wg.Wait()
+
+	// check that all instances have the same finalized block
+	ref := instances[0]
+	assert.Less(t, finalView-uint64(2*numPass), ref.forks.FinalizedBlock().View, "expect instance 0 should made enough progress, but didn't")
 	finalizedViews := FinalizedViews(ref)
 	for i := 1; i < numPass; i++ {
 		assert.Equal(t, ref.forks.FinalizedBlock(), instances[i].forks.FinalizedBlock(), "instance %d should have same finalized block as first instance")

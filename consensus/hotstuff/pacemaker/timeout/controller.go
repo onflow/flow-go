@@ -25,7 +25,7 @@ import (
 // - on progress: decrease number of failed rounds, this results in exponential decrease of round duration.
 type Controller struct {
 	cfg                   Config
-	timer                 *time.Timer
+	timer                 *time.Ticker
 	timerInfo             *model.TimerInfo
 	timeoutChannel        <-chan time.Time
 	maxExponent           float64 // max exponent for exponential function, derived from maximum round duration
@@ -72,7 +72,7 @@ func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
 	duration := t.ReplicaTimeout()
 
 	startTime := time.Now().UTC()
-	timer := time.NewTimer(duration)
+	timer := time.NewTicker(duration)
 	timerInfo := model.TimerInfo{View: view, StartTime: startTime, Duration: duration}
 	t.timer = timer
 	t.timeoutChannel = t.timer.C
