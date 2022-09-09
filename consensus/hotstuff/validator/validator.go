@@ -33,10 +33,11 @@ func New(
 }
 
 // ValidateQC checks the validity of a QC for a given block. Inputs:
-//  * qc - the qc to be validated
-//  * block - the block that the qc is pointing to
+//   - qc - the qc to be validated
+//   - block - the block that the qc is pointing to
+//
 // During normal operations, the following error returns are expected:
-//  * model.InvalidBlockError if the QC is invalid
+//   - model.InvalidBlockError if the QC is invalid
 func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) error {
 	if qc.BlockID != block.BlockID {
 		// Sanity check! Failing indicates a bug in the higher-level logic

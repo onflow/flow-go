@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -206,11 +205,11 @@ func CreateAccountsWithSimpleAddresses(
 	chain flow.Chain,
 ) ([]flow.Address, error) {
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
+		fvm.WithBlockPrograms(programs),
 	)
 
 	var accounts []flow.Address
@@ -254,7 +253,7 @@ func CreateAccountsWithSimpleAddresses(
 			AddAuthorizer(serviceAddress)
 
 		tx := fvm.Transaction(txBody, uint32(i))
-		err := vm.Run(ctx, tx, view, programs)
+		err := vm.RunV2(ctx, tx, view)
 		if err != nil {
 			return nil, err
 		}
@@ -286,7 +285,6 @@ func CreateAccountsWithSimpleAddresses(
 
 func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalOptions ...fvm.BootstrapProcedureOption) state.View {
 	view := fvmUtils.NewSimpleView()
-	programs := programs.NewEmptyPrograms()
 
 	// set 0 clusters to pass n_collectors >= n_clusters check
 	epochConfig := epochs.DefaultEpochConfig()
@@ -304,13 +302,7 @@ func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalO
 		options...,
 	)
 
-	_ = vm.Run(
-		ctx,
-		bootstrap,
-		view,
-		programs,
-	)
-
+	_ = vm.RunV2(ctx, bootstrap, view)
 	return view
 }
 

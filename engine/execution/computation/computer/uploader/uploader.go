@@ -18,7 +18,14 @@ type Uploader interface {
 	Upload(computationResult *execution.ComputationResult) error
 }
 
-func NewAsyncUploader(uploader Uploader, retryInitialTimeout time.Duration, maxRetryNumber uint64, log zerolog.Logger, metrics module.ExecutionMetrics) *AsyncUploader {
+// OnCompleteFunc is the type of function being called at upload completion.
+type OnCompleteFunc func(*execution.ComputationResult, error)
+
+func NewAsyncUploader(uploader Uploader,
+	retryInitialTimeout time.Duration,
+	maxRetryNumber uint64,
+	log zerolog.Logger,
+	metrics module.ExecutionMetrics) *AsyncUploader {
 	return &AsyncUploader{
 		unit:                engine.NewUnit(),
 		uploader:            uploader,
@@ -29,13 +36,16 @@ func NewAsyncUploader(uploader Uploader, retryInitialTimeout time.Duration, maxR
 	}
 }
 
+// AsyncUploader wraps up another Uploader instance and make its upload asynchronous
 type AsyncUploader struct {
+	module.ReadyDoneAware
 	unit                *engine.Unit
 	uploader            Uploader
 	log                 zerolog.Logger
 	metrics             module.ExecutionMetrics
 	retryInitialTimeout time.Duration
 	maxRetryNumber      uint64
+	onComplete          OnCompleteFunc // callback function called after Upload is completed
 }
 
 func (a *AsyncUploader) Ready() <-chan struct{} {
@@ -44,6 +54,10 @@ func (a *AsyncUploader) Ready() <-chan struct{} {
 
 func (a *AsyncUploader) Done() <-chan struct{} {
 	return a.unit.Done()
+}
+
+func (a *AsyncUploader) SetOnCompleteCallback(onComplete OnCompleteFunc) {
+	a.onComplete = onComplete
 }
 
 func (a *AsyncUploader) Upload(computationResult *execution.ComputationResult) error {
@@ -70,6 +84,10 @@ func (a *AsyncUploader) Upload(computationResult *execution.ComputationResult) e
 		}
 
 		a.metrics.ExecutionBlockDataUploadFinished(time.Since(start))
+
+		if a.onComplete != nil {
+			a.onComplete(computationResult, err)
+		}
 	})
 	return nil
 }

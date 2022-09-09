@@ -2,7 +2,7 @@ package reporters
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 
 	"github.com/rs/zerolog"
 
@@ -56,6 +56,6 @@ func (e *ExportReporter) Report(payload []ledger.Payload, commit ledger.State) e
 		Info().
 		Str("ExportReport", string(file)).
 		Msg("Ledger Export has finished")
-	_ = ioutil.WriteFile("export_report.json", file, 0644)
+	_ = os.WriteFile("export_report.json", file, 0644)
 	return nil
 }

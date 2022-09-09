@@ -366,9 +366,9 @@ type RuntimeMetrics interface {
 }
 
 type ProviderMetrics interface {
-	// ChunkDataPackRequested is executed every time a chunk data pack request is arrived at execution node.
-	// It increases the request counter by one.
-	ChunkDataPackRequested()
+	// ChunkDataPackRequestProcessed is executed every time a chunk data pack request is picked up for processing at execution node.
+	// It increases the request processed counter by one.
+	ChunkDataPackRequestProcessed()
 }
 
 type ExecutionDataProviderMetrics interface {
@@ -457,9 +457,11 @@ type ExecutionMetrics interface {
 	// ExecutionSync reports when the state syncing is triggered or stopped.
 	ExecutionSync(syncing bool)
 
+	// Upload metrics
 	ExecutionBlockDataUploadStarted()
-
 	ExecutionBlockDataUploadFinished(dur time.Duration)
+	ExecutionComputationResultUploaded()
+	ExecutionComputationResultUploadRetried()
 
 	UpdateCollectionMaxHeight(height uint64)
 }

@@ -4,19 +4,21 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/environment"
+	fvmmock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	fvmmock "github.com/onflow/flow-go/fvm/mock"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/runtime/testutil"
 )
 
 func TestGetExecutionMemoryWeights(t *testing.T) {
@@ -26,17 +28,14 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 		address common.Address,
 		path cadence.Path,
 		context runtime.Context,
-	) (cadence.Value, error)) fvm.Environment {
-		r := &TestInterpreterRuntime{
-			readStored: readStored,
-		}
-		vm := fvm.VirtualMachine{
-			Runtime: r,
-		}
+	) (cadence.Value, error)) environment.Environment {
 		envMock := &fvmmock.Environment{}
-		envMock.On("VM").
-			Return(&vm).
-			Once()
+		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
+			reusableRuntime.NewReusableCadenceRuntime(
+				&testutil.TestInterpreterRuntime{
+					ReadStoredFunc: readStored,
+				}))
+		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
 	}
 
@@ -50,8 +49,7 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionMemoryWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if can't parse stored",
@@ -64,8 +62,7 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionMemoryWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if get stored returns error",
@@ -158,17 +155,14 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 		address common.Address,
 		path cadence.Path,
 		context runtime.Context,
-	) (cadence.Value, error)) fvm.Environment {
-		r := &TestInterpreterRuntime{
-			readStored: readStored,
-		}
-		vm := fvm.VirtualMachine{
-			Runtime: r,
-		}
+	) (cadence.Value, error)) environment.Environment {
 		envMock := &fvmmock.Environment{}
-		envMock.On("VM").
-			Return(&vm).
-			Once()
+		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
+			reusableRuntime.NewReusableCadenceRuntime(
+				&testutil.TestInterpreterRuntime{
+					ReadStoredFunc: readStored,
+				}))
+		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
 	}
 
@@ -182,8 +176,7 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionEffortWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if can't parse stored",
@@ -196,8 +189,7 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionEffortWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if get stored returns error",
@@ -281,85 +273,4 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 			require.InDeltaMapValues(t, expectedWeights, weights, 0)
 		},
 	)
-}
-
-var _ runtime.Runtime = &TestInterpreterRuntime{}
-
-type TestInterpreterRuntime struct {
-	readStored             func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error)
-	invokeContractFunction func(a common.AddressLocation, s string, values []cadence.Value, types []sema.Type, ctx runtime.Context) (cadence.Value, error)
-}
-
-func (t *TestInterpreterRuntime) NewScriptExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
-	panic("NewScriptExecutor not defined")
-}
-
-func (t *TestInterpreterRuntime) NewTransactionExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
-	panic("NewTransactionExecutor not defined")
-}
-
-func (t *TestInterpreterRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []cadence.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
-	panic("NewContractFunctionExecutor not defined")
-}
-
-func (t *TestInterpreterRuntime) SetDebugger(debugger *interpreter.Debugger) {
-	panic("SetDebugger not defined")
-}
-
-func (t *TestInterpreterRuntime) ExecuteScript(runtime.Script, runtime.Context) (cadence.Value, error) {
-	panic("ExecuteScript not defined")
-}
-
-func (t *TestInterpreterRuntime) ExecuteTransaction(runtime.Script, runtime.Context) error {
-	panic("ExecuteTransaction not defined")
-}
-
-func (t *TestInterpreterRuntime) InvokeContractFunction(a common.AddressLocation, s string, values []cadence.Value, types []sema.Type, ctx runtime.Context) (cadence.Value, error) {
-	if t.invokeContractFunction == nil {
-		panic("InvokeContractFunction not defined")
-	}
-	return t.invokeContractFunction(a, s, values, types, ctx)
-}
-
-func (t *TestInterpreterRuntime) ParseAndCheckProgram([]byte, runtime.Context) (*interpreter.Program, error) {
-	panic("ParseAndCheckProgram not defined")
-}
-
-func (t *TestInterpreterRuntime) SetCoverageReport(*runtime.CoverageReport) {
-	panic("SetCoverageReport not defined")
-}
-
-func (t *TestInterpreterRuntime) SetContractUpdateValidationEnabled(bool) {
-	panic("SetContractUpdateValidationEnabled not defined")
-}
-
-func (t *TestInterpreterRuntime) SetAtreeValidationEnabled(bool) {
-	panic("SetAtreeValidationEnabled not defined")
-}
-
-func (t *TestInterpreterRuntime) SetTracingEnabled(bool) {
-	panic("SetTracingEnabled not defined")
-}
-
-func (t *TestInterpreterRuntime) SetInvalidatedResourceValidationEnabled(bool) {
-	panic("SetInvalidatedResourceValidationEnabled not defined")
-}
-
-func (t *TestInterpreterRuntime) SetResourceOwnerChangeHandlerEnabled(bool) {
-	panic("SetResourceOwnerChangeHandlerEnabled not defined")
-}
-
-func (t *TestInterpreterRuntime) ReadStored(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-	if t.readStored == nil {
-		panic("ReadStored not defined")
-	}
-	return t.readStored(address, path, context)
-}
-
-func (t *TestInterpreterRuntime) ReadLinked(common.Address, cadence.Path, runtime.Context) (cadence.Value, error) {
-	panic("ReadLinked not defined")
-}
-
-func (*TestInterpreterRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
-	panic("not implemented")
 }

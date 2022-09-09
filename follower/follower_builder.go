@@ -547,12 +547,13 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 // initLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the observer.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
-// 		DHT as client and seeded with the given bootstrap peers
-// 		The specified bind address as the listen address
-// 		The passed in private key as the libp2p key
-//		No connection gater
-// 		No connection manager
-// 		Default libp2p pubsub options
+//
+//   - DHT as client and seeded with the given bootstrap peers
+//   - The specified bind address as the listen address
+//   - The passed in private key as the libp2p key
+//   - No connection gater
+//   - No connection manager
+//   - Default libp2p pubsub options
 func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func(ctx context.Context) (*p2p.Node, error) {
 		var pis []peer.AddrInfo

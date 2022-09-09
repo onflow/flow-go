@@ -8,7 +8,8 @@ import (
 
 	"github.com/onflow/flow-go-sdk"
 
-	state "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
@@ -59,7 +60,7 @@ func TestAccountStatusMigration(t *testing.T) {
 	require.True(t, newPayloads[3].Equals(&payloads[7]))
 
 	// check address one status
-	expectedStatus := state.NewAccountStatus()
+	expectedStatus := environment.NewAccountStatus()
 	expectedStatus.SetFrozenFlag(true)
 	expectedStatus.SetPublicKeyCount(2)
 	expectedStatus.SetStorageUsed(12)

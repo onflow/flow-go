@@ -24,7 +24,7 @@ type BootstrapProcedure struct {
 	ctx       Context
 	sth       *state.StateHolder
 	programs  *programs.Programs
-	accounts  state.Accounts
+	accounts  environment.Accounts
 	rootBlock *flow.Header
 
 	// genesis parameters
@@ -253,8 +253,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.programs = programs
 
 	// initialize the account addressing state
-	b.accounts = state.NewAccounts(b.sth)
-	addressGenerator := state.NewStateBoundAddressGenerator(b.sth, ctx.Chain)
+	b.accounts = environment.NewAccounts(b.sth)
+	addressGenerator := environment.NewAccountCreator(b.sth, ctx.Chain)
 	b.addressGenerator = addressGenerator
 
 	service := b.createServiceAccount()
@@ -876,12 +876,6 @@ func (b *BootstrapProcedure) setContractDeploymentRestrictions(service flow.Addr
 	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
 }
 
-const (
-	fungibleTokenAccountIndex = 2
-	flowTokenAccountIndex     = 3
-	flowFeesAccountIndex      = 4
-)
-
 func panicOnMetaInvokeErrf(msg string, txError errors.Error, err error) {
 	if txError != nil {
 		panic(fmt.Sprintf(msg, txError.Error()))
@@ -892,16 +886,11 @@ func panicOnMetaInvokeErrf(msg string, txError errors.Error, err error) {
 }
 
 func FungibleTokenAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(fungibleTokenAccountIndex)
+	address, _ := chain.AddressAtIndex(environment.FungibleTokenAccountIndex)
 	return address
 }
 
 func FlowTokenAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(flowTokenAccountIndex)
-	return address
-}
-
-func FlowFeesAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(flowFeesAccountIndex)
+	address, _ := chain.AddressAtIndex(environment.FlowTokenAccountIndex)
 	return address
 }

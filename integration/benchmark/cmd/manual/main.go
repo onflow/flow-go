@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"flag"
 	"net"
 	"os"
@@ -16,9 +15,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/access"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/benchmark"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -36,14 +35,14 @@ func main() {
 	tpsFlag := flag.String("tps", "1", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
 	tpsDurationsFlag := flag.String("tps-durations", "0", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	chainIDStr := flag.String("chain", string(flowsdk.Emulator), "chain ID")
-	access := flag.String("access", net.JoinHostPort("127.0.0.1", "3569"), "access node address")
+	accessNodes := flag.String("access", net.JoinHostPort("127.0.0.1", "3569"), "access node address")
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 	logLvl := flag.String("log-level", "info", "set log level")
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	pushgateway := flag.String("pushgateway", "127.0.0.1:9091", "host:port for pushgateway")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
 	_ = flag.Bool("track-txs", false, "deprecated")
-	accountMultiplierFlag := flag.Int("account-multiplier", 50, "number of accounts to create per load tps")
+	accountMultiplierFlag := flag.Int("account-multiplier", 100, "number of accounts to create per load tps")
 	feedbackEnabled := flag.Bool("feedback-enabled", true, "wait for trannsaction execution before submitting new transaction")
 	maxConstExecTxSizeInBytes := flag.Uint("const-exec-max-tx-size", flow.DefaultMaxTransactionByteSize/10, "max byte size of constant exec transaction size to generate")
 	authAccNumInConstExecTx := flag.Uint("const-exec-num-authorizer", 1, "num of authorizer for each constant exec transaction to generate")
@@ -71,10 +70,6 @@ func main() {
 	sp := benchmark.NewStatsPusher(ctx, log, *pushgateway, "loader", prometheus.DefaultGatherer)
 	defer sp.Stop()
 
-	accessNodeAddrs := strings.Split(*access, ",")
-
-	cases := parseLoadCases(log, tpsFlag, tpsDurationsFlag)
-
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
 	log.Info().Msgf("Service Address: %v", serviceAccountAddress)
@@ -83,47 +78,24 @@ func main() {
 	flowTokenAddress := addressGen.NextAddress()
 	log.Info().Msgf("Flow Token Address: %v", flowTokenAddress)
 
-	serviceAccountPrivateKeyBytes, err := hex.DecodeString(*serviceAccountPrivateKeyHex)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("error while hex decoding hardcoded root key")
-	}
-
-	ServiceAccountPrivateKey := flow.AccountPrivateKey{
-		SignAlgo: unittest.ServiceAccountPrivateKeySignAlgo,
-		HashAlgo: unittest.ServiceAccountPrivateKeyHashAlgo,
-	}
-	ServiceAccountPrivateKey.PrivateKey, err = crypto.DecodePrivateKey(
-		ServiceAccountPrivateKey.SignAlgo, serviceAccountPrivateKeyBytes)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("error while decoding hardcoded root key bytes")
-	}
-
-	// get the private key string
-	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
-
 	// sleep in order to ensure the testnet is up and running
 	if *sleep > 0 {
 		log.Info().Msgf("Sleeping for %v before starting benchmark", sleep)
 		time.Sleep(*sleep)
 	}
 
-	loadedAccessAddr := accessNodeAddrs[0]
-	flowClient, err := client.NewClient(loadedAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
-	}
-
-	supervisorAccessAddr := accessNodeAddrs[0]
-	if len(accessNodeAddrs) > 1 {
-		supervisorAccessAddr = accessNodeAddrs[1]
-	}
-	supervisorClient, err := client.NewClient(supervisorAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
+	accessNodeAddrs := strings.Split(*accessNodes, ",")
+	clients := make([]access.Client, 0, len(accessNodeAddrs))
+	for _, addr := range accessNodeAddrs {
+		client, err := client.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatal().Str("addr", addr).Err(err).Msgf("unable to initialize flow client")
+		}
+		clients = append(clients, client)
 	}
 
 	// run load cases
-	for i, c := range cases {
+	for i, c := range parseLoadCases(log, tpsFlag, tpsDurationsFlag) {
 		log.Info().Str("load_type", *loadTypeFlag).Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
 
 		loaderMetrics.SetTPSConfigured(c.tps)
@@ -131,21 +103,24 @@ func main() {
 		var lg *benchmark.ContLoadGenerator
 		if c.tps > 0 {
 			var err error
-			lg, err = benchmark.NewContLoadGenerator(
+			lg, err = benchmark.New(
+				ctx,
 				log,
 				loaderMetrics,
-				flowClient,
-				supervisorClient,
-				loadedAccessAddr,
-				priv,
-				&serviceAccountAddress,
-				&fungibleTokenAddress,
-				&flowTokenAddress,
-				c.tps,
-				*accountMultiplierFlag,
-				benchmark.LoadType(*loadTypeFlag),
-				*feedbackEnabled,
-				benchmark.ConstExecParam{
+				clients,
+				benchmark.NetworkParams{
+					ServAccPrivKeyHex:     *serviceAccountPrivateKeyHex,
+					ServiceAccountAddress: &serviceAccountAddress,
+					FungibleTokenAddress:  &fungibleTokenAddress,
+					FlowTokenAddress:      &flowTokenAddress,
+				},
+				benchmark.LoadParams{
+					TPS:              c.tps,
+					NumberOfAccounts: c.tps * *accountMultiplierFlag,
+					LoadType:         benchmark.LoadType(*loadTypeFlag),
+					FeedbackEnabled:  *feedbackEnabled,
+				},
+				benchmark.ConstExecParams{
 					MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
 					AuthAccountNum:  *authAccNumInConstExecTx,
 					ArgSizeInByte:   *argSizeInByteInConstExecTx,

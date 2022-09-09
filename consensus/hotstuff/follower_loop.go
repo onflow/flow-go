@@ -63,8 +63,8 @@ func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView u
 
 // loop will synchronously processes all events.
 // All errors from FollowerLogic are fatal:
-//   * known critical error: some prerequisites of the HotStuff follower have been broken
-//   * unknown critical error: bug-related
+//   - known critical error: some prerequisites of the HotStuff follower have been broken
+//   - unknown critical error: bug-related
 func (fl *FollowerLoop) loop() {
 	shutdownSignal := fl.runner.ShutdownSignal()
 	for {

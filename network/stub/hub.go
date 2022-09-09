@@ -1,6 +1,7 @@
 package stub
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 // It maintains a set of network instances and enables them to directly exchange message
 // over the memory.
 type Hub struct {
+	sync.RWMutex
 	networks map[flow.Identifier]*Network
 	Buffer   *Buffer
 }
@@ -33,7 +35,6 @@ func (h *Hub) DeliverAll() {
 	for _, network := range h.networks {
 		network.DeliverAll(false)
 	}
-
 }
 
 // DeliverAllEventually attempts on delivery of all the buffered messages in the Network instances
@@ -62,6 +63,9 @@ func (h *Hub) DeliverAllEventuallyUntil(t *testing.T, condition func() bool, wai
 
 // GetNetwork returns the Network instance attached to the node ID.
 func (h *Hub) GetNetwork(nodeID flow.Identifier) (*Network, bool) {
+	h.RLock()
+	defer h.RUnlock()
+
 	net, ok := h.networks[nodeID]
 	return net, ok
 }
@@ -69,5 +73,8 @@ func (h *Hub) GetNetwork(nodeID flow.Identifier) (*Network, bool) {
 // AddNetwork stores the reference of the Network in the Hub, in order for networks to find
 // other networks to send events directly.
 func (h *Hub) AddNetwork(net *Network) {
+	h.Lock()
+	defer h.Unlock()
+
 	h.networks[net.GetID()] = net
 }

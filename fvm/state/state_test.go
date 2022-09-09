@@ -12,6 +12,14 @@ import (
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
+func createByteArray(size int) []byte {
+	bytes := make([]byte, size)
+	for i := range bytes {
+		bytes[i] = 255
+	}
+	return bytes
+}
+
 func TestState_ChildMergeFunctionality(t *testing.T) {
 	view := utils.NewSimpleView()
 	st := state.NewState(view, state.DefaultParameters())
@@ -60,7 +68,7 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		require.Equal(t, len(v), 0)
 
 		// merge to parent
-		err = st.MergeState(stChild, true)
+		err = st.MergeState(stChild)
 		require.NoError(t, err)
 
 		// read key3 on parent
@@ -179,7 +187,7 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Equal(t, st.InteractionUsed(), uint64(0))
 
 	// commit
-	err = st.MergeState(stChild, true)
+	err = st.MergeState(stChild)
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(3))
 

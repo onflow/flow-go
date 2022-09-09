@@ -106,11 +106,11 @@ func TestShortHash(t *testing.T) {
 
 // Test_ShortNodePathLengthEncoding:
 // The tree enforces a max key length of `maxKeyLength`. We verify that:
-// 1. the resulting number of bits (i.e. maxKeyLength * 8), does not
-//    overflow the hardware-dependent int range.
-// 2. the value range from [1, ..., maxKeyLength * 8] can be encoded into 2 bytes,
-//    as this is required by the short node (but not enforced at run time)
-// 3. serializedPathSegmentLength(l)
+//  1. the resulting number of bits (i.e. maxKeyLength * 8), does not
+//     overflow the hardware-dependent int range.
+//  2. the value range from [1, ..., maxKeyLength * 8] can be encoded into 2 bytes,
+//     as this is required by the short node (but not enforced at run time)
+//  3. serializedPathSegmentLength(l)
 func Test_ShortNodePathLengthEncoding(t *testing.T) {
 	// testing 1:
 	maxInt := int(^uint(0) >> 1) // largest int value (hardware-dependent)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -51,10 +52,10 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			// set the interaction limit
 			ctx.MaxStateInteractionSize = interactionLimit
 			// run the transaction
-			tx := fvm.Transaction(txBody, 1)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			require.NotPanics(t, func() {
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 			}, "Transaction should never result in a panic.")
 			require.NoError(t, err, "Transaction should never result in an error.")
 
@@ -84,8 +85,10 @@ type transactionType struct {
 
 var fuzzTransactionTypes = []transactionType{
 	{
+		// Token transfer of 0 tokens.
+		// should succeed if no limits are hit.
+		// fees should be deducted no matter what.
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
-			// token transfer
 			txBody := transferTokensTx(tctx.chain).
 				AddAuthorizer(tctx.address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(0))). // 0 value transferred
@@ -114,8 +117,10 @@ var fuzzTransactionTypes = []transactionType{
 		},
 	},
 	{
+		// Token transfer of too many tokens.
+		// Should never succeed.
+		// fees should be deducted no matter what.
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
-			// failed token transfer
 			txBody := transferTokensTx(tctx.chain).
 				AddAuthorizer(tctx.address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(2 * tctx.addressFunds))). // too much value transferred
@@ -142,6 +147,9 @@ var fuzzTransactionTypes = []transactionType{
 		},
 	},
 	{
+		// Transaction that calls panic.
+		// Should never succeed.
+		// fees should be deducted no matter what.
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
 			// empty transaction
 			txBody := flow.NewTransactionBody().SetScript([]byte("transaction(){prepare(){};execute{panic(\"some panic\")}}"))
@@ -203,7 +211,7 @@ func getDeductedFees(tb testing.TB, tctx transactionTypeContext, results fuzzRes
 	var ok bool
 	var feesDeductedEvent cadence.Event
 	for _, e := range results.tx.Events {
-		if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", fvm.FlowFeesAddress(tctx.chain)) {
+		if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", environment.FlowFeesAddress(tctx.chain)) {
 			data, err := jsoncdc.Decode(nil, e.Payload)
 			require.NoError(tb, err)
 			feesDeductedEvent, ok = data.(cadence.Event)
@@ -245,9 +253,9 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 			return err
 		}
 
-		tx := fvm.Transaction(txBody, 0)
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-		err = vm.Run(ctx, tx, view, programs)
+		err = vm.RunV2(ctx, tx, view)
 
 		require.NoError(tb, err)
 		accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
@@ -274,9 +282,9 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		)
 		require.NoError(tb, err)
 
-		tx = fvm.Transaction(txBody, 0)
+		tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-		err = vm.Run(ctx, tx, view, programs)
+		err = vm.RunV2(ctx, tx, view)
 		if err != nil {
 			return err
 		}

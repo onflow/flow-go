@@ -3,7 +3,7 @@ package ingest
 import (
 	"context"
 	"errors"
-	"io/ioutil"
+	"io"
 	"testing"
 	"time"
 
@@ -69,7 +69,7 @@ func (suite *Suite) SetupTest() {
 	suite.N_COLLECTORS = 4
 	suite.N_CLUSTERS = 2
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 	metrics := metrics.NewNoopCollector()
 
 	net := new(mocknetwork.Network)

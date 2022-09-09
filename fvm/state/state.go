@@ -18,6 +18,11 @@ const (
 	DefaultMaxKeySize         = 16_000      // ~16KB
 	DefaultMaxValueSize       = 256_000_000 // ~256MB
 	DefaultMaxInteractionSize = 20_000_000  // ~20MB
+
+	AccountKeyPrefix = "a."
+	KeyAccountStatus = AccountKeyPrefix + "s"
+	KeyCode          = "code"
+	KeyContractNames = "contract_names"
 )
 
 type mapKey struct {
@@ -251,16 +256,13 @@ func (s *State) TotalMemoryLimit() uint {
 }
 
 // MergeState applies the changes from a the given view to this view.
-func (s *State) MergeState(other *State, enforceLimit bool) error {
+func (s *State) MergeState(other *State) error {
 	err := s.view.MergeView(other.view)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)
 	}
 
-	err = s.meter.MergeMeter(other.meter, enforceLimit)
-	if err != nil {
-		return err
-	}
+	s.meter.MergeMeter(other.meter)
 
 	// apply address updates
 	for k, v := range other.updatedAddresses {
@@ -278,10 +280,6 @@ func (s *State) MergeState(other *State, enforceLimit bool) error {
 	s.TotalBytesRead += other.TotalBytesRead
 	s.TotalBytesWritten += other.TotalBytesWritten
 
-	// check max interaction as last step
-	if enforceLimit {
-		return s.checkMaxInteraction()
-	}
 	return nil
 }
 

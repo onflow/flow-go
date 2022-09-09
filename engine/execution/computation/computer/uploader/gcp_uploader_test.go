@@ -3,7 +3,7 @@ package uploader
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 
@@ -44,7 +44,7 @@ func Test_GCPBucketUploader(t *testing.T) {
 	reader, err := bucket.Object(objectName).NewReader(context.Background())
 	require.NoError(t, err)
 
-	readBytes, err := ioutil.ReadAll(reader)
+	readBytes, err := io.ReadAll(reader)
 	require.NoError(t, err)
 
 	require.Equal(t, buffer.Bytes(), readBytes)

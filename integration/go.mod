@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/integration
 
-go 1.18
+go 1.19
 
 require (
 	github.com/dapperlabs/testingdock v0.4.4
@@ -17,9 +17,9 @@ require (
 	github.com/onflow/cadence v0.26.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220720151516-797b149ceaaa
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220720151516-797b149ceaaa
-	github.com/onflow/flow-emulator v0.35.0
+	github.com/onflow/flow-emulator v0.35.1-0.20220830173823-dcedbb70687a
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
-	github.com/onflow/flow-go v0.26.14-test-synchronization.0.20220824222936-c55dd1bfea94
+	github.com/onflow/flow-go v0.26.14-test-synchronization.0.20220829184930-82493852fa22
 	github.com/onflow/flow-go-sdk v0.27.0
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/onflow/flow/protobuf/go/flow v0.3.1

@@ -15,7 +15,8 @@ type nestedTransactionStackFrame struct {
 	// When nil, the subtransaction will have unrestricted access to the runtime
 	// environment.  When non-nil, the subtransaction will only have access to
 	// the parts of the runtime environment necessary for importing/parsing the
-	// program.
+	// program, specifically, environment.ContractReader and
+	// environment.Programs.
 	//
 	// TODO(patrick): restrict environment method access
 	parseRestriction *common.AddressLocation
@@ -140,9 +141,7 @@ func (s *StateHolder) BeginParseRestrictedNestedTransaction(
 	}, nil
 }
 
-func (s *StateHolder) mergeIntoParent(
-	enforceLimits bool,
-) error {
+func (s *StateHolder) mergeIntoParent() error {
 	if len(s.nestedTransactions) < 2 {
 		return fmt.Errorf("cannot commit the main transaction")
 	}
@@ -151,7 +150,7 @@ func (s *StateHolder) mergeIntoParent(
 	s.nestedTransactions = s.nestedTransactions[:len(s.nestedTransactions)-1]
 	parent := s.current()
 
-	return parent.state.MergeState(child.state, enforceLimits)
+	return parent.state.MergeState(child.state)
 }
 
 // Commit commits the changes in the current unrestricted nested transaction
@@ -173,7 +172,7 @@ func (s *StateHolder) Commit(
 		)
 	}
 
-	return s.mergeIntoParent(s.EnforceLimits())
+	return s.mergeIntoParent()
 }
 
 // CommitParseRestricted commits the changes in the current restricted nested
@@ -197,7 +196,7 @@ func (s *StateHolder) CommitParseRestricted(
 		)
 	}
 
-	err := s.mergeIntoParent(s.EnforceLimits())
+	err := s.mergeIntoParent()
 	if err != nil {
 		return nil, err
 	}
@@ -218,9 +217,7 @@ func (s *StateHolder) AttachAndCommitParseRestricted(
 		},
 	)
 
-	// NOTE: limit enforcement is disabled here because cadence environment's
-	// Get() does not support returning error.
-	return s.mergeIntoParent(false)
+	return s.mergeIntoParent()
 }
 
 // RestartNestedTransaction merges all changes that belongs to the nested
@@ -245,7 +242,7 @@ func (s *StateHolder) RestartNestedTransaction(
 	}
 
 	for s.currentState() != id.state {
-		err := s.mergeIntoParent(s.EnforceLimits())
+		err := s.mergeIntoParent()
 		if err != nil {
 			return fmt.Errorf("cannot restart nested transaction: %w", err)
 		}
