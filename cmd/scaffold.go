@@ -725,8 +725,9 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
-	commits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
+	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
+	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
 
 	fnb.Storage = Storage{
 		Headers:      headers,
@@ -740,8 +741,9 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Transactions: transactions,
 		Collections:  collections,
 		Setups:       setups,
-		EpochCommits: commits,
+		EpochCommits: epochCommits,
 		Statuses:     statuses,
+		Commits:      commits,
 	}
 }
 
