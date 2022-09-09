@@ -41,12 +41,11 @@ type Suite struct {
 	suite.Suite
 	log zerolog.Logger
 	lib.TestnetStateTracker
-	ctx         context.Context
-	cancel      context.CancelFunc
-	net         *testnet.FlowNetwork
-	nodeConfigs []testnet.NodeConfig
-	ghostID     flow.Identifier
-	client      *testnet.Client
+	ctx     context.Context
+	cancel  context.CancelFunc
+	net     *testnet.FlowNetwork
+	ghostID flow.Identifier
+	client  *testnet.Client
 
 	// Epoch config (lengths in views)
 	StakingAuctionLen uint64
@@ -60,11 +59,7 @@ func (s *Suite) SetupTest() {
 	require.Greater(s.T(), s.EpochLen, s.StakingAuctionLen+s.DKGPhaseLen*3)
 
 	s.ctx, s.cancel = context.WithCancel(context.Background())
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", s.T().Name()).
-		Logger()
-	s.log = logger
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	defer func() {
 		s.log.Info().Msg("================> Finish SetupTest")
@@ -127,6 +122,12 @@ func (s *Suite) Ghost() *client.GhostClient {
 	client, err := lib.GetGhostClient(ghost)
 	require.NoError(s.T(), err, "could not get ghost client")
 	return client
+}
+
+// TimedLogf logs the message using t.Log, but prefixes the current time.
+func (s *Suite) TimedLogf(msg string, args ...interface{}) {
+	args = append([]interface{}{time.Now().String()}, args...)
+	s.T().Logf("%s - "+msg, args...)
 }
 
 func (s *Suite) TearDownTest() {
@@ -338,6 +339,7 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 		s.client.SDKServiceAddress(),
 		sdk.Identifier(latestBlockID),
 	)
+	require.NoError(s.T(), err)
 
 	err = s.client.SignAndSendTransaction(ctx, createStakingCollectionTx)
 	require.NoError(s.T(), err)
@@ -638,20 +640,6 @@ func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64) 
 	require.Equalf(s.T(), expectedCounter, actualCounter, "expected to be in epoch %d got %d", expectedCounter, actualCounter)
 }
 
-// assertQCVotingSuccessful asserts that the QC has completed successfully
-func (s *Suite) assertQCVotingSuccessful(ctx context.Context, env templates.Environment) {
-	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetVotingCompletedScript(env), []cadence.Value{})
-	require.NoError(s.T(), err)
-	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected qc voting to have completed successfully")
-}
-
-// assertDKGSuccessful asserts that the DKG has completed successfully
-func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environment) {
-	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetDKGCompletedScript(env), []cadence.Value{})
-	require.NoError(s.T(), err)
-	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected dkg to have completed successfully")
-}
-
 // assertLatestFinalizedBlockHeightHigher will assert that the difference between snapshot height and latest finalized height
 // is greater than numOfBlocks.
 func (s *Suite) assertLatestFinalizedBlockHeightHigher(ctx context.Context, snapshot *inmem.Snapshot, numOfBlocks uint64) {
@@ -763,13 +751,19 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	}
 
 	// staking our new node and add get the corresponding container for that node
+	s.TimedLogf("staking joining node with role %s", role.String())
 	info, testContainer := s.StakeNewNode(s.ctx, env, role)
+	s.TimedLogf("successfully staked joining node: %s", info.NodeID)
 
 	// use admin transaction to remove node, this simulates a node leaving the network
+	s.TimedLogf("removing node %s with role %s", containerToReplace.Config.NodeID, role.String())
 	s.removeNodeFromProtocol(s.ctx, env, containerToReplace.Config.NodeID)
+	s.TimedLogf("successfully removed node: %s", containerToReplace.Config.NodeID)
 
 	// wait for epoch setup phase before we start our container and pause the old container
+	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
 	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
+	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
 
 	// get latest snapshot and start new container
 	snapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
@@ -777,13 +771,19 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	testContainer.WriteRootSnapshot(snapshot)
 	testContainer.Container.Start(s.ctx)
 
-	currentEpochFinalView, err := snapshot.Epochs().Current().FinalView()
+	header, err := snapshot.Head()
+	require.NoError(s.T(), err)
+	s.TimedLogf("retrieved header after entering EpochSetup phase: height=%d, view=%d", header.Height, header.View)
+
+	epoch1FinalView, err := snapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
 	// wait for 5 views after the start of the next epoch before we pause our container to replace
-	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+5)
+	s.TimedLogf("waiting for sealed view %d before pausing container", epoch1FinalView+5)
+	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+5)
+	s.TimedLogf("observed sealed view %d -> pausing container", epoch1FinalView+5)
 
-	//make sure container to replace removed from smart contract state
+	// make sure container to replace removed from smart contract state
 	s.assertNodeNotApprovedOrProposed(s.ctx, env, containerToReplace.Config.NodeID)
 
 	// assert transition to second epoch happened as expected
@@ -794,7 +794,9 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	require.NoError(s.T(), err)
 
 	// wait for 5 views after pausing our container to replace before we assert healthy network
-	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+10)
+	s.TimedLogf("waiting for sealed view %d before asserting network health", epoch1FinalView+10)
+	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+10)
+	s.TimedLogf("observed sealed view %d -> asserting network health", epoch1FinalView+10)
 
 	// make sure the network is healthy after adding new node
 	checkNetworkHealth(s.ctx, env, snapshot, info)

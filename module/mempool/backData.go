@@ -16,8 +16,8 @@ type BackData interface {
 	// Add adds the given entity to the backdata.
 	Add(entityID flow.Identifier, entity flow.Entity) bool
 
-	// Rem removes the entity with the given identifier.
-	Rem(entityID flow.Identifier) (flow.Entity, bool)
+	// Remove removes the entity with the given identifier.
+	Remove(entityID flow.Identifier) (flow.Entity, bool)
 
 	// Adjust adjusts the entity using the given function if the given identifier can be found.
 	// Returns a bool which indicates whether the entity was updated as well as the updated entity.

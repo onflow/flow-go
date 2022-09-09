@@ -22,6 +22,7 @@ type Committee interface {
 	//   * contains nodes that are allowed to sign the specified block (legitimate participants with NON-ZERO WEIGHT)
 	//   * is ordered in the canonical order
 	//   * contains no duplicates.
+	// TODO: document possible error returns -> https://github.com/dapperlabs/flow-go/issues/6327
 	Identities(blockID flow.Identifier) (flow.IdentityList, error)
 
 	// Identity returns the full Identity for specified HotStuff participant.
@@ -47,6 +48,18 @@ type Committee interface {
 
 	// DKG returns the DKG info for the given block.
 	DKG(blockID flow.Identifier) (DKG, error)
+}
+
+// BlockSignerDecoder defines how to convert the SignerIndices field within a particular
+// block header to the identifiers of the nodes which signed the block.
+type BlockSignerDecoder interface {
+	// DecodeSignerIDs decodes the signer indices from the given block header into full node IDs.
+	// Expected Error returns during normal operations:
+	//  * state.UnknownBlockError if block has not been ingested yet
+	//    TODO: this sentinel could be changed to `ErrViewForUnknownEpoch` once we merge the active pacemaker
+	//  * signature.InvalidSignerIndicesError if signer indices included in the header do
+	//    not encode a valid subset of the consensus committee
+	DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error)
 }
 
 type DKG interface {

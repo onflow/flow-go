@@ -30,7 +30,7 @@ type ComponentFactory func() (Component, error)
 // It is meant to inspect the error, determining its type and seeing if e.g. a restart or some other measure is suitable,
 // and then return an ErrorHandlingResult indicating how RunComponent should proceed.
 // Before returning, it could also:
-// - panic (in canary / benchmark)
+// - panic (in stagingnet / benchmark)
 // - log in various Error channels and / or send telemetry ...
 type OnError = func(error) ErrorHandlingResult
 

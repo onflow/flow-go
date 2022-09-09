@@ -12,11 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
-
-	followereng "github.com/onflow/flow-go/engine/common/follower"
-	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -28,31 +24,35 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/common/follower"
+	followereng "github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	synchronization "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
+	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/upstream"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	storage "github.com/onflow/flow-go/storage/badger"
-
-	"github.com/rs/zerolog"
 )
 
 // FlowBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -242,7 +242,8 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			builder.FollowerCore,
 			builder.SyncCore,
 			node.Tracer,
-			compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold),
+			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
+			follower.WithChannel(channels.PublicReceiveBlocks),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -357,17 +358,17 @@ func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
 	codec := cborcodec.NewCodec()
 
 	// creates network instance
-	net, err := p2p.NewNetwork(
-		builder.Logger,
-		codec,
-		nodeID,
-		func() (network.Middleware, error) { return builder.Middleware, nil },
-		topology,
-		p2p.NewChannelSubscriptionManager(middleware),
-		networkMetrics,
-		builder.IdentityProvider,
-		receiveCache,
-	)
+	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+		Logger:              builder.Logger,
+		Codec:               codec,
+		Me:                  nodeID,
+		MiddlewareFactory:   func() (network.Middleware, error) { return builder.Middleware, nil },
+		Topology:            topology,
+		SubscriptionManager: p2p.NewChannelSubscriptionManager(middleware),
+		Metrics:             networkMetrics,
+		IdentityProvider:    builder.IdentityProvider,
+		ReceiveCache:        receiveCache,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
@@ -546,12 +547,13 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 // initLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the observer.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
-// 		DHT as client and seeded with the given bootstrap peers
-// 		The specified bind address as the listen address
-// 		The passed in private key as the libp2p key
-//		No connection gater
-// 		No connection manager
-// 		Default libp2p pubsub options
+//
+//   - DHT as client and seeded with the given bootstrap peers
+//   - The specified bind address as the listen address
+//   - The passed in private key as the libp2p key
+//   - No connection gater
+//   - No connection manager
+//   - Default libp2p pubsub options
 func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func(ctx context.Context) (*p2p.Node, error) {
 		var pis []peer.AddrInfo
@@ -668,7 +670,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 			return nil, err
 		}
 
-		builder.Network = converter.NewNetwork(net, network.SyncCommittee, network.PublicSyncCommittee)
+		builder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
 
 		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
@@ -697,16 +699,18 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) network.Middleware {
-
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger)
 	builder.Middleware = p2p.NewMiddleware(
 		builder.Logger,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
+		builder.Metrics.Bitswap,
 		builder.SporkID,
 		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
+		slashingViolationsConsumer,
 		p2p.WithMessageValidators(validators...),
 		// no peer manager
 		// use default identifier provider

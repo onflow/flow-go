@@ -15,10 +15,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	engineCommon "github.com/onflow/flow-go/network"
-
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -33,6 +32,7 @@ import (
 	module "github.com/onflow/flow-go/module/mocks"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	stateProtocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -146,7 +146,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	request.EXPECT().Force().Return().AnyTimes()
 
-	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	net.EXPECT().Register(gomock.Eq(channels.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
 	deltas, err := NewDeltas(1000)
 	require.NoError(t, err)
@@ -178,6 +178,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		false,
 		checkAuthorizedAtBlock,
 		false,
+		nil,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -414,7 +416,7 @@ func TestExecuteOneBlock(t *testing.T) {
 
 		// A <- B
 		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		ctx.mockHasWeightAtBlockID(blockA.ID(), true)
@@ -429,7 +431,7 @@ func TestExecuteOneBlock(t *testing.T) {
 		ctx.mockStateCommitsWithMap(commits)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(&blockA, nil)
+		ctx.snapshot.On("Head").Return(blockA, nil)
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
@@ -475,7 +477,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 		})
 
 		// last executed block - it will be re-queued regardless of state commit
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		// finalized block - it can be executed in parallel, as blockB has been executed
@@ -518,7 +520,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, mock.Anything).Return(nil, storageerr.ErrNotFound)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(&blockA, nil)
+		ctx.snapshot.On("Head").Return(blockA, nil)
 
 		wgB := sync.WaitGroup{}
 		wgB.Add(1)
@@ -610,7 +612,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 
 		// A <- B <- C
 		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		//blockCstartState := unittest.StateCommitmentFixture()
@@ -632,7 +634,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 		ctx.mockStateCommitsWithMap(commits)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(&blockA, nil)
+		ctx.snapshot.On("Head").Return(blockA, nil)
 
 		// wait finishing execution until all the blocks are sent to execution
 		wgPut := sync.WaitGroup{}
@@ -715,7 +717,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 
 		// A (0 collection) <- B (0 collection) <- C (0 collection) <- D (1 collection)
 		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		collectionIdentities := ctx.identities.Filter(filter.HasRole(flow.RoleCollection))
@@ -758,7 +760,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		ctx.mockSnapshot(blockD.Block.Header, ctx.identities)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(&blockA, nil)
+		ctx.snapshot.On("Head").Return(blockA, nil)
 
 		// wait to control parent (block B) execution until we are ready
 		wgB := sync.WaitGroup{}
@@ -853,7 +855,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		blockSealed := unittest.BlockHeaderFixture()
 
 		blocks := make(map[string]*entity.ExecutableBlock)
-		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, &blockSealed)
+		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, blockSealed)
 		blocks["A"].StartState = unittest.StateCommitmentPointerFixture()
 
 		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
@@ -879,7 +881,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		// a receipt for sealed block won't be broadcasted
-		ctx.snapshot.On("Head").Return(&blockSealed, nil)
+		ctx.snapshot.On("Head").Return(blockSealed, nil)
 		ctx.mockSnapshot(blocks["A"].Block.Header, unittest.IdentityListFixture(1))
 		ctx.mockSnapshot(blocks["B"].Block.Header, unittest.IdentityListFixture(1))
 		ctx.mockSnapshot(blocks["C"].Block.Header, unittest.IdentityListFixture(1))
@@ -1091,7 +1093,7 @@ func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		blockSealed := unittest.BlockHeaderFixture()
 
 		blocks := make(map[string]*entity.ExecutableBlock)
-		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, &blockSealed)
+		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, blockSealed)
 		blocks["A"].StartState = unittest.StateCommitmentPointerFixture()
 
 		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
@@ -1120,7 +1122,7 @@ func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		// will be executed.
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		// a receipt for sealed block won't be broadcasted
-		ctx.snapshot.On("Head").Return(&blockSealed, nil)
+		ctx.snapshot.On("Head").Return(blockSealed, nil)
 
 		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
 		identity := *ctx.identity
@@ -1214,7 +1216,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	request := module.NewMockRequester(ctrl)
 	syncConduit := &mocknetwork.Conduit{}
 	var engine *Engine
-	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	net.EXPECT().Register(gomock.Eq(channels.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
@@ -1265,6 +1267,8 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		false,
 		checkAuthorizedAtBlock,
 		false,
+		nil,
+		nil,
 	)
 
 	require.NoError(t, err)
@@ -1509,4 +1513,36 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 			blockH.ID()},
 			pending)
 	})
+}
+
+func TestRetryableUploader(t *testing.T) {
+	testRetryableUploader := new(FakeRetryableUploader)
+
+	engine := &Engine{
+		uploaders: []uploader.Uploader{testRetryableUploader},
+	}
+
+	err := engine.retryUpload()
+	assert.Nil(t, err)
+
+	require.True(t, testRetryableUploader.RetryUploadCalled())
+}
+
+// FakeRetryableUploader is one RetryableUploader for testing purposes.
+type FakeRetryableUploader struct {
+	uploader.RetryableUploaderWrapper
+	retryUploadCalled bool
+}
+
+func (f *FakeRetryableUploader) Upload(_ *execution.ComputationResult) error {
+	return nil
+}
+
+func (f *FakeRetryableUploader) RetryUpload() error {
+	f.retryUploadCalled = true
+	return nil
+}
+
+func (f *FakeRetryableUploader) RetryUploadCalled() bool {
+	return f.retryUploadCalled
 }

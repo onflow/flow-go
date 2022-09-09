@@ -224,8 +224,8 @@ func testAddToCache(t *testing.T,
 	}
 }
 
-// TestDNSCache_Rem checks the correctness of cache against removal.
-func TestDNSCache_Rem(t *testing.T) {
+// TestDNSCache_Remove checks the correctness of cache against removal.
+func TestDNSCache_Remove(t *testing.T) {
 	total := 30              // total entries to store (i.e., 700 ip domains and 700 txt records)
 	sizeLimit := uint32(500) // cache size limit (i.e., 500 ip domains and 500 txt records)
 

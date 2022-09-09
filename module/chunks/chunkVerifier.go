@@ -7,8 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/verification"
 
@@ -22,20 +20,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
-}
-
 // ChunkVerifier is a verifier based on the current definitions of the flow network
 type ChunkVerifier struct {
-	vm             VirtualMachine
+	vm             computer.VirtualMachine
 	vmCtx          fvm.Context
 	systemChunkCtx fvm.Context
 	logger         zerolog.Logger
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context, logger zerolog.Logger) *ChunkVerifier {
+func NewChunkVerifier(vm computer.VirtualMachine, vmCtx fvm.Context, logger zerolog.Logger) *ChunkVerifier {
 	return &ChunkVerifier{
 		vm:             vm,
 		vmCtx:          vmCtx,
@@ -118,18 +112,14 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			nil
 	}
 
-	// transactions in chunk can reuse the same cache, but its unknown
-	// if there were changes between chunks, so we always start with a new one
-	programs := programs.NewEmptyPrograms()
-
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[string]*ledger.Key)
 	var problematicTx flow.Identifier
-	getRegister := func(owner, controller, key string) (flow.RegisterValue, error) {
+	getRegister := func(owner, key string) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
-		registerID := flow.NewRegisterID(owner, controller, key)
+		registerID := flow.NewRegisterID(owner, key)
 
 		registerKey := executionState.RegisterIDToKey(registerID)
 
@@ -167,7 +157,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	for i, tx := range transactions {
 		txView := chunkView.NewChild()
 
-		err := fcv.vm.Run(context, tx, txView, programs)
+		err := fcv.vm.RunV2(context, tx, txView)
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )

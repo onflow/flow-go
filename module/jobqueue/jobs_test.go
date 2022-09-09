@@ -46,7 +46,7 @@ func TestBlockJob(t *testing.T) {
 
 func TestBlockHeaderJob(t *testing.T) {
 	block := unittest.BlockHeaderFixture()
-	job := jobqueue.BlockHeaderToJob(&block)
+	job := jobqueue.BlockHeaderToJob(block)
 
 	t.Run("job is correct type", func(t *testing.T) {
 		assert.IsType(t, &jobqueue.BlockHeaderJob{}, job, "job is not a block job")
@@ -60,7 +60,7 @@ func TestBlockHeaderJob(t *testing.T) {
 	t.Run("job converts to header", func(t *testing.T) {
 		b, err := jobqueue.JobToBlockHeader(job)
 		assert.NoError(t, err, "unexpected error converting notify job to header")
-		assert.Equal(t, block, *b, "converted header is not the same as the original header")
+		assert.Equal(t, *block, *b, "converted header is not the same as the original header")
 	})
 
 	t.Run("incorrect job type fails to convert to header", func(t *testing.T) {

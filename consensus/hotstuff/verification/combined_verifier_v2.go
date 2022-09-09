@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
@@ -38,8 +37,8 @@ var _ hotstuff.Verifier = (*CombinedVerifier)(nil)
 func NewCombinedVerifier(committee hotstuff.Committee, packer hotstuff.Packer) *CombinedVerifier {
 	return &CombinedVerifier{
 		committee:     committee,
-		stakingHasher: crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
-		beaconHasher:  crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		stakingHasher: signature.NewBLSHasher(signature.ConsensusVoteTag),
+		beaconHasher:  signature.NewBLSHasher(signature.RandomBeaconTag),
 		packer:        packer,
 	}
 }
@@ -47,11 +46,11 @@ func NewCombinedVerifier(committee hotstuff.Committee, packer hotstuff.Packer) *
 // VerifyVote verifies the validity of a combined signature from a vote.
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
-// * model.InvalidFormatError if the signature has an incompatible format.
-// * model.ErrInvalidSignature is the signature is invalid
-// * model.InvalidSignerError if signer is _not_ part of the random beacon committee
-// * unexpected errors should be treated as symptoms of bugs or uncovered
-//   edge cases in the logic (i.e. as fatal)
+//   - model.InvalidFormatError if the signature has an incompatible format.
+//   - model.ErrInvalidSignature is the signature is invalid
+//   - model.InvalidSignerError if signer is _not_ part of the random beacon committee
+//   - unexpected errors should be treated as symptoms of bugs or uncovered
+//     edge cases in the logic (i.e. as fatal)
 func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) error {
 
 	// create the to-be-signed message
@@ -111,13 +110,13 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 // VerifyQC checks the cryptographic validity of the QC's `sigData` for the
 // given block. It is the responsibility of the calling code to ensure
 // that all `signers` are authorized, without duplicates. Return values:
-//  - nil if `sigData` is cryptographically valid
-//  - model.InsufficientSignaturesError if `signers` is empty.
-//    Depending on the order of checks in the higher-level logic this error might
-//    be an indicator of a external byzantine input or an internal bug.
-//  - model.InvalidFormatError if `sigData` has an incompatible format
-//  - model.ErrInvalidSignature if a signature is invalid
-//  - error if running into any unexpected exception (i.e. fatal error)
+//   - nil if `sigData` is cryptographically valid
+//   - model.InsufficientSignaturesError if `signers` is empty.
+//     Depending on the order of checks in the higher-level logic this error might
+//     be an indicator of a external byzantine input or an internal bug.
+//   - model.InvalidFormatError if `sigData` has an incompatible format
+//   - model.ErrInvalidSignature if a signature is invalid
+//   - error if running into any unexpected exception (i.e. fatal error)
 func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
 	if len(signers) == 0 {
 		return model.NewInsufficientSignaturesErrorf("empty list of signers")

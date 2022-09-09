@@ -14,8 +14,8 @@ import (
 
 // assignmentCollectorVertex is a helper structure that wraps an AssignmentCollector
 // so it implements the LevelledForest's `Vertex` interface:
-//  * VertexID is defined as the ID of the execution result
-//  * Level is defined as the height of the executed block
+//   - VertexID is defined as the ID of the execution result
+//   - Level is defined as the height of the executed block
 type assignmentCollectorVertex struct {
 	collector AssignmentCollector
 }

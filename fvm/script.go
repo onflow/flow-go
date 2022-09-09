@@ -107,6 +107,12 @@ func (proc *ScriptProcedure) MemoryLimit(ctx Context) uint64 {
 	return memoryLimit
 }
 
+func (proc *ScriptProcedure) ShouldDisableMemoryAndInteractionLimits(
+	ctx Context,
+) bool {
+	return ctx.DisableMemoryAndInteractionLimits
+}
+
 type ScriptInvoker struct{}
 
 func NewScriptInvoker() ScriptInvoker {
@@ -121,17 +127,16 @@ func (i ScriptInvoker) Process(
 	programs *programs.Programs,
 ) error {
 	env := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, programs)
-	location := common.ScriptLocation(proc.ID)
-	value, err := vm.Runtime.ExecuteScript(
+
+	rt := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(rt)
+
+	value, err := rt.ExecuteScript(
 		runtime.Script{
 			Source:    proc.Script,
 			Arguments: proc.Arguments,
 		},
-		runtime.Context{
-			Interface: env,
-			Location:  location,
-		},
-	)
+		common.ScriptLocation(proc.ID))
 
 	if err != nil {
 		return errors.HandleRuntimeError(err)

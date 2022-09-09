@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -57,7 +56,7 @@ func writeText(path string, data []byte) {
 		log.Fatal().Err(err).Msg("could not create output dir")
 	}
 
-	err = ioutil.WriteFile(path, data, 0644)
+	err = os.WriteFile(path, data, 0644)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not write file")
 	}

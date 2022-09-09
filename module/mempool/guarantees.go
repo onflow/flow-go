@@ -17,9 +17,9 @@ type Guarantees interface {
 	// return false if it was already in the mempool.
 	Add(guarantee *flow.CollectionGuarantee) bool
 
-	// Rem will remove the given collection guarantees from the memory pool; it
+	// Remove will remove the given collection guarantees from the memory pool; it
 	// will return true if the collection guarantees was known and removed.
-	Rem(collID flow.Identifier) bool
+	Remove(collID flow.Identifier) bool
 
 	// ByID retrieve the collection guarantee with the given ID from the memory
 	// pool. It will return false if it was not found in the mempool.

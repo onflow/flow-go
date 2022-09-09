@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	msig "github.com/onflow/flow-go/module/signature"
 )
 
 func TestHashWithTag(t *testing.T) {
@@ -97,7 +98,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 						hasher, err = crypto.NewPrefixedHashing(crypto.RuntimeToCryptoHashingAlgorithm(h), tag)
 						require.NoError(t, err)
 					} else {
-						hasher = gocrypto.NewBLSKMAC(tag)
+						hasher = msig.NewBLSHasher(tag)
 					}
 
 					signature := make([]byte, 0)
@@ -182,7 +183,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 			pk, err := gocrypto.GeneratePrivateKey(gocrypto.BLSBLS12381, seed)
 			require.NoError(t, err)
 
-			hasher := gocrypto.NewBLSKMAC(string(c.signTag))
+			hasher := msig.NewBLSHasher(string(c.signTag))
 			signature := make([]byte, 0)
 			sig, err := pk.Sign([]byte("some data"), hasher)
 			require.NoError(t, err)
@@ -335,7 +336,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 						hasher, err = crypto.NewPrefixedHashing(h, tag)
 						require.NoError(t, err)
 					} else {
-						hasher = gocrypto.NewBLSKMAC(tag)
+						hasher = msig.NewBLSHasher(tag)
 					}
 
 					signature := make([]byte, 0)

@@ -42,6 +42,7 @@ const (
 	ContractServiceAccountFunction_defaultTokenBalance       = "defaultTokenBalance"
 	ContractServiceAccountFunction_deductTransactionFee      = "deductTransactionFee"
 	ContractStorageFeesFunction_calculateAccountCapacity     = "calculateAccountCapacity"
+	ContractStorageFeesFunction_calculateAccountsCapacity    = "calculateAccountsCapacity"
 	ContractStorageFeesFunction_defaultTokenAvailableBalance = "defaultTokenAvailableBalance"
 	ContractDeploymentAuditsFunction_useVoucherForDeploy     = "useVoucherForDeploy"
 )
@@ -177,14 +178,14 @@ func init() {
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
 
-	// Canary test network
+	// Stagingnet test network
 	// All system contracts are deployed to the service account
-	canary := map[string]flow.Address{
-		ContractNameEpoch:     flow.Canary.Chain().ServiceAddress(),
-		ContractNameClusterQC: flow.Canary.Chain().ServiceAddress(),
-		ContractNameDKG:       flow.Canary.Chain().ServiceAddress(),
+	stagingnet := map[string]flow.Address{
+		ContractNameEpoch:     flow.Stagingnet.Chain().ServiceAddress(),
+		ContractNameClusterQC: flow.Stagingnet.Chain().ServiceAddress(),
+		ContractNameDKG:       flow.Stagingnet.Chain().ServiceAddress(),
 	}
-	contractAddressesByChainID[flow.Canary] = canary
+	contractAddressesByChainID[flow.Stagingnet] = stagingnet
 
 	// Transient test networks
 	// All system contracts are deployed to the service account

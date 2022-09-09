@@ -8,7 +8,7 @@ metadata:
   # Best practice labels:
   #   app: <app-name> (the non-unique version of metadata.name)
   #   kind: [web|worker]
-  #   env: [staging|production|canary|test|dev]
+  #   env: [staging|production|test|dev]
   #   owner: who to ask about this service
   #   version: the major version of this service (v1/v2/v1beta1)
   labels:

@@ -13,7 +13,7 @@ FLITE is a tool for running a full version of the Flow blockchain.
 - [Stop the network](#stop-the-network)
 - [Logs](#logs)
 - [Metrics](#metrics)
-- [Loader](#loader)
+- [Benchmarking](#benchmarking)
 - [Playing with Localnet](#playing-with-localnet)
   - [Configure Flow CLI to work with localnet](#configure-flow-cli-to-work-with-localnet)
     - [Add localnet network](#add-localnet-network)
@@ -48,6 +48,7 @@ Specify the number of nodes for each role:
 ```sh
 make -e COLLECTION=2 CONSENSUS=5 EXECUTION=3 VERIFICATION=2 ACCESS=2 init
 ```
+*NOTE: number of execution\consensus nodes should be no less than 2. It is to avoid seals being created in case of execution forks.*
 
 Specify the number of collector clusters:
 
@@ -120,7 +121,7 @@ Or by using the grafana's Search feature in explore:
 Logs are available through the Loki backend.  You can use them either through the Logs/TimeSeries panels or through the explore:
 - http://localhost:3000/explore?orgId=1&left=%7B%22datasource%22:%22Loki%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%22,%22queryType%22:%22range%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D
 
-## Loader
+## Benchmarking
 
 Localnet can be loaded easily as well
 
@@ -130,7 +131,7 @@ make load
 
 The command by default will load your localnet with 1 tps for 30s, then 10 tps for 30s, and finally 100 tps indefinitely.
 
-More about the loader can be found in the loader module.
+More about the loader can be found in the benchmark module.
 
 ## Playing with Localnet
 

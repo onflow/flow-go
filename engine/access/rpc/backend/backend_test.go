@@ -64,7 +64,7 @@ func (suite *Suite) SetupTest() {
 	suite.snapshot = new(protocol.Snapshot)
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
-	params.On("Root").Return(&header, nil)
+	params.On("Root").Return(header, nil)
 	suite.state.On("Params").Return(params).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
@@ -118,7 +118,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	// setup the mocks
 	block := unittest.BlockHeaderFixture()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Head").Return(&block, nil).Once()
+	suite.snapshot.On("Head").Return(block, nil).Once()
 
 	backend := New(
 		suite.state,
@@ -484,7 +484,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	block := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(&block, nil).Once()
+	suite.snapshot.On("Head").Return(block, nil).Once()
 
 	backend := New(
 		suite.state,
@@ -620,7 +620,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	exeEventReq := execproto.GetTransactionByIndexRequest{
 		BlockId: blockId[:],
@@ -666,7 +666,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	head := unittest.BlockHeaderFixture()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Head").Return(&head, nil)
+	suite.snapshot.On("Head").Return(head, nil)
 
 	ctx := context.Background()
 	block := unittest.BlockFixture()
@@ -683,7 +683,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	exeEventReq := execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
@@ -766,8 +766,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
-	connFactory.On("InvalidateExecutionAPIClient", mock.Anything).Return(false)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 
 	exeEventReq := execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -1233,7 +1233,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	// create the expected results from execution node and access node
 	exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
@@ -1548,7 +1548,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 	rootHeader := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
-	params.On("Root").Return(&rootHeader, nil)
+	params.On("Root").Return(rootHeader, nil)
 	state.On("Params").Return(params).Maybe()
 
 	// mock snapshot to return head backend
@@ -1579,7 +1579,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	setupHeadHeight := func(height uint64) {
 		header := unittest.BlockHeaderFixture() // create a mock header
 		header.Height = height                  // set the header height
-		head = &header
+		head = header
 	}
 
 	setupStorage := func(min uint64, max uint64) ([]*flow.Header, []*flow.ExecutionReceipt, flow.IdentityList) {
@@ -1866,7 +1866,7 @@ func (suite *Suite) TestGetAccount() {
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	// create the handler with the mock
 	backend := New(
@@ -1928,7 +1928,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	// create the expected execution API request
 	blockID := h.ID()
@@ -2160,9 +2160,8 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.execClient, nil)
-	connFactory.On("InvalidateExecutionAPIClient", mock.Anything).Return(false)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 
 	// create the handler with the mock
 	backend := New(
@@ -2262,8 +2261,8 @@ func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, 
 func (suite *Suite) setupConnectionFactory() ConnectionFactory {
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
-	connFactory.On("InvalidateExecutionAPIClient", mock.Anything).Return(false)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 	return connFactory
 }
 

@@ -9,12 +9,12 @@ type IdentifierMap interface {
 	// Append will append the id to the list of identifiers associated with key.
 	Append(key, id flow.Identifier) error
 
-	// Rem removes the given key with all associated identifiers.
-	Rem(key flow.Identifier) bool
+	// Remove removes the given key with all associated identifiers.
+	Remove(key flow.Identifier) bool
 
-	// RemIdFromKey removes the id from the list of identifiers associated with key.
+	// RemoveIdFromKey removes the id from the list of identifiers associated with key.
 	// If the list becomes empty, it also removes the key from the map.
-	RemIdFromKey(key, id flow.Identifier) error
+	RemoveIdFromKey(key, id flow.Identifier) error
 
 	// Get returns list of all identifiers associated with key and true, if the key exists in the mempool.
 	// Otherwise it returns nil and false.

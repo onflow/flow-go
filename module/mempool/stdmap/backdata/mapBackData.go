@@ -34,8 +34,8 @@ func (b *MapBackData) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	return true
 }
 
-// Rem removes the entity with the given identifier.
-func (b *MapBackData) Rem(entityID flow.Identifier) (flow.Entity, bool) {
+// Remove removes the entity with the given identifier.
+func (b *MapBackData) Remove(entityID flow.Identifier) (flow.Entity, bool) {
 	entity, exists := b.entities[entityID]
 	if !exists {
 		return nil, false

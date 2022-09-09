@@ -8,12 +8,13 @@ import (
 
 	"github.com/dapperlabs/testingdock"
 	"github.com/onflow/cadence"
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -27,10 +28,7 @@ import (
 const defaultTimeout = time.Second * 10
 
 func TestMVP_Network(t *testing.T) {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", t.Name()).
-		Logger()
+	logger := unittest.LoggerForTest(t, zerolog.InfoLevel)
 	logger.Info().Msgf("================> START TESTING")
 	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig(), flow.Localnet)
 
@@ -48,10 +46,7 @@ func TestMVP_Network(t *testing.T) {
 }
 
 func TestMVP_Bootstrap(t *testing.T) {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", t.Name()).
-		Logger()
+	logger := unittest.LoggerForTest(t, zerolog.InfoLevel)
 	logger.Info().Msgf("================> START TESTING")
 	unittest.SkipUnless(t, unittest.TEST_TODO, "skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451")
 
@@ -243,7 +238,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	t.Log(">> funding new account...")
 
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	err = serviceAccountClient.SignAndSendTransaction(ctx, fundAccountTx)
+	err = serviceAccountClient.SignAndSendTransaction(childCtx, fundAccountTx)
 	require.NoError(t, err)
 
 	cancel()

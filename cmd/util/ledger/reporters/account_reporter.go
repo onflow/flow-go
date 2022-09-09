@@ -12,11 +12,11 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -66,9 +66,11 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	defer rwm.Close()
 
 	l := migrations.NewView(payload)
-	st := state.NewState(l, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
-	sth := state.NewStateHolder(st)
-	gen := state.NewStateBoundAddressGenerator(sth, r.Chain)
+	stTxn := state.NewStateTransaction(
+		l,
+		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
+	)
+	gen := environment.NewAccountCreator(stTxn, r.Chain)
 
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
 
@@ -120,13 +122,11 @@ type balanceProcessor struct {
 	vm            *fvm.VirtualMachine
 	ctx           fvm.Context
 	view          state.View
-	prog          *programs.Programs
-	intf          runtime.Interface
+	env           environment.Environment
 	balanceScript []byte
 	momentsScript []byte
 
-	accounts state.Accounts
-	st       *state.State
+	accounts environment.Accounts
 
 	rwa        ReportWriter
 	rwc        ReportWriter
@@ -136,23 +136,28 @@ type balanceProcessor struct {
 }
 
 func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
-	prog := programs.NewEmptyPrograms()
+	vm := fvm.NewVM()
+	progs := programs.NewEmptyPrograms()
+	ctx := fvm.NewContext(
+		fvm.WithChain(chain),
+		fvm.WithMemoryAndInteractionLimitsDisabled(),
+		fvm.WithBlockPrograms(progs))
 
 	v := view.NewChild()
-	st := state.NewState(v, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
-	sth := state.NewStateHolder(st)
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		v,
+		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
+	)
+	accounts := environment.NewAccounts(stTxn)
+
+	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, progs)
 
 	return &balanceProcessor{
 		vm:       vm,
 		ctx:      ctx,
 		view:     v,
 		accounts: accounts,
-		st:       st,
-		prog:     prog,
-		intf:     fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, prog),
+		env:      env,
 	}
 }
 
@@ -310,7 +315,7 @@ func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view, c.prog)
+	err := c.vm.RunV2(c.ctx, script, c.view)
 	if err != nil {
 		return 0, false, err
 	}
@@ -331,7 +336,7 @@ func (c *balanceProcessor) fusdBalance(address flow.Address) (uint64, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view, c.prog)
+	err := c.vm.RunV2(c.ctx, script, c.view)
 	if err != nil {
 		return 0, err
 	}
@@ -348,7 +353,7 @@ func (c *balanceProcessor) moments(address flow.Address) (int, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view, c.prog)
+	err := c.vm.RunV2(c.ctx, script, c.view)
 	if err != nil {
 		return 0, err
 	}
@@ -386,12 +391,16 @@ func (c *balanceProcessor) ReadStored(address flow.Address, domain common.PathDo
 	if err != nil {
 		return nil, err
 	}
-	receiver, err := c.vm.Runtime.ReadStored(addr,
+
+	rt := c.env.BorrowCadenceRuntime()
+	defer c.env.ReturnCadenceRuntime(rt)
+
+	receiver, err := rt.ReadStored(
+		addr,
 		cadence.Path{
 			Domain:     domain.Identifier(),
 			Identifier: id,
 		},
-		runtime.Context{Interface: c.intf},
 	)
 	return receiver, err
 }

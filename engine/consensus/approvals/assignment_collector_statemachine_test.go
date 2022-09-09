@@ -39,7 +39,7 @@ func (s *AssignmentCollectorStateMachineTestSuite) SetupTest() {
 		approvalConduit:                      s.Conduit,
 		requestTracker:                       s.RequestTracker,
 		requiredApprovalsForSealConstruction: 5,
-		executedBlock:                        &s.Block,
+		executedBlock:                        s.Block,
 		result:                               s.IncorporatedResult.Result,
 		resultID:                             s.IncorporatedResult.Result.ID(),
 	})
@@ -54,8 +54,8 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	for i := range results {
-		block := unittest.BlockHeaderWithParentFixture(&s.Block)
-		s.Blocks[block.ID()] = &block
+		block := unittest.BlockHeaderWithParentFixture(s.Block)
+		s.Blocks[block.ID()] = block
 		result := unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
 			unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result),

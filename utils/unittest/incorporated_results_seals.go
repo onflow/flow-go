@@ -20,7 +20,7 @@ func (f *incorporatedResultSealFactory) Fixture(opts ...func(*flow.IncorporatedR
 	irSeal := &flow.IncorporatedResultSeal{
 		IncorporatedResult: ir,
 		Seal:               seal,
-		Header:             &header,
+		Header:             header,
 	}
 
 	for _, apply := range opts {

@@ -1,167 +1,111 @@
 package fvm
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"path"
 	"strconv"
-	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
-	"github.com/opentracing/opentracing-go"
-	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/extralog"
-	"github.com/onflow/flow-go/fvm/programs"
+	programsCache "github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
 type TransactionInvoker struct {
-	logger zerolog.Logger
 }
 
-func NewTransactionInvoker(logger zerolog.Logger) *TransactionInvoker {
-	return &TransactionInvoker{
-		logger: logger,
-	}
+func NewTransactionInvoker() TransactionInvoker {
+	return TransactionInvoker{}
 }
 
-func (i *TransactionInvoker) Process(
+func (i TransactionInvoker) Process(
 	vm *VirtualMachine,
 	ctx *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	programs *programsCache.Programs,
 ) (processErr error) {
 
 	txIDStr := proc.ID.String()
-	var span opentracing.Span
+	var span otelTrace.Span
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
-		span.LogFields(
-			traceLog.String("transaction_id", txIDStr),
+		span.SetAttributes(
+			attribute.String("transaction_id", txIDStr),
 		)
-		defer span.Finish()
+		defer span.End()
 	}
 
-	var blockHeight uint64
-	if ctx.BlockHeader != nil {
-		blockHeight = ctx.BlockHeader.Height
+	nestedTxnId, err := sth.BeginNestedTransaction()
+	if err != nil {
+		return err
 	}
 
-	var env *TransactionEnv
-	var txError error
-	retry := false
-	numberOfRetries := 0
-
-	parentState := sth.State()
-	childState := sth.NewChild()
-
+	var modifiedSets programsCache.ModifiedSets
 	defer func() {
-		// an extra check for state holder health, this should never happen
-		if childState != sth.State() {
-			// error transaction
-			msg := "child state doesn't match the active state on the state holder"
-			i.logger.Error().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
+		// based on the contract and frozen account updates we decide how to
+		// clean up the programs for failed transactions we also do the same as
+		// transaction without any deployed contracts
+		programs.Cleanup(modifiedSets)
+
+		if sth.NumNestedTransactions() > 1 {
+			err := sth.RestartNestedTransaction(nestedTxnId)
+			if err != nil {
+				processErr = fmt.Errorf(
+					"cannot restart nested transaction: %w",
+					err,
+				)
+			}
+
+			msg := "transaction has unexpected nested transactions"
+			ctx.Logger.Error().
 				Msg(msg)
 
-			// drop delta
-			childState.View().DropDelta()
 			proc.Err = errors.NewFVMInternalErrorf(msg)
 			proc.Logs = make([]string, 0)
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
+
 		}
-		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
-			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
+
+		err := sth.Commit(nestedTxnId)
+		if err != nil {
+			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", err)
 		}
-		sth.SetActiveState(parentState)
 	}()
 
-	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+
+	rt := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(rt)
+
+	var txError error
+	err = rt.ExecuteTransaction(
+		runtime.Script{
+			Source:    proc.Transaction.Script,
+			Arguments: proc.Transaction.Arguments,
+		},
+		common.TransactionLocation(proc.ID))
+
 	if err != nil {
-		return fmt.Errorf("error creating new environment: %w", err)
+		var interactionLimitExceededErr *errors.LedgerInteractionLimitExceededError
+		if errors.As(err, &interactionLimitExceededErr) {
+			// If it is this special interaction limit error, just set it directly as the tx error
+			txError = err
+		} else {
+			// Otherwise, do what we use to do
+			txError = fmt.Errorf(
+				"transaction invocation failed when executing transaction: %w",
+				errors.HandleRuntimeError(err),
+			)
+		}
 	}
-	predeclaredValues := valueDeclarations(ctx, env)
-
-	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
-		if retry {
-			// rest state
-			sth.SetActiveState(parentState)
-			childState = sth.NewChild()
-			// force cleanup if retries
-			programs.ForceCleanup()
-
-			i.logger.Warn().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
-				Int("retries_count", numberOfRetries).
-				Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
-				Msg("retrying transaction execution")
-
-			// reset error part of proc
-			// Warning right now the tx requires retry logic doesn't change
-			// anything on state, but we might want to revert the state changes (or not committing)
-			// if we decided to expand it further.
-			proc.Err = nil
-			proc.Logs = make([]string, 0)
-			proc.Events = make([]flow.Event, 0)
-			proc.ServiceEvents = make([]flow.Event, 0)
-
-			// reset env
-			env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-			if err != nil {
-				return fmt.Errorf("error creating new environment: %w", err)
-			}
-		}
-
-		location := common.TransactionLocation(proc.ID)
-
-		err := vm.Runtime.ExecuteTransaction(
-			runtime.Script{
-				Source:    proc.Transaction.Script,
-				Arguments: proc.Transaction.Arguments,
-			},
-			runtime.Context{
-				Interface:         env,
-				Location:          location,
-				PredeclaredValues: predeclaredValues,
-			},
-		)
-		if err != nil {
-			var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
-			if errors.As(err, &interactionLimiExceededErr) {
-				// If it is this special interaction limit error, just set it directly as the tx error
-				txError = err
-			} else {
-				// Otherwise, do what we use to do
-				txError = fmt.Errorf("transaction invocation failed when executing transaction: %w", errors.HandleRuntimeError(err))
-			}
-		}
-
-		// break the loop
-		if !i.requiresRetry(err, proc) {
-			break
-		}
-
-		retry = true
-		proc.Retried++
-	}
-
-	// (for future use) panic if we tried several times and still failing because of checking issue
-	// if numberOfTries == maxNumberOfRetries {
-	// 	panic(err)
-	// }
 
 	// read computationUsed from the environment. This will be used to charge fees.
 	computationUsed := env.ComputationUsed()
@@ -169,7 +113,7 @@ func (i *TransactionInvoker) Process(
 
 	// log te execution intensities here, so tha they do not contain data from storage limit checks and
 	// transaction deduction, because the payer is not charged for those.
-	i.logExecutionIntensities(sth, txIDStr)
+	i.logExecutionIntensities(ctx, sth, txIDStr)
 
 	// disable the limit checks on states
 	sth.DisableAllLimitEnforcements()
@@ -186,7 +130,7 @@ func (i *TransactionInvoker) Process(
 	// this writes back the contract contents to accounts
 	// if any error occurs we fail the tx
 	// this needs to happen before checking limits, so that contract changes are committed to the state
-	updatedKeys, err := env.Commit()
+	modifiedSets, err = env.Commit()
 	if err != nil && txError == nil {
 		txError = fmt.Errorf("transaction invocation failed when committing Environment: %w", err)
 	}
@@ -197,7 +141,7 @@ func (i *TransactionInvoker) Process(
 		// so we don't error from computation/memory limits on this part.
 		// We cannot charge the user for this part, since fee deduction already happened.
 		sth.DisableAllLimitEnforcements()
-		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.UpdatedAddresses())
 		sth.EnableAllLimitEnforcements()
 	}
 
@@ -206,41 +150,37 @@ func (i *TransactionInvoker) Process(
 		sth.DisableAllLimitEnforcements()
 		defer sth.EnableAllLimitEnforcements()
 
+		modifiedSets = programsCache.ModifiedSets{}
+
 		// drop delta since transaction failed
-		childState.View().DropDelta()
-		// if tx fails just do clean up
-		programs.Cleanup(nil)
+		err := sth.RestartNestedTransaction(nestedTxnId)
+		if err != nil {
+			return fmt.Errorf(
+				"cannot restart nested transaction: %w",
+				err,
+			)
+		}
+
 		// log transaction as failed
-		i.logger.Info().
-			Str("txHash", txIDStr).
-			Uint64("blockHeight", blockHeight).
+		ctx.Logger.Info().
 			Msg("transaction executed with error")
 
+		// TODO(patrick): make env reusable on error
 		// reset env
-		env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-		if err != nil {
-			return fmt.Errorf("error creating new environment: %w", err)
-		}
+		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
 
-		updatedKeys, err = env.Commit()
-		if err != nil && feesError == nil {
-			feesError = fmt.Errorf("transaction invocation failed after deducting fees: %w", err)
-		}
-
 		// if fee deduction fails just do clean up and exit
 		if feesError != nil {
-			// drop delta
-			childState.View().DropDelta()
-			programs.Cleanup(nil)
-			i.logger.Info().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
+			ctx.Logger.Info().
 				Msg("transaction fee deduction executed with error")
 
-			return feesError
+			txError = feesError
+
+			// drop delta
+			_ = sth.RestartNestedTransaction(nestedTxnId)
 		}
 	}
 
@@ -249,11 +189,6 @@ func (i *TransactionInvoker) Process(
 	proc.ComputationUsed = proc.ComputationUsed + computationUsed
 	proc.MemoryEstimate = proc.MemoryEstimate + memoryEstimate
 
-	// based on the contract updates we decide how to clean up the programs
-	// for failed transactions we also do the same as
-	// transaction without any deployed contracts
-	programs.Cleanup(updatedKeys)
-
 	// if tx failed this will only contain fee deduction events
 	proc.Events = append(proc.Events, env.Events()...)
 	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
@@ -261,7 +196,7 @@ func (i *TransactionInvoker) Process(
 	return txError
 }
 
-func (i *TransactionInvoker) deductTransactionFees(
+func (i TransactionInvoker) deductTransactionFees(
 	env *TransactionEnv,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
@@ -270,15 +205,17 @@ func (i *TransactionInvoker) deductTransactionFees(
 		return nil
 	}
 
-	if computationUsed > uint64(sth.State().TotalComputationLimit()) {
-		computationUsed = uint64(sth.State().TotalComputationLimit())
+	if computationUsed > uint64(sth.TotalComputationLimit()) {
+		computationUsed = uint64(sth.TotalComputationLimit())
 	}
 
-	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
-	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be dynamic.
-	// Execution effort will be connected to computation used.
+	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be
+	// dynamic.	Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
-	_, err = deductTxFees(proc.Transaction.Payer, inclusionEffort, computationUsed)
+	_, err = env.DeductTransactionFees(
+		proc.Transaction.Payer,
+		inclusionEffort,
+		computationUsed)
 
 	if err != nil {
 		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, err)
@@ -286,174 +223,21 @@ func (i *TransactionInvoker) deductTransactionFees(
 	return nil
 }
 
-var setAccountFrozenFunctionType = &sema.FunctionType{
-	Parameters: []*sema.Parameter{
-		{
-			Label:          sema.ArgumentLabelNotRequired,
-			Identifier:     "account",
-			TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
-		},
-		{
-			Label:          sema.ArgumentLabelNotRequired,
-			Identifier:     "frozen",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
-		},
-	},
-	ReturnTypeAnnotation: &sema.TypeAnnotation{
-		Type: sema.VoidType,
-	},
-}
-
-func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration {
-	var predeclaredValues []runtime.ValueDeclaration
-
-	if ctx.AccountFreezeEnabled {
-		// TODO return the errors instead of panicing
-
-		setAccountFrozen := runtime.ValueDeclaration{
-			Name:           "setAccountFrozen",
-			Type:           setAccountFrozenFunctionType,
-			Kind:           common.DeclarationKindFunction,
-			IsConstant:     true,
-			ArgumentLabels: nil,
-			Value: interpreter.NewUnmeteredHostFunctionValue(
-				func(invocation interpreter.Invocation) interpreter.Value {
-					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
-					if !ok {
-						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
-							"first argument of setAccountFrozen must be an address"))
-					}
-
-					frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
-					if !ok {
-						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
-							"second argument of setAccountFrozen must be a boolean"))
-					}
-
-					var err error
-					if env, isTXEnv := env.(*TransactionEnv); isTXEnv {
-						err = env.SetAccountFrozen(common.Address(address), bool(frozen))
-					} else {
-						err = errors.NewOperationNotSupportedError("SetAccountFrozen")
-					}
-					if err != nil {
-						panic(err)
-					}
-
-					return interpreter.VoidValue{}
-				},
-				setAccountFrozenFunctionType,
-			),
-		}
-
-		predeclaredValues = append(predeclaredValues, setAccountFrozen)
-	}
-	return predeclaredValues
-}
-
-// requiresRetry returns true for transactions that has to be rerun
-// this is an additional check which was introduced
-func (i *TransactionInvoker) requiresRetry(err error, proc *TransactionProcedure) bool {
-	// if no error no retry
-	if err == nil {
-		return false
-	}
-
-	// Only consider runtime errors,
-	// in particular only consider parsing/checking errors
-	var runtimeErr runtime.Error
-	if !errors.As(err, &runtimeErr) {
-		return false
-	}
-
-	var parsingCheckingError *runtime.ParsingCheckingError
-	if !errors.As(err, &parsingCheckingError) {
-		return false
-	}
-
-	// Only consider errors in deployed contracts.
-
-	checkerError, ok := parsingCheckingError.Err.(*sema.CheckerError)
-	if !ok {
-		return false
-	}
-
-	var foundImportedProgramError bool
-
-	for _, checkingErr := range checkerError.Errors {
-		importedProgramError, ok := checkingErr.(*sema.ImportedProgramError)
-		if !ok {
-			continue
-		}
-
-		_, ok = importedProgramError.Location.(common.AddressLocation)
-		if !ok {
-			continue
-		}
-
-		foundImportedProgramError = true
-		break
-	}
-
-	if !foundImportedProgramError {
-		return false
-	}
-
-	i.dumpRuntimeError(&runtimeErr, proc)
-	return true
-}
-
-// logRuntimeError logs run time errors into a file
-// This is a temporary measure.
-func (i *TransactionInvoker) dumpRuntimeError(runtimeErr *runtime.Error, procedure *TransactionProcedure) {
-
-	codesJSON, err := json.Marshal(runtimeErr.Codes)
-	if err != nil {
-		i.logger.Error().Err(err).Msg("cannot marshal codes JSON")
-	}
-	programsJSON, err := json.Marshal(runtimeErr.Programs)
-	if err != nil {
-		i.logger.Error().Err(err).Msg("cannot marshal programs JSON")
-	}
-
-	t := time.Now().UnixNano()
-
-	codesPath := path.Join(extralog.ExtraLogDumpPath, fmt.Sprintf("%s-codes-%d", procedure.ID.String(), t))
-	programsPath := path.Join(extralog.ExtraLogDumpPath, fmt.Sprintf("%s-programs-%d", procedure.ID.String(), t))
-
-	err = ioutil.WriteFile(codesPath, codesJSON, 0700)
-	if err != nil {
-		i.logger.Error().Err(err).Msg("cannot write codes json")
-	}
-
-	err = ioutil.WriteFile(programsPath, programsJSON, 0700)
-	if err != nil {
-		i.logger.Error().Err(err).Msg("cannot write programs json")
-	}
-
-	i.logger.Error().
-		Str("txHash", procedure.ID.String()).
-		Str("codes", string(codesJSON)).
-		Str("programs", string(programsJSON)).
-		Msg("checking failed")
-}
-
 // logExecutionIntensities logs execution intensities of the transaction
-func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txHash string) {
-	if i.logger.Debug().Enabled() {
+func (i TransactionInvoker) logExecutionIntensities(ctx *Context, sth *state.StateHolder, txHash string) {
+	if ctx.Logger.Debug().Enabled() {
 		computation := zerolog.Dict()
-		for s, u := range sth.State().ComputationIntensities() {
+		for s, u := range sth.ComputationIntensities() {
 			computation.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
 		memory := zerolog.Dict()
-		for s, u := range sth.State().MemoryIntensities() {
+		for s, u := range sth.MemoryIntensities() {
 			memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
-		i.logger.Info().
-			Str("txHash", txHash).
-			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
-			Uint("computationUsed", sth.State().TotalComputationUsed()).
-			Uint("memoryEstimate", sth.State().TotalMemoryEstimate()).
+		ctx.Logger.Info().
+			Uint64("ledgerInteractionUsed", sth.InteractionUsed()).
+			Uint("computationUsed", sth.TotalComputationUsed()).
+			Uint64("memoryEstimate", sth.TotalMemoryEstimate()).
 			Dict("computationIntensities", computation).
 			Dict("memoryIntensities", memory).
 			Msg("transaction execution data")

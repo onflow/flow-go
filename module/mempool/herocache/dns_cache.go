@@ -106,12 +106,12 @@ func (d *DNSCache) GetTxtRecord(domain string) (*mempool.TxtRecord, bool) {
 
 // RemoveIp removes an ip domain from cache.
 func (d *DNSCache) RemoveIp(domain string) bool {
-	return d.ipCache.Rem(domainToIdentifier(domain))
+	return d.ipCache.Remove(domainToIdentifier(domain))
 }
 
 // RemoveTxt removes a txt record from cache.
 func (d *DNSCache) RemoveTxt(domain string) bool {
-	return d.txtCache.Rem(domainToIdentifier(domain))
+	return d.txtCache.Remove(domainToIdentifier(domain))
 }
 
 // LockIPDomain locks an ip address dns record if exists in the cache.
@@ -143,7 +143,7 @@ func (d *DNSCache) LockIPDomain(domain string) (bool, error) {
 
 		record.Locked = true
 
-		if _, removed := backdata.Rem(id); !removed {
+		if _, removed := backdata.Remove(id); !removed {
 			return fmt.Errorf("ip record could not be removed from backdata")
 		}
 
@@ -164,7 +164,7 @@ func (d *DNSCache) UpdateIPDomain(domain string, addresses []net.IPAddr, timesta
 		id := domainToIdentifier(domain)
 
 		// removes old entry if exists.
-		backdata.Rem(id)
+		backdata.Remove(id)
 
 		ipRecord := ipEntity{
 			IpRecord: mempool.IpRecord{
@@ -190,7 +190,7 @@ func (d *DNSCache) UpdateTxtRecord(txt string, records []string, timestamp int64
 		id := domainToIdentifier(txt)
 
 		// removes old entry if exists.
-		backdata.Rem(id)
+		backdata.Remove(id)
 
 		txtRecord := txtEntity{
 			TxtRecord: mempool.TxtRecord{
@@ -239,7 +239,7 @@ func (d *DNSCache) LockTxtRecord(txt string) (bool, error) {
 
 		record.Locked = true
 
-		if _, removed := backdata.Rem(id); !removed {
+		if _, removed := backdata.Remove(id); !removed {
 			return fmt.Errorf("txt record could not be removed from backdata")
 		}
 

@@ -5,9 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/signature"
 )
@@ -40,9 +38,9 @@ func NewCombinedSigner(
 
 	sc := &CombinedSigner{
 		staking:        staking,
-		stakingHasher:  crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
+		stakingHasher:  signature.NewBLSHasher(signature.ConsensusVoteTag),
 		beaconKeyStore: beaconKeyStore,
-		beaconHasher:   crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		beaconHasher:   signature.NewBLSHasher(signature.RandomBeaconTag),
 	}
 	return sc
 }
@@ -92,9 +90,9 @@ func (c *CombinedSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 
 // genSigData generates the signature data for our local node for the given block.
 // It returns:
-//  - (stakingSig, nil) if there is no random beacon private key.
-//  - (stakingSig+randomBeaconSig, nil) if there is a random beacon private key.
-//  - (nil, error) if there is any exception
+//   - (stakingSig, nil) if there is no random beacon private key.
+//   - (stakingSig+randomBeaconSig, nil) if there is a random beacon private key.
+//   - (nil, error) if there is any exception
 func (c *CombinedSigner) genSigData(block *model.Block) ([]byte, error) {
 
 	// create the message to be signed and generate signatures

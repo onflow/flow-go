@@ -3,12 +3,11 @@ package validation
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -41,7 +40,7 @@ func NewSealValidator(
 	return &sealValidator{
 		state:                state,
 		assigner:             assigner,
-		signatureHasher:      crypto.NewBLSKMAC(encoding.ResultApprovalTag),
+		signatureHasher:      signature.NewBLSHasher(signature.ResultApprovalTag),
 		headers:              headers,
 		results:              results,
 		seals:                seals,
@@ -92,12 +91,13 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 //
 // Note that we don't explicitly check that sealed results satisfy the sub-graph
 // check. Nevertheless, correctness in this regard is guaranteed because:
-//  * We only allow seals that correspond to ExecutionReceipts that were
-//    incorporated in this fork.
-//  * We only include ExecutionReceipts whose results pass the sub-graph check
-//    (as part of ReceiptValidator).
+//   - We only allow seals that correspond to ExecutionReceipts that were
+//     incorporated in this fork.
+//   - We only include ExecutionReceipts whose results pass the sub-graph check
+//     (as part of ReceiptValidator).
+//
 // => Therefore, only seals whose results pass the sub-graph check will be
-//    allowed.
+// allowed.
 func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
 	payload := candidate.Payload

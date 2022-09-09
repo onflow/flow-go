@@ -69,16 +69,16 @@ func (b *Backend) Add(entity flow.Entity) bool {
 	return added
 }
 
-// Rem will remove the item with the given hash.
-func (b *Backend) Rem(entityID flow.Identifier) bool {
-	//bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Rem")
+// Remove will remove the item with the given hash.
+func (b *Backend) Remove(entityID flow.Identifier) bool {
+	//bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Remove")
 	b.Lock()
 	//binstat.Leave(bs1)
 
-	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Rem")
+	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Remove")
 	//defer binstat.Leave(bs2)
 	defer b.Unlock()
-	_, removed := b.backData.Rem(entityID)
+	_, removed := b.backData.Remove(entityID)
 	return removed
 }
 

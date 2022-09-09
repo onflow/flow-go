@@ -101,11 +101,11 @@ func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 	return err == nil
 }
 
-// Rem provides deletion functionality from the memory pool.
-// If there is a chunk request with this ID, Rem removes it and returns true.
+// Remove provides deletion functionality from the memory pool.
+// If there is a chunk request with this ID, Remove removes it and returns true.
 // Otherwise it returns false.
-func (cs *ChunkRequests) Rem(chunkID flow.Identifier) bool {
-	return cs.Backend.Rem(chunkID)
+func (cs *ChunkRequests) Remove(chunkID flow.Identifier) bool {
+	return cs.Backend.Remove(chunkID)
 }
 
 // PopAll atomically returns all locators associated with this chunk ID while clearing out the
@@ -122,7 +122,7 @@ func (cs *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorMap, boo
 		}
 		locators = toChunkRequestStatus(entity).Locators
 
-		_, removed := backdata.Rem(chunkID)
+		_, removed := backdata.Remove(chunkID)
 		if !removed {
 			return fmt.Errorf("potential race condition on removing chunk request from mempool")
 		}

@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,7 +29,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	msgLen := 100
 	msg := make([]byte, msgLen)
 	tag := "random_tag"
-	hasher := crypto.NewBLSKMAC(tag)
+	hasher := msig.NewBLSHasher(tag)
 
 	// create keys, identities and signatures
 	ids := make([]*flow.Identity, 0, signersNumber)

@@ -49,15 +49,15 @@ func TestMakeFinalValidChain(t *testing.T) {
 	final.Height = uint64(rand.Uint32())
 
 	// generate a couple of children that are pending
-	parent := &final
+	parent := final
 	var pending []*flow.Header
 	total := 8
 	for i := 0; i < total; i++ {
 		header := unittest.BlockHeaderFixture()
 		header.Height = parent.Height + 1
 		header.ParentID = parent.ID()
-		pending = append(pending, &header)
-		parent = &header
+		pending = append(pending, header)
+		parent = header
 	}
 
 	// create a mock protocol state to check finalize calls
@@ -85,7 +85,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), &final))
+		err = db.Update(operation.InsertHeader(final.ID(), final))
 		require.NoError(t, err)
 
 		// insert all of the pending blocks into the DB
@@ -143,11 +143,11 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), &final))
+		err = db.Update(operation.InsertHeader(final.ID(), final))
 		require.NoError(t, err)
 
 		// insert all of the pending header into DB
-		err = db.Update(operation.InsertHeader(pending.ID(), &pending))
+		err = db.Update(operation.InsertHeader(pending.ID(), pending))
 		require.NoError(t, err)
 
 		// initialize the finalizer with the dependencies and make the call
@@ -195,7 +195,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), &final))
+		err = db.Update(operation.InsertHeader(final.ID(), final))
 		require.NoError(t, err)
 
 		// initialize the finalizer with the dependencies and make the call

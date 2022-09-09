@@ -44,7 +44,7 @@ func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 			}
 
 			// removes map entry associated with key for update
-			if _, removed := backdata.Rem(key); !removed {
+			if _, removed := backdata.Remove(key); !removed {
 				return fmt.Errorf("potential race condition on removing from identifier map")
 			}
 		}
@@ -100,14 +100,14 @@ func (i *IdentifierMap) Has(key flow.Identifier) bool {
 	return i.Backend.Has(key)
 }
 
-// Rem removes the given key with all associated identifiers.
-func (i *IdentifierMap) Rem(key flow.Identifier) bool {
-	return i.Backend.Rem(key)
+// Remove removes the given key with all associated identifiers.
+func (i *IdentifierMap) Remove(key flow.Identifier) bool {
+	return i.Backend.Remove(key)
 }
 
-// RemIdFromKey removes the id from the list of identifiers associated with key.
+// RemoveIdFromKey removes the id from the list of identifiers associated with key.
 // If the list becomes empty, it also removes the key from the map.
-func (i *IdentifierMap) RemIdFromKey(key, id flow.Identifier) error {
+func (i *IdentifierMap) RemoveIdFromKey(key, id flow.Identifier) error {
 	err := i.Backend.Run(func(backdata mempool.BackData) error {
 		// var ids map[flow.Identifier]struct{}
 		entity, ok := backdata.ByID(key)
@@ -127,7 +127,7 @@ func (i *IdentifierMap) RemIdFromKey(key, id flow.Identifier) error {
 		}
 
 		// removes map entry associated with key for update
-		if _, removed := backdata.Rem(key); !removed {
+		if _, removed := backdata.Remove(key); !removed {
 			return fmt.Errorf("potential race condition on removing from identifier map")
 		}
 
