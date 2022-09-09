@@ -24,13 +24,12 @@ type BootstrapProcedure struct {
 	ctx       Context
 	sth       *state.StateHolder
 	programs  *programs.Programs
-	accounts  environment.Accounts
 	rootBlock *flow.Header
 
 	// genesis parameters
 	accountKeys        BootstrapAccountKeys
 	initialTokenSupply cadence.UFix64
-	addressGenerator   flow.AddressGenerator
+	accountCreator     environment.BootstrapAccountCreator
 
 	accountCreationFee               cadence.UFix64
 	minimumStorageReservation        cadence.UFix64
@@ -253,9 +252,10 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.programs = programs
 
 	// initialize the account addressing state
-	b.accounts = environment.NewAccounts(b.sth)
-	addressGenerator := environment.NewAccountCreator(b.sth, ctx.Chain)
-	b.addressGenerator = addressGenerator
+	b.accountCreator = environment.NewBootstrapAccountCreator(
+		b.sth,
+		ctx.Chain,
+		environment.NewAccounts(b.sth))
 
 	service := b.createServiceAccount()
 
@@ -333,12 +333,7 @@ func (proc *BootstrapProcedure) ShouldDisableMemoryAndInteractionLimits(_ Contex
 }
 
 func (b *BootstrapProcedure) createAccount(publicKeys []flow.AccountPublicKey) flow.Address {
-	address, err := b.addressGenerator.NextAddress()
-	if err != nil {
-		panic(fmt.Sprintf("failed to generate address: %s", err))
-	}
-
-	err = b.accounts.Create(publicKeys, address)
+	address, err := b.accountCreator.CreateBootstrapAccount(publicKeys)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create account: %s", err))
 	}
@@ -347,12 +342,8 @@ func (b *BootstrapProcedure) createAccount(publicKeys []flow.AccountPublicKey) f
 }
 
 func (b *BootstrapProcedure) createServiceAccount() flow.Address {
-	address, err := b.addressGenerator.NextAddress()
-	if err != nil {
-		panic(fmt.Sprintf("failed to generate address: %s", err))
-	}
-
-	err = b.accounts.Create(b.accountKeys.ServiceAccountPublicKeys, address)
+	address, err := b.accountCreator.CreateBootstrapAccount(
+		b.accountKeys.ServiceAccountPublicKeys)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}

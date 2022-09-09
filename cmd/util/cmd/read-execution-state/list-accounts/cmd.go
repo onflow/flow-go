@@ -100,7 +100,7 @@ func run(*cobra.Command, []string) {
 
 	stTxn := state.NewStateTransaction(ldg, state.DefaultParameters())
 	accounts := environment.NewAccounts(stTxn)
-	finalGenerator := environment.NewAccountCreator(stTxn, chain)
+	finalGenerator := environment.NewAddressGenerator(stTxn, chain)
 	finalState := finalGenerator.Bytes()
 
 	generator := chain.NewAddressGenerator()
