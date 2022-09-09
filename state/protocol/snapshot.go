@@ -12,15 +12,16 @@ import (
 // in blocks along this fork up to (including) Head.
 // It allows us to read the parameters at the selected block in a deterministic manner.
 //
-//TODO Epoch / Snapshot API Structure:  Currently Epoch and Snapshot APIs
+// TODO Epoch / Snapshot API Structure:  Currently Epoch and Snapshot APIs
 // are structured to allow chained queries to be used without error checking
 // at each call where errors might occur. Instead, errors are cached in the
 // resulting struct (eg. invalid.Epoch) until the query chain ends with a
 // function which can return an error. This has some negative effects:
-// 1. Cached intermediary errors result in more complex error handling
-//    a) each final call of the chained query needs to handle all intermediary errors, every time
-//    b) intermediary errors must be handled by dependencies on the final call of the query chain (eg. conversion functions)
-// 2. The error caching pattern encourages potentially dangerous snapshot query patterns
+//  1. Cached intermediary errors result in more complex error handling
+//     a) each final call of the chained query needs to handle all intermediary errors, every time
+//     b) intermediary errors must be handled by dependencies on the final call of the query chain (eg. conversion functions)
+//  2. The error caching pattern encourages potentially dangerous snapshot query patterns
+//
 // See https://github.com/dapperlabs/flow-go/issues/6368 for details and proposal
 //
 // TODO document error returns
