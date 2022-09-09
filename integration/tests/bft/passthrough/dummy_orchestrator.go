@@ -1,7 +1,9 @@
 package passthrough
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"testing"
 
@@ -92,6 +94,11 @@ func (d *dummyOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) err
 	err := d.orchestratorNetwork.SendIngress(event)
 
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			// log a warning and continue for EOF errors
+			lg.Err(err).Msg("could not pass through ingress event")
+			return nil
+		}
 		// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
 		lg.Fatal().Err(err).Msg("could not pass through ingress event")
 		return err
