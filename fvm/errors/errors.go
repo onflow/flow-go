@@ -70,7 +70,7 @@ func HandleRuntimeError(err error) error {
 	// if is not a runtime error return as vm error
 	// this should never happen unless a bug in the code
 	if runErr, ok = err.(runtime.Error); !ok {
-		return NewUnknownFailure(fmt.Errorf("non runtime error from cadence: %w", runErr))
+		return NewUnknownFailure(fmt.Errorf("non runtime error from cadence: %w", err))
 	}
 
 	// External errors are reported by the runtime but originate from the VM.
