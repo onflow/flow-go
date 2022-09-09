@@ -102,7 +102,7 @@ func (i TransactionInvoker) Process(
 			// Otherwise, do what we use to do
 			txError = fmt.Errorf(
 				"transaction invocation failed when executing transaction: %w",
-				errors.HandleRuntimeError(err),
+				err,
 			)
 		}
 	}

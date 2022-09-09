@@ -225,7 +225,10 @@ func (pool ReusableCadenceRuntimePool) Borrow(
 	case reusable = <-pool.pool:
 		// Do nothing.
 	default:
-		reusable = NewReusableCadenceRuntime(pool.newRuntime())
+		reusable = NewReusableCadenceRuntime(
+			WrappedCadenceRuntime{
+				pool.newRuntime(),
+			})
 	}
 
 	reusable.SetFvmEnvironment(fvmEnv)
