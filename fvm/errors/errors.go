@@ -2,7 +2,6 @@ package errors
 
 import (
 	stdErrors "errors"
-	"fmt"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/errors"
@@ -56,7 +55,7 @@ func SplitErrorTypes(inp error) (err Error, failure Failure) {
 	// anything else that is left is an unknown failure
 	// (except the ones green listed for now to be considered as txErrors)
 	if inp != nil {
-		return nil, NewUnknownFailure(fmt.Errorf("unknown failure from spliting error type: %w", inp))
+		return nil, NewUnknownFailure(inp)
 	}
 	return nil, nil
 }
@@ -70,7 +69,7 @@ func HandleRuntimeError(err error) error {
 	// if is not a runtime error return as vm error
 	// this should never happen unless a bug in the code
 	if runErr, ok = err.(runtime.Error); !ok {
-		return NewUnknownFailure(fmt.Errorf("non runtime error from cadence: %w", err))
+		return NewUnknownFailure(err)
 	}
 
 	// External errors are reported by the runtime but originate from the VM.
@@ -82,7 +81,7 @@ func HandleRuntimeError(err error) error {
 			return recoveredErr
 		}
 		// if not recovered return
-		return NewUnknownFailure(fmt.Errorf("not recovered runtime error originated from vm: %w", externalErr))
+		return NewUnknownFailure(externalErr)
 	}
 
 	// All other errors are non-fatal Cadence errors.

@@ -214,7 +214,7 @@ func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
 
 	err = env.Meter(meter.ComputationKindGetValue, uint(valueByteSize))
 	if err != nil {
-		return nil, fmt.Errorf("meter failed: %w", err)
+		return nil, fmt.Errorf("get value failed: %w", err)
 	}
 	return v, nil
 }
@@ -232,7 +232,7 @@ func (env *commonEnv) SetValue(owner, key, value []byte) error {
 
 	err := env.Meter(meter.ComputationKindSetValue, uint(len(value)))
 	if err != nil {
-		return fmt.Errorf("meter failed: %w", err)
+		return fmt.Errorf("set value failed: %w", err)
 	}
 
 	err = env.accounts.SetValue(
@@ -251,7 +251,7 @@ func (env *commonEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 
 	err = env.Meter(meter.ComputationKindValueExists, 1)
 	if err != nil {
-		return false, fmt.Errorf("meter failed: %w", err)
+		return false, fmt.Errorf("check value existence failed: %w", err)
 	}
 
 	v, err := env.GetValue(owner, key)
@@ -267,7 +267,7 @@ func (env *commonEnv) GetStorageUsed(address common.Address) (value uint64, err 
 
 	err = env.Meter(meter.ComputationKindGetStorageUsed, 1)
 	if err != nil {
-		return value, fmt.Errorf("meter failed: %w", err)
+		return value, fmt.Errorf("get storage used failed: %w", err)
 	}
 
 	value, err = env.accounts.GetStorageUsed(flow.Address(address))
