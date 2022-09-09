@@ -28,10 +28,14 @@ type commonEnv struct {
 	environment.Meter
 	*environment.ProgramLogger
 	*environment.UUIDGenerator
+
 	*environment.UnsafeRandomGenerator
 	*environment.CryptoLibrary
+
 	*environment.BlockInfo
+	*environment.AccountInfo
 	environment.TransactionInfo
+
 	environment.EventEmitter
 	environment.AccountFreezer
 	*environment.ValueStore
@@ -64,6 +68,7 @@ func newCommonEnv(
 ) commonEnv {
 	accounts := environment.NewAccounts(stateTransaction)
 	programsHandler := handler.NewProgramsHandler(programs, stateTransaction)
+	systemContracts := environment.NewSystemContracts()
 
 	return commonEnv{
 		Tracer: tracer,
@@ -89,6 +94,12 @@ func newCommonEnv(
 			ctx.BlockHeader,
 			ctx.Blocks,
 		),
+		AccountInfo: environment.NewAccountInfo(
+			tracer,
+			meter,
+			accounts,
+			systemContracts,
+		),
 		ValueStore: environment.NewValueStore(
 			tracer,
 			meter,
@@ -104,7 +115,7 @@ func newCommonEnv(
 			meter,
 			accounts,
 		),
-		SystemContracts: environment.NewSystemContracts(),
+		SystemContracts: systemContracts,
 		ctx:             ctx,
 		sth:             stateTransaction,
 		vm:              vm,
@@ -129,93 +140,6 @@ func (env *commonEnv) ReturnCadenceRuntime(
 	reusable *runtime.ReusableCadenceRuntime,
 ) {
 	env.ctx.ReusableCadenceRuntimePool.Return(reusable)
-}
-
-func (env *commonEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
-	defer env.StartSpanFromRoot(trace.FVMEnvGetStorageUsed).End()
-
-	err = env.MeterComputation(environment.ComputationKindGetStorageUsed, 1)
-	if err != nil {
-		return value, fmt.Errorf("get storage used failed: %w", err)
-	}
-
-	value, err = env.accounts.GetStorageUsed(flow.Address(address))
-	if err != nil {
-		return value, fmt.Errorf("get storage used failed: %w", err)
-	}
-
-	return value, nil
-}
-
-// storageMBUFixToBytesUInt converts the return type of storage capacity which is a UFix64 with the unit of megabytes to
-// UInt with the unit of bytes
-func storageMBUFixToBytesUInt(result cadence.Value) uint64 {
-	// Divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
-	return result.ToGoValue().(uint64) / 100
-}
-
-func (env *commonEnv) GetStorageCapacity(
-	address common.Address,
-) (
-	value uint64,
-	err error,
-) {
-	defer env.StartSpanFromRoot(trace.FVMEnvGetStorageCapacity).End()
-
-	err = env.MeterComputation(environment.ComputationKindGetStorageCapacity, 1)
-	if err != nil {
-		return 0, fmt.Errorf("get storage capacity failed: %w", err)
-	}
-
-	result, invokeErr := env.AccountStorageCapacity(address)
-	if invokeErr != nil {
-		return 0, invokeErr
-	}
-
-	// Return type is actually a UFix64 with the unit of megabytes so some
-	// conversion is necessary divide the unsigned int by (1e8 (the scale of
-	// Fix64) / 1e6 (for mega)) to get bytes (rounded down)
-	return storageMBUFixToBytesUInt(result), nil
-}
-
-func (env *commonEnv) GetAccountBalance(
-	address common.Address,
-) (
-	value uint64,
-	err error,
-) {
-	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
-
-	err = env.MeterComputation(environment.ComputationKindGetAccountBalance, 1)
-	if err != nil {
-		return 0, fmt.Errorf("get account balance failed: %w", err)
-	}
-
-	result, invokeErr := env.AccountBalance(address)
-	if invokeErr != nil {
-		return 0, invokeErr
-	}
-	return result.ToGoValue().(uint64), nil
-}
-
-func (env *commonEnv) GetAccountAvailableBalance(
-	address common.Address,
-) (
-	value uint64,
-	err error,
-) {
-	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
-
-	err = env.MeterComputation(environment.ComputationKindGetAccountAvailableBalance, 1)
-	if err != nil {
-		return 0, fmt.Errorf("get account available balance failed: %w", err)
-	}
-
-	result, invokeErr := env.AccountAvailableBalance(address)
-	if invokeErr != nil {
-		return 0, invokeErr
-	}
-	return result.ToGoValue().(uint64), nil
 }
 
 func (env *commonEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
