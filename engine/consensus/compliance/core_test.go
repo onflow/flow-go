@@ -402,7 +402,7 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return(doneChan()).Once()
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(proposal, false)
+	err := cs.core.processBlockAndDescendants(proposal)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff

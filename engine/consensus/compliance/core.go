@@ -208,7 +208,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(proposal, inBlockRangeResponse)
+	err = c.processBlockAndDescendants(proposal)
 	c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -227,11 +227,11 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 // its pending proposals for its children. By induction, any children connected
 // to a valid proposal are validly connected to the finalized state and can be
 // processed as well.
-func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
+func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) error {
 	blockID := proposal.Header.ID()
 
 	// process block itself
-	err := c.processBlockProposal(proposal, inRangeBlockResponse)
+	err := c.processBlockProposal(proposal)
 	// child is outdated by the time we started processing it
 	// => node was probably behind and is catching up. Log as warning
 	if engine.IsOutdatedInputError(err) {
@@ -261,7 +261,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRa
 			Header:  child.Header,
 			Payload: child.Payload,
 		}
-		cpr := c.processBlockAndDescendants(childProposal, inRangeBlockResponse)
+		cpr := c.processBlockAndDescendants(childProposal)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
@@ -276,8 +276,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRa
 
 // processBlockProposal processes the given block proposal. The proposal must connect to
 // the finalized state.
-// TODO remove inRangeBlockResponse
-func (c *Core) processBlockProposal(proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
+func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	startTime := time.Now()
 	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
 
