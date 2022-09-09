@@ -389,7 +389,6 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Se
 	service.Command = append(
 		service.Command,
 		fmt.Sprintf("--block-rate-delay=%s", consensusDelay),
-		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--chunk-alpha=1"),
 		fmt.Sprintf("--emergency-sealing-active=false"),
@@ -427,7 +426,6 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, n int) S
 	service.Command = append(
 		service.Command,
 		fmt.Sprintf("--block-rate-delay=%s", collectionDelay),
-		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--insecure-access-api=false"),
