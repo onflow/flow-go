@@ -7,7 +7,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const keyAddressState = "account_address_state"
+const (
+	keyAddressState = "account_address_state"
+
+	FungibleTokenAccountIndex = 2
+	FlowTokenAccountIndex     = 3
+	FlowFeesAccountIndex      = 4
+)
 
 // AccountCreator make use of the storage state and the chain's address
 // generator to create accounts.

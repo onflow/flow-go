@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -95,7 +96,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithTracer(tracer),
 		fvm.WithReusableCadenceRuntimePool(
-			fvm.NewReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{})),
 	)

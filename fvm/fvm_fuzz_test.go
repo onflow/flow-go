@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -206,7 +207,7 @@ func getDeductedFees(tb testing.TB, tctx transactionTypeContext, results fuzzRes
 	var ok bool
 	var feesDeductedEvent cadence.Event
 	for _, e := range results.tx.Events {
-		if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", fvm.FlowFeesAddress(tctx.chain)) {
+		if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", environment.FlowFeesAddress(tctx.chain)) {
 			data, err := jsoncdc.Decode(nil, e.Payload)
 			require.NoError(tb, err)
 			feesDeductedEvent, ok = data.(cadence.Event)

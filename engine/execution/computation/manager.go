@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -118,7 +119,7 @@ func New(
 
 	options := []fvm.Option{
 		fvm.WithReusableCadenceRuntimePool(
-			fvm.NewReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
 					TracingEnabled: params.CadenceTracing,

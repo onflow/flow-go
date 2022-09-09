@@ -876,12 +876,6 @@ func (b *BootstrapProcedure) setContractDeploymentRestrictions(service flow.Addr
 	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
 }
 
-const (
-	fungibleTokenAccountIndex = 2
-	flowTokenAccountIndex     = 3
-	flowFeesAccountIndex      = 4
-)
-
 func panicOnMetaInvokeErrf(msg string, txError errors.Error, err error) {
 	if txError != nil {
 		panic(fmt.Sprintf(msg, txError.Error()))
@@ -892,11 +886,11 @@ func panicOnMetaInvokeErrf(msg string, txError errors.Error, err error) {
 }
 
 func FungibleTokenAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(fungibleTokenAccountIndex)
+	address, _ := chain.AddressAtIndex(environment.FungibleTokenAccountIndex)
 	return address
 }
 
 func FlowTokenAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(flowTokenAccountIndex)
+	address, _ := chain.AddressAtIndex(environment.FlowTokenAccountIndex)
 	return address
 }

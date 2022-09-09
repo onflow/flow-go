@@ -1,4 +1,4 @@
-package fvm
+package runtime
 
 import (
 	"github.com/onflow/cadence"
@@ -10,6 +10,14 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 )
+
+// Note: this is a subset of environment.Environment, redeclared to handle
+// circular dependency.
+type Environment interface {
+	runtime.Interface
+
+	SetAccountFrozen(address common.Address, frozen bool) error
+}
 
 var setAccountFrozenFunctionType = &sema.FunctionType{
 	Parameters: []*sema.Parameter{

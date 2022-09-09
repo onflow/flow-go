@@ -725,7 +725,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				require.NoError(t, tx.Err)
 				var feeDeduction flow.Event //fee deduction event
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", fvm.FlowFeesAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", environment.FlowFeesAddress(flow.Testnet.Chain())) {
 						feeDeduction = e
 						break
 					}
