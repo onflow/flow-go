@@ -3,7 +3,6 @@ package fvm
 import (
 	"context"
 	"fmt"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -132,8 +131,9 @@ func (i ScriptInvoker) Process(
 			Arguments: proc.Arguments,
 		},
 		runtime.Context{
-			Interface: env,
-			Location:  location,
+			Interface:      env,
+			Location:       location,
+			CheckerOptions: ctx.CheckerOptions(),
 		},
 	)
 
