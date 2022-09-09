@@ -48,12 +48,12 @@ func New(
 	log zerolog.Logger,
 	config Config,
 	e *ingestion.Engine,
-	blocks storage.Blocks,
 	headers storage.Headers,
 	state protocol.State,
 	events storage.Events,
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
+	commits storage.Commits,
 	chainID flow.ChainID,
 	signerIndicesDecoder hotstuff.BlockSignerDecoder,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
@@ -94,13 +94,13 @@ func New(
 		handler: &handler{
 			engine:               e,
 			chain:                chainID,
-			blocks:               blocks,
 			headers:              headers,
 			state:                state,
 			signerIndicesDecoder: signerIndicesDecoder,
 			events:               events,
 			exeResults:           exeResults,
 			transactionResults:   txResults,
+			commits:              commits,
 			log:                  log,
 		},
 		server: server,
@@ -153,7 +153,6 @@ func (e *Engine) serve() {
 type handler struct {
 	engine               ingestion.IngestRPC
 	chain                flow.ChainID
-	blocks               storage.Blocks
 	headers              storage.Headers
 	state                protocol.State
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
@@ -161,6 +160,7 @@ type handler struct {
 	exeResults           storage.ExecutionResults
 	transactionResults   storage.TransactionResults
 	log                  zerolog.Logger
+	commits              storage.Commits
 }
 
 var _ execution.ExecutionAPIServer = &handler{}
@@ -238,11 +238,11 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	// collect all the events and create a EventsResponse_Result for each block
 	for i, bID := range flowBlockIDs {
 		// Check if block has been executed
-		if _, err := h.exeResults.ByBlockID(bID); err != nil {
+		if _, err := h.commits.ByBlockID(bID); err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				return nil, status.Errorf(codes.NotFound, "results for block ID %s does not exist", bID)
+				return nil, status.Errorf(codes.NotFound, "state commitment for block ID %s does not exist", bID)
 			}
-			return nil, status.Errorf(codes.Internal, "results for block ID %s could not be retrieved", bID)
+			return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", bID)
 		}
 
 		// lookup events
