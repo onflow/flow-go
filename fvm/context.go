@@ -53,7 +53,7 @@ func (c Context) CheckerOptions() []sema.Option {
 
 		// backwards compatibility to enable rolling deploy
 		if (chainID == flow.Mainnet && blockHeight > 37_074_000) ||
-			(chainID == flow.Testnet && blockHeight > 79_131_000) {
+			(chainID == flow.Testnet && blockHeight > 79_144_000) {
 
 			return nil
 		}
