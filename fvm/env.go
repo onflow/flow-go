@@ -5,42 +5,21 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/rs/zerolog"
-	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// Environment accepts a context and a virtual machine instance and provides
-// cadence runtime interface methods to the runtime.
-type Environment interface {
-	runtime.Interface
-
-	environment.AccountFreezer
-
-	Chain() flow.Chain
-
-	LimitAccountStorage() bool
-
-	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
-	StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span
-
-	Logger() *zerolog.Logger
-
-	BorrowCadenceRuntime() *ReusableCadenceRuntime
-	ReturnCadenceRuntime(*ReusableCadenceRuntime)
-
-	AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error)
-}
+// TODO(patrick): rm after emulator is updated
+type Environment = environment.Environment
 
 // Parts of the environment that are common to all transaction and script
 // executions.
@@ -58,8 +37,9 @@ type commonEnv struct {
 	*environment.ValueStore
 	*environment.ContractReader
 	*environment.AccountKeyReader
+	*environment.SystemContracts
 
-	*SystemContracts
+	handler.ContractUpdater
 
 	// TODO(patrick): rm
 	ctx Context
@@ -69,17 +49,16 @@ type commonEnv struct {
 	programs    *handler.ProgramsHandler
 	accounts    environment.Accounts
 	accountKeys *handler.AccountKeyHandler
-	contracts   *handler.ContractHandler
 
 	// TODO(patrick): rm once fully refactored
-	fullEnv Environment
+	fullEnv environment.Environment
 }
 
 func newCommonEnv(
 	ctx Context,
 	vm *VirtualMachine,
 	stateTransaction *state.StateHolder,
-	programs *programs.Programs,
+	programs handler.TransactionPrograms,
 	tracer *environment.Tracer,
 	meter environment.Meter,
 ) commonEnv {
@@ -125,7 +104,7 @@ func newCommonEnv(
 			meter,
 			accounts,
 		),
-		SystemContracts: NewSystemContracts(),
+		SystemContracts: environment.NewSystemContracts(),
 		ctx:             ctx,
 		sth:             stateTransaction,
 		vm:              vm,
@@ -142,11 +121,13 @@ func (env *commonEnv) LimitAccountStorage() bool {
 	return env.ctx.LimitAccountStorage
 }
 
-func (env *commonEnv) BorrowCadenceRuntime() *ReusableCadenceRuntime {
+func (env *commonEnv) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
 	return env.ctx.ReusableCadenceRuntimePool.Borrow(env.fullEnv)
 }
 
-func (env *commonEnv) ReturnCadenceRuntime(reusable *ReusableCadenceRuntime) {
+func (env *commonEnv) ReturnCadenceRuntime(
+	reusable *runtime.ReusableCadenceRuntime,
+) {
 	env.ctx.ReusableCadenceRuntimePool.Return(reusable)
 }
 
@@ -291,7 +272,7 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 
 // Commit commits changes and return a list of updated keys
 func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
-	keys, err := env.contracts.Commit()
+	keys, err := env.ContractUpdater.Commit()
 	return programs.ModifiedSets{
 		ContractUpdateKeys: keys,
 		FrozenAccounts:     env.FrozenAccounts(),

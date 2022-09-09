@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/handler"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -35,7 +34,7 @@ func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	programs handler.TransactionPrograms,
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
@@ -82,13 +81,11 @@ func NewTransactionEnvironment(
 		env.accounts,
 		env.TransactionInfo)
 	env.SystemContracts.SetEnvironment(env)
-
-	// TODO(patrick): rm this hack
-	env.accountKeys = handler.NewAccountKeyHandler(env.accounts)
-	env.fullEnv = env
-
-	env.contracts = handler.NewContractHandler(
+	env.ContractUpdater = handler.NewContractUpdater(
+		tracer,
+		meter,
 		env.accounts,
+		env.TransactionInfo,
 		func() bool {
 			enabled, defined := env.GetIsContractDeploymentRestricted()
 			if !defined {
@@ -108,6 +105,10 @@ func NewTransactionEnvironment(
 		env.GetAccountsAuthorizedForContractRemoval,
 		env.useContractAuditVoucher,
 	)
+
+	// TODO(patrick): rm this hack
+	env.accountKeys = handler.NewAccountKeyHandler(env.accounts)
+	env.fullEnv = env
 
 	return env
 }
@@ -322,46 +323,4 @@ func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	return e.accountKeys.RevokeAccountKey(address, keyIndex)
-}
-
-func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
-	defer e.StartSpanFromRoot(trace.FVMEnvUpdateAccountContractCode).End()
-
-	err = e.MeterComputation(environment.ComputationKindUpdateAccountContractCode, 1)
-	if err != nil {
-		return fmt.Errorf("update account contract code failed: %w", err)
-	}
-
-	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
-	if err != nil {
-		return fmt.Errorf("update account contract code failed: %w", err)
-	}
-
-	err = e.contracts.SetContract(address, name, code, e.SigningAccounts())
-	if err != nil {
-		return fmt.Errorf("updating account contract code failed: %w", err)
-	}
-
-	return nil
-}
-
-func (e *TransactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
-	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountContractCode).End()
-
-	err = e.MeterComputation(environment.ComputationKindRemoveAccountContractCode, 1)
-	if err != nil {
-		return fmt.Errorf("remove account contract code failed: %w", err)
-	}
-
-	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
-	if err != nil {
-		return fmt.Errorf("remove account contract code failed: %w", err)
-	}
-
-	err = e.contracts.RemoveContract(address, name, e.SigningAccounts())
-	if err != nil {
-		return fmt.Errorf("remove account contract code failed: %w", err)
-	}
-
-	return nil
 }
