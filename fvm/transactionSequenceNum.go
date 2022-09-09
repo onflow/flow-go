@@ -40,7 +40,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	childState := sth.NewChild()
 	defer func() {
 		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
-			panic(mergeError)
+			panic(fmt.Errorf("fail to merge state when checking and increasing sequence number: %w", mergeError))
 		}
 		sth.SetActiveState(parentState)
 	}()

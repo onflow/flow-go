@@ -28,7 +28,7 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 
 	if err != nil {
 		// this might be fatal, return as is
-		return nil, err
+		return nil, errors.HandleRuntimeError(err)
 	}
 
 	weightsRaw, ok := utils.CadenceValueToWeights(value)
@@ -110,7 +110,7 @@ func GetExecutionMemoryLimit(
 	)
 	if err != nil {
 		// this might be fatal, return as is
-		return 0, err
+		return 0, errors.HandleRuntimeError(err)
 	}
 
 	memoryLimitRaw, ok := value.(cadence.UInt64)

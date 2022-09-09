@@ -128,6 +128,12 @@ func (e *TransactionEnv) setExecutionParameters() error {
 
 	// set the property if no error, but if the error is a fatal error then return it
 	setIfOk := func(prop string, err error, setter func()) (fatal error) {
+		if err == nil {
+			// everything is ok. do the setting
+			setter()
+			return nil
+		}
+
 		err, fatal = errors.SplitErrorTypes(err)
 		if fatal != nil {
 			// this is a fatal error. return it
