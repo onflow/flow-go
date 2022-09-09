@@ -1,13 +1,12 @@
 package timeout
 
 import (
-	"math"
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
-// Config contains the configuration parameters for ExponentialIncrease-LinearDecrease
+// Config contains the configuration parameters for Truncated Exponential Backoff.
 // timeout.Controller
 // - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
 //   this results in exponential growing timeout duration on multiple subsequent timeouts
@@ -21,7 +20,7 @@ type Config struct {
 	// change was triggered by a TC (unhappy path).
 	TimeoutIncrease float64
 	// HappyPathRounds is the number of rounds without progress where we still consider being
-	// on hot path of execution.
+	// on hot path of execution. After exceeding this value we will start increasing timeout values.
 	HappyPathRounds uint64
 	// BlockRateDelayMS is a delay to broadcast the proposal in order to control block production rate [MILLISECONDS]
 	BlockRateDelayMS float64
@@ -61,16 +60,13 @@ func NewDefaultConfig() Config {
 }
 
 // NewConfig creates a new TimoutConfig.
-//  * startReplicaTimeout: starting timeout value for replica round [Milliseconds]
-//    Consistency requirement: `startReplicaTimeout` cannot be smaller than `minReplicaTimeout`
 //  * minReplicaTimeout: minimal timeout value for replica round [Milliseconds]
 //    Consistency requirement: must be non-negative
 //  * maxReplicaTimeout: maximal timeout value for replica round [Milliseconds]
 //    Consistency requirement: must be non-negative and larger than minReplicaTimeout
 //  * timeoutIncrease: multiplicative factor for increasing timeout
 //    Consistency requirement: must be strictly larger than 1
-//  * timeoutDecrease: multiplicative factor for timeout decrease
-//    Consistency requirement: must be in open interval (0,1); boundary values not allowed
+//  * happyPathRounds: number of failed rounds after which we will increase timeout
 //  * blockRateDelay: a delay to delay the proposal broadcasting [Milliseconds]
 // Returns `model.ConfigurationError` is any of the consistency requirements is violated.
 func NewConfig(
@@ -101,10 +97,4 @@ func NewConfig(
 		BlockRateDelayMS:  float64(blockRateDelay.Milliseconds()),
 	}
 	return tc, nil
-}
-
-// StandardTimeoutDecreaseFactor calculates a standard value for TimeoutDecreaseFactor
-// for an assumed max fraction of offline (byzantine) HotStuff committee members
-func StandardTimeoutDecreaseFactor(maxFractionOfflineReplicas, timeoutIncreaseFactor float64) float64 {
-	return math.Pow(timeoutIncreaseFactor, maxFractionOfflineReplicas/(maxFractionOfflineReplicas-1))
 }

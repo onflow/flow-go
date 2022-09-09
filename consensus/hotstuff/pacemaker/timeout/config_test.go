@@ -1,7 +1,6 @@
 package timeout
 
 import (
-	"math"
 	"testing"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
+// TestConstructor tests that constructor performs needed checks and returns expected values depending on different inputs.
 func TestConstructor(t *testing.T) {
 	c, err := NewConfig(1200*time.Millisecond, 2000*time.Millisecond, 1.5, 3, time.Second)
 	require.NoError(t, err)
@@ -36,6 +36,7 @@ func TestConstructor(t *testing.T) {
 	require.True(t, model.IsConfigurationError(err))
 }
 
+// TestDefaultConfig tests that default config is filled with correct values.
 func TestDefaultConfig(t *testing.T) {
 	c := NewDefaultConfig()
 
@@ -43,20 +44,4 @@ func TestDefaultConfig(t *testing.T) {
 	require.Equal(t, float64(1.2), c.TimeoutIncrease)
 	require.Equal(t, uint64(6), c.HappyPathRounds)
 	require.Equal(t, float64(0), c.BlockRateDelayMS)
-}
-
-func TestStandardTimeoutDecreaseFactor(t *testing.T) {
-	timeoutIncreaseFactor := 2.0
-
-	offlineFraction := 1.0 / 3.0
-	f := StandardTimeoutDecreaseFactor(offlineFraction, timeoutIncreaseFactor)
-	expected := math.Pow(timeoutIncreaseFactor, offlineFraction) * math.Pow(f, 1.0-offlineFraction)
-	numericalError := math.Abs(expected - 1.0)
-	require.True(t, numericalError < 1e-15)
-
-	offlineFraction = 0.2
-	f = StandardTimeoutDecreaseFactor(offlineFraction, timeoutIncreaseFactor)
-	expected = math.Pow(timeoutIncreaseFactor, offlineFraction) * math.Pow(f, 1.0-offlineFraction)
-	numericalError = math.Abs(expected - 1.0)
-	require.True(t, numericalError < 1e-15)
 }
