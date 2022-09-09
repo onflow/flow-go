@@ -83,6 +83,8 @@ func (vm *VirtualMachine) RunV2(
 		meterParams,
 	)
 	if err != nil {
+		// TODO(JanezP): returning this from here makes this a Failure.
+		// Make sure this is ok and wrap it in a proper error.
 		return fmt.Errorf("error gettng environment meter parameters: %w", err)
 	}
 

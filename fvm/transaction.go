@@ -18,7 +18,10 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) error
+	// Process processes a transaction.
+	// Process should expect that the transaction procedure might already contain an error.
+	// Process can only return a Failure in which case execution will halt.
+	Process(*VirtualMachine, Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) errors.Failure
 }
 
 type TransactionProcedure struct {
@@ -38,20 +41,17 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
 	proc.TraceSpan = traceSpan
 }
 
+// Run runs the transaction procedure.
+// returning an error indicates a critical failure in the FVM. No other transactions should be executed afterwards.
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateHolder, programs *programs.Programs) error {
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, proc, st, programs)
-		txErr, failure := errors.SplitErrorTypes(err)
+		failure := p.Process(vm, ctx, proc, st, programs)
 		if failure != nil {
-			// log the full error path
-			ctx.Logger.Err(err).Msg("fatal error when execution a transaction")
+			ctx.Logger.
+				Err(failure).
+				Uint16("failure code", uint16(failure.FailureCode())).
+				Msg("fatal error when execution a transaction")
 			return failure
-		}
-
-		if txErr != nil {
-			proc.Err = txErr
-			// TODO we should not break here we should continue for fee deductions
-			break
 		}
 	}
 

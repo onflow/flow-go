@@ -23,8 +23,19 @@ func (c *TransactionSequenceNumberChecker) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	_ *programs.Programs,
-) error {
-	return c.checkAndIncrementSequenceNumber(proc, ctx, sth)
+) errors.Failure {
+	if proc.Err != nil {
+		return nil
+	}
+	err := c.checkAndIncrementSequenceNumber(proc, ctx, sth)
+	processErr, failure := errors.SplitErrorTypes(err)
+	if failure != nil {
+		return failure
+	}
+	if err != nil {
+		proc.Err = processErr
+	}
+	return nil
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(

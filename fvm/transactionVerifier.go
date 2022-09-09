@@ -37,8 +37,19 @@ func (v *TransactionVerifier) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	_ *programs.Programs,
-) error {
-	return v.verifyTransaction(proc, ctx, sth)
+) errors.Failure {
+	if proc.Err != nil {
+		return nil
+	}
+	err := v.verifyTransaction(proc, ctx, sth)
+	processErr, failure := errors.SplitErrorTypes(err)
+	if failure != nil {
+		return failure
+	}
+	if err != nil {
+		proc.Err = processErr
+	}
+	return nil
 }
 
 func newInvalidEnvelopeSignatureError(txSig flow.TransactionSignature, err error) error {

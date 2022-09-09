@@ -45,7 +45,8 @@ func TestSafetyCheck(t *testing.T) {
 		)
 
 		err := txInvoker.Process(vm, context, proc, stTxn, programs.NewEmptyPrograms())
-		require.Error(t, err)
+		require.NoError(t, err)
+		require.Error(t, proc.Err)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
@@ -76,7 +77,8 @@ func TestSafetyCheck(t *testing.T) {
 		)
 
 		err := txInvoker.Process(vm, context, proc, stTxn, programs.NewEmptyPrograms())
-		require.Error(t, err)
+		require.NoError(t, err)
+		require.Error(t, proc.Err)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")

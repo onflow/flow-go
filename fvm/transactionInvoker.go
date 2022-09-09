@@ -30,6 +30,29 @@ func (i TransactionInvoker) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programsCache.Programs,
+) errors.Failure {
+	if proc.Err != nil {
+		// this would eventually test if fees can still be deducted, and if so, deduct them
+		return nil
+	}
+	// TODO(JanezP): push failure handling further in
+	err := i.process(vm, ctx, proc, sth, programs)
+	processErr, failure := errors.SplitErrorTypes(err)
+	if failure != nil {
+		return failure
+	}
+	if err != nil {
+		proc.Err = processErr
+	}
+	return nil
+}
+
+func (i TransactionInvoker) process(
+	vm *VirtualMachine,
+	ctx Context,
+	proc *TransactionProcedure,
+	sth *state.StateHolder,
+	programs *programsCache.Programs,
 ) (processErr error) {
 
 	txIDStr := proc.ID.String()

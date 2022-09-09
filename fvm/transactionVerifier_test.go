@@ -55,8 +55,9 @@ func TestTransactionVerification(t *testing.T) {
 
 		txVerifier := fvm.NewTransactionVerifier(1000)
 		err = txVerifier.Process(nil, fvm.Context{}, proc, stTxn, programs.NewEmptyPrograms())
-		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), "duplicate signatures are provided for the same key"))
+		require.NoError(t, err)
+		require.Error(t, proc.Err)
+		require.True(t, strings.Contains(proc.Err.Error(), "duplicate signatures are provided for the same key"))
 	})
 	t.Run("duplicated authorization and envelope signatures", func(t *testing.T) {
 
@@ -75,8 +76,9 @@ func TestTransactionVerification(t *testing.T) {
 
 		txVerifier := fvm.NewTransactionVerifier(1000)
 		err = txVerifier.Process(nil, fvm.Context{}, proc, stTxn, programs.NewEmptyPrograms())
-		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), "duplicate signatures are provided for the same key"))
+		require.NoError(t, err)
+		require.Error(t, proc.Err)
+		require.True(t, strings.Contains(proc.Err.Error(), "duplicate signatures are provided for the same key"))
 	})
 
 	t.Run("invalid envelope signature", func(t *testing.T) {
@@ -109,10 +111,11 @@ func TestTransactionVerification(t *testing.T) {
 		proc := fvm.Transaction(&tx, 0)
 		txVerifier := fvm.NewTransactionVerifier(1000)
 		err = txVerifier.Process(nil, fvm.Context{}, proc, stTxn, programs.NewEmptyPrograms())
-		require.Error(t, err)
+		require.NoError(t, err)
+		require.Error(t, proc.Err)
 
 		var envelopeError *errors.InvalidEnvelopeSignatureError
-		require.ErrorAs(t, err, &envelopeError)
+		require.ErrorAs(t, proc.Err, &envelopeError)
 	})
 
 	t.Run("invalid payload signature", func(t *testing.T) {
@@ -145,10 +148,11 @@ func TestTransactionVerification(t *testing.T) {
 		proc := fvm.Transaction(&tx, 0)
 		txVerifier := fvm.NewTransactionVerifier(1000)
 		err = txVerifier.Process(nil, fvm.Context{}, proc, stTxn, programs.NewEmptyPrograms())
-		require.Error(t, err)
+		require.NoError(t, err)
+		require.Error(t, proc.Err)
 
 		var payloadError *errors.InvalidPayloadSignatureError
-		require.ErrorAs(t, err, &payloadError)
+		require.ErrorAs(t, proc.Err, &payloadError)
 	})
 
 	t.Run("invalid payload and envelope signatures", func(t *testing.T) {
@@ -178,11 +182,12 @@ func TestTransactionVerification(t *testing.T) {
 		proc := fvm.Transaction(&tx, 0)
 		txVerifier := fvm.NewTransactionVerifier(1000)
 		err = txVerifier.Process(nil, fvm.Context{}, proc, stTxn, programs.NewEmptyPrograms())
-		require.Error(t, err)
+		require.NoError(t, err)
+		require.Error(t, proc.Err)
 
 		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
 		var payloadError *errors.InvalidPayloadSignatureError
-		require.ErrorAs(t, err, &payloadError)
+		require.ErrorAs(t, proc.Err, &payloadError)
 	})
 
 	t.Run("frozen account is rejected", func(t *testing.T) {
@@ -228,7 +233,8 @@ func TestTransactionVerification(t *testing.T) {
 			Authorizers: []flow.Address{frozenAddress},
 		}, 0)
 		err = txChecker.Process(nil, fvm.Context{}, tx, st, programsStorage)
-		require.Error(t, err)
+		require.NoError(t, err)
+		require.Error(t, tx.Err)
 
 		// all addresses must not be frozen
 		tx = fvm.Transaction(&flow.TransactionBody{
@@ -237,7 +243,8 @@ func TestTransactionVerification(t *testing.T) {
 			Authorizers: []flow.Address{frozenAddress, notFrozenAddress},
 		}, 0)
 		err = txChecker.Process(nil, fvm.Context{}, tx, st, programsStorage)
-		require.Error(t, err)
+		require.NoError(t, err)
+		require.Error(t, tx.Err)
 
 		// Payer should be part of authorizers account, but lets check it separately for completeness
 
@@ -253,7 +260,8 @@ func TestTransactionVerification(t *testing.T) {
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 		}, 0)
 		err = txChecker.Process(nil, fvm.Context{}, tx, st, programsStorage)
-		require.Error(t, err)
+		require.NoError(t, err)
+		require.Error(t, tx.Err)
 
 		// Proposal account
 
@@ -262,7 +270,8 @@ func TestTransactionVerification(t *testing.T) {
 			ProposalKey: flow.ProposalKey{Address: frozenAddress},
 		}, 0)
 		err = txChecker.Process(nil, fvm.Context{}, tx, st, programsStorage)
-		require.Error(t, err)
+		require.NoError(t, err)
+		require.Error(t, tx.Err)
 
 		tx = fvm.Transaction(&flow.TransactionBody{
 			Payer:       notFrozenAddress,
