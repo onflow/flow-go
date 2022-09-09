@@ -218,3 +218,69 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 		assert.Equal(t, finalizedViews, FinalizedViews(instances[i]), "instance %d should have same finalized view as first instance")
 	}
 }
+
+// TestBlockDelayIsHigherThanTimeout tests an edge case where block delay is the same as round duration
+// which results in timing edge cases where some nodes generate timeout objects but don't yet form a TC but then receive
+// a proposal with newer QC.
+func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
+	numPass := 2
+	numFail := 2
+	finalView := uint64(20)
+
+	// generate the seven hotstuff participants
+	participants := unittest.IdentityListFixture(numPass + numFail)
+	instances := make([]*Instance, 0, numPass+numFail)
+	root := DefaultRoot()
+	// set block rate delay to be bigger than minimal timeout
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, 6, pmTimeout*2)
+	require.NoError(t, err)
+
+	// set up five instances that work fully
+	for n := 0; n < numPass; n++ {
+		in := NewInstance(t,
+			WithRoot(root),
+			WithParticipants(participants),
+			WithLocalID(participants[n].NodeID),
+			WithTimeouts(timeouts),
+			WithStopCondition(ViewReached(finalView)),
+		)
+		instances = append(instances, in)
+	}
+
+	// set up two instances which don't generate timeout objects
+	for n := numPass; n < numPass+numFail; n++ {
+		in := NewInstance(t,
+			WithRoot(root),
+			WithParticipants(participants),
+			WithLocalID(participants[n].NodeID),
+			WithTimeouts(timeouts),
+			WithStopCondition(ViewReached(finalView)),
+			WithOutgoingTimeoutObjects(BlockAllTimeoutObjects),
+		)
+		instances = append(instances, in)
+	}
+
+	// connect the communicators of the instances together
+	Connect(instances)
+
+	// start all seven instances and wait for them to wrap up
+	var wg sync.WaitGroup
+	for _, in := range instances {
+		wg.Add(1)
+		go func(in *Instance) {
+			err := in.Run()
+			require.True(t, errors.Is(err, errStopCondition))
+			wg.Done()
+		}(in)
+	}
+	wg.Wait()
+
+	// check that all instances have the same finalized block
+	ref := instances[0]
+	assert.Less(t, finalView-uint64(2*numPass+numFail), ref.forks.FinalizedBlock().View, "expect instance 0 should made enough progress, but didn't")
+	finalizedViews := FinalizedViews(ref)
+	for i := 1; i < numPass; i++ {
+		assert.Equal(t, ref.forks.FinalizedBlock(), instances[i].forks.FinalizedBlock(), "instance %d should have same finalized block as first instance")
+		assert.Equal(t, finalizedViews, FinalizedViews(instances[i]), "instance %d should have same finalized view as first instance")
+	}
+}

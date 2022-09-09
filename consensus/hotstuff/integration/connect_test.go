@@ -112,6 +112,12 @@ func Connect(instances []*Instance) {
 						continue
 					}
 
+					// check if we should block the outgoing value
+					if sender.blockTimeoutObjectOut(timeoutObject) {
+						continue
+					}
+
+					// check if we should block the incoming value
 					if receiver.blockTimeoutObjectIn(timeoutObject) {
 						continue
 					}

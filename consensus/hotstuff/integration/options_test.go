@@ -19,6 +19,7 @@ type Config struct {
 	IncomingVotes          VoteFilter
 	OutgoingVotes          VoteFilter
 	IncomingTimeoutObjects TimeoutObjectFilter
+	OutgoingTimeoutObjects TimeoutObjectFilter
 	IncomingProposals      ProposalFilter
 	OutgoingProposals      ProposalFilter
 
@@ -76,6 +77,12 @@ func WithOutgoingProposals(Filter ProposalFilter) Option {
 func WithIncomingTimeoutObjects(Filter TimeoutObjectFilter) Option {
 	return func(cfg *Config) {
 		cfg.IncomingTimeoutObjects = Filter
+	}
+}
+
+func WithOutgoingTimeoutObjects(Filter TimeoutObjectFilter) Option {
+	return func(cfg *Config) {
+		cfg.OutgoingTimeoutObjects = Filter
 	}
 }
 

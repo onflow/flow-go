@@ -44,14 +44,15 @@ import (
 type Instance struct {
 
 	// instance parameters
-	participants         flow.IdentityList
-	localID              flow.Identifier
-	blockVoteIn          VoteFilter
-	blockVoteOut         VoteFilter
-	blockPropIn          ProposalFilter
-	blockPropOut         ProposalFilter
-	blockTimeoutObjectIn TimeoutObjectFilter
-	stop                 Condition
+	participants          flow.IdentityList
+	localID               flow.Identifier
+	blockVoteIn           VoteFilter
+	blockVoteOut          VoteFilter
+	blockPropIn           ProposalFilter
+	blockPropOut          ProposalFilter
+	blockTimeoutObjectIn  TimeoutObjectFilter
+	blockTimeoutObjectOut TimeoutObjectFilter
+	stop                  Condition
 
 	// instance data
 	queue          chan interface{}
@@ -99,6 +100,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		IncomingProposals:      BlockNoProposals,
 		OutgoingProposals:      BlockNoProposals,
 		IncomingTimeoutObjects: BlockNoTimeoutObjects,
+		OutgoingTimeoutObjects: BlockNoTimeoutObjects,
 		StopCondition:          RightAway,
 	}
 
@@ -123,14 +125,15 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	in := Instance{
 
 		// instance parameters
-		participants:         cfg.Participants,
-		localID:              cfg.LocalID,
-		blockVoteIn:          cfg.IncomingVotes,
-		blockVoteOut:         cfg.OutgoingVotes,
-		blockPropIn:          cfg.IncomingProposals,
-		blockPropOut:         cfg.OutgoingProposals,
-		blockTimeoutObjectIn: cfg.IncomingTimeoutObjects,
-		stop:                 cfg.StopCondition,
+		participants:          cfg.Participants,
+		localID:               cfg.LocalID,
+		blockVoteIn:           cfg.IncomingVotes,
+		blockVoteOut:          cfg.OutgoingVotes,
+		blockPropIn:           cfg.IncomingProposals,
+		blockPropOut:          cfg.OutgoingProposals,
+		blockTimeoutObjectIn:  cfg.IncomingTimeoutObjects,
+		blockTimeoutObjectOut: cfg.OutgoingTimeoutObjects,
+		stop:                  cfg.StopCondition,
 
 		// instance data
 		pendings: make(map[flow.Identifier]*model.Proposal),
