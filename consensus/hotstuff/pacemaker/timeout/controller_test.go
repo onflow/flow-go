@@ -112,8 +112,8 @@ func Test_MaxCutoff(t *testing.T) {
 	}
 	tc := NewController(c)
 
-	for i := 1; i <= 50; i += 1 {
-		tc.OnTimeout() // after already 7 iterations we should have reached the max value
+	for i := uint64(1); i <= c.HappyPathRounds+uint64(tc.maxExponent)*2; i += 1 {
+		tc.OnTimeout() // after 11 iterations we should have reached the max value
 		assert.True(t, float64(tc.ReplicaTimeout().Milliseconds()) <= maxRepTimeout)
 	}
 }
@@ -147,6 +147,7 @@ func Test_CombinedIncreaseDecreaseDynamics(t *testing.T) {
 	testDynamicSequence([]bool{increase, increase, increase, increase, increase, decrease})
 }
 
+// Test_BlockRateDelay check that correct block rate delay is returned
 func Test_BlockRateDelay(t *testing.T) {
 	// here we use a different timeout controller with a larger timeoutIncrease to avoid too many iterations
 	c, err := NewConfig(

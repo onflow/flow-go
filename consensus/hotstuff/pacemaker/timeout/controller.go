@@ -7,17 +7,29 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
-// Controller implements a timout with:
-// - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
-//   this results in exponential growing timeout duration on multiple subsequent timeouts
-// - on progress: decrease timeout by subtrahend `timeoutDecrease`
+// Controller implements a truncated exponential backoff which can be described with next formula:
+// duration = t_min * min(b ^ (r * θ(r-k)), t_max)
+// for practical purpose we will transform this formula into:
+// duration(r) = t_min * b ^ (min(r * θ(r-k)), c), where c = b(t_max / t_min).
+// In described formula:
+//   k - is number of rounds we expect during hot path, after failing this many rounds,
+//   we will start increasing timeouts.
+//   b - timeout increase factor
+//   r - number of failed rounds
+//   θ - Heaviside step function
+// 	 t_min/t_max - minimum/maximum round duration
+// By manipulating with `r` after observing progress or lack of it we are achieving exponential increase/decrease
+// of round durations.
+// - on timeout: increase number of failed rounds, this results in exponential growing round duration
+//   on multiple subsequent timeouts, after exceeding k.
+// - on progress: decrease number of failed rounds, this results in exponential decrease of round duration.
 type Controller struct {
 	cfg                   Config
-	maxExponent           float64
-	roundsWithoutProgress uint64
 	timer                 *time.Timer
 	timerInfo             *model.TimerInfo
 	timeoutChannel        <-chan time.Time
+	maxExponent           float64 // max exponent for exponential function, derived from maximum round duration
+	roundsWithoutProgress uint64  // number of failed rounds, higher value results in longer round duration
 }
 
 // NewController creates a new Controller.
@@ -27,7 +39,7 @@ func NewController(timeoutConfig Config) *Controller {
 	startChannel := make(chan time.Time)
 	close(startChannel)
 
-	// we need to calculate log_b(tmax/tmin), golang doesn't support logarithm with custom base
+	// we need to calculate log_b(t_max/t_min), golang doesn't support logarithm with custom base
 	// we will apply change of base logarithm transformation to get around this:
 	// log_b(x) = log_e(x) / log_e(b)
 	maxExponent := math.Log(timeoutConfig.MaxReplicaTimeout/timeoutConfig.MinReplicaTimeout) /
@@ -41,10 +53,6 @@ func NewController(timeoutConfig Config) *Controller {
 	return &tc
 }
 
-func DefaultController() *Controller {
-	return NewController(DefaultConfig)
-}
-
 // TimerInfo returns TimerInfo for the current timer.
 // New struct is created for each timer.
 // Is nil if no timer has been started.
@@ -56,7 +64,7 @@ func (t *Controller) TimerInfo() *model.TimerInfo { return t.timerInfo }
 // returns closed channel if no timer has been started.
 func (t *Controller) Channel() <-chan time.Time { return t.timeoutChannel }
 
-// StartTimeout starts the timeout of the specified type and returns the
+// StartTimeout starts the timeout of the specified type and returns the timer info
 func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
 	if t.timer != nil { // stop old timer
 		t.timer.Stop()
@@ -75,6 +83,7 @@ func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
 
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
+	// piecewise function
 	step := uint64(0)
 	if t.roundsWithoutProgress > t.cfg.HappyPathRounds {
 		step = 1
