@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 )
 
@@ -25,7 +24,7 @@ func NewScriptEnvironment(
 	fvmContext Context,
 	vm *VirtualMachine,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	programs handler.TransactionPrograms,
 ) *ScriptEnv {
 
 	tracer := environment.NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)

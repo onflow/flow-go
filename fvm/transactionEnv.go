@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/handler"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -35,7 +34,7 @@ func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	programs handler.TransactionPrograms,
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
