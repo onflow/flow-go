@@ -49,15 +49,13 @@ func (f *FollowerLogic) AddBlock(blockProposal *model.Proposal) error {
 		f.log.Warn().Err(err).Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
 			Msg("invalid proposal")
 		return nil
-	}
-	if errors.Is(err, model.ErrViewForUnknownEpoch) {
+	} else if errors.Is(err, model.ErrViewForUnknownEpoch) {
 		f.log.Warn().
 			Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
 			Hex("qc_block_id", logging.ID(blockProposal.Block.QC.BlockID)).
 			Uint64("block_view", blockProposal.Block.View).
 			Msg("proposal for unknown epoch")
-	}
-	if errors.Is(err, model.ErrUnverifiableBlock) {
+	} else if errors.Is(err, model.ErrUnverifiableBlock) {
 		f.log.Warn().
 			Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
 			Hex("qc_block_id", logging.ID(blockProposal.Block.QC.BlockID)).

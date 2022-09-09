@@ -6,12 +6,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpochJoinAndLeaveLN(t *testing.T) {
-	// TODO(active-pacemaker)
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flakey test")
 	suite.Run(t, new(EpochJoinAndLeaveLNSuite))
 }
 
