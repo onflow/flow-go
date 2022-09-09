@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -41,7 +42,7 @@ func getEnvironmentMeterParameters(
 
 func fillEnvironmentMeterParameters(
 	ctx Context,
-	env Environment,
+	env environment.Environment,
 	params meter.MeterParameters,
 ) (
 	meter.MeterParameters,
@@ -112,7 +113,7 @@ func fillEnvironmentMeterParameters(
 }
 
 func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
-	env Environment,
+	env environment.Environment,
 	service runtime.Address,
 	path cadence.Path,
 	defaultWeights map[KindType]uint64,
@@ -120,17 +121,10 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	map[KindType]uint64,
 	error,
 ) {
-	runtimeEnv := env.BorrowCadenceRuntime()
-	defer env.ReturnCadenceRuntime(runtimeEnv)
+	runtime := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(runtime)
 
-	value, err := env.VM().Runtime.ReadStored(
-		service,
-		path,
-		runtime.Context{
-			Interface:   env,
-			Environment: runtimeEnv,
-		},
-	)
+	value, err := runtime.ReadStored(service, path)
 
 	if err != nil {
 		// this might be fatal, return as is
@@ -163,7 +157,7 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 
 // GetExecutionEffortWeights reads stored execution effort weights from the service account
 func GetExecutionEffortWeights(
-	env Environment,
+	env environment.Environment,
 	service runtime.Address,
 ) (
 	computationWeights meter.ExecutionEffortWeights,
@@ -178,7 +172,7 @@ func GetExecutionEffortWeights(
 
 // GetExecutionMemoryWeights reads stored execution memory weights from the service account
 func GetExecutionMemoryWeights(
-	env Environment,
+	env environment.Environment,
 	service runtime.Address,
 ) (
 	memoryWeights meter.ExecutionMemoryWeights,
@@ -193,23 +187,18 @@ func GetExecutionMemoryWeights(
 
 // GetExecutionMemoryLimit reads the stored execution memory limit from the service account
 func GetExecutionMemoryLimit(
-	env Environment,
+	env environment.Environment,
 	service runtime.Address,
 ) (
 	memoryLimit uint64,
 	err error,
 ) {
-	runtimeEnv := env.BorrowCadenceRuntime()
-	defer env.ReturnCadenceRuntime(runtimeEnv)
+	runtime := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(runtime)
 
-	value, err := env.VM().Runtime.ReadStored(
+	value, err := runtime.ReadStored(
 		service,
-		blueprints.TransactionFeesExecutionMemoryLimitPath,
-		runtime.Context{
-			Interface:   env,
-			Environment: runtimeEnv,
-		},
-	)
+		blueprints.TransactionFeesExecutionMemoryLimitPath)
 	if err != nil {
 		// this might be fatal, return as is
 		return 0, err

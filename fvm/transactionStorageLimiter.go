@@ -6,7 +6,8 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 
-	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -18,7 +19,7 @@ func NewTransactionStorageLimiter() TransactionStorageLimiter {
 }
 
 func (d TransactionStorageLimiter) CheckLimits(
-	env Environment,
+	env environment.Environment,
 	addresses []flow.Address,
 ) error {
 	if !env.LimitAccountStorage() {

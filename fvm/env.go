@@ -3,68 +3,23 @@ package fvm
 import (
 	"fmt"
 
-	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/rs/zerolog"
-	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// Environment accepts a context and a virtual machine instance and provides
-// cadence runtime interface methods to the runtime.
-type Environment interface {
-	VM() *VirtualMachine
-	runtime.Interface
-
-	Chain() flow.Chain
-
-	LimitAccountStorage() bool
-
-	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
-	StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span
-
-	Logger() *zerolog.Logger
-
-	BorrowCadenceRuntime() *ReusableCadenceRuntime
-	ReturnCadenceRuntime(*ReusableCadenceRuntime)
-
-	SetAccountFrozen(address common.Address, frozen bool) error
-
-	AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error)
-}
-
-// TODO(patrick): refactor this into an object
-// Set of account api that do not have shared implementation.
-type AccountInterface interface {
-	CreateAccount(address runtime.Address) (runtime.Address, error)
-
-	AddAccountKey(
-		address runtime.Address,
-		publicKey *runtime.PublicKey,
-		hashAlgo runtime.HashAlgorithm,
-		weight int,
-	) (
-		*runtime.AccountKey,
-		error,
-	)
-
-	GetAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error)
-
-	RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error)
-
-	AddEncodedAccountKey(address runtime.Address, publicKey []byte) error
-}
+// TODO(patrick): rm after emulator is updated
+type Environment = environment.Environment
 
 // Parts of the environment that are common to all transaction and script
 // executions.
@@ -78,27 +33,84 @@ type commonEnv struct {
 	*environment.BlockInfo
 	environment.TransactionInfo
 	environment.EventEmitter
+	environment.AccountFreezer
 	*environment.ValueStore
 	*environment.ContractReader
+	*environment.AccountKeyReader
+	*environment.SystemContracts
 
-	*SystemContracts
+	handler.ContractUpdater
 
 	// TODO(patrick): rm
 	ctx Context
-
-	AccountInterface
 
 	sth         *state.StateHolder
 	vm          *VirtualMachine
 	programs    *handler.ProgramsHandler
 	accounts    environment.Accounts
 	accountKeys *handler.AccountKeyHandler
-	contracts   *handler.ContractHandler
-
-	frozenAccounts []common.Address
 
 	// TODO(patrick): rm once fully refactored
-	fullEnv Environment
+	fullEnv environment.Environment
+}
+
+func newCommonEnv(
+	ctx Context,
+	vm *VirtualMachine,
+	stateTransaction *state.StateHolder,
+	programs *programs.Programs,
+	tracer *environment.Tracer,
+	meter environment.Meter,
+) commonEnv {
+	accounts := environment.NewAccounts(stateTransaction)
+	programsHandler := handler.NewProgramsHandler(programs, stateTransaction)
+
+	return commonEnv{
+		Tracer: tracer,
+		Meter:  meter,
+		ProgramLogger: environment.NewProgramLogger(
+			tracer,
+			ctx.Logger,
+			ctx.Metrics,
+			ctx.CadenceLoggingEnabled,
+		),
+		UUIDGenerator: environment.NewUUIDGenerator(
+			tracer,
+			meter,
+			stateTransaction),
+		UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
+			tracer,
+			ctx.BlockHeader,
+		),
+		CryptoLibrary: environment.NewCryptoLibrary(tracer, meter),
+		BlockInfo: environment.NewBlockInfo(
+			tracer,
+			meter,
+			ctx.BlockHeader,
+			ctx.Blocks,
+		),
+		ValueStore: environment.NewValueStore(
+			tracer,
+			meter,
+			accounts,
+		),
+		ContractReader: environment.NewContractReader(
+			tracer,
+			meter,
+			accounts,
+		),
+		AccountKeyReader: environment.NewAccountKeyReader(
+			tracer,
+			meter,
+			accounts,
+		),
+		SystemContracts: environment.NewSystemContracts(),
+		ctx:             ctx,
+		sth:             stateTransaction,
+		vm:              vm,
+		programs:        programsHandler,
+		accounts:        accounts,
+	}
 }
 
 func (env *commonEnv) Chain() flow.Chain {
@@ -109,15 +121,13 @@ func (env *commonEnv) LimitAccountStorage() bool {
 	return env.ctx.LimitAccountStorage
 }
 
-func (env *commonEnv) VM() *VirtualMachine {
-	return env.vm
-}
-
-func (env *commonEnv) BorrowCadenceRuntime() *ReusableCadenceRuntime {
+func (env *commonEnv) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
 	return env.ctx.ReusableCadenceRuntimePool.Borrow(env.fullEnv)
 }
 
-func (env *commonEnv) ReturnCadenceRuntime(reusable *ReusableCadenceRuntime) {
+func (env *commonEnv) ReturnCadenceRuntime(
+	reusable *runtime.ReusableCadenceRuntime,
+) {
 	env.ctx.ReusableCadenceRuntimePool.Return(reusable)
 }
 
@@ -262,10 +272,10 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 
 // Commit commits changes and return a list of updated keys
 func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
-	keys, err := env.contracts.Commit()
+	keys, err := env.ContractUpdater.Commit()
 	return programs.ModifiedSets{
 		ContractUpdateKeys: keys,
-		FrozenAccounts:     env.frozenAccounts,
+		FrozenAccounts:     env.FrozenAccounts(),
 	}, err
 }
 
@@ -275,44 +285,4 @@ func (commonEnv) ResourceOwnerChanged(
 	common.Address,
 	common.Address,
 ) {
-}
-
-// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (env *commonEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	err := env.MeterComputation(environment.ComputationKindAllocateStorageIndex, 1)
-	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("allocate storage index failed: %w", err)
-	}
-
-	v, err := env.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
-	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
-	}
-	return v, nil
-}
-
-// GetAccountKey retrieves a public key by index from an existing account.
-//
-// This function returns a nil key with no errors, if a key doesn't exist at
-// the given index. An error is returned if the specified account does not
-// exist, the provided index is not valid, or if the key retrieval fails.
-func (env *commonEnv) GetAccountKey(
-	address runtime.Address,
-	keyIndex int,
-) (
-	*runtime.AccountKey,
-	error,
-) {
-	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
-
-	err := env.MeterComputation(environment.ComputationKindGetAccountKey, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get account key failed: %w", err)
-	}
-
-	accKey, err := env.accountKeys.GetAccountKey(address, keyIndex)
-	if err != nil {
-		return nil, fmt.Errorf("get account key failed: %w", err)
-	}
-	return accKey, err
 }
