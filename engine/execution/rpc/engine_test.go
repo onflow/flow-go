@@ -29,7 +29,8 @@ type Suite struct {
 	events     *storage.Events
 	exeResults *storage.ExecutionResults
 	txResults  *storage.TransactionResults
-	blocks     *storage.Blocks
+	commits    *storage.Commits
+	headers    *storage.Headers
 }
 
 func TestHandler(t *testing.T) {
@@ -41,7 +42,8 @@ func (suite *Suite) SetupTest() {
 	suite.events = new(storage.Events)
 	suite.exeResults = new(storage.ExecutionResults)
 	suite.txResults = new(storage.TransactionResults)
-	suite.blocks = new(storage.Blocks)
+	suite.commits = new(storage.Commits)
+	suite.headers = new(storage.Headers)
 }
 
 // TestExecuteScriptAtBlockID tests the ExecuteScriptAtBlockID API call
@@ -121,13 +123,14 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			eventMessages[j] = convert.EventToMessage(e)
 		}
 		// expect one call to lookup result for each block ID
-		suite.exeResults.On("ByBlockID", id).Return(nil, nil).Once()
+		//suite.exeResults.On("ByBlockID", id).Return(nil, nil).Once()
+		suite.commits.On("ByBlockID", id).Return(nil, nil).Once()
 
 		// expect one call to lookup events for each block ID
 		suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(eventsForBlock, nil).Once()
 
 		// expect one call to lookup each block
-		suite.blocks.On("ByID", id).Return(&block, nil).Once()
+		suite.headers.On("ByBlockID", id).Return(block.Header, nil).Once()
 
 		// create the expected result for this block
 		expectedResult[i] = &execution.GetEventsForBlockIDsResponse_Result{
@@ -139,10 +142,11 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	// create the handler
 	handler := &handler{
-		blocks:             suite.blocks,
+		headers:            suite.headers,
 		events:             suite.events,
 		exeResults:         suite.exeResults,
 		transactionResults: suite.txResults,
+		commits:            suite.commits,
 		chain:              flow.Mainnet,
 	}
 
@@ -210,7 +214,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		id := unittest.IdentifierFixture()
 
 		// expect a storage call for the invalid id but return an error
-		suite.exeResults.On("ByBlockID", id).Return(nil, realstorage.ErrNotFound).Once()
+		suite.commits.On("ByBlockID", id).Return(nil, realstorage.ErrNotFound).Once()
 
 		// create an API request with the invalid block id
 		req := concoctReq(string(flow.EventAccountCreated), [][]byte{id[:]})
@@ -359,12 +363,12 @@ func (suite *Suite) TestGetTransactionResult() {
 	suite.events.On("ByBlockIDTransactionID", bID, txID).Return(eventsForTx, nil)
 
 	// expect a call to lookup each block
-	suite.blocks.On("ByID", block.ID()).Return(&block, true)
+	suite.headers.On("ByID", block.ID()).Return(&block, true)
 
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {
 		handler := &handler{
-			blocks:             suite.blocks,
+			headers:            suite.headers,
 			events:             suite.events,
 			transactionResults: txResults,
 			chain:              flow.Mainnet,
@@ -700,7 +704,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {
 		handler := &handler{
-			blocks:             suite.blocks,
+			headers:            suite.headers,
 			events:             suite.events,
 			transactionResults: txResults,
 			chain:              flow.Mainnet,
