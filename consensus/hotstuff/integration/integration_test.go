@@ -17,7 +17,7 @@ import (
 // but for slow environment like CI, a longer one is needed.
 const safeTimeout = 2 * time.Second
 
-// number of failed rounds before timeout increase
+// number of failed rounds before first timeout increase
 const safeHappyPathRounds = 6
 
 func TestSingleInstance(t *testing.T) {

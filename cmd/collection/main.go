@@ -132,7 +132,7 @@ func main() {
 			"multiplicative increase of timeout value in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathRounds, "hotstuff-happy-path-rounds",
 			timeout.DefaultConfig.HappyPathRounds,
-			"number of failed rounds before timeout increase")
+			"number of failed rounds before first timeout increase")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
 		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,

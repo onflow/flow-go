@@ -28,7 +28,7 @@ const (
 	minRepTimeout          float64 = 100.0 // Milliseconds
 	maxRepTimeout          float64 = 600.0 // Milliseconds
 	multiplicativeIncrease float64 = 1.5   // multiplicative factor
-	happyPathRounds        uint64  = 6     // number of failed rounds before timeout increase
+	happyPathRounds        uint64  = 6     // number of failed rounds before first timeout increase
 )
 
 // TestPaceMaker is a real pacemaker module with logging for view changes
