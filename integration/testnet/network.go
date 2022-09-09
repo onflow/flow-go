@@ -855,7 +855,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// net.AccessPorts[ColNodeMetricsPort] = hostMetricsPort
 			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 			// set a low timeout so that all nodes agree on the current view more quickly
-			nodeContainer.AddFlag("hotstuff-timeout", time.Second.String())
 			nodeContainer.AddFlag("hotstuff-min-timeout", time.Second.String())
 			t.Logf("%v hotstuff startup time will be in 8 seconds: %v", time.Now().UTC(), hotstuffStartupTime)
 			nodeContainer.AddFlag("hotstuff-startup-time", hotstuffStartupTime)
