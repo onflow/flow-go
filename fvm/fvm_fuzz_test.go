@@ -101,6 +101,7 @@ var fuzzTransactionTypes = []transactionType{
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			// if there is an error, it should be computation exceeded
 			if results.tx.Err != nil {
+				require.Len(t, results.tx.Events, 3)
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
@@ -131,6 +132,7 @@ var fuzzTransactionTypes = []transactionType{
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.tx.Err)
+			require.Len(t, results.tx.Events, 3)
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the failed transfer
@@ -157,6 +159,7 @@ var fuzzTransactionTypes = []transactionType{
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.tx.Err)
+			require.Len(t, results.tx.Events, 3)
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the panic
@@ -182,6 +185,7 @@ var fuzzTransactionTypes = []transactionType{
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			// if there is an error, it should be computation exceeded
 			if results.tx.Err != nil {
+				require.Len(t, results.tx.Events, 3)
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
