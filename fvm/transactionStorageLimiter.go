@@ -55,7 +55,7 @@ func (d TransactionStorageLimiter) CheckLimits(
 	}
 
 	for i, value := range resultArray.Values {
-		capacity := storageMBUFixToBytesUInt(value)
+		capacity := environment.StorageMBUFixToBytesUInt(value)
 
 		if usages[i] > capacity {
 			return errors.NewStorageCapacityExceededError(flow.BytesToAddress(addresses[i].Bytes()), usages[i], capacity)
