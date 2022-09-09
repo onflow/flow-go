@@ -214,28 +214,25 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 // eventually a bunch of blocks in one go.
 // The following illustrates the tree of submitted blocks, with notation
 //
-//   - [a, b] is a block at view "b" with a QC with view "a",
-//     e.g., [1, 2] means a block at view "2" with an included  QC for view "1"
-//
-//     [52078+14, 52078+20] (should finalize this fork)
-//     |
-//     |
-//     [52078+13, 52078+14]
-//     |
-//     |
-//     [52078+11, 52078+17]         [52078+ 9, 52078+13]   [52078+ 9, 52078+10]
-//     |                                               |  /
-//     |                                               | /
-//     [52078+ 7, 52078+ 8]   [52078+ 7, 52078+11]         [52078+ 5, 52078+ 9]   [52078+ 5, 52078+ 6]
-//     \ |                                               |  /
-//     \|                                               | /
-//     [52078+ 3, 52078+ 4]   [52078+ 3, 52078+ 7]         [52078+ 1, 52078+ 5]   [52078+ 1, 52078+ 2]
-//     \ |                                               |  /
-//     \|                                               | /
-//     [52078+ 0, 52078+ 3]         [52078+ 0, 52078+ 1]
-//     \         /
-//     \       /
-//     [52078+ 0, x] (root block; no qc to parent)
+//	                                                    [52078+14, 52078+20] (should finalize this fork)
+//	                                                                       |
+//	                                                                       |
+//	                                                    [52078+13, 52078+14]
+//	                                                                       |
+//	                                                                       |
+//	                       [52078+11, 52078+17]         [52078+ 9, 52078+13]   [52078+ 9, 52078+10]
+//	                       |                                               |  /
+//	                       |                                               | /
+//	[52078+ 7, 52078+ 8]   [52078+ 7, 52078+11]         [52078+ 5, 52078+ 9]   [52078+ 5, 52078+ 6]
+//	                     \ |                                               |  /
+//	                      \|                                               | /
+//	[52078+ 3, 52078+ 4]   [52078+ 3, 52078+ 7]         [52078+ 1, 52078+ 5]   [52078+ 1, 52078+ 2]
+//	                     \ |                                               |  /
+//	                      \|                                               | /
+//	                       [52078+ 0, 52078+ 3]         [52078+ 0, 52078+ 1]
+//	                                          \         /
+//	                                           \       /
+//	                                         [52078+ 0, x] (root block; no qc to parent)
 func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 	// in the following, we reference the block's by their view minus the view of the
 	// root block (52078). E.g. block [52078+ 9, 52078+10] would be referenced as `block10`
