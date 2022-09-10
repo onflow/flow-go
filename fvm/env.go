@@ -49,7 +49,6 @@ type commonEnv struct {
 	ctx Context
 
 	sth         *state.StateHolder
-	vm          *VirtualMachine
 	programs    *handler.ProgramsHandler
 	accounts    environment.Accounts
 	accountKeys *handler.AccountKeyHandler
@@ -60,7 +59,6 @@ type commonEnv struct {
 
 func newCommonEnv(
 	ctx Context,
-	vm *VirtualMachine,
 	stateTransaction *state.StateHolder,
 	programs handler.TransactionPrograms,
 	tracer *environment.Tracer,
@@ -118,7 +116,6 @@ func newCommonEnv(
 		SystemContracts: systemContracts,
 		ctx:             ctx,
 		sth:             stateTransaction,
-		vm:              vm,
 		programs:        programsHandler,
 		accounts:        accounts,
 	}
@@ -201,6 +198,12 @@ func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
 		ContractUpdateKeys: keys,
 		FrozenAccounts:     env.FrozenAccounts(),
 	}, err
+}
+
+func (env *commonEnv) Reset() {
+	env.ContractUpdater.Reset()
+	env.EventEmitter.Reset()
+	env.AccountFreezer.Reset()
 }
 
 func (commonEnv) ResourceOwnerChanged(

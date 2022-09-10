@@ -33,7 +33,6 @@ func NewScriptEnvironment(
 	env := &ScriptEnv{
 		commonEnv: newCommonEnv(
 			fvmContext,
-			vm,
 			sth,
 			programs,
 			tracer,

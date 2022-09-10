@@ -739,6 +739,11 @@ func (_m *Environment) RemoveAccountContractCode(address common.Address, name st
 	return r0
 }
 
+// Reset provides a mock function with given fields:
+func (_m *Environment) Reset() {
+	_m.Called()
+}
+
 // ResolveLocation provides a mock function with given fields: identifiers, location
 func (_m *Environment) ResolveLocation(identifiers []ast.Identifier, location common.Location) ([]sema.ResolvedLocation, error) {
 	ret := _m.Called(identifiers, location)
