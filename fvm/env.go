@@ -37,7 +37,10 @@ type commonEnv struct {
 	environment.TransactionInfo
 
 	environment.EventEmitter
+
+	environment.AccountCreator
 	environment.AccountFreezer
+
 	*environment.ValueStore
 	*environment.ContractReader
 	*environment.AccountKeyReader

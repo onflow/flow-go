@@ -42,6 +42,7 @@ func NewScriptEnvironment(
 
 	env.TransactionInfo = environment.NoTransactionInfo{}
 	env.EventEmitter = environment.NoEventEmitter{}
+	env.AccountCreator = environment.NoAccountCreator{}
 	env.AccountFreezer = environment.NoAccountFreezer{}
 	env.SystemContracts.SetEnvironment(env)
 
@@ -55,10 +56,6 @@ func NewScriptEnvironment(
 }
 
 // Block Environment Functions
-
-func (e *ScriptEnv) CreateAccount(_ runtime.Address) (address runtime.Address, err error) {
-	return runtime.Address{}, errors.NewOperationNotSupportedError("CreateAccount")
-}
 
 func (e *ScriptEnv) AddEncodedAccountKey(_ runtime.Address, _ []byte) error {
 	return errors.NewOperationNotSupportedError("AddEncodedAccountKey")

@@ -24,10 +24,9 @@ var _ runtime.Interface = &TransactionEnv{}
 type TransactionEnv struct {
 	commonEnv
 
-	addressGenerator flow.AddressGenerator
-	tx               *flow.TransactionBody
-	txIndex          uint32
-	txID             flow.Identifier
+	tx      *flow.TransactionBody
+	txIndex uint32
+	txID    flow.Identifier
 }
 
 func NewTransactionEnvironment(
@@ -41,7 +40,6 @@ func NewTransactionEnvironment(
 ) *TransactionEnv {
 
 	txID := tx.ID()
-	generator := environment.NewAccountCreator(sth, ctx.Chain)
 	// TODO set the flags on context
 	tracer := environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
 	meter := environment.NewMeter(sth)
@@ -54,10 +52,9 @@ func NewTransactionEnvironment(
 			tracer,
 			meter,
 		),
-		addressGenerator: generator,
-		tx:               tx,
-		txIndex:          txIndex,
-		txID:             txID,
+		tx:      tx,
+		txIndex: txIndex,
+		txID:    txID,
 	}
 
 	env.TransactionInfo = environment.NewTransactionInfo(
@@ -75,6 +72,15 @@ func NewTransactionEnvironment(
 		ctx.ServiceEventCollectionEnabled,
 		ctx.EventCollectionByteSizeLimit,
 	)
+	env.AccountCreator = environment.NewAccountCreator(
+		sth,
+		ctx.Chain,
+		env.accounts,
+		ctx.ServiceAccountEnabled,
+		tracer,
+		meter,
+		ctx.Metrics,
+		env.SystemContracts)
 	env.AccountFreezer = environment.NewAccountFreezer(
 		ctx.Chain.ServiceAddress(),
 		env.accounts,
@@ -191,38 +197,6 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
 	return e.UseContractAuditVoucher(address, string(code[:]))
-}
-
-func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
-	defer e.StartSpanFromRoot(trace.FVMEnvCreateAccount).End()
-
-	err = e.MeterComputation(environment.ComputationKindCreateAccount, 1)
-	if err != nil {
-		return address, err
-	}
-
-	e.sth.DisableAllLimitEnforcements() // don't enforce limit during account creation
-	defer e.sth.EnableAllLimitEnforcements()
-
-	flowAddress, err := e.addressGenerator.NextAddress()
-	if err != nil {
-		return address, err
-	}
-
-	err = e.accounts.Create(nil, flowAddress)
-	if err != nil {
-		return address, fmt.Errorf("create account failed: %w", err)
-	}
-
-	if e.ctx.ServiceAccountEnabled {
-		_, invokeErr := e.SetupNewAccount(flowAddress, payer)
-		if invokeErr != nil {
-			return address, invokeErr
-		}
-	}
-
-	e.ctx.Metrics.RuntimeSetNumberOfAccounts(e.addressGenerator.AddressCount())
-	return runtime.Address(flowAddress), nil
 }
 
 // AddEncodedAccountKey adds an encoded public key to an existing account.
