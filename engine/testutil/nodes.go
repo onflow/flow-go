@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -572,10 +570,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
-	vm := fvm.NewVirtualMachine(rt)
-
 	blockFinder := environment.NewBlockFinder(node.Headers)
 
 	vmCtx := fvm.NewContext(
@@ -605,14 +599,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Tracer,
 		node.Me,
 		node.State,
-		vm,
 		vmCtx,
-		computation.DefaultProgramsCacheSize,
 		committer,
-		computation.DefaultScriptLogThreshold,
-		computation.DefaultScriptExecutionTimeLimit,
 		nil,
 		prov,
+		computation.ComputationConfig{
+			ProgramsCacheSize:        computation.DefaultProgramsCacheSize,
+			ScriptLogThreshold:       computation.DefaultScriptLogThreshold,
+			ScriptExecutionTimeLimit: computation.DefaultScriptExecutionTimeLimit,
+		},
 	)
 	require.NoError(t, err)
 
@@ -652,6 +647,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		false,
 		checkAuthorizedAtBlock,
 		false,
+		nil,
 		nil,
 	)
 	require.NoError(t, err)
@@ -703,7 +699,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		RequestEngine:       requestEngine,
 		ReceiptsEngine:      pusherEngine,
 		BadgerDB:            node.PublicDB,
-		VM:                  vm,
+		VM:                  computationEngine.VM(),
 		ExecutionState:      execState,
 		Ledger:              ls,
 		LevelDbDir:          dbDir,
@@ -874,9 +870,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.VerifierEngine == nil {
-		rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
-		vm := fvm.NewVirtualMachine(rt)
+		vm := fvm.NewVM()
 
 		blockFinder := environment.NewBlockFinder(node.Headers)
 

@@ -3,7 +3,6 @@ package complete_test
 import (
 	"math"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -43,11 +42,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 	rand.Seed(time.Now().UnixNano())
 
-	dir, err := os.MkdirTemp("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, steps+1, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
@@ -162,11 +157,7 @@ func BenchmarkTrieUpdate(b *testing.B) {
 
 	rand.Seed(1)
 
-	dir, err := os.MkdirTemp("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
@@ -220,11 +211,7 @@ func BenchmarkTrieRead(b *testing.B) {
 
 	rand.Seed(1)
 
-	dir, err := os.MkdirTemp("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
@@ -287,11 +274,7 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 
 	rand.Seed(1)
 
-	dir, err := os.MkdirTemp("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
@@ -371,11 +354,7 @@ func BenchmarkTrieProve(b *testing.B) {
 
 	rand.Seed(1)
 
-	dir, err := os.MkdirTemp("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)

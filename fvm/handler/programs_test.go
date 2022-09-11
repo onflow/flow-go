@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
@@ -115,8 +113,7 @@ func Test_Programs(t *testing.T) {
 
 	stTxn := state.NewStateTransaction(mainView, state.DefaultParameters())
 
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 	programs := programsStorage.NewEmptyPrograms()
 
 	accounts := environment.NewAccounts(stTxn)
@@ -138,7 +135,8 @@ func Test_Programs(t *testing.T) {
 	context := fvm.NewContext(
 		fvm.WithContractDeploymentRestricted(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker()),
-		fvm.WithCadenceLogging(true))
+		fvm.WithCadenceLogging(true),
+		fvm.WithBlockPrograms(programs))
 
 	var contractAView *delta.View = nil
 	var contractBView *delta.View = nil
@@ -153,7 +151,7 @@ func Test_Programs(t *testing.T) {
 		procContractA0 := fvm.Transaction(
 			contractDeployTx("A", contractA0Code, addressA),
 			programs.NextTxIndexForTestingOnly())
-		err = vm.Run(context, procContractA0, mainView, programs)
+		err = vm.RunV2(context, procContractA0, mainView)
 		require.NoError(t, err)
 
 		retrievedContractA, err = accounts.GetContract("A", addressA)
@@ -165,7 +163,7 @@ func Test_Programs(t *testing.T) {
 		procContractA := fvm.Transaction(
 			updateContractTx("A", contractACode, addressA),
 			programs.NextTxIndexForTestingOnly())
-		err = vm.Run(context, procContractA, mainView, programs)
+		err = vm.RunV2(context, procContractA, mainView)
 		require.NoError(t, err)
 		require.NoError(t, procContractA.Err)
 
@@ -182,7 +180,7 @@ func Test_Programs(t *testing.T) {
 		procContractA := fvm.Transaction(
 			contractDeployTx("A", contractACode, addressA),
 			programs.NextTxIndexForTestingOnly())
-		err := vm.Run(context, procContractA, mainView, programs)
+		err := vm.RunV2(context, procContractA, mainView)
 		require.NoError(t, err)
 
 		fmt.Println("---------- Real transaction here ------------")
@@ -201,7 +199,7 @@ func Test_Programs(t *testing.T) {
 			return mainView.Peek(owner, key)
 		})
 
-		err = vm.Run(context, procCallA, viewExecA, programs)
+		err = vm.RunV2(context, procCallA, viewExecA)
 		require.NoError(t, err)
 
 		// make sure tx was really run
@@ -239,7 +237,7 @@ func Test_Programs(t *testing.T) {
 			callTx("A", addressA),
 			programs.NextTxIndexForTestingOnly())
 
-		err = vm.Run(context, procCallA, viewExecA2, programs)
+		err = vm.RunV2(context, procCallA, viewExecA2)
 		require.NoError(t, err)
 
 		require.Contains(t, procCallA.Logs, "\"hello from A\"")
@@ -259,7 +257,7 @@ func Test_Programs(t *testing.T) {
 		procContractB := fvm.Transaction(
 			contractDeployTx("B", contractBCode, addressB),
 			programs.NextTxIndexForTestingOnly())
-		err := vm.Run(context, procContractB, mainView, programs)
+		err := vm.RunV2(context, procContractB, mainView)
 		require.NoError(t, err)
 
 		_, _, hasA := programs.GetForTestingOnly(contractALocation)
@@ -282,7 +280,7 @@ func Test_Programs(t *testing.T) {
 
 		viewExecB = delta.NewView(mainView.Peek)
 
-		err = vm.Run(context, procCallB, viewExecB, programs)
+		err = vm.RunV2(context, procCallB, viewExecB)
 		require.NoError(t, err)
 
 		require.Contains(t, procCallB.Logs, "\"hello from B but also hello from A\"")
@@ -340,7 +338,7 @@ func Test_Programs(t *testing.T) {
 			callTx("B", addressB),
 			programs.NextTxIndexForTestingOnly())
 
-		err = vm.Run(context, procCallB, viewExecB2, programs)
+		err = vm.RunV2(context, procCallB, viewExecB2)
 		require.NoError(t, err)
 
 		require.Contains(t, procCallB.Logs, "\"hello from B but also hello from A\"")
@@ -367,7 +365,7 @@ func Test_Programs(t *testing.T) {
 			callTx("A", addressA),
 			programs.NextTxIndexForTestingOnly())
 
-		err = vm.Run(context, procCallA, viewExecA, programs)
+		err = vm.RunV2(context, procCallA, viewExecA)
 		require.NoError(t, err)
 
 		require.Contains(t, procCallA.Logs, "\"hello from A\"")
@@ -386,7 +384,7 @@ func Test_Programs(t *testing.T) {
 		procContractC := fvm.Transaction(
 			contractDeployTx("C", contractCCode, addressC),
 			programs.NextTxIndexForTestingOnly())
-		err := vm.Run(context, procContractC, mainView, programs)
+		err := vm.RunV2(context, procContractC, mainView)
 		require.NoError(t, err)
 
 		_, _, hasA := programs.GetForTestingOnly(contractALocation)
@@ -406,7 +404,7 @@ func Test_Programs(t *testing.T) {
 
 		viewExecC := delta.NewView(mainView.Peek)
 
-		err = vm.Run(context, procCallC, viewExecC, programs)
+		err = vm.RunV2(context, procCallC, viewExecC)
 		require.NoError(t, err)
 
 		require.Contains(t, procCallC.Logs, "\"hello from C, hello from B but also hello from A\"")

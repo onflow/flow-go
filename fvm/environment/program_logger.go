@@ -60,6 +60,10 @@ func NewProgramLogger(
 	}
 }
 
+func (logger *ProgramLogger) Logger() *zerolog.Logger {
+	return &logger.logger
+}
+
 func (logger *ProgramLogger) ImplementationDebugLog(message string) error {
 	logger.logger.Debug().Msgf("Cadence: %s", message)
 	return nil

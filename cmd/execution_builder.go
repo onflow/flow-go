@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -50,7 +51,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
@@ -106,39 +106,43 @@ type ExecutionNode struct {
 	builder *FlowNodeBuilder // This is needed for accessing the ShutdownFunc
 	exeConf *ExecutionConfig
 
-	collector               module.ExecutionMetrics
-	executionState          state.ExecutionState
-	followerState           protocol.MutableState
-	committee               hotstuff.Committee
-	ledgerStorage           *ledger.Ledger
-	events                  *storage.Events
-	serviceEvents           *storage.ServiceEvents
-	txResults               *storage.TransactionResults
-	results                 *storage.ExecutionResults
-	myReceipts              *storage.MyExecutionReceipts
-	providerEngine          *exeprovider.Engine
-	checkerEng              *checker.Engine
-	syncCore                *chainsync.Core
-	pendingBlocks           *buffer.PendingBlocks // used in follower engine
-	deltas                  *ingestion.Deltas
-	syncEngine              *synchronization.Engine
-	followerEng             *followereng.Engine // to sync blocks from consensus nodes
-	computationManager      *computation.Manager
-	collectionRequester     *requester.Engine
-	ingestionEng            *ingestion.Engine
-	finalizationDistributor *pubsub.FinalizationDistributor
-	finalizedHeader         *synchronization.FinalizedHeaderCache
-	checkAuthorizedAtBlock  func(blockID flow.Identifier) (bool, error)
-	diskWAL                 *wal.DiskWAL
-	blockDataUploaders      []uploader.Uploader
-	executionDataStore      execution_data.ExecutionDataStore
-	toTriggerCheckpoint     *atomic.Bool   // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	collector                     module.ExecutionMetrics
+	executionState                state.ExecutionState
+	followerState                 protocol.MutableState
+	committee                     hotstuff.Committee
+	ledgerStorage                 *ledger.Ledger
+	events                        *storage.Events
+	serviceEvents                 *storage.ServiceEvents
+	txResults                     *storage.TransactionResults
+	results                       *storage.ExecutionResults
+	myReceipts                    *storage.MyExecutionReceipts
+	computationResultUploadStatus *storage.ComputationResultUploadStatus
+	commits                       *storage.Commits
+	collections                   *storage.Collections
+	transactions                  *storage.Transactions
+	providerEngine                *exeprovider.Engine
+	checkerEng                    *checker.Engine
+	syncCore                      *chainsync.Core
+	pendingBlocks                 *buffer.PendingBlocks // used in follower engine
+	deltas                        *ingestion.Deltas
+	syncEngine                    *synchronization.Engine
+	followerEng                   *followereng.Engine // to sync blocks from consensus nodes
+	computationManager            *computation.Manager
+	collectionRequester           *requester.Engine
+	ingestionEng                  *ingestion.Engine
+	finalizationDistributor       *pubsub.FinalizationDistributor
+	finalizedHeader               *synchronization.FinalizedHeaderCache
+	checkAuthorizedAtBlock        func(blockID flow.Identifier) (bool, error)
+	diskWAL                       *wal.DiskWAL
+	blockDataUploaders            []uploader.Uploader
+	executionDataStore            execution_data.ExecutionDataStore
+	toTriggerCheckpoint           *atomic.Bool   // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
 	stopAtHeight            *atomic.Uint64 // stop the node at given block height
 	stopAtHeightCrash       *atomic.Bool   // if node stops at height, does it crash or not
-	executionDataDatastore  *badger.Datastore
-	executionDataPruner     *pruner.Pruner
-	executionDataBlobstore  blobs.Blobstore
-	executionDataTracker    tracker.Storage
+	executionDataDatastore        *badger.Datastore
+	executionDataPruner           *pruner.Pruner
+	executionDataBlobstore        blobs.Blobstore
+	executionDataTracker          tracker.Storage
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -170,8 +174,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", exeNode.LoadSyncCore).
 		Module("execution receipts storage", exeNode.LoadExecutionReceiptsStorage).
 		Module("pending block cache", exeNode.LoadPendingBlockCache).
-		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
-		Component("S3 block data uploader", exeNode.LoadS3BlockDataUploader).
 		Module("state exeNode.deltas mempool", exeNode.LoadDeltasMempool).
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
@@ -179,159 +181,9 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
-		Component("provider engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			opts := []network.BlobServiceOption{}
-
-			if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
-				opts = append(opts, p2p.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
-			}
-
-			bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
-			if err != nil {
-				return nil, fmt.Errorf("failed to register blob service: %w", err)
-			}
-
-			var providerMetrics module.ExecutionDataProviderMetrics = metrics.NewNoopCollector()
-			if node.MetricsEnabled {
-				providerMetrics = metrics.NewExecutionDataProviderCollector()
-			}
-
-			executionDataProvider := exedataprovider.NewProvider(
-				node.Logger,
-				providerMetrics,
-				execution_data.DefaultSerializer,
-				bs,
-				exeNode.executionDataTracker,
-			)
-
-			rt := fvm.NewInterpreterRuntime(runtime.Config{
-				TracingEnabled: exeNode.exeConf.cadenceTracing,
-			})
-
-			vm := fvm.NewVirtualMachine(rt)
-
-			fvmOptions := append([]fvm.Option{fvm.WithLogger(node.Logger)}, node.FvmOptions...)
-			if exeNode.exeConf.extensiveTracing {
-				fvmOptions = append(fvmOptions, fvm.WithExtensiveTracing())
-			}
-			vmCtx := fvm.NewContext(fvmOptions...)
-
-			ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
-			manager, err := computation.New(
-				node.Logger,
-				exeNode.collector,
-				node.Tracer,
-				node.Me,
-				node.State,
-				vm,
-				vmCtx,
-				exeNode.exeConf.cadenceExecutionCache,
-				ledgerViewCommitter,
-				exeNode.exeConf.scriptLogThreshold,
-				exeNode.exeConf.scriptExecutionTimeLimit,
-				exeNode.blockDataUploaders,
-				executionDataProvider,
-			)
-			if err != nil {
-				return nil, err
-			}
-			exeNode.computationManager = manager
-
-			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
-			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
-
-			// Needed for gRPC server, make sure to assign to main scoped vars
-			exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
-			exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
-			exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
-
-			exeNode.executionState = state.NewExecutionState(
-				exeNode.ledgerStorage,
-				stateCommitments,
-				node.Storage.Blocks,
-				node.Storage.Headers,
-				node.Storage.Collections,
-				chunkDataPacks,
-				exeNode.results,
-				exeNode.myReceipts,
-				exeNode.events,
-				exeNode.serviceEvents,
-				exeNode.txResults,
-				node.DB,
-				node.Tracer,
-			)
-
-			var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
-			if node.HeroCacheMetricsEnable {
-				chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
-			}
-			chdpReqQueue := queue.NewChunkDataPackRequestQueue(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
-			exeNode.providerEngine, err = exeprovider.New(
-				node.Logger,
-				node.Tracer,
-				node.Network,
-				node.State,
-				exeNode.executionState,
-				exeNode.collector,
-				exeNode.checkAuthorizedAtBlock,
-				chdpReqQueue,
-				exeNode.exeConf.chunkDataPackRequestWorkers,
-				exeNode.exeConf.chunkDataPackQueryTimeout,
-				exeNode.exeConf.chunkDataPackDeliveryTimeout,
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			// Get latest executed block and a view at that block
-			ctx := context.Background()
-			_, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("cannot get the latest executed block id: %w", err)
-			}
-			stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(ctx, blockID)
-			if err != nil {
-				return nil, fmt.Errorf("cannot get the state comitment at latest executed block id %s: %w", blockID.String(), err)
-			}
-			blockView := exeNode.executionState.NewView(stateCommit)
-
-			// Get the epoch counter from the smart contract at the last executed block.
-			contractEpochCounter, err := getContractEpochCounter(vm, vmCtx, blockView)
-			// Failing to fetch the epoch counter from the smart contract is a fatal error.
-			if err != nil {
-				return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s: %w", blockID.String(), err)
-			}
-
-			// Get the epoch counter form the protocol state, at the same block.
-			protocolStateEpochCounter, err := node.State.
-				AtBlockID(blockID).
-				Epochs().
-				Current().
-				Counter()
-			// Failing to fetch the epoch counter from the protocol state is a fatal error.
-			if err != nil {
-				return nil, fmt.Errorf("cannot get epoch counter from the protocol state at block %s: %w", blockID.String(), err)
-			}
-
-			l := node.Logger.With().
-				Str("component", "provider engine").
-				Uint64("contractEpochCounter", contractEpochCounter).
-				Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
-				Str("blockID", blockID.String()).
-				Logger()
-
-			if contractEpochCounter != protocolStateEpochCounter {
-				// Do not error, because immediately following a spork they will be mismatching,
-				// until the resetEpoch transaction is submitted.
-				l.Warn().
-					Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state mismatch!")
-			} else {
-				l.Info().
-					Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state match.")
-			}
-
-			return exeNode.providerEngine, nil
-		}).
+		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
+		Component("S3 block data uploader", exeNode.LoadS3BlockDataUploader).
+		Component("provider engine", exeNode.LoadProviderEngine).
 		Component("checker engine", exeNode.LoadCheckerEngine).
 		Component("ingestion engine", exeNode.LoadIngestionEngine).
 		Component("follower engine", exeNode.LoadFollowerEngine).
@@ -400,6 +252,8 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 	module.ReadyDoneAware,
 	error,
 ) {
+	// Since RetryableAsyncUploaderWrapper relies on executionDataService so we should create
+	// it after execution data service is fully setup.
 	if exeNode.exeConf.enableBlockDataUpload && exeNode.exeConf.gcpBucketName != "" {
 		logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
 		gcpBucketUploader, err := uploader.NewGCPBucketUploader(
@@ -419,9 +273,37 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			exeNode.collector,
 		)
 
-		exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, asyncUploader)
+		bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore)
+		if err != nil {
+			return nil, fmt.Errorf("could not register blob service: %w", err)
+		}
 
-		return asyncUploader, nil
+		exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
+		exeNode.commits = storage.NewCommits(node.Metrics.Cache, node.DB)
+		exeNode.computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
+		exeNode.collections = storage.NewCollections(node.DB, exeNode.transactions)
+		exeNode.transactions = storage.NewTransactions(node.Metrics.Cache, node.DB)
+		exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
+
+		// Setting up RetryableUploader for GCP uploader
+		retryableUploader := uploader.NewBadgerRetryableUploaderWrapper(
+			asyncUploader,
+			node.Storage.Blocks,
+			exeNode.commits,
+			exeNode.collections,
+			exeNode.events,
+			exeNode.results,
+			exeNode.txResults,
+			exeNode.computationResultUploadStatus,
+			execution_data.NewDownloader(bs),
+			exeNode.collector)
+		if retryableUploader == nil {
+			return nil, errors.New("failed to create ComputationResult upload status store")
+		}
+
+		exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, retryableUploader)
+
+		return retryableUploader, nil
 	}
 
 	// Since we don't have conditional component creation, we just use Noop one.
@@ -459,6 +341,9 @@ func (exeNode *ExecutionNode) LoadS3BlockDataUploader(
 			logger,
 			exeNode.collector,
 		)
+
+		// We are not enabling RetryableUploader for S3 uploader for now. When we need upload
+		// retry for multiple uploaders, we will need to use different BadgerDB key prefix.
 		exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, asyncUploader)
 
 		return asyncUploader, nil
@@ -468,6 +353,152 @@ func (exeNode *ExecutionNode) LoadS3BlockDataUploader(
 	// It's functions will be once per startup/shutdown - non-measurable performance penalty
 	// blockDataUploader will stay nil and disable calling uploader at all
 	return &module.NoopReadyDoneAware{}, nil
+}
+
+func (exeNode *ExecutionNode) LoadProviderEngine(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	opts := []network.BlobServiceOption{}
+
+	if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
+		opts = append(opts, p2p.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
+	}
+
+	bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register blob service: %w", err)
+	}
+
+	var providerMetrics module.ExecutionDataProviderMetrics = metrics.NewNoopCollector()
+	if node.MetricsEnabled {
+		providerMetrics = metrics.NewExecutionDataProviderCollector()
+	}
+
+	executionDataProvider := exedataprovider.NewProvider(
+		node.Logger,
+		providerMetrics,
+		execution_data.DefaultSerializer,
+		bs,
+		exeNode.executionDataTracker,
+	)
+
+	vmCtx := fvm.NewContext(node.FvmOptions...)
+
+	ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
+	manager, err := computation.New(
+		node.Logger,
+		exeNode.collector,
+		node.Tracer,
+		node.Me,
+		node.State,
+		vmCtx,
+		ledgerViewCommitter,
+		exeNode.blockDataUploaders,
+		executionDataProvider,
+		exeNode.exeConf.computationConfig,
+	)
+	if err != nil {
+		return nil, err
+	}
+	exeNode.computationManager = manager
+
+	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
+
+	// Needed for gRPC server, make sure to assign to main scoped vars
+	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
+	exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
+	exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
+
+	exeNode.executionState = state.NewExecutionState(
+		exeNode.ledgerStorage,
+		stateCommitments,
+		node.Storage.Blocks,
+		node.Storage.Headers,
+		node.Storage.Collections,
+		chunkDataPacks,
+		exeNode.results,
+		exeNode.myReceipts,
+		exeNode.events,
+		exeNode.serviceEvents,
+		exeNode.txResults,
+		node.DB,
+		node.Tracer,
+	)
+
+	var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
+	if node.HeroCacheMetricsEnable {
+		chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
+	}
+	chdpReqQueue := queue.NewChunkDataPackRequestQueue(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
+	exeNode.providerEngine, err = exeprovider.New(
+		node.Logger,
+		node.Tracer,
+		node.Network,
+		node.State,
+		exeNode.executionState,
+		exeNode.collector,
+		exeNode.checkAuthorizedAtBlock,
+		chdpReqQueue,
+		exeNode.exeConf.chunkDataPackRequestWorkers,
+		exeNode.exeConf.chunkDataPackQueryTimeout,
+		exeNode.exeConf.chunkDataPackDeliveryTimeout,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get latest executed block and a view at that block
+	ctx := context.Background()
+	_, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get the latest executed block id: %w", err)
+	}
+	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(ctx, blockID)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get the state comitment at latest executed block id %s: %w", blockID.String(), err)
+	}
+	blockView := exeNode.executionState.NewView(stateCommit)
+
+	// Get the epoch counter from the smart contract at the last executed block.
+	contractEpochCounter, err := getContractEpochCounter(exeNode.computationManager.VM(), vmCtx, blockView)
+	// Failing to fetch the epoch counter from the smart contract is a fatal error.
+	if err != nil {
+		return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s: %w", blockID.String(), err)
+	}
+
+	// Get the epoch counter form the protocol state, at the same block.
+	protocolStateEpochCounter, err := node.State.
+		AtBlockID(blockID).
+		Epochs().
+		Current().
+		Counter()
+	// Failing to fetch the epoch counter from the protocol state is a fatal error.
+	if err != nil {
+		return nil, fmt.Errorf("cannot get epoch counter from the protocol state at block %s: %w", blockID.String(), err)
+	}
+
+	l := node.Logger.With().
+		Str("component", "provider engine").
+		Uint64("contractEpochCounter", contractEpochCounter).
+		Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
+		Str("blockID", blockID.String()).
+		Logger()
+
+	if contractEpochCounter != protocolStateEpochCounter {
+		// Do not error, because immediately following a spork they will be mismatching,
+		// until the resetEpoch transaction is submitted.
+		l.Warn().
+			Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state mismatch!")
+	} else {
+		l.Info().
+			Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state match.")
+	}
+
+	return exeNode.providerEngine, nil
 }
 
 func (exeNode *ExecutionNode) LoadDeltasMempool(node *NodeConfig) error {
@@ -673,33 +704,34 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		node.Logger.Debug().Str("prefered_exe_node_id_string", exeNode.exeConf.preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
 	}
 
-			exeNode.ingestionEng, err = ingestion.New(
-				node.Logger,
-				node.Network,
-				node.Me,
-				exeNode.collectionRequester,
-				node.State,
-				node.Storage.Blocks,
-				node.Storage.Collections,
-				exeNode.events,
-				exeNode.serviceEvents,
-				exeNode.txResults,
-				exeNode.computationManager,
-				exeNode.providerEngine,
-				exeNode.executionState,
-				exeNode.collector,
-				node.Tracer,
-				exeNode.exeConf.extensiveLog,
-				preferredExeFilter,
-				exeNode.deltas,
-				exeNode.exeConf.syncThreshold,
-				exeNode.exeConf.syncFast,
-				exeNode.checkAuthorizedAtBlock,
-				exeNode.exeConf.pauseExecution,
-				exeNode.executionDataPruner,
-				exeNode.stopAtHeight,
-				exeNode.stopAtHeightCrash,
-			)
+	exeNode.ingestionEng, err = ingestion.New(
+		node.Logger,
+		node.Network,
+		node.Me,
+		exeNode.collectionRequester,
+		node.State,
+		node.Storage.Blocks,
+		node.Storage.Collections,
+		exeNode.events,
+		exeNode.serviceEvents,
+		exeNode.txResults,
+		exeNode.computationManager,
+		exeNode.providerEngine,
+		exeNode.executionState,
+		exeNode.collector,
+		node.Tracer,
+		exeNode.exeConf.extensiveLog,
+		preferredExeFilter,
+		exeNode.deltas,
+		exeNode.exeConf.syncThreshold,
+		exeNode.exeConf.syncFast,
+		exeNode.checkAuthorizedAtBlock,
+		exeNode.exeConf.pauseExecution,
+		exeNode.executionDataPruner,
+		exeNode.blockDataUploaders,
+		exeNode.stopAtHeight,
+		exeNode.stopAtHeightCrash,
+	)
 
 	// TODO: we should solve these mutual dependencies better
 	// => https://github.com/dapperlabs/flow-go/issues/4360
@@ -873,7 +905,7 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 }
 
 // getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the view provided.
-func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, view *delta.View) (uint64, error) {
+func getContractEpochCounter(vm computer.VirtualMachine, vmCtx fvm.Context, view *delta.View) (uint64, error) {
 	// Get the address of the FlowEpoch smart contract
 	sc, err := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
 	if err != nil {
@@ -887,11 +919,8 @@ func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, view *de
 	})
 	script := fvm.Script(scriptCode)
 
-	// Create empty programs cache
-	p := programs.NewEmptyPrograms()
-
 	// execute the script
-	err = vm.Run(vmCtx, script, view, p)
+	err = vm.RunV2(vmCtx, script, view)
 	if err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, internal error while executing script: %w", err)
 	}

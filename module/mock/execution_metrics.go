@@ -49,6 +49,16 @@ func (_m *ExecutionMetrics) ExecutionCollectionRequestSent() {
 	_m.Called()
 }
 
+// ExecutionComputationResultUploadRetried provides a mock function with given fields:
+func (_m *ExecutionMetrics) ExecutionComputationResultUploadRetried() {
+	_m.Called()
+}
+
+// ExecutionComputationResultUploaded provides a mock function with given fields:
+func (_m *ExecutionMetrics) ExecutionComputationResultUploaded() {
+	_m.Called()
+}
+
 // ExecutionLastExecutedBlockHeight provides a mock function with given fields: height
 func (_m *ExecutionMetrics) ExecutionLastExecutedBlockHeight(height uint64) {
 	_m.Called(height)
