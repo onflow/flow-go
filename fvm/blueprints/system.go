@@ -2,7 +2,6 @@ package blueprints
 
 import (
 	_ "embed"
-	"fmt"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -19,12 +18,9 @@ var systemChunkTransactionTemplate string
 
 // SystemChunkTransaction creates and returns the transaction corresponding to the system chunk
 // for the given chain.
-func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
+func SystemChunkTransaction(chain flow.Chain) *flow.TransactionBody {
 
-	contracts, err := systemcontracts.SystemContractsForChain(chain.ChainID())
-	if err != nil {
-		return nil, fmt.Errorf("could not get system contracts for chain: %w", err)
-	}
+	contracts := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(templates.ReplaceAddresses(systemChunkTransactionTemplate,
@@ -35,5 +31,5 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 		AddAuthorizer(contracts.Epoch.Address).
 		SetGasLimit(SystemChunkTransactionGasLimit)
 
-	return tx, nil
+	return tx
 }

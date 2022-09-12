@@ -1243,6 +1243,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				err := vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
+				require.NoError(t, tx.Err)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
 					pub fun main(): UFix64 {
@@ -1345,7 +1346,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				assert.NoError(t, err)
 				assert.NoError(t, script.Err)
-				assert.Equal(t, cadence.UFix64(9999_3120), script.Value)
+				assert.Equal(t, cadence.UFix64(9999_3130), script.Value)
 			}),
 	)
 

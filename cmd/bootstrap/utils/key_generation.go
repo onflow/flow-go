@@ -175,7 +175,7 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 	//
 	// for the machine account key, we keep track of the address index to map
 	// the Flow address of the machine account to the key.
-	addressIndex := uint64(4)
+	addressIndex := uint64(1)
 	for _, nodeInfo := range nodeInfos {
 
 		// retrieve private representation of the node

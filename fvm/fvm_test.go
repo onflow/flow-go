@@ -40,6 +40,8 @@ var mainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
 	meter.ComputationKindSetValue:            765,
 }
 
+const vmTestChain = flow.Emulator
+
 type vmTest struct {
 	bootstrapOptions []fvm.BootstrapProcedureOption
 	contextOptions   []fvm.Option
@@ -67,7 +69,7 @@ func (vmt vmTest) run(
 	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
-		chain, vm := createChainAndVm(flow.Testnet)
+		chain, vm := createChainAndVm(vmTestChain)
 		blockPrograms := programs.NewEmptyPrograms()
 
 		baseOpts := []fvm.Option{
@@ -99,7 +101,7 @@ func (vmt vmTest) run(
 func (vmt vmTest) bootstrapWith(
 	bootstrap func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) error,
 ) (bootstrappedVmTest, error) {
-	chain, vm := createChainAndVm(flow.Testnet)
+	chain, vm := createChainAndVm(vmTestChain)
 
 	baseOpts := []fvm.Option{
 		fvm.WithChain(chain),
@@ -669,7 +671,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		fundWith      uint64
 		tryToTransfer uint64
 		gasLimit      uint64
-		checkResult   func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure)
+		checkResult   func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain)
 	}
 
 	txFees := uint64(1_000)              // 0.00001
@@ -682,7 +684,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "Transaction fees are deducted",
 			fundWith:      fundingAmount,
 			tryToTransfer: 0,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.NoError(t, tx.Err)
 				require.Equal(t, txFees, balanceBefore-balanceAfter)
 			},
@@ -691,17 +693,17 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "Transaction fee deduction emits events",
 			fundWith:      fundingAmount,
 			tryToTransfer: 0,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.NoError(t, tx.Err)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
 						withdraws = append(withdraws, e)
 					}
 				}
@@ -714,7 +716,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "Transaction fees are deducted and tx is applied",
 			fundWith:      fundingAmount,
 			tryToTransfer: transferAmount,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.NoError(t, tx.Err)
 				require.Equal(t, txFees+transferAmount, balanceBefore-balanceAfter)
 			},
@@ -723,11 +725,11 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "Transaction fees are deducted and fe deduction is emitted",
 			fundWith:      fundingAmount,
 			tryToTransfer: transferAmount,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.NoError(t, tx.Err)
 				var feeDeduction flow.Event // fee deduction event
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", environment.FlowFeesAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", environment.FlowFeesAddress(chain)) {
 						feeDeduction = e
 						break
 					}
@@ -751,7 +753,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "If just enough balance, fees are deducted",
 			fundWith:      txFees + transferAmount,
 			tryToTransfer: transferAmount,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.NoError(t, tx.Err)
 				require.Equal(t, uint64(0), balanceAfter)
 			},
@@ -762,7 +764,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "If not enough balance, transaction succeeds and fees are deducted to 0",
 			fundWith:      txFees,
 			tryToTransfer: 1,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.NoError(t, tx.Err)
 				require.Equal(t, uint64(0), balanceAfter)
 			},
@@ -771,7 +773,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "If tx fails, fees are deducted",
 			fundWith:      fundingAmount,
 			tryToTransfer: 2 * fundingAmount,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.Error(t, tx.Err)
 				require.Equal(t, fundingAmount-txFees, balanceAfter)
 			},
@@ -780,17 +782,17 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "If tx fails, fee deduction events are emitted",
 			fundWith:      fundingAmount,
 			tryToTransfer: 2 * fundingAmount,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.Error(t, tx.Err)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
 						withdraws = append(withdraws, e)
 					}
 				}
@@ -804,17 +806,17 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fundWith:      txFees + transferAmount,
 			tryToTransfer: transferAmount,
 			gasLimit:      uint64(2),
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.ErrorContains(t, tx.Err, "computation exceeds limit (2)")
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
 						withdraws = append(withdraws, e)
 					}
 				}
@@ -830,7 +832,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "Transaction fees are deducted",
 			fundWith:      fundingAmount,
 			tryToTransfer: 0,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.NoError(t, tx.Err)
 				require.Equal(t, txFees, balanceBefore-balanceAfter)
 			},
@@ -839,17 +841,17 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "Transaction fee deduction emits events",
 			fundWith:      fundingAmount,
 			tryToTransfer: 0,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.NoError(t, tx.Err)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
 						withdraws = append(withdraws, e)
 					}
 				}
@@ -862,7 +864,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "Transaction fees are deducted and tx is applied",
 			fundWith:      fundingAmount,
 			tryToTransfer: transferAmount,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.NoError(t, tx.Err)
 				require.Equal(t, txFees+transferAmount, balanceBefore-balanceAfter)
 			},
@@ -871,7 +873,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "If just enough balance, fees are deducted",
 			fundWith:      txFees + transferAmount,
 			tryToTransfer: transferAmount,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.NoError(t, tx.Err)
 				require.Equal(t, minimumStorageReservation, balanceAfter)
 			},
@@ -880,7 +882,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "If tx fails, fees are deducted",
 			fundWith:      fundingAmount,
 			tryToTransfer: 2 * fundingAmount,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.Error(t, tx.Err)
 				require.Equal(t, fundingAmount-txFees+minimumStorageReservation, balanceAfter)
 			},
@@ -889,17 +891,17 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "If tx fails, fee deduction events are emitted",
 			fundWith:      fundingAmount,
 			tryToTransfer: 2 * fundingAmount,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.Error(t, tx.Err)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
 						withdraws = append(withdraws, e)
 					}
 				}
@@ -912,7 +914,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "If balance at minimum, transaction fails, fees are deducted and fee deduction events are emitted",
 			fundWith:      0,
 			tryToTransfer: 0,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure, chain flow.Chain) {
 				require.Error(t, tx.Err)
 				require.Equal(t, minimumStorageReservation-txFees, balanceAfter)
 
@@ -920,10 +922,10 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				var withdraws []flow.Event
 
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
 						withdraws = append(withdraws, e)
 					}
 				}
@@ -947,9 +949,9 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
-			assert.NoError(t, tx.Err)
+			require.NoError(t, tx.Err)
 
-			assert.Len(t, tx.Events, 10)
+			require.Len(t, tx.Events, 10)
 
 			accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
 
@@ -1019,6 +1021,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				balanceBefore,
 				balanceAfter,
 				tx,
+				chain,
 			)
 		}
 	}
@@ -1429,7 +1432,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 func TestStorageUsed(t *testing.T) {
 	t.Parallel()
 
-	chain, vm := createChainAndVm(flow.Testnet)
+	chain, vm := createChainAndVm(vmTestChain)
 
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
@@ -1483,7 +1486,8 @@ func TestStorageUsed(t *testing.T) {
 func TestEnforcingComputationLimit(t *testing.T) {
 	t.Parallel()
 
-	chain, vm := createChainAndVm(flow.Testnet)
+	chain, vm := createChainAndVm(vmTestChain)
+
 	simpleView := utils.NewSimpleView()
 
 	const computationLimit = 5

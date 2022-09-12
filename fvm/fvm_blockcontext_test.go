@@ -139,7 +139,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	t.Parallel()
 
-	chain, vm := createChainAndVm(flow.Testnet)
+	chain, vm := createChainAndVm(flow.Emulator)
 
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
@@ -1495,8 +1495,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	}
 
 	addressGen := chain.NewAddressGenerator()
-	// skip the addresses of 4 reserved accounts
-	for i := 0; i < 4; i++ {
+	// skip the addresses of 1 reserved account
+	for i := 0; i < 1; i++ {
 		_, err := addressGen.NextAddress()
 		require.NoError(t, err)
 	}
@@ -1617,7 +1617,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	require.NoError(t, err)
 	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
-	assert.Equal(t, flow.HexToAddress("05"), address)
+	assert.Equal(t, flow.HexToAddress("02"), address)
 }
 
 func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {

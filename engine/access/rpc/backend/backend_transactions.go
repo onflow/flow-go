@@ -219,10 +219,7 @@ func (b *backendTransactions) GetTransactionsByBlockID(
 		transactions = append(transactions, collection.Transactions...)
 	}
 
-	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
-	if err != nil {
-		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
-	}
+	systemTx := blueprints.SystemChunkTransaction(b.chainID.Chain())
 
 	transactions = append(transactions, systemTx)
 
@@ -380,10 +377,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return nil, status.Errorf(codes.Internal, "number of transaction results returned by execution node is more than the number of transactions in the block")
 		}
 
-		systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
-		if err != nil {
-			return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
-		}
+		systemTx := blueprints.SystemChunkTransaction(b.chainID.Chain())
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
 		systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
 		if err != nil {

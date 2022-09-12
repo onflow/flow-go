@@ -21,7 +21,8 @@ const (
 	FailureCodeStateMergeFailure  FailureCode = 2003
 	FailureCodeBlockFinderFailure FailureCode = 2004
 	// Deprecated: No longer used.
-	FailureCodeHasherFailure FailureCode = 2005
+	FailureCodeHasherFailure            FailureCode = 2005
+	FailureCannotGetCoreContractAddress FailureCode = 2006
 	// Deprecated: No longer used.
 	FailureCodeMetaTransactionFailure FailureCode = 2100
 )

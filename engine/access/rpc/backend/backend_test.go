@@ -74,7 +74,7 @@ func (suite *Suite) SetupTest() {
 	suite.results = new(storagemock.ExecutionResults)
 	suite.colClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
-	suite.chainID = flow.Testnet
+	suite.chainID = flow.Emulator
 	suite.historicalAccessClient = new(access.AccessAPIClient)
 	suite.connectionFactory = new(backendmock.ConnectionFactory)
 }

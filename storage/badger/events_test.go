@@ -60,8 +60,7 @@ func TestEventStoreRetrieve(t *testing.T) {
 		require.Len(t, actual, 1)
 		require.Contains(t, actual, evt2_1)
 
-		events, err := systemcontracts.ServiceEventsForChain(flow.Emulator)
-		require.NoError(t, err)
+		events := systemcontracts.ServiceEventsForChain(flow.Emulator)
 
 		actual, err = store.ByBlockIDEventType(blockID, events.EpochSetup.EventType())
 		require.NoError(t, err)

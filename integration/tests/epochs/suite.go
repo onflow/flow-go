@@ -167,7 +167,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	nodeID := flow.MakeID(stakingKey.PublicKey().Encode())
 	fullAccountKey := sdk.NewAccountKey().
 		SetPublicKey(stakingAccountKey.PublicKey()).
-		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetHashAlgo(sdkcrypto.SHA3_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
 	// create staking account
@@ -211,6 +211,8 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		fmt.Sprintf("%f", stakeAmount),
 		machineAccountPubKey,
 	)
+
+	s.log.Info().Str("machineAccountAddr", machineAccountAddr.Hex()).Msgf("machineAccountAddr")
 
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
@@ -328,7 +330,7 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA3_256)
 	require.NoError(s.T(), err)
 
 	createStakingCollectionTx, err := utils.MakeCreateStakingCollectionTx(
@@ -368,7 +370,7 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA3_256)
 	require.NoError(s.T(), err)
 
 	registerNodeTx, err := utils.MakeStakingCollectionRegisterNodeTx(
@@ -404,7 +406,7 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 				break
 			}
 		}
-
+		s.log.Info().Str("address", machineAccountAddr.Hex()).Msgf("created machine account")
 		require.NotZerof(s.T(), machineAccountAddr, "failed to create the machine account: %s", machineAccountAddr)
 		return result, machineAccountAddr, nil
 	}
@@ -423,7 +425,7 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA3_256)
 	require.NoError(s.T(), err)
 
 	closeStakeTx, err := utils.MakeStakingCollectionCloseStakeTx(
@@ -571,7 +573,7 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
-	//add our container to the network
+	// add our container to the network
 	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
 	require.NoError(s.T(), err, "failed to add container to network")
 
@@ -657,7 +659,7 @@ func (s *Suite) assertLatestFinalizedBlockHeightHigher(ctx context.Context, snap
 func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
 	fullAccountKey := sdk.NewAccountKey().
 		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
-		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetHashAlgo(sdkcrypto.SHA3_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
 	// createAccount will submit a create account transaction and wait for it to be sealed

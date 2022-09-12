@@ -23,13 +23,15 @@ const (
 
 	// Unqualified names of system smart contracts (not including address prefix)
 
-	ContractNameEpoch        = "FlowEpoch"
-	ContractNameClusterQC    = "FlowClusterQC"
-	ContractNameDKG          = "FlowDKG"
-	ContractServiceAccount   = "FlowServiceAccount"
-	ContractNameFlowFees     = "FlowFees"
-	ContractStorageFees      = "FlowStorageFees"
-	ContractDeploymentAudits = "FlowContractAudits"
+	ContractNameEpoch         = "FlowEpoch"
+	ContractNameClusterQC     = "FlowClusterQC"
+	ContractNameDKG           = "FlowDKG"
+	ContractServiceAccount    = "FlowServiceAccount"
+	ContractNameFlowFees      = "FlowFees"
+	ContractStorageFees       = "FlowStorageFees"
+	ContractDeploymentAudits  = "FlowContractAudits"
+	ContractNameFungibleToken = "FungibleToken"
+	ContractNameFlowToken     = "FlowToken"
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
@@ -45,6 +47,12 @@ const (
 	ContractStorageFeesFunction_calculateAccountsCapacity    = "calculateAccountsCapacity"
 	ContractStorageFeesFunction_defaultTokenAvailableBalance = "defaultTokenAvailableBalance"
 	ContractDeploymentAuditsFunction_useVoucherForDeploy     = "useVoucherForDeploy"
+)
+
+const (
+	fungibleTokenAccountIndex = 2
+	flowTokenAccountIndex     = 3
+	flowFeesAccountIndex      = 4
 )
 
 // SystemContract represents a system contract on a particular chain.
@@ -74,9 +82,12 @@ func (se ServiceEvent) EventType() flow.EventType {
 
 // SystemContracts is a container for all system contracts on a particular chain.
 type SystemContracts struct {
-	Epoch     SystemContract
-	ClusterQC SystemContract
-	DKG       SystemContract
+	Epoch         SystemContract
+	ClusterQC     SystemContract
+	DKG           SystemContract
+	Fees          SystemContract
+	FungibleToken SystemContract
+	FlowToken     SystemContract
 }
 
 // ServiceEvents is a container for all service events on a particular chain.
@@ -94,10 +105,10 @@ func (se ServiceEvents) All() []ServiceEvent {
 }
 
 // SystemContractsForChain returns the system contract configuration for the given chain.
-func SystemContractsForChain(chainID flow.ChainID) (*SystemContracts, error) {
+func SystemContractsForChain(chainID flow.ChainID) *SystemContracts {
 	addresses, ok := contractAddressesByChainID[chainID]
 	if !ok {
-		return nil, fmt.Errorf("unknown chain id (%s)", chainID.String())
+		panic("contractAddressesByChainID are not set up for chain " + chainID.String())
 	}
 
 	contracts := &SystemContracts{
@@ -113,16 +124,28 @@ func SystemContractsForChain(chainID flow.ChainID) (*SystemContracts, error) {
 			Address: addresses[ContractNameDKG],
 			Name:    ContractNameDKG,
 		},
+		Fees: SystemContract{
+			Address: addresses[ContractNameFlowFees],
+			Name:    ContractNameFlowFees,
+		},
+		FungibleToken: SystemContract{
+			Address: addresses[ContractNameFungibleToken],
+			Name:    ContractNameFungibleToken,
+		},
+		FlowToken: SystemContract{
+			Address: addresses[ContractNameFlowToken],
+			Name:    ContractNameFlowToken,
+		},
 	}
 
-	return contracts, nil
+	return contracts
 }
 
 // ServiceEventsForChain returns the service event confirmation for the given chain.
-func ServiceEventsForChain(chainID flow.ChainID) (*ServiceEvents, error) {
+func ServiceEventsForChain(chainID flow.ChainID) *ServiceEvents {
 	addresses, ok := contractAddressesByChainID[chainID]
 	if !ok {
-		return nil, fmt.Errorf("unknown chain id (%s)", chainID.String())
+		panic("contractAddressesByChainID are not set up for chain " + chainID.String())
 	}
 
 	events := &ServiceEvents{
@@ -138,7 +161,7 @@ func ServiceEventsForChain(chainID flow.ChainID) (*ServiceEvents, error) {
 		},
 	}
 
-	return events, nil
+	return events
 }
 
 // contractAddressesByChainID stores the default system smart contract
@@ -163,40 +186,62 @@ func init() {
 	// Main Flow network
 	// All system contracts are deployed to the account of the staking contract
 	mainnet := map[string]flow.Address{
-		ContractNameEpoch:     stakingContractAddressMainnet,
-		ContractNameClusterQC: stakingContractAddressMainnet,
-		ContractNameDKG:       stakingContractAddressMainnet,
+		ContractNameEpoch:         stakingContractAddressMainnet,
+		ContractNameClusterQC:     stakingContractAddressMainnet,
+		ContractNameDKG:           stakingContractAddressMainnet,
+		ContractNameFlowFees:      mustAddressAtIndex(flow.Mainnet.Chain(), flowFeesAccountIndex),
+		ContractNameFungibleToken: mustAddressAtIndex(flow.Mainnet.Chain(), fungibleTokenAccountIndex),
+		ContractNameFlowToken:     mustAddressAtIndex(flow.Mainnet.Chain(), flowTokenAccountIndex),
 	}
 	contractAddressesByChainID[flow.Mainnet] = mainnet
 
 	// Long-lived test networks
 	// All system contracts are deployed to the account of the staking contract
 	testnet := map[string]flow.Address{
-		ContractNameEpoch:     stakingContractAddressTestnet,
-		ContractNameClusterQC: stakingContractAddressTestnet,
-		ContractNameDKG:       stakingContractAddressTestnet,
+		ContractNameEpoch:         stakingContractAddressTestnet,
+		ContractNameClusterQC:     stakingContractAddressTestnet,
+		ContractNameDKG:           stakingContractAddressTestnet,
+		ContractNameFlowFees:      mustAddressAtIndex(flow.Testnet.Chain(), flowFeesAccountIndex),
+		ContractNameFungibleToken: mustAddressAtIndex(flow.Testnet.Chain(), fungibleTokenAccountIndex),
+		ContractNameFlowToken:     mustAddressAtIndex(flow.Testnet.Chain(), flowTokenAccountIndex),
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
 
 	// Stagingnet test network
 	// All system contracts are deployed to the service account
 	stagingnet := map[string]flow.Address{
-		ContractNameEpoch:     flow.Stagingnet.Chain().ServiceAddress(),
-		ContractNameClusterQC: flow.Stagingnet.Chain().ServiceAddress(),
-		ContractNameDKG:       flow.Stagingnet.Chain().ServiceAddress(),
+		ContractNameEpoch:         flow.Stagingnet.Chain().ServiceAddress(),
+		ContractNameClusterQC:     flow.Stagingnet.Chain().ServiceAddress(),
+		ContractNameDKG:           flow.Stagingnet.Chain().ServiceAddress(),
+		ContractNameFlowFees:      mustAddressAtIndex(flow.Stagingnet.Chain(), flowFeesAccountIndex),
+		ContractNameFungibleToken: mustAddressAtIndex(flow.Stagingnet.Chain(), fungibleTokenAccountIndex),
+		ContractNameFlowToken:     mustAddressAtIndex(flow.Stagingnet.Chain(), flowTokenAccountIndex),
 	}
 	contractAddressesByChainID[flow.Stagingnet] = stagingnet
 
 	// Transient test networks
 	// All system contracts are deployed to the service account
 	transient := map[string]flow.Address{
-		ContractNameEpoch:     flow.Emulator.Chain().ServiceAddress(),
-		ContractNameClusterQC: flow.Emulator.Chain().ServiceAddress(),
-		ContractNameDKG:       flow.Emulator.Chain().ServiceAddress(),
+		ContractNameEpoch:         flow.Emulator.Chain().ServiceAddress(),
+		ContractNameClusterQC:     flow.Emulator.Chain().ServiceAddress(),
+		ContractNameDKG:           flow.Emulator.Chain().ServiceAddress(),
+		ContractNameFlowFees:      flow.Emulator.Chain().ServiceAddress(),
+		ContractNameFungibleToken: flow.Emulator.Chain().ServiceAddress(),
+		ContractNameFlowToken:     flow.Emulator.Chain().ServiceAddress(),
 	}
 	contractAddressesByChainID[flow.Emulator] = transient
+	contractAddressesByChainID[flow.MonotonicEmulator] = transient
 	contractAddressesByChainID[flow.Localnet] = transient
 	contractAddressesByChainID[flow.BftTestnet] = transient
 	contractAddressesByChainID[flow.Benchnet] = transient
 
+}
+
+func mustAddressAtIndex(chain flow.Chain, index uint64) flow.Address {
+	address, err := chain.AddressAtIndex(fungibleTokenAccountIndex)
+	if err != nil {
+		// this should never panic as the index should always be ok
+		panic(err)
+	}
+	return address
 }

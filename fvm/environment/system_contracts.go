@@ -84,8 +84,8 @@ func (sys *SystemContracts) Invoke(
 }
 
 func FlowFeesAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(FlowFeesAccountIndex)
-	return address
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	return sc.Fees.Address
 }
 
 func ServiceAddress(chain flow.Chain) flow.Address {

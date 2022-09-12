@@ -205,10 +205,7 @@ func (collection *EventCollection) TotalByteSize() uint64 {
 func IsServiceEvent(event cadence.Event, chain flow.ChainID) (bool, error) {
 
 	// retrieve the service event information for this chain
-	events, err := systemcontracts.ServiceEventsForChain(chain)
-	if err != nil {
-		return false, fmt.Errorf("unknown system contracts for chain (%s): %w", chain.String(), err)
-	}
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	eventType := flow.EventType(event.EventType.ID())
 	for _, serviceEvent := range events.All() {

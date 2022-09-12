@@ -366,8 +366,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
-		require.NoError(t, err)
+		serviceEvents := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 
 		serviceEventA := cadence.Event{
 			EventType: &cadence.EventType{

@@ -97,19 +97,19 @@ func TestGetTransactions(t *testing.T) {
                "arguments": [],
 			   "reference_block_id":"%s",
 			   "gas_limit":"10",
-			   "payer":"8c5303eaa26202d6",
+			   "payer":"f8d6e0586b0a20c7",
 			   "proposal_key":{
-				  "address":"8c5303eaa26202d6",
+				  "address":"f8d6e0586b0a20c7",
 				  "key_index":"1",
 				  "sequence_number":"0"
 			   },
 			   "authorizers":[
-				  "8c5303eaa26202d6"
+				  "f8d6e0586b0a20c7"
 			   ],
                "payload_signatures": [],
 			   "envelope_signatures":[
 				  {
-					 "address":"8c5303eaa26202d6",
+					 "address":"f8d6e0586b0a20c7",
 					 "key_index":"1",
 					 "signature":"%s"
 				  }
@@ -148,19 +148,19 @@ func TestGetTransactions(t *testing.T) {
                "arguments": [],
 			   "reference_block_id":"%s",
 			   "gas_limit":"10",
-			   "payer":"8c5303eaa26202d6",
+			   "payer":"f8d6e0586b0a20c7",
 			   "proposal_key":{
-				  "address":"8c5303eaa26202d6",
+				  "address":"f8d6e0586b0a20c7",
 				  "key_index":"1",
 				  "sequence_number":"0"
 			   },
 			   "authorizers":[
-				  "8c5303eaa26202d6"
+				  "f8d6e0586b0a20c7"
 			   ],
                "payload_signatures": [],
 			   "envelope_signatures":[
 				  {
-					 "address":"8c5303eaa26202d6",
+					 "address":"f8d6e0586b0a20c7",
 					 "key_index":"1",
 					 "signature":"%s"
 				  }
@@ -340,25 +340,25 @@ func TestCreateTransaction(t *testing.T) {
 			   "arguments": [],
 			   "reference_block_id":"%s",
 			   "gas_limit":"10",
-			   "payer":"8c5303eaa26202d6",
+			   "payer":"f8d6e0586b0a20c7",
 			   "proposal_key":{
-				  "address":"8c5303eaa26202d6",
+				  "address":"f8d6e0586b0a20c7",
 				  "key_index":"1",
 				  "sequence_number":"0"
 			   },
 			   "authorizers":[
-				  "8c5303eaa26202d6"
+				  "f8d6e0586b0a20c7"
 			   ],
                "payload_signatures":[
 				  {
-					 "address":"8c5303eaa26202d6",
+					 "address":"f8d6e0586b0a20c7",
 					 "key_index":"1",
 					 "signature":"%s"
 				  }
 			   ],
 			   "envelope_signatures":[
 				  {
-					 "address":"8c5303eaa26202d6",
+					 "address":"f8d6e0586b0a20c7",
 					 "key_index":"1",
 					 "signature":"%s"
 				  }

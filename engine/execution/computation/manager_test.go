@@ -212,7 +212,10 @@ func TestExecuteScript(t *testing.T) {
 
 	logger := zerolog.Nop()
 
-	execCtx := fvm.NewContext(fvm.WithLogger(logger))
+	execCtx := fvm.NewContext(
+		fvm.WithLogger(logger),
+		fvm.WithChain(flow.Emulator.Chain()),
+	)
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)

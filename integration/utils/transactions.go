@@ -16,8 +16,8 @@ import (
 func LocalnetEnv() templates.Environment {
 	return templates.Environment{
 		IDTableAddress:           "f8d6e0586b0a20c7",
-		FungibleTokenAddress:     "ee82856bf20e2aa6",
-		FlowTokenAddress:         "0ae53cb6e3f42a79",
+		FungibleTokenAddress:     "f8d6e0586b0a20c7",
+		FlowTokenAddress:         "f8d6e0586b0a20c7",
 		LockedTokensAddress:      "f8d6e0586b0a20c7",
 		StakingProxyAddress:      "f8d6e0586b0a20c7",
 		DkgAddress:               "f8d6e0586b0a20c7",
@@ -44,7 +44,7 @@ func MakeCreateStakingCollectionTx(
 		SetPayer(payerAddress).
 		AddAuthorizer(stakingAccount.Address)
 
-	//signing the payload as used AddAuthorizer
+	// signing the payload as used AddAuthorizer
 	err := tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign payload: %w", err)

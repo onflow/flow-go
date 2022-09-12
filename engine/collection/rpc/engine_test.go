@@ -20,7 +20,7 @@ func TestSubmitTransaction(t *testing.T) {
 	backend := new(rpcmock.Backend)
 
 	h := handler{
-		chainID: flow.Testnet,
+		chainID: flow.Emulator,
 		backend: backend,
 	}
 

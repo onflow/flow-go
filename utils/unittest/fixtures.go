@@ -44,13 +44,13 @@ const (
 )
 
 func AddressFixture() flow.Address {
-	return flow.Testnet.Chain().ServiceAddress()
+	return flow.Emulator.Chain().ServiceAddress()
 }
 
 func RandomAddressFixture() flow.Address {
 	// we use a 32-bit index - since the linear address generator uses 45 bits,
 	// this won't error
-	addr, err := flow.Testnet.Chain().AddressAtIndex(uint64(rand.Uint32()))
+	addr, err := flow.Emulator.Chain().AddressAtIndex(uint64(rand.Uint32()))
 	if err != nil {
 		panic(err)
 	}
@@ -67,7 +67,7 @@ func RandomSDKAddressFixture() sdk.Address {
 func InvalidAddressFixture() flow.Address {
 	addr := AddressFixture()
 	addr[0] ^= 1 // alter one bit to obtain an invalid address
-	if flow.Testnet.Chain().IsValid(addr) {
+	if flow.Emulator.Chain().IsValid(addr) {
 		panic("invalid address fixture generated valid address")
 	}
 	return addr

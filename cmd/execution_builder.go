@@ -900,10 +900,7 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 // getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the view provided.
 func getContractEpochCounter(vm computer.VirtualMachine, vmCtx fvm.Context, view *delta.View) (uint64, error) {
 	// Get the address of the FlowEpoch smart contract
-	sc, err := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
-	if err != nil {
-		return 0, fmt.Errorf("could not get system contracts: %w", err)
-	}
+	sc := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
 	address := sc.Epoch.Address
 
 	// Generate the script to get the epoch counter from the FlowEpoch smart contract
@@ -913,7 +910,7 @@ func getContractEpochCounter(vm computer.VirtualMachine, vmCtx fvm.Context, view
 	script := fvm.Script(scriptCode)
 
 	// execute the script
-	err = vm.RunV2(vmCtx, script, view)
+	err := vm.RunV2(vmCtx, script, view)
 	if err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, internal error while executing script: %w", err)
 	}

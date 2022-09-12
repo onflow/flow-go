@@ -549,10 +549,7 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 
 	var qcContractClient module.QCContractClient
 
-	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
-	if err != nil {
-		return nil, err
-	}
+	contracts := systemcontracts.SystemContractsForChain(node.RootChainID)
 	qcContractAddress := contracts.ClusterQC.Address.Hex()
 
 	// construct signer from private key

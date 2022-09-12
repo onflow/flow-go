@@ -292,12 +292,9 @@ func (e *blockComputer) executeSystemCollection(
 	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeSystemCollection)
 	defer colSpan.End()
 
-	tx, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
-	if err != nil {
-		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
-	}
+	tx := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
 
-	err = e.executeTransaction(tx, colSpan, collectionView, systemChunkCtx, collectionIndex, txIndex, res, true)
+	err := e.executeTransaction(tx, colSpan, collectionView, systemChunkCtx, collectionIndex, txIndex, res, true)
 
 	if err != nil {
 		return nil, err

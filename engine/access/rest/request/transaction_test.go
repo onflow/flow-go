@@ -126,7 +126,7 @@ func TestTransaction_ValidParse(t *testing.T) {
 	input := transactionToReader(tx)
 
 	var transaction Transaction
-	err := transaction.Parse(input, flow.Testnet.Chain())
+	err := transaction.Parse(input, flow.Emulator.Chain())
 
 	assert.NoError(t, err)
 	assert.Equal(t, tx["payer"], transaction.Flow().Payer.String())

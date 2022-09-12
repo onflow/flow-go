@@ -131,10 +131,7 @@ func getFlowClient() *client.Client {
 
 // executeGetProposedNodesInfosScript executes the get node info for each ID in the proposed table
 func executeGetProposedNodesInfosScript(ctx context.Context, client *client.Client) (cadence.Value, error) {
-	script, err := common.GetNodeInfoForProposedNodesScript(flagNetworkEnv)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get cadence script: %w", err)
-	}
+	script := common.GetNodeInfoForProposedNodesScript(flagNetworkEnv)
 
 	infos, err := client.ExecuteScriptAtLatestBlock(ctx, script, []cadence.Value{})
 	if err != nil {

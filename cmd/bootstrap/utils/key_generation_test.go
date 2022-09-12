@@ -61,7 +61,7 @@ func TestWriteMachineAccountFiles(t *testing.T) {
 	expected := make(map[string]bootstrap.NodeMachineAccountInfo)
 	for i, node := range nodes {
 		// See comments in WriteMachineAccountFiles for why addresses take this form
-		addr, err := chain.AddressAtIndex(uint64(6 + i*2))
+		addr, err := chain.AddressAtIndex(uint64(3 + i*2))
 		require.NoError(t, err)
 		private, err := node.Private()
 		require.NoError(t, err)

@@ -101,7 +101,7 @@ func (suite *Suite) SetupTest() {
 		On("NodeID").
 		Return(accessIdentity.NodeID)
 
-	suite.chainID = flow.Testnet
+	suite.chainID = flow.Emulator
 	suite.metrics = metrics.NewNoopCollector()
 }
 

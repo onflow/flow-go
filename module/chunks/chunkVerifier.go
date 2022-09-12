@@ -68,10 +68,7 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 	}
 
 	// transaction body of system chunk
-	txBody, err := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get system chunk transaction: %w", err)
-	}
+	txBody := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
 
 	tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(0))
 	transactions := []*fvm.TransactionProcedure{tx}
