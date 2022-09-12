@@ -35,8 +35,10 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 	// We first start ccf and then the orchestrator network, since the order of startup matters, i.e., on startup, the orchestrator network tries
 	// to connect to all ccfs.
 	withCorruptibleNetwork(t, func(t *testing.T, corruptedIdentity flow.Identity, corruptibleNetwork *corruptible.Network, hub *stub.Hub) {
-		// this is the event orchestrator will send instead of the original event coming from corrupted engine.
-		corruptedEvent := &message.TestMessage{Text: "this is a corrupted message"}
+		// these are the events orchestrator will send instead of the original ingress and egress events coming to and from
+		// the corrupted engine, respectively.
+		corruptedEgressEvent := &message.TestMessage{Text: "this is a corrupted egress message"}
+		corruptedIngressEvent := &message.TestMessage{Text: "this is a corrupted ingress message"}
 
 		// extracting port that ccf gRPC server is running on
 		_, ccfPortStr, err := net.SplitHostPort(corruptibleNetwork.ServerAddress())
@@ -44,15 +46,22 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 		withAttackOrchestrator(t, flow.IdentityList{&corruptedIdentity}, map[flow.Identifier]string{corruptedIdentity.NodeID: ccfPortStr},
 			func(event *insecure.EgressEvent) {
-				// implementing the corruption functionality of the orchestrator.
-				event.FlowProtocolEvent = corruptedEvent
-			}, func(t *testing.T) {
-
+				// implementing the corruption functionality of the orchestrator for the egress traffic.
+				event.FlowProtocolEvent = corruptedEgressEvent
+			},
+			func(event *insecure.IngressEvent) {
+				// implementing the corruption functionality of the orchestrator for the ingress traffic.
+				event.FlowProtocolEvent = corruptedIngressEvent
+			},
+			func(t *testing.T) {
 				require.Eventually(t, func() bool {
 					return corruptibleNetwork.AttackerRegistered() // attacker's registration must be done on corruptible network prior to sending any messages.
 				}, 2*time.Second, 100*time.Millisecond, "registration of attacker on CCF could not be done one time")
 
-				originalEvent := &message.TestMessage{Text: "this is a test message"}
+				// egress event is sent from the node running corrupted engine to node running the honest engine.
+				originalEgressEvent := &message.TestMessage{Text: "this is a test egress message"}
+				// ingress event is sent from the node running the honest engine to node running the corrupted engine.
+				originalIngressEvent := &message.TestMessage{Text: "this is a test ingress message"}
 				testChannel := channels.TestNetworkChannel
 
 				// corrupted node network
@@ -66,25 +75,43 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 				honestNodeNetwork := stub.NewNetwork(t, honestIdentity.NodeID, hub)
 				// in this test, the honest node is only the receiver, hence, we discard
 				// the created conduit.
-				_, err = honestNodeNetwork.Register(testChannel, honestEngine)
+				honestNodeConduit, err := honestNodeNetwork.Register(testChannel, honestEngine)
 				require.NoError(t, err)
 
 				wg := &sync.WaitGroup{}
-				wg.Add(1)
+				wg.Add(2)
+				// we expect to receive the corrupted egress event on the honest node.
 				honestEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
 					// implementing the process logic of the honest engine on reception of message from underlying network.
 					require.Equal(t, testChannel, channel)               // event must arrive at the channel set by orchestrator.
 					require.Equal(t, corruptedIdentity.NodeID, originId) // origin id of the message must be the corrupted node.
-					require.Equal(t, corruptedEvent, event)              // content of event must be swapped with corrupted event.
+					require.Equal(t, corruptedEgressEvent, event)        // content of event must be swapped with corrupted event.
+
+					wg.Done()
+					return nil
+				})
+				// we expect to receive the corrupted ingress event on the corrupted node.
+				corruptedEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
+					// implementing the process logic of the corrupted engine on reception of message from underlying network.
+					require.Equal(t, testChannel, channel)            // event must arrive at the channel set by orchestrator.
+					require.Equal(t, honestIdentity.NodeID, originId) // origin id of the message must be the honest node.
+					require.Equal(t, corruptedIngressEvent, event)    // content of event must be swapped with corrupted event.
 
 					wg.Done()
 					return nil
 				})
 
-				require.NoError(t, corruptedConduit.Unicast(originalEvent, honestIdentity.NodeID))
+				go func() {
+					// sending egress event from corrupted node to honest node.
+					require.NoError(t, corruptedConduit.Unicast(originalEgressEvent, honestIdentity.NodeID))
+				}()
+				go func() {
+					// sending ingress event from honest node to corrupted node.
+					require.NoError(t, honestNodeConduit.Unicast(originalIngressEvent, corruptedIdentity.NodeID))
+				}()
 
+				// waiting for the events to be processed by the engines.
 				unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "honest node could not receive corrupted event on time")
-
 			})
 	})
 
@@ -146,10 +173,18 @@ func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *c
 
 // withAttackOrchestrator creates a mock orchestrator with the injected "corrupter" function, which entirely runs on top of a real orchestrator network.
 // It then starts the orchestrator network, executes the "run" function, and stops the orchestrator network afterwards.
-func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corruptedPortMap map[flow.Identifier]string, corrupter func(*insecure.EgressEvent),
+func withAttackOrchestrator(
+	t *testing.T,
+	corruptedIds flow.IdentityList,
+	corruptedPortMap map[flow.Identifier]string,
+	egressEventCorrupter func(*insecure.EgressEvent),
+	ingressEventCorrupter func(*insecure.IngressEvent),
 	run func(t *testing.T)) {
 	codec := unittest.NetworkCodec()
-	o := &mockOrchestrator{eventCorrupter: corrupter}
+	o := &mockOrchestrator{
+		egressEventCorrupter:  egressEventCorrupter,
+		ingressEventCorrupter: ingressEventCorrupter,
+	}
 	connector := orchestrator.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
 
 	orchestratorNetwork, err := orchestrator.NewOrchestratorNetwork(
