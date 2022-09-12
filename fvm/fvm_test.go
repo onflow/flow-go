@@ -60,8 +60,7 @@ func (vmt vmTest) withContextOptions(opts ...fvm.Option) vmTest {
 }
 
 func createChainAndVm(chainID flow.ChainID) (flow.Chain, *fvm.VirtualMachine) {
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-	return chainID.Chain(), fvm.NewVirtualMachine(rt)
+	return chainID.Chain(), fvm.NewVM()
 }
 
 func (vmt vmTest) run(
@@ -88,7 +87,7 @@ func (vmt vmTest) run(
 
 		bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
-		err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view, programs)
+		err := vm.RunV2(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
 		require.NoError(t, err)
 
 		f(t, vm, chain, ctx, view, programs)
@@ -120,7 +119,7 @@ func (vmt vmTest) bootstrapWith(
 
 	bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
-	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view, programs)
+	err := vm.RunV2(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
 	if err != nil {
 		return bootstrappedVmTest{}, err
 	}
@@ -145,7 +144,7 @@ func (vmt bootstrappedVmTest) run(
 	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
-		f(t, fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{})), vmt.chain, vmt.ctx, vmt.view.NewChild(), vmt.programs.ChildPrograms())
+		f(t, fvm.NewVM(), vmt.chain, vmt.ctx, vmt.view.NewChild(), vmt.programs.ChildPrograms())
 	}
 }
 
@@ -184,7 +183,7 @@ func TestPrograms(t *testing.T) {
 
 					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-					err = vm.Run(txCtx, tx, view, programs)
+					err = vm.RunV2(txCtx, tx, view)
 					require.NoError(t, err)
 
 					require.NoError(t, tx.Err)
@@ -208,7 +207,7 @@ func TestPrograms(t *testing.T) {
 					fvm.FungibleTokenAddress(chain).HexWithPrefix(),
 				)))
 
-				err := vm.Run(scriptCtx, script, view, programs)
+				err := vm.RunV2(scriptCtx, script, view)
 				require.NoError(t, err)
 				require.NoError(t, script.Err)
 			},
@@ -401,7 +400,7 @@ func TestHashing(t *testing.T) {
 				)
 			}
 
-			err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+			err := vm.RunV2(ctx, script, ledger)
 
 			byteResult := make([]byte, 0)
 			if err == nil && script.Err == nil {
@@ -432,7 +431,7 @@ func TestHashing(t *testing.T) {
 				cadenceData,
 				jsoncdc.MustEncode(cadence.String("")),
 			)
-			err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+			err := vm.RunV2(ctx, script, ledger)
 			require.NoError(t, err)
 			require.NoError(t, script.Err)
 
@@ -447,7 +446,7 @@ func TestHashing(t *testing.T) {
 			script = script.WithArguments(
 				cadenceData,
 			)
-			err = vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+			err = vm.RunV2(ctx, script, ledger)
 			require.NoError(t, err)
 			require.NoError(t, script.Err)
 
@@ -488,7 +487,7 @@ func TestWithServiceAccount(t *testing.T) {
 	t.Run("With service account enabled", func(t *testing.T) {
 		tx := fvm.Transaction(txBody, 0)
 
-		err := vm.Run(ctxA, tx, view, programs.NewEmptyPrograms())
+		err := vm.RunV2(ctxA, tx, view)
 		require.NoError(t, err)
 
 		// transaction should fail on non-bootstrapped ledger
@@ -500,7 +499,7 @@ func TestWithServiceAccount(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err := vm.Run(ctxB, tx, view, programs.NewEmptyPrograms())
+		err := vm.RunV2(ctxB, tx, view)
 		require.NoError(t, err)
 
 		// transaction should succeed on non-bootstrapped ledger
@@ -566,7 +565,7 @@ func TestEventLimits(t *testing.T) {
 	programs := programs.NewEmptyPrograms()
 
 	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-	err := vm.Run(ctx, tx, ledger, programs)
+	err := vm.RunV2(ctx, tx, ledger)
 	require.NoError(t, err)
 
 	txBody = flow.NewTransactionBody().
@@ -583,7 +582,7 @@ func TestEventLimits(t *testing.T) {
 	t.Run("With limits", func(t *testing.T) {
 		txBody.Payer = unittest.RandomAddressFixture()
 		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-		err := vm.Run(ctx, tx, ledger, programs)
+		err := vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		// transaction should fail due to event size limit
@@ -593,7 +592,7 @@ func TestEventLimits(t *testing.T) {
 	t.Run("With service account as payer", func(t *testing.T) {
 		txBody.Payer = chain.ServiceAddress()
 		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-		err := vm.Run(ctx, tx, ledger, programs)
+		err := vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		// transaction should not fail due to event size limit
@@ -630,7 +629,7 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.NoError(t, tx.Err)
 		},
@@ -657,7 +656,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)
 
-		err := vm.Run(ctx, script, view, programs.NewEmptyPrograms())
+		err := vm.RunV2(ctx, script, view)
 		require.NoError(t, err)
 		require.NoError(t, script.Err)
 		return script.Value.ToGoValue().(uint64)
@@ -726,7 +725,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				require.NoError(t, tx.Err)
 				var feeDeduction flow.Event //fee deduction event
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", fvm.FlowFeesAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", environment.FlowFeesAddress(flow.Testnet.Chain())) {
 						feeDeduction = e
 						break
 					}
@@ -943,7 +942,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
 			assert.NoError(t, tx.Err)
@@ -977,7 +976,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 			tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.NoError(t, tx.Err)
 
@@ -1008,7 +1007,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 			tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
 			balanceAfter := getBalance(vm, chain, ctx, view, address)
@@ -1086,7 +1085,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
 			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
@@ -1135,7 +1134,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
 
@@ -1171,7 +1170,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
 
@@ -1237,7 +1236,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			// There are 100 breaks and each break uses 1_000_000 memory
 			require.Greater(t, tx.MemoryEstimate, uint64(100_000_000))
@@ -1274,7 +1273,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
 			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
@@ -1309,7 +1308,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
 			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
@@ -1343,7 +1342,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
 			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
@@ -1384,7 +1383,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.NoError(t, tx.Err)
 
@@ -1406,7 +1405,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
 			require.ErrorContains(t, tx.Err, "computation exceeds limit (997)")
@@ -1473,7 +1472,7 @@ func TestStorageUsed(t *testing.T) {
 
 	script := fvm.Script(code)
 
-	err = vm.Run(ctx, script, simpleView, programs.NewEmptyPrograms())
+	err = vm.RunV2(ctx, script, simpleView)
 	require.NoError(t, err)
 
 	assert.Equal(t, cadence.NewUInt64(5), script.Value)
@@ -1581,7 +1580,7 @@ func TestEnforcingComputationLimit(t *testing.T) {
 			}
 			tx := fvm.Transaction(txBody, 0)
 
-			err := vm.Run(ctx, tx, simpleView, programs.NewEmptyPrograms())
+			err := vm.RunV2(ctx, tx, simpleView)
 			require.NoError(t, err)
 			require.Equal(t, test.expCompUsed, tx.ComputationUsed)
 			if test.ok {
@@ -1625,7 +1624,7 @@ func TestStorageCapacity(t *testing.T) {
 				SetProposalKey(service, 0, 0).
 				SetPayer(service)
 			tx := fvm.Transaction(transferTxBody, 0)
-			err := vm.Run(ctx, tx, view, programs)
+			err := vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.NoError(t, tx.Err)
 
@@ -1636,7 +1635,7 @@ func TestStorageCapacity(t *testing.T) {
 				SetProposalKey(service, 0, 0).
 				SetPayer(service)
 			tx = fvm.Transaction(transferTxBody, 0)
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.NoError(t, tx.Err)
 
@@ -1675,7 +1674,7 @@ func TestStorageCapacity(t *testing.T) {
 
 			tx = fvm.Transaction(txBody, 0)
 
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.NoError(t, tx.Err)
 
@@ -1715,7 +1714,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 					jsoncdc.MustEncode(address),
 				)
 
-				err = vm.Run(scriptCtx, script, view, programs)
+				err = vm.RunV2(scriptCtx, script, view)
 				require.NoError(t, err)
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
@@ -1760,7 +1759,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				_ = testutil.SignPayload(txBody, account, privateKey)
 				_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-				err = vm.Run(subCtx, tx, view, programs)
+				err = vm.RunV2(subCtx, tx, view)
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
 
@@ -1774,7 +1773,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 					jsoncdc.MustEncode(address),
 				)
 
-				err = vm.Run(subCtx, script, view, programs)
+				err = vm.RunV2(subCtx, script, view)
 				require.NoError(t, err)
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
@@ -1819,7 +1818,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				_ = testutil.SignPayload(txBody, account, privateKey)
 				_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-				err = vm.Run(subCtx, tx, view, programs)
+				err = vm.RunV2(subCtx, tx, view)
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
 
@@ -1832,7 +1831,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 					jsoncdc.MustEncode(address),
 				)
 
-				err = vm.Run(subCtx, script, view, programs)
+				err = vm.RunV2(subCtx, script, view)
 				require.NoError(t, err)
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
@@ -1880,7 +1879,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 					)),
 				)
 
-				err = vm.Run(scriptCtx, script, view, programs)
+				err = vm.RunV2(scriptCtx, script, view)
 				require.NoError(t, err)
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
@@ -1916,7 +1915,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 					jsoncdc.MustEncode(address),
 				)
 
-				err = vm.Run(scriptCtx, script, view, programs)
+				err = vm.RunV2(scriptCtx, script, view)
 				require.NoError(t, err)
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)

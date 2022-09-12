@@ -181,68 +181,6 @@ func (h *AccountKeyHandler) RevokeAccountKey(address runtime.Address, keyIndex i
 	}, nil
 }
 
-// GetAccountKey retrieves a public key by index from an existing account.
-//
-// This function returns a nil key with no errors, if a key doesn't exist at the given index.
-// An error is returned if the specified account does not exist, the provided index is not valid,
-// or if the key retrieval fails.
-func (h *AccountKeyHandler) GetAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
-	accountAddress := flow.Address(address)
-
-	ok, err := h.accounts.Exists(accountAddress)
-	if err != nil {
-		return nil, fmt.Errorf("getting account key failed: %w", err)
-	}
-
-	if !ok {
-		issue := errors.NewAccountNotFoundError(accountAddress)
-		return nil, fmt.Errorf("getting account key failed: %w", issue)
-	}
-
-	// Don't return an error for invalid key indices
-	if keyIndex < 0 {
-		return nil, nil
-	}
-
-	var publicKey flow.AccountPublicKey
-	publicKey, err = h.accounts.GetPublicKey(accountAddress, uint64(keyIndex))
-	if err != nil {
-		// If a key is not found at a given index, then return a nil key with no errors.
-		// This is to be inline with the Cadence runtime. Otherwise Cadence runtime cannot
-		// distinguish between a 'key not found error' vs other internal errors.
-		if errors.IsAccountAccountPublicKeyNotFoundError(err) {
-			return nil, nil
-		}
-
-		return nil, fmt.Errorf("getting account key failed: %w", err)
-	}
-
-	// Prepare the account key to return
-
-	signAlgo := crypto.CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
-	if signAlgo == runtime.SignatureAlgorithmUnknown {
-		err = errors.NewValueErrorf(publicKey.SignAlgo.String(), "signature algorithm type not found")
-		return nil, fmt.Errorf("getting account key failed: %w", err)
-	}
-
-	hashAlgo := crypto.CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
-	if hashAlgo == runtime.HashAlgorithmUnknown {
-		err = errors.NewValueErrorf(publicKey.HashAlgo.String(), "hashing algorithm type not found")
-		return nil, fmt.Errorf("getting account key failed: %w", err)
-	}
-
-	return &runtime.AccountKey{
-		KeyIndex: publicKey.Index,
-		PublicKey: &runtime.PublicKey{
-			PublicKey: publicKey.PublicKey.Encode(),
-			SignAlgo:  signAlgo,
-		},
-		HashAlgo:  hashAlgo,
-		Weight:    publicKey.Weight,
-		IsRevoked: publicKey.Revoked,
-	}, nil
-}
-
 // AddEncodedAccountKey adds an encoded public key to an existing account.
 //
 // This function returns following error

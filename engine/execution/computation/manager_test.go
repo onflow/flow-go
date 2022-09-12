@@ -15,7 +15,6 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -53,11 +52,9 @@ import (
 var scriptLogThreshold = 1 * time.Second
 
 func TestComputeBlockWithStorage(t *testing.T) {
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
@@ -220,9 +217,7 @@ func TestExecuteScript(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
@@ -373,7 +368,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 			ProgramsCacheSize:        DefaultProgramsCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() VirtualMachine {
+			NewCustomVirtualMachine: func() computer.VirtualMachine {
 				return &PanickingVM{}
 			},
 		},
@@ -423,7 +418,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 			ProgramsCacheSize:        DefaultProgramsCacheSize,
 			ScriptLogThreshold:       1 * time.Millisecond,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() VirtualMachine {
+			NewCustomVirtualMachine: func() computer.VirtualMachine {
 				return &LongRunningVM{duration: 2 * time.Millisecond}
 			},
 		},
@@ -473,7 +468,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 			ProgramsCacheSize:        DefaultProgramsCacheSize,
 			ScriptLogThreshold:       1 * time.Second,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() VirtualMachine {
+			NewCustomVirtualMachine: func() computer.VirtualMachine {
 				return &LongRunningVM{duration: 0}
 			},
 		},
@@ -490,6 +485,10 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 type PanickingVM struct{}
 
 func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
+	return p.RunV2(f, procedure, view)
+}
+
+func (p *PanickingVM) RunV2(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
@@ -502,6 +501,10 @@ type LongRunningVM struct {
 }
 
 func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
+	return l.RunV2(f, procedure, view)
+}
+
+func (l *LongRunningVM) RunV2(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	time.Sleep(l.duration)
 	// satisfy value marshaller
 	if scriptProcedure, is := procedure.(*fvm.ScriptProcedure); is {
@@ -681,10 +684,12 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	require.NoError(t, err)
 
-	v, err := vm.Runtime.ReadStored(
+	rt := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(rt)
+
+	v, err := rt.ReadStored(
 		commonAddress,
 		cadence.NewPath("storage", "x"),
-		runtime.Context{Interface: env},
 	)
 
 	// the save should not update account storage by writing the delta from the child view back to the parent

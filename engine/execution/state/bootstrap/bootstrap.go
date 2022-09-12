@@ -4,15 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -40,10 +37,8 @@ func (b *Bootstrapper) BootstrapLedger(
 	opts ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
-	programs := programs.NewEmptyPrograms()
 
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 
 	ctx := fvm.NewContext(
 		fvm.WithLogger(b.logger),
@@ -56,7 +51,7 @@ func (b *Bootstrapper) BootstrapLedger(
 		opts...,
 	)
 
-	err := vm.Run(ctx, bootstrap, view, programs)
+	err := vm.RunV2(ctx, bootstrap, view)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}

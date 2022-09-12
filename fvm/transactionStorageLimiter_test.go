@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	fvmmock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
-	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -29,9 +29,6 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			}),
 			nil,
 		)
-		env.On("BorrowCadenceRuntime", mock.Anything).Return(
-			fvm.NewReusableCadenceRuntime())
-		env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
 		d := &fvm.TransactionStorageLimiter{}
 		err := d.CheckLimits(env, []flow.Address{owner})
@@ -50,9 +47,6 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			}),
 			nil,
 		)
-		env.On("BorrowCadenceRuntime", mock.Anything).Return(
-			fvm.NewReusableCadenceRuntime())
-		env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
 		d := &fvm.TransactionStorageLimiter{}
 		err := d.CheckLimits(env, []flow.Address{owner})
@@ -71,9 +65,6 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			}),
 			nil,
 		)
-		env.On("BorrowCadenceRuntime", mock.Anything).Return(
-			fvm.NewReusableCadenceRuntime())
-		env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
 		d := &fvm.TransactionStorageLimiter{}
 		err := d.CheckLimits(env, []flow.Address{owner})
@@ -93,9 +84,6 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			}),
 			nil,
 		)
-		env.On("BorrowCadenceRuntime", mock.Anything).Return(
-			fvm.NewReusableCadenceRuntime())
-		env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
 		d := &fvm.TransactionStorageLimiter{}
 		err := d.CheckLimits(env, []flow.Address{owner})
@@ -114,9 +102,6 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			}),
 			nil,
 		)
-		env.On("BorrowCadenceRuntime", mock.Anything).Return(
-			fvm.NewReusableCadenceRuntime())
-		env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
 		d := &fvm.TransactionStorageLimiter{}
 		err := d.CheckLimits(env, []flow.Address{owner})

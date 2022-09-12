@@ -14,13 +14,13 @@ import (
 
 	flow "github.com/onflow/flow-go/model/flow"
 
-	fvm "github.com/onflow/flow-go/fvm"
-
 	interpreter "github.com/onflow/cadence/runtime/interpreter"
 
 	mock "github.com/stretchr/testify/mock"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
+
+	runtime "github.com/onflow/flow-go/fvm/runtime"
 
 	sema "github.com/onflow/cadence/runtime/sema"
 
@@ -189,15 +189,15 @@ func (_m *Environment) BLSVerifyPOP(pk *stdlib.PublicKey, s []byte) (bool, error
 }
 
 // BorrowCadenceRuntime provides a mock function with given fields:
-func (_m *Environment) BorrowCadenceRuntime() *fvm.ReusableCadenceRuntime {
+func (_m *Environment) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
 	ret := _m.Called()
 
-	var r0 *fvm.ReusableCadenceRuntime
-	if rf, ok := ret.Get(0).(func() *fvm.ReusableCadenceRuntime); ok {
+	var r0 *runtime.ReusableCadenceRuntime
+	if rf, ok := ret.Get(0).(func() *runtime.ReusableCadenceRuntime); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*fvm.ReusableCadenceRuntime)
+			r0 = ret.Get(0).(*runtime.ReusableCadenceRuntime)
 		}
 	}
 
@@ -275,6 +275,22 @@ func (_m *Environment) EmitEvent(_a0 cadence.Event) error {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// FrozenAccounts provides a mock function with given fields:
+func (_m *Environment) FrozenAccounts() []common.Address {
+	ret := _m.Called()
+
+	var r0 []common.Address
+	if rf, ok := ret.Get(0).(func() []common.Address); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]common.Address)
+		}
 	}
 
 	return r0
@@ -723,6 +739,11 @@ func (_m *Environment) RemoveAccountContractCode(address common.Address, name st
 	return r0
 }
 
+// Reset provides a mock function with given fields:
+func (_m *Environment) Reset() {
+	_m.Called()
+}
+
 // ResolveLocation provides a mock function with given fields: identifiers, location
 func (_m *Environment) ResolveLocation(identifiers []ast.Identifier, location common.Location) ([]sema.ResolvedLocation, error) {
 	ret := _m.Called(identifiers, location)
@@ -752,7 +773,7 @@ func (_m *Environment) ResourceOwnerChanged(_a0 *interpreter.Interpreter, resour
 }
 
 // ReturnCadenceRuntime provides a mock function with given fields: _a0
-func (_m *Environment) ReturnCadenceRuntime(_a0 *fvm.ReusableCadenceRuntime) {
+func (_m *Environment) ReturnCadenceRuntime(_a0 *runtime.ReusableCadenceRuntime) {
 	_m.Called(_a0)
 }
 
@@ -906,22 +927,6 @@ func (_m *Environment) UpdateAccountContractCode(address common.Address, name st
 		r0 = rf(address, name, code)
 	} else {
 		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// VM provides a mock function with given fields:
-func (_m *Environment) VM() *fvm.VirtualMachine {
-	ret := _m.Called()
-
-	var r0 *fvm.VirtualMachine
-	if rf, ok := ret.Get(0).(func() *fvm.VirtualMachine); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*fvm.VirtualMachine)
-		}
 	}
 
 	return r0
