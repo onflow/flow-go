@@ -37,7 +37,7 @@ type Context struct {
 	ScriptProcessors           []ScriptProcessor
 	Logger                     zerolog.Logger
 	ReusableCadenceRuntimePool reusableRuntime.ReusableCadenceRuntimePool
-	BlockPrograms              *programs.Programs
+	BlockPrograms              *programs.BlockPrograms
 
 	EnvironmentParams
 }
@@ -325,7 +325,7 @@ func WithReusableCadenceRuntimePool(
 
 // WithBlockPrograms sets the programs cache storage to be used by the
 // transaction/script.
-func WithBlockPrograms(programs *programs.Programs) Option {
+func WithBlockPrograms(programs *programs.BlockPrograms) Option {
 	return func(ctx Context) Context {
 		ctx.BlockPrograms = programs
 		return ctx
