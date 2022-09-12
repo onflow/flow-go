@@ -17,7 +17,7 @@ type MessageProcessor struct {
 	originalProcessor flownet.MessageProcessor // original message processor
 }
 
-var _ insecure.CorruptMessageProcessor = &MessageProcessor{}
+var _ flownet.MessageProcessor = &MessageProcessor{}
 
 func NewCorruptMessageProcessor(logger zerolog.Logger, originalProcessor flownet.MessageProcessor, ingressController insecure.IngressController) *MessageProcessor {
 	return &MessageProcessor{
