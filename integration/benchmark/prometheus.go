@@ -27,6 +27,7 @@ func NewStatsPusher(
 	localCtx, cancel := context.WithCancel(ctx)
 	sp := &statsPusherImpl{
 		pusher: push.New(pushgateway, job).Gatherer(gatherer),
+		done:   make(chan struct{}),
 		cancel: cancel,
 	}
 
@@ -58,8 +59,8 @@ func NewStatsPusher(
 	return sp
 }
 
-// Close stops the stats pusher and waits for it to finish.
-func (sp *statsPusherImpl) Close() {
+// Stop the stats pusher and waits for it to finish.
+func (sp *statsPusherImpl) Stop() {
 	sp.cancel()
 	<-sp.done
 }

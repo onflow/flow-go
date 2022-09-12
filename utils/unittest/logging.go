@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,7 +25,7 @@ func LogVerbose() {
 // Logger returns a zerolog
 // use -vv flag to print debugging logs for tests
 func Logger() zerolog.Logger {
-	writer := ioutil.Discard
+	writer := io.Discard
 	if *verbose {
 		writer = os.Stderr
 	}
@@ -69,7 +68,7 @@ func NewLoggerHook() LoggerHook {
 
 func HookedLogger() (zerolog.Logger, LoggerHook) {
 	hook := NewLoggerHook()
-	log := zerolog.New(ioutil.Discard).Hook(hook)
+	log := zerolog.New(io.Discard).Hook(hook)
 	return log, hook
 }
 

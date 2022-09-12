@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/slices"
@@ -66,7 +65,7 @@ func (generator *UUIDGenerator) GenerateUUID() (uint64, error) {
 		trace.FVMEnvGenerateUUID).End()
 
 	err := generator.meter.MeterComputation(
-		meter.ComputationKindGenerateUUID,
+		ComputationKindGenerateUUID,
 		1)
 	if err != nil {
 		return 0, fmt.Errorf("generate uuid failed: %w", err)

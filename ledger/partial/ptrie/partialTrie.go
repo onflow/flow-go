@@ -14,7 +14,7 @@ import (
 // a database.
 //
 // DEFINITIONS and CONVENTIONS:
-//   * HEIGHT of a node v in a tree is the number of edges on the longest downward path
+//   - HEIGHT of a node v in a tree is the number of edges on the longest downward path
 //     between v and a tree leaf. The height of a tree is the heights of its root.
 //     The height of a Trie is always the height of the fully-expanded tree.
 type PSMT struct {

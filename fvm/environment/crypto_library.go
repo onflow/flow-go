@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/crypto"
-	metering "github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -30,7 +29,7 @@ func (lib *CryptoLibrary) Hash(
 ) ([]byte, error) {
 	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvHash).End()
 
-	err := lib.meter.MeterComputation(metering.ComputationKindHash, 1)
+	err := lib.meter.MeterComputation(ComputationKindHash, 1)
 	if err != nil {
 		return nil, fmt.Errorf("hash failed: %w", err)
 	}
@@ -53,7 +52,7 @@ func (lib *CryptoLibrary) VerifySignature(
 	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
 
 	err := lib.meter.MeterComputation(
-		metering.ComputationKindVerifySignature,
+		ComputationKindVerifySignature,
 		1)
 	if err != nil {
 		return false, fmt.Errorf("verify signature failed: %w", err)
@@ -77,7 +76,7 @@ func (lib *CryptoLibrary) VerifySignature(
 
 func (lib *CryptoLibrary) ValidatePublicKey(pk *runtime.PublicKey) error {
 	err := lib.meter.MeterComputation(
-		metering.ComputationKindValidatePublicKey,
+		ComputationKindValidatePublicKey,
 		1)
 	if err != nil {
 		return fmt.Errorf("validate public key failed: %w", err)

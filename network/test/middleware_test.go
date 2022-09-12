@@ -36,7 +36,6 @@ const testChannel = channels.TestNetworkChannel
 // https://github.com/libp2p/go-libp2p-pubsub/blob/master/tag_tracer.go
 // One way to make sure such a mesh has formed, asynchronously, in unit tests, is to wait for libp2p.GossipSubD such calls,
 // and that's what we do with tagsObserver.
-//
 type tagsObserver struct {
 	tags chan string
 	log  zerolog.Logger

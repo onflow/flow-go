@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -524,6 +524,6 @@ func runReport(r ledger.Reporter, p []ledger.Payload, commit ledger.State, l zer
 func writeStatusFile(fileName string, e error) error {
 	checkpointStatus := map[string]bool{"succeeded": e == nil}
 	checkpointStatusJson, _ := json.MarshalIndent(checkpointStatus, "", " ")
-	err := ioutil.WriteFile(fileName, checkpointStatusJson, 0644)
+	err := os.WriteFile(fileName, checkpointStatusJson, 0644)
 	return err
 }

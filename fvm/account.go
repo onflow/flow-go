@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,7 +18,7 @@ func getAccount(
 	programs *programs.Programs,
 	address flow.Address,
 ) (*flow.Account, error) {
-	accounts := state.NewAccounts(sth)
+	accounts := environment.NewAccounts(sth)
 
 	account, err := accounts.Get(address)
 	if err != nil {

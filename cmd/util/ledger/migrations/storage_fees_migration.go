@@ -1,7 +1,7 @@
 package migrations
 
 import (
-	fvm "github.com/onflow/flow-go/fvm/state"
+	fvm "github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"

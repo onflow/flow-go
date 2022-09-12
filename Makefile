@@ -5,6 +5,10 @@ COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
 VERSION := $(shell git describe --tags --abbrev=2 --match "v*" --match "secure-cadence*" 2>/dev/null)
 
+# By default, this will run all tests in all packages, but we have a way to override this in CI so that we can
+# dynamically split up CI jobs into smaller jobs that can be run in parallel
+GO_TEST_PACKAGES := ./...
+
 # Image tag: if image tag is not set, set it with version (or short commit if empty)
 ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${VERSION}
@@ -53,7 +57,7 @@ cmd/util/util:
 .PHONY: unittest-main
 unittest-main:
 	# test all packages with Relic library enabled
-	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
+	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(GO_TEST_PACKAGES)
 
 .PHONY: install-mock-generators
 install-mock-generators:
@@ -65,7 +69,7 @@ install-mock-generators:
 
 .PHONY: install-tools
 install-tools: crypto_setup_tests crypto_setup_gopath check-go-version install-mock-generators
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.47.3; \
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.49.0; \
 	cd ${GOPATH}; \
 	go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
@@ -82,8 +86,13 @@ emulator-build:
 	# test the fvm package compiles with Relic library disabled (required for the emulator build)
 	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
 
+.PHONY: emulator-build
+fuzz-fvm:
+	# run fuzz tests in the fvm package
+	cd ./fvm && go test -fuzz=Fuzz -run ^$$ --tags relic
+
 .PHONY: test
-test: verfiy-mocks emulator-build unittest
+test: verify-mocks emulator-build unittest
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -116,8 +125,8 @@ generate: generate-proto generate-mocks
 generate-proto:
 	prototool generate protobuf
 
-.PHONY: verfiy-mocks
-verfiy-mocks: generate-mocks
+.PHONY: verify-mocks
+verify-mocks: generate-mocks
 	git diff --exit-code
 
 .PHONY: generate-mocks
@@ -150,6 +159,7 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir=engine/consensus --case=underscore --output="./engine/consensus/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/consensus/approvals --case=underscore --output="./engine/consensus/approvals/mock" --outpkg="mock"
 	mockery --name '.*' --dir=fvm --case=underscore --output="./fvm/mock" --outpkg="mock"
+	mockery --name '.*' --dir=fvm/environment --case=underscore --output="./fvm/environment/mock" --outpkg="mock"
 	mockery --name '.*' --dir=fvm/state --case=underscore --output="./fvm/mock/state" --outpkg="mock"
 	mockery --name '.*' --dir=ledger --case=underscore --output="./ledger/mock" --outpkg="mock"
 	mockery --name 'ViolationsConsumer' --dir=network/slashing --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
@@ -205,7 +215,7 @@ ci-benchmark: install-tools
 # Runs unit tests, test coverage, lint in Docker (for mac)
 .PHONY: docker-ci
 docker-ci:
-	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
+	docker run --env RACE_DETECTOR=$(RACE_DETECTOR) --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
 		-v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \

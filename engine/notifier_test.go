@@ -44,9 +44,9 @@ func TestNotifier_NoNotificationsInitialization(t *testing.T) {
 
 // TestNotifier_ManyNotifications sends many notifications to the Notifier
 // and verifies that:
-//  * the notifier accepts them all without a notification being consumed
-//  * only one notification is internally stored and subsequent attempts to
-//    read a notification would block
+//   - the notifier accepts them all without a notification being consumed
+//   - only one notification is internally stored and subsequent attempts to
+//     read a notification would block
 func TestNotifier_ManyNotifications(t *testing.T) {
 	t.Parallel()
 	notifier := NewNotifier()

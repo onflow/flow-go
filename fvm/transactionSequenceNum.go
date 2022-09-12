@@ -3,9 +3,11 @@ package fvm
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -42,16 +44,27 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	}
 
 	defer func() {
-		mergeError := sth.Commit(nestedTxnId)
-		if mergeError != nil {
-			panic(mergeError)
-		}
+		// Skip checking limits when merging the public key sequence number
+		sth.RunWithAllLimitsDisabled(func() {
+			mergeError := sth.Commit(nestedTxnId)
+			if mergeError != nil {
+				panic(mergeError)
+			}
+		})
 	}()
 
-	accounts := state.NewAccounts(sth)
+	accounts := environment.NewAccounts(sth)
 	proposalKey := proc.Transaction.ProposalKey
 
-	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
+	var accountKey flow.AccountPublicKey
+
+	// TODO(Janez): move disabling limits out of the sequence number verifier. Verifier should not be metered anyway.
+	// TODO(Janez): verification is part of inclusion fees, not execution fees.
+
+	// Skip checking limits when getting the public key
+	sth.RunWithAllLimitsDisabled(func() {
+		accountKey, err = accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
+	})
 	if err != nil {
 		err = errors.NewInvalidProposalSignatureError(proposalKey.Address, proposalKey.KeyIndex, err)
 		return fmt.Errorf("checking sequence number failed: %w", err)
@@ -64,7 +77,6 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	}
 
 	// Note that proposal key verification happens at the txVerifier and not here.
-
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
@@ -73,13 +85,14 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	accountKey.SeqNumber++
 
-	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
+	// Skip checking limits when setting the public key sequence number
+	sth.RunWithAllLimitsDisabled(func() {
+		_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
+	})
 	if err != nil {
 		// NOTE: we need to disable limits during restart or else restart may
 		// fail on merging.
-		sth.DisableAllLimitEnforcements()
-		_ = sth.RestartNestedTransaction(nestedTxnId)
-		sth.EnableAllLimitEnforcements()
+		sth.RunWithAllLimitsDisabled(func() { _ = sth.RestartNestedTransaction(nestedTxnId) })
 		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
 

@@ -54,8 +54,8 @@ const DefaultRequiredApprovalsForSealConstruction = uint(1)
 // present and valid for each chunk. Setting this to 0 will disable counting of chunk approvals
 // this can be used temporarily to ease the migration to new chunk based sealing.
 // TODO:
-//   * This value will result in consensus not depending on verification at all for sealing (no approvals required)
-//   * Full protocol should be +2/3 of all currently authorized verifiers.
+//   - This value will result in consensus not depending on verification at all for sealing (no approvals required)
+//   - Full protocol should be +2/3 of all currently authorized verifiers.
 const DefaultRequiredApprovalsForSealValidation = 0
 
 // DefaultChunkAssignmentAlpha is the default number of verifiers that should be

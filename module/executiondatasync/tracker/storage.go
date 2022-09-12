@@ -159,12 +159,13 @@ type Storage interface {
 }
 
 // The storage component tracks the following information:
-// * the latest pruned height
-// * the latest fulfilled height
-// * the set of CIDs of the execution data blobs we know about at each height, so that
-//   once we prune a fulfilled height we can remove the blob data from local storage
-// * for each CID, the most recent height that it was observed at, so that when pruning
-//   a fulfilled height we don't remove any blob data that is still needed at higher heights
+//   - the latest pruned height
+//   - the latest fulfilled height
+//   - the set of CIDs of the execution data blobs we know about at each height, so that
+//     once we prune a fulfilled height we can remove the blob data from local storage
+//   - for each CID, the most recent height that it was observed at, so that when pruning
+//     a fulfilled height we don't remove any blob data that is still needed at higher heights
+//
 // The storage component calls the given prune callback for a CID when the last height
 // at which that CID appears is pruned. The prune callback can be used to delete the
 // corresponding blob data from the blob store.

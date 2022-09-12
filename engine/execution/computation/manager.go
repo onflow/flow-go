@@ -10,6 +10,7 @@ import (
 	"time"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
@@ -19,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -30,6 +32,15 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const (
+	DefaultScriptLogThreshold       = 1 * time.Second
+	DefaultScriptExecutionTimeLimit = 10 * time.Second
+
+	MaxScriptErrorMessageSize = 1000 // 1000 chars
+
+	ReusableCadenceRuntimePoolSize = 1000
+)
+
 var uploadEnabled = true
 
 func SetUploaderEnabled(enabled bool) {
@@ -38,9 +49,8 @@ func SetUploaderEnabled(enabled bool) {
 	log.Info().Msgf("changed uploadEnabled to %v", enabled)
 }
 
-type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
-	GetAccount(fvm.Context, flow.Address, state.View, *programs.Programs) (*flow.Account, error)
+func GetUploaderEnabled() bool {
+	return uploadEnabled
 }
 
 type ComputationManager interface {
@@ -53,10 +63,20 @@ type ComputationManager interface {
 	GetAccount(addr flow.Address, header *flow.Header, view state.View) (*flow.Account, error)
 }
 
-var DefaultScriptLogThreshold = 1 * time.Second
-var DefaultScriptExecutionTimeLimit = 10 * time.Second
+type ComputationConfig struct {
+	CadenceTracing           bool
+	ExtensiveTracing         bool
+	ProgramsCacheSize        uint
+	ScriptLogThreshold       time.Duration
+	ScriptExecutionTimeLimit time.Duration
 
-const MaxScriptErrorMessageSize = 1000 // 1000 chars
+	// When NewCustomVirtualMachine is nil, the manager will create a standard
+	// fvm virtual machine via fvm.NewVM.  Otherwise, the manager
+	// will create a virtual machine using this function.
+	//
+	// Note that this is primarily used for testing.
+	NewCustomVirtualMachine func() computer.VirtualMachine
+}
 
 // Manager manages computation and execution
 type Manager struct {
@@ -65,7 +85,7 @@ type Manager struct {
 	metrics                  module.ExecutionMetrics
 	me                       module.Local
 	protoState               protocol.State
-	vm                       VirtualMachine
+	vm                       computer.VirtualMachine
 	vmCtx                    fvm.Context
 	blockComputer            computer.BlockComputer
 	programsCache            *ProgramsCache
@@ -82,16 +102,34 @@ func New(
 	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
-	vm VirtualMachine,
 	vmCtx fvm.Context,
-	programsCacheSize uint,
 	committer computer.ViewCommitter,
-	scriptLogThreshold time.Duration,
-	scriptExecutionTimeLimit time.Duration,
 	uploaders []uploader.Uploader,
 	executionDataProvider *provider.Provider,
+	params ComputationConfig,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
+
+	var vm computer.VirtualMachine
+	if params.NewCustomVirtualMachine != nil {
+		vm = params.NewCustomVirtualMachine()
+	} else {
+		vm = fvm.NewVM()
+	}
+
+	options := []fvm.Option{
+		fvm.WithReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
+				ReusableCadenceRuntimePoolSize,
+				runtime.Config{
+					TracingEnabled: params.CadenceTracing,
+				})),
+	}
+	if params.ExtensiveTracing {
+		options = append(options, fvm.WithExtensiveTracing())
+	}
+
+	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
 		vm,
@@ -107,7 +145,7 @@ func New(
 		return nil, fmt.Errorf("cannot create block computer: %w", err)
 	}
 
-	programsCache, err := NewProgramsCache(programsCacheSize)
+	programsCache, err := NewProgramsCache(params.ProgramsCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create programs cache: %w", err)
 	}
@@ -122,14 +160,18 @@ func New(
 		vmCtx:                    vmCtx,
 		blockComputer:            blockComputer,
 		programsCache:            programsCache,
-		scriptLogThreshold:       scriptLogThreshold,
-		scriptExecutionTimeLimit: scriptExecutionTimeLimit,
+		scriptLogThreshold:       params.ScriptLogThreshold,
+		scriptExecutionTimeLimit: params.ScriptExecutionTimeLimit,
 		uploaders:                uploaders,
 		rngLock:                  &sync.Mutex{},
 		rng:                      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	return &e, nil
+}
+
+func (e *Manager) VM() computer.VirtualMachine {
+	return e.vm
 }
 
 func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Programs {
@@ -170,8 +212,10 @@ func (e *Manager) ExecuteScript(
 	defer cancel()
 
 	script := fvm.NewScriptWithContextAndArgs(code, requestCtx, arguments...)
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
-	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithBlockPrograms(e.getChildProgramsOrEmpty(blockHeader.ID())))
 
 	err := func() (err error) {
 
@@ -207,7 +251,7 @@ func (e *Manager) ExecuteScript(
 			}
 		}()
 
-		return e.vm.Run(blockCtx, script, view, programs)
+		return e.vm.RunV2(blockCtx, script, view)
 	}()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
