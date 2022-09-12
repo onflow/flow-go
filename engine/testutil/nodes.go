@@ -649,6 +649,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		false,
 		nil,
 		nil,
+		atomic.NewUint64(0),
+		atomic.NewBool(false),
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
@@ -928,6 +930,7 @@ func VerificationNode(t testing.TB,
 			node.Results,
 			node.Receipts,
 			node.RequesterEngine,
+			0,
 		)
 	}
 
@@ -950,7 +953,8 @@ func VerificationNode(t testing.TB,
 			node.State,
 			assigner,
 			node.ChunksQueue,
-			node.ChunkConsumer)
+			node.ChunkConsumer,
+			0)
 	}
 
 	if node.BlockConsumer == nil {

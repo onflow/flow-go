@@ -32,6 +32,8 @@ type Engine struct {
 	chunksQueue           storage.ChunksQueue       // to store chunks to be verified.
 	newChunkListener      module.NewJobListener     // to notify chunk queue consumer about a new chunk.
 	blockConsumerNotifier module.ProcessingNotifier // to report a block has been processed.
+	stopAtHeight          uint64
+	stopAtBlockID         flow.Identifier
 }
 
 func New(
@@ -43,6 +45,7 @@ func New(
 	assigner module.ChunkAssigner,
 	chunksQueue storage.ChunksQueue,
 	newChunkListener module.NewJobListener,
+	stopAtHeight uint64,
 ) *Engine {
 	return &Engine{
 		unit:             engine.NewUnit(),
@@ -54,6 +57,8 @@ func New(
 		assigner:         assigner,
 		chunksQueue:      chunksQueue,
 		newChunkListener: newChunkListener,
+		stopAtHeight:     stopAtHeight,
+		stopAtBlockID:    flow.ZeroID,
 	}
 }
 
@@ -165,6 +170,11 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 // processFinalizedBlock indexes the execution receipts included in the block, performs chunk assignment on its result, and
 // processes the chunks assigned to this verification node by pushing them to the chunks consumer.
 func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
+
+	if e.stopAtHeight > 0 && block.Header.Height == e.stopAtHeight {
+		e.stopAtBlockID = block.ID()
+	}
+
 	blockID := block.ID()
 	// we should always notify block consumer before returning.
 	defer e.blockConsumerNotifier.Notify(blockID)
@@ -200,6 +210,13 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 		assignedChunksCount += uint64(len(chunkList))
 		for _, chunk := range chunkList {
+
+			if e.stopAtHeight > 0 && e.stopAtBlockID == chunk.BlockID {
+				resultLog.Fatal().
+					Hex("chunk_id", logging.ID(chunk.ID())).
+					Msgf("Chunk for block at finalized height %d received - stopping node", e.stopAtHeight)
+			}
+
 			processed, err := e.processChunkWithTracing(ctx, chunk, resultID, block.Header.Height)
 			if err != nil {
 				resultLog.Fatal().

@@ -431,10 +431,10 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 		return
 	}
 
+	// skips blocks at or above requested stop height
 	stopHeight := e.stopAtHeight.Load()
-	if stopHeight > 0 && stopHeight >= b.Height {
-		// stop executing blocks, but continue to receive them
-		e.pauseExecution = true
+	if stopHeight > 0 && b.Height >= stopHeight {
+		e.log.Warn().Msgf("Skipping execution of %s at height %d because stop has been requested at height %d", b.ID(), b.Height, stopHeight)
 		return
 	}
 
@@ -451,6 +451,31 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 	err = e.handleBlock(e.unit.Ctx(), newBlock)
 	if err != nil {
 		e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to handle block")
+	}
+}
+
+func (e *Engine) BlockFinalized(h *flow.Header) {
+
+	if e.pauseExecution {
+		return
+	}
+
+	stopHeight := e.stopAtHeight.Load()
+	// skip if no stop at height has been requested
+	if stopHeight == 0 {
+		return
+	}
+
+	// once finalization reached stop height we can be sure no other fork will be valid at this height,
+	// so it is safe to stop or crash now
+	if h.Height >= stopHeight {
+
+		if e.stopAtHeightCrash.Load() {
+			e.log.Fatal().Msgf("Crashing as finalization reached requested stop height %d", stopHeight)
+		} else {
+			e.pauseExecution = true
+			e.log.Warn().Msgf("Pausing execution as finalization reached requested stop height %d", stopHeight)
+		}
 	}
 }
 
