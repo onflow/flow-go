@@ -1,22 +1,41 @@
 package unicast
 
 import (
+	"fmt"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/network/message"
+)
+
+var (
+	ErrStreamRateLimited    = fmt.Errorf("rate-limiting peer unicast stream creation dropping message")
+	ErrBandwidthRateLimited = fmt.Errorf("rate-limiting peer unicast bandwidth limit exceeded dropping message")
 )
 
 // RateLimiters used to manage stream and bandwidth rate limiters
 type RateLimiters struct {
 	StreamRateLimiter     RateLimiter
 	BandWidthRateLimiter  RateLimiter
-	OnRateLimitedPeerFunc func(peerID peer.ID) // the callback called each time a peer is rate limited
+	OnRateLimitedPeerFunc func(peer.ID, error) // the callback called each time a peer is rate limited
+	dryRun                bool
 }
 
-func NewRateLimiters(streamLimiter, bandwidthLimiter RateLimiter, onRateLimitedPeer func(peer.ID)) *RateLimiters {
+// NewRateLimiters returns *RateLimiters
+func NewRateLimiters(streamLimiter, bandwidthLimiter RateLimiter, onRateLimitedPeer func(peer.ID, error), dryRun bool) *RateLimiters {
 	return &RateLimiters{
 		StreamRateLimiter:     streamLimiter,
 		BandWidthRateLimiter:  bandwidthLimiter,
 		OnRateLimitedPeerFunc: onRateLimitedPeer,
+		dryRun:                dryRun,
+	}
+}
+
+// NoopRateLimiters returns noop rate limiters.
+func NoopRateLimiters() *RateLimiters {
+	return &RateLimiters{
+		StreamRateLimiter:     nil,
+		BandWidthRateLimiter:  nil,
+		OnRateLimitedPeerFunc: nil,
+		dryRun:                true,
 	}
 }
 
@@ -28,7 +47,13 @@ func (r *RateLimiters) StreamAllowed(peerID peer.ID) bool {
 	}
 
 	if !r.StreamRateLimiter.Allow(peerID, nil) {
-		r.OnRateLimitedPeerFunc(peerID)
+		r.OnRateLimitedPeerFunc(peerID, ErrStreamRateLimited)
+
+		// avoid rate limiting during dry run
+		if r.dryRun {
+			return true
+		}
+
 		return false
 	}
 
@@ -43,7 +68,13 @@ func (r *RateLimiters) BandwidthAllowed(peerID peer.ID, message *message.Message
 	}
 
 	if !r.BandWidthRateLimiter.Allow(peerID, message) {
-		r.OnRateLimitedPeerFunc(peerID)
+		r.OnRateLimitedPeerFunc(peerID, ErrBandwidthRateLimited)
+
+		// avoid rate limiting during dry run
+		if r.dryRun {
+			return true
+		}
+
 		return false
 	}
 
@@ -64,10 +95,10 @@ func (r *RateLimiters) Start() {
 // Stop stops all limiters.
 func (r *RateLimiters) Stop() {
 	if r.StreamRateLimiter != nil {
-		go r.StreamRateLimiter.Stop()
+		r.StreamRateLimiter.Stop()
 	}
 
 	if r.BandWidthRateLimiter != nil {
-		go r.BandWidthRateLimiter.Stop()
+		r.BandWidthRateLimiter.Stop()
 	}
 }

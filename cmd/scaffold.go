@@ -287,7 +287,13 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	peerManagerFilters := make([]p2p.PeerFilter, 0)
 
 	// setup unicast rate limiters
-	unicastRateLimiters := unicast.NewRateLimiters(nil, nil, nil)
+	onRateLimit := func(peerID peer.ID, err error) {
+		fnb.Logger.Warn().
+			Err(err).
+			Str("peer_id", peerID.Pretty()).
+			Msg("unicast peer rate limited")
+	}
+	unicastRateLimiters := unicast.NewRateLimiters(nil, nil, onRateLimit, fnb.BaseConfig.UnicastRateLimitDryRun)
 
 	// setup unicast stream rate limiter
 	if fnb.BaseConfig.UnicastStreamCreationRateLimit > 0 && fnb.BaseConfig.UnicastStreamCreationBurstLimit > 0 {
