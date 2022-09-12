@@ -1128,7 +1128,8 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 				require.Error(t, tx.Err)
-				assert.Equal(t, (&errors.LedgerInteractionLimitExceededError{}).Code(), tx.Err.Code())
+
+				assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 			}))
 }
 
