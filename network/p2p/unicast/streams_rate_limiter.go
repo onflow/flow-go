@@ -12,22 +12,28 @@ import (
 // be created per some configured interval. A new stream is created each time a libP2P
 // node sends a direct message.
 type StreamsRateLimiterImpl struct {
-	rateLimitedPeers *rateLimitedPeers
-	limiters         *limiters
+	rateLimitedPeers *rateLimitedPeersMap
+	limiters         *rateLimiterMap
 	limit            rate.Limit
 	burst            int
 	now              GetTimeNow
 }
 
-// NewStreamsRateLimiter returns a new StreamsRateLimiterImpl.
+// NewStreamsRateLimiter returns a new StreamsRateLimiterImpl. The cleanup loop will be started in a
+// separate goroutine and should be stopped by calling Close.
 func NewStreamsRateLimiter(limit rate.Limit, burst int, now GetTimeNow) *StreamsRateLimiterImpl {
-	return &StreamsRateLimiterImpl{
-		rateLimitedPeers: newRateLimitedPeers(),
-		limiters:         newLimiters(),
+	l := &StreamsRateLimiterImpl{
+		rateLimitedPeers: newRateLimitedPeersMap(rateLimiterTTL, cleanUpTickDuration),
+		limiters:         newLimiterMap(rateLimiterTTL, cleanUpTickDuration),
 		limit:            limit,
 		burst:            burst,
 		now:              now,
 	}
+
+	go l.limiters.cleanupLoop()
+	go l.rateLimitedPeers.cleanupLoop()
+
+	return l
 }
 
 // Allow checks the cached limiter for the peer and returns limiter.Allow().
@@ -46,6 +52,13 @@ func (s *StreamsRateLimiterImpl) Allow(peerID peer.ID, _ *message.Message) bool 
 // IsRateLimited returns true is a peer is currently rate limited.
 func (s *StreamsRateLimiterImpl) IsRateLimited(peerID peer.ID) bool {
 	return s.rateLimitedPeers.exists(peerID)
+}
+
+// Close sends cleanup signal to underlying rate limiters and rate limited peers maps. After the rate limiter
+// is closed it can not be reused.
+func (s *StreamsRateLimiterImpl) Close() {
+	s.limiters.close()
+	s.rateLimitedPeers.close()
 }
 
 // getLimiter returns limiter for the peerID, if a limiter does not exist one is created and stored.

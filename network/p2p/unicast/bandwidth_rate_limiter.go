@@ -11,22 +11,28 @@ import (
 // BandWidthRateLimiterImpl unicast rate limiter that limits the bandwidth that can be sent
 // by a peer per some configured interval.
 type BandWidthRateLimiterImpl struct {
-	rateLimitedPeers *rateLimitedPeers
-	limiters         *limiters
+	rateLimitedPeers *rateLimitedPeersMap
+	limiters         *rateLimiterMap
 	limit            rate.Limit
 	burst            int
 	now              GetTimeNow
 }
 
-// NewBandWidthRateLimiter returns a new BandWidthRateLimiterImpl.
+// NewBandWidthRateLimiter returns a new BandWidthRateLimiterImpl. The cleanup loop will be started in a
+// separate goroutine and should be stopped by calling Close.
 func NewBandWidthRateLimiter(limit rate.Limit, burst int, now GetTimeNow) *BandWidthRateLimiterImpl {
-	return &BandWidthRateLimiterImpl{
-		rateLimitedPeers: newRateLimitedPeers(),
-		limiters:         newLimiters(),
+	l := &BandWidthRateLimiterImpl{
+		rateLimitedPeers: newRateLimitedPeersMap(rateLimiterTTL, cleanUpTickDuration),
+		limiters:         newLimiterMap(rateLimiterTTL, cleanUpTickDuration),
 		limit:            limit,
 		burst:            burst,
 		now:              now,
 	}
+
+	go l.limiters.cleanupLoop()
+	go l.rateLimitedPeers.cleanupLoop()
+
+	return l
 }
 
 // Allow checks the cached limiter for the peer and returns limiter.AllowN(msg.Size())
@@ -46,6 +52,13 @@ func (b *BandWidthRateLimiterImpl) Allow(peerID peer.ID, msg *message.Message) b
 // IsRateLimited returns true is a peer is currently rate limited.
 func (b *BandWidthRateLimiterImpl) IsRateLimited(peerID peer.ID) bool {
 	return b.rateLimitedPeers.exists(peerID)
+}
+
+// Close sends cleanup signal to underlying rate limiters and rate limited peers maps. After the rate limiter
+// is closed it can not be reused.
+func (b *BandWidthRateLimiterImpl) Close() {
+	b.limiters.close()
+	b.rateLimitedPeers.close()
 }
 
 // getLimiter returns limiter for the peerID, if a limiter does not exist one is created and stored.

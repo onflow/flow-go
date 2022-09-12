@@ -408,6 +408,15 @@ func (m *Middleware) stop() {
 
 	// wait for the readConnection and readSubscription routines to stop
 	m.wg.Wait()
+
+	// clean up rate limiter resources
+	if m.unicastStreamRateLimiter != nil {
+		m.unicastStreamRateLimiter.Close()
+	}
+
+	if m.unicastStreamRateLimiter != nil {
+		m.unicastBandwidthRateLimiter.Close()
+	}
 }
 
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
