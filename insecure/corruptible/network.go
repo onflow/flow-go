@@ -12,6 +12,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/crypto/hash"
@@ -47,6 +48,7 @@ type Network struct {
 	gRPCListenAddress     net.Addr
 	conduitFactory        insecure.CorruptibleConduitFactory
 	attackerInboundStream insecure.CorruptibleConduitFactory_ConnectAttackerServer // inbound stream to attack orchestrator
+	messageProcessors     map[channels.Channel]insecure.CorruptMessageProcessor
 
 	receiptHasher  hash.Hasher
 	spockHasher    hash.Hasher
@@ -71,14 +73,15 @@ func NewCorruptNetwork(
 	}
 
 	corruptNetwork := &Network{
-		codec:          codec,
-		me:             me,
-		conduitFactory: conduitFactory,
-		flowNetwork:    flowNetwork,
-		logger:         logger.With().Str("component", "corrupt-network").Logger(),
-		receiptHasher:  utils.NewExecutionReceiptHasher(),
-		spockHasher:    utils.NewSPOCKHasher(),
-		approvalHasher: verutils.NewResultApprovalHasher(),
+		codec:             codec,
+		me:                me,
+		conduitFactory:    conduitFactory,
+		flowNetwork:       flowNetwork,
+		logger:            logger.With().Str("component", "corrupt-network").Logger(),
+		receiptHasher:     utils.NewExecutionReceiptHasher(),
+		spockHasher:       utils.NewSPOCKHasher(),
+		approvalHasher:    verutils.NewResultApprovalHasher(),
+		messageProcessors: make(map[channels.Channel]insecure.CorruptMessageProcessor),
 	}
 
 	err := corruptNetwork.conduitFactory.RegisterEgressController(corruptNetwork)
@@ -110,13 +113,21 @@ func NewCorruptNetwork(
 // Except, it first wraps the given processor around a corrupt message processor, and then
 // registers the corrupt message processor to the original flow network.
 func (n *Network) Register(channel channels.Channel, messageProcessor flownet.MessageProcessor) (flownet.Conduit, error) {
-	corruptProcessor := NewCorruptMessageProcessor(n.logger, messageProcessor)
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	corruptProcessor := NewCorruptMessageProcessor(
+		n.logger.With().Str("module", "corrupted-message-processor").Hex("corrupt_id", logging.ID(n.me.NodeID())).Logger(),
+		messageProcessor,
+		n)
 	// TODO: we can dissolve CCF and instead have a decorator pattern to turn a conduit into
 	// a corrupt one?
 	conduit, err := n.flowNetwork.Register(channel, corruptProcessor)
 	if err != nil {
 		return nil, fmt.Errorf("could not register corrupt message processor on channel: %s, %w", channel, err)
 	}
+	n.messageProcessors[channel] = corruptProcessor
+
 	return conduit, nil
 }
 
@@ -169,11 +180,15 @@ func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFacto
 				n.logger.Fatal().Err(err).Msg("could not process attack orchestrator's message - both ingress and egress messages can't be set")
 				return stream.SendAndClose(&empty.Empty{})
 			}
-			// received ingress message
-			//if msg.Ingress != nil {
-			//	// TODO implement ingress message processing
-			//}
-			// received egress message
+
+			if msg.Ingress != nil {
+				// TODO implement ingress message processing
+				if err := n.processAttackerIngressMessage(msg.Ingress); err != nil {
+					n.logger.Fatal().Err(err).Msg("could not process attack orchestrator's ingress message")
+					return stream.SendAndClose(&empty.Empty{})
+				}
+			}
+
 			if msg.Egress != nil {
 				if err := n.processAttackerEgressMessage(msg); err != nil {
 					n.logger.Fatal().Err(err).Msg("could not process attack orchestrator's egress message")
@@ -182,6 +197,52 @@ func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFacto
 			}
 		}
 	}
+}
+
+func (n *Network) processAttackerIngressMessage(msg *insecure.IngressMessage) error {
+	lg := n.logger.With().
+		Str("channel", msg.ChannelID).Logger()
+	event, err := n.codec.Decode(msg.Payload)
+	if err != nil {
+		lg.Err(err).Msg("could not decode attack orchestrator's ingress message")
+		return fmt.Errorf("could not decode ingress message: %w", err)
+	}
+
+	senderId, err := flow.ByteSliceToId(msg.OriginID)
+	if err != nil {
+		return fmt.Errorf("could not convert origin id to flow identifier: %w", err)
+	}
+
+	targetId, err := flow.ByteSliceToId(msg.CorruptTargetID)
+	if err != nil {
+		return fmt.Errorf("could not convert corrupted target id to flow identifier: %w", err)
+	}
+
+	lg = n.logger.With().
+		Hex("sender_id", logging.ID(senderId)).
+		Hex("corrupted_target_id", logging.ID(targetId)).
+		Str("flow_protocol_event_type", fmt.Sprintf("%T", event)).Logger()
+
+	if targetId != n.me.NodeID() {
+		lg.Fatal().Msg("corrupt network received ingress message for a different node")
+	}
+
+	lg.Info().Msg("corrupt network received ingress message")
+
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	messageProcessor, ok := n.messageProcessors[channels.Channel(msg.ChannelID)]
+	if !ok {
+		lg.Fatal().Msg("corrupt network received ingress message for an unknown channel")
+	}
+	err = messageProcessor.RelayToOriginalProcessor(channels.Channel(msg.ChannelID), senderId, event)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not relay ingress message to original processor")
+	}
+
+	lg.Info().Msg("corrupt network relayed ingress message to original processor")
+	
+	return nil
 }
 
 // processAttackerEgressMessage dispatches the attack orchestrator message on the Flow network on behalf of this node.
