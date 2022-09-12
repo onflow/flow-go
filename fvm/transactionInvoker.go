@@ -82,23 +82,17 @@ func (i TransactionInvoker) Process(
 
 	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
-	location := common.TransactionLocation(proc.ID)
-
-	runtimeEnv := env.BorrowCadenceRuntime()
-	defer env.ReturnCadenceRuntime(runtimeEnv)
+	rt := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(rt)
 
 	var txError error
-	err = vm.Runtime.ExecuteTransaction(
+	err = rt.ExecuteTransaction(
 		runtime.Script{
 			Source:    proc.Transaction.Script,
 			Arguments: proc.Transaction.Arguments,
 		},
-		runtime.Context{
-			Interface:   env,
-			Location:    location,
-			Environment: runtimeEnv,
-		},
-	)
+		common.TransactionLocation(proc.ID))
+
 	if err != nil {
 		var interactionLimitExceededErr *errors.LedgerInteractionLimitExceededError
 		if errors.As(err, &interactionLimitExceededErr) {
@@ -157,6 +151,7 @@ func (i TransactionInvoker) Process(
 		defer sth.EnableAllLimitEnforcements()
 
 		modifiedSets = programsCache.ModifiedSets{}
+		env.Reset()
 
 		// drop delta since transaction failed
 		err := sth.RestartNestedTransaction(nestedTxnId)
@@ -170,10 +165,6 @@ func (i TransactionInvoker) Process(
 		// log transaction as failed
 		ctx.Logger.Info().
 			Msg("transaction executed with error")
-
-		// TODO(patrick): make env reusable on error
-		// reset env
-		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
@@ -218,8 +209,7 @@ func (i TransactionInvoker) deductTransactionFees(
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be
 	// dynamic.	Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
-	_, err = InvokeDeductTransactionFeesContract(
-		env,
+	_, err = env.DeductTransactionFees(
 		proc.Transaction.Payer,
 		inclusionEffort,
 		computationUsed)

@@ -61,3 +61,10 @@ func Test_IsServiceEvent(t *testing.T) {
 		assert.False(t, isServiceEvent)
 	})
 }
+
+func Test_ScriptEventEmitter(t *testing.T) {
+	// scripts use the NoEventEmitter
+	emitter := environment.NoEventEmitter{}
+	err := emitter.EmitEvent(cadence.Event{})
+	require.NoError(t, err, "script should not error when emitting events")
+}
