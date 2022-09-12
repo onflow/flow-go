@@ -323,7 +323,8 @@ func (e *executionDataRequester) processBlockJob(ctx irrecoverable.SignalerConte
 }
 
 // processSealedHeight downloads ExecutionData for the given block height.
-// If the download fails, it will retry forever, using exponential backoff.
+// If the download fails, it will retry forever, using exponential backoff .
+// TODO(state-sync): add error docs
 func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerContext, blockID flow.Identifier, height uint64) error {
 	backoff := retry.NewExponential(e.config.RetryDelay)
 	backoff = retry.WithCappedDuration(e.config.MaxRetryDelay, backoff)
@@ -361,6 +362,7 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 	})
 }
 
+// TODO(state-sync) general+error docs  - must call only with sealed blockIDs
 func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerContext, blockID flow.Identifier, height uint64, fetchTimeout time.Duration) error {
 	logger := e.log.With().
 		Str("block_id", blockID.String()).

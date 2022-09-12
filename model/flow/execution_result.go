@@ -14,7 +14,7 @@ type ExecutionResult struct {
 	BlockID          Identifier // commit of the current block
 	Chunks           ChunkList
 	ServiceEvents    ServiceEventList
-	ExecutionDataID  Identifier
+	ExecutionDataID  Identifier // TODO(state-sync): document this
 }
 
 // ID returns the hash of the execution result body
