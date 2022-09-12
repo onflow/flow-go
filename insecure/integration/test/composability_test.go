@@ -35,7 +35,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 	// We first start ccf and then the orchestrator network, since the order of startup matters, i.e., on startup, the orchestrator network tries
 	// to connect to all ccfs.
 	withCorruptibleNetwork(t, func(t *testing.T, corruptedIdentity flow.Identity, corruptibleNetwork *corruptible.Network, hub *stub.Hub) {
-		// these are the events orchestrator will send instead of the original ingress and egress events coming to and from
+		// these are the events which orchestrator will send instead of the original ingress and egress events coming to and from
 		// the corrupted engine, respectively.
 		corruptedEgressEvent := &message.TestMessage{Text: "this is a corrupted egress message"}
 		corruptedIngressEvent := &message.TestMessage{Text: "this is a corrupted ingress message"}
@@ -79,7 +79,8 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 				require.NoError(t, err)
 
 				wg := &sync.WaitGroup{}
-				wg.Add(2)
+				wg.Add(2) // wait for both egress and ingress events to be received.
+
 				// we expect to receive the corrupted egress event on the honest node.
 				honestEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
 					// implementing the process logic of the honest engine on reception of message from underlying network.
@@ -90,6 +91,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 					wg.Done()
 					return nil
 				})
+
 				// we expect to receive the corrupted ingress event on the corrupted node.
 				corruptedEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
 					// implementing the process logic of the corrupted engine on reception of message from underlying network.
@@ -110,7 +112,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 					require.NoError(t, honestNodeConduit.Unicast(originalIngressEvent, corruptedIdentity.NodeID))
 				}()
 
-				// waiting for the events to be processed by the engines.
+				// wait for both egress and ingress events to be received.
 				unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "honest node could not receive corrupted event on time")
 			})
 	})
