@@ -1,14 +1,14 @@
 package unicast
 
 import (
-	"fmt"
+	"errors"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/network/message"
 )
 
 var (
-	ErrStreamRateLimited    = fmt.Errorf("rate-limiting peer unicast stream creation dropping message")
-	ErrBandwidthRateLimited = fmt.Errorf("rate-limiting peer unicast bandwidth limit exceeded dropping message")
+	ErrStreamRateLimited    = errors.New("rate-limiting peer unicast stream creation dropping message")
+	ErrBandwidthRateLimited = errors.New("rate-limiting peer unicast bandwidth limit exceeded dropping message")
 )
 
 // RateLimiters used to manage stream and bandwidth rate limiters

@@ -202,7 +202,9 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 	// after 5 rate limits we will close ch.
 	ch := make(chan struct{})
 	var rateLimits uint64
-	onRateLimit := func(peerID peer.ID) {
+	onRateLimit := func(peerID peer.ID, err error) {
+		require.ErrorIs(m.T(), err, unicast.ErrStreamRateLimited)
+
 		// we only expect messages from the first middleware on the test suite
 		expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
 		require.NoError(m.T(), err)
@@ -213,7 +215,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 		close(ch)
 	}
 
-	rateLimiters := unicast.NewRateLimiters(streamsRateLimiter, nil, onRateLimit)
+	rateLimiters := unicast.NewRateLimiters(streamsRateLimiter, nil, onRateLimit, false)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
@@ -290,18 +292,19 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// after 5 rate limits we will close ch.
 	ch := make(chan struct{})
 	var rateLimits uint64
-	onRateLimit := func(peerID peer.ID) {
+	onRateLimit := func(peerID peer.ID, err error) {
+		require.ErrorIs(m.T(), err, unicast.ErrBandwidthRateLimited)
+
 		// we only expect messages from the first middleware on the test suite
 		expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
 		require.NoError(m.T(), err)
 		require.Equal(m.T(), expectedPID, peerID)
-
 		// update hook calls
 		atomic.AddUint64(&rateLimits, 1)
 		close(ch)
 	}
 
-	rateLimiters := unicast.NewRateLimiters(nil, bandwidthRateLimiter, onRateLimit)
+	rateLimiters := unicast.NewRateLimiters(nil, bandwidthRateLimiter, onRateLimit, false)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
