@@ -187,7 +187,6 @@ func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFacto
 			}
 
 			if msg.Ingress != nil {
-				// TODO implement ingress message processing
 				if err := n.processAttackerIngressMessage(msg.Ingress); err != nil {
 					n.logger.Fatal().Err(err).Msg("could not process attack orchestrator's ingress message")
 					return stream.SendAndClose(&empty.Empty{})
