@@ -112,20 +112,22 @@ func (on *Network) stop() error {
 // messages to the orchestrator network by calling the InboundHandler method of it remotely.
 func (on *Network) Observe(message *insecure.Message) {
 	if message.Ingress != nil && message.Egress != nil {
+		// In BFT testing framework, it is a bug to has both ingress and egress set.
 		on.logger.Fatal().Msg("received message with both ingress and egress set")
 		return // return to avoid changing the behavior by tweaking the log level.
 	}
 	if message.Egress != nil {
 		if err := on.processEgressMessage(message.Egress); err != nil {
-			on.logger.Fatal().Err(err).Msg("could not process message of corrupt node")
+			on.logger.Fatal().Err(err).Msg("could not process egress message of corrupt node")
 			return // return to avoid changing the behavior by tweaking the log level.
 		}
 	} else if message.Ingress != nil {
 		if err := on.processIngressMessage(message.Ingress); err != nil {
-			on.logger.Fatal().Err(err).Msg("could not process message of corrupt node")
+			on.logger.Fatal().Err(err).Msg("could not process ingress message of corrupt node")
 			return // return to avoid changing the behavior by tweaking the log level.
 		}
 	} else {
+		// In BFT testing framework, it is a bug to has neither ingress nor egress set.
 		on.logger.Fatal().Msg("received message with neither ingress nor egress")
 		return // return to avoid changing the behavior by tweaking the log level.
 	}
@@ -136,7 +138,7 @@ func (on *Network) Observe(message *insecure.Message) {
 func (on *Network) processEgressMessage(message *insecure.EgressMessage) error {
 	event, err := on.codec.Decode(message.Payload)
 	if err != nil {
-		return fmt.Errorf("could not decode observed payload: %w", err)
+		return fmt.Errorf("could not decode observed egress payload: %w", err)
 	}
 
 	sender, err := flow.ByteSliceToId(message.CorruptOriginID)
@@ -168,12 +170,12 @@ func (on *Network) processEgressMessage(message *insecure.EgressMessage) error {
 	return nil
 }
 
-// processIngressMessage processes incoming ingress messages arrived from corrupt conduits by passing them
+// processIngressMessage processes incoming ingress messages arrived from corrupt nodes by passing them
 // to the orchestrator.
 func (on *Network) processIngressMessage(message *insecure.IngressMessage) error {
 	event, err := on.codec.Decode(message.Payload)
 	if err != nil {
-		return fmt.Errorf("could not decode observed payload: %w", err)
+		return fmt.Errorf("could not decode observed ingress payload: %w", err)
 	}
 
 	senderId, err := flow.ByteSliceToId(message.OriginID)
