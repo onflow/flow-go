@@ -1,4 +1,4 @@
-package fvm
+package runtime
 
 import (
 	"testing"
@@ -59,9 +59,9 @@ func TestReusableCadanceRuntimePoolSharing(t *testing.T) {
 	default:
 	}
 
-	ctx := NewContext(WithReusableCadenceRuntimePool(pool))
+	var otherPool ReusableCadenceRuntimePool = pool
 
-	entry := ctx.ReusableCadenceRuntimePool.Borrow(nil)
+	entry := otherPool.Borrow(nil)
 	require.NotNil(t, entry)
 
 	select {
@@ -70,7 +70,7 @@ func TestReusableCadanceRuntimePoolSharing(t *testing.T) {
 	default:
 	}
 
-	ctx.ReusableCadenceRuntimePool.Return(entry)
+	otherPool.Return(entry)
 
 	entry2 := pool.Borrow(nil)
 	require.NotNil(t, entry2)

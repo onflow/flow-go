@@ -6,9 +6,15 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 )
+
+// TODO(patrick): remove and switch to *programs.TransactionPrograms once
+// emulator is updated.
+type TransactionPrograms interface {
+	Get(loc common.Location) (*interpreter.Program, *state.State, bool)
+	Set(loc common.Location, prog *interpreter.Program, state *state.State)
+}
 
 // ProgramsHandler manages operations using Programs storage.
 // It's separation of concern for hostEnv
@@ -18,7 +24,7 @@ import (
 // views must be merged in order to make sure they are recorded
 type ProgramsHandler struct {
 	masterState *state.StateHolder
-	Programs    *programs.Programs
+	Programs    TransactionPrograms
 
 	// NOTE: non-address programs are not reusable across transactions, hence
 	// they are kept out of the shared program cache.
@@ -26,7 +32,7 @@ type ProgramsHandler struct {
 }
 
 // NewProgramsHandler construts a new ProgramHandler
-func NewProgramsHandler(programs *programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
+func NewProgramsHandler(programs TransactionPrograms, stateHolder *state.StateHolder) *ProgramsHandler {
 	return &ProgramsHandler{
 		masterState:        stateHolder,
 		Programs:           programs,

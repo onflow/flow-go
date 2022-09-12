@@ -368,7 +368,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 			ProgramsCacheSize:        DefaultProgramsCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() VirtualMachine {
+			NewCustomVirtualMachine: func() computer.VirtualMachine {
 				return &PanickingVM{}
 			},
 		},
@@ -418,7 +418,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 			ProgramsCacheSize:        DefaultProgramsCacheSize,
 			ScriptLogThreshold:       1 * time.Millisecond,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() VirtualMachine {
+			NewCustomVirtualMachine: func() computer.VirtualMachine {
 				return &LongRunningVM{duration: 2 * time.Millisecond}
 			},
 		},
@@ -468,7 +468,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 			ProgramsCacheSize:        DefaultProgramsCacheSize,
 			ScriptLogThreshold:       1 * time.Second,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() VirtualMachine {
+			NewCustomVirtualMachine: func() computer.VirtualMachine {
 				return &LongRunningVM{duration: 0}
 			},
 		},
@@ -485,6 +485,10 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 type PanickingVM struct{}
 
 func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
+	return p.RunV2(f, procedure, view)
+}
+
+func (p *PanickingVM) RunV2(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
@@ -497,6 +501,10 @@ type LongRunningVM struct {
 }
 
 func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
+	return l.RunV2(f, procedure, view)
+}
+
+func (l *LongRunningVM) RunV2(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	time.Sleep(l.duration)
 	// satisfy value marshaller
 	if scriptProcedure, is := procedure.(*fvm.ScriptProcedure); is {

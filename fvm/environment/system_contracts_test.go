@@ -1,4 +1,4 @@
-package fvm_test
+package environment_test
 
 import (
 	"fmt"
@@ -13,9 +13,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
+	fvmMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
-	fvmMock "github.com/onflow/flow-go/fvm/mock"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/runtime/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -114,16 +116,16 @@ func TestSystemContractsInvoke(t *testing.T) {
 			env.On("Chain").Return(chain)
 			env.On("Logger").Return(&logger)
 			env.On("BorrowCadenceRuntime", mock.Anything).Return(
-				fvm.NewReusableCadenceRuntime(
-					&TestInterpreterRuntime{
-						invokeContractFunction: tc.contractFunction,
+				reusableRuntime.NewReusableCadenceRuntime(
+					&testutil.TestInterpreterRuntime{
+						InvokeContractFunc: tc.contractFunction,
 					}))
 			env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
-			invoker := fvm.NewSystemContracts()
+			invoker := environment.NewSystemContracts()
 			invoker.SetEnvironment(env)
 			value, err := invoker.Invoke(
-				fvm.ContractFunctionSpec{
+				environment.ContractFunctionSpec{
 					AddressFromChain: func(_ flow.Chain) flow.Address {
 						return flow.Address{}
 					},

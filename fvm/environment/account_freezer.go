@@ -18,6 +18,8 @@ type AccountFreezer interface {
 	SetAccountFrozen(address common.Address, frozen bool) error
 
 	FrozenAccounts() []common.Address
+
+	Reset()
 }
 
 type NoAccountFreezer struct{}
@@ -28,6 +30,9 @@ func (NoAccountFreezer) FrozenAccounts() []common.Address {
 
 func (NoAccountFreezer) SetAccountFrozen(_ common.Address, _ bool) error {
 	return errors.NewOperationNotSupportedError("SetAccountFrozen")
+}
+
+func (NoAccountFreezer) Reset() {
 }
 
 type accountFreezer struct {
@@ -44,12 +49,17 @@ func NewAccountFreezer(
 	accounts Accounts,
 	transactionInfo TransactionInfo,
 ) *accountFreezer {
-	return &accountFreezer{
+	freezer := &accountFreezer{
 		serviceAddress:  serviceAddress,
 		accounts:        accounts,
 		transactionInfo: transactionInfo,
-		frozenAccounts:  nil,
 	}
+	freezer.Reset()
+	return freezer
+}
+
+func (freezer *accountFreezer) Reset() {
+	freezer.frozenAccounts = nil
 }
 
 func (freezer *accountFreezer) FrozenAccounts() []common.Address {

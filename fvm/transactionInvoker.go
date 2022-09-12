@@ -151,6 +151,7 @@ func (i TransactionInvoker) Process(
 		defer sth.EnableAllLimitEnforcements()
 
 		modifiedSets = programsCache.ModifiedSets{}
+		env.Reset()
 
 		// drop delta since transaction failed
 		err := sth.RestartNestedTransaction(nestedTxnId)
@@ -164,10 +165,6 @@ func (i TransactionInvoker) Process(
 		// log transaction as failed
 		ctx.Logger.Info().
 			Msg("transaction executed with error")
-
-		// TODO(patrick): make env reusable on error
-		// reset env
-		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
