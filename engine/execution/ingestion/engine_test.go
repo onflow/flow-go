@@ -464,7 +464,7 @@ func TestExecuteOneBlock(t *testing.T) {
 }
 
 func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
-	//unittest.SkipUnless(t, unittest.TEST_FLAKY, "To be fixed later")
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "To be fixed later")
 	// only head of the queue should be executing.
 	// Restarting node or errors in consensus module could trigger
 	// block (or its parent) which already has been executed to be enqueued again
@@ -509,7 +509,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 		commits := make(map[flow.Identifier]flow.StateCommitment)
 		commits[blockB.Block.Header.ParentID] = *blockB.StartState
 		commits[blockC.Block.Header.ParentID] = *blockC.StartState
-		ctx.mockStateCommitsWithMap(commits)
+		//ctx.mockStateCommitsWithMap(commits)
 
 		wg := sync.WaitGroup{}
 
@@ -580,8 +580,8 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 		ctx.state.On("Final").Return(blockCSnapshot)
 
 		// for reloading
-		//ctx.blocks.EXPECT().ByID(blockB.ID()).Return(blockB.Block, nil)
-		//ctx.blocks.EXPECT().ByID(blockC.ID()).Return(blockC.Block, nil)
+		ctx.blocks.EXPECT().ByID(blockB.ID()).Return(blockB.Block, nil)
+		ctx.blocks.EXPECT().ByID(blockC.ID()).Return(blockC.Block, nil)
 
 		blockASnapshot.On("Head").Return(&blockA, nil)
 		blockCSnapshot.On("Head").Return(blockC.Block.Header, nil)
