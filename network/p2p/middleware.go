@@ -414,7 +414,7 @@ func (m *Middleware) stop() {
 		m.unicastStreamRateLimiter.Close()
 	}
 
-	if m.unicastStreamRateLimiter != nil {
+	if m.unicastBandwidthRateLimiter != nil {
 		m.unicastBandwidthRateLimiter.Close()
 	}
 }
