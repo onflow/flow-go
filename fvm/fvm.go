@@ -18,7 +18,12 @@ import (
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
-	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
+	Run(
+		ctx Context,
+		sth *state.StateHolder,
+		programs *programs.Programs,
+	) error
+
 	ComputationLimit(ctx Context) uint64
 	MemoryLimit(ctx Context) uint64
 	ShouldDisableMemoryAndInteractionLimits(ctx Context) bool
@@ -79,7 +84,6 @@ func (vm *VirtualMachine) RunV2(
 		WithMemoryLimit(proc.MemoryLimit(ctx))
 
 	meterParams, err := getEnvironmentMeterParameters(
-		vm,
 		ctx,
 		v,
 		blockPrograms,
@@ -104,7 +108,7 @@ func (vm *VirtualMachine) RunV2(
 			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
-	return proc.Run(vm, ctx, stTxn, blockPrograms)
+	return proc.Run(ctx, stTxn, blockPrograms)
 }
 
 // DEPRECATED. DO NOT USE

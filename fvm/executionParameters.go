@@ -17,7 +17,6 @@ import (
 )
 
 func getEnvironmentMeterParameters(
-	vm *VirtualMachine,
 	ctx Context,
 	view state.View,
 	programs *programs.Programs,
@@ -35,7 +34,7 @@ func getEnvironmentMeterParameters(
 
 	sth.DisableAllLimitEnforcements()
 
-	env := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
+	env := NewScriptEnv(context.Background(), ctx, sth, programs)
 
 	return fillEnvironmentMeterParameters(ctx, env, params)
 }

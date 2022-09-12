@@ -22,6 +22,9 @@ type TransactionEnv struct {
 	txID    flow.Identifier
 }
 
+// DEPRECATED.  DO NOT USE
+//
+// TODO(patrick): rm after updating emulator
 func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
@@ -31,7 +34,23 @@ func NewTransactionEnvironment(
 	txIndex uint32,
 	traceSpan otelTrace.Span,
 ) *TransactionEnv {
+	return NewTransactionEnv(
+		ctx,
+		sth,
+		programs,
+		tx,
+		txIndex,
+		traceSpan)
+}
 
+func NewTransactionEnv(
+	ctx Context,
+	sth *state.StateHolder,
+	programs handler.TransactionPrograms,
+	tx *flow.TransactionBody,
+	txIndex uint32,
+	traceSpan otelTrace.Span,
+) *TransactionEnv {
 	txID := tx.ID()
 	// TODO set the flags on context
 	tracer := environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)

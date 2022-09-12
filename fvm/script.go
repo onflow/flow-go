@@ -29,7 +29,12 @@ type ScriptProcedure struct {
 }
 
 type ScriptProcessor interface {
-	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateHolder, *programs.Programs) error
+	Process(
+		Context,
+		*ScriptProcedure,
+		*state.StateHolder,
+		*programs.Programs,
+	) error
 }
 
 func Script(code []byte) *ScriptProcedure {
@@ -70,9 +75,9 @@ func NewScriptWithContextAndArgs(code []byte, reqContext context.Context, args .
 	}
 }
 
-func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
+func (proc *ScriptProcedure) Run(ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	for _, p := range ctx.ScriptProcessors {
-		err := p.Process(vm, ctx, proc, sth, programs)
+		err := p.Process(ctx, proc, sth, programs)
 		txError, failure := errors.SplitErrorTypes(err)
 		if failure != nil {
 			if errors.IsALedgerFailure(failure) {
@@ -120,13 +125,12 @@ func NewScriptInvoker() ScriptInvoker {
 }
 
 func (i ScriptInvoker) Process(
-	vm *VirtualMachine,
 	ctx Context,
 	proc *ScriptProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-	env := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, programs)
+	env := NewScriptEnv(proc.RequestContext, ctx, sth, programs)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)

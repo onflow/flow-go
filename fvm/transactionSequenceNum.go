@@ -18,7 +18,6 @@ func NewTransactionSequenceNumberChecker() *TransactionSequenceNumberChecker {
 }
 
 func (c *TransactionSequenceNumberChecker) Process(
-	_ *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
