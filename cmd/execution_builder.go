@@ -137,8 +137,8 @@ type ExecutionNode struct {
 	blockDataUploaders            []uploader.Uploader
 	executionDataStore            execution_data.ExecutionDataStore
 	toTriggerCheckpoint           *atomic.Bool   // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
-	stopAtHeight            *atomic.Uint64 // stop the node at given block height
-	stopAtHeightCrash       *atomic.Bool   // if node stops at height, does it crash or not
+	stopAtHeight                  *atomic.Uint64 // stop the node at given block height
+	stopAtHeightCrash             *atomic.Bool   // if node stops at height, does it crash or not
 	executionDataDatastore        *badger.Datastore
 	executionDataPruner           *pruner.Pruner
 	executionDataBlobstore        blobs.Blobstore

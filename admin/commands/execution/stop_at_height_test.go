@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/onflow/flow-go/admin"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/admin"
 )
 
 func TestCommandParsing(t *testing.T) {
