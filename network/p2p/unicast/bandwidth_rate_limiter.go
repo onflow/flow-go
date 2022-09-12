@@ -54,9 +54,15 @@ func (b *BandWidthRateLimiterImpl) IsRateLimited(peerID peer.ID) bool {
 	return b.rateLimitedPeers.exists(peerID)
 }
 
-// Close sends cleanup signal to underlying rate limiters and rate limited peers maps. After the rate limiter
-// is closed it can not be reused.
-func (b *BandWidthRateLimiterImpl) Close() {
+// Start starts cleanup loop for underlying caches.
+func (b *BandWidthRateLimiterImpl) Start() {
+	go b.limiters.cleanupLoop()
+	go b.rateLimitedPeers.cleanupLoop()
+}
+
+// Stop sends cleanup signal to underlying rate limiters and rate limited peers maps. After the rate limiter
+// is stopped it can not be reused.
+func (b *BandWidthRateLimiterImpl) Stop() {
 	b.limiters.close()
 	b.rateLimitedPeers.close()
 }

@@ -286,10 +286,13 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	connGaterInterceptSecureFilters := make([]p2p.PeerFilter, 0)
 	peerManagerFilters := make([]p2p.PeerFilter, 0)
 
+	// setup unicast rate limiters
+	unicastRateLimiters := unicast.NewRateLimiters(nil, nil, nil)
+
 	// setup unicast stream rate limiter
 	if fnb.BaseConfig.UnicastStreamCreationRateLimit > 0 && fnb.BaseConfig.UnicastStreamCreationBurstLimit > 0 {
 		unicastStreamsRateLimiter := unicast.NewStreamsRateLimiter(rate.Limit(fnb.BaseConfig.UnicastStreamCreationRateLimit), fnb.BaseConfig.UnicastStreamCreationBurstLimit, time.Now)
-		mwOpts = append(mwOpts, p2p.WithUnicastStreamRateLimiter(unicastStreamsRateLimiter))
+		unicastRateLimiters.StreamRateLimiter = unicastStreamsRateLimiter
 
 		// avoid connection gating and pruning during dry run
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
@@ -303,7 +306,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	// setup unicast bandwidth rate limiter
 	if fnb.BaseConfig.UnicastBandwidthRateLimit > 0 && fnb.BaseConfig.UnicastBandwidthBurstLimit > 0 {
 		unicastBandwidthRateLimiter := unicast.NewBandWidthRateLimiter(rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit), fnb.BaseConfig.UnicastBandwidthBurstLimit, time.Now)
-		mwOpts = append(mwOpts, p2p.WithUnicastStreamRateLimiter(unicastBandwidthRateLimiter))
+		unicastRateLimiters.BandWidthRateLimiter = unicastBandwidthRateLimiter
 
 		// avoid connection gating and pruning during dry run
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
@@ -313,6 +316,8 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 			peerManagerFilters = append(peerManagerFilters, f)
 		}
 	}
+
+	mwOpts = append(mwOpts, p2p.WithUnicastRateLimiters(unicastRateLimiters))
 
 	libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
 		fnb.Logger,

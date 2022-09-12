@@ -54,9 +54,15 @@ func (s *StreamsRateLimiterImpl) IsRateLimited(peerID peer.ID) bool {
 	return s.rateLimitedPeers.exists(peerID)
 }
 
-// Close sends cleanup signal to underlying rate limiters and rate limited peers maps. After the rate limiter
+// Start starts cleanup loop for underlying caches.
+func (s *StreamsRateLimiterImpl) Start() {
+	go s.limiters.cleanupLoop()
+	go s.rateLimitedPeers.cleanupLoop()
+}
+
+// Stop sends cleanup signal to underlying rate limiters and rate limited peers maps. After the rate limiter
 // is closed it can not be reused.
-func (s *StreamsRateLimiterImpl) Close() {
+func (s *StreamsRateLimiterImpl) Stop() {
 	s.limiters.close()
 	s.rateLimitedPeers.close()
 }

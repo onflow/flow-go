@@ -21,9 +21,12 @@ type RateLimiter interface {
 	// IsRateLimited returns true if a peer is rate limited.
 	IsRateLimited(peerID peer.ID) bool
 
-	// Close sends cleanup signal to underlying rate limiters and rate limited peers maps. After the rate limiter
-	// is closed it can not be reused.
-	Close()
+	// Stop sends cleanup signal to underlying rate limiters and rate limited peers maps. After the rate limiter
+	// is stopped it can not be reused.
+	Stop()
+
+	// Start starts cleanup loop for underlying rate limiters and rate limited peers maps.
+	Start()
 }
 
 // GetTimeNow callback used to get the current time. This allows us to improve testing by manipulating the current time

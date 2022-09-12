@@ -182,9 +182,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			codec,
 			consumer,
 			p2p.WithPeerManager(peerManagerFactory),
-			p2p.WithUnicastStreamRateLimiter(o.streamsRateLimiter),
-			p2p.WithUnicastBandwidthRateLimiter(o.bandwidthRateLimiter),
-			p2p.WithUnicastRateLimitedPeerFunc(o.onUnicastRateLimitedPeerFunc),
+			p2p.WithUnicastRateLimiters(o.unicastRateLimiters),
 		)
 	}
 	return mws, idProviders
@@ -272,6 +270,7 @@ type optsConfig struct {
 	streamsRateLimiter           unicast.RateLimiter
 	bandwidthRateLimiter         unicast.RateLimiter
 	onUnicastRateLimitedPeerFunc func(peerID peer.ID)
+	unicastRateLimiters          *unicast.RateLimiters
 	peerUpdateInterval           time.Duration
 }
 
@@ -294,11 +293,9 @@ func WithPeerUpdateInterval(interval time.Duration) func(*optsConfig) {
 	}
 }
 
-func WithUnicastRateLimiters(streamsRateLimiter, bandwidthRateLimiter unicast.RateLimiter, onUnicastRateLimitedPeerFunc func(peerID peer.ID)) func(*optsConfig) {
+func WithUnicastRateLimiters(limiters *unicast.RateLimiters) func(*optsConfig) {
 	return func(o *optsConfig) {
-		o.streamsRateLimiter = streamsRateLimiter
-		o.bandwidthRateLimiter = bandwidthRateLimiter
-		o.onUnicastRateLimitedPeerFunc = onUnicastRateLimitedPeerFunc
+		o.unicastRateLimiters = limiters
 	}
 }
 

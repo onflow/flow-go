@@ -198,10 +198,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 	// setup streams rate limiter
 	streamsRateLimiter := unicast.NewStreamsRateLimiter(limit, burst, testtime.Now)
 
-	// create a new staked identity
-	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
-	defer testnet.StopNodes(m.T(), libP2PNodes)
-
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.
 	ch := make(chan struct{})
@@ -217,8 +213,14 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 		close(ch)
 	}
 
+	rateLimiters := unicast.NewRateLimiters(streamsRateLimiter, nil, onRateLimit)
+
+	// create a new staked identity
+	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
+	defer testnet.StopNodes(m.T(), libP2PNodes)
+
 	// create middleware
-	opts := WithUnicastRateLimiters(streamsRateLimiter, nil, onRateLimit)
+	opts := WithUnicastRateLimiters(rateLimiters)
 	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer, opts)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
@@ -272,21 +274,17 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
-	// limiter limit will be set up to 1000 bytes/sec
+	//limiter limit will be set up to 1000 bytes/sec
 	limit := rate.Limit(1000)
 
-	// burst per interval
+	//burst per interval
 	burst := 1000
 
 	// create test time
 	testtime := unittest.NewTestTime()
 
 	// setup bandwidth rate limiter
-	bandWidthRateLimiter := unicast.NewBandWidthRateLimiter(limit, burst, testtime.Now)
-
-	// create a new staked identity
-	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
-	defer testnet.StopNodes(m.T(), libP2PNodes)
+	bandwidthRateLimiter := unicast.NewBandWidthRateLimiter(limit, burst, testtime.Now)
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.
@@ -303,8 +301,14 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		close(ch)
 	}
 
+	rateLimiters := unicast.NewRateLimiters(nil, bandwidthRateLimiter, onRateLimit)
+
+	// create a new staked identity
+	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
+	defer testnet.StopNodes(m.T(), libP2PNodes)
+
 	// create middleware
-	opts := WithUnicastRateLimiters(nil, bandWidthRateLimiter, onRateLimit)
+	opts := WithUnicastRateLimiters(rateLimiters)
 	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer, opts)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
@@ -354,7 +358,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	}
 
 	// wait for all rate limits before shutting down middleware
-	unittest.RequireCloseBefore(m.T(), ch, 500*time.Minute, "could not stop on rate limit test ch on time")
+	unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
 
 	// shutdown our middleware so that each message can be processed
 	cancel()

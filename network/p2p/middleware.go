@@ -77,26 +77,24 @@ type Middleware struct {
 	// goroutines to exit, because new goroutines could be started after we've already
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
 	// and worker routines.
-	wg                           *sync.WaitGroup
-	libP2PNode                   *Node
-	libP2PNodeFactory            LibP2PFactoryFunc
-	preferredUnicasts            []unicast.ProtocolName
-	me                           flow.Identifier
-	metrics                      module.NetworkMetrics
-	bitswapMetrics               module.BitswapMetrics
-	rootBlockID                  flow.Identifier
-	validators                   []network.MessageValidator
-	peerManagerFactory           PeerManagerFactoryFunc
-	peerManager                  *PeerManager
-	peerManagerFilters           []PeerFilter
-	unicastMessageTimeout        time.Duration
-	idTranslator                 IDTranslator
-	previousProtocolStatePeers   []peer.AddrInfo
-	codec                        network.Codec
-	slashingViolationsConsumer   slashing.ViolationsConsumer
-	unicastStreamRateLimiter     unicast.RateLimiter
-	unicastBandwidthRateLimiter  unicast.RateLimiter
-	onUnicastRateLimitedPeerFunc func(peerID peer.ID) // the callback called each time a peer is rate limited
+	wg                         *sync.WaitGroup
+	libP2PNode                 *Node
+	libP2PNodeFactory          LibP2PFactoryFunc
+	preferredUnicasts          []unicast.ProtocolName
+	me                         flow.Identifier
+	metrics                    module.NetworkMetrics
+	bitswapMetrics             module.BitswapMetrics
+	rootBlockID                flow.Identifier
+	validators                 []network.MessageValidator
+	peerManagerFactory         PeerManagerFactoryFunc
+	peerManager                *PeerManager
+	peerManagerFilters         []PeerFilter
+	unicastMessageTimeout      time.Duration
+	idTranslator               IDTranslator
+	previousProtocolStatePeers []peer.AddrInfo
+	codec                      network.Codec
+	slashingViolationsConsumer slashing.ViolationsConsumer
+	unicastRateLimiters        *unicast.RateLimiters
 	component.Component
 }
 
@@ -128,27 +126,10 @@ func WithPeerManagerFilters(peerManagerFilters []PeerFilter) MiddlewareOption {
 	}
 }
 
-// WithUnicastStreamRateLimiter sets the streams rate limiter on the middleware. This will
-// force the middleware to rate limit streams per interval for each peer.
-func WithUnicastStreamRateLimiter(unicastStreamRateLimiter unicast.RateLimiter) MiddlewareOption {
+// WithUnicastRateLimiters sets the unicast rate limiters.
+func WithUnicastRateLimiters(rateLimiters *unicast.RateLimiters) MiddlewareOption {
 	return func(mw *Middleware) {
-		mw.unicastStreamRateLimiter = unicastStreamRateLimiter
-	}
-}
-
-// WithUnicastBandwidthRateLimiter sets the streams rate limiter on the middleware. This will
-// force the middleware to rate limit streams per interval for each peer.
-func WithUnicastBandwidthRateLimiter(unicastBandwidthRateLimiter unicast.RateLimiter) MiddlewareOption {
-	return func(mw *Middleware) {
-		mw.unicastBandwidthRateLimiter = unicastBandwidthRateLimiter
-	}
-}
-
-// WithUnicastRateLimitedPeerFunc sets the callback func that will be invoked each time a message sent via
-// unicast is rate limited.
-func WithUnicastRateLimitedPeerFunc(f func(peerID peer.ID)) MiddlewareOption {
-	return func(mw *Middleware) {
-		mw.onUnicastRateLimitedPeerFunc = f
+		mw.unicastRateLimiters = rateLimiters
 	}
 }
 
@@ -202,6 +183,12 @@ func NewMiddleware(
 		opt(mw)
 	}
 
+	// if no unicast rate limiters set
+	if mw.unicastRateLimiters == nil {
+		// no op
+		mw.unicastRateLimiters = unicast.NewRateLimiters(nil, nil, nil)
+	}
+
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// TODO: refactor to avoid storing ctx altogether
@@ -218,11 +205,6 @@ func NewMiddleware(
 		}).Build()
 
 	mw.Component = cm
-
-	// set unicast rate limited peer func to no-op
-	if mw.onUnicastRateLimitedPeerFunc == nil {
-		mw.onUnicastRateLimitedPeerFunc = func(peerID peer.ID) {}
-	}
 
 	return mw
 }
@@ -359,6 +341,11 @@ func (m *Middleware) start(ctx context.Context) error {
 		}
 	}
 
+	// starting rate limiters kicks off cleanup loop
+	if m.unicastRateLimiters != nil {
+		m.unicastRateLimiters.Start()
+	}
+
 	return nil
 }
 
@@ -410,12 +397,8 @@ func (m *Middleware) stop() {
 	m.wg.Wait()
 
 	// clean up rate limiter resources
-	if m.unicastStreamRateLimiter != nil {
-		m.unicastStreamRateLimiter.Close()
-	}
-
-	if m.unicastBandwidthRateLimiter != nil {
-		m.unicastBandwidthRateLimiter.Close()
+	if m.unicastRateLimiters != nil {
+		m.unicastRateLimiters.Stop()
 	}
 }
 
@@ -530,9 +513,8 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	remotePeer := s.Conn().RemotePeer()
 
 	// check if unicast stream creation is rate limited for peer
-	if !m.unicastStreamAllowed(remotePeer) {
+	if !m.unicastRateLimiters.StreamAllowed(remotePeer) {
 		log.Warn().Msg(UnicastStreamRateLimited)
-		m.onUnicastRateLimitedPeerFunc(remotePeer)
 		return
 	}
 
@@ -604,7 +586,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 
 		// check unicast bandwidth rate limiter for peer
-		if !m.unicastBandwidthAllowed(remotePeer, &msg) {
+		if !m.unicastRateLimiters.BandwidthAllowed(remotePeer, &msg) {
 			log.Warn().
 				Hex("sender", msg.OriginID).
 				Hex("event_id", msg.EventID).
@@ -612,7 +594,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 				Str("channel", msg.ChannelID).
 				Int("maxSize", maxSize).
 				Msg(UnicastBandwidthRateLimited)
-			m.onUnicastRateLimitedPeerFunc(remotePeer)
 			return
 		}
 
@@ -624,30 +605,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	}
 
 	success = true
-}
-
-// unicastStreamAllowed will check if the peer is able to create an
-// unicast stream using the configured Middleware.unicastStreamRateLimiter.
-// If no unicastStreamRateLimiter is configured rate limiting is skipped.
-func (m *Middleware) unicastStreamAllowed(peerID peer.ID) bool {
-	if m.unicastStreamRateLimiter == nil {
-		// no rate limiter configured allow all messages
-		return true
-	}
-
-	return m.unicastStreamRateLimiter.Allow(peerID, nil)
-}
-
-// unicastBandwidthAllowed will check if the peer is able to send a message
-// of size msg.Size() using the configured Middleware.unicastBandwidthRateLimiter.
-// If no unicastBandwidthRateLimiter is configured rate limiting is skipped.
-func (m *Middleware) unicastBandwidthAllowed(peerID peer.ID, msg *message.Message) bool {
-	if m.unicastBandwidthRateLimiter == nil {
-		// no rate limiter configured allow all messages
-		return true
-	}
-
-	return m.unicastBandwidthRateLimiter.Allow(peerID, msg)
 }
 
 // Subscribe subscribes the middleware to a channel.
