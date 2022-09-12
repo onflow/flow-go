@@ -27,11 +27,6 @@ func NewCorruptMessageProcessor(logger zerolog.Logger, originalProcessor flownet
 	}
 }
 
-// RelayToOriginalProcessor relays the message to the original message processor.
-func (m *MessageProcessor) RelayToOriginalProcessor(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	return m.originalProcessor.Process(channel, originID, event)
-}
-
 func (m *MessageProcessor) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	// Relay message to the attack orchestrator.
 	lg := m.logger.With().
