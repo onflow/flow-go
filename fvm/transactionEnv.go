@@ -16,10 +16,6 @@ var _ runtime.Interface = &TransactionEnv{}
 // TransactionEnv is a read-write environment used for executing flow transactions.
 type TransactionEnv struct {
 	commonEnv
-
-	tx      *flow.TransactionBody
-	txIndex uint32
-	txID    flow.Identifier
 }
 
 func NewTransactionEnvironment(
@@ -45,12 +41,11 @@ func NewTransactionEnvironment(
 			tracer,
 			meter,
 		),
-		tx:      tx,
-		txIndex: txIndex,
-		txID:    txID,
 	}
 
 	env.TransactionInfo = environment.NewTransactionInfo(
+		txIndex,
+		txID,
 		tracer,
 		tx.Authorizers,
 		ctx.Chain.ServiceAddress(),
@@ -103,12 +98,4 @@ func NewTransactionEnvironment(
 	env.fullEnv = env
 
 	return env
-}
-
-func (e *TransactionEnv) TxIndex() uint32 {
-	return e.txIndex
-}
-
-func (e *TransactionEnv) TxID() flow.Identifier {
-	return e.txID
 }
