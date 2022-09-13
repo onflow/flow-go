@@ -26,7 +26,7 @@ func NewTransactionInvoker() TransactionInvoker {
 
 func (i TransactionInvoker) Process(
 	vm *VirtualMachine,
-	ctx *Context,
+	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programsCache.Programs,
@@ -80,7 +80,7 @@ func (i TransactionInvoker) Process(
 		}
 	}()
 
-	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	env := NewTransactionEnvironment(ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)
@@ -221,7 +221,7 @@ func (i TransactionInvoker) deductTransactionFees(
 }
 
 // logExecutionIntensities logs execution intensities of the transaction
-func (i TransactionInvoker) logExecutionIntensities(ctx *Context, sth *state.StateHolder, txHash string) {
+func (i TransactionInvoker) logExecutionIntensities(ctx Context, sth *state.StateHolder, txHash string) {
 	if ctx.Logger.Debug().Enabled() {
 		computation := zerolog.Dict()
 		for s, u := range sth.ComputationIntensities() {

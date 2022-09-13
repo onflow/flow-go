@@ -22,7 +22,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, *Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) error
+	Process(*VirtualMachine, Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) error
 }
 
 type TransactionProcedure struct {
@@ -58,7 +58,7 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 	}()
 
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, &ctx, proc, st, programs)
+		err := p.Process(vm, ctx, proc, st, programs)
 		txErr, failure := errors.SplitErrorTypes(err)
 		if failure != nil {
 			// log the full error path

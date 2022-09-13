@@ -33,12 +33,12 @@ func NewTransactionVerifier(keyWeightThreshold int) *TransactionVerifier {
 
 func (v *TransactionVerifier) Process(
 	_ *VirtualMachine,
-	ctx *Context,
+	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	_ *programs.Programs,
 ) error {
-	return v.verifyTransaction(proc, *ctx, sth)
+	return v.verifyTransaction(proc, ctx, sth)
 }
 
 func newInvalidEnvelopeSignatureError(txSig flow.TransactionSignature, err error) error {
