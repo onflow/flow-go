@@ -168,6 +168,7 @@ func (i *TransactionInvoker) Process(
 		programs.Cleanup(nil)
 		// log transaction as failed
 		i.logger.Info().
+			Err(txError).
 			Str("txHash", txIDStr).
 			Uint64("blockHeight", blockHeight).
 			Msg("transaction executed with error")
