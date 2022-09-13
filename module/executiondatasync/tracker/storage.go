@@ -142,6 +142,7 @@ type Storage interface {
 	// It is up to the caller to ensure that this is never
 	// called with a value lower than the pruned height.
 	// No errors are expected during normal operation
+	// TODO(state-sync): documentation is outdated - fulfilled height is set when executed, not sealed
 	SetFulfilledHeight(height uint64) error
 
 	// GetPrunedHeight returns the current pruned height.

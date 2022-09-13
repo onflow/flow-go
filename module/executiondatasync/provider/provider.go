@@ -118,6 +118,7 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 // It computes and returns the root CID of the execution data blob tree.
 // This function returns once the root CID has been computed, and all blobs are successfully stored
 // in the Bitswap Blobstore.
+// TODO(state-sync): error
 func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, error) {
 	rootID, errCh, err := p.provide(ctx, blockHeight, executionData)
 	storeErr, ok := <-errCh
