@@ -94,17 +94,10 @@ func (i TransactionInvoker) Process(
 		common.TransactionLocation(proc.ID))
 
 	if err != nil {
-		var interactionLimitExceededErr *errors.LedgerInteractionLimitExceededError
-		if errors.As(err, &interactionLimitExceededErr) {
-			// If it is this special interaction limit error, just set it directly as the tx error
-			txError = err
-		} else {
-			// Otherwise, do what we use to do
-			txError = fmt.Errorf(
-				"transaction invocation failed when executing transaction: %w",
-				err,
-			)
-		}
+		txError = fmt.Errorf(
+			"transaction invocation failed when executing transaction: %w",
+			err,
+		)
 	}
 
 	// read computationUsed from the environment. This will be used to charge fees.

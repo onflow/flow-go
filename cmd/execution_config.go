@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/rpc"
+	"github.com/onflow/flow-go/fvm/programs"
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
@@ -63,7 +64,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.UintVar(&exeConf.checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
 	flags.UintVar(&exeConf.checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 	flags.UintVar(&exeConf.stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
-	flags.UintVar(&exeConf.computationConfig.ProgramsCacheSize, "cadence-execution-cache", computation.DefaultProgramsCacheSize,
+	flags.UintVar(&exeConf.computationConfig.ProgramsCacheSize, "cadence-execution-cache", programs.DefaultProgramsCacheSize,
 		"cache size for Cadence execution")
 	flags.BoolVar(&exeConf.computationConfig.ExtensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
 	flags.BoolVar(&exeConf.computationConfig.CadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")

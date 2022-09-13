@@ -135,7 +135,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
-	programsCache, err := NewProgramsCache(10)
+	programsCache, err := programs.NewChainPrograms(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
@@ -183,7 +183,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		computationResult: computationResult,
 	}
 
-	programsCache, err := NewProgramsCache(10)
+	programsCache, err := programs.NewChainPrograms(10)
 	require.NoError(t, err)
 
 	fakeUploader := &FakeUploader{}
@@ -258,7 +258,7 @@ func TestExecuteScript(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 		},
@@ -320,7 +320,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 		},
@@ -365,7 +365,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 			NewCustomVirtualMachine: func() computer.VirtualMachine {
@@ -415,7 +415,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       1 * time.Millisecond,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 			NewCustomVirtualMachine: func() computer.VirtualMachine {
@@ -465,7 +465,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       1 * time.Second,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 			NewCustomVirtualMachine: func() computer.VirtualMachine {
@@ -558,7 +558,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		nil,
 		nil,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -598,7 +598,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		nil,
 		nil,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -649,7 +649,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		nil,
 		nil,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
