@@ -47,14 +47,14 @@ type commonEnv struct {
 	*environment.SystemContracts
 
 	handler.ContractUpdater
+	handler.AccountKeyUpdater
 
 	// TODO(patrick): rm
 	ctx Context
 
-	sth         *state.StateHolder
-	programs    *handler.ProgramsHandler
-	accounts    environment.Accounts
-	accountKeys *handler.AccountKeyHandler
+	sth      *state.StateHolder
+	programs *handler.ProgramsHandler
+	accounts environment.Accounts
 
 	// TODO(patrick): rm once fully refactored
 	fullEnv environment.Environment
