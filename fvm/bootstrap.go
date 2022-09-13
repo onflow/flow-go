@@ -909,7 +909,7 @@ func (b *BootstrapProcedure) invokeMetaTransaction(
 		WithTransactionFeesEnabled(false),
 	)
 
-	err := invoker.Process(b.vm, &ctx, tx, stTxn, programs)
+	err := invoker.Process(b.vm, ctx, tx, stTxn, programs)
 	txErr, fatalErr := errors.SplitErrorTypes(err)
 	return txErr, fatalErr
 }

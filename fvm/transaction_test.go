@@ -74,7 +74,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		context := fvm.NewContext(fvm.WithChain(chain))
 
-		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
+		err = txInvoker.Process(vm, context, proc, st, programsStorage)
 		require.NoError(t, err)
 
 		// account should be frozen now
@@ -496,7 +496,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		txInvoker := fvm.NewTransactionInvoker()
 		var err error
-		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
+		err = txInvoker.Process(vm, context, proc, st, programsStorage)
 		require.NoError(t, err)
 
 		// make sure freeze status is correct
