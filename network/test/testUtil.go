@@ -263,15 +263,12 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 }
 
 type optsConfig struct {
-	idOpts                       []func(*flow.Identity)
-	dhtPrefix                    string
-	dhtOpts                      []dht.Option
-	connectionGating             bool
-	streamsRateLimiter           unicast.RateLimiter
-	bandwidthRateLimiter         unicast.RateLimiter
-	onUnicastRateLimitedPeerFunc func(peerID peer.ID)
-	unicastRateLimiters          *unicast.RateLimiters
-	peerUpdateInterval           time.Duration
+	idOpts              []func(*flow.Identity)
+	dhtPrefix           string
+	dhtOpts             []dht.Option
+	connectionGating    bool
+	unicastRateLimiters *unicast.RateLimiters
+	peerUpdateInterval  time.Duration
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {

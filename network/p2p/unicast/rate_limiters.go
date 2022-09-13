@@ -52,11 +52,7 @@ func (r *RateLimiters) StreamAllowed(peerID peer.ID) bool {
 		r.OnRateLimitedPeerFunc(peerID, ErrStreamRateLimited)
 
 		// avoid rate limiting during dry run
-		if r.dryRun {
-			return true
-		}
-
-		return false
+		return r.dryRun
 	}
 
 	return true
@@ -73,11 +69,7 @@ func (r *RateLimiters) BandwidthAllowed(peerID peer.ID, message *message.Message
 		r.OnRateLimitedPeerFunc(peerID, ErrBandwidthRateLimited)
 
 		// avoid rate limiting during dry run
-		if r.dryRun {
-			return true
-		}
-
-		return false
+		return r.dryRun
 	}
 
 	return true
