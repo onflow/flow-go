@@ -202,7 +202,7 @@ type ComponentManager struct {
 func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	// Make sure we only start once. atomically check if started is false then set it to true.
 	// If it was not false, panic
-	if !c.started.CAS(false, true) {
+	if !c.started.CompareAndSwap(false, true) {
 		panic(module.ErrMultipleStartup)
 	}
 
