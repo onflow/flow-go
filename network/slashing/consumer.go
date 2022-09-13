@@ -35,7 +35,7 @@ func NewSlashingViolationsConsumer(log zerolog.Logger, metrics module.NetworkSec
 
 func (c *Consumer) logOffense(networkOffense string, violation *Violation) {
 	// if violation fails before the message is decoded the violation.MsgType will be unknown
-	if violation.MsgType == "" {
+	if len(violation.MsgType) == 0 {
 		violation.MsgType = unknown
 	}
 
