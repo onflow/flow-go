@@ -562,6 +562,14 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			return
 		}
 
+		// check if we can get a role for logging and metrics label if this is not a public channel
+		role := ""
+		if !channels.IsPublicChannel(channels.Channel(msg.ChannelID)) {
+			if identity, ok := m.ov.Identity(remotePeer); ok {
+				role = identity.Role.String()
+			}
+		}
+
 		// TODO: once we've implemented per topic message size limits per the TODO above,
 		// we can remove this check
 		maxSize := unicastMaxMsgSize(&msg)
@@ -578,7 +586,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 
 		// check unicast bandwidth rate limiter for peer
-		if !m.unicastRateLimiters.BandwidthAllowed(remotePeer, &msg) {
+		if !m.unicastRateLimiters.BandwidthAllowed(remotePeer, role, &msg) {
 			return
 		}
 

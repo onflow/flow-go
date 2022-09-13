@@ -48,6 +48,7 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/dns"
@@ -286,14 +287,20 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	connGaterInterceptSecureFilters := make([]p2p.PeerFilter, 0)
 	peerManagerFilters := make([]p2p.PeerFilter, 0)
 
-	// setup unicast rate limiters
-	onRateLimit := func(peerID peer.ID, err error) {
+	// log and collect metrics for unicast messages that are rate limited
+	onUnicastRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason unicast.RateLimitReason) {
 		fnb.Logger.Warn().
-			Err(err).
 			Str("peer_id", peerID.Pretty()).
+			Str("role", role).
+			Str("message_type", msgType).
+			Str("topic", topic.String()).
+			Str("reason", reason.String()).
 			Msg("unicast peer rate limited")
+		fnb.Metrics.Network.OnRateLimitedUnicastMessage(role, msgType, topic.String(), reason.String())
 	}
-	unicastRateLimiters := unicast.NewRateLimiters(nil, nil, onRateLimit, fnb.BaseConfig.UnicastRateLimitDryRun)
+
+	// setup unicast rate limiters
+	unicastRateLimiters := unicast.NewRateLimiters(nil, nil, onUnicastRateLimit, fnb.BaseConfig.UnicastRateLimitDryRun)
 
 	// setup unicast stream rate limiter
 	if fnb.BaseConfig.UnicastStreamCreationRateLimit > 0 && fnb.BaseConfig.UnicastStreamCreationBurstLimit > 0 {

@@ -1,43 +1,50 @@
 package unicast
 
 import (
-	"errors"
-
 	"github.com/libp2p/go-libp2p-core/peer"
 
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 )
 
 var (
-	ErrStreamRateLimited    = errors.New("rate-limiting peer unicast stream creation dropping message")
-	ErrBandwidthRateLimited = errors.New("rate-limiting peer unicast bandwidth limit exceeded dropping message")
+	StreamCount RateLimitReason = "streamcount"
+	Bandwidth   RateLimitReason = "bandwidth"
 )
+
+type RateLimitReason string
+
+func (r RateLimitReason) String() string {
+	return string(r)
+}
+
+type OnRateLimitedPeerFunc func(pid peer.ID, role, msgType string, topic channels.Topic, reason RateLimitReason) // the callback called each time a peer is rate limited
 
 // RateLimiters used to manage stream and bandwidth rate limiters
 type RateLimiters struct {
-	StreamRateLimiter     RateLimiter
-	BandWidthRateLimiter  RateLimiter
-	OnRateLimitedPeerFunc func(peer.ID, error) // the callback called each time a peer is rate limited
-	dryRun                bool
+	StreamRateLimiter    RateLimiter
+	BandWidthRateLimiter RateLimiter
+	OnRateLimitedPeer    OnRateLimitedPeerFunc // the callback called each time a peer is rate limited
+	dryRun               bool
 }
 
 // NewRateLimiters returns *RateLimiters
-func NewRateLimiters(streamLimiter, bandwidthLimiter RateLimiter, onRateLimitedPeer func(peer.ID, error), dryRun bool) *RateLimiters {
+func NewRateLimiters(streamLimiter, bandwidthLimiter RateLimiter, onRateLimitedPeer OnRateLimitedPeerFunc, dryRun bool) *RateLimiters {
 	return &RateLimiters{
-		StreamRateLimiter:     streamLimiter,
-		BandWidthRateLimiter:  bandwidthLimiter,
-		OnRateLimitedPeerFunc: onRateLimitedPeer,
-		dryRun:                dryRun,
+		StreamRateLimiter:    streamLimiter,
+		BandWidthRateLimiter: bandwidthLimiter,
+		OnRateLimitedPeer:    onRateLimitedPeer,
+		dryRun:               dryRun,
 	}
 }
 
 // NoopRateLimiters returns noop rate limiters.
 func NoopRateLimiters() *RateLimiters {
 	return &RateLimiters{
-		StreamRateLimiter:     nil,
-		BandWidthRateLimiter:  nil,
-		OnRateLimitedPeerFunc: nil,
-		dryRun:                true,
+		StreamRateLimiter:    nil,
+		BandWidthRateLimiter: nil,
+		OnRateLimitedPeer:    nil,
+		dryRun:               true,
 	}
 }
 
@@ -49,7 +56,7 @@ func (r *RateLimiters) StreamAllowed(peerID peer.ID) bool {
 	}
 
 	if !r.StreamRateLimiter.Allow(peerID, nil) {
-		r.OnRateLimitedPeerFunc(peerID, ErrStreamRateLimited)
+		r.onRateLimitedPeer(peerID, "", "", "", StreamCount)
 
 		// avoid rate limiting during dry run
 		return r.dryRun
@@ -60,19 +67,26 @@ func (r *RateLimiters) StreamAllowed(peerID peer.ID) bool {
 
 // BandwidthAllowed will return result from BandWidthRateLimiter.Allow. It will invoke the OnRateLimitedPeerFunc
 // callback each time a peer is not allowed.
-func (r *RateLimiters) BandwidthAllowed(peerID peer.ID, message *message.Message) bool {
+func (r *RateLimiters) BandwidthAllowed(peerID peer.ID, role string, msg *message.Message) bool {
 	if r.BandWidthRateLimiter == nil {
 		return true
 	}
 
-	if !r.BandWidthRateLimiter.Allow(peerID, message) {
-		r.OnRateLimitedPeerFunc(peerID, ErrBandwidthRateLimited)
+	if !r.BandWidthRateLimiter.Allow(peerID, msg) {
+		r.onRateLimitedPeer(peerID, role, msg.Type, channels.Topic(msg.ChannelID), Bandwidth)
 
 		// avoid rate limiting during dry run
 		return r.dryRun
 	}
 
 	return true
+}
+
+// onRateLimitedPeer invokes the r.onRateLimitedPeer callback if it is not nil
+func (r *RateLimiters) onRateLimitedPeer(peerID peer.ID, role, msgType string, topic channels.Topic, reason RateLimitReason) {
+	if r.OnRateLimitedPeer != nil {
+		r.OnRateLimitedPeer(peerID, role, msgType, topic, reason)
+	}
 }
 
 // Start starts the cleanup loop for all limiters
