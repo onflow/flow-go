@@ -150,6 +150,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		builder:             builder.FlowNodeBuilder,
 		exeConf:             builder.exeConf,
 		toTriggerCheckpoint: atomic.NewBool(false),
+		stopAtHeight:        atomic.NewUint64(0),
+		stopAtHeightCrash:   atomic.NewBool(false),
 	}
 
 	builder.FlowNodeBuilder.
