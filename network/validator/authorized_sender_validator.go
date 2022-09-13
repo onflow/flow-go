@@ -2,7 +2,7 @@ package validator
 
 import (
 	"errors"
-
+	"fmt"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
@@ -72,14 +72,10 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, msg interface{}, cha
 	default:
 		// this condition should never happen and indicates there's a bug
 		// don't crash as a result of external inputs since that creates a DoS vector
-		av.log.Error().
-			Err(err).
-			Str("peer_id", from.String()).
-			Str("role", identity.Role.String()).
-			Str("peer_node_id", identity.NodeID.String()).
-			Str("message_type", msgType).
-			Bool("unicast_message", isUnicast).
-			Msg("unexpected error during message validation")
+		// collect slashing data because this could potentially lead to slashing
+		err = fmt.Errorf("unexpected error during message validation: %w", err)
+		violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
+		av.slashingViolationsConsumer.OnUnexpectedError(violation)
 		return msgType, err
 	}
 }

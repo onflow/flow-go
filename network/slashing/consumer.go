@@ -12,6 +12,7 @@ import (
 
 const (
 	unknown                     = "unknown"
+	unExpectedValidationError   = "unexpected_validation_error"
 	unAuthorizedSenderViolation = "unauthorized_sender"
 	unknownMsgTypeViolation     = "unknown_message_type"
 	invalidMsgViolation         = "invalid_message"
@@ -81,4 +82,10 @@ func (c *Consumer) OnInvalidMsgError(violation *Violation) {
 // OnSenderEjectedError logs an error for sender ejected error
 func (c *Consumer) OnSenderEjectedError(violation *Violation) {
 	c.logOffense(senderEjectedViolation, violation)
+}
+
+// OnUnexpectedError logs an error for unexpected errors. This indicates message validation
+// has failed for an unknown reason and could potentially be n slashable offense.
+func (c *Consumer) OnUnexpectedError(violation *Violation) {
+	c.logOffense(unExpectedValidationError, violation)
 }
