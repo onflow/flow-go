@@ -1,0 +1,43 @@
+name: Ephemeral-Benchnet2-Setup
+
+on:
+  pull_request:
+    branches:
+      - master
+      - 'auto-cadence-upgrade/**'
+      - 'feature/**'
+      - 'v[0-9]+.[0-9]+'
+
+env:
+  GO_VERSION: 1.19
+
+jobs:
+  create-kubernetes-env:
+    name: Create Kubernetes Containers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create containers
+        # uses: helm command
+
+  build-flow-images:
+    name: Build Flow Docker Images
+    runs-on: ubuntu-latest
+    outputs:
+      image-container-registry: registry name
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Docker Compose
+        # uses: docker compose
+      
+  deploy-docker-images:
+    name: Deploy Branch Docker Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy containers
+        # uses: kubernetes command
