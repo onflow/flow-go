@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// TODO(state-sync): add documentation
 type ComponentConsumer struct {
 	component.Component
 

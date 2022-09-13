@@ -184,6 +184,7 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 	}
 }
 
+// TODO(state-sync): docs
 func (p *Pruner) checkPrune(ctx irrecoverable.SignalerContext) {
 	if p.lastFulfilledHeight > p.heightRangeTarget+p.threshold+p.lastPrunedHeight {
 		pruneHeight := p.lastFulfilledHeight - p.heightRangeTarget

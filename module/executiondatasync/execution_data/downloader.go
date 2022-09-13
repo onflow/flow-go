@@ -124,6 +124,7 @@ func (d *downloader) Download(ctx context.Context, executionDataID flow.Identifi
 	return bed, nil
 }
 
+// TODO(state-sync): add documentation+errors
 func (d *downloader) getExecutionDataRoot(
 	ctx context.Context,
 	rootID flow.Identifier,
@@ -159,6 +160,7 @@ func (d *downloader) getExecutionDataRoot(
 	return edRoot, nil
 }
 
+// TODO(state-sync): add documentation+errors
 func (d *downloader) getChunkExecutionData(
 	ctx context.Context,
 	chunkExecutionDataID cid.Cid,
@@ -186,6 +188,7 @@ func (d *downloader) getChunkExecutionData(
 }
 
 // getBlobs gets the given CIDs from the blobservice, reassembles the blobs, and deserializes the reassembled data into an object.
+// TODO(state-sync): add errors
 func (d *downloader) getBlobs(ctx context.Context, blobGetter network.BlobGetter, cids []cid.Cid) (interface{}, error) {
 	blobCh, errCh := d.retrieveBlobs(ctx, blobGetter, cids)
 	bcr := blobs.NewBlobChannelReader(blobCh)
@@ -204,6 +207,7 @@ func (d *downloader) getBlobs(ctx context.Context, blobGetter network.BlobGetter
 }
 
 // retrieveBlobs asynchronously retrieves the blobs for the given CIDs with the given BlobGetter.
+// TODO(state-sync): add errors
 func (d *downloader) retrieveBlobs(parent context.Context, blobGetter network.BlobGetter, cids []cid.Cid) (<-chan blobs.Blob, <-chan error) {
 	blobsOut := make(chan blobs.Blob, len(cids))
 	errCh := make(chan error, 1)
@@ -260,6 +264,7 @@ func (d *downloader) retrieveBlobs(parent context.Context, blobGetter network.Bl
 
 // findBlob retrieves blobs from the given channel, caching them along the way, until it either
 // finds the target blob or exhausts the channel.
+// TODO(state-sync): add errors
 func (d *downloader) findBlob(
 	blobChan <-chan blobs.Blob,
 	target cid.Cid,

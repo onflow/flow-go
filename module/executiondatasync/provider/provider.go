@@ -61,6 +61,7 @@ func NewProvider(
 	return p
 }
 
+// TODO(state-sync): docs+error
 func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh <-chan blobs.Blob) <-chan error {
 	ch := make(chan error, 1)
 	go func() {
@@ -132,6 +133,7 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 	}
 }
 
+// TODO(state-sync): docs+error
 func (p *Provider) provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, <-chan error, error) {
 	logger := p.logger.With().Uint64("height", blockHeight).Str("block_id", executionData.BlockID.String()).Logger()
 	logger.Debug().Msg("providing execution data")
@@ -182,6 +184,7 @@ func (p *Provider) provide(ctx context.Context, blockHeight uint64, executionDat
 	return rootID, errCh, nil
 }
 
+// TODO(state-sync): docs+error
 func (p *Provider) addExecutionDataRoot(
 	ctx context.Context,
 	edRoot *execution_data.BlockExecutionDataRoot,
@@ -207,6 +210,7 @@ func (p *Provider) addExecutionDataRoot(
 	return rootID, nil
 }
 
+// TODO(state-sync): docs+error
 func (p *Provider) addChunkExecutionData(
 	ctx context.Context,
 	ced *execution_data.ChunkExecutionData,

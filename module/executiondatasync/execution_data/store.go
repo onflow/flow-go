@@ -55,6 +55,7 @@ func NewExecutionDataStore(blobstore blobs.Blobstore, serializer Serializer, opt
 	return s
 }
 
+// TODO(state-sync): docs+errors
 func (s *store) AddExecutionData(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error) {
 	executionDataRoot := &BlockExecutionDataRoot{
 		BlockID:               executionData.BlockID,
@@ -92,6 +93,7 @@ func (s *store) AddExecutionData(ctx context.Context, executionData *BlockExecut
 	return rootID, nil
 }
 
+// TODO(state-sync): docs+errors
 func (s *store) addChunkExecutionData(ctx context.Context, chunkExecutionData *ChunkExecutionData) (cid.Cid, error) {
 	var v interface{} = chunkExecutionData
 
@@ -109,6 +111,7 @@ func (s *store) addChunkExecutionData(ctx context.Context, chunkExecutionData *C
 	}
 }
 
+// TODO(state-sync): docs+errors
 func (s *store) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) {
 	buf := new(bytes.Buffer)
 	if err := s.serializer.Serialize(buf, v); err != nil {
@@ -138,6 +141,7 @@ func (s *store) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) 
 	return cids, nil
 }
 
+// TODO(state-sync): docs+errors
 func (s *store) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error) {
 	rootCid := flow.IdToCid(rootID)
 
@@ -177,6 +181,7 @@ func (s *store) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*
 	return blockExecutionData, nil
 }
 
+// TODO(state-sync): docs+errors
 func (s *store) getChunkExecutionData(ctx context.Context, chunkExecutionDataID cid.Cid) (*ChunkExecutionData, error) {
 	cids := []cid.Cid{chunkExecutionDataID}
 
@@ -197,6 +202,7 @@ func (s *store) getChunkExecutionData(ctx context.Context, chunkExecutionDataID 
 	}
 }
 
+// TODO(state-sync): docs+errors
 func (s *store) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, error) {
 	buf := new(bytes.Buffer)
 
