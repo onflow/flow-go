@@ -350,7 +350,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		mwOpts = append(mwOpts, p2p.WithPeerManagerFilters(peerManagerFilters))
 	}
 
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger)
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
 
 	fnb.Middleware = p2p.NewMiddleware(
 		fnb.Logger,

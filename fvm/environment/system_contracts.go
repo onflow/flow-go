@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -64,8 +63,6 @@ func (sys *SystemContracts) Invoke(
 		spec.ArgumentTypes,
 	)
 	if err != nil {
-		// this is an error coming from Cadendce runtime, so it must be handled first.
-		err = errors.HandleRuntimeError(err)
 		sys.env.Logger().
 			Info().
 			Err(err).

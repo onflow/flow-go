@@ -430,6 +430,6 @@ func CrashTestWithExpectedStatus(
 }
 
 // NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware
-func NetworkSlashingViolationsConsumer(logger zerolog.Logger) slashing.ViolationsConsumer {
-	return slashing.NewSlashingViolationsConsumer(logger)
+func NetworkSlashingViolationsConsumer(logger zerolog.Logger, metrics module.NetworkSecurityMetrics) slashing.ViolationsConsumer {
+	return slashing.NewSlashingViolationsConsumer(logger, metrics)
 }

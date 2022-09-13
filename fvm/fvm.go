@@ -101,12 +101,7 @@ func (vm *VirtualMachine) RunV2(
 			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
-	err = proc.Run(vm, ctx, stTxn, blockPrograms)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return proc.Run(vm, ctx, stTxn, blockPrograms)
 }
 
 // GetAccount returns an account by address or an error if none exists.

@@ -92,6 +92,7 @@ type Middleware struct {
 	codec                      network.Codec
 	slashingViolationsConsumer slashing.ViolationsConsumer
 	unicastRateLimiters        *unicast.RateLimiters
+	authorizedSenderValidator  *validator.AuthorizedSenderValidator
 	component.Component
 }
 
@@ -294,19 +295,14 @@ func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
 }
 
-// validateUnicastAuthorizedSender will validate messages sent via unicast stream.
-func (m *Middleware) validateUnicastAuthorizedSender(remotePeer peer.ID, channel channels.Channel, msg interface{}) error {
-	validate := validator.AuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, channel, true, m.ov.Identity)
-	_, err := validate(remotePeer, msg)
-	return err
-}
-
 // start will start the middleware.
 // No errors are expected during normal operation.
 func (m *Middleware) start(ctx context.Context) error {
 	if m.ov == nil {
 		return fmt.Errorf("could not start middleware: overlay must be configured by calling SetOverlay before middleware can be started")
 	}
+
+	m.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, m.ov.Identity)
 
 	libP2PNode, err := m.libP2PNodeFactory(ctx)
 	if err != nil {
@@ -611,7 +607,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
-			validator.AuthorizedSenderMessageValidator(m.log, m.slashingViolationsConsumer, channel, m.ov.Identity),
+			m.authorizedSenderValidator.PubSubMessageValidator(channel),
 		)
 
 		// NOTE: For non-public channels the libP2P node topic validator will reject
@@ -690,7 +686,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// if message channel is not public perform authorized sender validation
 	if !channels.IsPublicChannel(channel) {
-		err := m.validateUnicastAuthorizedSender(remotePeer, channel, decodedMsgPayload)
+		_, err := m.authorizedSenderValidator.Validate(remotePeer, decodedMsgPayload, channel, true)
 		if err != nil {
 			m.log.
 				Error().

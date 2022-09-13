@@ -29,10 +29,19 @@ type ResolverMetrics interface {
 	OnDNSLookupRequestDropped()
 }
 
+// NetworkSecurityMetrics metrics related to network protection.
+type NetworkSecurityMetrics interface {
+	// OnUnauthorizedMessage tracks the number of unauthorized messages seen on the network.
+	OnUnauthorizedMessage(role, msgType, topic, offense string)
+
+	// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
+	OnRateLimitedUnicastMessage(role, msgType, topic string)
+}
+
 type NetworkMetrics interface {
 	ResolverMetrics
 	DHTMetrics
-
+	NetworkSecurityMetrics
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
 
