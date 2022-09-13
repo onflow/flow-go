@@ -14,9 +14,9 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	provider "github.com/ipfs/go-ipfs-provider"
 	"github.com/ipfs/go-ipfs-provider/simple"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 	"golang.org/x/time/rate"
 

@@ -3,9 +3,9 @@ package p2p
 import (
 	"fmt"
 
-	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
-	crypto_pb "github.com/libp2p/go-libp2p-core/crypto/pb"
-	"github.com/libp2p/go-libp2p-core/peer"
+	lcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	crypto_pb "github.com/libp2p/go-libp2p/core/crypto/pb"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
 )

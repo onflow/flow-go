@@ -1,8 +1,9 @@
 package p2p
 
 import (
-	"github.com/libp2p/go-libp2p-core/peer"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
@@ -17,6 +18,8 @@ type RoleBasedFilter struct {
 
 const UnstakedRole = flow.Role(0)
 
+var _ pubsub.SubscriptionFilter = (*RoleBasedFilter)(nil)
+
 func NewRoleBasedFilter(role flow.Role, idProvider id.IdentityProvider) *RoleBasedFilter {
 	filter := &RoleBasedFilter{
 		idProvider: idProvider,
@@ -27,8 +30,8 @@ func NewRoleBasedFilter(role flow.Role, idProvider id.IdentityProvider) *RoleBas
 }
 
 func (f *RoleBasedFilter) getRole(pid peer.ID) flow.Role {
-	if id, ok := f.idProvider.ByPeerID(pid); ok {
-		return id.Role
+	if flowId, ok := f.idProvider.ByPeerID(pid); ok {
+		return flowId.Role
 	}
 
 	return UnstakedRole

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"

@@ -10,15 +10,13 @@ import (
 	"time"
 
 	badger "github.com/ipfs/go-ds-badger2"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/routing"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-
-	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/admin/commands"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
@@ -69,6 +67,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/grpcutils"
+	"github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node.

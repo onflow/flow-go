@@ -3,10 +3,10 @@ package p2p
 import (
 	"sync"
 
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/control"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/control"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 )
