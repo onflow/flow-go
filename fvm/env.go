@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -27,6 +26,8 @@ type commonEnv struct {
 	*environment.Tracer
 	environment.Meter
 	*environment.ProgramLogger
+	*environment.Runtime
+
 	*environment.UUIDGenerator
 
 	*environment.UnsafeRandomGenerator
@@ -69,17 +70,24 @@ func newCommonEnv(
 ) commonEnv {
 	accounts := environment.NewAccounts(stateTransaction)
 	programsHandler := handler.NewProgramsHandler(programs, stateTransaction)
-	systemContracts := environment.NewSystemContracts()
+	logger := environment.NewProgramLogger(
+		tracer,
+		ctx.Logger,
+		ctx.Metrics,
+		ctx.CadenceLoggingEnabled,
+	)
+	runtime := environment.NewRuntime(ctx.ReusableCadenceRuntimePool)
+	systemContracts := environment.NewSystemContracts(
+		ctx.Chain,
+		tracer,
+		logger,
+		runtime)
 
 	return commonEnv{
-		Tracer: tracer,
-		Meter:  meter,
-		ProgramLogger: environment.NewProgramLogger(
-			tracer,
-			ctx.Logger,
-			ctx.Metrics,
-			ctx.CadenceLoggingEnabled,
-		),
+		Tracer:        tracer,
+		Meter:         meter,
+		ProgramLogger: logger,
+		Runtime:       runtime,
 		UUIDGenerator: environment.NewUUIDGenerator(
 			tracer,
 			meter,
@@ -130,16 +138,6 @@ func (env *commonEnv) Chain() flow.Chain {
 
 func (env *commonEnv) LimitAccountStorage() bool {
 	return env.ctx.LimitAccountStorage
-}
-
-func (env *commonEnv) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
-	return env.ctx.ReusableCadenceRuntimePool.Borrow(env.fullEnv)
-}
-
-func (env *commonEnv) ReturnCadenceRuntime(
-	reusable *runtime.ReusableCadenceRuntime,
-) {
-	env.ctx.ReusableCadenceRuntimePool.Return(reusable)
 }
 
 func (env *commonEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
