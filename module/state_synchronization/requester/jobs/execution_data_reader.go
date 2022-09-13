@@ -85,12 +85,14 @@ func (r *ExecutionDataReader) AtIndex(height uint64) (module.Job, error) {
 }
 
 // Head returns the highest consecutive block height with downloaded execution data
+// TODO(state-sync): error docs
 func (r *ExecutionDataReader) Head() (uint64, error) {
 	return r.highestAvailableHeight(), nil
 }
 
 // getExecutionData returns the ExecutionData for the given block height.
 // This is used by the execution data reader to get the ExecutionData for a block.
+// TODO(state-sync): error docs
 func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerContext, height uint64) (*execution_data.BlockExecutionData, error) {
 	header, err := r.headers.ByHeight(height)
 	if err != nil {
@@ -112,6 +114,7 @@ func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerC
 	defer cancel()
 
 	executionData, err := r.downloader.Download(ctx, result.ExecutionDataID)
+	// TODO(state-sync): handle expected / unexpected errors expicitly
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data for block %s: %w", header.ID(), err)

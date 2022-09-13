@@ -57,6 +57,7 @@ func makeBlobRecordKey(blockHeight uint64, c cid.Cid) []byte {
 	return blobRecordKey
 }
 
+// TODO(state-sync): error docs
 func parseBlobRecordKey(key []byte) (uint64, cid.Cid, error) {
 	blockHeight := binary.LittleEndian.Uint64(key[1:])
 	c, err := cid.Cast(key[1+8:])
@@ -78,6 +79,7 @@ func makeUint64Value(v uint64) []byte {
 	return value
 }
 
+// TODO(state-sync): error docs
 func getUint64Value(item *badger.Item) (uint64, error) {
 	value, err := item.ValueCopy(nil)
 	if err != nil {
@@ -129,6 +131,7 @@ type Storage interface {
 	// different heights.
 	// The same blob may also be added multiple times for the same
 	// height, but it will only be tracked once per height.
+	// TODO(state-sync): error docs
 	Update(UpdateFn) error
 
 	// GetFulfilledHeight returns the current fulfilled height.
@@ -156,6 +159,7 @@ type Storage interface {
 	// can occur during the pruning.
 	// It is up to the caller to ensure that this is never
 	// called with a value higher than the fulfilled height.
+	// TODO(state-sync): error docs
 	PruneUpToHeight(height uint64) error
 }
 
@@ -212,6 +216,7 @@ func OpenStorage(dbPath string, startHeight uint64, logger zerolog.Logger, opts 
 	return storage, nil
 }
 
+// TODO(state-sync): error docs
 func (s *storage) init(startHeight uint64) error {
 	fulfilledHeight, fulfilledHeightErr := s.GetFulfilledHeight()
 	prunedHeight, prunedHeightErr := s.GetPrunedHeight()
@@ -241,6 +246,7 @@ func (s *storage) init(startHeight uint64) error {
 	return nil
 }
 
+// TODO(state-sync): error docs
 func (s *storage) bootstrap(startHeight uint64) error {
 	fulfilledHeightKey := makeGlobalStateKey(globalStateFulfilledHeight)
 	fulfilledHeightValue := makeUint64Value(startHeight)
@@ -303,6 +309,7 @@ func (s *storage) GetFulfilledHeight() (uint64, error) {
 	return fulfilledHeight, nil
 }
 
+// TODO(state-sync): error docs
 func (s *storage) trackBlob(txn *badger.Txn, blockHeight uint64, c cid.Cid) error {
 	if err := txn.Set(makeBlobRecordKey(blockHeight, c), nil); err != nil {
 		return fmt.Errorf("failed to add blob record: %w", err)
@@ -335,6 +342,7 @@ func (s *storage) trackBlob(txn *badger.Txn, blockHeight uint64, c cid.Cid) erro
 	return nil
 }
 
+// TODO(state-sync): error docs
 func (s *storage) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
 	cidsPerBatch := cidsPerBatch
 	maxCidsPerBatch := getBatchItemCountLimit(s.db, 2, blobRecordKeyLength+latestHeightKeyLength+8)
@@ -367,6 +375,7 @@ func (s *storage) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
 	return nil
 }
 
+// TODO(state-sync): error docs
 func (s *storage) batchDelete(deleteInfos []*deleteInfo) error {
 	return s.db.Update(func(txn *badger.Txn) error {
 		for _, dInfo := range deleteInfos {
@@ -492,6 +501,7 @@ func (s *storage) PruneUpToHeight(height uint64) error {
 	return nil
 }
 
+// TODO(state-sync): error docs
 func (s *storage) setPrunedHeight(height uint64) error {
 	prunedHeightKey := makeGlobalStateKey(globalStatePrunedHeight)
 	prunedHeightValue := makeUint64Value(height)

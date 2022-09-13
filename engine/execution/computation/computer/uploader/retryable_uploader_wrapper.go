@@ -178,6 +178,7 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 	executionDataID := executionResult.ExecutionDataID
 
 	// retrieving BlockExecutionData from EDS
+	// TODO(state-sync): handle expected / unexpected errors expicitly
 	executionData, err := b.execDataDownloader.Download(b.unit.Ctx(), executionDataID)
 	if executionData == nil || err != nil {
 		log.Error().Err(err).Msgf(

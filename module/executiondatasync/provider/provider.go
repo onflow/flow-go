@@ -234,6 +234,7 @@ func (p *Provider) addChunkExecutionData(
 }
 
 // addBlobs serializes the given object, splits the serialized data into blobs, and sends them to the given channel.
+// TODO(state-sync): error docs
 func (p *Provider) addBlobs(ctx context.Context, v interface{}, blobCh chan<- blobs.Blob) ([]cid.Cid, error) {
 	bcw := blobs.NewBlobChannelWriter(blobCh, p.maxBlobSize)
 	defer bcw.Close()

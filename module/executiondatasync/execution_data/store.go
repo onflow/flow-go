@@ -22,6 +22,7 @@ type ExecutionDataStore interface {
 
 	// AddExecutionData constructs a blob tree for the given BlockExecutionData and adds it to the
 	// blobstore, and then returns the root CID.
+	// TODO(state-sync): error docs
 	AddExecutionData(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error)
 }
 

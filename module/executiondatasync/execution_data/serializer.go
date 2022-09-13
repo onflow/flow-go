@@ -95,6 +95,7 @@ func NewSerializer(codec encoding.Codec, compressor network.Compressor) *seriali
 }
 
 // writePrototype writes the header code for the given value to the given writer
+// TODO(state-sync): error docs
 func (s *serializer) writePrototype(w io.Writer, v interface{}) error {
 	var code byte
 	var err error
@@ -117,6 +118,7 @@ func (s *serializer) writePrototype(w io.Writer, v interface{}) error {
 }
 
 // Serialize encodes and compresses the given value to the given writer
+// TODO(state-sync): error docs
 func (s *serializer) Serialize(w io.Writer, v interface{}) error {
 	if err := s.writePrototype(w, v); err != nil {
 		return fmt.Errorf("failed to write prototype: %w", err)
@@ -143,6 +145,7 @@ func (s *serializer) Serialize(w io.Writer, v interface{}) error {
 }
 
 // readPrototype reads a header code from the given reader and returns a prototype value
+// TODO(state-sync): error docs
 func (s *serializer) readPrototype(r io.Reader) (interface{}, error) {
 	var code byte
 	var err error
@@ -163,6 +166,7 @@ func (s *serializer) readPrototype(r io.Reader) (interface{}, error) {
 }
 
 // Deserialize decompresses and decodes the data from the given reader
+// TODO(state-sync): error docs
 func (s *serializer) Deserialize(r io.Reader) (interface{}, error) {
 	v, err := s.readPrototype(r)
 

@@ -142,6 +142,7 @@ func (p *Pruner) NotifyFulfilledHeight(height uint64) {
 
 // SetHeightRangeTarget updates the Pruner's height range target.
 // This may block for the duration of a pruning operation.
+// TODO(state-sync): error docs
 func (p *Pruner) SetHeightRangeTarget(heightRangeTarget uint64) error {
 	select {
 	case p.heightRangeTargetChan <- heightRangeTarget:
@@ -153,6 +154,7 @@ func (p *Pruner) SetHeightRangeTarget(heightRangeTarget uint64) error {
 
 // SetThreshold update's the Pruner's threshold.
 // This may block for the duration of a pruning operation.
+// TODO(state-sync): error docs
 func (p *Pruner) SetThreshold(threshold uint64) error {
 	select {
 	case p.thresholdChan <- threshold:

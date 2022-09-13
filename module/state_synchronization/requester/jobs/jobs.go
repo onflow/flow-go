@@ -21,6 +21,7 @@ func (j BlockEntryJob) ID() module.JobID {
 }
 
 // JobToBlockEntry converts a block entry job into its corresponding BlockEntry.
+// TODO(state-sync): error docs
 func JobToBlockEntry(job module.Job) (*BlockEntry, error) {
 	blockJob, ok := job.(*BlockEntryJob)
 	if !ok {

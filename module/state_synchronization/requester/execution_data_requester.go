@@ -167,6 +167,7 @@ func New(
 		finalizationNotifier: engine.NewNotifier(),
 	}
 
+	// notifies when new execution data is downloaded
 	executionDataNotifier := engine.NewNotifier()
 
 	// jobqueue Jobs object that tracks sealed blocks by height. This is used by the blockConsumer
@@ -420,6 +421,7 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 }
 
 // fetchExecutionData fetches the ExecutionData by its ID, and times out if fetchTimeout is exceeded
+// TODO(state-sync): error docs
 func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier, fetchTimeout time.Duration) (*execution_data.BlockExecutionData, error) {
 	ctx, cancel := context.WithTimeout(signalerCtx, fetchTimeout)
 	defer cancel()
@@ -429,6 +431,7 @@ func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.Si
 	// the data is received
 	executionData, err := e.downloader.Download(ctx, executionDataID)
 
+	// TODO(state-sync): handle expected / unexpected errors expicitly
 	if err != nil {
 		return nil, err
 	}
