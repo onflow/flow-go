@@ -28,7 +28,7 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 	entities := unittest.EntityListFixture(uint(limit))
 
 	// adds all entities to backdata
-	testAddEntities(t, bd, entities)
+	testAddEntities(t, bd, entities, heropool.LRUEjection)
 
 	// sanity checks
 	for i := heropool.EIndex(0); i < heropool.EIndex(len(entities)); i++ {
@@ -61,7 +61,7 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	entities := unittest.EntityListFixture(uint(limit))
 
 	// adds all entities to backdata
-	testAddEntities(t, bd, entities)
+	testAddEntities(t, bd, entities, heropool.LRUEjection)
 
 	// picks a random entity from BackData and adjusts its identifier to a new one.
 	entityIndex := rand.Int() % limit
@@ -140,7 +140,7 @@ func TestArrayBackData_WriteHeavy(t *testing.T) {
 	entities := unittest.EntityListFixture(uint(limit))
 
 	// adds all entities to backdata
-	testAddEntities(t, bd, entities)
+	testAddEntities(t, bd, entities, heropool.LRUEjection)
 
 	// retrieves all entities from backdata
 	testRetrievableFrom(t, bd, entities, 0)
@@ -164,11 +164,36 @@ func TestArrayBackData_LRU_Ejection(t *testing.T) {
 	entities := unittest.EntityListFixture(items)
 
 	// adds all entities to backdata
-	testAddEntities(t, bd, entities)
+	testAddEntities(t, bd, entities, heropool.LRUEjection)
 
 	// only last 100K (i.e., 900Kth forward) items must be retrievable, and
 	// the rest must be ejected.
 	testRetrievableFrom(t, bd, entities, 900_000)
+}
+
+// TestArrayBackData_No_Ejection evaluates correctness of Cache under the writing and retrieving
+// a heavy load of entities beyond its limit. With NoEjection mode, the cache should refuse to add extra entities beyond
+// its limit.
+func TestArrayBackData_No_Ejection(t *testing.T) {
+	// mempool has the limit of 100K, but we put 1M
+	// (10 time more than its capacity)
+	limit := 100_000
+	items := uint(1_000_000)
+
+	bd := NewCache(uint32(limit),
+		8,
+		heropool.NoEjection,
+		unittest.Logger(),
+		metrics.NewNoopCollector())
+
+	entities := unittest.EntityListFixture(items)
+
+	// adds all entities to backdata
+	testAddEntities(t, bd, entities, heropool.NoEjection)
+
+	// only last 100K (i.e., 900Kth forward) items must be retrievable, and
+	// the rest must be ejected.
+	testRetrievableInRange(t, bd, entities, 0, limit)
 }
 
 // TestArrayBackData_Random_Ejection evaluates correctness of Cache under the writing and retrieving
@@ -189,7 +214,7 @@ func TestArrayBackData_Random_Ejection(t *testing.T) {
 	entities := unittest.EntityListFixture(items)
 
 	// adds all entities to backdata
-	testAddEntities(t, bd, entities)
+	testAddEntities(t, bd, entities, heropool.RandomEjection)
 
 	// only 100K (random) items must be retrievable, as the rest
 	// are randomly ejected to make room.
@@ -210,7 +235,7 @@ func TestArrayBackData_AddDuplicate(t *testing.T) {
 	entities := unittest.EntityListFixture(uint(limit))
 
 	// adds all entities to backdata
-	testAddEntities(t, bd, entities)
+	testAddEntities(t, bd, entities, heropool.LRUEjection)
 
 	// adding duplicate entity should fail
 	for _, entity := range entities {
@@ -234,7 +259,7 @@ func TestArrayBackData_Clear(t *testing.T) {
 	entities := unittest.EntityListFixture(uint(limit))
 
 	// adds all entities to backdata
-	testAddEntities(t, bd, entities)
+	testAddEntities(t, bd, entities, heropool.LRUEjection)
 
 	// still all must be retrievable from backdata
 	testRetrievableFrom(t, bd, entities, 0)
@@ -288,7 +313,7 @@ func TestArrayBackData_All(t *testing.T) {
 				metrics.NewNoopCollector())
 			entities := unittest.EntityListFixture(uint(tc.items))
 
-			testAddEntities(t, bd, entities)
+			testAddEntities(t, bd, entities, tc.ejectionMode)
 
 			if tc.ejectionMode == heropool.RandomEjection {
 				// in random ejection mode we count total number of matched entities
@@ -355,7 +380,7 @@ func TestArrayBackData_Remove(t *testing.T) {
 				metrics.NewNoopCollector())
 			entities := unittest.EntityListFixture(uint(tc.items))
 
-			testAddEntities(t, bd, entities)
+			testAddEntities(t, bd, entities, heropool.RandomEjection)
 
 			if tc.from == -1 {
 				// random removal
@@ -373,35 +398,60 @@ func TestArrayBackData_Remove(t *testing.T) {
 
 // testAddEntities is a test helper that checks entities are added successfully to the Cache.
 // and each entity is retrievable right after it is written to backdata.
-func testAddEntities(t *testing.T, bd *Cache, entities []*unittest.MockEntity) {
+func testAddEntities(t *testing.T, bd *Cache, entities []*unittest.MockEntity, ejection heropool.EjectionMode) {
+	// initially, head should be undefined
+	e, ok := bd.Head()
+	require.False(t, ok)
+	require.Nil(t, e)
+
 	// adding elements
 	for i, e := range entities {
-		// adding each element must be successful.
-		require.True(t, bd.Add(e.ID(), e))
+		if ejection == heropool.NoEjection && uint32(i) >= bd.sizeLimit {
+			// with no ejection when it goes beyond limit, the writes should be unsuccessful.
+			require.False(t, bd.Add(e.ID(), e))
 
-		if uint32(i) < bd.sizeLimit {
-			// when we are below limit the size of
-			// Cache should be incremented by each addition.
-			require.Equal(t, bd.Size(), uint(i+1))
+			// the head should retrieve the first added entity.
+			headEntity, headExists := bd.Head()
+			require.True(t, headExists)
+			require.Equal(t, headEntity.ID(), entities[0].ID())
 		} else {
-			// when we cross the limit, the ejection kicks in, and
-			// size must be steady at the limit.
-			require.Equal(t, uint32(bd.Size()), bd.sizeLimit)
-		}
+			// adding each element must be successful.
+			require.True(t, bd.Add(e.ID(), e))
 
-		// entity should be immediately retrievable
-		actual, ok := bd.ByID(e.ID())
-		require.True(t, ok)
-		require.Equal(t, e, actual)
+			if uint32(i) < bd.sizeLimit {
+				// when we are below limit the size of
+				// Cache should be incremented by each addition.
+				require.Equal(t, bd.Size(), uint(i+1))
+
+				// in case cache is not full, the head should retrieve the first added entity.
+				headEntity, headExists := bd.Head()
+				require.True(t, headExists)
+				require.Equal(t, headEntity.ID(), entities[0].ID())
+			} else {
+				// when we cross the limit, the ejection kicks in, and
+				// size must be steady at the limit.
+				require.Equal(t, uint32(bd.Size()), bd.sizeLimit)
+			}
+
+			// entity should be immediately retrievable
+			actual, ok := bd.ByID(e.ID())
+			require.True(t, ok)
+			require.Equal(t, e, actual)
+		}
 	}
 }
 
-// testRetrievableFrom is a test helper that evaluates that all entities starting from given index are retrievable from Cache.
+// testRetrievableInRange is a test helper that evaluates that all entities starting from given index are retrievable from Cache.
 func testRetrievableFrom(t *testing.T, bd *Cache, entities []*unittest.MockEntity, from int) {
+	testRetrievableInRange(t, bd, entities, from, len(entities))
+}
+
+// testRetrievableInRange is a test helper that evaluates within given range [from, to) are retrievable from Cache.
+func testRetrievableInRange(t *testing.T, bd *Cache, entities []*unittest.MockEntity, from int, to int) {
 	for i := range entities {
 		expected := entities[i]
 		actual, ok := bd.ByID(expected.ID())
-		if i < from {
+		if i < from || i >= to {
 			require.False(t, ok, i)
 			require.Nil(t, actual)
 		} else {

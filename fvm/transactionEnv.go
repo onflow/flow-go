@@ -88,13 +88,22 @@ func NewTransactionEnvironment(
 				ctx.ServiceEventCollectionEnabled,
 				ctx.EventCollectionByteSizeLimit,
 			),
-			ctx:            ctx,
-			sth:            sth,
-			vm:             vm,
-			programs:       programsHandler,
-			accounts:       accounts,
-			accountKeys:    accountKeys,
-			frozenAccounts: nil,
+			ValueStore: environment.NewValueStore(
+				tracer,
+				meter,
+				accounts),
+			ContractReader: environment.NewContractReader(
+				tracer,
+				meter,
+				accounts),
+			SystemContracts: NewSystemContracts(),
+			ctx:             ctx,
+			sth:             sth,
+			vm:              vm,
+			programs:        programsHandler,
+			accounts:        accounts,
+			accountKeys:     accountKeys,
+			frozenAccounts:  nil,
 		},
 
 		addressGenerator: generator,
@@ -102,6 +111,8 @@ func NewTransactionEnvironment(
 		txIndex:          txIndex,
 		txID:             txID,
 	}
+
+	env.SystemContracts.SetEnvironment(env)
 
 	// TODO(patrick): rm this hack
 	env.AccountInterface = env
@@ -142,20 +153,12 @@ func (e *TransactionEnv) TxID() flow.Identifier {
 
 // GetAccountsAuthorizedForContractUpdate returns a list of addresses authorized to update/deploy contracts
 func (e *TransactionEnv) GetAccountsAuthorizedForContractUpdate() []common.Address {
-	return e.GetAuthorizedAccounts(
-		cadence.Path{
-			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
-			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
-		})
+	return e.GetAuthorizedAccounts(blueprints.ContractDeploymentAuthorizedAddressesPath)
 }
 
 // GetAccountsAuthorizedForContractRemoval returns a list of addresses authorized to remove contracts
 func (e *TransactionEnv) GetAccountsAuthorizedForContractRemoval() []common.Address {
-	return e.GetAuthorizedAccounts(
-		cadence.Path{
-			Domain:     blueprints.ContractRemovalAuthorizedAddressesPathDomain,
-			Identifier: blueprints.ContractRemovalAuthorizedAddressesPathIdentifier,
-		})
+	return e.GetAuthorizedAccounts(blueprints.ContractRemovalAuthorizedAddressesPath)
 }
 
 // GetAuthorizedAccounts returns a list of addresses authorized by the service account.
@@ -205,10 +208,7 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 
 	value, err := e.vm.Runtime.ReadStored(
 		service,
-		cadence.Path{
-			Domain:     blueprints.IsContractDeploymentRestrictedPathDomain,
-			Identifier: blueprints.IsContractDeploymentRestrictedPathIdentifier,
-		},
+		blueprints.IsContractDeploymentRestrictedPath,
 		runtime.Context{
 			Interface:   e,
 			Environment: runtimeEnv,
@@ -233,10 +233,7 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 }
 
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
-	return InvokeUseContractAuditVoucherContract(
-		e,
-		address,
-		string(code[:]))
+	return e.UseContractAuditVoucher(address, string(code[:]))
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
@@ -287,10 +284,7 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		_, invokeErr := InvokeSetupNewAccountContract(
-			e,
-			flowAddress,
-			payer)
+		_, invokeErr := e.SetupNewAccount(flowAddress, payer)
 		if invokeErr != nil {
 			return address, invokeErr
 		}

@@ -95,6 +95,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithTracer(tracer),
+		fvm.WithReusableCadenceRuntimePool(
+			fvm.NewReusableCadenceRuntimePool(ReusableCadenceRuntimePoolSize)),
 	)
 	ledger := testutil.RootBootstrappedLedger(
 		vm,

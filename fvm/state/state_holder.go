@@ -15,7 +15,8 @@ type nestedTransactionStackFrame struct {
 	// When nil, the subtransaction will have unrestricted access to the runtime
 	// environment.  When non-nil, the subtransaction will only have access to
 	// the parts of the runtime environment necessary for importing/parsing the
-	// program.
+	// program, specifically, environment.ContractReader and
+	// environment.Programs.
 	//
 	// TODO(patrick): restrict environment method access
 	parseRestriction *common.AddressLocation

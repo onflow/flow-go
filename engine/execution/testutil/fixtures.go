@@ -324,7 +324,7 @@ func BytesToCadenceArray(l []byte) cadence.Array {
 // CreateAccountCreationTransaction creates a transaction which will create a new account.
 //
 // This function returns a randomly generated private key and the transaction.
-func CreateAccountCreationTransaction(t *testing.T, chain flow.Chain) (flow.AccountPrivateKey, *flow.TransactionBody) {
+func CreateAccountCreationTransaction(t testing.TB, chain flow.Chain) (flow.AccountPrivateKey, *flow.TransactionBody) {
 	accountKey, err := GenerateAccountPrivateKey()
 	require.NoError(t, err)
 	encPublicKey := accountKey.PublicKey(1000).PublicKey.Encode()

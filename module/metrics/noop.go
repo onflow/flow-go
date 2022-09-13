@@ -168,10 +168,12 @@ func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Tim
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                          {}
 func (nc *NoopCollector) TransactionSubmissionFailed()                                     {}
 func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                    {}
-func (nc *NoopCollector) ChunkDataPackRequested()                                          {}
+func (nc *NoopCollector) ChunkDataPackRequestProcessed()                                   {}
 func (nc *NoopCollector) ExecutionSync(syncing bool)                                       {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                 {}
 func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)               {}
+func (nc *NoopCollector) ExecutionComputationResultUploaded()                              {}
+func (nc *NoopCollector) ExecutionComputationResultUploadRetried()                         {}
 func (nc *NoopCollector) RootIDComputed(duration time.Duration, numberOfChunks int)        {}
 func (nc *NoopCollector) AddBlobsSucceeded(duration time.Duration, totalSize uint64)       {}
 func (nc *NoopCollector) AddBlobsFailed()                                                  {}

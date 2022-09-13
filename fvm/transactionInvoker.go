@@ -218,8 +218,7 @@ func (i TransactionInvoker) deductTransactionFees(
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be
 	// dynamic.	Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
-	_, err = InvokeDeductTransactionFeesContract(
-		env,
+	_, err = env.DeductTransactionFees(
 		proc.Transaction.Payer,
 		inclusionEffort,
 		computationUsed)

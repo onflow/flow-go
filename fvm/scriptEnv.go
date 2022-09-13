@@ -59,6 +59,15 @@ func NewScriptEnvironment(
 			),
 			TransactionInfo: environment.NoTransactionInfo{},
 			EventEmitter:    environment.NoEventEmitter{},
+			ValueStore: environment.NewValueStore(
+				tracer,
+				meter,
+				accounts),
+			ContractReader: environment.NewContractReader(
+				tracer,
+				meter,
+				accounts),
+			SystemContracts: NewSystemContracts(),
 			ctx:             fvmContext,
 			sth:             sth,
 			vm:              vm,
@@ -69,17 +78,11 @@ func NewScriptEnvironment(
 		},
 	}
 
+	env.SystemContracts.SetEnvironment(env)
+
 	// TODO(patrick): remove this hack
 	env.AccountInterface = env
 	env.fullEnv = env
-
-	env.contracts = handler.NewContractHandler(
-		accounts,
-		func() bool { return true },
-		func() bool { return true },
-		func() []common.Address { return []common.Address{} },
-		func() []common.Address { return []common.Address{} },
-		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
 	return env
 }

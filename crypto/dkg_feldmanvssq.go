@@ -127,9 +127,9 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 // - the finalized private key which is the current participant's own private key share
 // This is also a timeout to receiving all complaint answers
 // - the returned erorr is :
-//    - dkgFailureError if the dealer was disqualified.
-//    - other error if Start() was not called, or NextTimeout() was not called twice
-//    - nil otherwise.
+//   - dkgFailureError if the dealer was disqualified.
+//   - other error if Start() was not called, or NextTimeout() was not called twice
+//   - nil otherwise.
 func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
 		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.myIndex)

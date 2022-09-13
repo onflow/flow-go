@@ -4,22 +4,23 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	runtimeerrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/sema"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
 	fvmMock "github.com/onflow/flow-go/fvm/mock"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
-func TestContractInvoker(t *testing.T) {
+func TestSystemContractsInvoke(t *testing.T) {
 
 	type testCase struct {
 		name             string
@@ -105,29 +106,33 @@ func TestContractInvoker(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			invoker := fvm.NewContractFunctionInvoker(
-				common.AddressLocation{},
-				"functionName",
-				[]cadence.Value{},
-				[]sema.Type{},
-			)
-
 			env := &fvmMock.Environment{}
 			vm := &fvm.VirtualMachine{
 				Runtime: &TestInterpreterRuntime{
 					invokeContractFunction: tc.contractFunction,
 				},
 			}
-			vmCtx := fvm.NewContext()
+			logger := zerolog.Logger{}
+			chain := flow.Mainnet.Chain()
 
 			env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
 			env.On("VM").Return(vm)
-			env.On("Context").Return(&vmCtx)
+			env.On("Chain").Return(chain)
+			env.On("Logger").Return(&logger)
 			env.On("BorrowCadenceRuntime", mock.Anything).Return(
 				fvm.NewReusableCadenceRuntime())
 			env.On("ReturnCadenceRuntime", mock.Anything).Return()
 
-			value, err := invoker.Invoke(env)
+			invoker := fvm.NewSystemContracts()
+			invoker.SetEnvironment(env)
+			value, err := invoker.Invoke(
+				fvm.ContractFunctionSpec{
+					AddressFromChain: func(_ flow.Chain) flow.Address {
+						return flow.Address{}
+					},
+					FunctionName: "functionName",
+				},
+				[]cadence.Value{})
 
 			tc.require(t, value, err)
 		})

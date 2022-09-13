@@ -9,11 +9,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestStoreAndRetrieval_Without_Ejection checks health of heroPool for storing and retrieval scenarios that
+// TestStoreAndRetrieval_BelowLimit checks health of heroPool for storing and retrieval scenarios that
 // do not involve ejection.
 // The test involves cases for testing the pool below its limit, and also up to its limit. However, it never gets beyond
 // the limit, so no ejection will kick-in.
-func TestStoreAndRetrieval_Without_Ejection(t *testing.T) {
+func TestStoreAndRetrieval_BelowLimit(t *testing.T) {
 	for _, tc := range []struct {
 		limit       uint32 // capacity of entity list
 		entityCount uint32 // total entities to be stored
@@ -45,6 +45,40 @@ func TestStoreAndRetrieval_Without_Ejection(t *testing.T) {
 				},
 				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 					testRetrievingEntitiesFrom(t, pool, entities, 0)
+				},
+			}...,
+			)
+		})
+	}
+}
+
+// TestStoreAndRetrieval_With_No_Ejection checks health of heroPool for storing and retrieval scenarios that involves the NoEjection mode.
+func TestStoreAndRetrieval_With_No_Ejection(t *testing.T) {
+	for _, tc := range []struct {
+		limit       uint32 // capacity of pool
+		entityCount uint32 // total entities to be stored
+	}{
+		{
+			limit:       30,
+			entityCount: 31,
+		},
+		{
+			limit:       30,
+			entityCount: 100,
+		},
+		{
+			limit:       1000,
+			entityCount: 2000,
+		},
+	} {
+		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
+			withTestScenario(t, tc.limit, tc.entityCount, NoEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
+				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+					testAddingEntities(t, pool, entities, NoEjection)
+				},
+				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+					// with the NoEjection mode, only the first "limit" entities must be retrievable.
+					testRetrievingEntitiesInRange(t, pool, entities, 0, EIndex(tc.limit))
 				},
 			}...,
 			)
@@ -391,20 +425,63 @@ func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
 
 // testAddingEntities evaluates health of pool for storing new elements.
 func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.MockEntity, ejectionMode EjectionMode) {
+	// initially head must be empty
+	e, ok := pool.Head()
+	require.False(t, ok)
+	require.Nil(t, e)
+
 	// adding elements
 	for i, e := range entitiesToBeAdded {
 		// adding each element must be successful.
-		pool.Add(e.ID(), e, uint64(i))
+		entityIndex, slotAvailable, ejectionHappened := pool.Add(e.ID(), e, uint64(i))
 
 		if i < len(pool.poolEntities) {
 			// in case of no over limit, size of entities linked list should be incremented by each addition.
 			require.Equal(t, pool.Size(), uint32(i+1))
+
+			require.True(t, slotAvailable)
+			require.False(t, ejectionHappened)
+			require.Equal(t, entityIndex, EIndex(i))
+
+			// in case pool is not full, the head should retrieve the first added entity.
+			headEntity, headExists := pool.Head()
+			require.True(t, headExists)
+			require.Equal(t, headEntity.ID(), entitiesToBeAdded[0].ID())
 		}
 
 		if ejectionMode == LRUEjection {
 			// under LRU ejection mode, new entity should be placed at index i in back data
 			_, entity, _ := pool.Get(EIndex(i % len(pool.poolEntities)))
 			require.Equal(t, e, entity)
+
+			if i >= len(pool.poolEntities) {
+				require.True(t, slotAvailable)
+				require.True(t, ejectionHappened)
+				// when pool is full and with LRU ejection, the head should move forward with each element added.
+				headEntity, headExists := pool.Head()
+				require.True(t, headExists)
+				require.Equal(t, headEntity.ID(), entitiesToBeAdded[i+1-len(pool.poolEntities)].ID())
+			}
+		}
+
+		if ejectionMode == RandomEjection {
+			if i >= len(pool.poolEntities) {
+				require.True(t, slotAvailable)
+				require.True(t, ejectionHappened)
+			}
+		}
+
+		if ejectionMode == NoEjection {
+			if i >= len(pool.poolEntities) {
+				require.False(t, slotAvailable)
+				require.False(t, ejectionHappened)
+				require.Equal(t, entityIndex, EIndex(0))
+
+				// when pool is full and with NoEjection, the head must keep pointing to the first added element.
+				headEntity, headExists := pool.Head()
+				require.True(t, headExists)
+				require.Equal(t, headEntity.ID(), entitiesToBeAdded[0].ID())
+			}
 		}
 
 		// underlying linked-lists sanity check
@@ -424,10 +501,19 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			require.True(t, usedHead.node.prev.isUndefined())
 		}
 
-		// new entity must be successfully added to tail of used linked-list
-		require.Equal(t, entitiesToBeAdded[i], usedTail.entity)
-		// used tail must be healthy and point back to undefined.
-		require.True(t, usedTail.node.next.isUndefined())
+		if ejectionMode != NoEjection || i < len(pool.poolEntities) {
+			// new entity must be successfully added to tail of used linked-list
+			require.Equal(t, entitiesToBeAdded[i], usedTail.entity)
+			// used tail must be healthy and point back to undefined.
+			require.True(t, usedTail.node.next.isUndefined())
+		}
+
+		if ejectionMode == NoEjection && i >= len(pool.poolEntities) {
+			// used tail must not move
+			require.Equal(t, entitiesToBeAdded[len(pool.poolEntities)-1], usedTail.entity)
+			// used tail must be healthy and point back to undefined.
+			require.True(t, usedTail.node.next.isUndefined())
+		}
 
 		// free head
 		if i < len(pool.poolEntities)-1 {
@@ -507,10 +593,15 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 
 // testRetrievingEntitiesFrom evaluates that all entities starting from given index are retrievable from pool.
 func testRetrievingEntitiesFrom(t *testing.T, pool *Pool, entities []*unittest.MockEntity, from EIndex) {
-	for i := from; i < EIndex(len(entities)); i++ {
+	testRetrievingEntitiesInRange(t, pool, entities, from, EIndex(len(entities)))
+}
+
+// testRetrievingEntitiesInRange evaluates that all entities in the given range are retrievable from pool.
+func testRetrievingEntitiesInRange(t *testing.T, pool *Pool, entities []*unittest.MockEntity, from EIndex, to EIndex) {
+	for i := from; i < to; i++ {
 		actualID, actual, _ := pool.Get(i % EIndex(len(pool.poolEntities)))
-		require.Equal(t, entities[i].ID(), actualID)
-		require.Equal(t, entities[i], actual)
+		require.Equal(t, entities[i].ID(), actualID, i)
+		require.Equal(t, entities[i], actual, i)
 	}
 }
 
