@@ -76,7 +76,6 @@ func (vm *VirtualMachine) RunV2(
 		WithMemoryLimit(proc.MemoryLimit(ctx))
 
 	meterParams, err := getEnvironmentMeterParameters(
-		vm,
 		ctx,
 		v,
 		blockPrograms,
@@ -114,7 +113,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
 	)
 
-	account, err := getAccount(vm, ctx, stTxn, programs, address)
+	account, err := getAccount(ctx, stTxn, programs, address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {
 			return nil, fmt.Errorf("cannot get account, this error usually happens if the reference block for this query is not set to a recent block: %w", err)

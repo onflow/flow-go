@@ -31,7 +31,6 @@ type TransactionEnv struct {
 
 func NewTransactionEnvironment(
 	ctx Context,
-	vm *VirtualMachine,
 	sth *state.StateHolder,
 	programs handler.TransactionPrograms,
 	tx *flow.TransactionBody,

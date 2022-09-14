@@ -126,7 +126,7 @@ func (i ScriptInvoker) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-	env := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, programs)
+	env := NewScriptEnvironment(proc.RequestContext, ctx, sth, programs)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)

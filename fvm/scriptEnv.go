@@ -22,7 +22,6 @@ type ScriptEnv struct {
 func NewScriptEnvironment(
 	reqContext context.Context,
 	fvmContext Context,
-	vm *VirtualMachine,
 	sth *state.StateHolder,
 	programs handler.TransactionPrograms,
 ) *ScriptEnv {
