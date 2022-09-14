@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/encoding"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -47,6 +48,7 @@ type Context struct {
 	Logger                        zerolog.Logger
 	ReusableCadenceRuntimePool    reusableRuntime.ReusableCadenceRuntimePool
 	BlockPrograms                 *programs.Programs
+	Codec                         encoding.Codec
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -340,6 +342,14 @@ func WithReusableCadenceRuntimePool(
 func WithBlockPrograms(programs *programs.Programs) Option {
 	return func(ctx Context) Context {
 		ctx.BlockPrograms = programs
+		return ctx
+	}
+}
+
+// WithCodec sets the codec for encoding and decoding Cadence values
+func WithCodec(codec encoding.Codec) Option {
+	return func(ctx Context) Context {
+		ctx.Codec = codec
 		return ctx
 	}
 }

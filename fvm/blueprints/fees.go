@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
@@ -65,20 +66,21 @@ func SetupParametersTransaction(
 	minimumStorageReservation,
 	storagePerFlow cadence.UFix64,
 	restrictedAccountCreationEnabled cadence.Bool,
+	codec encoding.Codec,
 ) *flow.TransactionBody {
-	addressCreationFeeArg, err := jsoncdc.Encode(addressCreationFee)
+	addressCreationFeeArg, err := codec.Encode(addressCreationFee)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode address creation fee: %s", err.Error()))
 	}
-	minimumStorageReservationArg, err := jsoncdc.Encode(minimumStorageReservation)
+	minimumStorageReservationArg, err := codec.Encode(minimumStorageReservation)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode minimum storage reservation: %s", err.Error()))
 	}
-	storagePerFlowArg, err := jsoncdc.Encode(storagePerFlow)
+	storagePerFlowArg, err := codec.Encode(storagePerFlow)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode storage ratio: %s", err.Error()))
 	}
-	restrictedAccountCreationEnabledArg, err := jsoncdc.Encode(restrictedAccountCreationEnabled)
+	restrictedAccountCreationEnabledArg, err := codec.Encode(restrictedAccountCreationEnabled)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode restrictedAccountCreationEnabled: %s", err.Error()))
 	}
@@ -121,16 +123,17 @@ func SetupFeesTransaction(
 	surgeFactor,
 	inclusionEffortCost,
 	executionEffortCost cadence.UFix64,
+	codec encoding.Codec,
 ) *flow.TransactionBody {
-	surgeFactorArg, err := jsoncdc.Encode(surgeFactor)
+	surgeFactorArg, err := codec.Encode(surgeFactor)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode surge factor: %s", err.Error()))
 	}
-	inclusionEffortCostArg, err := jsoncdc.Encode(inclusionEffortCost)
+	inclusionEffortCostArg, err := codec.Encode(inclusionEffortCost)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode inclusion effort cost: %s", err.Error()))
 	}
-	executionEffortCostArg, err := jsoncdc.Encode(executionEffortCost)
+	executionEffortCostArg, err := codec.Encode(executionEffortCost)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode execution effort cost: %s", err.Error()))
 	}

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
@@ -132,6 +132,10 @@ func newCommonEnv(
 	}
 }
 
+func (env *commonEnv) Context() Context {
+	return env.ctx
+}
+
 func (env *commonEnv) Chain() flow.Chain {
 	return env.ctx.Chain
 }
@@ -180,13 +184,27 @@ func (env *commonEnv) SetProgram(location common.Location, program *interpreter.
 	return nil
 }
 
-func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, error) {
+func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (v cadence.Value, err error) {
 	defer env.StartExtensiveTracingSpanFromRoot(trace.FVMEnvDecodeArgument).End()
 
-	v, err := jsoncdc.Decode(env, b)
+	v, err = env.Context().Codec.Decode(env, b)
+
 	if err != nil {
-		err = errors.NewInvalidArgumentErrorf("argument is not json decodable: %w", err)
-		return nil, fmt.Errorf("decodeing argument failed: %w", err)
+		err = fmt.Errorf("decoding argument failed: %w", errors.NewInvalidArgumentErrorf("argument is not decodable: %w", err))
+	}
+
+	return
+}
+func (env *commonEnv) Hash(
+	data []byte,
+	tag string,
+	hashAlgorithm runtime.HashAlgorithm,
+) ([]byte, error) {
+	defer env.StartSpanFromRoot(trace.FVMEnvHash).End()
+
+	err := env.Meter(meter.ComputationKindHash, 1)
+	if err != nil {
+		return nil, fmt.Errorf("hash failed: %w", err)
 	}
 
 	return v, err

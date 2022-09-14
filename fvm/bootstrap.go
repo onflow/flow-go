@@ -523,7 +523,7 @@ func (b *BootstrapProcedure) deployEpoch(service, fungibleToken, flowToken, flow
 	txError, err := b.invokeMetaTransaction(
 		context,
 		Transaction(
-			blueprints.DeployEpochTransaction(service, contract, b.epochConfig),
+			blueprints.DeployEpochTransaction(service, contract, b.epochConfig, b.ctx.Codec),
 			0,
 		),
 		b.sth,
@@ -565,7 +565,9 @@ func (b *BootstrapProcedure) mintInitialTokens(
 				fungibleToken,
 				flowToken,
 				service,
-				initialSupply),
+				initialSupply,
+				b.ctx.Codec,
+			),
 			0),
 		b.sth,
 		b.programs,
@@ -589,6 +591,7 @@ func (b *BootstrapProcedure) setupParameters(
 				minimumStorageReservation,
 				storagePerFlow,
 				restrictedAccountCreationEnabled,
+				b.ctx.Codec,
 			),
 			0),
 		b.sth,
@@ -607,6 +610,7 @@ func (b *BootstrapProcedure) setupFees(service, flowFees flow.Address, surgeFact
 				surgeFactor,
 				inclusionEffortCost,
 				executionEffortCost,
+				b.ctx.Codec,
 			),
 			0),
 		b.sth,
@@ -721,6 +725,7 @@ func (b *BootstrapProcedure) setStakingAllowlist(service flow.Address, allowedID
 			blueprints.SetStakingAllowlistTransaction(
 				service,
 				allowedIDs,
+				b.ctx.Codec,
 			),
 			0),
 		b.sth,
@@ -811,7 +816,7 @@ func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fu
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployLockedTokensTransaction(service, contract, publicKeys),
+			blueprints.DeployLockedTokensTransaction(service, contract, publicKeys, b.ctx.Codec),
 			0,
 		),
 		b.sth,

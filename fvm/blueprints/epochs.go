@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
@@ -34,7 +35,7 @@ var fundAccountTemplate string
 var deployLockedTokensTemplate string
 
 // DeployEpochTransaction returns the transaction body for the deploy epoch transaction
-func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig) *flow.TransactionBody {
+func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig, codec encoding.Codec) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(
 			templates.ReplaceAddresses(
@@ -44,15 +45,15 @@ func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig e
 				},
 			),
 		)).
-		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
-		AddArgument(jsoncdc.MustEncode(epochConfig.CurrentEpochCounter)).
-		AddArgument(jsoncdc.MustEncode(epochConfig.NumViewsInEpoch)).
-		AddArgument(jsoncdc.MustEncode(epochConfig.NumViewsInStakingAuction)).
-		AddArgument(jsoncdc.MustEncode(epochConfig.NumViewsInDKGPhase)).
-		AddArgument(jsoncdc.MustEncode(epochConfig.NumCollectorClusters)).
-		AddArgument(jsoncdc.MustEncode(epochConfig.FLOWsupplyIncreasePercentage)).
-		AddArgument(jsoncdc.MustEncode(epochConfig.RandomSource)).
-		AddArgument(epochs.EncodeClusterAssignments(epochConfig.CollectorClusters)).
+		AddArgument(codec.MustEncode(cadence.String(hex.EncodeToString(contract)))).
+		AddArgument(codec.MustEncode(epochConfig.CurrentEpochCounter)).
+		AddArgument(codec.MustEncode(epochConfig.NumViewsInEpoch)).
+		AddArgument(codec.MustEncode(epochConfig.NumViewsInStakingAuction)).
+		AddArgument(codec.MustEncode(epochConfig.NumViewsInDKGPhase)).
+		AddArgument(codec.MustEncode(epochConfig.NumCollectorClusters)).
+		AddArgument(codec.MustEncode(epochConfig.FLOWsupplyIncreasePercentage)).
+		AddArgument(codec.MustEncode(epochConfig.RandomSource)).
+		AddArgument(epochs.EncodeClusterAssignments(epochConfig.CollectorClusters, codec)).
 		AddAuthorizer(service)
 }
 
@@ -112,13 +113,13 @@ func FundAccountTransaction(
 }
 
 // DeployLockedTokensTransaction returns the transaction body for the deploy locked tokens transaction
-func DeployLockedTokensTransaction(service flow.Address, contract []byte, publicKeys []cadence.Value) *flow.TransactionBody {
+func DeployLockedTokensTransaction(service flow.Address, contract []byte, publicKeys []cadence.Value, codec encoding.Codec) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(
 			deployLockedTokensTemplate,
 		)).
-		AddArgument(jsoncdc.MustEncode(cadence.NewArray(publicKeys))).
-		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
+		AddArgument(codec.MustEncode(cadence.NewArray(publicKeys))).
+		AddArgument(codec.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(service)
 }
 
@@ -199,7 +200,7 @@ func RegisterNodeTransaction(
 }
 
 // SetStakingAllowlistTransaction returns transaction body for set staking allowlist transaction
-func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNodeIDs []flow.Identifier) *flow.TransactionBody {
+func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNodeIDs []flow.Identifier, codec encoding.Codec) *flow.TransactionBody {
 	env := templates.Environment{
 		IDTableAddress: idTableStakingAddr.HexWithPrefix(),
 	}
@@ -215,7 +216,7 @@ func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNode
 
 	return flow.NewTransactionBody().
 		SetScript(templates.GenerateSetApprovedNodesScript(env)).
-		AddArgument(jsoncdc.MustEncode(cadence.NewArray(cdcNodeIDs))).
+		AddArgument(codec.MustEncode(cadence.NewArray(cdcNodeIDs))).
 		AddAuthorizer(idTableStakingAddr)
 }
 

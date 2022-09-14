@@ -2,8 +2,7 @@ package epochs
 
 import (
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-
+	"github.com/onflow/cadence/encoding"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -45,7 +44,7 @@ func DefaultEpochConfig() EpochConfig {
 // The resulting argument has type [{String: UInt64}] which represents a list
 // of weight mappings for each cluster. The full Cluster struct is constructed
 // within the transaction in Cadence for simplicity here.
-func EncodeClusterAssignments(clusterAssignments flow.AssignmentList) []byte {
+func EncodeClusterAssignments(clusterAssignments flow.AssignmentList, codec encoding.Codec) []byte {
 
 	weightMappingPerCluster := []cadence.Value{}
 	for _, cluster := range clusterAssignments {
@@ -67,5 +66,5 @@ func EncodeClusterAssignments(clusterAssignments flow.AssignmentList) []byte {
 	}
 
 	asArray := cadence.NewArray(weightMappingPerCluster)
-	return jsoncdc.MustEncode(asArray)
+	return codec.MustEncode(asArray)
 }

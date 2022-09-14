@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -58,8 +58,9 @@ func CreateFlowTokenMinterTransaction(service, flowToken flow.Address) *flow.Tra
 func MintFlowTokenTransaction(
 	fungibleToken, flowToken, service flow.Address,
 	initialSupply cadence.UFix64,
+	codec encoding.Codec,
 ) *flow.TransactionBody {
-	initialSupplyArg, err := jsoncdc.Encode(initialSupply)
+	initialSupplyArg, err := codec.Encode(initialSupply)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))
 	}
