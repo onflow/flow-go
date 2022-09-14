@@ -421,7 +421,10 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 }
 
 // fetchExecutionData fetches the ExecutionData by its ID, and times out if fetchTimeout is exceeded
-// TODO(state-sync): error docs
+//
+//	TODO(state-sync): error docs
+//	  The error conditions from Download are handled one level up in processFetchRequest.
+//	  Since we do not handle the errors here, we must also document the errors this function can propagate up from Download
 func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier, fetchTimeout time.Duration) (*execution_data.BlockExecutionData, error) {
 	ctx, cancel := context.WithTimeout(signalerCtx, fetchTimeout)
 	defer cancel()
@@ -431,7 +434,6 @@ func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.Si
 	// the data is received
 	executionData, err := e.downloader.Download(ctx, executionDataID)
 
-	// TODO(state-sync): handle expected / unexpected errors expicitly
 	if err != nil {
 		return nil, err
 	}

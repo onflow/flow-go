@@ -113,8 +113,13 @@ func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerC
 	ctx, cancel := context.WithTimeout(signalCtx, r.fetchTimeout)
 	defer cancel()
 
+	//  TODO(state-sync): handle expected / unexpected errors explicitly
+	//    For example, Download may return MalformedDataError, BlobNotFoundError, BlobSizeLimitExceededError.
+	//    We do not differentiate between these expected errors, and unexpected errors here.
+	//    Ultimately, this will *currently* result only in an error being logged further up the stack,
+	//    because the jobqueue also does not correctly handle unexpected errors.
+	//    However, avoiding a crash here is depending on the jobqueue being non-conformant with error handling proctices.
 	executionData, err := r.downloader.Download(ctx, result.ExecutionDataID)
-	// TODO(state-sync): handle expected / unexpected errors expicitly
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data for block %s: %w", header.ID(), err)
