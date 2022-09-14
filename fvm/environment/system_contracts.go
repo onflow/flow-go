@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -24,15 +23,25 @@ type ContractFunctionSpec struct {
 // SystemContracts provides methods for invoking system contract functions as
 // service account.
 type SystemContracts struct {
-	env Environment
+	chain flow.Chain
+
+	tracer  *Tracer
+	logger  *ProgramLogger
+	runtime *Runtime
 }
 
-func NewSystemContracts() *SystemContracts {
-	return &SystemContracts{}
-}
-
-func (sys *SystemContracts) SetEnvironment(env Environment) {
-	sys.env = env
+func NewSystemContracts(
+	chain flow.Chain,
+	tracer *Tracer,
+	logger *ProgramLogger,
+	runtime *Runtime,
+) *SystemContracts {
+	return &SystemContracts{
+		chain:   chain,
+		tracer:  tracer,
+		logger:  logger,
+		runtime: runtime,
+	}
 }
 
 func (sys *SystemContracts) Invoke(
@@ -43,19 +52,19 @@ func (sys *SystemContracts) Invoke(
 	error,
 ) {
 	contractLocation := common.AddressLocation{
-		Address: common.Address(spec.AddressFromChain(sys.env.Chain())),
+		Address: common.Address(spec.AddressFromChain(sys.chain)),
 		Name:    spec.LocationName,
 	}
 
-	span := sys.env.StartSpanFromRoot(trace.FVMInvokeContractFunction)
+	span := sys.tracer.StartSpanFromRoot(trace.FVMInvokeContractFunction)
 	span.SetAttributes(
 		attribute.String(
 			"transaction.ContractFunctionCall",
 			contractLocation.String()+"."+spec.FunctionName))
 	defer span.End()
 
-	runtime := sys.env.BorrowCadenceRuntime()
-	defer sys.env.ReturnCadenceRuntime(runtime)
+	runtime := sys.runtime.BorrowCadenceRuntime()
+	defer sys.runtime.ReturnCadenceRuntime(runtime)
 
 	value, err := runtime.InvokeContractFunction(
 		contractLocation,
@@ -64,9 +73,7 @@ func (sys *SystemContracts) Invoke(
 		spec.ArgumentTypes,
 	)
 	if err != nil {
-		// this is an error coming from Cadendce runtime, so it must be handled first.
-		err = errors.HandleRuntimeError(err)
-		sys.env.Logger().
+		sys.logger.Logger().
 			Info().
 			Err(err).
 			Str("contract", contractLocation.String()).

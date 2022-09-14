@@ -2,6 +2,7 @@ package validator
 
 import (
 	"errors"
+	"fmt"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -20,63 +21,70 @@ var (
 
 type GetIdentityFunc func(peer.ID) (*flow.Identity, bool)
 
-// AuthorizedSenderValidator returns a MessageValidator that will check if the sender of a message is authorized to send the message.
-// The MessageValidator returned will use the getIdentity to get the flow identity for the sender, asserting that the sender is a staked node and not ejected. Otherwise, the message is rejected.
-// The message is also authorized by checking that the sender is allowed to send the message on the channel.
-// If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
-// Authorization config is defined in message.MsgAuthConfig.
-func AuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, channel channels.Channel, isUnicast bool, getIdentity GetIdentityFunc) MessageValidator {
-	return func(from peer.ID, msg interface{}) (string, error) {
-		// NOTE: messages from unstaked nodes should be rejected by the libP2P node topic validator
-		// before they reach message validators. If a message from a unstaked peer gets to this point
-		// something terrible went wrong.
-		identity, ok := getIdentity(from)
-		if !ok {
-			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), Channel: channel, IsUnicast: isUnicast, Err: ErrIdentityUnverified}
-			slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
-			return "", ErrIdentityUnverified
-		}
+// AuthorizedSenderValidator performs message authorization validation.
+type AuthorizedSenderValidator struct {
+	log                        zerolog.Logger
+	slashingViolationsConsumer slashing.ViolationsConsumer
+	getIdentity                GetIdentityFunc
+}
 
-		msgType, err := isAuthorizedSender(identity, channel, msg)
-
-		switch {
-		case err == nil:
-			return msgType, nil
-		case message.IsUnknownMsgTypeErr(err):
-			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
-			slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
-			return msgType, err
-		case errors.Is(err, message.ErrUnauthorizedMessageOnChannel) || errors.Is(err, message.ErrUnauthorizedRole):
-			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
-			slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
-			return msgType, err
-		case errors.Is(err, ErrSenderEjected):
-			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
-			slashingViolationsConsumer.OnSenderEjectedError(violation)
-			return msgType, ErrSenderEjected
-		default:
-			// this condition should never happen and indicates there's a bug
-			// don't crash as a result of external inputs since that creates a DoS vector
-			log.Error().
-				Err(err).
-				Str("peer_id", from.String()).
-				Str("role", identity.Role.String()).
-				Str("peer_node_id", identity.NodeID.String()).
-				Str("message_type", msgType).
-				Bool("unicast_message", isUnicast).
-				Msg("unexpected error during message validation")
-			return msgType, err
-		}
+// NewAuthorizedSenderValidator returns a new AuthorizedSenderValidator
+func NewAuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, getIdentity GetIdentityFunc) *AuthorizedSenderValidator {
+	return &AuthorizedSenderValidator{
+		log:                        log.With().Str("component", "authorized_sender_validator").Logger(),
+		slashingViolationsConsumer: slashingViolationsConsumer,
+		getIdentity:                getIdentity,
 	}
 }
 
-// AuthorizedSenderMessageValidator wraps the callback returned by AuthorizedSenderValidator and returns
-// MessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
-func AuthorizedSenderMessageValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, channel channels.Channel, getIdentity GetIdentityFunc) PubSubMessageValidator {
-	return func(from peer.ID, msg interface{}) pubsub.ValidationResult {
-		validate := AuthorizedSenderValidator(log, slashingViolationsConsumer, channel, false, getIdentity)
+// Validate will check if the sender of a message is authorized to send the message.
+// Using the getIdentity to get the flow identity for the sender, asserting that the sender is a staked node and not ejected.
+// Otherwise, the message is rejected. The message is also authorized by checking that the sender is allowed to send the message on the channel.
+// If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
+// Authorization config is defined in message.MsgAuthConfig.
+func (av *AuthorizedSenderValidator) Validate(from peer.ID, msg interface{}, channel channels.Channel, isUnicast bool) (string, error) {
+	// NOTE: messages from unstaked nodes should be rejected by the libP2P node topic validator
+	// before they reach message validators. If a message from a unstaked peer gets to this point
+	// something terrible went wrong.
+	identity, ok := av.getIdentity(from)
+	if !ok {
+		violation := &slashing.Violation{Identity: identity, PeerID: from.String(), Channel: channel, IsUnicast: isUnicast, Err: ErrIdentityUnverified}
+		av.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
+		return "", ErrIdentityUnverified
+	}
 
-		_, err := validate(from, msg)
+	msgType, err := av.isAuthorizedSender(identity, channel, msg)
+
+	switch {
+	case err == nil:
+		return msgType, nil
+	case message.IsUnknownMsgTypeErr(err):
+		violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
+		av.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+		return msgType, err
+	case errors.Is(err, message.ErrUnauthorizedMessageOnChannel) || errors.Is(err, message.ErrUnauthorizedRole):
+		violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
+		av.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
+		return msgType, err
+	case errors.Is(err, ErrSenderEjected):
+		violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
+		av.slashingViolationsConsumer.OnSenderEjectedError(violation)
+		return msgType, ErrSenderEjected
+	default:
+		// this condition should never happen and indicates there's a bug
+		// don't crash as a result of external inputs since that creates a DoS vector
+		// collect slashing data because this could potentially lead to slashing
+		err = fmt.Errorf("unexpected error during message validation: %w", err)
+		violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
+		av.slashingViolationsConsumer.OnUnexpectedError(violation)
+		return msgType, err
+	}
+}
+
+// PubSubMessageValidator wraps Validate and returns PubSubMessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
+func (av *AuthorizedSenderValidator) PubSubMessageValidator(channel channels.Channel) PubSubMessageValidator {
+	return func(from peer.ID, msg interface{}) pubsub.ValidationResult {
+		_, err := av.Validate(from, msg, channel, false)
 		if err != nil {
 			return pubsub.ValidationReject
 		}
@@ -96,7 +104,7 @@ func AuthorizedSenderMessageValidator(log zerolog.Logger, slashingViolationsCons
 //   - message.ErrUnknownMsgType if message auth config us not found for the msg
 //   - message.ErrUnauthorizedMessageOnChannel if msg is not authorized to be sent on channel
 //   - message.ErrUnauthorizedRole if sender role is not authorized to send msg
-func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}) (string, error) {
+func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}) (string, error) {
 	if identity.Ejected {
 		return "", ErrSenderEjected
 	}

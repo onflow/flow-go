@@ -41,6 +41,29 @@ func (_m *VirtualMachine) GetAccount(_a0 fvm.Context, _a1 flow.Address, _a2 stat
 	return r0, r1
 }
 
+// GetAccountV2 provides a mock function with given fields: _a0, _a1, _a2
+func (_m *VirtualMachine) GetAccountV2(_a0 fvm.Context, _a1 flow.Address, _a2 state.View) (*flow.Account, error) {
+	ret := _m.Called(_a0, _a1, _a2)
+
+	var r0 *flow.Account
+	if rf, ok := ret.Get(0).(func(fvm.Context, flow.Address, state.View) *flow.Account); ok {
+		r0 = rf(_a0, _a1, _a2)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Account)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(fvm.Context, flow.Address, state.View) error); ok {
+		r1 = rf(_a0, _a1, _a2)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Run provides a mock function with given fields: _a0, _a1, _a2, _a3
 func (_m *VirtualMachine) Run(_a0 fvm.Context, _a1 fvm.Procedure, _a2 state.View, _a3 *programs.Programs) error {
 	ret := _m.Called(_a0, _a1, _a2, _a3)

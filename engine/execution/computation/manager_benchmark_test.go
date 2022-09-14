@@ -132,7 +132,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), tracer, zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(b, err)
 
-	programsCache, err := NewProgramsCache(1000)
+	programsCache, err := programs.NewChainPrograms(
+		programs.DefaultProgramsCacheSize)
 	require.NoError(b, err)
 
 	engine := &Manager{

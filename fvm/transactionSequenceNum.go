@@ -18,8 +18,7 @@ func NewTransactionSequenceNumberChecker() *TransactionSequenceNumberChecker {
 }
 
 func (c *TransactionSequenceNumberChecker) Process(
-	_ *VirtualMachine,
-	ctx *Context,
+	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	_ *programs.Programs,
@@ -29,7 +28,7 @@ func (c *TransactionSequenceNumberChecker) Process(
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	proc *TransactionProcedure,
-	ctx *Context,
+	ctx Context,
 	sth *state.StateHolder,
 ) error {
 
