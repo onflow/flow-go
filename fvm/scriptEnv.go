@@ -43,10 +43,10 @@ func NewScriptEnvironment(
 	env.EventEmitter = environment.NoEventEmitter{}
 	env.AccountCreator = environment.NoAccountCreator{}
 	env.AccountFreezer = environment.NoAccountFreezer{}
-	env.SystemContracts.SetEnvironment(env)
-
 	env.ContractUpdater = handler.NoContractUpdater{}
 	env.AccountKeyUpdater = handler.NoAccountKeyUpdater{}
+
+	env.Runtime.SetEnvironment(env)
 
 	// TODO(patrick): remove this hack
 	env.fullEnv = env
