@@ -331,9 +331,6 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	// submit the model to hotstuff for processing
 	log.Info().Msg("forwarding block proposal to hotstuff")
 
-	// when the block is in range response, we should wait for hotstuff to finish processing the block,
-	// otherwise processing the next block might fail because the current block hasn't been added
-	// to protocol state yet.
 	c.hotstuff.SubmitProposal(header, parent.View)
 
 	return nil
