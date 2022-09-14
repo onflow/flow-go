@@ -230,19 +230,17 @@ func (f *LevelledForest) getOrCreateVertexContainer(id flow.Identifier, level ui
 
 // VerifyVertex verifies that adding vertex `v` would yield a valid Levelled Forest.
 // Specifically, we verify that _all_ of the following conditions are satisfied:
-// (1) `v.Level()` must be strictly larger than the level that `v` reports
 //
-//	for its parent (maintains an acyclic graph).
+//  1. `v.Level()` must be strictly larger than the level that `v` reports
+//     for its parent (maintains an acyclic graph).
 //
-// (2) If a vertex with the same ID as `v.VertexID()` exists in the graph or is
+//  2. If a vertex with the same ID as `v.VertexID()` exists in the graph or is
+//     referenced by another vertex within the graph, the level must be identical.
+//     (In other words, we don't have vertices with the same ID but different level)
 //
-//	referenced by another vertex within the graph, the level must be identical.
-//	(In other words, we don't have vertices with the same ID but different level)
-//
-// (3) Let `ParentLevel`, `ParentID` denote the level, ID that `v` reports for its parent.
-//
-//	If a vertex with `ParentID` exists (or is referenced by other vertices as their parent),
-//	we require that the respective level is identical to `ParentLevel`.
+//  3. Let `ParentLevel`, `ParentID` denote the level, ID that `v` reports for its parent.
+//     If a vertex with `ParentID` exists (or is referenced by other vertices as their parent),
+//     we require that the respective level is identical to `ParentLevel`.
 //
 // Notes:
 //   - If `v.Level()` has already been pruned, adding it to the forest is a NoOp.
