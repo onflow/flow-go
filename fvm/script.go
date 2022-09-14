@@ -139,7 +139,7 @@ func (i ScriptInvoker) Process(
 		common.ScriptLocation(proc.ID))
 
 	if err != nil {
-		return errors.HandleRuntimeError(err)
+		return err
 	}
 
 	proc.Value = value

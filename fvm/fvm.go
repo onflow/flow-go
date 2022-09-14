@@ -101,12 +101,7 @@ func (vm *VirtualMachine) RunV2(
 			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
-	err = proc.Run(vm, ctx, stTxn, blockPrograms)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return proc.Run(vm, ctx, stTxn, blockPrograms)
 }
 
 // GetAccount returns an account by address or an error if none exists.
@@ -127,22 +122,4 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 		return nil, fmt.Errorf("cannot get account: %w", err)
 	}
 	return account, nil
-}
-
-// invokeMetaTransaction invokes a meta transaction inside the context of an outer transaction.
-//
-// Errors that occur in a meta transaction are propagated as a single error that can be
-// captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, stTxn *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
-	invoker := NewTransactionInvoker()
-
-	// do not deduct fees or check storage in meta transactions
-	ctx := NewContextFromParent(parentCtx,
-		WithAccountStorageLimit(false),
-		WithTransactionFeesEnabled(false),
-	)
-
-	err := invoker.Process(vm, &ctx, tx, stTxn, programs)
-	txErr, fatalErr := errors.SplitErrorTypes(err)
-	return txErr, fatalErr
 }

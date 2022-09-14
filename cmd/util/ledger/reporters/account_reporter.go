@@ -70,7 +70,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 		l,
 		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
 	)
-	gen := environment.NewAccountCreator(stTxn, r.Chain)
+	gen := environment.NewAddressGenerator(stTxn, r.Chain)
 
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
 

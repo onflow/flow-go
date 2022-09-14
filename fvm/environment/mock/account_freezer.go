@@ -29,6 +29,11 @@ func (_m *AccountFreezer) FrozenAccounts() []common.Address {
 	return r0
 }
 
+// Reset provides a mock function with given fields:
+func (_m *AccountFreezer) Reset() {
+	_m.Called()
+}
+
 // SetAccountFrozen provides a mock function with given fields: address, frozen
 func (_m *AccountFreezer) SetAccountFrozen(address common.Address, frozen bool) error {
 	ret := _m.Called(address, frozen)
