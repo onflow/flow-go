@@ -66,7 +66,7 @@ func (f *RoleBasedFilter) FilterIncomingSubscriptions(from peer.ID, opts []*pb.R
 	var filtered []*pb.RPC_SubOpts
 
 	for _, opt := range opts {
-		if f.allowed(role, opt.GetTopicid()) {
+		if AllowedSubscription(role, opt.GetTopicid()) {
 			filtered = append(filtered, opt)
 		}
 	}
