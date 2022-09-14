@@ -55,6 +55,7 @@ func (f *FollowerLogic) AddBlock(blockProposal *model.Proposal) error {
 			Hex("qc_block_id", logging.ID(blockProposal.Block.QC.BlockID)).
 			Uint64("block_view", blockProposal.Block.View).
 			Msg("proposal for unknown epoch")
+		return nil
 	} else if errors.Is(err, model.ErrUnverifiableBlock) {
 		f.log.Warn().
 			Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
