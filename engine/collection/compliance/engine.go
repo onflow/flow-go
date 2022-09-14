@@ -29,13 +29,13 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// defaultBlockQueueCapacity maximum capacity of block proposals queue
-const defaultBlockQueueCapacity = 10000
+// defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.ClusterBlockProposal`s
+const defaultBlockQueueCapacity = 10_000
 
-// defaultVoteQueueCapacity maximum capacity of block votes queue
+// defaultVoteQueueCapacity maximum capacity of inbound queue for `messages.ClusterBlockVote`s
 const defaultVoteQueueCapacity = 1000
 
-// defaultTimeoutObjectsQueueCapacity maximum capacity of timeout objects queue
+// defaultTimeoutObjectsQueueCapacity maximum capacity of inbound queue for `messages.ClusterTimeoutObject`s
 const defaultTimeoutObjectsQueueCapacity = 1000
 
 // Engine is a wrapper struct for `Core` which implements cluster consensus algorithm.

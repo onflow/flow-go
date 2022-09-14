@@ -28,10 +28,10 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// defaultRangeResponseQueueCapacity maximum capacity of block range responses queue
+// defaultRangeResponseQueueCapacity maximum capacity of inbound queue for `messages.BlockResponse`s
 const defaultRangeResponseQueueCapacity = 100
 
-// defaultBlockQueueCapacity maximum capacity of block proposals queue
+// defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
 const defaultBlockQueueCapacity = 10000
 
 // defaultVoteQueueCapacity maximum capacity of inbound queue for `messages.BlockVote`s
@@ -97,10 +97,7 @@ func NewEngine(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound block proposals: %w", err)
 	}
-
-	pendingBlocks := &engine.FifoMessageStore{
-		FifoQueue: blocksQueue,
-	}
+	pendingBlocks := &engine.FifoMessageStore{FifoQueue: blocksQueue}
 
 	// Inbound FIFO queue for `messages.BlockVote`s
 	votesQueue, err := fifoqueue.NewFifoQueue(
@@ -566,7 +563,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-// (1) Informs sealing.Core about finalization of respective block.
+// It informs sealing.Core about finalization of respective block.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
@@ -591,10 +588,10 @@ func (e *Engine) finalizationProcessingLoop() {
 
 // handleHotStuffError accepts the error channel from the HotStuff component and
 // crashes the node if any error is detected.
-// TODO: this function should be removed in favour of refactoring this engine and
 //
-//	the epochmgr engine to use the Component pattern, so that irrecoverable errors
-//	can be bubbled all the way to the node scaffold
+//	 TODO: this function should be removed in favour of refactoring this engine and
+//		 	 the epochmgr engine to use the Component pattern, so that irrecoverable errors
+//			 can be bubbled all the way to the node scaffold
 func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
 	for {
 		select {
