@@ -82,7 +82,6 @@ func NewTransactionEnvironment(
 		ctx.Chain.ServiceAddress(),
 		env.accounts,
 		env.TransactionInfo)
-	env.SystemContracts.SetEnvironment(env)
 	env.ContractUpdater = handler.NewContractUpdater(
 		tracer,
 		meter,
@@ -107,13 +106,14 @@ func NewTransactionEnvironment(
 		env.GetAccountsAuthorizedForContractRemoval,
 		env.useContractAuditVoucher,
 	)
-
 	env.AccountKeyUpdater = handler.NewAccountKeyUpdater(
 		tracer,
 		meter,
 		env.accounts,
 		sth,
 		env)
+
+	env.Runtime.SetEnvironment(env)
 
 	// TODO(patrick): rm this hack
 	env.fullEnv = env

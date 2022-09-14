@@ -8,15 +8,12 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	fvmMock "github.com/onflow/flow-go/fvm/environment/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/runtime/testutil"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/trace"
 )
 
 func TestSystemContractsInvoke(t *testing.T) {
@@ -57,22 +54,24 @@ func TestSystemContractsInvoke(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			env := &fvmMock.Environment{}
-			logger := zerolog.Logger{}
-			chain := flow.Mainnet.Chain()
-
-			env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
-			env.On("Chain").Return(chain)
-			env.On("Logger").Return(&logger)
-			env.On("BorrowCadenceRuntime", mock.Anything).Return(
-				reusableRuntime.NewReusableCadenceRuntime(
-					&testutil.TestInterpreterRuntime{
-						InvokeContractFunc: tc.contractFunction,
+			tracer := environment.NewTracer(nil, nil, false)
+			runtime := environment.NewRuntime(
+				reusableRuntime.NewCustomReusableCadenceRuntimePool(
+					0,
+					func() runtime.Runtime {
+						return &testutil.TestInterpreterRuntime{
+							InvokeContractFunc: tc.contractFunction,
+						}
 					}))
-			env.On("ReturnCadenceRuntime", mock.Anything).Return()
-
-			invoker := environment.NewSystemContracts()
-			invoker.SetEnvironment(env)
+			invoker := environment.NewSystemContracts(
+				flow.Mainnet.Chain(),
+				tracer,
+				environment.NewProgramLogger(
+					tracer,
+					zerolog.Logger{},
+					environment.NoopMetricsReporter{},
+					false),
+				runtime)
 			value, err := invoker.Invoke(
 				environment.ContractFunctionSpec{
 					AddressFromChain: func(_ flow.Chain) flow.Address {
