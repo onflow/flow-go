@@ -37,7 +37,7 @@ func (f *RoleBasedFilter) getRole(pid peer.ID) flow.Role {
 	return UnstakedRole
 }
 
-func (f *RoleBasedFilter) allowed(role flow.Role, topic string) bool {
+func AllowedSubscription(role flow.Role, topic string) bool {
 	channel, ok := channels.ChannelFromTopic(channels.Topic(topic))
 	if !ok {
 		return false
@@ -58,7 +58,7 @@ func (f *RoleBasedFilter) allowed(role flow.Role, topic string) bool {
 }
 
 func (f *RoleBasedFilter) CanSubscribe(topic string) bool {
-	return f.allowed(f.myRole, topic)
+	return AllowedSubscription(f.myRole, topic)
 }
 
 func (f *RoleBasedFilter) FilterIncomingSubscriptions(from peer.ID, opts []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error) {
