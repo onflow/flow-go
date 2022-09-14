@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 )
@@ -47,28 +46,10 @@ func NewScriptEnvironment(
 	env.SystemContracts.SetEnvironment(env)
 
 	env.ContractUpdater = handler.NoContractUpdater{}
+	env.AccountKeyUpdater = handler.NoAccountKeyUpdater{}
 
 	// TODO(patrick): remove this hack
-	env.accountKeys = handler.NewAccountKeyHandler(env.accounts)
 	env.fullEnv = env
 
 	return env
-}
-
-// Block Environment Functions
-
-func (e *ScriptEnv) AddEncodedAccountKey(_ runtime.Address, _ []byte) error {
-	return errors.NewOperationNotSupportedError("AddEncodedAccountKey")
-}
-
-func (e *ScriptEnv) RevokeEncodedAccountKey(_ runtime.Address, _ int) (publicKey []byte, err error) {
-	return nil, errors.NewOperationNotSupportedError("RevokeEncodedAccountKey")
-}
-
-func (e *ScriptEnv) AddAccountKey(_ runtime.Address, _ *runtime.PublicKey, _ runtime.HashAlgorithm, _ int) (*runtime.AccountKey, error) {
-	return nil, errors.NewOperationNotSupportedError("AddAccountKey")
-}
-
-func (e *ScriptEnv) RevokeAccountKey(_ runtime.Address, _ int) (*runtime.AccountKey, error) {
-	return nil, errors.NewOperationNotSupportedError("RevokeAccountKey")
 }

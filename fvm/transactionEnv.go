@@ -1,8 +1,6 @@
 package fvm
 
 import (
-	"fmt"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -15,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/trace"
 )
 
 var _ runtime.Interface = &TransactionEnv{}
@@ -111,8 +108,14 @@ func NewTransactionEnvironment(
 		env.useContractAuditVoucher,
 	)
 
+	env.AccountKeyUpdater = handler.NewAccountKeyUpdater(
+		tracer,
+		meter,
+		env.accounts,
+		sth,
+		env)
+
 	// TODO(patrick): rm this hack
-	env.accountKeys = handler.NewAccountKeyHandler(env.accounts)
 	env.fullEnv = env
 
 	return env
@@ -197,103 +200,4 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
 	return e.UseContractAuditVoucher(address, string(code[:]))
-}
-
-// AddEncodedAccountKey adds an encoded public key to an existing account.
-//
-// This function returns an error if the specified account does not exist or
-// if the key insertion fails.
-func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte) error {
-	defer e.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
-
-	err := e.MeterComputation(environment.ComputationKindAddEncodedAccountKey, 1)
-	if err != nil {
-		return fmt.Errorf("add encoded account key failed: %w", err)
-	}
-
-	// TODO do a call to track the computation usage and memory usage
-	e.sth.DisableAllLimitEnforcements() // don't enforce limit during adding a key
-	defer e.sth.EnableAllLimitEnforcements()
-
-	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
-	if err != nil {
-		return fmt.Errorf("add encoded account key failed: %w", err)
-	}
-
-	err = e.accountKeys.AddEncodedAccountKey(address, publicKey)
-
-	if err != nil {
-		return fmt.Errorf("add encoded account key failed: %w", err)
-	}
-	return nil
-}
-
-// RevokeEncodedAccountKey revokes a public key by index from an existing account.
-//
-// This function returns an error if the specified account does not exist, the
-// provided key is invalid, or if key revoking fails.
-func (e *TransactionEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
-	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
-
-	err = e.MeterComputation(environment.ComputationKindRevokeEncodedAccountKey, 1)
-	if err != nil {
-		return publicKey, fmt.Errorf("revoke encoded account key failed: %w", err)
-	}
-
-	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
-	if err != nil {
-		return nil, fmt.Errorf("revoke encoded account key failed: %w", err)
-	}
-
-	encodedKey, err := e.accountKeys.RemoveAccountKey(address, index)
-	if err != nil {
-		return nil, fmt.Errorf("revoke encoded account key failed: %w", err)
-	}
-
-	return encodedKey, nil
-}
-
-// AddAccountKey adds a public key to an existing account.
-//
-// This function returns an error if the specified account does not exist or
-// if the key insertion fails.
-func (e *TransactionEnv) AddAccountKey(
-	address runtime.Address,
-	publicKey *runtime.PublicKey,
-	hashAlgo runtime.HashAlgorithm,
-	weight int,
-) (
-	*runtime.AccountKey,
-	error,
-) {
-	defer e.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
-
-	err := e.MeterComputation(environment.ComputationKindAddAccountKey, 1)
-	if err != nil {
-		return nil, fmt.Errorf("add account key failed: %w", err)
-	}
-
-	accKey, err := e.accountKeys.AddAccountKey(address, publicKey, hashAlgo, weight)
-	if err != nil {
-		return nil, fmt.Errorf("add account key failed: %w", err)
-	}
-
-	return accKey, nil
-}
-
-// RevokeAccountKey revokes a public key by index from an existing account,
-// and returns the revoked key.
-//
-// This function returns a nil key with no errors, if a key doesn't exist at the given index.
-// An error is returned if the specified account does not exist, the provided index is not valid,
-// or if the key revoking fails.
-func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
-	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
-
-	err := e.MeterComputation(environment.ComputationKindRevokeAccountKey, 1)
-	if err != nil {
-		return nil, fmt.Errorf("revoke account key failed: %w", err)
-	}
-
-	return e.accountKeys.RevokeAccountKey(address, keyIndex)
 }
