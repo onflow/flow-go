@@ -2,6 +2,7 @@ package scoring
 
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/onflow/flow-go/module/id"
 	p2putils "github.com/onflow/flow-go/network/p2p/utils"
 )

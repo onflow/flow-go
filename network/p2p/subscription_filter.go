@@ -4,6 +4,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+
 	p2putils "github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/model/flow"
