@@ -15,7 +15,8 @@ import (
 type FollowerLoop struct {
 	log           zerolog.Logger
 	followerLogic FollowerLogic
-	proposals     chan *model.Proposal
+	// TODO: change this to an inbound queue, to be consistent with our design
+	proposals chan *model.Proposal
 
 	runner runner.SingleRunner // lock for preventing concurrent state transitions
 }
