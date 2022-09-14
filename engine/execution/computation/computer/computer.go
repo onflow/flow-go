@@ -40,7 +40,12 @@ type VirtualMachine interface {
 
 	RunV2(fvm.Context, fvm.Procedure, state.View) error
 
+	// DEPRECATED. DO NOT USE
+	//
+	// TODO(patrick): remove after emulator is updated.
 	GetAccount(fvm.Context, flow.Address, state.View, *programs.Programs) (*flow.Account, error)
+
+	GetAccountV2(fvm.Context, flow.Address, state.View) (*flow.Account, error)
 }
 
 // ViewCommitter commits views's deltas to the ledger and collects the proofs

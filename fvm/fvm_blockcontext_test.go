@@ -1516,7 +1516,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	t.Run("get accounts", func(t *testing.T) {
 		for address, expectedKey := range accounts {
 
-			account, err := vm.GetAccount(ctx, address, ledger, programs)
+			account, err := vm.GetAccountV2(ctx, address, ledger)
 			require.NoError(t, err)
 
 			assert.Len(t, account.Keys, 1)
@@ -1531,7 +1531,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		var account *flow.Account
-		account, err = vm.GetAccount(ctx, address, ledger, programs)
+		account, err = vm.GetAccountV2(ctx, address, ledger)
 		assert.True(t, errors.IsAccountNotFoundError(err))
 		assert.Nil(t, account)
 	})

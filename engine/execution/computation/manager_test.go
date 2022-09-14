@@ -496,6 +496,10 @@ func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, view state
 	panic("not expected")
 }
 
+func (p *PanickingVM) GetAccountV2(f fvm.Context, address flow.Address, view state.View) (*flow.Account, error) {
+	panic("not expected")
+}
+
 type LongRunningVM struct {
 	duration time.Duration
 }
@@ -515,6 +519,10 @@ func (l *LongRunningVM) RunV2(f fvm.Context, procedure fvm.Procedure, view state
 }
 
 func (l *LongRunningVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
+	panic("not expected")
+}
+
+func (l *LongRunningVM) GetAccountV2(f fvm.Context, address flow.Address, view state.View) (*flow.Account, error) {
 	panic("not expected")
 }
 
