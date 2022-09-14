@@ -1,8 +1,9 @@
-package p2p
+package scoring
 
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/flow-go/module/id"
+	p2putils "github.com/onflow/flow-go/network/p2p/utils"
 )
 
 type SubscriptionValidator struct {
@@ -31,7 +32,7 @@ func (v *SubscriptionValidator) ValidationSubscriptions(pid peer.ID) bool {
 	}
 
 	for _, topic := range topics {
-		if AllowedSubscription(flowId.Role, topic) {
+		if p2putils.AllowedSubscription(flowId.Role, topic) {
 			return false
 		}
 	}

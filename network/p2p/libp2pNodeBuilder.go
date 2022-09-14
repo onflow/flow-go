@@ -197,13 +197,11 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	}
 
 	host, err := DefaultLibP2PHost(ctx, builder.addr, builder.networkKey, opts...)
-
 	if err != nil {
 		return nil, err
 	}
 
 	rsys, err := builder.routingFactory(ctx, host)
-
 	if err != nil {
 		return nil, err
 	}
