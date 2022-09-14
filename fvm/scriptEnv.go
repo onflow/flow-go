@@ -18,6 +18,9 @@ type ScriptEnv struct {
 	commonEnv
 }
 
+// DEPRECATED.  DO NOT USE
+//
+// TODO(patrick): rm after emulator is updated.
 func NewScriptEnvironment(
 	reqContext context.Context,
 	fvmContext Context,
@@ -25,7 +28,19 @@ func NewScriptEnvironment(
 	sth *state.StateHolder,
 	programs handler.TransactionPrograms,
 ) *ScriptEnv {
+	return NewScriptEnv(
+		reqContext,
+		fvmContext,
+		sth,
+		programs)
+}
 
+func NewScriptEnv(
+	reqContext context.Context,
+	fvmContext Context,
+	sth *state.StateHolder,
+	programs handler.TransactionPrograms,
+) *ScriptEnv {
 	tracer := environment.NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
 	meter := environment.NewCancellableMeter(reqContext, sth)
 
