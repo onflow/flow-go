@@ -53,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -604,7 +605,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		nil,
 		prov,
 		computation.ComputationConfig{
-			ProgramsCacheSize:        computation.DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       computation.DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: computation.DefaultScriptExecutionTimeLimit,
 		},

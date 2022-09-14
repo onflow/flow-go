@@ -5,7 +5,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -45,7 +44,7 @@ func (d *RemoteDebugger) RunTransaction(txBody *flow.TransactionBody) (txErr, pr
 	view := NewRemoteView(d.grpcAddress)
 	blockCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	tx := fvm.Transaction(txBody, 0)
-	err := d.vm.Run(blockCtx, tx, view, programs.NewEmptyPrograms())
+	err := d.vm.RunV2(blockCtx, tx, view)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +64,7 @@ func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, b
 		view.Cache = newFileRegisterCache(regCachePath)
 	}
 	tx := fvm.Transaction(txBody, 0)
-	err := d.vm.Run(blockCtx, tx, view, programs.NewEmptyPrograms())
+	err := d.vm.RunV2(blockCtx, tx, view)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +79,7 @@ func (d *RemoteDebugger) RunScript(code []byte, arguments [][]byte) (value caden
 	view := NewRemoteView(d.grpcAddress)
 	scriptCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	script := fvm.Script(code).WithArguments(arguments...)
-	err := d.vm.Run(scriptCtx, script, view, programs.NewEmptyPrograms())
+	err := d.vm.RunV2(scriptCtx, script, view)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -91,7 +90,7 @@ func (d *RemoteDebugger) RunScriptAtBlockID(code []byte, arguments [][]byte, blo
 	view := NewRemoteView(d.grpcAddress, WithBlockID(blockID))
 	scriptCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	script := fvm.Script(code).WithArguments(arguments...)
-	err := d.vm.Run(scriptCtx, script, view, programs.NewEmptyPrograms())
+	err := d.vm.RunV2(scriptCtx, script, view)
 	if err != nil {
 		return nil, nil, err
 	}

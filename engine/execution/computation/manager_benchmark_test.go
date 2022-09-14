@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -74,7 +75,7 @@ func mustFundAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, e
 		accs.seq++
 
 		tx := fvm.Transaction(transferTx, uint32(i))
-		err = vm.Run(execCtx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(execCtx, tx, ledger)
 		require.NoError(b, err)
 		require.NoError(b, tx.Err)
 	}
@@ -95,7 +96,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithTracer(tracer),
 		fvm.WithReusableCadenceRuntimePool(
-			fvm.NewReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{})),
 	)
@@ -131,7 +132,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), tracer, zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(b, err)
 
-	programsCache, err := NewProgramsCache(1000)
+	programsCache, err := programs.NewChainPrograms(
+		programs.DefaultProgramsCacheSize)
 	require.NoError(b, err)
 
 	engine := &Manager{

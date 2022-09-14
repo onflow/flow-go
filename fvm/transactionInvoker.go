@@ -25,8 +25,7 @@ func NewTransactionInvoker() TransactionInvoker {
 }
 
 func (i TransactionInvoker) Process(
-	vm *VirtualMachine,
-	ctx *Context,
+	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programsCache.Programs,
@@ -80,7 +79,7 @@ func (i TransactionInvoker) Process(
 		}
 	}()
 
-	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	env := NewTransactionEnv(ctx, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)
@@ -94,17 +93,10 @@ func (i TransactionInvoker) Process(
 		common.TransactionLocation(proc.ID))
 
 	if err != nil {
-		var interactionLimitExceededErr *errors.LedgerInteractionLimitExceededError
-		if errors.As(err, &interactionLimitExceededErr) {
-			// If it is this special interaction limit error, just set it directly as the tx error
-			txError = err
-		} else {
-			// Otherwise, do what we use to do
-			txError = fmt.Errorf(
-				"transaction invocation failed when executing transaction: %w",
-				errors.HandleRuntimeError(err),
-			)
-		}
+		txError = fmt.Errorf(
+			"transaction invocation failed when executing transaction: %w",
+			err,
+		)
 	}
 
 	// read computationUsed from the environment. This will be used to charge fees.
@@ -151,6 +143,7 @@ func (i TransactionInvoker) Process(
 		defer sth.EnableAllLimitEnforcements()
 
 		modifiedSets = programsCache.ModifiedSets{}
+		env.Reset()
 
 		// drop delta since transaction failed
 		err := sth.RestartNestedTransaction(nestedTxnId)
@@ -164,10 +157,6 @@ func (i TransactionInvoker) Process(
 		// log transaction as failed
 		ctx.Logger.Info().
 			Msg("transaction executed with error")
-
-		// TODO(patrick): make env reusable on error
-		// reset env
-		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
@@ -224,7 +213,7 @@ func (i TransactionInvoker) deductTransactionFees(
 }
 
 // logExecutionIntensities logs execution intensities of the transaction
-func (i TransactionInvoker) logExecutionIntensities(ctx *Context, sth *state.StateHolder, txHash string) {
+func (i TransactionInvoker) logExecutionIntensities(ctx Context, sth *state.StateHolder, txHash string) {
 	if ctx.Logger.Debug().Enabled() {
 		computation := zerolog.Dict()
 		for s, u := range sth.ComputationIntensities() {

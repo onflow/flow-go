@@ -1012,7 +1012,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 
 	// disable connection pruning for the access node which supports the observer
 	peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningDisabled, builder.PeerUpdateInterval)
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger)
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, builder.Metrics.Network)
 
 	builder.Middleware = p2p.NewMiddleware(
 		logger,

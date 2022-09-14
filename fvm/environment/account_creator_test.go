@@ -15,7 +15,7 @@ func Test_NewAccountCreator_NoError(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	creator := environment.NewAccountCreator(stTxn, chain)
+	creator := environment.NewAddressGenerator(stTxn, chain)
 	require.NotNil(t, creator)
 }
 
@@ -23,7 +23,7 @@ func Test_NewAccountCreator_GeneratingUpdatesState(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	creator := environment.NewAccountCreator(stTxn, chain)
+	creator := environment.NewAddressGenerator(stTxn, chain)
 	_, err := creator.NextAddress()
 	require.NoError(t, err)
 
@@ -40,7 +40,7 @@ func Test_NewAccountCreator_UsesLedgerState(t *testing.T) {
 
 	chain := flow.MonotonicEmulator.Chain()
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	creator := environment.NewAccountCreator(stTxn, chain)
+	creator := environment.NewAddressGenerator(stTxn, chain)
 
 	_, err = creator.NextAddress()
 	require.NoError(t, err)

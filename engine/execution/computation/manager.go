@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -52,11 +53,6 @@ func GetUploaderEnabled() bool {
 	return uploadEnabled
 }
 
-type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
-	GetAccount(fvm.Context, flow.Address, state.View, *programs.Programs) (*flow.Account, error)
-}
-
 type ComputationManager interface {
 	ExecuteScript(context.Context, []byte, [][]byte, *flow.Header, state.View) ([]byte, error)
 	ComputeBlock(
@@ -79,7 +75,7 @@ type ComputationConfig struct {
 	// will create a virtual machine using this function.
 	//
 	// Note that this is primarily used for testing.
-	NewCustomVirtualMachine func() VirtualMachine
+	NewCustomVirtualMachine func() computer.VirtualMachine
 }
 
 // Manager manages computation and execution
@@ -89,10 +85,10 @@ type Manager struct {
 	metrics                  module.ExecutionMetrics
 	me                       module.Local
 	protoState               protocol.State
-	vm                       VirtualMachine
+	vm                       computer.VirtualMachine
 	vmCtx                    fvm.Context
 	blockComputer            computer.BlockComputer
-	programsCache            *ProgramsCache
+	programsCache            *programs.ChainPrograms
 	scriptLogThreshold       time.Duration
 	scriptExecutionTimeLimit time.Duration
 	uploaders                []uploader.Uploader
@@ -114,7 +110,7 @@ func New(
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
-	var vm VirtualMachine
+	var vm computer.VirtualMachine
 	if params.NewCustomVirtualMachine != nil {
 		vm = params.NewCustomVirtualMachine()
 	} else {
@@ -123,7 +119,7 @@ func New(
 
 	options := []fvm.Option{
 		fvm.WithReusableCadenceRuntimePool(
-			fvm.NewReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
 					TracingEnabled: params.CadenceTracing,
@@ -149,7 +145,7 @@ func New(
 		return nil, fmt.Errorf("cannot create block computer: %w", err)
 	}
 
-	programsCache, err := NewProgramsCache(params.ProgramsCacheSize)
+	programsCache, err := programs.NewChainPrograms(params.ProgramsCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create programs cache: %w", err)
 	}
@@ -174,16 +170,8 @@ func New(
 	return &e, nil
 }
 
-func (e *Manager) VM() VirtualMachine {
+func (e *Manager) VM() computer.VirtualMachine {
 	return e.vm
-}
-
-func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Programs {
-	blockPrograms := e.programsCache.Get(blockID)
-	if blockPrograms == nil {
-		return programs.NewEmptyPrograms()
-	}
-	return blockPrograms.ChildPrograms()
 }
 
 func (e *Manager) ExecuteScript(
@@ -216,8 +204,11 @@ func (e *Manager) ExecuteScript(
 	defer cancel()
 
 	script := fvm.NewScriptWithContextAndArgs(code, requestCtx, arguments...)
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
-	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithBlockPrograms(
+			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
 
 	err := func() (err error) {
 
@@ -253,7 +244,7 @@ func (e *Manager) ExecuteScript(
 			}
 		}()
 
-		return e.vm.Run(blockCtx, script, view, programs)
+		return e.vm.RunV2(blockCtx, script, view)
 	}()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
@@ -294,14 +285,9 @@ func (e *Manager) ComputeBlock(
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
 
-	var blockPrograms *programs.Programs
-	fromCache := e.programsCache.Get(block.ParentID())
-
-	if fromCache == nil {
-		blockPrograms = programs.NewEmptyPrograms()
-	} else {
-		blockPrograms = fromCache.ChildPrograms()
-	}
+	blockPrograms := e.programsCache.GetOrCreateBlockPrograms(
+		block.ID(),
+		block.ParentID())
 
 	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, blockPrograms)
 	if err != nil {
@@ -314,15 +300,6 @@ func (e *Manager) ComputeBlock(
 
 	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("block result computed")
 
-	toInsert := blockPrograms
-
-	// if we have item from cache and there were no changes
-	// insert it under new block, to prevent long chains
-	if fromCache != nil && !blockPrograms.HasChanges() {
-		toInsert = fromCache
-	}
-
-	e.programsCache.Set(block.ID(), toInsert)
 	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("programs cache updated")
 
 	if uploadEnabled {
@@ -354,11 +331,13 @@ func (e *Manager) ComputeBlock(
 }
 
 func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view state.View) (*flow.Account, error) {
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithBlockPrograms(
+			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
 
-	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
-
-	account, err := e.vm.GetAccount(blockCtx, address, view, programs)
+	account, err := e.vm.GetAccountV2(blockCtx, address, view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account (%s) at block (%s): %w", address.String(), blockHeader.ID(), err)
 	}

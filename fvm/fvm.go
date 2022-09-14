@@ -1,11 +1,14 @@
 package fvm
 
 import (
+	"context"
 	"fmt"
 	"math"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -15,7 +18,12 @@ import (
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
-	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
+	Run(
+		ctx Context,
+		sth *state.StateHolder,
+		programs *programs.Programs,
+	) error
+
 	ComputationLimit(ctx Context) uint64
 	MemoryLimit(ctx Context) uint64
 	ShouldDisableMemoryAndInteractionLimits(ctx Context) bool
@@ -48,17 +56,37 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 	}
 }
 
+// DEPRECATED.  DO NOT USE.
+//
+// TODO(patrick): remove after emulator is updated
+//
 // Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
+func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, _ *programs.Programs) (err error) {
+	return vm.RunV2(ctx, proc, v)
+}
+
+// TODO(patrick): rename back to Run after emulator is fully updated (this
+// takes at least 3 sporks ...).
+//
+// Run runs a procedure against a ledger in the given context.
+func (vm *VirtualMachine) RunV2(
+	ctx Context,
+	proc Procedure,
+	v state.View,
+) error {
+	blockPrograms := ctx.BlockPrograms
+	if blockPrograms == nil {
+		blockPrograms = programs.NewEmptyPrograms()
+	}
+
 	meterParams := meter.DefaultParameters().
 		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
 		WithMemoryLimit(proc.MemoryLimit(ctx))
 
-	meterParams, err = getEnvironmentMeterParameters(
-		vm,
+	meterParams, err := getEnvironmentMeterParameters(
 		ctx,
 		v,
-		programs,
+		blockPrograms,
 		meterParams,
 	)
 	if err != nil {
@@ -80,16 +108,33 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
-	err = proc.Run(vm, ctx, stTxn, programs)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return proc.Run(ctx, stTxn, blockPrograms)
 }
 
-// GetAccount returns an account by address or an error if none exists.
+// DEPRECATED. DO NOT USE
+//
+// TODO(patrick): remove after emulator is updated
 func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
+	return vm.GetAccountV2(ctx, address, v)
+}
+
+// TODO(patrick): rename back to GetAccount after emulator is fully updated
+// (this takes at least 3 sporks ...).
+//
+// GetAccountV2 returns an account by address or an error if none exists.
+func (vm *VirtualMachine) GetAccountV2(
+	ctx Context,
+	address flow.Address,
+	v state.View,
+) (
+	*flow.Account,
+	error,
+) {
+	blockPrograms := ctx.BlockPrograms
+	if blockPrograms == nil {
+		blockPrograms = programs.NewEmptyPrograms()
+	}
+
 	stTxn := state.NewStateTransaction(
 		v,
 		state.DefaultParameters().
@@ -98,7 +143,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
 	)
 
-	account, err := getAccount(vm, ctx, stTxn, programs, address)
+	account, err := vm.getAccount(ctx, stTxn, blockPrograms, address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {
 			return nil, fmt.Errorf("cannot get account, this error usually happens if the reference block for this query is not set to a recent block: %w", err)
@@ -108,20 +153,32 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 	return account, nil
 }
 
-// invokeMetaTransaction invokes a meta transaction inside the context of an outer transaction.
-//
-// Errors that occur in a meta transaction are propagated as a single error that can be
-// captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, stTxn *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
-	invoker := NewTransactionInvoker()
+func (vm *VirtualMachine) getAccount(
+	ctx Context,
+	sth *state.StateHolder,
+	programs *programs.Programs,
+	address flow.Address,
+) (
+	*flow.Account,
+	error,
+) {
+	accounts := environment.NewAccounts(sth)
 
-	// do not deduct fees or check storage in meta transactions
-	ctx := NewContextFromParent(parentCtx,
-		WithAccountStorageLimit(false),
-		WithTransactionFeesEnabled(false),
-	)
+	account, err := accounts.Get(address)
+	if err != nil {
+		return nil, err
+	}
 
-	err := invoker.Process(vm, &ctx, tx, stTxn, programs)
-	txErr, fatalErr := errors.SplitErrorTypes(err)
-	return txErr, fatalErr
+	if ctx.ServiceAccountEnabled {
+		env := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
+
+		balance, err := env.GetAccountBalance(common.Address(address))
+		if err != nil {
+			return nil, err
+		}
+
+		account.Balance = balance
+	}
+
+	return account, nil
 }

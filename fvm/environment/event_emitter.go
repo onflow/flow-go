@@ -24,6 +24,8 @@ type EventEmitter interface {
 
 	Events() []flow.Event
 	ServiceEvents() []flow.Event
+
+	Reset()
 }
 
 var _ EventEmitter = NoEventEmitter{}
@@ -42,6 +44,9 @@ func (NoEventEmitter) Events() []flow.Event {
 
 func (NoEventEmitter) ServiceEvents() []flow.Event {
 	return []flow.Event{}
+}
+
+func (NoEventEmitter) Reset() {
 }
 
 type eventEmitter struct {
@@ -69,7 +74,7 @@ func NewEventEmitter(
 	serviceEventCollectionEnabled bool,
 	eventCollectionByteSizeLimit uint64,
 ) EventEmitter {
-	return &eventEmitter{
+	emitter := &eventEmitter{
 		tracer:                        tracer,
 		meter:                         meter,
 		chain:                         chain,
@@ -78,8 +83,14 @@ func NewEventEmitter(
 		payer:                         payer,
 		serviceEventCollectionEnabled: serviceEventCollectionEnabled,
 		eventCollectionByteSizeLimit:  eventCollectionByteSizeLimit,
-		eventCollection:               NewEventCollection(),
 	}
+
+	emitter.Reset()
+	return emitter
+}
+
+func (emitter *eventEmitter) Reset() {
+	emitter.eventCollection = NewEventCollection()
 }
 
 func (emitter *eventEmitter) EventCollection() *EventCollection {

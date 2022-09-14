@@ -328,6 +328,17 @@ func (s *StateHolder) DisableAllLimitEnforcements() {
 	s.enforceLimits = false
 }
 
+// RunWithAllLimitsDisabled runs f with limits disabled
+func (s *StateHolder) RunWithAllLimitsDisabled(f func()) {
+	if f == nil {
+		return
+	}
+	current := s.enforceLimits
+	s.enforceLimits = false
+	f()
+	s.enforceLimits = current
+}
+
 // EnforceComputationLimits returns if the computation limits should be enforced
 // or not.
 func (s *StateHolder) EnforceComputationLimits() bool {
