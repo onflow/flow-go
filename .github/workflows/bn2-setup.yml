@@ -41,3 +41,21 @@ jobs:
     steps:
       - name: Deploy containers
         # uses: kubernetes command
+
+  setup-testroot-account:
+    name: Setup E2E Testroot Account
+    runs-on: ubuntu-latest
+    steps:
+      - name: setup account
+        # uses: flow CLI command
+      - name: add flow tokens
+        # uses: flow CLI command
+
+  destroy-env:
+    name: Teardown
+    runs-on: ubuntu-latest
+    steps:
+      - name: stop network
+       # uses: kubernetes command
+      - name: turn off machines
+       # uses: helm

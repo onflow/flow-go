@@ -1,0 +1,46 @@
+name: Ephemeral-Benchnet2-Setup
+
+on:
+  pull_request:
+    branches:
+      - master
+
+env:
+  GO_VERSION: 1.19
+
+jobs:
+  golangci:
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: [./, ./integration/, ./crypto/]
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    - name: Build relic
+      run: make crypto_setup_gopath
+    - name: Run go generate
+      run: go generate
+      working-directory: ${{ matrix.dir }}
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+        version: v1.49
+        args: -v --build-tags relic
+        working-directory: ${{ matrix.dir }}
+        # https://github.com/golangci/golangci-lint-action/issues/244
+        skip-cache: true
+
+  destroy-bn2-for-pr:
+    - name: stop network
+      # run: kubernetes stop flow network
+    - name: teardown k8s
+      # run: helm

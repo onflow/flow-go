@@ -1,0 +1,199 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - 'auto-cadence-upgrade/**'
+      - staging
+      - trying
+      - 'feature/**'
+      - 'v[0-9]+.[0-9]+'
+  pull_request:
+    branches:
+      - master
+      - 'auto-cadence-upgrade/**'
+      - 'feature/**'
+      - 'v[0-9]+.[0-9]+'
+
+env:
+  GO_VERSION: 1.19
+
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  golangci:
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: [./, ./integration/, ./crypto/]
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    - name: Build relic
+      run: make crypto_setup_gopath
+    - name: Run go generate
+      run: go generate
+      working-directory: ${{ matrix.dir }}
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+        version: v1.49
+        args: -v --build-tags relic
+        working-directory: ${{ matrix.dir }}
+        # https://github.com/golangci/golangci-lint-action/issues/244
+        skip-cache: true
+
+  shell-check:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@203a3fd018dfe73f8ae7e3aa8da2c149a5f41c33
+      with:
+        scandir: './crypto'
+        ignore: 'relic'
+
+  create-dynamic-test-matrix:
+    name: Create Dynamic Test Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Set Test Matrix
+        id: set-test-matrix
+        run: go run utils/test_matrix/test_matrix.go access admin cmd consensus engine fvm ledger module network utils
+
+  unit-test:
+    name: Unit Tests (${{ matrix.targets.name }})
+    needs: create-dynamic-test-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
+    # need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    - name: Run tests (${{ matrix.targets.name }})
+      if: github.actor != 'bors[bot]'
+      run: make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
+      # TODO(rbtz): re-enable when we fix exisiting races.
+      #env:
+      #  RACE_DETECTOR: 1
+    - name: Run tests (Bors)
+      if: github.actor == 'bors[bot]'
+      uses: nick-invision/retry@v2
+      with:
+        timeout_minutes: 25
+        max_attempts: 3
+        command: make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
+    - name: Upload coverage report
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.txt
+        flags: unittests
+        name: codecov-umbrella
+
+  integration-test:
+    name: Integration Tests
+    strategy:
+      fail-fast: false
+      matrix:
+        make:
+          - make -C integration access-tests
+          - make -C integration bft-tests
+          - make -C integration collection-tests
+          - make -C integration consensus-tests
+          - make -C integration epochs-tests
+          - make -C integration execution-tests
+          - make -C integration ghost-tests
+          - make -C integration mvp-tests
+          - make -C integration network-tests
+          - make -C integration verification-tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    - name: Build relic
+      run: make crypto_setup_gopath
+    - name: Docker build
+      run: make docker-build-flow
+    - name: Run tests
+      if: github.actor != 'bors[bot]'
+      run: ${{ matrix.make }}
+      # TODO(rbtz): re-enable when we fix exisiting races.
+      #env:
+      #  RACE_DETECTOR: 1
+    - name: Run tests (Bors)
+      if: github.actor == 'bors[bot]'
+      uses: nick-invision/retry@v2
+      with:
+        timeout_minutes: 15
+        max_attempts: 2
+        command: ${{ matrix.make }}
+
+  localnet-test:
+    name: Localnet Compatibility Tests With Flow-CLI Client and Observer
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    - name: Build relic and other tools
+      run: make install-tools
+    - name: Install Flow Client In Docker
+      # This proved to be more reliable than installing it locally.
+      run: cd integration/localnet && sh client/client.sh
+    - name: Build and deploy images
+      # run: docker compose
+      # run: kubernetes deploy
+    - name: Ensure Observer is started
+      run: docker ps -f name=localnet_observer_1_1 | grep localnet_observer
+    - name: Get Client Version ensuring the client is provisioned
+      run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer version
+    - name: Wait for a default waiting period until a clean state
+      # This will not cause flakiness.
+      # The waiting time is a reasonable time to expect an observer to be responsive
+      run: sleep 10
+    - name: Get Status ensuring the access endpoint is online
+      run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n access status
+    - name: Wait for finalized blocks and check them
+      run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer blocks get latest
+    - name: Wait for finalized blocks and check them with Observer
+      run: sleep 5 && docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n access blocks get latest && docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer blocks get latest
