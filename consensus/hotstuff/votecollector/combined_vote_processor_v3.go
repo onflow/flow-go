@@ -152,12 +152,12 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // every signerID. However, we have the edge case, where we still feed the proposers vote twice into the
 // `VerifyingVoteProcessor` (once as part of a cached vote, once as an individual vote). This can be exploited
 // by a byzantine proposer to be erroneously counted twice, which would lead to a safety fault.
-// TODO: (suggestion) I think it would be worth-while to include a second `votesCache` into the `CombinedVoteProcessorV3`.
 //
-//	Thereby,  `CombinedVoteProcessorV3` inherently guarantees correctness of the QCs it produces without relying on
-//	external conditions (making the code more modular, less interdependent and thereby easier to maintain). The
-//	runtime overhead is marginal: For `votesCache` to add 500 votes (concurrently with 20 threads) takes about
-//	0.25ms. This runtime overhead is neglectable and a good tradeoff for the gain in maintainability and code clarity.
+//	 TODO (suggestion): I think it would be worth-while to include a second `votesCache` into the `CombinedVoteProcessorV3`.
+//			Thereby, `CombinedVoteProcessorV3` inherently guarantees correctness of the QCs it produces without relying on
+//			external conditions (making the code more modular, less interdependent and thereby easier to maintain). The
+//			runtime overhead is marginal: For `votesCache` to add 500 votes (concurrently with 20 threads) takes about
+//			0.25ms. This runtime overhead is neglectable and a good tradeoff for the gain in maintainability and code clarity.
 func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
