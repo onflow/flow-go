@@ -50,7 +50,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		address, _, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		programsStorage := programs.NewEmptyPrograms()
+		blockPrograms := programs.NewEmptyPrograms()
 
 		// account should no be frozen
 		frozen, err := accounts.GetAccountFrozen(address)
@@ -69,11 +69,13 @@ func TestAccountFreezing(t *testing.T) {
 
 		tx := flow.TransactionBody{Script: []byte(code)}
 		tx.AddAuthorizer(chain.ServiceAddress())
-		proc := fvm.Transaction(&tx, 0)
+		proc := fvm.Transaction(&tx, blockPrograms.NextTxIndexForTestingOnly())
 
-		context := fvm.NewContext(fvm.WithChain(chain))
+		context := fvm.NewContext(
+			fvm.WithChain(chain),
+			fvm.WithBlockPrograms(blockPrograms))
 
-		err = txInvoker.Process(context, proc, st, programsStorage)
+		err = txInvoker.Process(context, proc, st, blockPrograms)
 		require.NoError(t, err)
 
 		// account should be frozen now
@@ -254,7 +256,8 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
-				fvm.NewTransactionInvoker()))
+				fvm.NewTransactionInvoker()),
+			fvm.WithBlockPrograms(programsStorage))
 
 		err := vm.RunV2(context, procFrozen, st.ViewForTestingOnly())
 		require.NoError(t, err)
@@ -366,8 +369,9 @@ func TestAccountFreezing(t *testing.T) {
 
 		vm := fvm.NewVM()
 		// create default context
-		context := fvm.NewContext()
 		programsStorage := programs.NewEmptyPrograms()
+		context := fvm.NewContext(
+			fvm.WithBlockPrograms(programsStorage))
 
 		ledger := testutil.RootBootstrappedLedger(vm, context)
 
@@ -476,7 +480,8 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
 				fvm.NewTransactionVerifier(-1),
-				fvm.NewTransactionInvoker()))
+				fvm.NewTransactionInvoker()),
+			fvm.WithBlockPrograms(programsStorage))
 
 		// freeze account
 
@@ -491,7 +496,7 @@ func TestAccountFreezing(t *testing.T) {
 		tx := &flow.TransactionBody{Script: []byte(freezeTx)}
 		tx.AddAuthorizer(chain.ServiceAddress())
 
-		proc := fvm.Transaction(tx, 0)
+		proc := fvm.Transaction(tx, programsStorage.NextTxIndexForTestingOnly())
 
 		txInvoker := fvm.NewTransactionInvoker()
 		err := txInvoker.Process(context, proc, st, programsStorage)
