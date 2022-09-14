@@ -12,6 +12,7 @@ import (
 )
 
 // FollowerLoop implements interface FollowerLoop
+// TODO: should implement component.Component interface
 type FollowerLoop struct {
 	log           zerolog.Logger
 	followerLogic FollowerLogic
