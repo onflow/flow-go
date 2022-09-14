@@ -182,11 +182,6 @@ func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
 	return infos
 }
 
-// n - the total number of nodes to be created
-// finalizedCount - the number of finalized blocks before stopping the tests
-// tolerate - the number of node to tolerate that don't need to reach the finalization count
-//
-//	before stopping the tests
 func createNodes(
 	t *testing.T,
 	participants *ConsensusParticipants,
