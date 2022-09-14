@@ -61,10 +61,6 @@ const (
 
 var (
 	_ network.Middleware = (*Middleware)(nil)
-
-	// allowAll is a peerFilterFunc that will always return true for all peer ids.
-	// This filter is used to allow communication by all roles on public network channels.
-	allowAll = func(_ peer.ID) bool { return true }
 )
 
 // Middleware handles the input & output on the direct connections we have to
@@ -94,6 +90,7 @@ type Middleware struct {
 	previousProtocolStatePeers []peer.AddrInfo
 	codec                      network.Codec
 	slashingViolationsConsumer slashing.ViolationsConsumer
+	authorizedSenderValidator  *validator.AuthorizedSenderValidator
 	component.Component
 }
 
@@ -196,9 +193,11 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 
 // isProtocolParticipant returns a PeerFilter that returns true if a peer is a staked node.
 func (m *Middleware) isProtocolParticipant() PeerFilter {
-	return func(peerID peer.ID) bool {
-		_, ok := m.ov.Identity(peerID)
-		return ok
+	return func(p peer.ID) error {
+		if _, ok := m.ov.Identity(p); !ok {
+			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.Pretty())
+		}
+		return nil
 	}
 }
 
@@ -273,19 +272,14 @@ func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
 }
 
-// validateUnicastAuthorizedSender will validate messages sent via unicast stream.
-func (m *Middleware) validateUnicastAuthorizedSender(remotePeer peer.ID, channel channels.Channel, msg interface{}) error {
-	validate := validator.AuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, channel, true, m.ov.Identity)
-	_, err := validate(remotePeer, msg)
-	return err
-}
-
 // start will start the middleware.
 // No errors are expected during normal operation.
 func (m *Middleware) start(ctx context.Context) error {
 	if m.ov == nil {
 		return fmt.Errorf("could not start middleware: overlay must be configured by calling SetOverlay before middleware can be started")
 	}
+
+	m.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, m.ov.Identity)
 
 	libP2PNode, err := m.libP2PNodeFactory(ctx)
 	if err != nil {
@@ -546,11 +540,11 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	if channels.IsPublicChannel(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
 		// return true for every node.
-		peerFilter = allowAll
+		peerFilter = allowAllPeerFilter()
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
-			validator.AuthorizedSenderMessageValidator(m.log, m.slashingViolationsConsumer, channel, m.ov.Identity),
+			m.authorizedSenderValidator.PubSubMessageValidator(channel),
 		)
 
 		// NOTE: For non-public channels the libP2P node topic validator will reject
@@ -558,7 +552,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 		peerFilter = m.isProtocolParticipant()
 	}
 
-	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, validators...)
+	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, m.slashingViolationsConsumer, validators...)
 	if err != nil {
 		return fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
 	}
@@ -629,7 +623,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// if message channel is not public perform authorized sender validation
 	if !channels.IsPublicChannel(channel) {
-		err := m.validateUnicastAuthorizedSender(remotePeer, channel, decodedMsgPayload)
+		_, err := m.authorizedSenderValidator.Validate(remotePeer, decodedMsgPayload, channel, true)
 		if err != nil {
 			m.log.
 				Error().

@@ -20,22 +20,24 @@ import (
 
 // ExecForkSuppressor is a wrapper around a conventional mempool.IncorporatedResultSeals
 // mempool. It implements the following mitigation strategy for execution forks:
-//   * In case two conflicting results are considered sealable for the same block,
+//   - In case two conflicting results are considered sealable for the same block,
 //     sealing should halt. Specifically, two results are considered conflicting,
 //     if they differ in their start or end state.
-//   * Even after a restart, the sealing should not resume.
-//   * We rely on human intervention to resolve the conflict.
+//   - Even after a restart, the sealing should not resume.
+//   - We rely on human intervention to resolve the conflict.
+//
 // The ExecForkSuppressor implements this mitigation strategy as follows:
-//   * For each candidate seal inserted into the mempool, indexes seal
+//   - For each candidate seal inserted into the mempool, indexes seal
 //     by respective blockID, storing all seals in the internal map `sealsForBlock`.
-//   * Whenever client perform any query, we check if there are conflicting seals.
-//   * We pick first seal available for a block and check whether
+//   - Whenever client perform any query, we check if there are conflicting seals.
+//   - We pick first seal available for a block and check whether
 //     the seal has the same state transition as other seals included for same block.
-//   * If conflicting state transitions for the same block are detected,
+//   - If conflicting state transitions for the same block are detected,
 //     ExecForkSuppressor sets an internal flag and thereafter
 //     reports the mempool as empty, which will lead to the respective
 //     consensus node not including any more seals.
-//   * Evidence for an execution fork stored in a database (persisted across restarts).
+//   - Evidence for an execution fork stored in a database (persisted across restarts).
+//
 // Implementation is concurrency safe.
 type ExecForkSuppressor struct {
 	mutex            sync.RWMutex
@@ -84,7 +86,7 @@ func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, onExecFor
 // Add adds the given seal to the mempool. Return value indicates whether seal was added to the mempool.
 // Internally indexes every added seal by blockID. Expects that underlying mempool never eject items.
 // Error returns:
-//   * engine.InvalidInputError (sentinel error)
+//   - engine.InvalidInputError (sentinel error)
 //     In case a seal fails one of the required consistency checks;
 func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, error) {
 	s.mutex.Lock()
@@ -307,9 +309,10 @@ func (s *ExecForkSuppressor) enforceValidChunks(irSeal *flow.IncorporatedResultS
 
 // enforceConsistentStateTransitions checks whether the execution results in the seals
 // have matching state transitions. If a fork in the execution state is detected:
-//   * wrapped mempool is cleared
-//   * internal execForkDetected flag is ste to true
-//   * the new value of execForkDetected is persisted to data base
+//   - wrapped mempool is cleared
+//   - internal execForkDetected flag is ste to true
+//   - the new value of execForkDetected is persisted to data base
+//
 // and executionForkErr (sentinel error) is returned
 // The function assumes the execution results in the seals have a non-zero number of chunks.
 func hasConsistentStateTransitions(irSeal, irSeal2 *flow.IncorporatedResultSeal) bool {

@@ -169,9 +169,10 @@ func (m *VoteCollector) View() uint64 {
 // The internal state change is implemented as an atomic compare-and-swap, i.e.
 // the state transition is only executed if VoteCollector's internal state is
 // equal to `expectedValue`. The implementation only allows the transitions
-//         CachingVotes   -> VerifyingVotes
-//         CachingVotes   -> Invalid
-//         VerifyingVotes -> Invalid
+//
+//	CachingVotes   -> VerifyingVotes
+//	CachingVotes   -> Invalid
+//	VerifyingVotes -> Invalid
 func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 
 	if proposal.Block.View != m.View() {
@@ -229,8 +230,8 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 // RegisterVoteConsumer registers a VoteConsumer. Upon registration, the collector
 // feeds all cached votes into the consumer in the order they arrived.
 // CAUTION, VoteConsumer implementations must be
-//  * NON-BLOCKING and consume the votes without noteworthy delay, and
-//  * CONCURRENCY SAFE
+//   - NON-BLOCKING and consume the votes without noteworthy delay, and
+//   - CONCURRENCY SAFE
 func (m *VoteCollector) RegisterVoteConsumer(consumer hotstuff.VoteConsumer) {
 	m.votesCache.RegisterVoteConsumer(consumer)
 }

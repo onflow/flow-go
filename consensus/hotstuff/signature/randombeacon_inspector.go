@@ -16,10 +16,10 @@ type randomBeaconInspector struct {
 
 // NewRandomBeaconInspector instantiates a new randomBeaconInspector.
 // The constructor errors with a `model.ConfigurationError` in any of the following cases
-//  - n is not between `ThresholdSignMinSize` and `ThresholdSignMaxSize`,
-//    for n the number of participants `n := len(publicKeyShares)`
-//  - threshold value is not in interval [1, n-1]
-//  - any input public key is not a BLS key
+//   - n is not between `ThresholdSignMinSize` and `ThresholdSignMaxSize`,
+//     for n the number of participants `n := len(publicKeyShares)`
+//   - threshold value is not in interval [1, n-1]
+//   - any input public key is not a BLS key
 func NewRandomBeaconInspector(
 	groupPublicKey crypto.PublicKey,
 	publicKeyShares []crypto.PublicKey,
@@ -49,9 +49,9 @@ func NewRandomBeaconInspector(
 // execute the business logic, without interfering with each other).
 // It allows concurrent verification of the given signature.
 // Returns :
-//  - model.InvalidSignerError if signerIndex is invalid
-//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
-//  - other error if there is an unexpected exception.
+//   - model.InvalidSignerError if signerIndex is invalid
+//   - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
+//   - other error if there is an unexpected exception.
 func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) error {
 	valid, err := r.inspector.VerifyShare(signerIndex, share)
 	if err != nil {
@@ -76,12 +76,13 @@ func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) 
 // The function is thread-safe but locks its internal state, thereby permitting only
 // one routine at a time to add a signature.
 // Returns:
-//  - (true, nil) if the signature has been added, and enough shares have been collected.
-//  - (false, nil) if the signature has been added, but not enough shares were collected.
-//  - (false, error) if there is any exception adding the signature share.
-//      - model.InvalidSignerError if signerIndex is invalid (out of the valid range)
-//  	- model.DuplicatedSignerError if the signer has been already added
-//      - other error if there is an unexpected exception.
+//   - (true, nil) if the signature has been added, and enough shares have been collected.
+//   - (false, nil) if the signature has been added, but not enough shares were collected.
+//
+// The following errors are expected during normal operations:
+//   - model.InvalidSignerError if signerIndex is invalid (out of the valid range)
+//   - model.DuplicatedSignerError if the signer has been already added
+//   - other error if there is an unexpected exception.
 func (r *randomBeaconInspector) TrustedAdd(signerIndex int, share crypto.Signature) (bool, error) {
 	// Trusted add to the crypto layer
 	enough, err := r.inspector.TrustedAdd(signerIndex, share)
@@ -109,12 +110,12 @@ func (r *randomBeaconInspector) EnoughShares() bool {
 // its internal state, thereby permitting only one routine at a time.
 //
 // Returns:
-// - (signature, nil) if no error occurred
-// - (nil, model.InsufficientSignaturesError) if not enough shares were collected
-// - (nil, model.InvalidSignatureIncluded) if at least one collected share does not serialize to a valid BLS signature,
-//    or if the constructed signature failed to verify against the group public key and stored message. This post-verification
-//    is required  for safety, as `TrustedAdd` allows adding invalid signatures.
-// - (nil, error) for any other unexpected error.
+//   - (signature, nil) if no error occurred
+//   - (nil, model.InsufficientSignaturesError) if not enough shares were collected
+//   - (nil, model.InvalidSignatureIncluded) if at least one collected share does not serialize to a valid BLS signature,
+//     or if the constructed signature failed to verify against the group public key and stored message. This post-verification
+//     is required  for safety, as `TrustedAdd` allows adding invalid signatures.
+//   - (nil, error) for any other unexpected error.
 func (r *randomBeaconInspector) Reconstruct() (crypto.Signature, error) {
 	sig, err := r.inspector.ThresholdSignature()
 	if err != nil {

@@ -85,8 +85,8 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 // NOTE: 'envelope' contains 'code' & serialized / encoded 'v'.
 // i.e.  1st byte is 'code' and remaining bytes are CBOR encoded 'v'.
 // Expected error returns during normal operations:
-//  * codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
-//  * codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
+//   - codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
+//   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope

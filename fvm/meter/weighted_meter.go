@@ -349,7 +349,7 @@ func (m *WeightedMeter) NewChild() Meter {
 }
 
 // MergeMeter merges the input meter into the current meter and checks for the limits
-func (m *WeightedMeter) MergeMeter(child Meter, enforceLimits bool) error {
+func (m *WeightedMeter) MergeMeter(child Meter) {
 
 	var childComputationUsed uint64
 	if basic, ok := child.(*WeightedMeter); ok {
@@ -358,29 +358,16 @@ func (m *WeightedMeter) MergeMeter(child Meter, enforceLimits bool) error {
 		childComputationUsed = uint64(child.TotalComputationUsed()) << MeterExecutionInternalPrecisionBytes
 	}
 	m.computationUsed = m.computationUsed + childComputationUsed
-	if enforceLimits && m.computationUsed > m.computationLimit {
-		return errors.NewComputationLimitExceededError(uint64(m.TotalComputationLimit()))
-	}
 
 	for key, intensity := range child.ComputationIntensities() {
 		m.computationIntensities[key] += intensity
 	}
 
-	var childMemoryEstimate uint64
-	if basic, ok := child.(*WeightedMeter); ok {
-		childMemoryEstimate = basic.memoryEstimate
-	} else {
-		childMemoryEstimate = uint64(child.TotalMemoryEstimate())
-	}
-	m.memoryEstimate = m.memoryEstimate + childMemoryEstimate
-	if enforceLimits && m.memoryEstimate > m.memoryLimit {
-		return errors.NewMemoryLimitExceededError(uint64(m.TotalMemoryLimit()))
-	}
+	m.memoryEstimate = m.memoryEstimate + child.TotalMemoryEstimate()
 
 	for key, intensity := range child.MemoryIntensities() {
 		m.memoryIntensities[key] += intensity
 	}
-	return nil
 }
 
 // MeterComputation captures computation usage and returns an error if it goes beyond the limit

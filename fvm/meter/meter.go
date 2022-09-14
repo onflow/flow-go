@@ -4,6 +4,7 @@ import "github.com/onflow/cadence/runtime/common"
 
 type MetringOperationType uint
 
+// TODO(patrick): rm after emulator is updated ...
 const (
 	// [2_000, 3_000) reserved for the FVM
 	_ common.ComputationKind = iota + 2_000
@@ -44,7 +45,7 @@ type MeteredMemoryIntensities map[common.MemoryKind]uint
 type Meter interface {
 	// merge child funcionality
 	NewChild() Meter
-	MergeMeter(child Meter, enforceLimits bool) error
+	MergeMeter(child Meter)
 
 	// computation metering
 	MeterComputation(kind common.ComputationKind, intensity uint) error

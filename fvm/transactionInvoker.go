@@ -4,12 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/stdlib"
-
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
@@ -22,18 +18,15 @@ import (
 )
 
 type TransactionInvoker struct {
-	logger zerolog.Logger
 }
 
-func NewTransactionInvoker(logger zerolog.Logger) *TransactionInvoker {
-	return &TransactionInvoker{
-		logger: logger,
-	}
+func NewTransactionInvoker() TransactionInvoker {
+	return TransactionInvoker{}
 }
 
-func (i *TransactionInvoker) Process(
+func (i TransactionInvoker) Process(
 	vm *VirtualMachine,
-	ctx *Context,
+	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programsCache.Programs,
@@ -47,11 +40,6 @@ func (i *TransactionInvoker) Process(
 			attribute.String("transaction_id", txIDStr),
 		)
 		defer span.End()
-	}
-
-	var blockHeight uint64
-	if ctx.BlockHeader != nil {
-		blockHeight = ctx.BlockHeader.Height
 	}
 
 	nestedTxnId, err := sth.BeginNestedTransaction()
@@ -76,9 +64,7 @@ func (i *TransactionInvoker) Process(
 			}
 
 			msg := "transaction has unexpected nested transactions"
-			i.logger.Error().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
+			ctx.Logger.Error().
 				Msg(msg)
 
 			proc.Err = errors.NewFVMInternalErrorf(msg)
@@ -97,37 +83,24 @@ func (i *TransactionInvoker) Process(
 		}
 	}()
 
-	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	env := NewTransactionEnvironment(ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
-	location := common.TransactionLocation(proc.ID)
-
-	runtimeEnv := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-	declareStandardLibraryValues(runtimeEnv, env)
+	rt := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(rt)
 
 	var txError error
-	err = vm.Runtime.ExecuteTransaction(
+	err = rt.ExecuteTransaction(
 		runtime.Script{
 			Source:    proc.Transaction.Script,
 			Arguments: proc.Transaction.Arguments,
 		},
-		runtime.Context{
-			Interface:   env,
-			Location:    location,
-			Environment: runtimeEnv,
-		},
-	)
+		common.TransactionLocation(proc.ID))
+
 	if err != nil {
-		var interactionLimitExceededErr *errors.LedgerInteractionLimitExceededError
-		if errors.As(err, &interactionLimitExceededErr) {
-			// If it is this special interaction limit error, just set it directly as the tx error
-			txError = err
-		} else {
-			// Otherwise, do what we use to do
-			txError = fmt.Errorf(
-				"transaction invocation failed when executing transaction: %w",
-				errors.HandleRuntimeError(err),
-			)
-		}
+		txError = fmt.Errorf(
+			"transaction invocation failed when executing transaction: %w",
+			err,
+		)
 	}
 
 	// read computationUsed from the environment. This will be used to charge fees.
@@ -136,7 +109,7 @@ func (i *TransactionInvoker) Process(
 
 	// log te execution intensities here, so tha they do not contain data from storage limit checks and
 	// transaction deduction, because the payer is not charged for those.
-	i.logExecutionIntensities(sth, txIDStr)
+	i.logExecutionIntensities(ctx, sth, txIDStr)
 
 	// disable the limit checks on states
 	sth.DisableAllLimitEnforcements()
@@ -174,6 +147,7 @@ func (i *TransactionInvoker) Process(
 		defer sth.EnableAllLimitEnforcements()
 
 		modifiedSets = programsCache.ModifiedSets{}
+		env.Reset()
 
 		// drop delta since transaction failed
 		err := sth.RestartNestedTransaction(nestedTxnId)
@@ -185,23 +159,15 @@ func (i *TransactionInvoker) Process(
 		}
 
 		// log transaction as failed
-		i.logger.Info().
-			Str("txHash", txIDStr).
-			Uint64("blockHeight", blockHeight).
+		ctx.Logger.Info().
 			Msg("transaction executed with error")
-
-		// TODO(patrick): make env reusable on error
-		// reset env
-		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
 
 		// if fee deduction fails just do clean up and exit
 		if feesError != nil {
-			i.logger.Info().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
+			ctx.Logger.Info().
 				Msg("transaction fee deduction executed with error")
 
 			txError = feesError
@@ -223,7 +189,7 @@ func (i *TransactionInvoker) Process(
 	return txError
 }
 
-func (i *TransactionInvoker) deductTransactionFees(
+func (i TransactionInvoker) deductTransactionFees(
 	env *TransactionEnv,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
@@ -239,8 +205,7 @@ func (i *TransactionInvoker) deductTransactionFees(
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be
 	// dynamic.	Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
-	_, err = InvokeDeductTransactionFeesContract(
-		env,
+	_, err = env.DeductTransactionFees(
 		proc.Transaction.Payer,
 		inclusionEffort,
 		computationUsed)
@@ -251,64 +216,9 @@ func (i *TransactionInvoker) deductTransactionFees(
 	return nil
 }
 
-var setAccountFrozenFunctionType = &sema.FunctionType{
-	Parameters: []*sema.Parameter{
-		{
-			Label:          sema.ArgumentLabelNotRequired,
-			Identifier:     "account",
-			TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
-		},
-		{
-			Label:          sema.ArgumentLabelNotRequired,
-			Identifier:     "frozen",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
-		},
-	},
-	ReturnTypeAnnotation: &sema.TypeAnnotation{
-		Type: sema.VoidType,
-	},
-}
-
-type StandardLibraryInterface interface {
-	SetAccountFrozen(address common.Address, frozen bool) error
-}
-
-func declareStandardLibraryValues(runtimeEnv runtime.Environment, i StandardLibraryInterface) {
-	// TODO return the errors instead of panicing
-
-	runtimeEnv.Declare(stdlib.StandardLibraryValue{
-		Name: "setAccountFrozen",
-		Type: setAccountFrozenFunctionType,
-		Kind: common.DeclarationKindFunction,
-		Value: interpreter.NewUnmeteredHostFunctionValue(
-			func(invocation interpreter.Invocation) interpreter.Value {
-				address, ok := invocation.Arguments[0].(interpreter.AddressValue)
-				if !ok {
-					panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
-						"first argument of setAccountFrozen must be an address"))
-				}
-
-				frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
-				if !ok {
-					panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
-						"second argument of setAccountFrozen must be a boolean"))
-				}
-
-				err := i.SetAccountFrozen(common.Address(address), bool(frozen))
-				if err != nil {
-					panic(err)
-				}
-
-				return interpreter.VoidValue{}
-			},
-			setAccountFrozenFunctionType,
-		),
-	})
-}
-
 // logExecutionIntensities logs execution intensities of the transaction
-func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txHash string) {
-	if i.logger.Debug().Enabled() {
+func (i TransactionInvoker) logExecutionIntensities(ctx Context, sth *state.StateHolder, txHash string) {
+	if ctx.Logger.Debug().Enabled() {
 		computation := zerolog.Dict()
 		for s, u := range sth.ComputationIntensities() {
 			computation.Uint(strconv.FormatUint(uint64(s), 10), u)
@@ -317,8 +227,7 @@ func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txH
 		for s, u := range sth.MemoryIntensities() {
 			memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
-		i.logger.Info().
-			Str("txHash", txHash).
+		ctx.Logger.Info().
 			Uint64("ledgerInteractionUsed", sth.InteractionUsed()).
 			Uint("computationUsed", sth.TotalComputationUsed()).
 			Uint64("memoryEstimate", sth.TotalMemoryEstimate()).

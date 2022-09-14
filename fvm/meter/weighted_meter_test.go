@@ -142,18 +142,21 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = child3.MeterComputation(compKind, 4)
 		require.NoError(t, err)
 
-		err = m.MergeMeter(child1, true)
-		require.NoError(t, err)
+		m.MergeMeter(child1)
 		require.Equal(t, uint(1+2), m.TotalComputationUsed())
 		require.Equal(t, uint(1+2), m.ComputationIntensities()[compKind])
 
-		err = m.MergeMeter(child2, true)
-		require.NoError(t, err)
+		m.MergeMeter(child2)
 		require.Equal(t, uint(1+2+3), m.TotalComputationUsed())
 		require.Equal(t, uint(1+2+3), m.ComputationIntensities()[compKind])
 
-		// error on merge (hitting limit)
-		err = m.MergeMeter(child3, true)
+		// merge hits limit, but is accepted.
+		m.MergeMeter(child3)
+		require.Equal(t, uint(1+2+3+4), m.TotalComputationUsed())
+		require.Equal(t, uint(1+2+3+4), m.ComputationIntensities()[compKind])
+
+		// error after merge (hitting limit)
+		err = m.MeterComputation(compKind, 0)
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 		require.Equal(t, err.(*errors.ComputationLimitExceededError).Error(), errors.NewComputationLimitExceededError(9).Error())
@@ -176,8 +179,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		require.NoError(t, err)
 
 		// hitting limit and ignoring it
-		err = m.MergeMeter(child, false)
-		require.NoError(t, err)
+		m.MergeMeter(child)
 		require.Equal(t, uint(1+1), m.TotalComputationUsed())
 		require.Equal(t, uint(1+1), m.ComputationIntensities()[compKind])
 	})
@@ -198,7 +200,9 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = child1.MeterComputation(0, 1)
 		require.NoError(t, err)
 
-		err = m.MergeMeter(child1, true)
+		m.MergeMeter(child1)
+
+		err = m.MeterComputation(0, 0)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 	})
 
@@ -218,8 +222,9 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = child1.MeterMemory(0, 1)
 		require.NoError(t, err)
 
-		err = m.MergeMeter(child1, true)
+		m.MergeMeter(child1)
 
+		err = m.MeterMemory(0, 0)
 		require.Error(t, err)
 		require.True(t, errors.IsMemoryLimitExceededError(err))
 		require.Equal(t, err.(*errors.MemoryLimitExceededError).Error(), errors.NewMemoryLimitExceededError(math.MaxUint32).Error())

@@ -8,9 +8,9 @@ import (
 
 // The node represents a generic vertex in the sparse Merkle trie.
 // CONVENTION:
-//  * This implementation guarantees that within the trie there are
-//    _never_ nil-references to descendants. We completely avoid this by
-//    utilizing `short nodes` that represent any path-segment without branching.
+//   - This implementation guarantees that within the trie there are
+//     _never_ nil-references to descendants. We completely avoid this by
+//     utilizing `short nodes` that represent any path-segment without branching.
 type node interface {
 	// Hash computes recursively the hash of this respective sub trie.
 	// To simplify enforcing cryptographic security, we introduce the convention

@@ -94,8 +94,8 @@ func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identif
 
 // process processes events for the synchronization request handler engine.
 // Error returns:
-//  * IncompatibleInputTypeError if input has unexpected type
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+//   - IncompatibleInputTypeError if input has unexpected type
+//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (r *RequestHandler) process(originID flow.Identifier, event interface{}) error {
 	return r.requestMessageHandler.Process(originID, event)
 }

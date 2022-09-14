@@ -1003,9 +1003,13 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		// build the rpc engine
-		engineBuilder.WithNewHandler(proxy)
-		engineBuilder.WithLegacy()
-		builder.RpcEng = engineBuilder.Build()
+		builder.RpcEng, err = engineBuilder.
+			WithNewHandler(proxy).
+			WithLegacy().
+			Build()
+		if err != nil {
+			return nil, err
+		}
 		return builder.RpcEng, nil
 	})
 }
@@ -1016,7 +1020,7 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) network.Middleware {
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger)
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
 	builder.Middleware = p2p.NewMiddleware(
 		builder.Logger,
 		factoryFunc,

@@ -18,6 +18,8 @@ type ViolationsConsumer interface {
 
 	// OnSenderEjectedError logs an error for sender ejected error
 	OnSenderEjectedError(violation *Violation)
+
+	OnUnexpectedError(violation *Violation)
 }
 
 type Violation struct {

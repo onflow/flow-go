@@ -9,6 +9,40 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
+const (
+	// [2_000, 3_000) reserved for the FVM
+	_ common.ComputationKind = iota + 2_000
+	ComputationKindHash
+	ComputationKindVerifySignature
+	ComputationKindAddAccountKey
+	ComputationKindAddEncodedAccountKey
+	ComputationKindAllocateStorageIndex
+	ComputationKindCreateAccount
+	ComputationKindEmitEvent
+	ComputationKindGenerateUUID
+	ComputationKindGetAccountAvailableBalance
+	ComputationKindGetAccountBalance
+	ComputationKindGetAccountContractCode
+	ComputationKindGetAccountContractNames
+	ComputationKindGetAccountKey
+	ComputationKindGetBlockAtHeight
+	ComputationKindGetCode
+	ComputationKindGetCurrentBlockHeight
+	ComputationKindGetProgram
+	ComputationKindGetStorageCapacity
+	ComputationKindGetStorageUsed
+	ComputationKindGetValue
+	ComputationKindRemoveAccountContractCode
+	ComputationKindResolveLocation
+	ComputationKindRevokeAccountKey
+	ComputationKindRevokeEncodedAccountKey
+	ComputationKindSetProgram
+	ComputationKindSetValue
+	ComputationKindUpdateAccountContractCode
+	ComputationKindValidatePublicKey
+	ComputationKindValueExists
+)
+
 type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error
 	ComputationUsed() uint64

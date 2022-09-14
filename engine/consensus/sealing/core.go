@@ -31,10 +31,10 @@ import (
 
 // Core is an implementation of SealingCore interface
 // This struct is responsible for:
-// 	- collecting approvals for execution results
-// 	- processing multiple incorporated results
-// 	- pre-validating approvals (if they are outdated or non-verifiable)
-// 	- pruning already processed collectorTree
+//   - collecting approvals for execution results
+//   - processing multiple incorporated results
+//   - pre-validating approvals (if they are outdated or non-verifiable)
+//   - pruning already processed collectorTree
 type Core struct {
 	unit                       *engine.Unit
 	workerPool                 *workerpool.WorkerPool             // worker pool used by collectors
@@ -429,9 +429,10 @@ func (c *Core) processApproval(approval *flow.ResultApproval) error {
 // generate an emergency seal. To limit performance impact of these checks, we limit emergency sealing
 // to the 100 lowest finalized blocks that are still unsealed.
 // Inputs:
-//  * `observer` for tracking and reporting the current internal state of the local sealing logic
-//  * `lastFinalizedHeight` is the height of the latest block that is finalized
-//  * `lastHeightWithFinalizedSeal` is the height of the latest block that is finalized and in addition
+//   - `observer` for tracking and reporting the current internal state of the local sealing logic
+//   - `lastFinalizedHeight` is the height of the latest block that is finalized
+//   - `lastHeightWithFinalizedSeal` is the height of the latest block that is finalized and in addition
+//
 // No errors are expected during normal operations.
 func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, lastHeightWithFinalizedSeal, lastFinalizedHeight uint64) error {
 	// if emergency sealing is not activated, then exit
@@ -605,10 +606,10 @@ func (c *Core) prune(parentSpan otelTrace.Span, finalized, lastSealed *flow.Head
 // request approvals if the block incorporating the result is below the
 // threshold.
 //
-//                                   threshold
-//                              |                   |
-// ... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
-//       sealed       maxHeightForRequesting      final
+//	                                  threshold
+//	                             |                   |
+//	... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
+//	      sealed       maxHeightForRequesting      final
 func (c *Core) requestPendingApprovals(observation consensus.SealingObservation, lastSealedHeight, lastFinalizedHeight uint64) error {
 	if lastSealedHeight+c.sealingConfigsGetter.ApprovalRequestsThresholdConst() >= lastFinalizedHeight {
 		return nil
@@ -650,9 +651,8 @@ func (c *Core) requestPendingApprovals(observation consensus.SealingObservation,
 // since Z is prior to sealing segment, the node cannot valid the ER. Therefore, we
 // ignore these block references.
 //
-//      [  sealing segment       ]
-// Z <- A <- B(RZ) <- C <- D <- E
-//
+//	     [  sealing segment       ]
+//	Z <- A <- B(RZ) <- C <- D <- E
 func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.Header) (map[flow.Identifier]struct{}, error) {
 
 	rootSealingSegment, err := c.state.AtBlockID(rootHeader.ID()).SealingSegment()

@@ -813,10 +813,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, err
 			}
 
-			builder.RpcEng = engineBuilder.
+			builder.RpcEng, err = engineBuilder.
 				WithLegacy().
 				WithBlockSignerDecoder(signature.NewBlockSignerDecoder(builder.Committee)).
 				Build()
+			if err != nil {
+				return nil, err
+			}
+
 			return builder.RpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -957,11 +961,11 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 // initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
-// 		DHT as server
-// 		The address from the node config or the specified bind address as the listen address
-// 		The passed in private key as the libp2p key
-//		No connection gater
-// 		Default Flow libp2p pubsub options
+//   - DHT as server
+//   - The address from the node config or the specified bind address as the listen address
+//   - The passed in private key as the libp2p key
+//   - No connection gater
+//   - Default Flow libp2p pubsub options
 func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func(ctx context.Context) (*p2p.Node, error) {
 		connManager := p2p.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
@@ -1008,7 +1012,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 
 	// disable connection pruning for the access node which supports the observer
 	peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningDisabled, builder.PeerUpdateInterval)
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger)
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, builder.Metrics.Network)
 
 	builder.Middleware = p2p.NewMiddleware(
 		logger,
