@@ -13,12 +13,10 @@ import (
 //
 // Note that Verifier only implements (2). This API design allows to decouple
 //
-//	(i) the common logic for checking that a super-majority of the consensus
-//	    committee voted
-//
-// (ii) the handling of combined staking+RandomBeacon votes (consensus nodes)
-//
-//	vs only staking votes (collector nodes)
+//	 (i)  the common logic for checking that a super-majority of the consensus
+//	      committee voted
+//	 (ii) the handling of combined staking+RandomBeacon votes (consensus nodes)
+//		  vs only staking votes (collector nodes)
 //
 // On the one hand, this API design makes code less concise, as the two checks
 // are now distributed over API boundaries. On the other hand, we can avoid
