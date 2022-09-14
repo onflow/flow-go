@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -84,9 +87,123 @@ func (NoContractUpdater) Commit() ([]programs.ContractUpdateKey, error) {
 func (NoContractUpdater) Reset() {
 }
 
-type RestrictionIsEnabledFunc func() bool
-type AuthorizedAccountsFunc func() []common.Address
-type UseContractAuditVoucherFunc func(address runtime.Address, code []byte) (bool, error)
+// Expose stub interface for testing.
+type ContractUpdaterStubs interface {
+	RestrictedDeploymentEnabled() bool
+	RestrictedRemovalEnabled() bool
+
+	GetAuthorizedAccounts(path cadence.Path) []common.Address
+
+	UseContractAuditVoucher(address runtime.Address, code []byte) (bool, error)
+}
+
+type contractUpdaterStubsImpl struct {
+	chain                      flow.Chain
+	restrictContractDeployment bool
+	restrictContractRemoval    bool
+
+	logger          *environment.ProgramLogger
+	systemContracts *environment.SystemContracts
+	runtime         *environment.Runtime
+}
+
+func (impl *contractUpdaterStubsImpl) RestrictedDeploymentEnabled() bool {
+	enabled, defined := impl.getIsContractDeploymentRestricted()
+	if !defined {
+		// If the contract deployment bool is not set by the state
+		// fallback to the default value set by the configuration
+		// after the contract deployment bool is set by the state on all
+		// chains, this logic can be simplified
+		return impl.restrictContractDeployment
+	}
+	return enabled
+}
+
+// GetIsContractDeploymentRestricted returns if contract deployment
+// restriction is defined in the state and the value of it
+func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
+	restricted bool,
+	defined bool,
+) {
+	service := runtime.Address(impl.chain.ServiceAddress())
+
+	runtime := impl.runtime.BorrowCadenceRuntime()
+	defer impl.runtime.ReturnCadenceRuntime(runtime)
+
+	value, err := runtime.ReadStored(
+		service,
+		blueprints.IsContractDeploymentRestrictedPath)
+	if err != nil {
+		impl.logger.Logger().
+			Debug().
+			Msg("Failed to read IsContractDeploymentRestricted from the " +
+				"service account. Using value from context instead.")
+		return false, false
+	}
+	restrictedCadence, ok := value.(cadence.Bool)
+	if !ok {
+		impl.logger.Logger().
+			Debug().
+			Msg("Failed to parse IsContractDeploymentRestricted from the " +
+				"service account. Using value from context instead.")
+		return false, false
+	}
+	restricted = restrictedCadence.ToGoValue().(bool)
+	return restricted, true
+}
+
+func (impl *contractUpdaterStubsImpl) RestrictedRemovalEnabled() bool {
+	// TODO read this from the chain similar to the contract deployment
+	// but for now we would honor the fallback context flag
+	return impl.restrictContractRemoval
+}
+
+// GetAuthorizedAccounts returns a list of addresses authorized by the service
+// account. Used to determine which accounts are permitted to deploy, update,
+// or remove contracts.
+//
+// It reads a storage path from service account and parse the addresses. If any
+// issue occurs on the process (missing registers, stored value properly not
+// set), it gracefully handles it and falls back to default behaviour (only
+// service account be authorized).
+func (impl *contractUpdaterStubsImpl) GetAuthorizedAccounts(
+	path cadence.Path,
+) []common.Address {
+	// set default to service account only
+	service := runtime.Address(impl.chain.ServiceAddress())
+	defaultAccounts := []runtime.Address{service}
+
+	runtime := impl.runtime.BorrowCadenceRuntime()
+	defer impl.runtime.ReturnCadenceRuntime(runtime)
+
+	value, err := runtime.ReadStored(service, path)
+
+	const warningMsg = "failed to read contract authorized accounts from " +
+		"service account. using default behaviour instead."
+
+	if err != nil {
+		impl.logger.Logger().Warn().Msg(warningMsg)
+		return defaultAccounts
+	}
+	addresses, ok := utils.CadenceValueToAddressSlice(value)
+	if !ok {
+		impl.logger.Logger().Warn().Msg(warningMsg)
+		return defaultAccounts
+	}
+	return addresses
+}
+
+func (impl *contractUpdaterStubsImpl) UseContractAuditVoucher(
+	address runtime.Address,
+	code []byte,
+) (
+	bool,
+	error,
+) {
+	return impl.systemContracts.UseContractAuditVoucher(
+		address,
+		string(code[:]))
+}
 
 type contractUpdater struct {
 	tracer          *environment.Tracer
@@ -96,37 +213,55 @@ type contractUpdater struct {
 
 	draftUpdates map[programs.ContractUpdateKey]programs.ContractUpdate
 
-	// TODO(patrick): convert these into normal methods.
-	restrictedDeploymentEnabled  RestrictionIsEnabledFunc
-	restrictedRemovalEnabled     RestrictionIsEnabledFunc
-	authorizedDeploymentAccounts AuthorizedAccountsFunc
-	authorizedRemovalAccounts    AuthorizedAccountsFunc
-	useContractAuditVoucher      UseContractAuditVoucherFunc
+	ContractUpdaterStubs
 }
 
 var _ ContractUpdater = &contractUpdater{}
+
+func NewContractUpdaterForTesting(
+	accounts environment.Accounts,
+	stubs ContractUpdaterStubs,
+) *contractUpdater {
+	updater := NewContractUpdater(
+		nil,
+		nil,
+		accounts,
+		nil,
+		nil,
+		false,
+		false,
+		nil,
+		nil,
+		nil)
+	updater.ContractUpdaterStubs = stubs
+	return updater
+}
 
 func NewContractUpdater(
 	tracer *environment.Tracer,
 	meter environment.Meter,
 	accounts environment.Accounts,
 	transactionInfo environment.TransactionInfo,
-	restrictedDeploymentEnabled RestrictionIsEnabledFunc,
-	restrictedRemovalEnabled RestrictionIsEnabledFunc,
-	authorizedDeploymentAccounts AuthorizedAccountsFunc,
-	authorizedRemovalAccounts AuthorizedAccountsFunc,
-	useContractAuditVoucher UseContractAuditVoucherFunc,
+	chain flow.Chain,
+	restrictContractDeployment bool,
+	restrictContractRemoval bool,
+	logger *environment.ProgramLogger,
+	systemContracts *environment.SystemContracts,
+	runtime *environment.Runtime,
 ) *contractUpdater {
 	updater := &contractUpdater{
-		tracer:                       tracer,
-		meter:                        meter,
-		accounts:                     accounts,
-		transactionInfo:              transactionInfo,
-		restrictedDeploymentEnabled:  restrictedDeploymentEnabled,
-		restrictedRemovalEnabled:     restrictedRemovalEnabled,
-		authorizedDeploymentAccounts: authorizedDeploymentAccounts,
-		authorizedRemovalAccounts:    authorizedRemovalAccounts,
-		useContractAuditVoucher:      useContractAuditVoucher,
+		tracer:          tracer,
+		meter:           meter,
+		accounts:        accounts,
+		transactionInfo: transactionInfo,
+		ContractUpdaterStubs: &contractUpdaterStubsImpl{
+			logger:                     logger,
+			chain:                      chain,
+			restrictContractDeployment: restrictContractDeployment,
+			restrictContractRemoval:    restrictContractRemoval,
+			systemContracts:            systemContracts,
+			runtime:                    runtime,
+		},
 	}
 
 	updater.Reset()
@@ -217,7 +352,7 @@ func (updater *contractUpdater) setContract(
 
 	if !exists && !updater.isAuthorizedForDeployment(signingAccounts) {
 		// check if there's an audit voucher for the contract
-		voucherAvailable, err := updater.useContractAuditVoucher(address, code)
+		voucherAvailable, err := updater.UseContractAuditVoucher(address, code)
 		if err != nil {
 			errInner := errors.NewOperationAuthorizationErrorf(
 				"SetContract",
@@ -321,10 +456,10 @@ func (updater *contractUpdater) updates() (
 func (updater *contractUpdater) isAuthorizedForDeployment(
 	signingAccounts []runtime.Address,
 ) bool {
-	if updater.restrictedDeploymentEnabled() {
+	if updater.RestrictedDeploymentEnabled() {
 		return updater.isAuthorized(
 			signingAccounts,
-			updater.authorizedDeploymentAccounts)
+			blueprints.ContractDeploymentAuthorizedAddressesPath)
 	}
 	return true
 }
@@ -332,19 +467,19 @@ func (updater *contractUpdater) isAuthorizedForDeployment(
 func (updater *contractUpdater) isAuthorizedForRemoval(
 	signingAccounts []runtime.Address,
 ) bool {
-	if updater.restrictedRemovalEnabled() {
+	if updater.RestrictedRemovalEnabled() {
 		return updater.isAuthorized(
 			signingAccounts,
-			updater.authorizedRemovalAccounts)
+			blueprints.ContractRemovalAuthorizedAddressesPath)
 	}
 	return true
 }
 
 func (updater *contractUpdater) isAuthorized(
 	signingAccounts []runtime.Address,
-	authorizedAccounts AuthorizedAccountsFunc,
+	path cadence.Path,
 ) bool {
-	accts := authorizedAccounts()
+	accts := updater.GetAuthorizedAccounts(path)
 	for _, authorized := range accts {
 		for _, signer := range signingAccounts {
 			if signer == authorized {
