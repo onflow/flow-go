@@ -1926,3 +1926,152 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 		),
 	)
 }
+
+func TestInteractionLimit(t *testing.T) {
+	type testCase struct {
+		name             string
+		interactionLimit uint64
+		require          func(t *testing.T, tx *fvm.TransactionProcedure)
+	}
+
+	testCases := []testCase{
+		{
+			name:             "high limit succeeds",
+			interactionLimit: math.MaxUint64,
+			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
+				require.NoError(t, tx.Err)
+				require.Len(t, tx.Events, 5)
+			},
+		},
+		{
+			name:             "default limit succeeds",
+			interactionLimit: state.DefaultMaxInteractionSize,
+			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
+				require.NoError(t, tx.Err)
+				require.Len(t, tx.Events, 5)
+			},
+		},
+		{
+			name:             "low limit succeeds",
+			interactionLimit: 100000,
+			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
+				require.NoError(t, tx.Err)
+				require.Len(t, tx.Events, 5)
+			},
+		},
+		{
+			name:             "even lower low limit fails, and has only 3 events",
+			interactionLimit: 10000,
+			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
+				require.Error(t, tx.Err)
+				require.Len(t, tx.Events, 3)
+			},
+		},
+	}
+
+	// === setup ===
+	// setup an address with some funds
+	var privateKey flow.AccountPrivateKey
+	var address flow.Address
+	vmt, err := newVMTest().withBootstrapProcedureOptions(
+		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithExecutionMemoryLimit(math.MaxUint64),
+	).withContextOptions(
+		fvm.WithTransactionFeesEnabled(true),
+		fvm.WithAccountStorageLimit(true),
+	).bootstrapWith(
+		func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) error {
+			// ==== Create an account ====
+			var txBody *flow.TransactionBody
+			privateKey, txBody = testutil.CreateAccountCreationTransaction(t, chain)
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			if err != nil {
+				return err
+			}
+
+			tx := fvm.Transaction(txBody, 0)
+
+			err = vm.Run(ctx, tx, view, programs)
+			if err != nil {
+				return err
+			}
+			if tx.Err != nil {
+				return tx.Err
+			}
+
+			accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
+
+			// read the address of the account created (e.g. "0x01" and convert it to flow.address)
+			data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
+			if err != nil {
+				return err
+			}
+			address = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+
+			// ==== Transfer tokens to new account ====
+			txBody = transferTokensTx(chain).
+				AddAuthorizer(chain.ServiceAddress()).
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_000_000))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address)))
+
+			txBody.SetProposalKey(chain.ServiceAddress(), 0, 1)
+			txBody.SetPayer(chain.ServiceAddress())
+
+			err = testutil.SignEnvelope(
+				txBody,
+				chain.ServiceAddress(),
+				unittest.ServiceAccountPrivateKey,
+			)
+			if err != nil {
+				return err
+			}
+
+			tx = fvm.Transaction(txBody, 0)
+
+			err = vm.Run(ctx, tx, view, programs)
+			if err != nil {
+				return err
+			}
+			if tx.Err != nil {
+				return tx.Err
+			}
+			return nil
+		},
+	)
+	require.NoError(t, err)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, vmt.run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				// ==== Transfer funds with lowe interaction limit ====
+				txBody := transferTokensTx(chain).
+					AddAuthorizer(address).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
+					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+
+				txBody.SetProposalKey(address, 0, 0)
+				txBody.SetPayer(address)
+
+				hasher, err := exeUtils.NewHasher(privateKey.HashAlgo)
+				require.NoError(t, err)
+
+				sig, err := txBody.Sign(txBody.EnvelopeMessage(), privateKey.PrivateKey, hasher)
+				require.NoError(t, err)
+				txBody.AddEnvelopeSignature(address, 0, sig)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				// ==== IMPORTANT LINE ====
+				ctx.MaxStateInteractionSize = tc.interactionLimit
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+				tc.require(t, tx)
+			}),
+		)
+	}
+}
