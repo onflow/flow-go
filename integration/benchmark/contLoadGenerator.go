@@ -59,7 +59,8 @@ type ContLoadGenerator struct {
 	availableAccounts   chan *flowAccount // queue with accounts available for workers
 	workerStatsTracker  *WorkerStatsTracker
 	workers             []*Worker
-	Stopped             bool
+	stopped             bool
+	stoppedChannel      chan bool
 	follower            TxFollower
 	availableAccountsLo int
 }
@@ -155,6 +156,7 @@ func New(
 		workerStatsTracker:  NewWorkerStatsTracker(),
 		follower:            follower,
 		availableAccountsLo: loadParams.NumberOfAccounts,
+		stoppedChannel:      make(chan bool),
 	}
 
 	return lGen, nil
@@ -163,7 +165,7 @@ func New(
 // TODO(rbtz): make part of New
 func (lg *ContLoadGenerator) Init() error {
 	for i := 0; i < lg.loadParams.NumberOfAccounts; i += accountCreationBatchSize {
-		if lg.Stopped {
+		if lg.stopped {
 			return nil
 		}
 
@@ -269,7 +271,7 @@ func (lg *ContLoadGenerator) Start() {
 func (lg *ContLoadGenerator) Stop() {
 	defer lg.log.Debug().Msg("stopped generator")
 
-	lg.Stopped = true
+	lg.stopped = true
 	wg := sync.WaitGroup{}
 	wg.Add(len(lg.workers))
 	for _, w := range lg.workers {
@@ -286,6 +288,11 @@ func (lg *ContLoadGenerator) Stop() {
 	lg.workerStatsTracker.StopPrinting()
 	lg.log.Debug().Msg("stopping follower")
 	lg.follower.Stop()
+	lg.stoppedChannel <- true
+}
+
+func (lg *ContLoadGenerator) GetStoppedChannel() chan bool {
+	return lg.stoppedChannel
 }
 
 func (lg *ContLoadGenerator) GetTxExecuted() int {

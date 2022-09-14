@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"runtime"
 	"strconv"
@@ -73,8 +71,8 @@ func main() {
 	tpsFlag := flag.String("tps", "300", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
 	tpsDurationsFlag := flag.String("tps-durations", "10m", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	ciFlag := flag.Bool("ci-run", false, "whether or not the run is part of CI")
-	leadTime := flag.String("leadTime", "30s", "the amount of time before data slices are started")
 	sliceSize := flag.String("sliceSize", "2m", "the amount of time that each slice covers")
+	timeout := flag.String("test-timeout", "10m", "the amount of time in addition to the duration that the test will wait before timing out")
 	flag.Parse()
 
 	// Version and Commit Info
@@ -152,7 +150,7 @@ func main() {
 		benchmark.LoadParams{
 			TPS:              loadCase.tps,
 			NumberOfAccounts: loadCase.tps * accountMultiplier,
-			LoadType:         benchmark.LoadType(loadType),
+			LoadType:         loadType,
 			FeedbackEnabled:  feedbackEnabled,
 		},
 		benchmark.ConstExecParams{
@@ -176,53 +174,70 @@ func main() {
 
 	// prepare data slices
 	dataSlices := make([]dataSlice, 0)
-	go func() {
-		leadDuration, _ := time.ParseDuration(*leadTime)
-		sliceDuration, _ := time.ParseDuration(*sliceSize)
+	defer prepareDataForBigQuery(dataSlices, *ciFlag)
 
-		// wait through lead duration.
-		time.Sleep(leadDuration)
+	defer lg.Stop()
 
-		// grab time into start time
-		startTime := time.Now()
-		// grab total executed transactions into start transactions
-		startExecutedTransactions := lg.GetTxExecuted()
+	sliceDuration, _ := time.ParseDuration(*sliceSize)
 
-		t := time.NewTicker(sliceDuration)
-		for !lg.Stopped {
+	go recordTransactionData(
+		dataSlices,
+		lg,
+		sliceDuration,
+		runStartTime,
+		gitSha,
+		goVersion,
+		osVersion)
 
-			select {
-			case <-t.C:
-				endTime := time.Now()
-				endExecutedTransaction := lg.GetTxExecuted()
-
-				// calculate this slice
-				inputTps := lg.AvgTpsBetween(startTime, endTime)
-				outputTps := float64(endExecutedTransaction-startExecutedTransactions) / sliceDuration.Seconds()
-				slice := dataSlice{
-					GitSha:       gitSha,
-					GoVersion:    goVersion,
-					OsVersion:    osVersion,
-					StartTime:    startTime,
-					EndTime:      endTime,
-					InputTps:     inputTps,
-					OutputTps:    outputTps,
-					BeforeExTxs:  startExecutedTransactions,
-					AfterExTxs:   endExecutedTransaction,
-					RunStartTime: runStartTime}
-
-				startExecutedTransactions = endExecutedTransaction
-				startTime = endTime
-
-				dataSlices = append(dataSlices, slice)
-			}
-		}
-	}()
-
+	//replace with channel stuff?
 	time.Sleep(loadCase.duration)
-	lg.Stop()
+}
 
-	prepareDataForBigQuery(dataSlices, *ciFlag)
+func recordTransactionData(
+	slices []dataSlice,
+	lg *benchmark.ContLoadGenerator,
+	sliceDuration time.Duration,
+	runStartTime time.Time,
+	gitSha, goVersion, osVersion string) {
+
+	// grab time into start time
+	startTime := time.Now()
+	// grab total executed transactions into start transactions
+	startExecutedTransactions := lg.GetTxExecuted()
+
+	t := time.NewTicker(sliceDuration)
+	defer t.Stop()
+
+	stopped := lg.GetStoppedChannel()
+	for {
+		select {
+		case <-t.C:
+			endTime := time.Now()
+			endExecutedTransaction := lg.GetTxExecuted()
+
+			// calculate this slice
+			inputTps := lg.AvgTpsBetween(startTime, endTime)
+			outputTps := float64(endExecutedTransaction-startExecutedTransactions) / sliceDuration.Seconds()
+			slice := dataSlice{
+				GitSha:       gitSha,
+				GoVersion:    goVersion,
+				OsVersion:    osVersion,
+				StartTime:    startTime,
+				EndTime:      endTime,
+				InputTps:     inputTps,
+				OutputTps:    outputTps,
+				BeforeExTxs:  startExecutedTransactions,
+				AfterExTxs:   endExecutedTransaction,
+				RunStartTime: runStartTime}
+
+			startExecutedTransactions = endExecutedTransaction
+			startTime = endTime
+
+			slices = append(slices, slice)
+		case <-stopped:
+			return
+		}
+	}
 }
 
 func prepareDataForBigQuery(slices []dataSlice, ci bool) {
@@ -254,51 +269,4 @@ func prepareDataForBigQuery(slices []dataSlice, ci bool) {
 	if err != nil {
 		fmt.Println(err)
 	}
-}
-
-func getPrometheusTransactionAtTime(time time.Time) float64 {
-	url := fmt.Sprintf("http://localhost:9090/api/v1/query?query=execution_runtime_total_executed_transactions&time=%v", time.Unix())
-	resp, err := http.Get(url)
-	if err != nil {
-		// error handling
-		println("Error getting prometheus data")
-		return -1
-	}
-
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Printf("Error reading response body, %v", err)
-		return -1
-	}
-
-	var result map[string]interface{}
-
-	err = json.Unmarshal([]byte(body), &result)
-	if err != nil {
-		fmt.Printf("Error unmarshaling json, %v", err)
-		return -1
-	}
-
-	totalTxs := 0
-	executionNodeCount := 0
-
-	resultMap := result["data"].(map[string]interface{})["result"].([]interface{})
-
-	for i, executionNodeMap := range resultMap {
-		executionNodeCount = i
-		nodeMap, _ := executionNodeMap.(map[string]interface{})
-		values := nodeMap["value"].([]interface{})
-		nodeTxsStr := values[1].(string)
-		nodeTxsInt, _ := strconv.Atoi(nodeTxsStr)
-		totalTxs = totalTxs + nodeTxsInt
-	}
-
-	if executionNodeCount == 0 {
-		println("No execution nodes found. No transactions.")
-		return 0
-	}
-
-	avgTps := float64(totalTxs) / float64(executionNodeCount)
-	return avgTps
 }
