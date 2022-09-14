@@ -416,6 +416,10 @@ func (vmMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View, _ *program
 	panic("not expected")
 }
 
+func (vmMock) GetAccountV2(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Account, error) {
+	panic("not expected")
+}
+
 type vmSystemOkMock struct{}
 
 func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, programs *programs.Programs) error {
@@ -443,6 +447,10 @@ func (vmSystemOkMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View, _ 
 	panic("not expected")
 }
 
+func (vmSystemOkMock) GetAccountV2(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Account, error) {
+	panic("not expected")
+}
+
 type vmSystemBadMock struct{}
 
 func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, programs *programs.Programs) error {
@@ -461,5 +469,9 @@ func (vm *vmSystemBadMock) RunV2(ctx fvm.Context, proc fvm.Procedure, led state.
 }
 
 func (vmSystemBadMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View, _ *programs.Programs) (*flow.Account, error) {
+	panic("not expected")
+}
+
+func (vmSystemBadMock) GetAccountV2(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Account, error) {
 	panic("not expected")
 }

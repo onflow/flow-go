@@ -27,8 +27,6 @@ func TestSafetyCheck(t *testing.T) {
 		log := zerolog.New(buffer)
 		txInvoker := fvm.NewTransactionInvoker()
 
-		vm := fvm.NewVM()
-
 		code := `X`
 
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
@@ -44,7 +42,7 @@ func TestSafetyCheck(t *testing.T) {
 				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		)
 
-		err := txInvoker.Process(vm, &context, proc, stTxn, programs.NewEmptyPrograms())
+		err := txInvoker.Process(context, proc, stTxn, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -57,8 +55,6 @@ func TestSafetyCheck(t *testing.T) {
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
 		txInvoker := fvm.NewTransactionInvoker()
-
-		vm := fvm.NewVM()
 
 		code := `transaction(arg: X) { }`
 
@@ -75,7 +71,7 @@ func TestSafetyCheck(t *testing.T) {
 				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		)
 
-		err := txInvoker.Process(vm, &context, proc, stTxn, programs.NewEmptyPrograms())
+		err := txInvoker.Process(context, proc, stTxn, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")

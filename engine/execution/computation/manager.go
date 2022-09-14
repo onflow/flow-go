@@ -88,7 +88,7 @@ type Manager struct {
 	vm                       computer.VirtualMachine
 	vmCtx                    fvm.Context
 	blockComputer            computer.BlockComputer
-	programsCache            *ProgramsCache
+	programsCache            *programs.ChainPrograms
 	scriptLogThreshold       time.Duration
 	scriptExecutionTimeLimit time.Duration
 	uploaders                []uploader.Uploader
@@ -145,7 +145,7 @@ func New(
 		return nil, fmt.Errorf("cannot create block computer: %w", err)
 	}
 
-	programsCache, err := NewProgramsCache(params.ProgramsCacheSize)
+	programsCache, err := programs.NewChainPrograms(params.ProgramsCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create programs cache: %w", err)
 	}
@@ -172,14 +172,6 @@ func New(
 
 func (e *Manager) VM() computer.VirtualMachine {
 	return e.vm
-}
-
-func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Programs {
-	blockPrograms := e.programsCache.Get(blockID)
-	if blockPrograms == nil {
-		return programs.NewEmptyPrograms()
-	}
-	return blockPrograms.ChildPrograms()
 }
 
 func (e *Manager) ExecuteScript(
@@ -215,7 +207,8 @@ func (e *Manager) ExecuteScript(
 	blockCtx := fvm.NewContextFromParent(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
-		fvm.WithBlockPrograms(e.getChildProgramsOrEmpty(blockHeader.ID())))
+		fvm.WithBlockPrograms(
+			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
 
 	err := func() (err error) {
 
@@ -292,14 +285,9 @@ func (e *Manager) ComputeBlock(
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
 
-	var blockPrograms *programs.Programs
-	fromCache := e.programsCache.Get(block.ParentID())
-
-	if fromCache == nil {
-		blockPrograms = programs.NewEmptyPrograms()
-	} else {
-		blockPrograms = fromCache.ChildPrograms()
-	}
+	blockPrograms := e.programsCache.GetOrCreateBlockPrograms(
+		block.ID(),
+		block.ParentID())
 
 	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, blockPrograms)
 	if err != nil {
@@ -312,15 +300,6 @@ func (e *Manager) ComputeBlock(
 
 	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("block result computed")
 
-	toInsert := blockPrograms
-
-	// if we have item from cache and there were no changes
-	// insert it under new block, to prevent long chains
-	if fromCache != nil && !blockPrograms.HasChanges() {
-		toInsert = fromCache
-	}
-
-	e.programsCache.Set(block.ID(), toInsert)
 	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("programs cache updated")
 
 	if uploadEnabled {
@@ -352,11 +331,13 @@ func (e *Manager) ComputeBlock(
 }
 
 func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view state.View) (*flow.Account, error) {
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithBlockPrograms(
+			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
 
-	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
-
-	account, err := e.vm.GetAccount(blockCtx, address, view, programs)
+	account, err := e.vm.GetAccountV2(blockCtx, address, view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account (%s) at block (%s): %w", address.String(), blockHeader.ID(), err)
 	}
