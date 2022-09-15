@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -392,12 +393,13 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	}
 
 	// Serialize subtrie nodes
-	for _, subTrieRoot := range subtrieRoots {
+	for i, subTrieRoot := range subtrieRoots {
 		// traversedSubtrieNodes contains all unique nodes of subtries of the same path and their index.
 		traversedSubtrieNodes := make(map[*node.Node]uint64, estimatedSubtrieNodeCount)
 		// Index 0 is a special case with nil node.
 		traversedSubtrieNodes[nil] = 0
 
+		logging := logProgress(fmt.Sprintf("storing %v-th sub trie roots", i), estimatedSubtrieNodeCount, &log.Logger)
 		for _, root := range subTrieRoot {
 			if root == nil {
 				continue
@@ -406,7 +408,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 			// into the checkpoint file. Therefore, it has to be reused when iterating each subtrie.
 			// storeUniqueNodes will add the unique visited node into traversedSubtrieNodes with key as the node
 			// itself, and value as n-th node being seralized in the checkpoint file.
-			nodeCounter, err = storeUniqueNodes(root, traversedSubtrieNodes, nodeCounter, scratch, crc32Writer)
+			nodeCounter, err = storeUniqueNodes(root, traversedSubtrieNodes, nodeCounter, scratch, crc32Writer, logging)
 			if err != nil {
 				return fmt.Errorf("fail to store nodes in step 1 for subtrie root %v: %w", root.Hash(), err)
 			}
@@ -430,7 +432,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 		// all nodes at all levels. In order to skip the nodes above subtrieLevel, since they have been seralized in step 1,
 		// we will need to pass in a visited nodes map that contains all the subtrie root nodes, which is the topLevelNodes.
 		// The topLevelNodes was built in step 1, when seralizing each subtrie root nodes.
-		nodeCounter, err = storeUniqueNodes(root, topLevelNodes, nodeCounter, scratch, crc32Writer)
+		nodeCounter, err = storeUniqueNodes(root, topLevelNodes, nodeCounter, scratch, crc32Writer, func(uint64) {})
 		if err != nil {
 			return fmt.Errorf("fail to store nodes in step 2 for root trie %v: %w", root.Hash(), err)
 		}
@@ -478,6 +480,27 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	return nil
 }
 
+func logProgress(msg string, estimatedSubtrieNodeCount int, logger *zerolog.Logger) func(nodeCounter uint64) {
+	lookup := make(map[int]int)
+	for i := 1; i < 10; i++ { // [1...9]
+		lookup[estimatedSubtrieNodeCount/10*i] = i * 10
+	}
+	return func(nodeCounter uint64) {
+		percentage, ok := reportProgress(int(nodeCounter), lookup)
+		if ok {
+			logger.Info().Msgf("%s completion percentage: %v %", msg, percentage)
+		}
+	}
+}
+
+func reportProgress(progress int, lookup map[int]int) (int, bool) {
+	percentage, ok := lookup[progress]
+	if ok {
+		return percentage, true
+	}
+	return 0, false
+}
+
 // storeUniqueNodes iterates and serializes unique nodes for trie with given root node.
 // It also saves unique nodes and node counter in visitedNodes map.
 // It returns nodeCounter and error (if any).
@@ -487,6 +510,7 @@ func storeUniqueNodes(
 	nodeCounter uint64,
 	scratch []byte,
 	writer io.Writer,
+	nodeCounterUpdated func(nodeCounter uint64), // for logging estimated progress
 ) (uint64, error) {
 
 	for itr := flattener.NewUniqueNodeIterator(root, visitedNodes); itr.Next(); {
@@ -494,6 +518,7 @@ func storeUniqueNodes(
 
 		visitedNodes[n] = nodeCounter
 		nodeCounter++
+		nodeCounterUpdated(nodeCounter)
 
 		var lchildIndex, rchildIndex uint64
 
