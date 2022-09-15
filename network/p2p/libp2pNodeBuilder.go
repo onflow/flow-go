@@ -96,7 +96,7 @@ type NodeBuilder interface {
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
-	EnableGossipSubPeerScoring()
+	EnableGossipSubPeerScoring(id.IdentityProvider) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -112,6 +112,7 @@ type LibP2PNodeBuilder struct {
 	connGater            connmgr.ConnectionGater
 	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
 	gossipSubPeerScoring bool
+	idProvider           id.IdentityProvider
 }
 
 func NewNodeBuilder(
@@ -158,8 +159,11 @@ func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring() {
+func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider id.IdentityProvider) NodeBuilder {
 	builder.gossipSubPeerScoring = true
+	builder.idProvider = provider
+
+	return builder
 }
 
 func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
@@ -212,7 +216,7 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 
 	var scoreOpt *scoring.ScoreOption
 	if builder.gossipSubPeerScoring {
-		scoreOpt = scoring.NewScoreOption(builder.logger)
+		scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider)
 		psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
 	}
 

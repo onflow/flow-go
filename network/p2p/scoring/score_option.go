@@ -3,6 +3,7 @@ package scoring
 import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/rs/zerolog"
 )
 
@@ -70,9 +71,10 @@ type ScoreOption struct {
 	peerThresholdParams *pubsub.PeerScoreThresholds
 }
 
-func NewScoreOption(logger zerolog.Logger) *ScoreOption {
+func NewScoreOption(logger zerolog.Logger, idProvider id.IdentityProvider) *ScoreOption {
 	return &ScoreOption{
-		logger: logger.With().Str("module", "pubsub_score_option").Logger(),
+		logger:    logger.With().Str("module", "pubsub_score_option").Logger(),
+		validator: NewSubscriptionValidator(idProvider),
 	}
 }
 
