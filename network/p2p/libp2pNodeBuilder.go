@@ -96,6 +96,7 @@ type NodeBuilder interface {
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
+	EnableGossipSubPeerScoring()
 	Build(context.Context) (*Node, error)
 }
 
