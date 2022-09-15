@@ -1,26 +1,26 @@
 package scoring
 
 import (
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 type SubscriptionProvider struct {
-	ps *pubsub.PubSub
+	tp p2p.TopicProvider
 }
 
-func NewSubscriptionProvider(ps *pubsub.PubSub) *SubscriptionProvider {
+func NewSubscriptionProvider(tp p2p.TopicProvider) *SubscriptionProvider {
 	return &SubscriptionProvider{
-		ps: ps,
+		tp: tp,
 	}
 }
 
 // GetSubscribedTopics returns all the subscriptions of a peer within the pubsub network.
 func (s *SubscriptionProvider) GetSubscribedTopics(pid peer.ID) []string {
-	topics := s.ps.GetTopics()
+	topics := s.tp.GetTopics()
 	subscriptions := make([]string, 0)
 	for _, topic := range topics {
-		peers := s.ps.ListPeers(topic)
+		peers := s.tp.ListPeers(topic)
 		for _, p := range peers {
 			if p == pid {
 				subscriptions = append(subscriptions, topic)
