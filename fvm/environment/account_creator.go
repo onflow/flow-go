@@ -241,9 +241,21 @@ func (creator *accountCreator) CreateAccount(
 		return common.Address{}, err
 	}
 
-	creator.stateTransaction.DisableAllLimitEnforcements() // don't enforce limit during account creation
-	defer creator.stateTransaction.EnableAllLimitEnforcements()
+	// don't enforce limit during account creation
+	var addr runtime.Address
+	creator.stateTransaction.RunWithAllLimitsDisabled(func() {
+		addr, err = creator.createAccount(payer)
+	})
 
+	return addr, err
+}
+
+func (creator *accountCreator) createAccount(
+	payer runtime.Address,
+) (
+	runtime.Address,
+	error,
+) {
 	flowAddress, err := creator.createBasicAccount(nil)
 	if err != nil {
 		return common.Address{}, err

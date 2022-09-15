@@ -452,18 +452,17 @@ func (updater *accountKeyUpdater) AddEncodedAccountKey(
 		return fmt.Errorf("add encoded account key failed: %w", err)
 	}
 
-	// TODO do a call to track the computation usage and memory usage
-	//
-	// don't enforce limit during adding a key
-	updater.stTxn.DisableAllLimitEnforcements()
-	defer updater.stTxn.EnableAllLimitEnforcements()
-
 	err = updater.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
 		return fmt.Errorf("add encoded account key failed: %w", err)
 	}
 
-	err = updater.addEncodedAccountKey(address, publicKey)
+	// TODO do a call to track the computation usage and memory usage
+	//
+	// don't enforce limit during adding a key
+	updater.stTxn.RunWithAllLimitsDisabled(func() {
+		err = updater.addEncodedAccountKey(address, publicKey)
+	})
 
 	if err != nil {
 		return fmt.Errorf("add encoded account key failed: %w", err)
