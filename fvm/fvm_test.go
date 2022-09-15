@@ -68,9 +68,11 @@ func (vmt vmTest) run(
 ) func(t *testing.T) {
 	return func(t *testing.T) {
 		chain, vm := createChainAndVm(flow.Testnet)
+		blockPrograms := programs.NewEmptyPrograms()
 
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
+			fvm.WithBlockPrograms(blockPrograms),
 		}
 
 		opts := append(baseOpts, vmt.contextOptions...)
@@ -83,14 +85,12 @@ func (vmt vmTest) run(
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		}
 
-		programs := programs.NewEmptyPrograms()
-
 		bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
 		err := vm.RunV2(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
 		require.NoError(t, err)
 
-		f(t, vm, chain, ctx, view, programs)
+		f(t, vm, chain, ctx, view, blockPrograms)
 	}
 }
 
@@ -485,9 +485,14 @@ func TestWithServiceAccount(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	t.Run("With service account enabled", func(t *testing.T) {
-		tx := fvm.Transaction(txBody, 0)
+		blockPrograms := programs.NewEmptyPrograms()
+		ctxB := fvm.NewContextFromParent(
+			ctxA,
+			fvm.WithBlockPrograms(blockPrograms))
 
-		err := vm.RunV2(ctxA, tx, view)
+		tx := fvm.Transaction(txBody, blockPrograms.NextTxIndexForTestingOnly())
+
+		err := vm.RunV2(ctxB, tx, view)
 		require.NoError(t, err)
 
 		// transaction should fail on non-bootstrapped ledger
@@ -495,9 +500,13 @@ func TestWithServiceAccount(t *testing.T) {
 	})
 
 	t.Run("With service account disabled", func(t *testing.T) {
-		ctxB := fvm.NewContextFromParent(ctxA, fvm.WithServiceAccount(false))
+		blockPrograms := programs.NewEmptyPrograms()
+		ctxB := fvm.NewContextFromParent(
+			ctxA,
+			fvm.WithServiceAccount(false),
+			fvm.WithBlockPrograms(blockPrograms))
 
-		tx := fvm.Transaction(txBody, 0)
+		tx := fvm.Transaction(txBody, blockPrograms.NextTxIndexForTestingOnly())
 
 		err := vm.RunV2(ctxB, tx, view)
 		require.NoError(t, err)
@@ -508,16 +517,15 @@ func TestWithServiceAccount(t *testing.T) {
 }
 
 func TestEventLimits(t *testing.T) {
-
-	t.Parallel()
-
 	chain, vm := createChainAndVm(flow.Mainnet)
+	blockPrograms := programs.NewEmptyPrograms()
 
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
 			fvm.NewTransactionInvoker(),
 		),
+		fvm.WithBlockPrograms(blockPrograms),
 	)
 
 	ledger := testutil.RootBootstrappedLedger(vm, ctx)
@@ -549,22 +557,16 @@ func TestEventLimits(t *testing.T) {
 	}
 	`
 
-	ctx = fvm.NewContext(
-		fvm.WithChain(chain),
-		fvm.WithEventCollectionSizeLimit(2),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(),
-		),
-	)
+	ctx = fvm.NewContextFromParent(
+		ctx,
+		fvm.WithEventCollectionSizeLimit(2))
 
 	txBody := flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(deployingContractScriptTemplate, hex.EncodeToString([]byte(testContract))))).
 		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress())
 
-	programs := programs.NewEmptyPrograms()
-
-	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+	tx := fvm.Transaction(txBody, blockPrograms.NextTxIndexForTestingOnly())
 	err := vm.RunV2(ctx, tx, ledger)
 	require.NoError(t, err)
 
@@ -581,7 +583,7 @@ func TestEventLimits(t *testing.T) {
 
 	t.Run("With limits", func(t *testing.T) {
 		txBody.Payer = unittest.RandomAddressFixture()
-		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+		tx := fvm.Transaction(txBody, blockPrograms.NextTxIndexForTestingOnly())
 		err := vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
@@ -591,7 +593,7 @@ func TestEventLimits(t *testing.T) {
 
 	t.Run("With service account as payer", func(t *testing.T) {
 		txBody.Payer = chain.ServiceAddress()
-		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+		tx := fvm.Transaction(txBody, blockPrograms.NextTxIndexForTestingOnly())
 		err := vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
@@ -1482,14 +1484,6 @@ func TestEnforcingComputationLimit(t *testing.T) {
 	t.Parallel()
 
 	chain, vm := createChainAndVm(flow.Testnet)
-
-	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(),
-		),
-	)
-
 	simpleView := utils.NewSimpleView()
 
 	const computationLimit = 5
@@ -1556,6 +1550,15 @@ func TestEnforcingComputationLimit(t *testing.T) {
 	for _, test := range tests {
 
 		t.Run(test.name, func(t *testing.T) {
+			blockPrograms := programs.NewEmptyPrograms()
+
+			ctx := fvm.NewContext(
+				fvm.WithChain(chain),
+				fvm.WithTransactionProcessors(
+					fvm.NewTransactionInvoker(),
+				),
+				fvm.WithBlockPrograms(blockPrograms),
+			)
 
 			script := []byte(
 				fmt.Sprintf(
@@ -1578,7 +1581,7 @@ func TestEnforcingComputationLimit(t *testing.T) {
 				txBody.SetPayer(chain.ServiceAddress()).
 					SetGasLimit(0)
 			}
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, blockPrograms.NextTxIndexForTestingOnly())
 
 			err := vm.RunV2(ctx, tx, simpleView)
 			require.NoError(t, err)
@@ -1623,7 +1626,7 @@ func TestStorageCapacity(t *testing.T) {
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(signer))).
 				SetProposalKey(service, 0, 0).
 				SetPayer(service)
-			tx := fvm.Transaction(transferTxBody, 0)
+			tx := fvm.Transaction(transferTxBody, programs.NextTxIndexForTestingOnly())
 			err := vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.NoError(t, tx.Err)
@@ -1634,7 +1637,7 @@ func TestStorageCapacity(t *testing.T) {
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(target))).
 				SetProposalKey(service, 0, 0).
 				SetPayer(service)
-			tx = fvm.Transaction(transferTxBody, 0)
+			tx = fvm.Transaction(transferTxBody, programs.NextTxIndexForTestingOnly())
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.NoError(t, tx.Err)
@@ -1672,7 +1675,7 @@ func TestStorageCapacity(t *testing.T) {
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(target))).
 				AddAuthorizer(signer)
 
-			tx = fvm.Transaction(txBody, 0)
+			tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
@@ -1993,9 +1996,9 @@ func TestInteractionLimit(t *testing.T) {
 				return err
 			}
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			if err != nil {
 				return err
 			}
@@ -2030,9 +2033,9 @@ func TestInteractionLimit(t *testing.T) {
 				return err
 			}
 
-			tx = fvm.Transaction(txBody, 0)
+			tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			if err != nil {
 				return err
 			}
@@ -2063,12 +2066,12 @@ func TestInteractionLimit(t *testing.T) {
 				require.NoError(t, err)
 				txBody.AddEnvelopeSignature(address, 0, sig)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 				// ==== IMPORTANT LINE ====
 				ctx.MaxStateInteractionSize = tc.interactionLimit
 
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 				tc.require(t, tx)
 			}),

@@ -450,7 +450,7 @@ func (c *Cache) logTelemetry() {
 		// not long elapsed since last log.
 		return
 	}
-	if !c.interactionCounter.CAS(counter, 0) {
+	if !c.interactionCounter.CompareAndSwap(counter, 0) {
 		// raced on CAS, hence, not logging.
 		return
 	}

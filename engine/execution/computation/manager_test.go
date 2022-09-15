@@ -496,6 +496,10 @@ func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, view state
 	panic("not expected")
 }
 
+func (p *PanickingVM) GetAccountV2(f fvm.Context, address flow.Address, view state.View) (*flow.Account, error) {
+	panic("not expected")
+}
+
 type LongRunningVM struct {
 	duration time.Duration
 }
@@ -515,6 +519,10 @@ func (l *LongRunningVM) RunV2(f fvm.Context, procedure fvm.Procedure, view state
 }
 
 func (l *LongRunningVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
+	panic("not expected")
+}
+
+func (l *LongRunningVM) GetAccountV2(f fvm.Context, address flow.Address, view state.View) (*flow.Account, error) {
 	panic("not expected")
 }
 
@@ -658,7 +666,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 	programs := programs.NewEmptyPrograms()
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, programs)
+	env := fvm.NewScriptEnv(context.Background(), ctx, stTxn, programs)
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)

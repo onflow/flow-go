@@ -370,7 +370,7 @@ func TestCreateAccount(t *testing.T) {
 				require.NoError(t, err)
 				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
-				account, err := vm.GetAccount(ctx, address, view, programs)
+				account, err := vm.GetAccountV2(ctx, address, view)
 				require.NoError(t, err)
 				require.NotNil(t, account)
 			}),
@@ -405,7 +405,7 @@ func TestCreateAccount(t *testing.T) {
 					require.NoError(t, err)
 					address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
-					account, err := vm.GetAccount(ctx, address, view, programs)
+					account, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					require.NotNil(t, account)
 				}
@@ -554,7 +554,7 @@ func TestAddAccountKey(t *testing.T) {
 				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Empty(t, before.Keys)
 
@@ -575,7 +575,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					assert.NoError(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 
 					require.Len(t, after.Keys, 1)
@@ -596,7 +596,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					publicKey1 := addAccountKey(t, vm, ctx, view, programs, address, test.apiVersion)
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, 1)
 
@@ -617,7 +617,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					assert.NoError(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 
 					expectedKeys := []flow.AccountPublicKey{
@@ -659,7 +659,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					assert.Error(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 
 					assert.Empty(t, after.Keys)
@@ -686,7 +686,7 @@ func TestAddAccountKey(t *testing.T) {
 				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Empty(t, before.Keys)
 
@@ -712,7 +712,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					assert.NoError(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 
 					expectedKeys := []flow.AccountPublicKey{
@@ -777,7 +777,7 @@ func TestAddAccountKey(t *testing.T) {
 						require.Error(t, tx.Err)
 						assert.Contains(t, tx.Err.Error(), "hashing algorithm type not supported")
 
-						after, err := vm.GetAccount(ctx, address, view, programs)
+						after, err := vm.GetAccountV2(ctx, address, view)
 						require.NoError(t, err)
 
 						assert.Empty(t, after.Keys)
@@ -827,7 +827,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						_ = addAccountKey(t, vm, ctx, view, programs, address, test.apiVersion)
 					}
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
@@ -852,7 +852,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						}
 					}
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, after.Keys, keyCount)
 
@@ -874,7 +874,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						_ = addAccountKey(t, vm, ctx, view, programs, address, test.apiVersion)
 					}
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
@@ -893,7 +893,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					assert.NoError(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, after.Keys, keyCount)
 
@@ -925,7 +925,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						_ = addAccountKey(t, vm, ctx, view, programs, address, apiVersionForAdding)
 					}
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
@@ -944,7 +944,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					assert.NoError(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, after.Keys, keyCount)
 
@@ -982,7 +982,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						_ = addAccountKey(t, vm, ctx, view, programs, address, test.apiVersion)
 					}
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
@@ -1004,7 +1004,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					assert.NoError(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, after.Keys, keyCount)
 
@@ -1034,7 +1034,7 @@ func TestGetAccountKey(t *testing.T) {
 					_ = addAccountKey(t, vm, ctx, view, programs, address, accountKeyAPIVersionV2)
 				}
 
-				before, err := vm.GetAccount(ctx, address, view, programs)
+				before, err := vm.GetAccountV2(ctx, address, view)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -1072,7 +1072,7 @@ func TestGetAccountKey(t *testing.T) {
 					keys[i] = addAccountKey(t, vm, ctx, view, programs, address, accountKeyAPIVersionV2)
 				}
 
-				before, err := vm.GetAccount(ctx, address, view, programs)
+				before, err := vm.GetAccountV2(ctx, address, view)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -1124,7 +1124,7 @@ func TestGetAccountKey(t *testing.T) {
 					keys[i] = addAccountKey(t, vm, ctx, view, programs, address, accountKeyAPIVersionV1)
 				}
 
-				before, err := vm.GetAccount(ctx, address, view, programs)
+				before, err := vm.GetAccountV2(ctx, address, view)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -1174,7 +1174,7 @@ func TestGetAccountKey(t *testing.T) {
 					keys[i] = addAccountKey(t, vm, ctx, view, programs, address, accountKeyAPIVersionV2)
 				}
 
-				before, err := vm.GetAccount(ctx, address, view, programs)
+				before, err := vm.GetAccountV2(ctx, address, view)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 

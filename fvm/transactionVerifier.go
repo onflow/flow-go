@@ -32,7 +32,6 @@ func NewTransactionVerifier(keyWeightThreshold int) *TransactionVerifier {
 }
 
 func (v *TransactionVerifier) Process(
-	_ *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,

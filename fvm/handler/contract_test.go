@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/mock"
@@ -11,12 +12,49 @@ import (
 
 	"github.com/onflow/flow-go/fvm/programs"
 
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	stateMock "github.com/onflow/flow-go/fvm/mock/state"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+type testContractUpdaterStubs struct {
+	deploymentEnabled    bool
+	removalEnabled       bool
+	deploymentAuthorized []common.Address
+	removalAuthorized    []common.Address
+
+	auditFunc func(address runtime.Address, code []byte) (bool, error)
+}
+
+func (p testContractUpdaterStubs) RestrictedDeploymentEnabled() bool {
+	return p.deploymentEnabled
+}
+
+func (p testContractUpdaterStubs) RestrictedRemovalEnabled() bool {
+	return p.removalEnabled
+}
+
+func (p testContractUpdaterStubs) GetAuthorizedAccounts(
+	path cadence.Path,
+) []common.Address {
+	if path == blueprints.ContractDeploymentAuthorizedAddressesPath {
+		return p.deploymentAuthorized
+	}
+	return p.removalAuthorized
+}
+
+func (p testContractUpdaterStubs) UseContractAuditVoucher(
+	address runtime.Address,
+	code []byte,
+) (
+	bool,
+	error,
+) {
+	return p.auditFunc(address, code)
+}
 
 func TestContract_ChildMergeFunctionality(t *testing.T) {
 	stTxn := state.NewStateTransaction(
@@ -28,14 +66,9 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
-	contractUpdater := NewContractUpdater(
-		nil,
-		nil,
+	contractUpdater := NewContractUpdaterForTesting(
 		accounts,
-		nil,
-		func() bool { return false },
-		func() bool { return false },
-		nil, nil, nil)
+		testContractUpdaterStubs{})
 
 	// no contract initially
 	names, err := accounts.GetContractNames(address)
@@ -123,16 +156,16 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 	require.NoError(t, err)
 
 	makeUpdater := func() *contractUpdater {
-		return NewContractUpdater(
-			nil,
-			nil,
+		return NewContractUpdaterForTesting(
 			accounts,
-			nil,
-			func() bool { return true },
-			func() bool { return true },
-			func() []common.Address { return []common.Address{rAdd, rBoth} },
-			func() []common.Address { return []common.Address{rRemove, rBoth} },
-			func(address runtime.Address, code []byte) (bool, error) { return false, nil })
+			testContractUpdaterStubs{
+				deploymentEnabled:    true,
+				removalEnabled:       true,
+				deploymentAuthorized: []common.Address{rAdd, rBoth},
+				removalAuthorized:    []common.Address{rRemove, rBoth},
+				auditFunc:            func(address runtime.Address, code []byte) (bool, error) { return false, nil },
+			})
+
 	}
 
 	t.Run("try to set contract with unauthorized account", func(t *testing.T) {
@@ -237,24 +270,17 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 	err = accounts.Create(nil, addressNoVoucher)
 	require.NoError(t, err)
 
-	contractUpdater := NewContractUpdater(
-		nil,
-		nil,
+	contractUpdater := NewContractUpdaterForTesting(
 		accounts,
-		nil,
-		func() bool { return true },
-		func() bool { return true },
-		func() []common.Address {
-			return []common.Address{}
-		},
-		func() []common.Address {
-			return []common.Address{}
-		},
-		func(address runtime.Address, code []byte) (bool, error) {
-			if address.String() == addressWithVoucher.String() {
-				return true, nil
-			}
-			return false, nil
+		testContractUpdaterStubs{
+			deploymentEnabled: true,
+			removalEnabled:    true,
+			auditFunc: func(address runtime.Address, code []byte) (bool, error) {
+				if address.String() == addressWithVoucher.String() {
+					return true, nil
+				}
+				return false, nil
+			},
 		})
 
 	// set contract without voucher
@@ -296,28 +322,20 @@ func TestContract_ContractUpdate(t *testing.T) {
 
 	var authorizationChecked bool
 
-	contractUpdater := NewContractUpdater(
-		nil,
-		nil,
+	contractUpdater := NewContractUpdaterForTesting(
 		accounts,
-		nil,
-		func() bool { return true },
-		func() bool { return true },
-		func() []common.Address {
-			return []common.Address{}
-		},
-		func() []common.Address {
-			return []common.Address{}
-		},
-		func(address runtime.Address, code []byte) (bool, error) {
-			// Ensure the voucher check is only called once,
-			// for the initial contract deployment,
-			// and not for the subsequent update
-			require.False(t, authorizationChecked)
-			authorizationChecked = true
-			return true, nil
-		},
-	)
+		testContractUpdaterStubs{
+			deploymentEnabled: true,
+			removalEnabled:    true,
+			auditFunc: func(address runtime.Address, code []byte) (bool, error) {
+				// Ensure the voucher check is only called once,
+				// for the initial contract deployment,
+				// and not for the subsequent update
+				require.False(t, authorizationChecked)
+				authorizationChecked = true
+				return true, nil
+			},
+		})
 
 	// deploy contract with voucher
 	err = contractUpdater.setContract(
@@ -368,17 +386,9 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 			return fmt.Errorf("%s %s", contractName, address.Hex())
 		})
 
-	contractUpdater := NewContractUpdater(
-		nil,
-		nil,
+	contractUpdater := NewContractUpdaterForTesting(
 		mockAccounts,
-		nil,
-		func() bool { return false },
-		func() bool { return false },
-		nil,
-		nil,
-		nil,
-	)
+		testContractUpdaterStubs{})
 
 	address1 := runtime.Address(flow.HexToAddress("0000000000000001"))
 	address2 := runtime.Address(flow.HexToAddress("0000000000000002"))
@@ -411,28 +421,19 @@ func TestContract_ContractRemoval(t *testing.T) {
 	t.Run("contract removal with restriction", func(t *testing.T) {
 		var authorizationChecked bool
 
-		contractUpdater := NewContractUpdater(
-			nil,
-			nil,
+		contractUpdater := NewContractUpdaterForTesting(
 			accounts,
-			nil,
-			func() bool { return false },
-			func() bool { return true },
-			func() []common.Address {
-				return []common.Address{}
-			},
-			func() []common.Address {
-				return []common.Address{}
-			},
-			func(address runtime.Address, code []byte) (bool, error) {
-				// Ensure the voucher check is only called once,
-				// for the initial contract deployment,
-				// and not for the subsequent update
-				require.False(t, authorizationChecked)
-				authorizationChecked = true
-				return true, nil
-			},
-		)
+			testContractUpdaterStubs{
+				removalEnabled: true,
+				auditFunc: func(address runtime.Address, code []byte) (bool, error) {
+					// Ensure the voucher check is only called once,
+					// for the initial contract deployment,
+					// and not for the subsequent update
+					require.False(t, authorizationChecked)
+					authorizationChecked = true
+					return true, nil
+				},
+			})
 
 		// deploy contract with voucher
 		err = contractUpdater.setContract(
@@ -485,28 +486,18 @@ func TestContract_ContractRemoval(t *testing.T) {
 	t.Run("contract removal without restriction", func(t *testing.T) {
 		var authorizationChecked bool
 
-		contractUpdater := NewContractUpdater(
-			nil,
-			nil,
+		contractUpdater := NewContractUpdaterForTesting(
 			accounts,
-			nil,
-			func() bool { return false },
-			func() bool { return false },
-			func() []common.Address {
-				return []common.Address{}
-			},
-			func() []common.Address {
-				return []common.Address{}
-			},
-			func(address runtime.Address, code []byte) (bool, error) {
-				// Ensure the voucher check is only called once,
-				// for the initial contract deployment,
-				// and not for the subsequent update
-				require.False(t, authorizationChecked)
-				authorizationChecked = true
-				return true, nil
-			},
-		)
+			testContractUpdaterStubs{
+				auditFunc: func(address runtime.Address, code []byte) (bool, error) {
+					// Ensure the voucher check is only called once,
+					// for the initial contract deployment,
+					// and not for the subsequent update
+					require.False(t, authorizationChecked)
+					authorizationChecked = true
+					return true, nil
+				},
+			})
 
 		// deploy contract with voucher
 		err = contractUpdater.setContract(

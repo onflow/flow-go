@@ -5,6 +5,8 @@ package mock
 import (
 	common "github.com/onflow/cadence/runtime/common"
 
+	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -61,6 +63,36 @@ func (_m *TransactionInfo) SigningAccounts() []common.Address {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]common.Address)
 		}
+	}
+
+	return r0
+}
+
+// TxID provides a mock function with given fields:
+func (_m *TransactionInfo) TxID() flow.Identifier {
+	ret := _m.Called()
+
+	var r0 flow.Identifier
+	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.Identifier)
+		}
+	}
+
+	return r0
+}
+
+// TxIndex provides a mock function with given fields:
+func (_m *TransactionInfo) TxIndex() uint32 {
+	ret := _m.Called()
+
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint32)
 	}
 
 	return r0
