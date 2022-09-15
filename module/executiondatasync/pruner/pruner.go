@@ -33,6 +33,7 @@ const (
 // and triggers pruning once the difference between the tracked
 // height and the last pruned height reaches the height range
 // target + threshold.
+// TODO doc below is incorrect - we mark fulfilled when executed
 // A height is considered fulfilled once it has both been executed,
 // tracked, and sealed.
 type Pruner struct {
