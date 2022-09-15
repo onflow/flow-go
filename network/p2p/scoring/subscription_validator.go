@@ -1,6 +1,8 @@
 package scoring
 
 import (
+	"fmt"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/module/id"
@@ -9,7 +11,7 @@ import (
 
 type SubscriptionValidator struct {
 	idProvider           id.IdentityProvider
-	subscriptionProvider SubscriptionProvider
+	subscriptionProvider *SubscriptionProvider
 }
 
 func NewSubscriptionValidator(idProvider id.IdentityProvider) *SubscriptionValidator {
@@ -18,25 +20,24 @@ func NewSubscriptionValidator(idProvider id.IdentityProvider) *SubscriptionValid
 	}
 }
 
-func (v *SubscriptionValidator) RegisterSubscriptionProvider(provider SubscriptionProvider) {
+func (v *SubscriptionValidator) RegisterSubscriptionProvider(provider *SubscriptionProvider) {
 	v.subscriptionProvider = provider
 }
 
-// ValidationSubscriptions validates all subscriptions a peer has with respect to all Flow topics.
-// It returns true if the peer is allowed to subscribe to all topics that it has subscribed.
-func (v *SubscriptionValidator) ValidationSubscriptions(pid peer.ID) bool {
+// MustSubscribedToAllowedTopics validates all subscriptions a peer has with respect to all Flow topics.
+func (v *SubscriptionValidator) MustSubscribedToAllowedTopics(pid peer.ID) error {
 	topics := v.subscriptionProvider.GetSubscribedTopics(pid)
 
 	flowId, ok := v.idProvider.ByPeerID(pid)
 	if !ok {
-		return false
+		return fmt.Errorf("could not find authorized identity for peer id %s", pid)
 	}
 
 	for _, topic := range topics {
 		if p2putils.AllowedSubscription(flowId.Role, topic) {
-			return false
+			return fmt.Errorf("unauthorized subscription: %s", topic)
 		}
 	}
 
-	return true
+	return nil
 }
