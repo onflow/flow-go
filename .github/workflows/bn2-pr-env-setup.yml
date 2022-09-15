@@ -1,13 +1,6 @@
-name: CI
+name: Ephemeral BN2 Setup for PR
 
 on:
-  push:
-    branches:
-      - 'auto-cadence-upgrade/**'
-      - staging
-      - trying
-      - 'feature/**'
-      - 'v[0-9]+.[0-9]+'
   pull_request:
     branches:
       - master

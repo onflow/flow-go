@@ -1,4 +1,4 @@
-name: Ephemeral-Benchnet2-Setup
+name: Ephemeral-Benchnet2-Setup-Teardown
 
 on:
   pull_request:
