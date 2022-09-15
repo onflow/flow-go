@@ -16,8 +16,6 @@ on:
       - 'v[0-9]+.[0-9]+'
 
 env:
-  BIGQUERY_DATASET: production_src_flow_tps_metrics
-  BIGQUERY_TABLE: TpsSlices
   GO_VERSION: 1.19
 
 jobs:
@@ -27,7 +25,6 @@ jobs:
       TEST_CATEGORY: TPS-Performance
       COMMIT_SHA: ${{ github.sha }}
       RUN_ID: ${{ github.run_id }}
-      RESULTS_FILE: tps-bq-results
     runs-on: ubuntu-latest
     steps:
       - name: Get job run date
@@ -53,9 +50,3 @@ jobs:
       - name: Run Localnet TPS test
         working-directory: integration/localnet
         run: make tps-test-ci
-      - name: Upload results to BigQuery
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 2
-          max_attempts: 3
-          command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $RESULTS_FILE integration/benchmark/tps_results_schema.json
