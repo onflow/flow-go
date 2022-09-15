@@ -112,7 +112,7 @@ func (on *Network) stop() error {
 // messages to the orchestrator network by calling the InboundHandler method of it remotely.
 func (on *Network) Observe(message *insecure.Message) {
 	if message.Ingress != nil && message.Egress != nil {
-		// In BFT testing framework, it is a bug to has both ingress and egress set.
+		// In BFT testing framework, it is a bug to have both ingress and egress messages not set.
 		on.logger.Fatal().Msg("received message with both ingress and egress set")
 		return // return to avoid changing the behavior by tweaking the log level.
 	}
