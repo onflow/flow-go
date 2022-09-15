@@ -331,11 +331,13 @@ func (e *Manager) ComputeBlock(
 }
 
 func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view state.View) (*flow.Account, error) {
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithBlockPrograms(
+			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
 
-	programs := e.programsCache.NewBlockProgramsForScript(blockHeader.ID())
-
-	account, err := e.vm.GetAccount(blockCtx, address, view, programs)
+	account, err := e.vm.GetAccountV2(blockCtx, address, view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account (%s) at block (%s): %w", address.String(), blockHeader.ID(), err)
 	}

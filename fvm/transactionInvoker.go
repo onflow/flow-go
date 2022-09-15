@@ -25,7 +25,6 @@ func NewTransactionInvoker() TransactionInvoker {
 }
 
 func (i TransactionInvoker) Process(
-	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
@@ -80,7 +79,7 @@ func (i TransactionInvoker) Process(
 		}
 	}()
 
-	env := NewTransactionEnvironment(ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	env := NewTransactionEnv(ctx, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)
@@ -143,6 +142,11 @@ func (i TransactionInvoker) Process(
 		sth.DisableAllLimitEnforcements()
 		defer sth.EnableAllLimitEnforcements()
 
+		// log transaction as failed
+		ctx.Logger.Info().
+			Err(txError).
+			Msg("transaction executed with error")
+
 		modifiedSets = programsCache.ModifiedSets{}
 		env.Reset()
 
@@ -154,10 +158,6 @@ func (i TransactionInvoker) Process(
 				err,
 			)
 		}
-
-		// log transaction as failed
-		ctx.Logger.Info().
-			Msg("transaction executed with error")
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
