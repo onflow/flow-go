@@ -750,11 +750,12 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 	// initialize consensus committee's membership state
 	// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 	// Note: node.Me.NodeID() is not part of the consensus exeNode.committee
-	var err error
-	exeNode.committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+	committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
 	if err != nil {
 		return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 	}
+	node.ProtocolEvents.AddConsumer(committee)
+	exeNode.committee = committee
 
 	packer := signature.NewConsensusSigDataPacker(exeNode.committee)
 	// initialize the verifier for the protocol consensus
