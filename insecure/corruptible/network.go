@@ -48,10 +48,9 @@ type Network struct {
 	conduitFactory        insecure.CorruptibleConduitFactory
 	attackerInboundStream insecure.CorruptibleConduitFactory_ConnectAttackerServer // inbound stream to attack orchestrator
 
-	// message processors for each channel.
-	// this map keeps the original message processors, so that we can restore them to
-	// send messages directly to them.
-	// defined as a concurrent map.
+	// We keep the original message processor here so that we can directly send messages to it when
+	// attacker dictates to do so.
+	// Defined as a concurrent map, as it is accessed concurrently through registration and message processing.
 	originalMessageProcessors sync.Map
 
 	receiptHasher  hash.Hasher
