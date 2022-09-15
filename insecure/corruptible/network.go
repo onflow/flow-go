@@ -51,7 +51,8 @@ type Network struct {
 	// message processors for each channel.
 	// this map keeps the original message processors, so that we can restore them to
 	// send messages directly to them.
-	originalMessageProcessors map[channels.Channel]flownet.MessageProcessor
+	// defined as a concurrent map.
+	originalMessageProcessors sync.Map
 
 	receiptHasher  hash.Hasher
 	spockHasher    hash.Hasher
@@ -84,7 +85,7 @@ func NewCorruptNetwork(
 		receiptHasher:             utils.NewExecutionReceiptHasher(),
 		spockHasher:               utils.NewSPOCKHasher(),
 		approvalHasher:            verutils.NewResultApprovalHasher(),
-		originalMessageProcessors: make(map[channels.Channel]flownet.MessageProcessor),
+		originalMessageProcessors: sync.Map{},
 	}
 
 	err := corruptNetwork.conduitFactory.RegisterEgressController(corruptNetwork)
@@ -116,9 +117,6 @@ func NewCorruptNetwork(
 // Except, it first wraps the given processor around a corrupt message processor, and then
 // registers the corrupt message processor to the original flow network.
 func (n *Network) Register(channel channels.Channel, messageProcessor flownet.MessageProcessor) (flownet.Conduit, error) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
 	corruptProcessor := NewCorruptMessageProcessor(
 		n.logger.With().Str("module", "corrupted-message-processor").Hex("corrupt_id", logging.ID(n.me.NodeID())).Logger(),
 		messageProcessor,
@@ -131,7 +129,7 @@ func (n *Network) Register(channel channels.Channel, messageProcessor flownet.Me
 	}
 	// we keep the original message processor here so that we can directly send messages to it when
 	// attacker dictates to do so.
-	n.originalMessageProcessors[channel] = messageProcessor
+	n.originalMessageProcessors.Store(channel, messageProcessor)
 
 	return conduit, nil
 }
@@ -233,11 +231,12 @@ func (n *Network) processAttackerIngressMessage(msg *insecure.IngressMessage) er
 
 	lg.Info().Msg("corrupt network received ingress message")
 
-	originalProcessor, err := n.originalMessageProcessorForChannel(channels.Channel(msg.ChannelID))
-	if err != nil {
-		lg.Fatal().Err(err).Msg("corrupt network received ingress message for an unknown channel")
+	originalProcessor, ok := n.originalMessageProcessors.Load(channels.Channel(msg.ChannelID))
+	if !ok {
+		lg.Fatal().Msg("corrupt network received ingress message for an unknown channel")
 	}
-	err = originalProcessor.Process(channels.Channel(msg.ChannelID), senderId, event)
+
+	err = originalProcessor.(flownet.MessageProcessor).Process(channels.Channel(msg.ChannelID), senderId, event)
 	if err != nil {
 		lg.Fatal().Err(err).Msg("could not relay ingress message to original processor")
 	}
@@ -245,21 +244,6 @@ func (n *Network) processAttackerIngressMessage(msg *insecure.IngressMessage) er
 	lg.Info().Msg("corrupt network relayed ingress message to original processor")
 
 	return nil
-}
-
-// originalMessageProcessorForChannel returns the original message processor for the given channel.
-// It is a thread-safe method to provide mutual exclusion for the map access.
-// The map is concurrently used by the Register method as well.
-func (n *Network) originalMessageProcessorForChannel(channel channels.Channel) (flownet.MessageProcessor, error) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	originalMessageProcessor, ok := n.originalMessageProcessors[channel]
-	if !ok {
-		return nil, fmt.Errorf("could not find original message processor for channel %s", channel)
-	}
-
-	return originalMessageProcessor, nil
 }
 
 // processAttackerEgressMessage dispatches the attack orchestrator message on the Flow network on behalf of this node.
