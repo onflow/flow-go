@@ -71,6 +71,7 @@ func NewTransactionEnvironment(
 		tx.Payer,
 		ctx.ServiceEventCollectionEnabled,
 		ctx.EventCollectionByteSizeLimit,
+		ctx.CadenceCodec
 	)
 	env.AccountCreator = environment.NewAccountCreator(
 		sth,

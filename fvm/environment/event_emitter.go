@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	cbcodec "github.com/onflow/cadence/encoding/cadence_codec"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -52,6 +52,7 @@ func (NoEventEmitter) Reset() {
 type eventEmitter struct {
 	tracer *Tracer
 	meter  Meter
+	codec  cbcodec.CadenceCodec
 
 	chain   flow.Chain
 	txID    flow.Identifier
@@ -73,10 +74,12 @@ func NewEventEmitter(
 	payer flow.Address,
 	serviceEventCollectionEnabled bool,
 	eventCollectionByteSizeLimit uint64,
+	codec cbcodec.CadenceCodec,
 ) EventEmitter {
 	emitter := &eventEmitter{
 		tracer:                        tracer,
 		meter:                         meter,
+		codec:                         codec,
 		chain:                         chain,
 		txID:                          txID,
 		txIndex:                       txIndex,
@@ -106,10 +109,10 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 		return fmt.Errorf("emit event failed: %w", err)
 	}
 
-	payload, err := jsoncdc.Encode(event)
+	payload, err := emitter.codec.Encode(event)
 	if err != nil {
 		return errors.NewEncodingFailuref(
-			"failed to json encode a cadence event: %w",
+			"failed to encode a cadence event: %w",
 			err)
 	}
 

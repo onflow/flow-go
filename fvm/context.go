@@ -6,6 +6,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
+	cbcodec "github.com/onflow/cadence/encoding/cadence_codec"
+	customCodec "github.com/onflow/cadence/encoding/cbf/cbf_codec"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
@@ -47,6 +49,7 @@ type Context struct {
 	Logger                        zerolog.Logger
 	ReusableCadenceRuntimePool    reusableRuntime.ReusableCadenceRuntimePool
 	BlockPrograms                 *programs.Programs
+	CadenceCodec cbcodec.CadenceCodec
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -107,6 +110,7 @@ func defaultContext() Context {
 		ReusableCadenceRuntimePool: reusableRuntime.NewReusableCadenceRuntimePool(
 			0,
 			runtime.Config{}),
+		CadenceCodec: cbcodec.NewCadenceCodec(customCodec.CadenceBinaryFormatCodec{}),
 	}
 }
 
