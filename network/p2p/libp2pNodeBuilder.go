@@ -19,6 +19,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/rs/zerolog"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
@@ -99,16 +100,17 @@ type NodeBuilder interface {
 }
 
 type LibP2PNodeBuilder struct {
-	sporkID            flow.Identifier
-	addr               string
-	networkKey         fcrypto.PrivateKey
-	logger             zerolog.Logger
-	basicResolver      madns.BasicResolver
-	subscriptionFilter pubsub.SubscriptionFilter
-	resourceManager    network.ResourceManager
-	connManager        connmgr.ConnManager
-	connGater          connmgr.ConnectionGater
-	routingFactory     func(context.Context, host.Host) (routing.Routing, error)
+	sporkID              flow.Identifier
+	addr                 string
+	networkKey           fcrypto.PrivateKey
+	logger               zerolog.Logger
+	basicResolver        madns.BasicResolver
+	subscriptionFilter   pubsub.SubscriptionFilter
+	resourceManager      network.ResourceManager
+	connManager          connmgr.ConnManager
+	connGater            connmgr.ConnectionGater
+	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
+	gossipSubPeerScoring bool
 }
 
 func NewNodeBuilder(
@@ -153,6 +155,10 @@ func (builder *LibP2PNodeBuilder) SetConnectionGater(gater connmgr.ConnectionGat
 func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder {
 	builder.routingFactory = f
 	return builder
+}
+
+func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring() {
+	builder.gossipSubPeerScoring = true
 }
 
 func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
@@ -203,9 +209,18 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 		psOpts = append(psOpts, pubsub.WithSubscriptionFilter(builder.subscriptionFilter))
 	}
 
+	var scoreOpt *scoring.ScoreOption
+	if builder.gossipSubPeerScoring {
+		scoreOpt = scoring.NewScoreOption(builder.logger)
+		psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
+	}
+
 	pubSub, err := pubsub.NewGossipSub(ctx, h, psOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("could not create gossipsub: %w", err)
+	}
+	if scoreOpt != nil {
+		scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(pubSub))
 	}
 
 	pCache, err := newProtocolPeerCache(builder.logger, h)
