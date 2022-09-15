@@ -185,7 +185,7 @@ func (p *Provider) provide(ctx context.Context, blockHeight uint64, executionDat
 	return rootID, errCh, nil
 }
 
-// TODO(state-sync): docs+error
+// TODO(state-sync): docs+error, unused param
 func (p *Provider) addExecutionDataRoot(
 	ctx context.Context,
 	edRoot *execution_data.BlockExecutionDataRoot,
@@ -234,7 +234,7 @@ func (p *Provider) addChunkExecutionData(
 }
 
 // addBlobs serializes the given object, splits the serialized data into blobs, and sends them to the given channel.
-// TODO(state-sync): error docs
+// TODO(state-sync): error docs, unused param
 func (p *Provider) addBlobs(ctx context.Context, v interface{}, blobCh chan<- blobs.Blob) ([]cid.Cid, error) {
 	bcw := blobs.NewBlobChannelWriter(blobCh, p.maxBlobSize)
 	defer bcw.Close()
