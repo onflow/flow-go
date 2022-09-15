@@ -230,6 +230,9 @@ func (n *Network) processAttackerIngressMessage(msg *insecure.IngressMessage) er
 
 	lg.Info().Msg("corrupt network received ingress message")
 
+	// As this ingress message is dictated by the attack orchestrator, we need to send it to the original message processor
+	// instead of the corrupt one. The reason is the corrupt one always routes the ingress messages back to the attack
+	// orchestrator, which yields an infinite loop.
 	originalProcessor, ok := n.originalMessageProcessors.Load(channels.Channel(msg.ChannelID))
 	if !ok {
 		lg.Fatal().Msg("corrupt network received ingress message for an unknown channel")
