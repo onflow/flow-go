@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -8,6 +10,9 @@ import (
 type LoaderCollector struct {
 	transactionsSent prometheus.Counter
 	tpsConfigured    prometheus.Gauge
+
+	transactionsExecuted prometheus.Counter
+	tteInSeconds         prometheus.Histogram
 }
 
 func NewLoaderCollector() *LoaderCollector {
@@ -23,6 +28,17 @@ func NewLoaderCollector() *LoaderCollector {
 			Namespace: namespaceLoader,
 			Help:      "transactions per second that the loader should send",
 		}),
+		transactionsExecuted: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "transactions_executed",
+			Namespace: namespaceLoader,
+			Help:      "transaction successfully executed by the loader",
+		}),
+		tteInSeconds: promauto.NewHistogram(prometheus.HistogramOpts{
+			Name:      "transactions_executed_in_seconds",
+			Namespace: namespaceLoader,
+			Help:      "Time To Execute histogram for transactions (in seconds)",
+			Buckets:   prometheus.ExponentialBuckets(2, 2, 8),
+		}),
 	}
 
 	return cc
@@ -34,4 +50,9 @@ func (cc *LoaderCollector) TransactionSent() {
 
 func (cc *LoaderCollector) SetTPSConfigured(tps int) {
 	cc.tpsConfigured.Set(float64(tps))
+}
+
+func (cc *LoaderCollector) TransactionExecuted(duration time.Duration) {
+	cc.transactionsExecuted.Inc()
+	cc.tteInSeconds.Observe(float64(duration.Seconds()))
 }

@@ -8,10 +8,12 @@ import (
 	"github.com/onflow/flow-go-sdk/templates"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/cadence"
+
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go-sdk/crypto"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
@@ -39,18 +41,21 @@ type Client struct {
 // address, using the given account key for signing transactions.
 func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.PrivateKey, chain flow.Chain) (*Client, error) {
 
-	flowClient, err := client.New(accessAddr, grpc.WithInsecure()) //nolint:staticcheck
+	flowClient, err := client.NewClient(accessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create new flow client: %w", err)
 	}
 
 	acc, err := flowClient.GetAccount(context.Background(), accountAddr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get the account %x: %w", accountAddr, err)
 	}
 	accountKey := acc.Keys[0]
 
-	mySigner := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
+	mySigner, err := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
+	if err != nil {
+		return nil, fmt.Errorf("could not create a signer: %w", err)
+	}
 
 	tc := &Client{
 		client:         flowClient,
@@ -70,7 +75,7 @@ func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	key := unittest.ServiceAccountPrivateKey
 	privateKey, err := sdkcrypto.DecodePrivateKey(sdkcrypto.SignatureAlgorithm(key.SignAlgo), key.PrivateKey.Encode())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not decode private key: %w", err)
 	}
 	// Uncomment for debugging keys
 
@@ -101,12 +106,8 @@ func (c *Client) GetSeqNumber() uint64 {
 	return n
 }
 
-func (c *Client) Events(ctx context.Context, typ string) ([]client.BlockEvents, error) {
-	return c.client.GetEventsForHeightRange(ctx, client.EventRangeQuery{
-		Type:        typ,
-		StartHeight: 0,
-		EndHeight:   1000,
-	})
+func (c *Client) Events(ctx context.Context, typ string) ([]sdk.BlockEvents, error) {
+	return c.client.GetEventsForHeightRange(ctx, typ, 0, 1000)
 }
 
 // DeployContract submits a transaction to deploy a contract with the given

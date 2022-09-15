@@ -116,7 +116,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			for _, colTx := range payload.Collection.Transactions {
 				txID := colTx.ID()
 				// ignore result -- we don't care whether the transaction was in the pool
-				_ = f.transactions.Rem(txID)
+				_ = f.transactions.Remove(txID)
 			}
 
 			// finalize the block in cluster state

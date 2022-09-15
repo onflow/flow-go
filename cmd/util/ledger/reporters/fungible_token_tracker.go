@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -84,7 +85,7 @@ type job struct {
 
 // Report creates a fungible_token_report_*.json file that contains data on all fungible token Vaults in the state commitment.
 // I recommend using gojq to browse through the data, because of the large uint64 numbers which jq won't be able to handle.
-func (r *FungibleTokenTracker) Report(payloads []ledger.Payload) error {
+func (r *FungibleTokenTracker) Report(payloads []ledger.Payload, commit ledger.State) error {
 	r.rw = r.rwf.ReportWriter(FungibleTokenTrackerReportPrefix)
 	defer r.rw.Close()
 
@@ -95,7 +96,11 @@ func (r *FungibleTokenTracker) Report(payloads []ledger.Payload) error {
 	payloadsByOwner := make(map[flow.Address][]ledger.Payload)
 
 	for _, pay := range payloads {
-		owner := flow.BytesToAddress(pay.Key.KeyParts[0].Value)
+		k, err := pay.Key()
+		if err != nil {
+			return nil
+		}
+		owner := flow.BytesToAddress(k.KeyParts[0].Value)
 		if len(owner) > 0 { // ignoring payloads without ownership (fvm ones)
 			m, ok := payloadsByOwner[owner]
 			if !ok {
@@ -137,9 +142,8 @@ func (r *FungibleTokenTracker) worker(
 	for j := range jobs {
 
 		view := migrations.NewView(j.payloads)
-		st := state.NewState(view)
-		sth := state.NewStateHolder(st)
-		accounts := state.NewAccounts(sth)
+		stTxn := state.NewStateTransaction(view, state.DefaultParameters())
+		accounts := environment.NewAccounts(stTxn)
 		storage := cadenceRuntime.NewStorage(
 			&migrations.AccountsAtreeLedger{Accounts: accounts},
 			nil,
@@ -150,7 +154,11 @@ func (r *FungibleTokenTracker) worker(
 			panic(err)
 		}
 
-		inter := &interpreter.Interpreter{}
+		inter, err := interpreter.NewInterpreter(nil, nil, &interpreter.Config{})
+		if err != nil {
+			panic(err)
+		}
+
 		for _, domain := range domains {
 			storageMap := storage.GetStorageMap(owner, domain, true)
 			itr := storageMap.Iterator(inter)
@@ -179,7 +187,10 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 
 	// because compValue.Kind == common.CompositeKindResource
 	// we could pass nil to the IsResourceKinded method
-	inter := &interpreter.Interpreter{}
+	inter, err := interpreter.NewInterpreter(nil, nil, &interpreter.Config{})
+	if err != nil {
+		panic(err)
+	}
 	if compValue.IsResourceKinded(nil) {
 		typeIDStr := string(compValue.TypeID())
 		if _, ok := r.vaultTypeIDs[typeIDStr]; ok {

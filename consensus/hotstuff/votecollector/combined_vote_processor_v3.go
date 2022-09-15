@@ -53,7 +53,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		stakingKeys = append(stakingKeys, participant.StakingPubKey)
 	}
 
-	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, encoding.ConsensusVoteTag)
+	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, msig.ConsensusVoteTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
@@ -73,7 +73,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		beaconKeys = append(beaconKeys, pk)
 	}
 
-	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, encoding.RandomBeaconTag)
+	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, msig.RandomBeaconTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for thershold signatures: %w", err)
 	}
@@ -149,11 +149,12 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // every signerID. However, we have the edge case, where we still feed the proposers vote twice into the
 // `VerifyingVoteProcessor` (once as part of a cached vote, once as an individual vote). This can be exploited
 // by a byzantine proposer to be erroneously counted twice, which would lead to a safety fault.
+//
 // TODO: (suggestion) I think it would be worth-while to include a second `votesCache` into the `CombinedVoteProcessorV3`.
-//       Thereby,  `CombinedVoteProcessorV3` inherently guarantees correctness of the QCs it produces without relying on
-//       external conditions (making the code more modular, less interdependent and thereby easier to maintain). The
-//       runtime overhead is marginal: For `votesCache` to add 500 votes (concurrently with 20 threads) takes about
-//       0.25ms. This runtime overhead is neglectable and a good tradeoff for the gain in maintainability and code clarity.
+// Thereby,  `CombinedVoteProcessorV3` inherently guarantees correctness of the QCs it produces without relying on
+// external conditions (making the code more modular, less interdependent and thereby easier to maintain). The
+// runtime overhead is marginal: For `votesCache` to add 500 votes (concurrently with 20 threads) takes about
+// 0.25ms. This runtime overhead is neglectable and a good tradeoff for the gain in maintainability and code clarity.
 func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {

@@ -3,7 +3,7 @@ package ingest
 import (
 	"context"
 	"errors"
-	"io/ioutil"
+	"io"
 	"testing"
 	"time"
 
@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -68,7 +69,7 @@ func (suite *Suite) SetupTest() {
 	suite.N_COLLECTORS = 4
 	suite.N_CLUSTERS = 2
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 	metrics := metrics.NewNoopCollector()
 
 	net := new(mocknetwork.Network)
@@ -157,7 +158,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.ErrUnknownReferenceBlock))
+		suite.Assert().True(errors.As(err, &engine.UnverifiableInputError{}))
 	})
 
 	suite.Run("un-parseable script", func() {
@@ -243,28 +244,14 @@ func (suite *Suite) TestInvalidTransaction() {
 	})
 
 	suite.Run("invalid address", func() {
-		suite.Run("objective check", func() {
-			invalid := unittest.InvalidAddressFixture()
-			tx := unittest.TransactionBodyFixture()
-			tx.ReferenceBlockID = suite.root.ID()
-			tx.Payer = invalid
+		invalid := unittest.InvalidAddressFixture()
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.root.ID()
+		tx.Payer = invalid
 
-			err := suite.engine.ProcessTransaction(&tx)
-			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.InvalidAddressError{}))
-		})
-
-		suite.Run("subjective check with max index", func() {
-			invalid, err := flow.Testnet.Chain().AddressAtIndex(suite.conf.MaxAddressIndex + 1)
-			suite.Require().NoError(err)
-			tx := unittest.TransactionBodyFixture()
-			tx.ReferenceBlockID = suite.root.ID()
-			tx.Authorizers[0] = invalid
-
-			err = suite.engine.ProcessTransaction(&tx)
-			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.InvalidAddressError{}))
-		})
+		err := suite.engine.ProcessTransaction(&tx)
+		suite.Assert().Error(err)
+		suite.Assert().True(errors.As(err, &access.InvalidAddressError{}))
 	})
 
 	suite.Run("expired reference block ID", func() {

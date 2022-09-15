@@ -1,7 +1,7 @@
 package node_builder
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -10,88 +10,87 @@ import (
 	"time"
 
 	badger "github.com/ipfs/go-ds-badger2"
-	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/routing"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
+	"github.com/onflow/flow/protobuf/go/flow/access"
+
+	"github.com/onflow/flow-go/admin/commands"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	consensuspubsub "github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
+	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/unicast"
+	relaynet "github.com/onflow/flow-go/network/relay"
+	"github.com/onflow/flow-go/network/slashing"
+	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
-// AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
-// These functions are shared by staked and unstaked access node builders.
-// The Staked network allows the staked nodes to communicate among themselves, while the unstaked network allows the
-// unstaked nodes and a staked Access node to communicate.
+// AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node.
+// The private network allows the staked nodes to communicate among themselves, while the public network allows the
+// Observers and an Access node to communicate.
 //
-//                                 unstaked network                           staked network
+//                                 public network                           private network
 //  +------------------------+
-//  | Unstaked Access Node 1 |<--------------------------|
+//  | Observer             1 |<--------------------------|
 //  +------------------------+                           v
 //  +------------------------+                         +--------------------+                 +------------------------+
-//  | Unstaked Access Node 2 |<----------------------->| Staked Access Node |<--------------->| All other staked Nodes |
+//  | Observer             2 |<----------------------->| Staked Access Node |<--------------->| All other staked Nodes |
 //  +------------------------+                         +--------------------+                 +------------------------+
 //  +------------------------+                           ^
-//  | Unstaked Access Node 3 |<--------------------------|
+//  | Observer             3 |<--------------------------|
 //  +------------------------+
-
-type AccessNodeBuilder interface {
-	cmd.NodeBuilder
-
-	// IsStaked returns True if this is a staked Access Node, False otherwise
-	IsStaked() bool
-}
 
 // AccessNodeConfig defines all the user defined parameters required to bootstrap an access node
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
-	staked                       bool
-	bootstrapNodeAddresses       []string
-	bootstrapNodePublicKeys      []string
-	observerNetworkingKeyPath    string
-	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
-	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
-	supportsUnstakedFollower     bool              // True if this is a staked Access node which also supports unstaked access nodes/unstaked consensus follower engines
+	supportsObserver             bool // True if this is an Access node that supports observers and consensus follower engines
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
 	pingEnabled                  bool
@@ -126,6 +125,7 @@ type PublicNetworkConfig struct {
 func DefaultAccessNodeConfig() *AccessNodeConfig {
 	homedir, _ := os.UserHomeDir()
 	return &AccessNodeConfig{
+		supportsObserver:   false,
 		collectionGRPCPort: 9000,
 		executionGRPCPort:  9000,
 		rpcConf: rpc.Config{
@@ -137,6 +137,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			HistoricalAccessAddrs:     "",
 			CollectionClientTimeout:   3 * time.Second,
 			ExecutionClientTimeout:    3 * time.Second,
+			ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
 			MaxHeightRange:            backend.DefaultMaxHeightRange,
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
@@ -151,31 +152,27 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		nodeInfoFile:                 "",
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
-		staked:                       true,
-		bootstrapNodeAddresses:       []string{},
-		bootstrapNodePublicKeys:      []string{},
-		supportsUnstakedFollower:     false,
 		PublicNetworkConfig: PublicNetworkConfig{
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
 		},
-		observerNetworkingKeyPath: cmd.NotSet,
-		executionDataSyncEnabled:  false,
-		executionDataDir:          filepath.Join(homedir, ".flow", "execution_data"),
-		executionDataStartHeight:  0,
+		executionDataSyncEnabled: false,
+		executionDataDir:         filepath.Join(homedir, ".flow", "execution_data"),
+		executionDataStartHeight: 0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
 			InitialBlockHeight: 0,
 			MaxSearchAhead:     edrequester.DefaultMaxSearchAhead,
 			FetchTimeout:       edrequester.DefaultFetchTimeout,
+			MaxFetchTimeout:    edrequester.DefaultMaxFetchTimeout,
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
 	}
 }
 
-// FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and unstaked access node
+// FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow access node
 // It is composed of the FlowNodeBuilder, the AccessNodeConfig and contains all the components and modules needed for the
-// staked and unstaked access nodes
+// access nodes
 type FlowAccessNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 	*AccessNodeConfig
@@ -183,9 +180,9 @@ type FlowAccessNodeBuilder struct {
 	// components
 	LibP2PNode                 *p2p.Node
 	FollowerState              protocol.MutableState
-	SyncCore                   *synchronization.Core
+	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
-	FinalizationDistributor    *pubsub.FinalizationDistributor
+	FinalizationDistributor    *consensuspubsub.FinalizationDistributor
 	FinalizedHeader            *synceng.FinalizedHeaderCache
 	CollectionRPC              access.AccessAPIClient
 	TransactionTimings         *stdmap.TransactionTimings
@@ -193,16 +190,18 @@ type FlowAccessNodeBuilder struct {
 	CollectionsToMarkExecuted  *stdmap.Times
 	BlocksToMarkExecuted       *stdmap.Times
 	TransactionMetrics         module.TransactionMetrics
+	AccessMetrics              module.AccessMetrics
 	PingMetrics                module.PingMetrics
 	Committee                  hotstuff.Committee
 	Finalized                  *flow.Header
 	Pending                    []*flow.Header
 	FollowerCore               module.HotStuffFollower
-	ExecutionDataService       state_synchronization.ExecutionDataService
+	ExecutionDataDownloader    execution_data.Downloader
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
-	// for the unstaked access node, the sync engine participants provider is the libp2p peer store which is not
-	// available until after the network has started. Hence, a factory function that needs to be called just before
-	// creating the sync engine
+
+	// The sync engine participants provider is the libp2p peer store for the access node
+	// which is not available until after the network has started.
+	// Hence, a factory function that needs to be called just before creating the sync engine
 	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
 
 	// engines
@@ -210,25 +209,6 @@ type FlowAccessNodeBuilder struct {
 	RequestEng  *requester.Engine
 	FollowerEng *followereng.Engine
 	SyncEng     *synceng.Engine
-}
-
-// deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
-// These are the identities of the staked and unstaked ANs also acting as the DHT bootstrap server
-func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() error {
-	// if bootstrap identities already provided (as part of alternate initialization as a library the skip reading command
-	// line params)
-	if builder.bootstrapIdentities != nil {
-		return nil
-	}
-
-	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
-	if err != nil {
-		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
-	}
-
-	builder.bootstrapIdentities = ids
-
-	return nil
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -258,7 +238,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 
 func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig)
+		syncCore, err := chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 		builder.SyncCore = syncCore
 
 		return err
@@ -298,7 +278,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 		// state when the follower detects newly finalized blocks
 		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
 
-		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
+		packer := signature.NewConsensusSigDataPacker(builder.Committee)
 		// initialize the verifier for the protocol consensus
 		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
 
@@ -345,7 +325,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			builder.FollowerCore,
 			builder.SyncCore,
 			node.Tracer,
-			compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold),
+			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -396,7 +376,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() AccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBuilder {
 	builder.
 		buildFollowerState().
 		buildSyncCore().
@@ -418,12 +398,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 
 	builder.
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
-			err := os.MkdirAll(builder.executionDataDir, 0700)
+			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
+			err := os.MkdirAll(datastoreDir, 0700)
 			if err != nil {
 				return err
 			}
 
-			ds, err = badger.NewDatastore(builder.executionDataDir, &badger.DefaultOptions)
+			ds, err = badger.NewDatastore(datastoreDir, &badger.DefaultOptions)
 			if err != nil {
 				return err
 			}
@@ -449,20 +430,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
-			bs, err = node.Network.RegisterBlobService(engine.ExecutionDataService, ds)
+			bs, err = node.Network.RegisterBlobService(channels.ExecutionDataService, ds)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
 
-			builder.ExecutionDataService = state_synchronization.NewExecutionDataService(
-				new(cbor.Codec),
-				compressor.NewLz4Compressor(),
-				bs,
-				metrics.NewExecutionDataServiceCollector(),
-				builder.Logger,
-			)
+			builder.ExecutionDataDownloader = execution_data.NewDownloader(bs)
 
-			return builder.ExecutionDataService, nil
+			return builder.ExecutionDataDownloader, nil
 		}).
 		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Validation of the start block height needs to be done after loading state
@@ -498,12 +473,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			builder.ExecutionDataRequester = edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
-				builder.ExecutionDataService,
+				builder.ExecutionDataDownloader,
 				processedBlockHeight,
 				processedNotifications,
 				builder.State,
 				builder.Storage.Headers,
 				builder.Storage.Results,
+				builder.Storage.Seals,
 				builder.executionDataConfig,
 			)
 
@@ -517,30 +493,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 
 type Option func(*AccessNodeConfig)
 
-func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
-	return func(config *AccessNodeConfig) {
-		config.bootstrapIdentities = bootstrapNodes
-	}
-}
-
-func SupportsUnstakedNode(enable bool) Option {
-	return func(config *AccessNodeConfig) {
-		config.supportsUnstakedFollower = enable
-	}
-}
-
-func WithNetworkKey(key crypto.PrivateKey) Option {
-	return func(config *AccessNodeConfig) {
-		config.NetworkKey = key
-	}
-}
-
-func WithBaseOptions(baseOptions []cmd.Option) Option {
-	return func(config *AccessNodeConfig) {
-		config.baseOptions = baseOptions
-	}
-}
-
 func FlowAccessNode(opts ...Option) *FlowAccessNodeBuilder {
 	config := DefaultAccessNodeConfig()
 	for _, opt := range opts {
@@ -550,11 +502,8 @@ func FlowAccessNode(opts ...Option) *FlowAccessNodeBuilder {
 	return &FlowAccessNodeBuilder{
 		AccessNodeConfig:        config,
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
-		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
+		FinalizationDistributor: consensuspubsub.NewFinalizationDistributor(),
 	}
-}
-func (builder *FlowAccessNodeBuilder) IsStaked() bool {
-	return builder.staked
 }
 
 func (builder *FlowAccessNodeBuilder) ParseFlags() error {
@@ -581,6 +530,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
 		flags.DurationVar(&builder.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
 		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
+		flags.UintVar(&builder.rpcConf.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
 		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
@@ -593,11 +543,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVarP(&builder.nodeInfoFile, "node-info-file", "", defaultConfig.nodeInfoFile, "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
-		flags.BoolVar(&builder.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
-		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
-		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
-		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
+		flags.BoolVar(&builder.supportsObserver, "supports-observer", defaultConfig.supportsObserver, "true if this staked access node supports observer or follower connections")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
 
 		// ExecutionDataRequester config
@@ -605,17 +551,20 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
 		flags.Uint64Var(&builder.executionDataStartHeight, "execution-data-start-height", defaultConfig.executionDataStartHeight, "height of first block to sync execution data from when starting with an empty Execution Data database")
 		flags.Uint64Var(&builder.executionDataConfig.MaxSearchAhead, "execution-data-max-search-ahead", defaultConfig.executionDataConfig.MaxSearchAhead, "max number of heights to search ahead of the lowest outstanding execution data height")
-		flags.DurationVar(&builder.executionDataConfig.FetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataConfig.FetchTimeout, "timeout to use when fetching execution data from the network e.g. 300s")
+		flags.DurationVar(&builder.executionDataConfig.FetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataConfig.FetchTimeout, "initial timeout to use when fetching execution data from the network. timeout increases using an incremental backoff until execution-data-max-fetch-timeout. e.g. 30s")
+		flags.DurationVar(&builder.executionDataConfig.MaxFetchTimeout, "execution-data-max-fetch-timeout", defaultConfig.executionDataConfig.MaxFetchTimeout, "maximum timeout to use when fetching execution data from the network e.g. 300s")
 		flags.DurationVar(&builder.executionDataConfig.RetryDelay, "execution-data-retry-delay", defaultConfig.executionDataConfig.RetryDelay, "initial delay for exponential backoff when fetching execution data fails e.g. 10s")
 		flags.DurationVar(&builder.executionDataConfig.MaxRetryDelay, "execution-data-max-retry-delay", defaultConfig.executionDataConfig.MaxRetryDelay, "maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
 	}).ValidateFlags(func() error {
-		if builder.supportsUnstakedFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
-			return errors.New("public-network-address must be set if supports-unstaked-node is true")
+		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
+			return errors.New("public-network-address must be set if supports-observer is true")
 		}
-
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
 				return errors.New("execution-data-fetch-timeout must be greater than 0")
+			}
+			if builder.executionDataConfig.MaxFetchTimeout < builder.executionDataConfig.FetchTimeout {
+				return errors.New("execution-data-max-fetch-timeout must be greater than execution-data-fetch-timeout")
 			}
 			if builder.executionDataConfig.RetryDelay <= 0 {
 				return errors.New("execution-data-retry-delay must be greater than 0")
@@ -642,20 +591,18 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
 
-	codec := cborcodec.NewCodec()
-
 	// creates network instance
-	net, err := p2p.NewNetwork(
-		builder.Logger,
-		codec,
-		nodeID,
-		func() (network.Middleware, error) { return builder.Middleware, nil },
-		topology,
-		p2p.NewChannelSubscriptionManager(middleware),
-		networkMetrics,
-		builder.IdentityProvider,
-		receiveCache,
-	)
+	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+		Logger:              builder.Logger,
+		Codec:               cborcodec.NewCodec(),
+		Me:                  nodeID,
+		MiddlewareFactory:   func() (network.Middleware, error) { return builder.Middleware, nil },
+		Topology:            topology,
+		SubscriptionManager: p2p.NewChannelSubscriptionManager(middleware),
+		Metrics:             networkMetrics,
+		IdentityProvider:    builder.IdentityProvider,
+		ReceiveCache:        receiveCache,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
@@ -663,7 +610,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	return net, nil
 }
 
-func unstakedNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
+func publicNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
 	return []network.MessageValidator{
 		// filter out messages sent by this node itself
 		validator.ValidateNotSender(selfID),
@@ -678,39 +625,410 @@ func unstakedNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProv
 	}
 }
 
-// BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
-// each Flow Identity is initialized with the passed address, the networking key
-// and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
-func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, error) {
+// accessNodeBuilder builds a staked access node.
+// The access node can optionally participate in the public network publishing data for the observers downstream.
+func (builder *FlowAccessNodeBuilder) InitIDProviders() {
+	builder.Module("id providers", func(node *cmd.NodeConfig) error {
+		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
+		if err != nil {
+			return err
+		}
 
-	if len(addresses) != len(keys) {
-		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
+		builder.IdentityProvider = idCache
+
+		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
+			return id.NewIdentityFilterIdentifierProvider(
+				filter.And(
+					filter.HasRole(flow.RoleConsensus),
+					filter.Not(filter.HasNodeID(node.Me.NodeID())),
+					p2p.NotEjectedFilter,
+				),
+				idCache,
+			)
+		}
+
+		builder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewPublicNetworkIDTranslator())
+
+		return nil
+	})
+}
+
+func (builder *FlowAccessNodeBuilder) Initialize() error {
+	builder.InitIDProviders()
+
+	builder.EnqueueResolver()
+
+	// enqueue the regular network
+	builder.EnqueueNetworkInit()
+
+	builder.AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
+		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
+	})
+
+	// if this is an access node that supports public followers, enqueue the public network
+	if builder.supportsObserver {
+		builder.enqueuePublicNetworkInit()
+		builder.enqueueRelayNetwork()
 	}
 
-	ids := make([]*flow.Identity, len(addresses))
-	for i, address := range addresses {
-		key := keys[i]
+	builder.EnqueuePingService()
 
-		// json unmarshaller needs a quotes before and after the string
-		// the pflags.StringSliceVar does not retain quotes for the command line arg even if escaped with \"
-		// hence this additional check to ensure the key is indeed quoted
-		if !strings.HasPrefix(key, "\"") {
-			key = fmt.Sprintf("\"%s\"", key)
+	builder.EnqueueMetricsServerInit()
+
+	if err := builder.RegisterBadgerMetrics(); err != nil {
+		return err
+	}
+
+	builder.EnqueueTracer()
+	builder.PreInit(cmd.DynamicStartPreInit)
+	return nil
+}
+
+func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
+	builder.Component("relay network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		relayNet := relaynet.NewRelayNetwork(
+			node.Network,
+			builder.AccessNodeConfig.PublicNetworkConfig.Network,
+			node.Logger,
+			map[channels.Channel]channels.Channel{
+				channels.ReceiveBlocks: channels.PublicReceiveBlocks,
+			},
+		)
+		node.Network = relayNet
+		return relayNet, nil
+	})
+}
+
+func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
+	builder.
+		BuildConsensusFollower().
+		Module("collection node client", func(node *cmd.NodeConfig) error {
+			// collection node address is optional (if not specified, collection nodes will be chosen at random)
+			if strings.TrimSpace(builder.rpcConf.CollectionAddr) == "" {
+				node.Logger.Info().Msg("using a dynamic collection node address")
+				return nil
+			}
+
+			node.Logger.Info().
+				Str("collection_node", builder.rpcConf.CollectionAddr).
+				Msg("using the static collection node address")
+
+			collectionRPCConn, err := grpc.Dial(
+				builder.rpcConf.CollectionAddr,
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+				grpc.WithInsecure(), //nolint:staticcheck
+				backend.WithClientUnaryInterceptor(builder.rpcConf.CollectionClientTimeout))
+			if err != nil {
+				return err
+			}
+			builder.CollectionRPC = access.NewAccessAPIClient(collectionRPCConn)
+			return nil
+		}).
+		Module("historical access node clients", func(node *cmd.NodeConfig) error {
+			addrs := strings.Split(builder.rpcConf.HistoricalAccessAddrs, ",")
+			for _, addr := range addrs {
+				if strings.TrimSpace(addr) == "" {
+					continue
+				}
+				node.Logger.Info().Str("access_nodes", addr).Msg("historical access node addresses")
+
+				historicalAccessRPCConn, err := grpc.Dial(
+					addr,
+					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+					grpc.WithInsecure()) //nolint:staticcheck
+				if err != nil {
+					return err
+				}
+				builder.HistoricalAccessRPCs = append(builder.HistoricalAccessRPCs, access.NewAccessAPIClient(historicalAccessRPCConn))
+			}
+			return nil
+		}).
+		Module("transaction timing mempools", func(node *cmd.NodeConfig) error {
+			var err error
+			builder.TransactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
+			if err != nil {
+				return err
+			}
+
+			builder.CollectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			if err != nil {
+				return err
+			}
+
+			builder.CollectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			if err != nil {
+				return err
+			}
+
+			builder.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
+			return err
+		}).
+		Module("transaction metrics", func(node *cmd.NodeConfig) error {
+			builder.TransactionMetrics = metrics.NewTransactionCollector(builder.TransactionTimings, node.Logger, builder.logTxTimeToFinalized,
+				builder.logTxTimeToExecuted, builder.logTxTimeToFinalizedExecuted)
+			return nil
+		}).
+		Module("access metrics", func(node *cmd.NodeConfig) error {
+			builder.AccessMetrics = metrics.NewAccessCollector()
+			return nil
+		}).
+		Module("ping metrics", func(node *cmd.NodeConfig) error {
+			builder.PingMetrics = metrics.NewPingCollector()
+			return nil
+		}).
+		Module("server certificate", func(node *cmd.NodeConfig) error {
+			// generate the server certificate that will be served by the GRPC server
+			x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
+			if err != nil {
+				return err
+			}
+			tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
+			builder.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
+			return nil
+		}).
+		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			engineBuilder, err := rpc.NewBuilder(
+				node.Logger,
+				node.State,
+				builder.rpcConf,
+				builder.CollectionRPC,
+				builder.HistoricalAccessRPCs,
+				node.Storage.Blocks,
+				node.Storage.Headers,
+				node.Storage.Collections,
+				node.Storage.Transactions,
+				node.Storage.Receipts,
+				node.Storage.Results,
+				node.RootChainID,
+				builder.TransactionMetrics,
+				builder.AccessMetrics,
+				builder.collectionGRPCPort,
+				builder.executionGRPCPort,
+				builder.retryEnabled,
+				builder.rpcMetricsEnabled,
+				builder.apiRatelimits,
+				builder.apiBurstlimits,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			builder.RpcEng, err = engineBuilder.
+				WithLegacy().
+				WithBlockSignerDecoder(signature.NewBlockSignerDecoder(builder.Committee)).
+				Build()
+			if err != nil {
+				return nil, err
+			}
+
+			return builder.RpcEng, nil
+		}).
+		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
+
+			builder.RequestEng, err = requester.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				channels.RequestCollections,
+				filter.HasRole(flow.RoleCollection),
+				func() flow.Entity { return &flow.Collection{} },
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create requester engine: %w", err)
+			}
+
+			builder.IngestEng, err = ingestion.New(
+				node.Logger,
+				node.Network,
+				node.State,
+				node.Me,
+				builder.RequestEng,
+				node.Storage.Blocks,
+				node.Storage.Headers,
+				node.Storage.Collections,
+				node.Storage.Transactions,
+				node.Storage.Results,
+				node.Storage.Receipts,
+				builder.TransactionMetrics,
+				builder.CollectionsToMarkFinalized,
+				builder.CollectionsToMarkExecuted,
+				builder.BlocksToMarkExecuted,
+				builder.RpcEng,
+			)
+			if err != nil {
+				return nil, err
+			}
+			builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
+			builder.FinalizationDistributor.AddConsumer(builder.IngestEng)
+
+			return builder.IngestEng, nil
+		}).
+		Component("requester engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
+			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
+			// be handled by the scaffold.
+			return builder.RequestEng, nil
+		})
+
+	if builder.supportsObserver {
+		builder.Component("public sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			syncRequestHandler, err := synceng.NewRequestHandlerEngine(
+				node.Logger.With().Bool("public", true).Logger(),
+				unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
+				builder.AccessNodeConfig.PublicNetworkConfig.Network,
+				node.Me,
+				node.Storage.Blocks,
+				builder.SyncCore,
+				builder.FinalizedHeader,
+			)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create public sync request handler: %w", err)
+			}
+
+			return syncRequestHandler, nil
+		})
+	}
+
+	if builder.executionDataSyncEnabled {
+		builder.BuildExecutionDataRequester()
+	}
+
+	builder.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		ping, err := pingeng.New(
+			node.Logger,
+			node.IdentityProvider,
+			node.IDTranslator,
+			node.Me,
+			builder.PingMetrics,
+			builder.pingEnabled,
+			builder.nodeInfoFile,
+			node.PingService,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("could not create ping engine: %w", err)
 		}
-		// networking public key
-		var networkKey encodable.NetworkPubKey
-		err := json.Unmarshal([]byte(key), &networkKey)
+
+		return ping, nil
+	})
+
+	return builder.FlowNodeBuilder.Build()
+}
+
+// enqueuePublicNetworkInit enqueues the public network component initialized for the staked node
+func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
+	builder.Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(metrics.WithNetworkPrefix("public"))
+
+		libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey)
+
+		msgValidators := publicNetworkMsgValidators(node.Logger.With().Bool("public", true).Logger(), node.IdentityProvider, builder.NodeID)
+
+		middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libP2PFactory, msgValidators...)
+
+		// topology returns empty list since peers are not known upfront
+		top := topology.EmptyTopology{}
+
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if builder.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.PublicNetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
+		}
+		receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
+			builder.Logger,
+			heroCacheCollector)
+
+		err := node.Metrics.Mempool.Register(metrics.ResourcePublicNetworkingReceiveCache, receiveCache.Size)
+		if err != nil {
+			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+		}
+
+		net, err := builder.initNetwork(builder.Me, builder.PublicNetworkConfig.Metrics, middleware, top, receiveCache)
 		if err != nil {
 			return nil, err
 		}
 
-		// create the identity of the peer by setting only the relevant fields
-		ids[i] = &flow.Identity{
-			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the unstaked network it does not apply
-			Address:       address,
-			Role:          flow.RoleAccess, // the upstream node has to be an access node
-			NetworkPubKey: networkKey,
+		builder.AccessNodeConfig.PublicNetworkConfig.Network = net
+
+		node.Logger.Info().Msgf("network will run on address: %s", builder.PublicNetworkConfig.BindAddress)
+		return net, nil
+	})
+}
+
+// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
+// The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
+// The LibP2P host is created with the following options:
+//   - DHT as server
+//   - The address from the node config or the specified bind address as the listen address
+//   - The passed in private key as the libp2p key
+//   - No connection gater
+//   - Default Flow libp2p pubsub options
+func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
+	return func(ctx context.Context) (*p2p.Node, error) {
+		connManager := p2p.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
+
+		libp2pNode, err := p2p.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
+			SetBasicResolver(builder.Resolver).
+			SetSubscriptionFilter(
+				p2p.NewRoleBasedFilter(
+					flow.RoleAccess, builder.IdentityProvider,
+				),
+			).
+			SetConnectionManager(connManager).
+			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
+				return p2p.NewDHT(
+					ctx,
+					h,
+					unicast.FlowPublicDHTProtocolID(builder.SporkID),
+					builder.Logger,
+					builder.PublicNetworkConfig.Metrics,
+					p2p.AsServer(),
+				)
+			}).
+			SetPubSub(pubsub.NewGossipSub).
+			Build(ctx)
+
+		if err != nil {
+			return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
 		}
+
+		builder.LibP2PNode = libp2pNode
+
+		return builder.LibP2PNode, nil
 	}
-	return ids, nil
+}
+
+// initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
+// interval, and validators. The network.Middleware is then passed into the initNetwork function.
+func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
+	networkMetrics module.NetworkMetrics,
+	factoryFunc p2p.LibP2PFactoryFunc,
+	validators ...network.MessageValidator) network.Middleware {
+
+	logger := builder.Logger.With().Bool("staked", false).Logger()
+
+	// disable connection pruning for the access node which supports the observer
+	peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningDisabled, builder.PeerUpdateInterval)
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, builder.Metrics.Network)
+
+	builder.Middleware = p2p.NewMiddleware(
+		logger,
+		factoryFunc,
+		nodeID,
+		networkMetrics,
+		builder.Metrics.Bitswap,
+		builder.SporkID,
+		p2p.DefaultUnicastTimeout,
+		builder.IDTranslator,
+		builder.CodecFactory(),
+		slashingViolationsConsumer,
+		p2p.WithMessageValidators(validators...),
+		p2p.WithPeerManager(peerManagerFactory),
+		// use default identifier provider
+	)
+
+	return builder.Middleware
 }

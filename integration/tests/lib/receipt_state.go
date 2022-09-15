@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const receiptTimeout = 60 * time.Second
+const receiptTimeout = 120 * time.Second
 const receiptStateTimeout = 120 * time.Second
 
 type ReceiptState struct {
@@ -49,6 +49,9 @@ func (rs *ReceiptState) WaitForReceiptFromAny(t *testing.T, blockID flow.Identif
 	}, receiptTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive execution receipt for block ID %x from any node within %v seconds", blockID,
 			receiptTimeout))
+
+	rs.RLock()
+	defer rs.RUnlock()
 	for _, r := range rs.receipts[blockID] {
 		return r
 	}

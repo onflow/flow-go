@@ -31,6 +31,11 @@ type NetworkCollector struct {
 	dnsCacheHitCount             prometheus.Counter
 	dnsCacheInvalidationCount    prometheus.Counter
 	dnsLookupRequestDroppedCount prometheus.Counter
+	routingTableSize             prometheus.Gauge
+
+	// authorization, rate limiting metrics
+	unAuthorizedMessagesCount       *prometheus.CounterVec
+	rateLimitedUnicastMessagesCount *prometheus.CounterVec
 
 	prefix string
 }
@@ -191,6 +196,33 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		},
 	)
 
+	nc.routingTableSize = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name:      nc.prefix + "routing_table_size",
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemDHT,
+			Help:      "the size of the DHT routing table",
+		},
+	)
+
+	nc.unAuthorizedMessagesCount = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemAuth,
+			Name:      nc.prefix + "unauthorized_messages_count",
+			Help:      "number of messages that failed authorization validation",
+		}, []string{LabelNodeRole, LabelMessage, LabelChannel},
+	)
+
+	nc.rateLimitedUnicastMessagesCount = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemRateLimiting,
+			Name:      nc.prefix + "rate_limited_unicast_messages_count",
+			Help:      "number of messages sent via unicast that have been rate limited",
+		}, []string{LabelNodeRole, LabelMessage, LabelChannel},
+	)
+
 	return nc
 }
 
@@ -235,6 +267,14 @@ func (nc *NetworkCollector) DirectMessageFinished(topic string) {
 	nc.numDirectMessagesSending.WithLabelValues(topic).Dec()
 }
 
+func (nc *NetworkCollector) RoutingTablePeerAdded() {
+	nc.routingTableSize.Inc()
+}
+
+func (nc *NetworkCollector) RoutingTablePeerRemoved() {
+	nc.routingTableSize.Dec()
+}
+
 // MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
 func (nc *NetworkCollector) MessageProcessingFinished(topic string, duration time.Duration) {
 	nc.numMessagesProcessing.WithLabelValues(topic).Dec()
@@ -275,4 +315,14 @@ func (nc *NetworkCollector) OnDNSCacheHit() {
 // OnDNSLookupRequestDropped tracks the number of dns lookup requests that are dropped due to a full queue
 func (nc *NetworkCollector) OnDNSLookupRequestDropped() {
 	nc.dnsLookupRequestDroppedCount.Inc()
+}
+
+// OnUnauthorizedMessage tracks the number of unauthorized messages seen on the network.
+func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense string) {
+	nc.unAuthorizedMessagesCount.WithLabelValues(role, msgType, topic, offense).Inc()
+}
+
+// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
+func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic string) {
+	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic).Inc()
 }

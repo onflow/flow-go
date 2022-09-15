@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -73,12 +74,18 @@ func (p *pointG1) scalarMultG1(res *pointG1, expo *scalar) {
 
 // This function is for TEST only
 // Exponentiation of g1 in G1
-func genScalarMultG1(res *pointG1, expo *scalar) {
-	C.ep_mult_gen((*C.ep_st)(res), (*C.bn_st)(expo))
+func generatorScalarMultG1(res *pointG1, expo *scalar) {
+	C.ep_mult_gen_bench((*C.ep_st)(res), (*C.bn_st)(expo))
+}
+
+// This function is for TEST only
+// Generic Exponentiation G1
+func genericScalarMultG1(res *pointG1, expo *scalar) {
+	C.ep_mult_generic_bench((*C.ep_st)(res), (*C.bn_st)(expo))
 }
 
 // Exponentiation of g2 in G2
-func genScalarMultG2(res *pointG2, expo *scalar) {
+func generatorScalarMultG2(res *pointG2, expo *scalar) {
 	C.ep2_mult_gen((*C.ep2_st)(res), (*C.bn_st)(expo))
 }
 
@@ -213,11 +220,17 @@ func benchG1Test() {
 // It hashes `data` to a G1 point using the tag `dst` and returns the G1 point serialization.
 // The function uses xmd with SHA256 in the hash-to-field.
 func hashToG1Bytes(data, dst []byte) []byte {
-	hash := make([]byte, opSwUInputLenBLSBLS12381)
+	hash := make([]byte, expandMsgOutput)
+
+	inputLength := len(data)
+	if len(data) == 0 {
+		data = make([]byte, 1)
+	}
+
 	// XMD using SHA256
 	C.xmd_sha256((*C.uchar)(&hash[0]),
-		(C.int)(opSwUInputLenBLSBLS12381),
-		(*C.uchar)(&data[0]), (C.int)(len(data)),
+		(C.int)(expandMsgOutput),
+		(*C.uchar)(&data[0]), (C.int)(inputLength),
 		(*C.uchar)(&dst[0]), (C.int)(len(dst)))
 
 	// map the hash to G1

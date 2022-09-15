@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -16,7 +17,7 @@ import (
 
 // BLS tests
 func TestBLSBLS12381(t *testing.T) {
-	halg := NewBLSKMAC("test tag")
+	halg := NewExpandMsgXOFKMAC128("test tag")
 	// test the key generation seed lengths
 	testKeyGenSeed(t, BLSBLS12381, KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
 	// test the consistency with different inputs
@@ -25,13 +26,13 @@ func TestBLSBLS12381(t *testing.T) {
 
 // Signing bench
 func BenchmarkBLSBLS12381Sign(b *testing.B) {
-	halg := NewBLSKMAC("bench tag")
+	halg := NewExpandMsgXOFKMAC128("bench tag")
 	benchSign(b, BLSBLS12381, halg)
 }
 
 // Verifying bench
 func BenchmarkBLSBLS12381Verify(b *testing.B) {
-	halg := NewBLSKMAC("bench tag")
+	halg := NewExpandMsgXOFKMAC128("bench tag")
 	benchVerify(b, BLSBLS12381, halg)
 }
 
@@ -86,16 +87,31 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 		assert.False(t, valid)
 	})
 
-	t.Run("NewBLSKMAC sanity check", func(t *testing.T) {
-		// test the parameter lengths of "NewBLSKMAC" are in the correct range
-		// h is nil if the kamc inputs are invalid
-		h := internalBLSKMAC("test")
+	t.Run("NewExpandMsgXOFKMAC128 sanity check", func(t *testing.T) {
+		// test the parameter lengths of NewExpandMsgXOFKMAC128 are in the correct range
+		// h would be nil if the kmac inputs are invalid
+		h := internalExpandMsgXOFKMAC128(blsSigCipherSuite)
 		assert.NotNil(t, h)
-
-		// test the application and PoP prefixes are different and have the same length
-		assert.NotEqual(t, applicationTagPrefix, popTagPrefix)
-		assert.Equal(t, len(applicationTagPrefix), len(popTagPrefix))
 	})
+
+	t.Run("constants sanity check", func(t *testing.T) {
+		// test that the ciphersuites exceed 16 bytes as per draft-irtf-cfrg-hash-to-curve
+		// The tags used by internalExpandMsgXOFKMAC128 are at least len(ciphersuite) long
+		assert.GreaterOrEqual(t, len(blsSigCipherSuite), 16)
+		assert.GreaterOrEqual(t, len(blsPOPCipherSuite), 16)
+	})
+
+	t.Run("orthogonal PoP and signature hashing", func(t *testing.T) {
+		data := []byte("random_data")
+		// empty tag hasher
+		sigKmac := NewExpandMsgXOFKMAC128("")
+		h1 := sigKmac.ComputeHash(data)
+
+		// PoP hasher
+		h2 := popKMAC.ComputeHash(data)
+		assert.NotEqual(t, h1, h2)
+	})
+
 }
 
 // TestBLSEncodeDecode tests encoding and decoding of BLS keys
@@ -211,7 +227,7 @@ func TestAggregateSignatures(t *testing.T) {
 	_, err := rand.Read(input)
 	require.NoError(t, err)
 	// hasher
-	kmac := NewBLSKMAC("test tag")
+	kmac := NewExpandMsgXOFKMAC128("test tag")
 	// number of signatures to aggregate
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
@@ -272,6 +288,7 @@ func TestAggregateSignatures(t *testing.T) {
 			"verification of signature %s should fail, it shouldn't be %s private keys are %s, input is %x",
 			aggSig, expectedSig, sks, input)
 		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
+		require.NoError(t, err)
 	})
 
 	// check if one the public keys is not correct
@@ -524,7 +541,7 @@ func TestBatchVerify(t *testing.T) {
 	_, err := mrand.Read(input)
 	require.NoError(t, err)
 	// hasher
-	kmac := NewBLSKMAC("test tag")
+	kmac := NewExpandMsgXOFKMAC128("test tag")
 	// number of signatures to aggregate
 	sigsNum := mrand.Intn(100) + 2
 	sigs := make([]Signature, 0, sigsNum)
@@ -667,7 +684,7 @@ func BenchmarkBatchVerify(b *testing.B) {
 	input := make([]byte, 100)
 	_, _ = mrand.Read(input)
 	// hasher
-	kmac := NewBLSKMAC("bench tag")
+	kmac := NewExpandMsgXOFKMAC128("bench tag")
 	sigsNum := 100
 	sigs := make([]Signature, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
@@ -732,13 +749,11 @@ func TestAggregateSignaturesManyMessages(t *testing.T) {
 	// number of keys
 	keysNum := mrand.Intn(sigsNum) + 1
 	sks := make([]PrivateKey, 0, keysNum)
-	pks := make([]PublicKey, 0, keysNum)
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	// generate the keys
 	for i := 0; i < keysNum; i++ {
 		sk := randomSK(t, seed)
 		sks = append(sks, sk)
-		pks = append(pks, sk.PublicKey())
 	}
 
 	// number of messages (could be larger or smaller than the number of keys)
@@ -755,7 +770,7 @@ func TestAggregateSignaturesManyMessages(t *testing.T) {
 
 	// create the signatures
 	for i := 0; i < sigsNum; i++ {
-		kmac := NewBLSKMAC("test tag")
+		kmac := NewExpandMsgXOFKMAC128("test tag")
 		// pick a key randomly from the list
 		skRand := mrand.Intn(keysNum)
 		sk := sks[skRand]
@@ -792,6 +807,7 @@ func TestAggregateSignaturesManyMessages(t *testing.T) {
 		messages[0][0] ^= 1                // make sure the signature is different
 		var err error
 		sigs[randomIndex], err = sks[0].Sign(messages[0][:], inputKmacs[0])
+		require.NoError(t, err)
 		messages[0][0] ^= 1
 		aggSig, err = AggregateBLSSignatures(sigs)
 		require.NoError(t, err)
@@ -857,7 +873,7 @@ func BenchmarkVerifySignatureManyMessages(b *testing.B) {
 	pks := make([]PublicKey, 0, sigsNum)
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	inputMsgs := make([][]byte, 0, sigsNum)
-	kmac := NewBLSKMAC("bench tag")
+	kmac := NewExpandMsgXOFKMAC128("bench tag")
 
 	// create the signatures
 	for i := 0; i < sigsNum; i++ {
@@ -888,7 +904,7 @@ func BenchmarkAggregate(b *testing.B) {
 	input := make([]byte, 100)
 	_, _ = mrand.Read(input)
 	// hasher
-	kmac := NewBLSKMAC("bench tag")
+	kmac := NewExpandMsgXOFKMAC128("bench tag")
 	sigsNum := 1000
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)

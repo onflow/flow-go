@@ -50,11 +50,7 @@ func (s *ConsensusFollowerSuite) TearDownTest() {
 }
 
 func (suite *ConsensusFollowerSuite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "unstaked.go").
-		Str("testcase", suite.T().Name()).
-		Logger()
-	suite.log = logger
+	suite.log = unittest.LoggerForTest(suite.Suite.T(), zerolog.InfoLevel)
 	suite.log.Info().Msg("================> SetupTest")
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.buildNetworkConfig()
@@ -77,13 +73,11 @@ func (suite *ConsensusFollowerSuite) TestReceiveBlocks() {
 		var err error
 		receiveBlocks := func() {
 			for i := 0; i < blockCount; i++ {
-				select {
-				case blockID := <-suite.followerMgr1.blockIDChan:
-					receivedBlocks[blockID] = struct{}{}
-					_, err = suite.followerMgr1.getBlock(blockID)
-					if err != nil {
-						return
-					}
+				blockID := <-suite.followerMgr1.blockIDChan
+				receivedBlocks[blockID] = struct{}{}
+				_, err = suite.followerMgr1.getBlock(blockID)
+				if err != nil {
+					return
 				}
 			}
 		}
@@ -188,7 +182,7 @@ func UnstakedNetworkingKey() (crypto.PrivateKey, error) {
 	if err != nil || n != crypto.KeyGenSeedMinLenECDSASecp256k1 {
 		return nil, err
 	}
-	return utils.GenerateUnstakedNetworkingKey(unittest.SeedFixture(n))
+	return utils.GeneratePublicNetworkingKey(unittest.SeedFixture(n))
 }
 
 // followerManager is a convenience wrapper around the consensus follower

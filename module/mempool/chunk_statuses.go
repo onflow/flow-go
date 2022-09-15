@@ -17,11 +17,11 @@ type ChunkStatuses interface {
 	// chunk ID in the memory. Otherwise, it aborts the insertion and returns false.
 	Add(status *verification.ChunkStatus) bool
 
-	// Rem provides deletion functionality from the memory pool based on the pair of
+	// Remove provides deletion functionality from the memory pool based on the pair of
 	// chunk index and result id.
-	// If there is a chunk status associated with this pair, Rem removes it and returns true.
+	// If there is a chunk status associated with this pair, Remove removes it and returns true.
 	// Otherwise, it returns false.
-	Rem(chunkIndex uint64, resultID flow.Identifier) bool
+	Remove(chunkIndex uint64, resultID flow.Identifier) bool
 
 	// All returns all chunk statuses stored in this memory pool.
 	All() []*verification.ChunkStatus

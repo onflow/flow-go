@@ -9,7 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 )
@@ -22,8 +22,8 @@ func TestNodeV3Decoding(t *testing.T) {
 	const leafNode1Index = 1
 	const leafNode2Index = 2
 
-	leafNode1 := node.NewNode(255, nil, nil, utils.PathByUint8(0), utils.LightPayload8('A', 'a'), hash.Hash([32]byte{1, 1, 1}))
-	leafNode2 := node.NewNode(255, nil, nil, utils.PathByUint8(1), utils.LightPayload8('B', 'b'), hash.Hash([32]byte{2, 2, 2}))
+	leafNode1 := node.NewNode(255, nil, nil, testutils.PathByUint8(0), testutils.LightPayload8('A', 'a'), hash.Hash([32]byte{1, 1, 1}))
+	leafNode2 := node.NewNode(255, nil, nil, testutils.PathByUint8(1), testutils.LightPayload8('B', 'b'), hash.Hash([32]byte{2, 2, 2}))
 
 	interimNode := node.NewNode(256, leafNode1, leafNode2, ledger.DummyPath, nil, hash.Hash([32]byte{3, 3, 3}))
 

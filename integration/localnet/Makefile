@@ -1,6 +1,8 @@
 COLLECTION = 3
 CONSENSUS = 3
+VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
 EXECUTION = 2
+VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
 VERIFICATION = 1
 ACCESS = 2
 OBSERVER = 0
@@ -12,6 +14,7 @@ CONSENSUS_DELAY=800ms
 COLLECTION_DELAY=950ms
 
 PROFILER=false
+PROFILE_UPLOADER=false
 TRACING=true
 EXTENSIVE_TRACING=false
 CADENCE_TRACING=false
@@ -22,6 +25,12 @@ VERSION=localnetbuild
 
 .PHONY: init
 init:
+ifeq ($(strip $(VALID_EXECUTION)), 1)
+	# multiple execution nodes are required to prevent seals being generated in case of execution forking.
+	$(error Number of Execution nodes should be no less than 2)
+else ifeq ($(strip $(VALID_CONSENSUS)), 1)
+	$(error Number of Consensus nodes should be no less than 2)
+else
 	go run -tags relic \
 		-ldflags="-X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' \
 		-X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
@@ -37,11 +46,13 @@ init:
 		-epoch-staking-phase-length=$(STAKINGLEN) \
 		-epoch-dkg-phase-length=$(DKGLEN) \
 		-profiler=$(PROFILER) \
+		-profile-uploader=$(PROFILE_UPLOADER) \
 		-tracing=$(TRACING) \
 		-cadence-tracing=$(CADENCE_TRACING) \
 		-extensive-tracing=$(EXTENSIVE_TRACING) \
 		-consensus-delay=$(CONSENSUS_DELAY) \
 		-collection-delay=$(COLLECTION_DELAY)
+endif
 
 # Creates a light version of the localnet with just 1 instance for each node type
 .PHONY: init-light
@@ -59,15 +70,21 @@ start:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
 
-.PHONY: logs
-logs:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml logs -f
-
 .PHONY: stop
 stop:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml -f docker-compose.logs.yml down -v
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml down -v --remove-orphans
 
 .PHONY: load
 load:
-	go run --tags relic ../loader -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
+	go run --tags relic ../benchmark/cmd/manual -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
 
+.PHONY: tps-test
+tps-test:
+	go run --tags relic ../benchmark/cmd/ci -log-level info -tps 25 -tps-durations 10m
+
+.PHONY: tps-test-ci
+tps-test-ci:
+	make init
+	make start
+	go run --tags relic ../benchmark/cmd/ci -ci-run -tps 1
+	make stop

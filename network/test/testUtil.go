@@ -10,18 +10,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
+	p2pNetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pc "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	rcmgr "github.com/libp2p/go-libp2p-resource-manager"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -34,11 +35,11 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -106,7 +107,7 @@ func GenerateIDs(
 	libP2PNodes := make([]*p2p.Node, n)
 	tagObservables := make([]observable.Observable, n)
 
-	o := &optsConfig{}
+	o := &optsConfig{peerUpdateInterval: p2p.DefaultPeerUpdateInterval}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -144,12 +145,12 @@ func GenerateIDs(
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, codec network.Codec, consumer slashing.ViolationsConsumer, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
 
-	o := &optsConfig{}
+	o := &optsConfig{peerUpdateInterval: p2p.DefaultPeerUpdateInterval}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -167,16 +168,19 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 
 		idProviders[i] = NewUpdatableIDProvider(identities)
 
-		peerManagerFactory := p2p.PeerManagerFactory(o.peerManagerOpts)
+		peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningEnabled, o.peerUpdateInterval)
 
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
 			factory,
 			nodeId,
 			metrics,
+			metrics,
 			sporkID,
 			p2p.DefaultUnicastTimeout,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
+			codec,
+			consumer,
 			p2p.WithPeerManager(peerManagerFactory),
 		)
 	}
@@ -190,26 +194,10 @@ func GenerateNetworks(
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
-	tops []network.Topology,
 	sms []network.SubscriptionManager,
 ) []network.Network {
 	count := len(ids)
 	nets := make([]network.Network, 0)
-
-	// checks if necessary to generate topology managers
-	if tops == nil {
-		// nil topology managers means generating default ones
-
-		// creates default topology
-		//
-		// mocks state for collector nodes topology
-		// considers only a single cluster as higher cluster numbers are tested
-		// in collectionTopology_test
-		state, _ := topology.MockStateForCollectionNodes(t,
-			ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
-		// creates topology instances for the nodes based on their roles
-		tops = GenerateTopologies(t, state, ids, log)
-	}
 
 	for i := 0; i < count; i++ {
 
@@ -224,17 +212,17 @@ func GenerateNetworks(
 			metrics.NewNoopCollector())
 
 		// create the network
-		net, err := p2p.NewNetwork(
-			log,
-			cbor.NewCodec(),
-			me,
-			func() (network.Middleware, error) { return mws[i], nil },
-			tops[i],
-			sms[i],
-			metrics.NewNoopCollector(),
-			id.NewFixedIdentityProvider(ids),
-			receiveCache,
-		)
+		net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+			Logger:              log,
+			Codec:               cbor.NewCodec(),
+			Me:                  me,
+			MiddlewareFactory:   func() (network.Middleware, error) { return mws[i], nil },
+			Topology:            unittest.NetworkTopology(),
+			SubscriptionManager: sms[i],
+			Metrics:             metrics.NewNoopCollector(),
+			IdentityProvider:    id.NewFixedIdentityProvider(ids),
+			ReceiveCache:        receiveCache,
+		})
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -263,20 +251,22 @@ func GenerateNetworks(
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	logger zerolog.Logger,
+	codec network.Codec,
+	consumer slashing.ViolationsConsumer,
 	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
 	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, opts...)
-	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, opts...)
+	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, consumer, opts...)
 	return ids, mws, protectObservables, providers
 }
 
 type optsConfig struct {
-	idOpts           []func(*flow.Identity)
-	dhtPrefix        string
-	dhtOpts          []dht.Option
-	peerManagerOpts  []p2p.Option
-	connectionGating bool
+	idOpts             []func(*flow.Identity)
+	dhtPrefix          string
+	dhtOpts            []dht.Option
+	peerUpdateInterval time.Duration
+	connectionGating   bool
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
@@ -292,9 +282,9 @@ func WithDHT(prefix string, dhtOpts ...dht.Option) func(*optsConfig) {
 	}
 }
 
-func WithPeerManagerOpts(peerManagerOpts ...p2p.Option) func(*optsConfig) {
+func WithPeerUpdateInterval(interval time.Duration) func(*optsConfig) {
 	return func(o *optsConfig) {
-		o.peerManagerOpts = peerManagerOpts
+		o.peerUpdateInterval = interval
 	}
 }
 
@@ -303,12 +293,13 @@ func GenerateIDsMiddlewaresNetworks(
 	t *testing.T,
 	n int,
 	log zerolog.Logger,
-	tops []network.Topology,
+	codec network.Codec,
+	consumer slashing.ViolationsConsumer,
 	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []network.Network, []observable.Observable) {
-	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, opts...)
+	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, consumer, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := GenerateNetworks(ctx, t, log, ids, mws, tops, sms)
+	networks := GenerateNetworks(ctx, t, log, ids, mws, sms)
 	return ids, mws, networks, observables
 }
 
@@ -317,7 +308,7 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	count := len(nets)
 	engs := make([]*MeshEngine, count)
 	for i, n := range nets {
-		eng := NewMeshEngine(t, n, 100, engine.TestNetwork)
+		eng := NewMeshEngine(t, n, 100, channels.TestNetworkChannel)
 		engs[i] = eng
 	}
 	return engs
@@ -328,7 +319,11 @@ type nodeBuilderOption func(p2p.NodeBuilder)
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 	return func(nb p2p.NodeBuilder) {
 		nb.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2p.NewDHT(c, h, pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix), dhtOpts...)
+			return p2p.NewDHT(c, h,
+				pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix),
+				zerolog.Nop(),
+				metrics.NewNoopCollector(),
+				dhtOpts...)
 		})
 	}
 }
@@ -353,7 +348,8 @@ func generateLibP2PNode(
 
 	builder := p2p.NewNodeBuilder(logger, "0.0.0.0:0", key, sporkID).
 		SetConnectionManager(connManager).
-		SetPubSub(pubsub.NewGossipSub)
+		SetPubSub(pubsub.NewGossipSub).
+		SetResourceManager(NewResourceManager(t))
 
 	for _, opt := range opts {
 		opt(builder)
@@ -378,22 +374,6 @@ func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
-}
-
-// CreateTopologies is a test helper on receiving an identity list, creates a topology per identity
-// and returns the slice of topologies.
-func GenerateTopologies(t *testing.T, state protocol.State, identities flow.IdentityList, logger zerolog.Logger) []network.Topology {
-	tops := make([]network.Topology, 0)
-	for _, id := range identities {
-		var top network.Topology
-		var err error
-
-		top, err = topology.NewTopicBasedTopology(id.NodeID, logger, state)
-		require.NoError(t, err)
-
-		tops = append(tops, top)
-	}
-	return tops
 }
 
 // GenerateSubscriptionManagers creates and returns a ChannelSubscriptionManager for each middleware object.
@@ -456,4 +436,19 @@ func networkPayloadFixture(t *testing.T, size uint) []byte {
 	require.InDelta(t, len(encodedEvent), int(size), float64(overhead))
 
 	return payload
+}
+
+// NewResourceManager creates a new resource manager for testing with huge limits.
+func NewResourceManager(t *testing.T) p2pNetwork.ResourceManager {
+	// Sadly we can not use:
+	//    rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits))
+	// Since it is broken due to numeric overflow in the resource manager:
+	// https://github.com/libp2p/go-libp2p/issues/1721
+	scalingLimits := rcmgr.DefaultLimits
+	libp2p.SetDefaultServiceLimits(&scalingLimits)
+	limiter := rcmgr.NewFixedLimiter(scalingLimits.Scale(16<<30, 1048575))
+	rm, err := rcmgr.NewResourceManager(limiter)
+	require.NoError(t, err)
+
+	return rm
 }

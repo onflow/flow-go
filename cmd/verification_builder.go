@@ -24,13 +24,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -67,7 +67,7 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 	v.FlowNodeBuilder.
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&v.verConf.chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
-			flags.UintVar(&v.verConf.chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers should be assigned to each chunk")
+			flags.UintVar(&v.verConf.chunkAlpha, "chunk-alpha", flow.DefaultChunkAssignmentAlpha, "number of verifiers should be assigned to each chunk")
 			flags.DurationVar(&v.verConf.requestInterval, "chunk-request-interval", requester.DefaultRequestInterval, "time interval chunk data pack request is processed")
 			flags.DurationVar(&v.verConf.backoffMinInterval, "backoff-min-interval", requester.DefaultBackoffMinInterval, "min time interval a chunk data pack request waits before dispatching")
 			flags.DurationVar(&v.verConf.backoffMaxInterval, "backoff-max-interval", requester.DefaultBackoffMaxInterval, "min time interval a chunk data pack request waits before dispatching")
@@ -88,7 +88,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		processedBlockHeight *badger.ConsumerProgress // used in block consumer
 		chunkQueue           *badger.ChunksQueue      // used in chunk consumer
 
-		syncCore                *synchronization.Core // used in follower engine
+		syncCore                *chainsync.Core       // used in follower engine
 		pendingBlocks           *buffer.PendingBlocks // used in follower engine
 		assignerEngine          *assigner.Engine      // the assigner engine
 		fetcherEngine           *fetcher.Engine       // the fetcher engine
@@ -186,15 +186,18 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", func(node *NodeConfig) error {
 			var err error
 
-			syncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
-			rt := fvm.NewInterpreterRuntime()
-			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
+			vm := fvm.NewVM()
+			fvmOptions := append(
+				[]fvm.Option{fvm.WithLogger(node.Logger)},
+				node.FvmOptions...,
+			)
+			vmCtx := fvm.NewContext(fvmOptions...)
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 			approvalStorage := badger.NewResultApprovals(node.Metrics.Cache, node.DB)
 			verifierEng, err = verifier.New(
@@ -359,7 +362,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				followerCore,
 				syncCore,
 				node.Tracer,
-				compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+				follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)

@@ -45,7 +45,6 @@ func EnsureSecretDB(db *badger.DB) error {
 // insertDBTypeMarker inserts a database type marker if none exists. If a marker
 // already exists in the database, this function will return an error if the
 // marker does not match the argument, or return nil if it matches.
-//
 func insertDBTypeMarker(marker dbTypeMarker) func(*badger.Txn) error {
 	return func(txn *badger.Txn) error {
 		var storedMarker dbTypeMarker
@@ -72,7 +71,6 @@ func insertDBTypeMarker(marker dbTypeMarker) func(*badger.Txn) error {
 // ensureDBWithType ensures the given database has been initialized with the
 // given database type marker. If the given database has not been initialized
 // with any marker, or with a different marker than expected, returns an error.
-//
 func ensureDBWithType(db *badger.DB, expectedMarker dbTypeMarker) error {
 	var actualMarker dbTypeMarker
 	err := db.View(retrieveDBType(&actualMarker))

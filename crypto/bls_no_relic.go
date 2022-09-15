@@ -18,7 +18,7 @@ import (
 const relic_panic = "function is not supported when building without \"relic\" Go build tag"
 
 // bls.go functions
-func NewBLSKMAC(tag string) hash.Hasher {
+func NewExpandMsgXOFKMAC128(tag string) hash.Hasher {
 	panic(relic_panic)
 }
 
@@ -109,12 +109,12 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 
 // dkg.go functions
 func NewFeldmanVSS(size int, threshold int, myIndex int,
-	processor DKGProcessor, leaderIndex int) (DKGState, error) {
+	processor DKGProcessor, dealerIndex int) (DKGState, error) {
 	panic(relic_panic)
 }
 
 func NewFeldmanVSSQual(size int, threshold int, myIndex int,
-	processor DKGProcessor, leaderIndex int) (DKGState, error) {
+	processor DKGProcessor, dealerIndex int) (DKGState, error) {
 	panic(relic_panic)
 }
 

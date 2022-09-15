@@ -76,6 +76,10 @@ The `requester` engine requests collections from the collection nodes on behalf 
 The `rpc` engine is the GRPC server which responds to the [Access API](https://docs.onflow.org/access-api/) requests from clients.
 It also supports GRPCWebproxy requests.
 
+### [REST](../../engine/access/rest)
+
+The `rest` engine is the HTTP server that implements the [OpenAPI schema](https://github.com/onflow/flow/tree/master/openapi) and handles requests from clients. The API docuemntation is [available here](https://docs.onflow.org/http-api/).
+
 ### [Ping](../../engine/access/ping)
 
 The `ping` engine pings all the other nodes specified in the identity list via a [libp2p](https://github.com/libp2p/go-libp2p) ping and reports via metrics if the node is reachable or not.

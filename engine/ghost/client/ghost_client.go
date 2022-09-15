@@ -8,10 +8,12 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/utils/unittest"
+
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
-	jsoncodec "github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // GhostClient is a client for the ghost node.
@@ -41,7 +43,7 @@ func NewGhostClient(addr string) (*GhostClient, error) {
 	return &GhostClient{
 		rpcClient: grpcClient,
 		close:     func() error { return conn.Close() },
-		codec:     jsoncodec.NewCodec(),
+		codec:     unittest.NetworkCodec(),
 	}, nil
 }
 
@@ -50,7 +52,7 @@ func (c *GhostClient) Close() error {
 	return c.close()
 }
 
-func (c *GhostClient) Send(ctx context.Context, channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
+func (c *GhostClient) Send(ctx context.Context, channel channels.Channel, event interface{}, targetIDs ...flow.Identifier) error {
 
 	message, err := c.codec.Encode(event)
 	if err != nil {

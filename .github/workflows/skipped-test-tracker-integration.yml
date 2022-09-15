@@ -5,12 +5,13 @@ on:
     branches:
       - staging
       - trying
-  pull_request:
-    branches:
-      - master
 
 env:
-  GO_VERSION: 1.18
+  GO_VERSION: 1.19
+
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   generate-skipped-test-summary:
@@ -22,6 +23,7 @@ jobs:
           - unit
           - unit-crypto
           - unit-integration
+          - integration-bft
           - integration-mvp
           - integration-ghost
           - integration-network

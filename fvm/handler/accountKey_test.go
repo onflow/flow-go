@@ -23,7 +23,7 @@ import (
 
 func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 
-	akh := &AccountKeyHandler{accounts: FakeAccounts{}}
+	akh := &accountKeyUpdater{accounts: FakeAccounts{}}
 
 	address := cadence.BytesToAddress([]byte{1, 2, 3, 4})
 
@@ -48,7 +48,7 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(accountPublicKey)
 	require.NoError(t, err)
 
-	err = akh.AddEncodedAccountKey(runtime.Address(address), encodedPublicKey)
+	err = akh.addEncodedAccountKey(runtime.Address(address), encodedPublicKey)
 	require.Error(t, err)
 
 	err = errors2.Unwrap(err)

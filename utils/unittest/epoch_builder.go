@@ -111,15 +111,16 @@ func (builder *EpochBuilder) EpochHeights(counter uint64) (*EpochHeights, bool) 
 // epoch (epoch N). We assume the latest finalized block is within staking phase
 // in epoch N.
 //
-//                 |                                  EPOCH N                                                      |
-//                 |                                                                                               |
-//     P                 A               B               C               D             E             F           G
-// +------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+
-// | ER(P-1)    |->| ER(P)      |->| ER(A)     |->| ER(B)     |->| ER(C)    |->| ER(D)    |->| ER(E)    | ER(F)    |
-// | S(ER(P-2)) |  | S(ER(P-1)) |  | S(ER(P))  |  | S(ER(A))  |  | S(ER(B)) |  | S(ER(C)) |  | S(ER(D)) | S(ER(E)) |
-// +------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+
-//                                                                             |                        |
-//                                                                             Setup                    Commit
+//	                |                                  EPOCH N                                                      |
+//	                |                                                                                               |
+//	P                 A               B               C               D             E             F           G
+//
+//	+------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+
+//	| ER(P-1)    |->| ER(P)      |->| ER(A)     |->| ER(B)     |->| ER(C)    |->| ER(D)    |->| ER(E)    | ER(F)    |
+//	| S(ER(P-2)) |  | S(ER(P-1)) |  | S(ER(P))  |  | S(ER(A))  |  | S(ER(B)) |  | S(ER(C)) |  | S(ER(D)) | S(ER(E)) |
+//	+------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+
+//	                                                                            |                        |
+//	                                                                          Setup                    Commit
 //
 // ER(X)    := ExecutionReceipt for block X
 // S(ER(X)) := Seal for the ExecutionResult contained in ER(X) (seals block X)
@@ -376,9 +377,10 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 		err := state.Extend(context.Background(), block)
 		require.NoError(builder.t, err)
 
-		err = state.Finalize(context.Background(), blockID)
-		require.NoError(builder.t, err)
 		err = state.MarkValid(blockID)
+		require.NoError(builder.t, err)
+
+		err = state.Finalize(context.Background(), blockID)
 		require.NoError(builder.t, err)
 	}
 
@@ -395,14 +397,13 @@ func (builder *EpochBuilder) AddBlocksWithSeals(n int, counter uint64) *EpochBui
 		// Given the last 2 blocks in state A <- B when we add block C it will contain the following.
 		// - seal for A
 		// - execution result for B
-		a := builder.blocks[len(builder.blocks)-2]
 		b := builder.blocks[len(builder.blocks)-1]
 
 		receiptB := ReceiptForBlockFixture(b)
 
 		block := BlockWithParentFixture(b.Header)
 		seal := Seal.Fixture(
-			Seal.WithResult(a.Payload.Results[0]),
+			Seal.WithResult(b.Payload.Results[0]),
 		)
 
 		payload := PayloadFixture(

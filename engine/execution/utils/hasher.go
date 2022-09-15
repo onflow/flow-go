@@ -3,22 +3,21 @@ package utils
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // NewExecutionReceiptHasher generates and returns a hasher for signing
 // and verification of execution receipts
 func NewExecutionReceiptHasher() hash.Hasher {
-	h := crypto.NewBLSKMAC(encoding.ExecutionReceiptTag)
+	h := signature.NewBLSHasher(signature.ExecutionReceiptTag)
 	return h
 }
 
 // NewSPOCKHasher generates and returns a hasher for signing
 // and verification of SPoCKs
 func NewSPOCKHasher() hash.Hasher {
-	h := crypto.NewBLSKMAC(encoding.SPOCKTag)
+	h := signature.NewBLSHasher(signature.SPOCKTag)
 	return h
 }
 
@@ -27,12 +26,9 @@ func NewHasher(algo hash.HashingAlgorithm) (hash.Hasher, error) {
 	switch algo {
 	case hash.SHA2_256:
 		return hash.NewSHA2_256(), nil
-	case hash.SHA2_384:
-		return hash.NewSHA2_384(), nil
 	case hash.SHA3_256:
 		return hash.NewSHA3_256(), nil
-	case hash.SHA3_384:
-		return hash.NewSHA3_384(), nil
+	default:
+		return nil, fmt.Errorf("not supported hashing algorithms: %d", algo)
 	}
-	return nil, fmt.Errorf("not supported hashing algorithms: %d", algo)
 }

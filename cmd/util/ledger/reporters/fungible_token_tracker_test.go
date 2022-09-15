@@ -28,15 +28,15 @@ func TestFungibleTokenTracker(t *testing.T) {
 	chain := flow.Testnet.Chain()
 	view := migrations.NewView(payloads)
 
-	rt := fvm.NewInterpreterRuntime()
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
+		fvm.WithBlockPrograms(programs.NewEmptyPrograms()),
 	}
-	ctx := fvm.NewContext(zerolog.Nop(), opts...)
+	ctx := fvm.NewContext(opts...)
 	bootstrapOptions := []fvm.BootstrapProcedureOption{
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -44,9 +44,8 @@ func TestFungibleTokenTracker(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
-	programs := programs.NewEmptyPrograms()
 
-	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view, programs)
+	err := vm.RunV2(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view)
 	require.NoError(t, err)
 
 	// deploy wrapper resource
@@ -56,7 +55,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 	pub contract WrappedToken {
 		pub resource WrappedVault {
 			pub var vault: @FungibleToken.Vault
-	
+
 			init(v: @FungibleToken.Vault) {
 				self.vault <- v
 			}
@@ -82,7 +81,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	tx := fvm.Transaction(txBody, 0)
-	err = vm.Run(ctx, tx, view, programs)
+	err = vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
@@ -90,12 +89,12 @@ func TestFungibleTokenTracker(t *testing.T) {
 							import FungibleToken from 0x%s
 							import FlowToken from 0x%s
 							import WrappedToken from 0x%s
-							
-							transaction(amount: UFix64) {							
+
+							transaction(amount: UFix64) {
 								prepare(signer: AuthAccount) {
 									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
-							
+
 									let sentVault <- vaultRef.withdraw(amount: amount)
 									let wrappedFlow <- WrappedToken.CreateWrappedVault(inp :<- sentVault)
 									signer.save(<-wrappedFlow, to: /storage/wrappedToken)
@@ -108,7 +107,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	tx = fvm.Transaction(txBody, 0)
-	err = vm.Run(ctx, tx, view, programs)
+	err = vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
@@ -117,7 +116,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 	reporterFactory := reporters.NewReportFileWriterFactory(dir, log)
 
 	br := reporters.NewFungibleTokenTracker(log, reporterFactory, chain, []string{reporters.FlowTokenTypeID(chain)})
-	err = br.Report(view.Payloads())
+	err = br.Report(view.Payloads(), ledger.State{})
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(reporterFactory.Filename(reporters.FungibleTokenTrackerReportPrefix))

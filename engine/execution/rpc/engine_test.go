@@ -29,7 +29,8 @@ type Suite struct {
 	events     *storage.Events
 	exeResults *storage.ExecutionResults
 	txResults  *storage.TransactionResults
-	blocks     *storage.Blocks
+	commits    *storage.Commits
+	headers    *storage.Headers
 }
 
 func TestHandler(t *testing.T) {
@@ -41,7 +42,8 @@ func (suite *Suite) SetupTest() {
 	suite.events = new(storage.Events)
 	suite.exeResults = new(storage.ExecutionResults)
 	suite.txResults = new(storage.TransactionResults)
-	suite.blocks = new(storage.Blocks)
+	suite.commits = new(storage.Commits)
+	suite.headers = new(storage.Headers)
 }
 
 // TestExecuteScriptAtBlockID tests the ExecuteScriptAtBlockID API call
@@ -55,13 +57,11 @@ func (suite *Suite) TestExecuteScriptAtBlockID() {
 
 	// setup dummy request/response
 	ctx := context.Background()
-	rawId := []byte("dummy ID")
-	mockIdentifier, err := convert.BlockID(rawId)
-	suite.Require().NoError(err)
+	mockIdentifier := unittest.IdentifierFixture()
 	script := []byte("dummy script")
 	arguments := [][]byte(nil)
 	executionReq := execution.ExecuteScriptAtBlockIDRequest{
-		BlockId: rawId[:],
+		BlockId: mockIdentifier[:],
 		Script:  script,
 	}
 	scriptExecValue := []byte{9, 10, 11}
@@ -123,13 +123,14 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			eventMessages[j] = convert.EventToMessage(e)
 		}
 		// expect one call to lookup result for each block ID
-		suite.exeResults.On("ByBlockID", id).Return(nil, nil).Once()
+		//suite.exeResults.On("ByBlockID", id).Return(nil, nil).Once()
+		suite.commits.On("ByBlockID", id).Return(nil, nil).Once()
 
 		// expect one call to lookup events for each block ID
 		suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(eventsForBlock, nil).Once()
 
 		// expect one call to lookup each block
-		suite.blocks.On("ByID", id).Return(&block, nil).Once()
+		suite.headers.On("ByBlockID", id).Return(block.Header, nil).Once()
 
 		// create the expected result for this block
 		expectedResult[i] = &execution.GetEventsForBlockIDsResponse_Result{
@@ -141,10 +142,11 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	// create the handler
 	handler := &handler{
-		blocks:             suite.blocks,
+		headers:            suite.headers,
 		events:             suite.events,
 		exeResults:         suite.exeResults,
 		transactionResults: suite.txResults,
+		commits:            suite.commits,
 		chain:              flow.Mainnet,
 	}
 
@@ -212,7 +214,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		id := unittest.IdentifierFixture()
 
 		// expect a storage call for the invalid id but return an error
-		suite.exeResults.On("ByBlockID", id).Return(nil, realstorage.ErrNotFound).Once()
+		suite.commits.On("ByBlockID", id).Return(nil, realstorage.ErrNotFound).Once()
 
 		// create an API request with the invalid block id
 		req := concoctReq(string(flow.EventAccountCreated), [][]byte{id[:]})
@@ -294,7 +296,6 @@ func (suite *Suite) TestGetRegisterAtBlockID() {
 
 	id := unittest.IdentifierFixture()
 	serviceAddress := flow.Mainnet.Chain().ServiceAddress()
-	controller := []byte("")
 	validKey := []byte("exists")
 
 	mockEngine := new(ingestion.IngestRPC)
@@ -305,21 +306,20 @@ func (suite *Suite) TestGetRegisterAtBlockID() {
 		chain:  flow.Mainnet,
 	}
 
-	createReq := func(id, owner, controller, key []byte) *execution.GetRegisterAtBlockIDRequest {
+	createReq := func(id, owner, key []byte) *execution.GetRegisterAtBlockIDRequest {
 		return &execution.GetRegisterAtBlockIDRequest{
-			RegisterOwner:      owner,
-			RegisterController: controller,
-			RegisterKey:        key,
-			BlockId:            id,
+			RegisterOwner: owner,
+			RegisterKey:   key,
+			BlockId:       id,
 		}
 	}
 
 	suite.Run("happy path with valid request", func() {
 
 		// setup mock expectations
-		mockEngine.On("GetRegisterAtBlockID", mock.Anything, serviceAddress.Bytes(), controller, validKey, id).Return([]uint8{1}, nil).Once()
+		mockEngine.On("GetRegisterAtBlockID", mock.Anything, serviceAddress.Bytes(), validKey, id).Return([]uint8{1}, nil).Once()
 
-		req := createReq(id[:], serviceAddress.Bytes(), controller, validKey)
+		req := createReq(id[:], serviceAddress.Bytes(), validKey)
 		resp, err := handler.GetRegisterAtBlockID(context.Background(), req)
 
 		suite.Require().NoError(err)
@@ -332,9 +332,9 @@ func (suite *Suite) TestGetRegisterAtBlockID() {
 	suite.Run("invalid request with bad address", func() {
 		badOwner := []byte("\uFFFD")
 		// return error
-		mockEngine.On("GetRegisterAtBlockID", mock.Anything, badOwner, controller, validKey, id).Return(nil, errors.New("error")).Once()
+		mockEngine.On("GetRegisterAtBlockID", mock.Anything, badOwner, validKey, id).Return(nil, errors.New("error")).Once()
 
-		req := createReq(id[:], badOwner, controller, validKey)
+		req := createReq(id[:], badOwner, validKey)
 		_, err := handler.GetRegisterAtBlockID(context.Background(), req)
 		suite.Require().Error(err)
 	})
@@ -363,12 +363,12 @@ func (suite *Suite) TestGetTransactionResult() {
 	suite.events.On("ByBlockIDTransactionID", bID, txID).Return(eventsForTx, nil)
 
 	// expect a call to lookup each block
-	suite.blocks.On("ByID", block.ID()).Return(&block, true)
+	suite.headers.On("ByID", block.ID()).Return(&block, true)
 
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {
 		handler := &handler{
-			blocks:             suite.blocks,
+			headers:            suite.headers,
 			events:             suite.events,
 			transactionResults: txResults,
 			chain:              flow.Mainnet,
@@ -704,7 +704,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {
 		handler := &handler{
-			blocks:             suite.blocks,
+			headers:            suite.headers,
 			events:             suite.events,
 			transactionResults: txResults,
 			chain:              flow.Mainnet,

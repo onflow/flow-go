@@ -101,8 +101,11 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	// save the public key to use later in tests later
 	suite.publicKey = networkingKey.PublicKey()
 
-	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, nil, suite.chainID, suite.metrics, 0, 0, false, false, nil, nil)
+	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
+		nil, nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil)
+	assert.NoError(suite.T(), err)
+	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
+	assert.NoError(suite.T(), err)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
 	// wait for the server to startup

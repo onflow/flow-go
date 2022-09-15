@@ -2,11 +2,11 @@ package backend
 
 import (
 	"context"
-	"crypto/md5" //nolint:gosec
 	"errors"
 	"fmt"
-	"sync"
 	"time"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
@@ -38,10 +38,15 @@ const DefaultMaxHeightRange = 250
 // when recursively searching for a valid snapshot
 const DefaultSnapshotHistoryLimit = 50
 
+// DefaultLoggedScriptsCacheSize is the default size of the lookup cache used to dedupe logs of scripts sent to ENs
+// limiting cache size to 16MB and does not affect script execution, only for keeping logs tidy
+const DefaultLoggedScriptsCacheSize = 1_000_000
+
+// DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
+const DefaultConnectionPoolSize = 250
+
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
-
-var SnapshotHistoryLimitErr = fmt.Errorf("reached the snapshot history limit")
 
 // Backend implements the Access API.
 //
@@ -63,13 +68,13 @@ type Backend struct {
 	backendBlockDetails
 	backendAccounts
 	backendExecutionResults
+	backendNetwork
 
-	state                protocol.State
-	chainID              flow.ChainID
-	collections          storage.Collections
-	executionReceipts    storage.ExecutionReceipts
-	connFactory          ConnectionFactory
-	snapshotHistoryLimit int
+	state             protocol.State
+	chainID           flow.ChainID
+	collections       storage.Collections
+	executionReceipts storage.ExecutionReceipts
+	connFactory       ConnectionFactory
 }
 
 func New(
@@ -97,6 +102,13 @@ func New(
 		retry.Activate()
 	}
 
+	var err error
+
+	loggedScripts, _ := lru.New(DefaultLoggedScriptsCacheSize)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
+	}
+
 	b := &Backend{
 		state: state,
 		// create the sub-backends
@@ -107,10 +119,7 @@ func New(
 			state:             state,
 			log:               log,
 			metrics:           transactionMetrics,
-			seenScripts: &scriptMap{
-				scripts: make(map[[md5.Size]byte]time.Time),
-				lock:    sync.RWMutex{},
-			},
+			loggedScripts:     loggedScripts,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -153,16 +162,19 @@ func New(
 		backendExecutionResults: backendExecutionResults{
 			executionResults: executionResults,
 		},
-		collections:          collections,
-		executionReceipts:    executionReceipts,
-		connFactory:          connFactory,
-		chainID:              chainID,
-		snapshotHistoryLimit: snapshotHistoryLimit,
+		backendNetwork: backendNetwork{
+			state:                state,
+			chainID:              chainID,
+			snapshotHistoryLimit: snapshotHistoryLimit,
+		},
+		collections:       collections,
+		executionReceipts: executionReceipts,
+		connFactory:       connFactory,
+		chainID:           chainID,
 	}
 
 	retry.SetBackend(b)
 
-	var err error
 	preferredENIdentifiers, err = identifierList(preferredExecutionNodeIDs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
@@ -252,80 +264,6 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 	return convert.SnapshotToBytes(validSnapshot)
 }
 
-// getValidSnapshot will return a valid snapshot that has a sealing segment which
-// 1. does not contain any blocks that span an epoch transition
-// 2. does not contain any blocks that span an epoch phase transition
-// If a snapshot does contain an invalid sealing segment query the state
-// by height of each block in the segment and return a snapshot at the point
-// where the transition happens.
-func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int) (protocol.Snapshot, error) {
-	segment, err := snapshot.SealingSegment()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sealing segment: %w", err)
-	}
-
-	counterAtHighest, phaseAtHighest, err := b.getCounterAndPhase(segment.Highest().Header.Height)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get counter and phase at highest block in the segment: %w", err)
-	}
-
-	counterAtLowest, phaseAtLowest, err := b.getCounterAndPhase(segment.Lowest().Header.Height)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get counter and phase at lowest block in the segment: %w", err)
-	}
-
-	// Check if the counters and phase are different this indicates that the sealing segment
-	// of the snapshot requested spans either an epoch transition or phase transition.
-	if b.isEpochOrPhaseDifferent(counterAtHighest, counterAtLowest, phaseAtHighest, phaseAtLowest) {
-		// Visit each node in strict order of decreasing height starting at head
-		// to find the block that straddles the transition boundary.
-		for i := len(segment.Blocks) - 1; i >= 0; i-- {
-			blocksVisited++
-
-			// NOTE: Check if we have reached our history limit, in edge cases
-			// where the sealing segment is abnormally long we want to short circuit
-			// the recursive calls and return an error. The API caller can retry.
-			if blocksVisited > b.snapshotHistoryLimit {
-				return nil, fmt.Errorf("%w: (%d)", SnapshotHistoryLimitErr, b.snapshotHistoryLimit)
-			}
-
-			counterAtBlock, phaseAtBlock, err := b.getCounterAndPhase(segment.Blocks[i].Header.Height)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get epoch counter and phase for snapshot at block %s: %w", segment.Blocks[i].ID(), err)
-			}
-
-			// Check if this block straddles the transition boundary, if it does return the snapshot
-			// at that block height.
-			if b.isEpochOrPhaseDifferent(counterAtHighest, counterAtBlock, phaseAtHighest, phaseAtBlock) {
-				return b.getValidSnapshot(b.state.AtHeight(segment.Blocks[i].Header.Height), blocksVisited)
-			}
-		}
-	}
-
-	return snapshot, nil
-}
-
-// getCounterAndPhase will return the epoch counter and phase at the specified height in state
-func (b *Backend) getCounterAndPhase(height uint64) (uint64, flow.EpochPhase, error) {
-	snapshot := b.state.AtHeight(height)
-
-	counter, err := snapshot.Epochs().Current().Counter()
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get counter for block (height=%d): %w", height, err)
-	}
-
-	phase, err := snapshot.Phase()
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get phase for block (height=%d): %w", height, err)
-	}
-
-	return counter, phase, nil
-}
-
-func (b *Backend) isEpochOrPhaseDifferent(counter1, counter2 uint64, phase1, phase2 flow.EpochPhase) bool {
-	return counter1 != counter2 || phase1 != phase2
-}
-
 func convertStorageError(err error) error {
 	if err == nil {
 		return nil
@@ -352,8 +290,6 @@ func executionNodesForBlockID(
 	log zerolog.Logger) (flow.IdentityList, error) {
 
 	var executorIDs flow.IdentifierList
-	var err error
-	attempt := 0
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
@@ -370,11 +306,10 @@ func executionNodesForBlockID(
 		executorIDs = executorIdentities.NodeIDs()
 	} else {
 		// try to find atleast minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
-		for ; attempt < maxAttemptsForExecutionReceipt; attempt++ {
-
+		for attempt := 0; attempt < maxAttemptsForExecutionReceipt; attempt++ {
 			executorIDs, err = findAllExecutionNodes(blockID, executionReceipts, log)
 			if err != nil {
-				return flow.IdentityList{}, err
+				return nil, err
 			}
 
 			if len(executorIDs) >= minExecutionNodesCnt {
@@ -392,7 +327,7 @@ func executionNodesForBlockID(
 
 			select {
 			case <-ctx.Done():
-				return flow.IdentityList{}, err
+				return nil, ctx.Err()
 			case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
 				//retry after an exponential backoff
 			}
@@ -419,8 +354,7 @@ func executionNodesForBlockID(
 	executionIdentitiesRandom := subsetENs.Sample(maxExecutionNodesCnt)
 
 	if len(executionIdentitiesRandom) == 0 {
-		return flow.IdentityList{},
-			fmt.Errorf("no matching execution node found for block ID %v", blockID)
+		return nil, fmt.Errorf("no matching execution node found for block ID %v", blockID)
 	}
 
 	return executionIdentitiesRandom, nil

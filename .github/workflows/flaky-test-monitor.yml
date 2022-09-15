@@ -10,7 +10,11 @@ on:
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
   BIGQUERY_TABLE: test_results
-  GO_VERSION: 1.18
+  GO_VERSION: 1.19
+
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   upload-flaky-test-summary:
@@ -22,6 +26,7 @@ jobs:
           - unit
           - unit-crypto
           - unit-integration
+          - integration-bft
           - integration-mvp
           - integration-ghost
           - integration-network
@@ -64,6 +69,7 @@ jobs:
       env:
         TEST_FLAKY: true
         JSON_OUTPUT: true
+        RACE_DETECTOR: 1
     - name: Process test results
       run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
       env:

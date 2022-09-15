@@ -28,12 +28,14 @@ func init() {
 
 func run(*cobra.Command, []string) {
 
+	log.Info().Msgf("loading checkpoint %v", flagCheckpoint)
 	tries, err := wal.LoadCheckpoint(flagCheckpoint, &log.Logger)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while loading checkpoint")
 	}
+	log.Info().Msgf("checkpoint loaded, total tries: %v", len(tries))
 
 	for _, trie := range tries {
-		fmt.Printf("%x\n", trie.RootHash())
+		fmt.Printf("trie root hash: %s\n", trie.RootHash())
 	}
 }

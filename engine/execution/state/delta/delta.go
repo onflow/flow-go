@@ -20,8 +20,8 @@ func NewDelta() Delta {
 	}
 }
 
-func toString(owner, controller, key string) string {
-	register := flow.NewRegisterID(owner, controller, key)
+func toString(owner, key string) string {
+	register := flow.NewRegisterID(owner, key)
 	return register.String()
 }
 
@@ -29,16 +29,16 @@ func toString(owner, controller, key string) string {
 //
 // This function will return nil if the given key has been deleted in this delta.
 // Second return parameters indicated if the value has been set/deleted in this delta
-func (d Delta) Get(owner, controller, key string) (flow.RegisterValue, bool) {
-	value, set := d.Data[toString(owner, controller, key)]
+func (d Delta) Get(owner, key string) (flow.RegisterValue, bool) {
+	value, set := d.Data[toString(owner, key)]
 	return value.Value, set
 }
 
 // Set records an update in this delta.
-func (d Delta) Set(owner, controller, key string, value flow.RegisterValue) {
-	k := toString(owner, controller, key)
+func (d Delta) Set(owner, key string, value flow.RegisterValue) {
+	k := toString(owner, key)
 	d.Data[k] = flow.RegisterEntry{
-		Key:   flow.NewRegisterID(owner, controller, key),
+		Key:   flow.NewRegisterID(owner, key),
 		Value: value,
 	}
 }

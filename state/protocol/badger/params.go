@@ -86,7 +86,7 @@ func (p *Params) Seal() (*flow.Seal, error) {
 	}
 
 	// retrieve the root seal
-	seal, err := p.state.seals.ByBlockID(rootID)
+	seal, err := p.state.seals.HighestInFork(rootID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve root seal: %w", err)
 	}

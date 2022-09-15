@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	mathRand "math/rand"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-	engineCommon "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -31,6 +32,7 @@ import (
 	module "github.com/onflow/flow-go/module/mocks"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	stateProtocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -123,8 +125,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	identityListUnsorted := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
 	identityList := identityListUnsorted.Sort(order.Canonical)
 
-	executionState.On("DiskSize").Return(int64(1024*1024), nil).Maybe()
-
 	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(selector)
 	}, nil)
@@ -146,7 +146,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	request.EXPECT().Force().Return().AnyTimes()
 
-	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	net.EXPECT().Register(gomock.Eq(channels.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
 	deltas, err := NewDeltas(1000)
 	require.NoError(t, err)
@@ -178,6 +178,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		false,
 		checkAuthorizedAtBlock,
 		false,
+		nil,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -414,7 +416,7 @@ func TestExecuteOneBlock(t *testing.T) {
 
 		// A <- B
 		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		ctx.mockHasWeightAtBlockID(blockA.ID(), true)
@@ -429,7 +431,7 @@ func TestExecuteOneBlock(t *testing.T) {
 		ctx.mockStateCommitsWithMap(commits)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(&blockA, nil)
+		ctx.snapshot.On("Head").Return(blockA, nil)
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
@@ -475,7 +477,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 		})
 
 		// last executed block - it will be re-queued regardless of state commit
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		// finalized block - it can be executed in parallel, as blockB has been executed
@@ -518,7 +520,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, mock.Anything).Return(nil, storageerr.ErrNotFound)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(&blockA, nil)
+		ctx.snapshot.On("Head").Return(blockA, nil)
 
 		wgB := sync.WaitGroup{}
 		wgB.Add(1)
@@ -610,7 +612,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 
 		// A <- B <- C
 		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		//blockCstartState := unittest.StateCommitmentFixture()
@@ -632,7 +634,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 		ctx.mockStateCommitsWithMap(commits)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(&blockA, nil)
+		ctx.snapshot.On("Head").Return(blockA, nil)
 
 		// wait finishing execution until all the blocks are sent to execution
 		wgPut := sync.WaitGroup{}
@@ -715,7 +717,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 
 		// A (0 collection) <- B (0 collection) <- C (0 collection) <- D (1 collection)
 		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		collectionIdentities := ctx.identities.Filter(filter.HasRole(flow.RoleCollection))
@@ -758,7 +760,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		ctx.mockSnapshot(blockD.Block.Header, ctx.identities)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(&blockA, nil)
+		ctx.snapshot.On("Head").Return(blockA, nil)
 
 		// wait to control parent (block B) execution until we are ready
 		wgB := sync.WaitGroup{}
@@ -853,7 +855,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		blockSealed := unittest.BlockHeaderFixture()
 
 		blocks := make(map[string]*entity.ExecutableBlock)
-		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, &blockSealed)
+		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, blockSealed)
 		blocks["A"].StartState = unittest.StateCommitmentPointerFixture()
 
 		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
@@ -879,7 +881,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		// a receipt for sealed block won't be broadcasted
-		ctx.snapshot.On("Head").Return(&blockSealed, nil)
+		ctx.snapshot.On("Head").Return(blockSealed, nil)
 		ctx.mockSnapshot(blocks["A"].Block.Header, unittest.IdentityListFixture(1))
 		ctx.mockSnapshot(blocks["B"].Block.Header, unittest.IdentityListFixture(1))
 		ctx.mockSnapshot(blocks["C"].Block.Header, unittest.IdentityListFixture(1))
@@ -973,42 +975,72 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 }
 
 func TestExecuteScriptAtBlockID(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
-		// Meaningless script
-		script := []byte{1, 1, 2, 3, 5, 8, 11}
-		scriptResult := []byte{1}
+	t.Run("happy path", func(t *testing.T) {
+		runWithEngine(t, func(ctx testingContext) {
+			// Meaningless script
+			script := []byte{1, 1, 2, 3, 5, 8, 11}
+			scriptResult := []byte{1}
 
-		// Ensure block we're about to query against is executable
-		blockA := unittest.ExecutableBlockFixture(nil)
-		blockA.StartState = unittest.StateCommitmentPointerFixture()
+			// Ensure block we're about to query against is executable
+			blockA := unittest.ExecutableBlockFixture(nil)
+			blockA.StartState = unittest.StateCommitmentPointerFixture()
 
-		snapshot := new(protocol.Snapshot)
-		snapshot.On("Head").Return(blockA.Block.Header, nil)
+			snapshot := new(protocol.Snapshot)
+			snapshot.On("Head").Return(blockA.Block.Header, nil)
 
-		commits := make(map[flow.Identifier]flow.StateCommitment)
-		commits[blockA.ID()] = *blockA.StartState
+			commits := make(map[flow.Identifier]flow.StateCommitment)
+			commits[blockA.ID()] = *blockA.StartState
 
-		ctx.stateCommitmentExist(blockA.ID(), *blockA.StartState)
+			ctx.stateCommitmentExist(blockA.ID(), *blockA.StartState)
 
-		ctx.state.On("AtBlockID", blockA.Block.ID()).Return(snapshot)
-		view := new(delta.View)
-		ctx.executionState.On("NewView", *blockA.StartState).Return(view)
+			ctx.state.On("AtBlockID", blockA.Block.ID()).Return(snapshot)
+			view := new(delta.View)
+			ctx.executionState.On("NewView", *blockA.StartState).Return(view)
+			ctx.executionState.On("HasState", *blockA.StartState).Return(true)
 
-		// Successful call to computation manager
-		ctx.computationManager.
-			On("ExecuteScript", mock.Anything, script, [][]byte(nil), blockA.Block.Header, view).
-			Return(scriptResult, nil)
+			// Successful call to computation manager
+			ctx.computationManager.
+				On("ExecuteScript", mock.Anything, script, [][]byte(nil), blockA.Block.Header, view).
+				Return(scriptResult, nil)
 
-		// Execute our script and expect no error
-		res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.Block.ID())
-		assert.NoError(t, err)
-		assert.Equal(t, scriptResult, res)
+			// Execute our script and expect no error
+			res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.Block.ID())
+			assert.NoError(t, err)
+			assert.Equal(t, scriptResult, res)
 
-		// Assert other components were called as expected
-		ctx.computationManager.AssertExpectations(t)
-		ctx.executionState.AssertExpectations(t)
-		ctx.state.AssertExpectations(t)
+			// Assert other components were called as expected
+			ctx.computationManager.AssertExpectations(t)
+			ctx.executionState.AssertExpectations(t)
+			ctx.state.AssertExpectations(t)
+		})
 	})
+
+	t.Run("return early when state commitment not exist", func(t *testing.T) {
+		runWithEngine(t, func(ctx testingContext) {
+			// Meaningless script
+			script := []byte{1, 1, 2, 3, 5, 8, 11}
+
+			// Ensure block we're about to query against is executable
+			blockA := unittest.ExecutableBlockFixture(nil)
+			blockA.StartState = unittest.StateCommitmentPointerFixture()
+
+			// make sure blockID to state commitment mapping exist
+			ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blockA.ID()).Return(*blockA.StartState, nil)
+
+			// but the state commitment does not exist (e.g. purged)
+			ctx.executionState.On("HasState", *blockA.StartState).Return(false)
+
+			// Execute our script and expect no error
+			_, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.Block.ID())
+			assert.Error(t, err)
+			assert.True(t, strings.Contains(err.Error(), "state commitment not found"))
+
+			// Assert other components were called as expected
+			ctx.executionState.AssertExpectations(t)
+			ctx.state.AssertExpectations(t)
+		})
+	})
+
 }
 
 func Test_SPOCKGeneration(t *testing.T) {
@@ -1061,7 +1093,7 @@ func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		blockSealed := unittest.BlockHeaderFixture()
 
 		blocks := make(map[string]*entity.ExecutableBlock)
-		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, &blockSealed)
+		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, blockSealed)
 		blocks["A"].StartState = unittest.StateCommitmentPointerFixture()
 
 		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
@@ -1090,7 +1122,7 @@ func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		// will be executed.
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		// a receipt for sealed block won't be broadcasted
-		ctx.snapshot.On("Head").Return(&blockSealed, nil)
+		ctx.snapshot.On("Head").Return(blockSealed, nil)
 
 		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
 		identity := *ctx.identity
@@ -1184,7 +1216,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	request := module.NewMockRequester(ctrl)
 	syncConduit := &mocknetwork.Conduit{}
 	var engine *Engine
-	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	net.EXPECT().Register(gomock.Eq(channels.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
@@ -1235,6 +1267,8 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		false,
 		checkAuthorizedAtBlock,
 		false,
+		nil,
+		nil,
 	)
 
 	require.NoError(t, err)
@@ -1479,4 +1513,36 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 			blockH.ID()},
 			pending)
 	})
+}
+
+func TestRetryableUploader(t *testing.T) {
+	testRetryableUploader := new(FakeRetryableUploader)
+
+	engine := &Engine{
+		uploaders: []uploader.Uploader{testRetryableUploader},
+	}
+
+	err := engine.retryUpload()
+	assert.Nil(t, err)
+
+	require.True(t, testRetryableUploader.RetryUploadCalled())
+}
+
+// FakeRetryableUploader is one RetryableUploader for testing purposes.
+type FakeRetryableUploader struct {
+	uploader.RetryableUploaderWrapper
+	retryUploadCalled bool
+}
+
+func (f *FakeRetryableUploader) Upload(_ *execution.ComputationResult) error {
+	return nil
+}
+
+func (f *FakeRetryableUploader) RetryUpload() error {
+	f.retryUploadCalled = true
+	return nil
+}
+
+func (f *FakeRetryableUploader) RetryUploadCalled() bool {
+	return f.retryUploadCalled
 }

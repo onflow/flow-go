@@ -40,12 +40,35 @@ const DefaultMaxCollectionTotalGas = 10_000_000 // 10M
 // DefaultMaxCollectionSize is the default maximum number of transactions allowed inside a collection.
 const DefaultMaxCollectionSize = 100
 
-// DefaultMaxAddressIndex is the default for the maximum address index allowed to be acceptable by collection and acccess nodes.
-const DefaultMaxAddressIndex = 20_000_000
-
 // DefaultValueLogGCFrequency is the default frequency in blocks that we call the
 // badger value log GC. Equivalent to 10 mins for a 1 second block time
 const DefaultValueLogGCFrequency = 10 * 60
+
+// DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
+// for subsequent inclusion in block.
+// when set to 1, it requires at least 1 approval to build a seal
+// when set to 0, it can build seal without any approval
+const DefaultRequiredApprovalsForSealConstruction = uint(1)
+
+// DefaultRequiredApprovalsForSealValidation is the default number of approvals that should be
+// present and valid for each chunk. Setting this to 0 will disable counting of chunk approvals
+// this can be used temporarily to ease the migration to new chunk based sealing.
+// TODO:
+//   - This value will result in consensus not depending on verification at all for sealing (no approvals required)
+//   - Full protocol should be +2/3 of all currently authorized verifiers.
+const DefaultRequiredApprovalsForSealValidation = 0
+
+// DefaultChunkAssignmentAlpha is the default number of verifiers that should be
+// assigned to each chunk.
+const DefaultChunkAssignmentAlpha = 3
+
+// DefaultEmergencySealingActive is a flag which indicates when emergency sealing is active, this is a temporary measure
+// to make fire fighting easier while seal & verification is under development.
+const DefaultEmergencySealingActive = false
+
+// threshold for re-requesting approvals: min height difference between the latest finalized block
+// and the block incorporating a result
+const DefaultApprovalRequestsThreshold = uint64(10)
 
 // DomainTagLength is set to 32 bytes.
 //

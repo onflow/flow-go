@@ -139,19 +139,22 @@ func GetGhostClient(ghostContainer *testnet.Container) (*client.GhostClient, err
 }
 
 // GetAccount returns a new account address, key, and signer.
-func GetAccount(chain flow.Chain) (sdk.Address, *sdk.AccountKey, sdkcrypto.Signer) {
+func GetAccount(chain flow.Chain) (sdk.Address, *sdk.AccountKey, sdkcrypto.Signer, error) {
 
 	addr := sdk.Address(chain.ServiceAddress())
 
 	key := RandomPrivateKey()
-	signer := sdkcrypto.NewInMemorySigner(key, sdkcrypto.SHA3_256)
+	signer, err := sdkcrypto.NewInMemorySigner(key, sdkcrypto.SHA3_256)
+	if err != nil {
+		return sdk.Address{}, nil, nil, err
+	}
 
 	acct := sdk.NewAccountKey().
 		FromPrivateKey(key).
 		SetHashAlgo(sdkcrypto.SHA3_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
-	return addr, acct, signer
+	return addr, acct, signer, nil
 }
 
 // RandomPrivateKey returns a randomly generated ECDSA P-256 private key.

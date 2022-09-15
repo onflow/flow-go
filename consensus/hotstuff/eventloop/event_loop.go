@@ -16,13 +16,18 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 )
 
+type proposalTask struct {
+	*model.Proposal
+	done chan struct{}
+}
+
 // EventLoop buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
 type EventLoop struct {
 	*component.ComponentManager
 	log                zerolog.Logger
 	eventHandler       hotstuff.EventHandler
 	metrics            module.HotstuffMetrics
-	proposals          chan *model.Proposal
+	proposals          chan *proposalTask
 	quorumCertificates chan *flow.QuorumCertificate
 	startTime          time.Time
 }
@@ -32,7 +37,7 @@ var _ component.Component = (*EventLoop)(nil)
 
 // NewEventLoop creates an instance of EventLoop.
 func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {
-	proposals := make(chan *model.Proposal)
+	proposals := make(chan *proposalTask)
 	quorumCertificates := make(chan *flow.QuorumCertificate, 1)
 
 	el := &EventLoop{
@@ -153,7 +158,12 @@ func (el *EventLoop) loop(ctx context.Context) error {
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnReceiveProposal(p)
+			err := el.eventHandler.OnReceiveProposal(p.Proposal)
+			// done processing the proposal, notify the caller (usually the compliance engine) that
+			// this block has been processed. If the block is valid, protocol state should have it stored.
+			// useful when the caller is processing a range of blocks, and waiting for the current block
+			// to be processed by hotstuff before processing the next block.
+			close(p.done)
 
 			// measure how long it takes for a proposal to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnProposal)
@@ -189,20 +199,24 @@ func (el *EventLoop) loop(ctx context.Context) error {
 }
 
 // SubmitProposal pushes the received block to the blockheader channel
-func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) {
+func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) <-chan struct{} {
 	received := time.Now()
 
-	proposal := model.ProposalFromFlow(proposalHeader, parentView)
+	proposal := &proposalTask{
+		Proposal: model.ProposalFromFlow(proposalHeader, parentView),
+		done:     make(chan struct{}),
+	}
 
 	select {
 	case el.proposals <- proposal:
 	case <-el.ComponentManager.ShutdownSignal():
-		return
+		return proposal.done
 	}
 
 	// the wait duration is measured as how long it takes from a block being
 	// received to event handler commencing the processing of the block
 	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnProposal)
+	return proposal.done
 }
 
 // SubmitTrustedQC pushes the received QC to the quorumCertificates channel

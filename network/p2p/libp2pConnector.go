@@ -10,15 +10,20 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
-	discovery "github.com/libp2p/go-libp2p-discovery"
+	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// libp2pConnector is a libp2p based Connector implementation to connect and disconnect from peers
+const (
+	ConnectionPruningEnabled  = true
+	ConnectionPruningDisabled = false
+)
+
+// Libp2pConnector is a libp2p based Connector implementation to connect and disconnect from peers
 type Libp2pConnector struct {
-	backoffConnector *discovery.BackoffConnector
+	backoffConnector *discoveryBackoff.BackoffConnector
 	host             host.Host
 	log              zerolog.Logger
 	pruneConnections bool
@@ -52,29 +57,18 @@ func IsUnconvertibleIdentitiesError(err error) bool {
 	return errors.As(err, &errUnconvertableIdentitiesError)
 }
 
-type ConnectorOption func(connector *Libp2pConnector)
-
-func WithConnectionPruning(enable bool) ConnectorOption {
-	return func(connector *Libp2pConnector) {
-		connector.pruneConnections = false
-	}
-}
-
-func NewLibp2pConnector(host host.Host, log zerolog.Logger, options ...ConnectorOption) (*Libp2pConnector, error) {
+func NewLibp2pConnector(log zerolog.Logger, host host.Host, pruning bool) (*Libp2pConnector, error) {
 	connector, err := defaultLibp2pBackoffConnector(host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libP2P connector: %w", err)
 	}
 	libP2PConnector := &Libp2pConnector{
+		log:              log,
 		backoffConnector: connector,
 		host:             host,
-		log:              log,
-		pruneConnections: true,
+		pruneConnections: pruning,
 	}
 
-	for _, o := range options {
-		o(libP2PConnector)
-	}
 	return libP2PConnector, nil
 }
 
@@ -86,7 +80,9 @@ func (l *Libp2pConnector) UpdatePeers(ctx context.Context, peerIDs peer.IDSlice)
 
 	if l.pruneConnections {
 		// disconnect from any other peers not in pInfos
-		l.trimAllConnectionsExcept(peerIDs)
+		// Note: by default almost on all roles, we run on a full topology,
+		// this trimming only affects evicted peers from protocol state.
+		l.pruneAllConnectionsExcept(peerIDs)
 	}
 }
 
@@ -108,10 +104,10 @@ func (l *Libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSli
 	l.backoffConnector.Connect(ctx, peerCh)
 }
 
-// trimAllConnectionsExcept trims all connections of the node from peers not part of peerIDs.
+// pruneAllConnectionsExcept trims all connections of the node from peers not part of peerIDs.
 // A node would have created such extra connections earlier when the identity list may have been different, or
 // it may have been target of such connections from node which have now been excluded.
-func (l *Libp2pConnector) trimAllConnectionsExcept(peerIDs peer.IDSlice) {
+func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 
 	// convert the peerInfos to a peer.ID -> bool map
 	peersToKeep := make(map[peer.ID]bool, len(peerIDs))
@@ -162,13 +158,13 @@ func (l *Libp2pConnector) trimAllConnectionsExcept(peerIDs peer.IDSlice) {
 
 // defaultLibp2pBackoffConnector creates a default libp2p backoff connector similar to the one created by libp2p.pubsub
 // (https://github.com/libp2p/go-libp2p-pubsub/blob/master/discovery.go#L34)
-func defaultLibp2pBackoffConnector(host host.Host) (*discovery.BackoffConnector, error) {
+func defaultLibp2pBackoffConnector(host host.Host) (*discoveryBackoff.BackoffConnector, error) {
 	rngSrc := rand.NewSource(rand.Int63())
 	minBackoff, maxBackoff := time.Second*10, time.Hour
 	cacheSize := 100
 	dialTimeout := time.Minute * 2
-	backoff := discovery.NewExponentialBackoff(minBackoff, maxBackoff, discovery.FullJitter, time.Second, 5.0, 0, rand.New(rngSrc))
-	backoffConnector, err := discovery.NewBackoffConnector(host, cacheSize, dialTimeout, backoff)
+	backoff := discoveryBackoff.NewExponentialBackoff(minBackoff, maxBackoff, discoveryBackoff.FullJitter, time.Second, 5.0, 0, rand.New(rngSrc))
+	backoffConnector, err := discoveryBackoff.NewBackoffConnector(host, cacheSize, dialTimeout, backoff)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backoff connector: %w", err)
 	}

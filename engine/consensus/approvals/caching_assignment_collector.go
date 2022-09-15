@@ -39,8 +39,8 @@ func (ac *CachingAssignmentCollector) RequestMissingApprovals(consensus.SealingO
 // ProcessIncorporatedResult starts tracking the approval for IncorporatedResult.
 // Method is idempotent.
 // Error Returns:
-//  * no errors expected during normal operation;
-//    errors might be symptoms of bugs or internal state corruption (fatal)
+//   - no errors expected during normal operation;
+//     errors might be symptoms of bugs or internal state corruption (fatal)
 func (ac *CachingAssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	// check that result is the one that this VerifyingAssignmentCollector manages
 	if resID := incorporatedResult.Result.ID(); resID != ac.ResultID() {
@@ -60,9 +60,9 @@ func (ac *CachingAssignmentCollector) ProcessIncorporatedResult(incorporatedResu
 // ProcessApproval ingests Result Approvals and triggers sealing of execution result
 // when sufficient approvals have arrived.
 // Error Returns:
-//  * nil in case of success (outdated approvals might be silently discarded)
-//  * engine.InvalidInputError if the result approval is invalid
-//  * any other errors might be symptoms of bugs or internal state corruption (fatal)
+//   - nil in case of success (outdated approvals might be silently discarded)
+//   - engine.InvalidInputError if the result approval is invalid
+//   - any other errors might be symptoms of bugs or internal state corruption (fatal)
 func (ac *CachingAssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
 	ac.log.Debug().
 		Str("result_id", approval.Body.ExecutionResultID.String()).

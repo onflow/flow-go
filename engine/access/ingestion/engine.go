@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -178,12 +179,49 @@ func New(
 		Build()
 
 	// register engine with the execution receipt provider
-	_, err = net.Register(engine.ReceiveReceipts, e)
+	_, err = net.Register(channels.ReceiveReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
 	return e, nil
+}
+
+func (e *Engine) Start(parent irrecoverable.SignalerContext) {
+	rootBlock, err := e.state.Params().Root()
+	if err != nil {
+		parent.Throw(fmt.Errorf("failed to get root block: %w", err))
+	}
+
+	// if spork root snapshot
+	rootSnapshot := e.state.AtBlockID(rootBlock.ID())
+
+	isSporkRootSnapshot, err := protocol.IsSporkRootSnapshot(rootSnapshot)
+	if err != nil {
+		parent.Throw(fmt.Errorf("could not check if root snapshot is a spork root snapshot: %w", err))
+	}
+
+	// This is useful for dynamically bootstrapped access node, they will request missing collections. In order to ensure all txs
+	// from the missing collections can be verified, we must ensure they are referencing to known blocks.
+	// That's why we set the full block height to be rootHeight + TransactionExpiry, so that we only request missing collections
+	// in blocks above that height.
+	if isSporkRootSnapshot {
+		// for snapshot with a single block in the sealing segment the first full block is the root block.
+		err := e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
+		if err != nil {
+			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
+		}
+	} else {
+		// for midspork snapshots with a sealing segment that has more than 1 block add the transaction expiry to the root block height to avoid
+		// requesting resources for blocks below the expiry.
+		firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
+		err := e.blocks.InsertLastFullBlockHeightIfNotExists(firstFullHeight)
+		if err != nil {
+			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
+		}
+	}
+
+	e.ComponentManager.Start(parent)
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -323,7 +361,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	err := e.process(originID, event)
 	if err != nil {
 		engine.LogError(e.log, err)
@@ -337,7 +375,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.process(originID, event)
 }
 
@@ -374,6 +412,19 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 		if err != nil {
 			return fmt.Errorf("could not index block for execution result: %w", err)
 		}
+	}
+
+	// skip requesting collections, if this block is below the last full block height
+	// this means that either we have already received these collections, or the block
+	// may contain unverifiable guarantees (in case this node has just joined the network)
+	lastFullBlockHeight, err := e.blocks.GetLastFullBlockHeight()
+	if err != nil {
+		return fmt.Errorf("could not get last full block height: %w", err)
+	}
+
+	if block.Header.Height <= lastFullBlockHeight {
+		e.log.Info().Msgf("skipping requesting collections for finalized block below last full block height (%d<=%d)", block.Header.Height, lastFullBlockHeight)
+		return nil
 	}
 
 	// queue requesting each of the collections from the collection node
@@ -413,7 +464,8 @@ func (e *Engine) trackFinalizedMetricForBlock(hb *model.Block) {
 
 	if ti, found := e.blocksToMarkExecuted.ByID(hb.BlockID); found {
 		e.trackExecutedMetricForBlock(block, ti)
-		e.blocksToMarkExecuted.Rem(hb.BlockID)
+		e.transactionMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
+		e.blocksToMarkExecuted.Remove(hb.BlockID)
 	}
 }
 
@@ -424,23 +476,29 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 		return fmt.Errorf("failed to store execution receipt: %w", err)
 	}
 
-	e.trackExecutedMetricForReceipt(r)
+	e.trackExecutionReceiptMetrics(r)
 	return nil
 }
 
-func (e *Engine) trackExecutedMetricForReceipt(r *flow.ExecutionReceipt) {
+func (e *Engine) trackExecutionReceiptMetrics(r *flow.ExecutionReceipt) {
 	// TODO add actual execution time to execution receipt?
 	now := time.Now().UTC()
 
 	// retrieve the block
 	b, err := e.blocks.ByID(r.ExecutionResult.BlockID)
+
 	if errors.Is(err, storage.ErrNotFound) {
 		e.blocksToMarkExecuted.Add(r.ExecutionResult.BlockID, now)
 		return
-	} else if err != nil {
+	}
+
+	if err != nil {
 		e.log.Warn().Err(err).Msg("could not track tx executed metric: executed block not found locally")
 		return
 	}
+
+	e.transactionMetrics.UpdateExecutionReceiptMaxHeight(b.Header.Height)
+
 	e.trackExecutedMetricForBlock(b, now)
 }
 
@@ -479,14 +537,14 @@ func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) 
 		for _, t := range light.Transactions {
 			e.transactionMetrics.TransactionFinalized(t, ti)
 		}
-		e.collectionsToMarkFinalized.Rem(light.ID())
+		e.collectionsToMarkFinalized.Remove(light.ID())
 	}
 
 	if ti, found := e.collectionsToMarkExecuted.ByID(light.ID()); found {
 		for _, t := range light.Transactions {
 			e.transactionMetrics.TransactionExecuted(t, ti)
 		}
-		e.collectionsToMarkExecuted.Rem(light.ID())
+		e.collectionsToMarkExecuted.Remove(light.ID())
 	}
 
 	// FIX: we can't index guarantees here, as we might have more than one block

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // ConduitFactory is an interface type that is utilized by the Network to create conduits for the channels.
@@ -19,7 +20,7 @@ type ConduitFactory interface {
 
 	// NewConduit creates a conduit on the specified channel.
 	// Prior to creating any conduit, the factory requires an Adapter to be registered with it.
-	NewConduit(context.Context, Channel) (Conduit, error)
+	NewConduit(context.Context, channels.Channel) (Conduit, error)
 }
 
 // Conduit represents the interface for engines to communicate over the

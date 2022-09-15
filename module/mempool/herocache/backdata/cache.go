@@ -151,8 +151,8 @@ func (c *Cache) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	return c.put(entityID, entity)
 }
 
-// Rem removes the entity with the given identifier.
-func (c *Cache) Rem(entityID flow.Identifier) (flow.Entity, bool) {
+// Remove removes the entity with the given identifier.
+func (c *Cache) Remove(entityID flow.Identifier) (flow.Entity, bool) {
 	defer c.logTelemetry()
 
 	entity, bucketIndex, sliceIndex, exists := c.get(entityID)
@@ -173,7 +173,7 @@ func (c *Cache) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 func (c *Cache) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
 	defer c.logTelemetry()
 
-	entity, removed := c.Rem(entityID)
+	entity, removed := c.Remove(entityID)
 	if !removed {
 		return nil, false
 	}
@@ -199,6 +199,12 @@ func (c Cache) Size() uint {
 	defer c.logTelemetry()
 
 	return uint(c.entities.Size())
+}
+
+// Head returns the head of queue.
+// Boolean return value determines whether there is a head available.
+func (c Cache) Head() (flow.Entity, bool) {
+	return c.entities.Head()
 }
 
 // All returns all entities stored in the backdata.
@@ -284,8 +290,12 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	}
 
 	c.slotCount++
-	entityIndex, ejection := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
-	if ejection {
+	entityIndex, slotAvailable, ejectionHappened := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
+	if !slotAvailable {
+		return false
+	}
+
+	if ejectionHappened {
 		// cache is at its full size and ejection happened to make room for this new entity.
 		c.collector.OnEntityEjectionDueToFullCapacity()
 	}
@@ -468,5 +478,5 @@ func (c *Cache) unuseSlot(b bucketIndex, s slotIndex) {
 // invalidateEntity removes the entity linked to the specified slot from the underlying entities
 // list. So that entity slot is made available to take if needed.
 func (c *Cache) invalidateEntity(b bucketIndex, s slotIndex) {
-	c.entities.Rem(c.buckets[b].slots[s].entityIndex)
+	c.entities.Remove(c.buckets[b].slots[s].entityIndex)
 }

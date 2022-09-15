@@ -2,23 +2,30 @@ package metrics
 
 // Prometheus metric namespaces
 const (
-	namespaceNetwork      = "network"
-	namespaceStorage      = "storage"
-	namespaceAccess       = "access"
-	namespaceCollection   = "collection"
-	namespaceConsensus    = "consensus"
-	namespaceVerification = "verification"
-	namespaceExecution    = "execution"
-	namespaceLoader       = "loader"
-	namespaceStateSync    = "state_synchronization"
+	namespaceNetwork           = "network"
+	namespaceStorage           = "storage"
+	namespaceAccess            = "access"
+	namespaceObserver          = "observer"
+	namespaceCollection        = "collection"
+	namespaceConsensus         = "consensus"
+	namespaceVerification      = "verification"
+	namespaceExecution         = "execution"
+	namespaceLoader            = "loader"
+	namespaceStateSync         = "state_synchronization"
+	namespaceExecutionDataSync = "execution_data_sync"
+	namespaceChainsync         = "chainsync"
 )
 
 // Network subsystems represent the various layers of networking.
 const (
 	// subsystemLibp2p = "libp2p"
-	subsystemGossip = "gossip"
-	subsystemEngine = "engine"
-	subsystemQueue  = "queue"
+	subsystemGossip       = "gossip"
+	subsystemEngine       = "engine"
+	subsystemQueue        = "queue"
+	subsystemDHT          = "dht"
+	subsystemBitswap      = "bitswap"
+	subsystemAuth         = "authorization"
+	subsystemRateLimiting = "ratelimit"
 )
 
 // Storage subsystems represent the various components of the storage layer.
@@ -32,6 +39,12 @@ const (
 const (
 	subsystemTransactionTiming     = "transaction_timing"
 	subsystemTransactionSubmission = "transaction_submission"
+	subsystemConnectionPool        = "connection_pool"
+)
+
+// Observer subsystem
+const (
+	subsystemObserverGRPC = "observer_grpc"
 )
 
 // Collection subsystem
@@ -66,10 +79,18 @@ const (
 	subsystemChunkConsumer   = "chunk_consumer"
 )
 
-// State Synchronization Subsystems
+// Execution Data Sync Subsystems
 const (
-	subsystemExecutionDataService   = "execution_data_service"
+	subsystemExeDataRequester       = "requester"
+	subsystemExeDataProvider        = "provider"
+	subsystemExeDataPruner          = "pruner"
 	subsystemExecutionDataRequester = "execution_data_requester"
+	subsystemExeDataBlobstore       = "blobstore"
+)
+
+// module/synchronization core
+const (
+	subsystemSyncCore = "sync_core"
 )
 
 // METRIC NAMING GUIDELINES

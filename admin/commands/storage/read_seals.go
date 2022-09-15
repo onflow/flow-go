@@ -71,7 +71,7 @@ func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandReques
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve index for block %#v: %w", blockID, err)
 		}
-		lastSeal, err := r.seals.ByBlockID(blockID)
+		lastSeal, err := r.seals.HighestInFork(blockID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve last seal for block %#v: %w", blockID, err)
 		}

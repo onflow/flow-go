@@ -18,9 +18,13 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/network/slashing"
+
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	validator "github.com/onflow/flow-go/network/validator/pubsub"
+	"github.com/onflow/flow-go/network/validator"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
 const (
@@ -36,11 +40,11 @@ const (
 type Node struct {
 	sync.Mutex
 	unicastManager *unicast.Manager
-	host           host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
-	pubSub         *pubsub.PubSub                         // reference to the libp2p PubSub component
-	logger         zerolog.Logger                         // used to provide logging
-	topics         map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs           map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
+	host           host.Host                               // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	pubSub         *pubsub.PubSub                          // reference to the libp2p PubSub component
+	logger         zerolog.Logger                          // used to provide logging
+	topics         map[channels.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
+	subs           map[channels.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
 	routing        routing.Routing
 	pCache         *protocolPeerCache
 }
@@ -172,7 +176,7 @@ func (n *Node) ListPeers(topic string) []peer.ID {
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(topic flownet.Topic, validators ...validator.MessageValidator) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter PeerFilter, slashingViolationsConsumer slashing.ViolationsConsumer, validators ...validator.PubSubMessageValidator) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -181,7 +185,7 @@ func (n *Node) Subscribe(topic flownet.Topic, validators ...validator.MessageVal
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		topicValidator := validator.TopicValidator(validators...)
+		topicValidator := flowpubsub.TopicValidator(n.logger, codec, slashingViolationsConsumer, peerFilter, validators...)
 		if err := n.pubSub.RegisterTopicValidator(
 			topic.String(), topicValidator, pubsub.WithValidatorInline(true),
 		); err != nil {
@@ -217,7 +221,7 @@ func (n *Node) Subscribe(topic flownet.Topic, validators ...validator.MessageVal
 }
 
 // UnSubscribe cancels the subscriber and closes the topic.
-func (n *Node) UnSubscribe(topic flownet.Topic) error {
+func (n *Node) UnSubscribe(topic channels.Topic) error {
 	n.Lock()
 	defer n.Unlock()
 	// Remove the Subscriber from the cache
@@ -253,7 +257,7 @@ func (n *Node) UnSubscribe(topic flownet.Topic) error {
 }
 
 // Publish publishes the given payload on the topic
-func (n *Node) Publish(ctx context.Context, topic flownet.Topic, data []byte) error {
+func (n *Node) Publish(ctx context.Context, topic channels.Topic, data []byte) error {
 	ps, found := n.topics[topic]
 	if !found {
 		return fmt.Errorf("could not find topic (%s)", topic)

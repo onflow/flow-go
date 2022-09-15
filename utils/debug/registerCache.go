@@ -12,8 +12,8 @@ import (
 )
 
 type registerCache interface {
-	Get(owner, controller, key string) (value []byte, found bool)
-	Set(owner, controller, key string, value []byte)
+	Get(owner, key string) (value []byte, found bool)
+	Set(owner, key string, value []byte)
 	Persist() error
 }
 
@@ -25,13 +25,13 @@ func newMemRegisterCache() *memRegisterCache {
 	return &memRegisterCache{data: make(map[string]flow.RegisterValue)}
 
 }
-func (c *memRegisterCache) Get(owner, controller, key string) ([]byte, bool) {
-	v, found := c.data[owner+"~"+controller+"~"+key]
+func (c *memRegisterCache) Get(owner, key string) ([]byte, bool) {
+	v, found := c.data[owner+"~"+key]
 	return v, found
 }
 
-func (c *memRegisterCache) Set(owner, controller, key string, value []byte) {
-	c.data[owner+"~"+controller+"~"+key] = value
+func (c *memRegisterCache) Set(owner, key string, value []byte) {
+	c.data[owner+"~"+key] = value
 }
 func (c *memRegisterCache) Persist() error {
 	// No-op
@@ -70,15 +70,11 @@ func newFileRegisterCache(filePath string) *fileRegisterCache {
 				if err != nil {
 					panic(err)
 				}
-				controller, err := hex.DecodeString(d.Key.Controller)
-				if err != nil {
-					panic(err)
-				}
 				keyCopy, err := hex.DecodeString(d.Key.Key)
 				if err != nil {
 					panic(err)
 				}
-				data[string(owner)+"~"+string(controller)+"~"+string(keyCopy)] = d
+				data[string(owner)+"~"+string(keyCopy)] = d
 			}
 			if err != nil {
 				break
@@ -90,21 +86,20 @@ func newFileRegisterCache(filePath string) *fileRegisterCache {
 	return cache
 }
 
-func (f *fileRegisterCache) Get(owner, controller, key string) ([]byte, bool) {
-	v, found := f.data[owner+"~"+controller+"~"+key]
+func (f *fileRegisterCache) Get(owner, key string) ([]byte, bool) {
+	v, found := f.data[owner+"~"+key]
 	if found {
 		return v.Value, found
 	}
 	return nil, found
 }
 
-func (f *fileRegisterCache) Set(owner, controller, key string, value []byte) {
+func (f *fileRegisterCache) Set(owner, key string, value []byte) {
 	valueCopy := make([]byte, len(value))
 	copy(valueCopy, value)
 	fmt.Println(hex.EncodeToString([]byte(owner)), hex.EncodeToString([]byte(key)), len(value))
-	f.data[owner+"~"+controller+"~"+key] = flow.RegisterEntry{
+	f.data[owner+"~"+key] = flow.RegisterEntry{
 		Key: flow.NewRegisterID(hex.EncodeToString([]byte(owner)),
-			hex.EncodeToString([]byte(controller)),
 			hex.EncodeToString([]byte(key))),
 		Value: flow.RegisterValue(valueCopy),
 	}
@@ -132,18 +127,6 @@ func (c *fileRegisterCache) Persist() error {
 		}
 	}
 	err = w.Flush()
-	if err != nil {
-		return err
-	}
-	err = f.Sync()
-	if err != nil {
-		return err
-	}
-	err = w.Flush()
-	if err != nil {
-		return err
-	}
-	err = f.Sync()
 	if err != nil {
 		return err
 	}

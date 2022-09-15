@@ -3,9 +3,10 @@ package fvm
 import (
 	"fmt"
 
-	"github.com/opentracing/opentracing-go/log"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -13,24 +14,30 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-type TransactionSignatureVerifier struct {
+// TransactionVerifier verifies the content of the transaction by
+// checking accounts (authorizers, payer, proposer) are not frozen
+// checking there is no double signature
+// all signatures are valid
+// all accounts provides enoguh weights
+//
+// if KeyWeightThreshold is set to a negative number, signature verification is skipped
+type TransactionVerifier struct {
 	KeyWeightThreshold int
 }
 
-func NewTransactionSignatureVerifier(keyWeightThreshold int) *TransactionSignatureVerifier {
-	return &TransactionSignatureVerifier{
+func NewTransactionVerifier(keyWeightThreshold int) *TransactionVerifier {
+	return &TransactionVerifier{
 		KeyWeightThreshold: keyWeightThreshold,
 	}
 }
 
-func (v *TransactionSignatureVerifier) Process(
-	_ *VirtualMachine,
-	ctx *Context,
+func (v *TransactionVerifier) Process(
+	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	_ *programs.Programs,
 ) error {
-	return v.verifyTransactionSignatures(proc, *ctx, sth)
+	return v.verifyTransaction(proc, ctx, sth)
 }
 
 func newInvalidEnvelopeSignatureError(txSig flow.TransactionSignature, err error) error {
@@ -41,21 +48,21 @@ func newInvalidPayloadSignatureError(txSig flow.TransactionSignature, err error)
 	return errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 }
 
-func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
+func (v *TransactionVerifier) verifyTransaction(
 	proc *TransactionProcedure,
 	ctx Context,
 	sth *state.StateHolder,
 ) error {
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMVerifyTransaction)
-		span.LogFields(
-			log.String("transaction.ID", proc.ID.String()),
+		span.SetAttributes(
+			attribute.String("transaction.ID", proc.ID.String()),
 		)
-		defer span.Finish()
+		defer span.End()
 	}
 
 	tx := proc.Transaction
-	accounts := state.NewAccounts(sth)
+	accounts := environment.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
 		err := errors.NewInvalidAddressErrorf(tx.Payer, "payer address is invalid")
 		return fmt.Errorf("transaction verification failed: %w", err)
@@ -70,7 +77,26 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
 
+	// TODO(Janez): move disabling limits out of the verifier. Verifier should not be metered anyway.
+	// TODO(Janez): verification is part of inclusion fees, not execution fees.
+
+	// check accounts uses the state, but if the limits are too low, this might fail.
+	// we shouldn't fail here if the limits are too low as fee deduction won't happen
+	sth.RunWithAllLimitsDisabled(
+		func() {
+			err = v.checkAccountsAreNotFrozen(tx, accounts)
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("transaction verification failed: %w", err)
+	}
+
+	if v.KeyWeightThreshold < 0 {
+		return nil
+	}
+
 	payloadWeights, proposalKeyVerifiedInPayload, err = v.verifyAccountSignatures(
+		sth,
 		accounts,
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
@@ -85,6 +111,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	var proposalKeyVerifiedInEnvelope bool
 
 	envelopeWeights, proposalKeyVerifiedInEnvelope, err = v.verifyAccountSignatures(
+		sth,
 		accounts,
 		tx.EnvelopeSignatures,
 		tx.EnvelopeMessage(),
@@ -125,8 +152,24 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	return nil
 }
 
-func (v *TransactionSignatureVerifier) verifyAccountSignatures(
-	accounts state.Accounts,
+// getPublicKey skips checking limits when getting the public key
+func (v *TransactionVerifier) getPublicKey(
+	sth *state.StateHolder,
+	accounts environment.Accounts,
+	address flow.Address,
+	keyIndex uint64,
+) (pub flow.AccountPublicKey, err error) {
+	sth.RunWithAllLimitsDisabled(
+		func() {
+			pub, err = accounts.GetPublicKey(address, keyIndex)
+		},
+	)
+	return
+}
+
+func (v *TransactionVerifier) verifyAccountSignatures(
+	sth *state.StateHolder,
+	accounts environment.Accounts,
 	signatures []flow.TransactionSignature,
 	message []byte,
 	proposalKey flow.ProposalKey,
@@ -140,7 +183,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignatures(
 
 	for _, txSig := range signatures {
 
-		accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyIndex)
+		accountKey, err := v.getPublicKey(sth, accounts, txSig.Address, txSig.KeyIndex)
 		if err != nil {
 			return nil, false, errorBuilder(txSig, err)
 		}
@@ -165,7 +208,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignatures(
 //
 // An error is returned if the account does not contain a public key that
 // correctly verifies the signature against the given message.
-func (v *TransactionSignatureVerifier) verifyAccountSignature(
+func (v *TransactionVerifier) verifyAccountSignature(
 	accountKey flow.AccountPublicKey,
 	txSig flow.TransactionSignature,
 	message []byte,
@@ -193,21 +236,21 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	return errorBuilder(txSig, fmt.Errorf("signature is not valid"))
 }
 
-func (v *TransactionSignatureVerifier) hasSufficientKeyWeight(
+func (v *TransactionVerifier) hasSufficientKeyWeight(
 	weights map[flow.Address]int,
 	address flow.Address,
 ) bool {
 	return weights[address] >= v.KeyWeightThreshold
 }
 
-func (v *TransactionSignatureVerifier) sigIsForProposalKey(
+func (v *TransactionVerifier) sigIsForProposalKey(
 	txSig flow.TransactionSignature,
 	proposalKey flow.ProposalKey,
 ) bool {
 	return txSig.Address == proposalKey.Address && txSig.KeyIndex == proposalKey.KeyIndex
 }
 
-func (v *TransactionSignatureVerifier) checkSignatureDuplications(tx *flow.TransactionBody) error {
+func (v *TransactionVerifier) checkSignatureDuplications(tx *flow.TransactionBody) error {
 	type uniqueKey struct {
 		address flow.Address
 		index   uint64
@@ -228,5 +271,29 @@ func (v *TransactionSignatureVerifier) checkSignatureDuplications(tx *flow.Trans
 		}
 		observedSigs[uniqueKey{sig.Address, sig.KeyIndex}] = true
 	}
+	return nil
+}
+
+func (v *TransactionVerifier) checkAccountsAreNotFrozen(
+	tx *flow.TransactionBody,
+	accounts environment.Accounts,
+) error {
+	for _, authorizer := range tx.Authorizers {
+		err := accounts.CheckAccountNotFrozen(authorizer)
+		if err != nil {
+			return fmt.Errorf("checking frozen account failed: %w", err)
+		}
+	}
+
+	err := accounts.CheckAccountNotFrozen(tx.ProposalKey.Address)
+	if err != nil {
+		return fmt.Errorf("checking frozen account failed: %w", err)
+	}
+
+	err = accounts.CheckAccountNotFrozen(tx.Payer)
+	if err != nil {
+		return fmt.Errorf("checking frozen account failed: %w", err)
+	}
+
 	return nil
 }

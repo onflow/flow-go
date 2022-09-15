@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization"
@@ -67,12 +68,16 @@ import (
 //                               +-------------+             +-------------+
 
 const (
-	// DefaultFetchTimeout is the default timeout for fetching ExecutionData from the db/network
-	DefaultFetchTimeout = 5 * time.Minute
+	// DefaultFetchTimeout is the default initial timeout for fetching ExecutionData from the
+	// db/network. The timeout is increased using an incremental backoff until FetchTimeout.
+	DefaultFetchTimeout = 10 * time.Second
+
+	// DefaultMaxFetchTimeout is the default timeout for fetching ExecutionData from the db/network
+	DefaultMaxFetchTimeout = 10 * time.Minute
 
 	// DefaultRetryDelay is the default initial delay used in the exponential backoff for failed
 	// ExecutionData download retries
-	DefaultRetryDelay = 10 * time.Second
+	DefaultRetryDelay = 1 * time.Second
 
 	// DefaultMaxRetryDelay is the default maximum delay used in the exponential backoff for failed
 	// ExecutionData download retries
@@ -97,8 +102,11 @@ type ExecutionDataConfig struct {
 	// unbounded memory use by the requester if it gets stuck fetching a specific height.
 	MaxSearchAhead uint64
 
-	// The timeout for fetching ExecutionData from the db/network
+	// The initial timeout for fetching ExecutionData from the db/network
 	FetchTimeout time.Duration
+
+	// The max timeout for fetching ExecutionData from the db/network
+	MaxFetchTimeout time.Duration
 
 	// Exponential backoff settings for download retries
 	RetryDelay    time.Duration
@@ -107,15 +115,16 @@ type ExecutionDataConfig struct {
 
 type executionDataRequester struct {
 	component.Component
-	cm      *component.ComponentManager
-	eds     state_synchronization.ExecutionDataService
-	metrics module.ExecutionDataRequesterMetrics
-	config  ExecutionDataConfig
-	log     zerolog.Logger
+	cm         *component.ComponentManager
+	downloader execution_data.Downloader
+	metrics    module.ExecutionDataRequesterMetrics
+	config     ExecutionDataConfig
+	log        zerolog.Logger
 
 	// Local db objects
 	headers storage.Headers
 	results storage.ExecutionResults
+	seals   storage.Seals
 
 	executionDataReader *jobs.ExecutionDataReader
 
@@ -138,20 +147,22 @@ var _ state_synchronization.ExecutionDataRequester = (*executionDataRequester)(n
 func New(
 	log zerolog.Logger,
 	edrMetrics module.ExecutionDataRequesterMetrics,
-	eds state_synchronization.ExecutionDataService,
+	downloader execution_data.Downloader,
 	processedHeight storage.ConsumerProgress,
 	processedNotifications storage.ConsumerProgress,
 	state protocol.State,
 	headers storage.Headers,
 	results storage.ExecutionResults,
+	seals storage.Seals,
 	cfg ExecutionDataConfig,
 ) state_synchronization.ExecutionDataRequester {
 	e := &executionDataRequester{
 		log:                  log.With().Str("component", "execution_data_requester").Logger(),
-		eds:                  eds,
+		downloader:           downloader,
 		metrics:              edrMetrics,
 		headers:              headers,
 		results:              results,
+		seals:                seals,
 		config:               cfg,
 		finalizationNotifier: engine.NewNotifier(),
 	}
@@ -192,9 +203,10 @@ func New(
 	// jobqueue Jobs object tracks downloaded execution data by height. This is used by the
 	// notificationConsumer to get downloaded execution data from storage.
 	e.executionDataReader = jobs.NewExecutionDataReader(
-		e.eds,
+		e.downloader,
 		e.headers,
 		e.results,
+		e.seals,
 		e.config.FetchTimeout,
 		// method to get highest consecutive height that has downloaded execution data. it is used
 		// here by the notification job consumer to discover new jobs.
@@ -242,9 +254,9 @@ func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
 
 // AddOnExecutionDataFetchedConsumer adds a callback to be called when a new ExecutionData is received
 // Callback Implementations must:
-//   * be concurrency safe
-//   * be non-blocking
-//   * handle repetition of the same events (with some processing overhead).
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
 func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_synchronization.ExecutionDataReceivedCallback) {
 	e.consumerMu.Lock()
 	defer e.consumerMu.Unlock()
@@ -254,7 +266,7 @@ func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_sync
 
 // runBlockConsumer runs the blockConsumer component
 func (e *executionDataRequester) runBlockConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	err := util.WaitClosed(ctx, e.eds.Ready())
+	err := util.WaitClosed(ctx, e.downloader.Ready())
 	if err != nil {
 		return // context cancelled
 	}
@@ -317,6 +329,12 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 	backoff = retry.WithCappedDuration(e.config.MaxRetryDelay, backoff)
 	backoff = retry.WithJitterPercent(15, backoff)
 
+	// bitswap always waits for either all data to be received or a timeout, even if it encountered an error.
+	// use an incremental backoff for the timeout so we do faster initial retries, then allow for more
+	// time in case data is large or there is network congestion.
+	timeout := retry.NewExponential(e.config.FetchTimeout)
+	timeout = retry.WithCappedDuration(e.config.MaxFetchTimeout, timeout)
+
 	attempt := 0
 	return retry.Do(ctx, backoff, func(context.Context) error {
 		if attempt > 0 {
@@ -331,7 +349,8 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 		attempt++
 
 		// download execution data for the block
-		err := e.processFetchRequest(ctx, blockID, height)
+		fetchTimeout, _ := timeout.Next()
+		err := e.processFetchRequest(ctx, blockID, height, fetchTimeout)
 
 		// don't retry if the blob was invalid
 		if isInvalidBlobError(err) {
@@ -342,7 +361,7 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 	})
 }
 
-func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerContext, blockID flow.Identifier, height uint64) error {
+func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerContext, blockID flow.Identifier, height uint64, fetchTimeout time.Duration) error {
 	logger := e.log.With().
 		Str("block_id", blockID.String()).
 		Uint64("height", height).
@@ -350,14 +369,12 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 
 	logger.Debug().Msg("processing fetch request")
 
-	result, err := e.results.ByBlockID(blockID)
-
-	// The ExecutionResult may not have been downloaded yet. This error should be retried
-	if errors.Is(err, storage.ErrNotFound) {
-		logger.Debug().Msg("execution result not found")
-		return err
+	seal, err := e.seals.FinalizedSealForBlock(blockID)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to get seal for block %s: %w", blockID, err))
 	}
 
+	result, err := e.results.ByID(seal.ResultID)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to lookup execution result for block %s: %w", blockID, err))
 	}
@@ -369,7 +386,7 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 
 	logger.Debug().Msg("downloading execution data")
 
-	_, err = e.fetchExecutionData(ctx, result.ExecutionDataID)
+	_, err = e.fetchExecutionData(ctx, result.ExecutionDataID, fetchTimeout)
 
 	e.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
 
@@ -395,20 +412,20 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 		ctx.Throw(err)
 	}
 
-	logger.Debug().Msg("Fetched execution data")
+	logger.Info().Msg("execution data fetched")
 
 	return nil
 }
 
 // fetchExecutionData fetches the ExecutionData by its ID, and times out if fetchTimeout is exceeded
-func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier) (*state_synchronization.ExecutionData, error) {
-	ctx, cancel := context.WithTimeout(signalerCtx, e.config.FetchTimeout)
+func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier, fetchTimeout time.Duration) (*execution_data.BlockExecutionData, error) {
+	ctx, cancel := context.WithTimeout(signalerCtx, fetchTimeout)
 	defer cancel()
 
 	// Get the data from the network
 	// this is a blocking call, won't be unblocked until either hitting error (including timeout) or
 	// the data is received
-	executionData, err := e.eds.Get(ctx, executionDataID)
+	executionData, err := e.downloader.Download(ctx, executionDataID)
 
 	if err != nil {
 		return nil, err
@@ -430,7 +447,7 @@ func (e *executionDataRequester) processNotificationJob(ctx irrecoverable.Signal
 	jobComplete()
 }
 
-func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerContext, height uint64, executionData *state_synchronization.ExecutionData) {
+func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerContext, height uint64, executionData *execution_data.BlockExecutionData) {
 	e.log.Debug().Msgf("notifying for block %d", height)
 
 	// send notifications
@@ -439,7 +456,7 @@ func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerC
 	e.metrics.NotificationSent(height)
 }
 
-func (e *executionDataRequester) notifyConsumers(executionData *state_synchronization.ExecutionData) {
+func (e *executionDataRequester) notifyConsumers(executionData *execution_data.BlockExecutionData) {
 	e.consumerMu.RLock()
 	defer e.consumerMu.RUnlock()
 
@@ -449,14 +466,13 @@ func (e *executionDataRequester) notifyConsumers(executionData *state_synchroniz
 }
 
 func isInvalidBlobError(err error) bool {
-	var malformedDataError *state_synchronization.MalformedDataError
-	var blobSizeLimitExceededError *state_synchronization.BlobSizeLimitExceededError
+	var malformedDataError *execution_data.MalformedDataError
+	var blobSizeLimitExceededError *execution_data.BlobSizeLimitExceededError
 	return errors.As(err, &malformedDataError) ||
-		errors.As(err, &blobSizeLimitExceededError) ||
-		errors.Is(err, state_synchronization.ErrBlobTreeDepthExceeded)
+		errors.As(err, &blobSizeLimitExceededError)
 }
 
 func isBlobNotFoundError(err error) bool {
-	var blobNotFoundError *state_synchronization.BlobNotFoundError
+	var blobNotFoundError *execution_data.BlobNotFoundError
 	return errors.As(err, &blobNotFoundError)
 }

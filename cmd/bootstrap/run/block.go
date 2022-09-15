@@ -8,11 +8,11 @@ import (
 
 func GenerateRootBlock(chainID flow.ChainID, parentID flow.Identifier, height uint64, timestamp time.Time) *flow.Block {
 
-	payload := flow.Payload{
+	payload := &flow.Payload{
 		Guarantees: nil,
 		Seals:      nil,
 	}
-	header := flow.Header{
+	header := &flow.Header{
 		ChainID:            chainID,
 		ParentID:           parentID,
 		Height:             height,
@@ -26,7 +26,7 @@ func GenerateRootBlock(chainID flow.ChainID, parentID flow.Identifier, height ui
 	}
 
 	return &flow.Block{
-		Header:  &header,
-		Payload: &payload,
+		Header:  header,
+		Payload: payload,
 	}
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/sethvargo/go-retry"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -153,7 +153,6 @@ func (validator *MachineAccountConfigValidator) Done() <-chan struct{} {
 // will perpetually log errors indicating the problem.
 //
 // This function should be invoked as a goroutine by using Ready and Done.
-//
 func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx context.Context) {
 
 	log := validator.log
@@ -199,7 +198,6 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 // confirming that the account contains the relevant QCVoter or DKGParticipant
 // resource. This is omitted because it is not possible to query private account
 // info from a script.
-//
 func CheckMachineAccountInfo(
 	log zerolog.Logger,
 	conf MachineAccountValidatorConfig,

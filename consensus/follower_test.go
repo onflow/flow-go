@@ -28,18 +28,19 @@ import (
 // has its own processing thread. Therefore, the test must be concurrency safe and ensure that the Follower
 // has asynchronously processed the submitted blocks _before_ we assert whether all callbacks were run.
 // We use the following knowledge about the Follower's _internal_ processing:
-//   * The Follower is running in a single go-routine, pulling one event at a time from an
+//   - The Follower is running in a single go-routine, pulling one event at a time from an
 //     _unbuffered_ channel. The test will send blocks to the Follower's input channel and block there
 //     until the Follower receives the block from the channel. Hence, when all sends have completed, the
 //     Follower has processed all blocks but the last one. Furthermore, the last block has already been
 //     received.
-//   * Therefore, the Follower will only pick up a shutdown signal _after_ it processed the last block.
+//   - Therefore, the Follower will only pick up a shutdown signal _after_ it processed the last block.
 //     Hence, waiting for the Follower's `Done()` channel guarantees that it complete processing any
 //     blocks that are in the event loop.
+//
 // For this test, most of the Follower's injected components are mocked out.
 // As we test the mocked components separately, we assume:
-//   * The mocked components work according to specification.
-//   * Especially, we assume that Forks works according to specification, i.e. that the determination of
+//   - The mocked components work according to specification.
+//   - Especially, we assume that Forks works according to specification, i.e. that the determination of
 //     finalized blocks is correct and events are emitted in the desired order (both are tested separately).
 func TestHotStuffFollower(t *testing.T) {
 	suite.Run(t, new(HotStuffFollowerSuite))
@@ -215,31 +216,32 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 // for all the added blocks. Furthermore, we construct the test such that the follower should finalize
 // eventually a bunch of blocks in one go.
 // The following illustrates the tree of submitted blocks, with notation
-//   * [a, b] is a block at view "b" with a QC with view "a",
+//
+//   - [a, b] is a block at view "b" with a QC with view "a",
 //     e.g., [1, 2] means a block at view "2" with an included  QC for view "1"
 //
-//                                                       [52078+15, 52078+20] (should finalize this fork)
-//                                                                          |
-//                                                                          |
-//                                                       [52078+14, 52078+15]
-//                                                                          |
-//                                                                          |
-//                                                       [52078+13, 52078+14]
-//                                                                          |
-//                                                                          |
-//   [52078+11, 52078+12]   [52078+11, 52078+17]         [52078+ 9, 52078+13]   [52078+ 9, 52078+10]
-//                        \ |                                               |  /
-//                         \|                                               | /
-//   [52078+ 7, 52078+ 8]   [52078+ 7, 52078+11]         [52078+ 5, 52078+ 9]   [52078+ 5, 52078+ 6]
-//                        \ |                                               |  /
-//                         \|                                               | /
-//   [52078+ 3, 52078+ 4]   [52078+ 3, 52078+ 7]         [52078+ 1, 52078+ 5]   [52078+ 1, 52078+ 2]
-//                        \ |                                               |  /
-//                         \|                                               | /
-//                          [52078+ 0, 52078+ 3]         [52078+ 0, 52078+ 1]
-//                                             \         /
-//                                              \       /
-//                                            [52078+ 0, x] (root block; no qc to parent)
+// .                                                       [52078+15, 52078+20] (should finalize this fork)
+// .                                                                          |
+// .                                                                          |
+// .                                                       [52078+14, 52078+15]
+// .                                                                          |
+// .                                                                          |
+// .                                                       [52078+13, 52078+14]
+// .                                                                          |
+// .                                                                          |
+// .   [52078+11, 52078+12]   [52078+11, 52078+17]         [52078+ 9, 52078+13]   [52078+ 9, 52078+10]
+// .                        \ |                                               |  /
+// .                         \|                                               | /
+// .   [52078+ 7, 52078+ 8]   [52078+ 7, 52078+11]         [52078+ 5, 52078+ 9]   [52078+ 5, 52078+ 6]
+// .                        \ |                                               |  /
+// .                         \|                                               | /
+// .   [52078+ 3, 52078+ 4]   [52078+ 3, 52078+ 7]         [52078+ 1, 52078+ 5]   [52078+ 1, 52078+ 2]
+// .                        \ |                                               |  /
+// .                         \|                                               | /
+// .                          [52078+ 0, 52078+ 3]         [52078+ 0, 52078+ 1]
+// .                                             \         /
+// .                                              \       /
+// .                                            [52078+ 0, x] (root block; no qc to parent)
 func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 	// in the following, we reference the block's by their view minus the view of the
 	// root block (52078). E.g. block [52078+ 9, 52078+10] would be referenced as `block10`
@@ -342,5 +344,5 @@ func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flo
 	nextBlock.ProposerID = mc.identities[int(blockView)%len(mc.identities)].NodeID
 	signerIndices, _ := signature.EncodeSignersToIndices(mc.identities.NodeIDs(), mc.identities.NodeIDs())
 	nextBlock.ParentVoterIndices = signerIndices
-	return &nextBlock
+	return nextBlock
 }

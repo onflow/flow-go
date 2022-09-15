@@ -9,41 +9,20 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 )
 
-func WithCollections(collections []*flow.Collection) func(*state_synchronization.ExecutionData) {
-	return func(executionData *state_synchronization.ExecutionData) {
-		executionData.Collections = collections
-	}
-}
-
-func WithEvents(events []flow.EventsList) func(*state_synchronization.ExecutionData) {
-	return func(executionData *state_synchronization.ExecutionData) {
-		executionData.Events = events
-	}
-}
-
-func WithTrieUpdates(updates []*ledger.TrieUpdate) func(*state_synchronization.ExecutionData) {
-	return func(executionData *state_synchronization.ExecutionData) {
-		executionData.TrieUpdates = updates
-	}
-}
-
-func ExecutionDataFixture(blockID flow.Identifier) *state_synchronization.ExecutionData {
-	return &state_synchronization.ExecutionData{
-		BlockID:     blockID,
-		Collections: []*flow.Collection{},
-		Events:      []flow.EventsList{},
-		TrieUpdates: []*ledger.TrieUpdate{},
+func ExecutionDataFixture(blockID flow.Identifier) *execution_data.BlockExecutionData {
+	return &execution_data.BlockExecutionData{
+		BlockID:             blockID,
+		ChunkExecutionDatas: []*execution_data.ChunkExecutionData{},
 	}
 }
 
@@ -104,6 +83,12 @@ func WithHead(head *flow.Header) SnapshotMockOptions {
 	}
 }
 
+func WithSeal(seal *flow.Seal) SnapshotMockOptions {
+	return func(snapshot *statemock.Snapshot) {
+		snapshot.On("Seal").Return(seal, nil)
+	}
+}
+
 func MockProtocolStateSnapshot(opts ...SnapshotMockOptions) *statemock.Snapshot {
 	snapshot := new(statemock.Snapshot)
 
@@ -116,7 +101,7 @@ func MockProtocolStateSnapshot(opts ...SnapshotMockOptions) *statemock.Snapshot 
 
 type StateMockOptions func(*statemock.State)
 
-func WithSnapshot(snapshot *statemock.Snapshot) StateMockOptions {
+func WithSealedSnapshot(snapshot *statemock.Snapshot) StateMockOptions {
 	return func(state *statemock.State) {
 		state.On("Sealed").Return(snapshot)
 	}
@@ -203,6 +188,25 @@ func WithByBlockID(resultsByID map[flow.Identifier]*flow.ExecutionResult) Result
 	}
 }
 
+func WithResultByID(resultsByID map[flow.Identifier]*flow.ExecutionResult) ResultsMockOptions {
+	return func(results *storagemock.ExecutionResults) {
+		results.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(
+			func(resultID flow.Identifier) *flow.ExecutionResult {
+				if _, has := resultsByID[resultID]; !has {
+					return nil
+				}
+				return resultsByID[resultID]
+			},
+			func(resultID flow.Identifier) error {
+				if _, has := resultsByID[resultID]; !has {
+					return fmt.Errorf("result %s not found: %w", resultID, storage.ErrNotFound)
+				}
+				return nil
+			},
+		)
+	}
+}
+
 func MockResultsStorage(opts ...ResultsMockOptions) *storagemock.ExecutionResults {
 	results := new(storagemock.ExecutionResults)
 
@@ -211,6 +215,37 @@ func MockResultsStorage(opts ...ResultsMockOptions) *storagemock.ExecutionResult
 	}
 
 	return results
+}
+
+type SealsMockOptions func(*storagemock.Seals)
+
+func WithSealsByBlockID(sealsByBlockID map[flow.Identifier]*flow.Seal) SealsMockOptions {
+	return func(seals *storagemock.Seals) {
+		seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
+			func(blockID flow.Identifier) *flow.Seal {
+				if _, has := sealsByBlockID[blockID]; !has {
+					return nil
+				}
+				return sealsByBlockID[blockID]
+			},
+			func(blockID flow.Identifier) error {
+				if _, has := sealsByBlockID[blockID]; !has {
+					return fmt.Errorf("seal for block %s not found: %w", blockID, storage.ErrNotFound)
+				}
+				return nil
+			},
+		)
+	}
+}
+
+func MockSealsStorage(opts ...SealsMockOptions) *storagemock.Seals {
+	seals := new(storagemock.Seals)
+
+	for _, opt := range opts {
+		opt(seals)
+	}
+
+	return seals
 }
 
 func RemoveExpectedCall(method string, expectedCalls []*mock.Call) []*mock.Call {

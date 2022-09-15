@@ -247,7 +247,7 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 // commitment represents the execution state as currently finalized.
 func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	// get the ID of the sealed block
-	seal, err := s.state.seals.ByBlockID(s.blockID)
+	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
 		return flow.DummyStateCommitment, fmt.Errorf("could not retrieve sealed state commit: %w", err)
 	}
@@ -255,7 +255,7 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 }
 
 func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
-	seal, err := s.state.seals.ByBlockID(s.blockID)
+	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not look up latest seal: %w", err)
 	}
@@ -284,14 +284,14 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 		return nil, protocol.ErrSealingSegmentBelowRootBlock
 	}
 
-	seal, err := s.state.seals.ByBlockID(s.blockID)
+	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
 	}
 
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.ByBlockID)
+	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
@@ -467,20 +467,24 @@ func (q *EpochQuery) Current() protocol.Epoch {
 
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpoch(fmt.Errorf("failed to get epoch statuses for block ID %s: %w",
+			q.snap.blockID, err))
 	}
 	setup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpoch(fmt.Errorf("failed to get epoch setups for setup ID %s at block %v: %w",
+			status.CurrentEpoch.SetupID, q.snap.blockID, err))
 	}
 	commit, err := q.snap.state.epoch.commits.ByID(status.CurrentEpoch.CommitID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpoch(fmt.Errorf("failed to get epoch commits for commit ID %s at block %v: %w",
+			status.CurrentEpoch.CommitID, q.snap.blockID, err))
 	}
 
 	epoch, err := inmem.NewCommittedEpoch(setup, commit)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpoch(fmt.Errorf("failed to get new committed epoch with setup (%s) and commit (%s) at block %v: %w",
+			setup.ID(), commit.ID(), q.snap.blockID, err))
 	}
 	return epoch
 }

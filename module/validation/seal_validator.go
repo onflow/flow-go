@@ -3,38 +3,28 @@ package validation
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
-// DefaultRequiredApprovalsForSealValidation is the default number of approvals that should be
-// present and valid for each chunk. Setting this to 0 will disable counting of chunk approvals
-// this can be used temporarily to ease the migration to new chunk based sealing.
-// TODO:
-//   * This value is for the happy path (requires just one approval per chunk).
-//   * Full protocol should be +2/3 of all currently authorized verifiers.
-const DefaultRequiredApprovalsForSealValidation = 0
-
 // sealValidator holds all needed context for checking seal
 // validity against current protocol state.
 type sealValidator struct {
-	state                                protocol.State
-	assigner                             module.ChunkAssigner
-	signatureHasher                      hash.Hasher
-	seals                                storage.Seals
-	headers                              storage.Headers
-	index                                storage.Index
-	results                              storage.ExecutionResults
-	requiredApprovalsForSealConstruction uint // number of required approvals per chunk to construct a seal
-	requiredApprovalsForSealVerification uint // number of required approvals per chunk for a seal to be valid
-	metrics                              module.ConsensusMetrics
+	state                protocol.State
+	assigner             module.ChunkAssigner
+	signatureHasher      hash.Hasher
+	seals                storage.Seals
+	headers              storage.Headers
+	index                storage.Index
+	results              storage.ExecutionResults
+	sealingConfigsGetter module.SealingConfigsGetter // number of required approvals per chunk to construct a seal
+	metrics              module.ConsensusMetrics
 }
 
 func NewSealValidator(
@@ -44,27 +34,20 @@ func NewSealValidator(
 	results storage.ExecutionResults,
 	seals storage.Seals,
 	assigner module.ChunkAssigner,
-	requiredApprovalsForSealConstruction uint,
-	requiredApprovalsForSealVerification uint,
+	sealingConfigsGetter module.SealingConfigsGetter,
 	metrics module.ConsensusMetrics,
-) (*sealValidator, error) {
-	if requiredApprovalsForSealConstruction < requiredApprovalsForSealVerification {
-		return nil, fmt.Errorf("required number of approvals for seal construction (%d) cannot be smaller than for seal verification (%d)",
-			requiredApprovalsForSealConstruction, requiredApprovalsForSealVerification)
-	}
-
+) *sealValidator {
 	return &sealValidator{
-		state:                                state,
-		assigner:                             assigner,
-		signatureHasher:                      crypto.NewBLSKMAC(encoding.ResultApprovalTag),
-		headers:                              headers,
-		results:                              results,
-		seals:                                seals,
-		index:                                index,
-		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
-		requiredApprovalsForSealVerification: requiredApprovalsForSealVerification,
-		metrics:                              metrics,
-	}, nil
+		state:                state,
+		assigner:             assigner,
+		signatureHasher:      signature.NewBLSHasher(signature.ResultApprovalTag),
+		headers:              headers,
+		results:              results,
+		seals:                seals,
+		index:                index,
+		sealingConfigsGetter: sealingConfigsGetter,
+		metrics:              metrics,
+	}
 }
 
 func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.AggregatedSignature,
@@ -108,12 +91,13 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 //
 // Note that we don't explicitly check that sealed results satisfy the sub-graph
 // check. Nevertheless, correctness in this regard is guaranteed because:
-//  * We only allow seals that correspond to ExecutionReceipts that were
-//    incorporated in this fork.
-//  * We only include ExecutionReceipts whose results pass the sub-graph check
-//    (as part of ReceiptValidator).
+//   - We only allow seals that correspond to ExecutionReceipts that were
+//     incorporated in this fork.
+//   - We only include ExecutionReceipts whose results pass the sub-graph check
+//     (as part of ReceiptValidator).
+//
 // => Therefore, only seals whose results pass the sub-graph check will be
-//    allowed.
+// allowed.
 func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
 	payload := candidate.Payload
@@ -127,7 +111,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// attached to the main chain, we store the latest seal in the fork that ends with B.
 	// Therefore, _not_ finding the latest sealed block of the parent constitutes
 	// a fatal internal error.
-	lastSealUpToParent, err := s.seals.ByBlockID(parentID)
+	lastSealUpToParent, err := s.seals.HighestInFork(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
 	}
@@ -289,8 +273,10 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 
 		// the chunk must have been approved by at least the minimally
 		// required number of Verification Nodes
-		if uint(numberApprovers) < s.requiredApprovalsForSealConstruction {
-			if uint(numberApprovers) >= s.requiredApprovalsForSealVerification {
+		requireApprovalsForSealConstruction := s.sealingConfigsGetter.RequireApprovalsForSealConstructionDynamicValue()
+		requireApprovalsForSealVerification := s.sealingConfigsGetter.RequireApprovalsForSealVerificationConst()
+		if uint(numberApprovers) < requireApprovalsForSealConstruction {
+			if uint(numberApprovers) >= requireApprovalsForSealVerification {
 				// Emergency sealing is a _temporary_ fallback to reduce the probability of
 				// sealing halts due to bugs in the verification nodes, where they don't
 				// approve a chunk even though they should (false-negative).
@@ -298,7 +284,7 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 				emergencySealed = true
 			} else {
 				return engine.NewInvalidInputErrorf("chunk %d has %d approvals but require at least %d",
-					chunk.Index, numberApprovers, s.requiredApprovalsForSealVerification)
+					chunk.Index, numberApprovers, requireApprovalsForSealVerification)
 			}
 		}
 

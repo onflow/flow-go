@@ -4,15 +4,14 @@ import (
 	"context"
 	"testing"
 
-	sdk "github.com/onflow/flow-go-sdk"
-
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine"
+	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -27,7 +26,8 @@ type StateSyncSuite struct {
 
 func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	// wait for next height finalized (potentially first height), called blockA
-	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T())
+	currentFinalized := s.BlockState.HighestFinalizedHeight()
+	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// wait for execution receipt for blockA from execution node 1
@@ -54,7 +54,8 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	require.NotEqual(s.T(), finalStateExe1BlockA, finalStateExe1BlockB)
 
 	// wait until the next proposed block is finalized, called blockC
-	blockC := s.BlockState.WaitUntilNextHeightFinalized(s.T())
+	currentProposed := s.BlockState.HighestProposedHeight()
+	blockC := s.BlockState.WaitUntilNextHeightFinalized(s.T(), currentProposed)
 	s.T().Logf("got blockC height %v ID %v", blockC.Header.Height, blockC.Header.ID())
 
 	// wait for execution receipt for blockC from execution node 1
@@ -71,7 +72,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	s.T().Logf("block C has been sealed: %v", sealed.Header.ID())
 
 	// send a ExecutionStateSyncRequest from Ghost node
-	err = s.Ghost().Send(context.Background(), engine.SyncExecution,
+	err = s.Ghost().Send(context.Background(), channels.SyncExecution,
 		&messages.ExecutionStateSyncRequest{FromHeight: blockA.Header.Height, ToHeight: blockC.Header.Height},
 		[]flow.Identifier{s.exe1ID}...)
 	require.NoError(s.T(), err)

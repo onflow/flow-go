@@ -28,7 +28,7 @@ func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataP
 // Pack serializes the block signature data into raw bytes, suitable to create a QC.
 // To pack the block signature data, we first build a compact data type, and then encode it into bytes.
 // Expected error returns during normal operations:
-//  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
+//   - none; all errors are symptoms of inconsistent input data or corrupted internal state.
 func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]byte, []byte, error) {
 	// retrieve all authorized consensus participants at the given block
 	fullMembers, err := p.committees.Identities(blockID)
@@ -65,8 +65,8 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 // Unpack de-serializes the provided signature data.
 // sig is the aggregated signature data
 // It returns:
-//  - (sigData, nil) if successfully unpacked the signature data
-//  - (nil, model.InvalidFormatError) if failed to unpack the signature data
+//   - (sigData, nil) if successfully unpacked the signature data
+//   - (nil, model.InvalidFormatError) if failed to unpack the signature data
 func (p *ConsensusSigDataPacker) Unpack(signerIdentities flow.IdentityList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
 	data, err := p.Decode(sigData)

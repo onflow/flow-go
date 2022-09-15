@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -39,6 +40,25 @@ type Engine struct {
 	con            network.Conduit
 	sync           module.BlockRequester
 	tracer         module.Tracer
+	channel        channels.Channel
+}
+
+type Option func(*Engine)
+
+// WithComplianceOptions sets options for the engine's compliance config
+func WithComplianceOptions(opts ...compliance.Opt) Option {
+	return func(e *Engine) {
+		for _, apply := range opts {
+			apply(&e.config)
+		}
+	}
+}
+
+// WithChannel sets the channel the follower engine will use to receive blocks.
+func WithChannel(channel channels.Channel) Option {
+	return func(e *Engine) {
+		e.channel = channel
+	}
 }
 
 func New(
@@ -55,18 +75,12 @@ func New(
 	follower module.HotStuffFollower,
 	sync module.BlockRequester,
 	tracer module.Tracer,
-	opts ...compliance.Opt,
+	opts ...Option,
 ) (*Engine, error) {
-
-	config := compliance.DefaultConfig()
-	for _, apply := range opts {
-		apply(&config)
-	}
-
 	e := &Engine{
 		unit:           engine.NewUnit(),
 		log:            log.With().Str("engine", "follower").Logger(),
-		config:         config,
+		config:         compliance.DefaultConfig(),
 		me:             me,
 		engMetrics:     engMetrics,
 		mempoolMetrics: mempoolMetrics,
@@ -78,9 +92,14 @@ func New(
 		follower:       follower,
 		sync:           sync,
 		tracer:         tracer,
+		channel:        channels.ReceiveBlocks,
 	}
 
-	con, err := net.Register(engine.ReceiveBlocks, e)
+	for _, apply := range opts {
+		apply(e)
+	}
+
+	con, err := net.Register(e.channel, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine to network: %w", err)
 	}
@@ -119,7 +138,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(channel, originID, event)
 		if err != nil {
@@ -137,7 +156,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -145,6 +164,12 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 
 func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 	switch v := input.(type) {
+	case *messages.BlockResponse:
+		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockResponse)
+		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockResponse)
+		e.unit.Lock()
+		defer e.unit.Unlock()
+		return e.onBlockResponse(originID, v)
 	case *events.SyncedBlock:
 		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
 		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlock)
@@ -156,7 +181,7 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 		e.unit.Lock()
 		defer e.unit.Unlock()
-		return e.onBlockProposal(originID, v)
+		return e.onBlockProposal(originID, v, false)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
@@ -175,18 +200,35 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 		Header:  synced.Block.Header,
 		Payload: synced.Block.Payload,
 	}
-	return e.onBlockProposal(originID, proposal)
+	return e.onBlockProposal(originID, proposal, false)
 }
 
-// onBlockProposal handles incoming block proposals.
-func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) error {
+	for i, block := range res.Blocks {
+		proposal := &messages.BlockProposal{
+			Header:  block.Header,
+			Payload: block.Payload,
+		}
+
+		// process block proposal with a wait
+		if err := e.onBlockProposal(originID, proposal, true); err != nil {
+			return fmt.Errorf("fail to process the block at index %v in a range block response that contains %v blocks: %w", i, len(res.Blocks), err)
+		}
+	}
+
+	return nil
+}
+
+// onBlockProposal handles incoming block proposals. inRangeBlockResponse will determine whether or not we should wait in processBlockAndDescendants
+func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
-	defer span.Finish()
+	defer span.End()
 
 	header := proposal.Header
 
 	log := e.log.With().
+		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
@@ -269,7 +311,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 			Hex("ancestor_id", ancestorID[:]).
 			Msg("requesting missing ancestor for proposal")
 
-		e.sync.RequestBlock(ancestorID)
+		e.sync.RequestBlock(ancestorID, ancestorHeight)
 
 		return nil
 	}
@@ -284,7 +326,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 		log.Debug().Msg("requesting missing parent for proposal")
 
-		e.sync.RequestBlock(header.ParentID)
+		e.sync.RequestBlock(header.ParentID, header.Height-1)
 
 		return nil
 	}
@@ -294,7 +336,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	// at this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not
-	err = e.processBlockAndDescendants(ctx, proposal)
+	err = e.processBlockAndDescendants(ctx, proposal, inRangeBlockResponse)
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
@@ -312,10 +354,10 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // The function assumes that `proposal` is connected to the finalized state. By induction,
 // any children are therefore also connected to the finalized state and can be processed as well.
 // No errors are expected during normal operations.
-func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messages.BlockProposal) error {
+func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
-	defer span.Finish()
+	defer span.End()
 
 	header := proposal.Header
 
@@ -368,10 +410,15 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 	log.Info().Msg("forwarding block proposal to hotstuff")
 
 	// submit the model to follower for processing
-	e.follower.SubmitProposal(header, parent.View)
+	if inRangeBlockResponse {
+		<-e.follower.SubmitProposal(header, parent.View)
+	} else {
+		// ignore returned channel to avoid waiting
+		e.follower.SubmitProposal(header, parent.View)
+	}
 
 	// check for any descendants of the block to process
-	err = e.processPendingChildren(ctx, header)
+	err = e.processPendingChildren(ctx, header, inRangeBlockResponse)
 	if err != nil {
 		return fmt.Errorf("could not process pending children: %w", err)
 	}
@@ -382,10 +429,10 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 // processPendingChildren checks if there are proposals connected to the given
 // parent block that was just processed; if this is the case, they should now
 // all be validly connected to the finalized state and we should process them.
-func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header) error {
+func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessPendingChildren)
-	defer span.Finish()
+	defer span.End()
 
 	blockID := header.ID()
 
@@ -402,7 +449,7 @@ func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header
 			Header:  child.Header,
 			Payload: child.Payload,
 		}
-		err := e.processBlockAndDescendants(ctx, proposal)
+		err := e.processBlockAndDescendants(ctx, proposal, inRangeBlockResponse)
 		if err != nil {
 			result = multierror.Append(result, err)
 		}

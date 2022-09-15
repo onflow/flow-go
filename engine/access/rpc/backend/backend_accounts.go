@@ -158,8 +158,12 @@ func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Iden
 		return nil, err
 	}
 	defer closer.Close()
+
 	resp, err := execRPCClient.GetAccountAtBlockID(ctx, &req)
 	if err != nil {
+		if status.Code(err) == codes.Unavailable {
+			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		}
 		return nil, err
 	}
 	return resp, nil

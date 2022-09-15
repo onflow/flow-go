@@ -53,10 +53,7 @@ func NewLocalBlobService(
 			ready()
 
 			<-ctx.Done()
-
-			if err := bs.blockService.Close(); err != nil {
-				ctx.Throw(err)
-			}
+			// Not calling bs.blockService.Close() since exchange is not set
 		}).
 		Build()
 

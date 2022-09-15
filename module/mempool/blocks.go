@@ -17,9 +17,9 @@ type Blocks interface {
 	// false if it was already in the mempool.
 	Add(block *flow.Block) bool
 
-	// Rem will remove the given block from the memory pool; it will
+	// Remove will remove the given block from the memory pool; it will
 	// will return true if the block was known and removed.
-	Rem(blockID flow.Identifier) bool
+	Remove(blockID flow.Identifier) bool
 
 	// ByID retrieve the block with the given ID from the memory pool.
 	// It will return false if it was not found in the mempool.

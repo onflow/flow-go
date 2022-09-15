@@ -5,7 +5,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -20,18 +19,16 @@ type RemoteDebugger struct {
 func NewRemoteDebugger(grpcAddress string,
 	chain flow.Chain,
 	logger zerolog.Logger) *RemoteDebugger {
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	vm := fvm.NewVM()
 
 	// no signature processor here
 	// TODO Maybe we add fee-deduction step as well
 	ctx := fvm.NewContext(
-		logger,
+		fvm.WithLogger(logger),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionAccountFrozenChecker(),
 			fvm.NewTransactionSequenceNumberChecker(),
-			fvm.NewTransactionAccountFrozenEnabler(),
-			fvm.NewTransactionInvoker(logger),
+			fvm.NewTransactionInvoker(),
 		),
 	)
 
@@ -47,7 +44,7 @@ func (d *RemoteDebugger) RunTransaction(txBody *flow.TransactionBody) (txErr, pr
 	view := NewRemoteView(d.grpcAddress)
 	blockCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	tx := fvm.Transaction(txBody, 0)
-	err := d.vm.Run(blockCtx, tx, view, programs.NewEmptyPrograms())
+	err := d.vm.RunV2(blockCtx, tx, view)
 	if err != nil {
 		return nil, err
 	}
@@ -60,16 +57,14 @@ func (d *RemoteDebugger) RunTransaction(txBody *flow.TransactionBody) (txErr, pr
 // if regCachePath is empty, the register values won't be cached
 func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, blockID flow.Identifier, regCachePath string) (txErr, processError error) {
 	view := NewRemoteView(d.grpcAddress, WithBlockID(blockID))
+	defer view.Done()
+
 	blockCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	if len(regCachePath) > 0 {
 		view.Cache = newFileRegisterCache(regCachePath)
 	}
 	tx := fvm.Transaction(txBody, 0)
-	err := d.vm.Run(blockCtx, tx, view, programs.NewEmptyPrograms())
-	if err != nil {
-		return nil, err
-	}
-	err = view.Cache.Persist()
+	err := d.vm.RunV2(blockCtx, tx, view)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +79,7 @@ func (d *RemoteDebugger) RunScript(code []byte, arguments [][]byte) (value caden
 	view := NewRemoteView(d.grpcAddress)
 	scriptCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	script := fvm.Script(code).WithArguments(arguments...)
-	err := d.vm.Run(scriptCtx, script, view, programs.NewEmptyPrograms())
+	err := d.vm.RunV2(scriptCtx, script, view)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -95,7 +90,7 @@ func (d *RemoteDebugger) RunScriptAtBlockID(code []byte, arguments [][]byte, blo
 	view := NewRemoteView(d.grpcAddress, WithBlockID(blockID))
 	scriptCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	script := fvm.Script(code).WithArguments(arguments...)
-	err := d.vm.Run(scriptCtx, script, view, programs.NewEmptyPrograms())
+	err := d.vm.RunV2(scriptCtx, script, view)
 	if err != nil {
 		return nil, nil, err
 	}
