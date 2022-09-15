@@ -9,7 +9,6 @@ import (
 
 	addrutil "github.com/libp2p/go-addr-util"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -131,7 +130,6 @@ func nodeFixture(
 
 	builder := p2p.NewNodeBuilder(parameters.logger, parameters.address, parameters.key, sporkID).
 		SetConnectionManager(connManager).
-		SetPubSub(pubsub.NewGossipSub).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2p.NewDHT(c, h,
 				protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),

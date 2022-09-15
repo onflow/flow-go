@@ -70,8 +70,7 @@ func DefaultLibP2PNodeFactory(
 					metrics,
 					AsServer(),
 				)
-			}).
-			SetPubSub(pubsub.NewGossipSub)
+			})
 
 		if role != "ghost" {
 			r, _ := flow.ParseRole(role)
@@ -96,7 +95,6 @@ type NodeBuilder interface {
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
-	SetPubSub(func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -111,7 +109,6 @@ type LibP2PNodeBuilder struct {
 	connManager        connmgr.ConnManager
 	connGater          connmgr.ConnectionGater
 	routingFactory     func(context.Context, host.Host) (routing.Routing, error)
-	pubsubFactory      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 }
 
 func NewNodeBuilder(
@@ -158,22 +155,12 @@ func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetPubSub(f func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)) NodeBuilder {
-	builder.pubsubFactory = f
-	return builder
-}
-
 func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	if builder.routingFactory == nil {
 		return nil, errors.New("routing factory is not set")
 	}
 
-	if builder.pubsubFactory == nil {
-		return nil, errors.New("pubsub factory is not set")
-	}
-
 	var opts []libp2p.Option
-
 	if builder.basicResolver != nil {
 		resolver, err := madns.NewResolver(madns.WithDefaultResolver(builder.basicResolver))
 
@@ -196,14 +183,14 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 		opts = append(opts, libp2p.ConnectionGater(builder.connGater))
 	}
 
-	host, err := DefaultLibP2PHost(ctx, builder.addr, builder.networkKey, opts...)
+	h, err := DefaultLibP2PHost(ctx, builder.addr, builder.networkKey, opts...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create libp2p host: %w", err)
 	}
 
-	rsys, err := builder.routingFactory(ctx, host)
+	rsys, err := builder.routingFactory(ctx, h)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create routing system: %w", err)
 	}
 
 	psOpts := append(
@@ -216,16 +203,14 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 		psOpts = append(psOpts, pubsub.WithSubscriptionFilter(builder.subscriptionFilter))
 	}
 
-	pubSub, err := builder.pubsubFactory(ctx, host, psOpts...)
-
+	pubSub, err := pubsub.NewGossipSub(ctx, h, psOpts...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create gossipsub: %w", err)
 	}
 
-	pCache, err := newProtocolPeerCache(builder.logger, host)
-
+	pCache, err := newProtocolPeerCache(builder.logger, h)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create protocol peer cache: %w", err)
 	}
 
 	node := &Node{
@@ -233,10 +218,10 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 		subs:    make(map[channels.Topic]*pubsub.Subscription),
 		logger:  builder.logger,
 		routing: rsys,
-		host:    host,
+		host:    h,
 		unicastManager: unicast.NewUnicastManager(
 			builder.logger,
-			unicast.NewLibP2PStreamFactory(host),
+			unicast.NewLibP2PStreamFactory(h),
 			builder.sporkID,
 		),
 		pCache: pCache,

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	badger "github.com/ipfs/go-ds-badger2"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
@@ -988,7 +987,6 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 					p2p.AsServer(),
 				)
 			}).
-			SetPubSub(pubsub.NewGossipSub).
 			Build(ctx)
 
 		if err != nil {

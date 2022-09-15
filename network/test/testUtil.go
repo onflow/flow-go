@@ -12,7 +12,6 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	p2pNetwork "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -348,7 +347,6 @@ func generateLibP2PNode(
 
 	builder := p2p.NewNodeBuilder(logger, "0.0.0.0:0", key, sporkID).
 		SetConnectionManager(connManager).
-		SetPubSub(pubsub.NewGossipSub).
 		SetResourceManager(NewResourceManager(t))
 
 	for _, opt := range opts {

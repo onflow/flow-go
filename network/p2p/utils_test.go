@@ -33,7 +33,6 @@ func createNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2p.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
-		SetPubSub(pubsub.NewGossipSub).
 		SetResourceManager(test.NewResourceManager(t))
 
 	for _, opt := range opts {

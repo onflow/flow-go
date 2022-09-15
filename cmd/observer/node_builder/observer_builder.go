@@ -13,7 +13,6 @@ import (
 
 	badger "github.com/ipfs/go-ds-badger2"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -842,7 +841,6 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 					dht.BootstrapPeers(pis...),
 				)
 			}).
-			SetPubSub(p2ppubsub.NewGossipSub).
 			Build(ctx)
 
 		if err != nil {
