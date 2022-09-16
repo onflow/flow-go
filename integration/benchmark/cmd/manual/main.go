@@ -94,71 +94,75 @@ func main() {
 		clients = append(clients, client)
 	}
 
-	// run load cases
-	for i, c := range parseLoadCases(log, tpsFlag, tpsDurationsFlag) {
-		log.Info().Str("load_type", *loadTypeFlag).Int("number", i).Uint("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
+	// run load cases and compute max tps
+	var maxTPS uint
+	loadCases := parseLoadCases(log, tpsFlag, tpsDurationsFlag)
+	for _, c := range loadCases {
+		if c.tps > maxTPS {
+			maxTPS = c.tps
+		}
+	}
 
+	lg, err := benchmark.New(
+		ctx,
+		log,
+		loaderMetrics,
+		clients,
+		benchmark.NetworkParams{
+			ServAccPrivKeyHex:     *serviceAccountPrivateKeyHex,
+			ServiceAccountAddress: &serviceAccountAddress,
+			FungibleTokenAddress:  &fungibleTokenAddress,
+			FlowTokenAddress:      &flowTokenAddress,
+		},
+		benchmark.LoadParams{
+			NumberOfAccounts: int(maxTPS) * *accountMultiplierFlag,
+			LoadType:         benchmark.LoadType(*loadTypeFlag),
+			FeedbackEnabled:  *feedbackEnabled,
+		},
+		benchmark.ConstExecParams{
+			MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
+			AuthAccountNum:  *authAccNumInConstExecTx,
+			ArgSizeInByte:   *argSizeInByteInConstExecTx,
+			PayerKeyCount:   *payerKeyCountInConstExecTx,
+		},
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to create new cont load generator")
+	}
+	defer lg.Stop()
+
+	err = lg.Init()
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to init loader")
+	}
+
+	for i, c := range loadCases {
+		log.Info().
+			Str("load_type", *loadTypeFlag).
+			Int("number", i).
+			Uint("tps", c.tps).
+			Dur("duration", c.duration).
+			Msg("running load case")
+
+		err = lg.SetTPS(c.tps)
+		if err != nil {
+			log.Fatal().Err(err).Msg("unable to set tps")
+		}
+		// TODO(rbtz): pass metrics to the load generator
 		loaderMetrics.SetTPSConfigured(c.tps)
 
-		var lg *benchmark.ContLoadGenerator
-		if c.tps > 0 {
-			var err error
-			lg, err = benchmark.New(
-				ctx,
-				log,
-				loaderMetrics,
-				clients,
-				benchmark.NetworkParams{
-					ServAccPrivKeyHex:     *serviceAccountPrivateKeyHex,
-					ServiceAccountAddress: &serviceAccountAddress,
-					FungibleTokenAddress:  &fungibleTokenAddress,
-					FlowTokenAddress:      &flowTokenAddress,
-				},
-				benchmark.LoadParams{
-					NumberOfAccounts: int(c.tps) * *accountMultiplierFlag,
-					LoadType:         benchmark.LoadType(*loadTypeFlag),
-					FeedbackEnabled:  *feedbackEnabled,
-				},
-				benchmark.ConstExecParams{
-					MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
-					AuthAccountNum:  *authAccNumInConstExecTx,
-					ArgSizeInByte:   *argSizeInByteInConstExecTx,
-					PayerKeyCount:   *payerKeyCountInConstExecTx,
-				},
-			)
-			if err != nil {
-				log.Fatal().Err(err).Msgf("unable to create new cont load generator")
-			}
-
-			err = lg.Init()
-			if err != nil {
-				log.Fatal().Err(err).Msgf("unable to init loader")
-			}
-
-			err = lg.SetTPS(uint(c.tps))
-			if err != nil {
-				log.Fatal().Err(err).Msgf("unable to set tps")
-			}
-		}
-
-		waitC := make(<-chan time.Time)
 		// if the duration is 0, we run this case forever
-		if c.duration.Nanoseconds() != 0 {
+		waitC := make(<-chan time.Time)
+		if c.duration != 0 {
 			waitC = time.After(c.duration)
 		}
 
 		select {
+		case <-ctx.Done():
+			log.Info().Err(ctx.Err()).Msg("context cancelled")
+			return
 		case <-waitC:
-			if lg != nil {
-				lg.Stop()
-			}
-		case <-ctx.Done(): //TODO: the loader currently doesn't ever cancel the context
-			if lg != nil {
-				lg.Stop()
-			}
-			// add logging here to express the *why* of the canceled the context.
-			// when the loader cancels its own context it may also call Stop() on itself
-			// this may become redundant.
+			log.Info().Msg("finished load case")
 		}
 	}
 }

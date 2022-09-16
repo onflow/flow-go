@@ -76,7 +76,7 @@ stop:
 
 .PHONY: load
 load:
-	go run --tags relic ../benchmark/cmd/manual -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
+	go run --tags relic ../benchmark/cmd/manual -log-level info -tps 1,10,100 -tps-durations 30s,30s
 
 .PHONY: tps-test
 tps-test:
