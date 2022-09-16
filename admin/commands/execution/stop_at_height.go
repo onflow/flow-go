@@ -58,7 +58,7 @@ func (s *StopAtHeightCommand) Validator(req *admin.CommandRequest) error {
 		return errInvalidHeightValue
 	}
 
-	height, ok := result.(int)
+	height, ok := result.(float64)
 	if !ok || height <= 0 {
 		return errInvalidHeightValue
 	}
