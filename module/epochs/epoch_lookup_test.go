@@ -176,7 +176,7 @@ func (suite *EpochLookupSuite) TestEpochForViewWithFallback_EpochFallbackTrigger
 }
 
 // TestProtocolEvents_EpochFallbackTriggered tests constructing and subsequently querying
-// EpochLookup where at construction time `EpochLookup` there is no epoch fallback,
+// EpochLookup, where there is no epoch fallback at construction time,
 // but an epoch fallback happens later via an epoch event.
 func (suite *EpochLookupSuite) TestProtocolEvents_EpochFallbackTriggered() {
 	// initially, only current epoch is committed
