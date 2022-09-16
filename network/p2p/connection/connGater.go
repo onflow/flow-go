@@ -1,4 +1,4 @@
-package p2p
+package connection
 
 import (
 	"sync"
@@ -41,8 +41,6 @@ type ConnGater struct {
 	onInterceptSecuredFilters  []PeerFilter
 	log                        zerolog.Logger
 }
-
-type PeerFilter func(peer.ID) error
 
 func NewConnGater(log zerolog.Logger, opts ...ConnGaterOption) *ConnGater {
 	cg := &ConnGater{

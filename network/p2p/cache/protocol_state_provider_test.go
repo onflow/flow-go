@@ -1,4 +1,4 @@
-package p2p_test
+package cache_test
 
 import (
 	"testing"

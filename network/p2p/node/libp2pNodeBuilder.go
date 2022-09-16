@@ -1,4 +1,4 @@
-package p2p
+package node
 
 import (
 	"context"
@@ -19,6 +19,9 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/p2p/dht"
@@ -50,13 +53,13 @@ func DefaultLibP2PNodeFactory(
 ) LibP2PFactoryFunc {
 
 	return func(ctx context.Context) (*Node, error) {
-		connManager := NewConnManager(log, metrics)
+		connManager := connection.NewConnManager(log, metrics)
 
 		// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
 		peerFilter := notEjectedPeerFilter(idProvider)
-		connGater := NewConnGater(log,
-			WithOnInterceptPeerDialFilters([]PeerFilter{peerFilter}),
-			WithOnInterceptSecuredFilters([]PeerFilter{peerFilter}),
+		connGater := connection.NewConnGater(log,
+			connection.WithOnInterceptPeerDialFilters([]p2p.PeerFilter{peerFilter}),
+			connection.WithOnInterceptSecuredFilters([]p2p.PeerFilter{peerFilter}),
 		)
 
 		builder := NewNodeBuilder(log, address, flowKey, sporkId).
@@ -77,7 +80,7 @@ func DefaultLibP2PNodeFactory(
 
 		if role != "ghost" {
 			r, _ := flow.ParseRole(role)
-			builder.SetSubscriptionFilter(NewRoleBasedFilter(r, idProvider))
+			builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
 		}
 
 		return builder.Build(ctx)

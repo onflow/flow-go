@@ -1,4 +1,4 @@
-package p2p_test
+package connection_test
 
 import (
 	"fmt"
@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -50,7 +51,7 @@ func TestConnectionManagerProtection(t *testing.T) {
 
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	noopMetrics := metrics.NewNoopCollector()
-	connManager := p2p.NewConnManager(log, noopMetrics)
+	connManager := connection.NewConnManager(log, noopMetrics)
 
 	testCases := [][]fun{
 		// single stream created on a connection
@@ -66,7 +67,7 @@ func TestConnectionManagerProtection(t *testing.T) {
 	}
 }
 
-func testSequence(t *testing.T, sequence []fun, connMgr *p2p.ConnManager) {
+func testSequence(t *testing.T, sequence []fun, connMgr *connection.ConnManager) {
 	pID := generatePeerInfo(t)
 	for _, s := range sequence {
 		switch s.funName {
@@ -83,7 +84,7 @@ func testSequence(t *testing.T, sequence []fun, connMgr *p2p.ConnManager) {
 func generatePeerInfo(t *testing.T) peer.ID {
 	key := p2pfixtures.NetworkingKeyFixtures(t)
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
-	pInfo, err := p2p.PeerAddressInfo(*identity)
+	pInfo, err := p2putils.PeerAddressInfo(*identity)
 	require.NoError(t, err)
 	return pInfo.ID
 }

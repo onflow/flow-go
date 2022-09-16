@@ -11,9 +11,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 
 	"github.com/onflow/flow-go/model/flow"

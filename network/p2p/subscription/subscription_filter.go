@@ -1,4 +1,4 @@
-package p2p
+package subscription
 
 import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"

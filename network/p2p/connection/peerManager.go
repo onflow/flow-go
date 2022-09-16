@@ -6,9 +6,8 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 )

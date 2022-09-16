@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/test"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -55,7 +55,7 @@ func NodeFixture(
 	sporkID flow.Identifier,
 	dhtPrefix string,
 	opts ...NodeFixtureParameterOption,
-) (*p2p.Node, flow.Identity) {
+) (*node.Node, flow.Identity) {
 	// default parameters
 	parameters := &NodeFixtureParameters{
 		HandlerFunc: func(network.Stream) {},
@@ -75,10 +75,10 @@ func NodeFixture(
 		unittest.WithRole(parameters.Role))
 
 	noopMetrics := metrics.NewNoopCollector()
-	connManager := p2p.NewConnManager(parameters.Logger, noopMetrics)
+	connManager := node.NewConnManager(parameters.Logger, noopMetrics)
 	resourceManager := test.NewResourceManager(t)
 
-	builder := p2p.NewNodeBuilder(parameters.Logger, parameters.Address, parameters.Key, sporkID).
+	builder := node.NewNodeBuilder(parameters.Logger, parameters.Address, parameters.Key, sporkID).
 		SetConnectionManager(connManager).
 		SetPubSub(pubsub.NewGossipSub).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
@@ -92,9 +92,9 @@ func NodeFixture(
 		SetResourceManager(resourceManager)
 
 	if parameters.PeerFilter != nil {
-		filters := []p2p.PeerFilter{parameters.PeerFilter}
+		filters := []node.PeerFilter{parameters.PeerFilter}
 		// set parameters.peerFilter as the default peerFilter for both callbacks
-		connGater := p2p.NewConnGater(parameters.Logger, p2p.WithOnInterceptPeerDialFilters(filters), p2p.WithOnInterceptSecuredFilters(filters))
+		connGater := node.NewConnGater(parameters.Logger, node.WithOnInterceptPeerDialFilters(filters), node.WithOnInterceptSecuredFilters(filters))
 		builder.SetConnectionGater(connGater)
 	}
 
@@ -122,7 +122,7 @@ type NodeFixtureParameters struct {
 	Key         crypto.PrivateKey
 	Address     string
 	DhtOptions  []dht.Option
-	PeerFilter  p2p.PeerFilter
+	PeerFilter  node.PeerFilter
 	Role        flow.Role
 	Logger      zerolog.Logger
 }
@@ -159,7 +159,7 @@ func WithDHTOptions(opts ...dht.Option) NodeFixtureParameterOption {
 	}
 }
 
-func WithPeerFilter(filter p2p.PeerFilter) NodeFixtureParameterOption {
+func WithPeerFilter(filter node.PeerFilter) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.PeerFilter = filter
 	}
@@ -178,14 +178,14 @@ func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 }
 
 // StopNodes stop all nodes in the input slice
-func StopNodes(t *testing.T, nodes []*p2p.Node) {
+func StopNodes(t *testing.T, nodes []*node.Node) {
 	for _, n := range nodes {
 		StopNode(t, n)
 	}
 }
 
-func StopNode(t *testing.T, node *p2p.Node) {
-	done, err := node.Stop()
+func StopNode(t *testing.T, n *node.Node) {
+	done, err := n.Stop()
 	assert.NoError(t, err)
 	unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop node on ime")
 }
@@ -206,7 +206,7 @@ func SilentNodeFixture(t *testing.T) (net.Listener, flow.Identity) {
 
 	go acceptAndHang(t, lst)
 
-	ip, port, err := p2p.IPPortFromMultiAddress(addrs...)
+	ip, port, err := node.IPPortFromMultiAddress(addrs...)
 	require.NoError(t, err)
 
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(ip+":"+port))
@@ -231,11 +231,11 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 
 // NodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func NodesFixture(t *testing.T, ctx context.Context, sporkID flow.Identifier, dhtPrefix string, count int, opts ...NodeFixtureParameterOption) ([]*p2p.Node,
+func NodesFixture(t *testing.T, ctx context.Context, sporkID flow.Identifier, dhtPrefix string, count int, opts ...NodeFixtureParameterOption) ([]*node.Node,
 	flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
-	var nodes []*p2p.Node
+	var nodes []*node.Node
 
 	defer func() {
 		if err != nil && nodes != nil {
@@ -255,4 +255,30 @@ func NodesFixture(t *testing.T, ctx context.Context, sporkID flow.Identifier, dh
 	}
 
 	return nodes, identities
+}
+
+type nodeOpt func(node.NodeBuilder)
+
+func WithSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
+	return func(builder node.NodeBuilder) {
+		builder.SetSubscriptionFilter(filter)
+	}
+}
+
+func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, opts ...nodeOpt) *node.Node {
+	builder := node.NewNodeBuilder(logger, "0.0.0.0:0", networkKey, sporkID).
+		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
+			return p2pdht.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
+		}).
+		SetPubSub(pubsub.NewGossipSub).
+		SetResourceManager(test.NewResourceManager(t))
+
+	for _, opt := range opts {
+		opt(builder)
+	}
+
+	libp2pNode, err := builder.Build(context.TODO())
+	require.NoError(t, err)
+
+	return libp2pNode
 }

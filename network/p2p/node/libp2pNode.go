@@ -1,5 +1,5 @@
 // Package p2p encapsulates the libp2p library
-package p2p
+package node
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/slashing"
@@ -28,8 +29,18 @@ import (
 )
 
 const (
-	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
-	maxConnectAttempt = 3
+	_  = iota
+	kb = 1 << (10 * iota)
+	mb
+	gb
+)
+
+const (
+	// MaxConnectAttempt is the maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
+	MaxConnectAttempt = 3
+
+	// DefaultMaxPubSubMsgSize defines the maximum message size in publish and multicast modes
+	DefaultMaxPubSubMsgSize = 5 * mb // 5 mb
 
 	// timeout for FindPeer queries to the routing system
 	// TODO: is this a sensible value?
@@ -147,7 +158,7 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 			lg.Debug().Msg("address not found in peer store, but found in routing system search")
 		}
 	}
-	stream, dialAddrs, err := n.unicastManager.CreateStream(ctx, peerID, maxConnectAttempt)
+	stream, dialAddrs, err := n.unicastManager.CreateStream(ctx, peerID, MaxConnectAttempt)
 	if err != nil {
 		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
 			dialAddrs, err))
@@ -176,7 +187,7 @@ func (n *Node) ListPeers(topic string) []peer.ID {
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter PeerFilter, slashingViolationsConsumer slashing.ViolationsConsumer, validators ...validator.PubSubMessageValidator) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter p2p.PeerFilter, slashingViolationsConsumer slashing.ViolationsConsumer, validators ...validator.PubSubMessageValidator) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -290,4 +301,8 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
 	isConnected := n.host.Network().Connectedness(peerID) == libp2pnet.Connected
 	return isConnected, nil
+}
+
+func (n *Node) Routing() routing.Routing {
+	return n.routing
 }

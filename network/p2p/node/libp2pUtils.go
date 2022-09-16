@@ -1,4 +1,4 @@
-package p2p
+package node
 
 // All utilities for libp2p not natively provided by the library.
 
@@ -10,13 +10,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	libp2pnetwork "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
@@ -162,32 +161,6 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-// PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
-// A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
-//
-//	flow.Identity        ---> peer.AddrInfo
-//	|-- Address          --->   |-- []multiaddr.Multiaddr
-//	|-- NetworkPublicKey --->   |-- ID
-func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
-	ip, port, key, err := NetworkingInfo(identity)
-	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("could not translate identity to networking info %s: %w", identity.NodeID.String(), err)
-	}
-
-	addr := MultiAddressStr(ip, port)
-	maddr, err := multiaddr.NewMultiaddr(addr)
-	if err != nil {
-		return peer.AddrInfo{}, err
-	}
-
-	id, err := peer.IDFromPublicKey(key)
-	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("could not extract libp2p id from key:%w", err)
-	}
-	pInfo := peer.AddrInfo{ID: id, Addrs: []multiaddr.Multiaddr{maddr}}
-	return pInfo, err
-}
-
 // PeerInfosFromIDs converts the given flow.Identities to peer.AddrInfo.
 // For each identity, if the conversion succeeds, the peer.AddrInfo is included in the result else it is
 // included in the error map with the corresponding error
@@ -195,7 +168,7 @@ func PeerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifi
 	validIDs := make([]peer.AddrInfo, 0, len(ids))
 	invalidIDs := make(map[flow.Identifier]error)
 	for _, id := range ids {
-		peerInfo, err := PeerAddressInfo(*id)
+		peerInfo, err := p2putils.PeerAddressInfo(*id)
 		if err != nil {
 			invalidIDs[id.NodeID] = err
 			continue
@@ -205,26 +178,8 @@ func PeerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifi
 	return validIDs, invalidIDs
 }
 
-// streamLogger creates a logger for libp2p stream which logs the remote and local peer IDs and addresses
-func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logger {
-	logger := log.With().
-		Str("protocol", string(stream.Protocol())).
-		Str("remote_peer", stream.Conn().RemotePeer().String()).
-		Str("remote_address", stream.Conn().RemoteMultiaddr().String()).
-		Str("local_peer", stream.Conn().LocalPeer().String()).
-		Str("local_address", stream.Conn().LocalMultiaddr().String()).Logger()
-	return logger
-}
-
-// allowAllPeerFilter returns a peer filter that does not do any filtering.
-func allowAllPeerFilter() PeerFilter {
-	return func(p peer.ID) error {
-		return nil
-	}
-}
-
 // notEjectedPeerFilter returns a PeerFilter that will return an error if the peer is unknown or ejected.
-func notEjectedPeerFilter(idProvider id.IdentityProvider) PeerFilter {
+func notEjectedPeerFilter(idProvider id.IdentityProvider) p2p.PeerFilter {
 	return func(p peer.ID) error {
 		if id, found := idProvider.ByPeerID(p); !found {
 			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.Pretty())
@@ -232,6 +187,13 @@ func notEjectedPeerFilter(idProvider id.IdentityProvider) PeerFilter {
 			return fmt.Errorf("node with the peer_id %s is ejected", id.NodeID)
 		}
 
+		return nil
+	}
+}
+
+// AllowAllPeerFilter returns a peer filter that does not do any filtering.
+func AllowAllPeerFilter() p2p.PeerFilter {
+	return func(p peer.ID) error {
 		return nil
 	}
 }

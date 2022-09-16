@@ -1,4 +1,4 @@
-package p2p_test
+package subscription_test
 
 import (
 	"context"
@@ -8,6 +8,9 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/p2p/node"
+	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -15,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,11 +33,11 @@ func TestFilterSubscribe(t *testing.T) {
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
 	ids := flow.IdentityList{identity1, identity2}
 
-	node1 := createNode(t, identity1.NodeID, privateKey1, sporkId, zerolog.Nop(), withSubscriptionFilter(subscriptionFilter(identity1, ids)))
-	node2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop(), withSubscriptionFilter(subscriptionFilter(identity2, ids)))
+	node1 := p2pfixtures.CreateNode(t, identity1.NodeID, privateKey1, sporkId, zerolog.Nop(), p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity1, ids)))
+	node2 := p2pfixtures.CreateNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop(), p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity2, ids)))
 
 	unstakedKey := unittest.NetworkingPrivKeyFixture()
-	unstakedNode := createNode(t, flow.ZeroID, unstakedKey, sporkId, zerolog.Nop())
+	unstakedNode := p2pfixtures.CreateNode(t, flow.ZeroID, unstakedKey, sporkId, zerolog.Nop())
 
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.Host())))
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(unstakedNode.Host())))
@@ -70,7 +72,7 @@ func TestFilterSubscribe(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	testPublish := func(wg *sync.WaitGroup, from *p2p.Node, sub *pubsub.Subscription) {
+	testPublish := func(wg *sync.WaitGroup, from *node.Node, sub *pubsub.Subscription) {
 		data := []byte("hello")
 
 		err := from.Publish(context.TODO(), badTopic, data)
@@ -105,7 +107,7 @@ func TestCanSubscribe(t *testing.T) {
 	identity, privateKey := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 	sporkId := unittest.IdentifierFixture()
 
-	collectionNode := createNode(t, identity.NodeID, privateKey, sporkId, zerolog.Nop(), withSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
+	collectionNode := p2pfixtures.CreateNode(t, identity.NodeID, privateKey, sporkId, zerolog.Nop(), p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
 	defer func() {
 		done, err := collectionNode.Stop()
 		require.NoError(t, err)
@@ -137,5 +139,5 @@ func TestCanSubscribe(t *testing.T) {
 
 func subscriptionFilter(self *flow.Identity, ids flow.IdentityList) pubsub.SubscriptionFilter {
 	idProvider := id.NewFixedIdentityProvider(ids)
-	return p2p.NewRoleBasedFilter(self.Role, idProvider)
+	return subscription.NewRoleBasedFilter(self.Role, idProvider)
 }

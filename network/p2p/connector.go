@@ -14,3 +14,5 @@ type Connector interface {
 	// create multiple connections
 	UpdatePeers(ctx context.Context, peerIDs peer.IDSlice)
 }
+
+type PeerFilter func(peer.ID) error

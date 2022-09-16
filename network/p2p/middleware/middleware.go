@@ -1,6 +1,6 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package p2p
+package middleware
 
 import (
 	"bufio"
@@ -16,6 +16,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/blob"
+	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
+	"github.com/onflow/flow-go/network/p2p/node"
+	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -41,10 +46,6 @@ const (
 )
 
 const (
-
-	// defines maximum message size in publish and multicast modes
-	DefaultMaxPubSubMsgSize = 5 * mb // 5 mb
-
 	// defines maximum message size in unicast mode for most messages
 	DefaultMaxUnicastMsgSize = 10 * mb // 10 mb
 
@@ -75,18 +76,18 @@ type Middleware struct {
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
 	// and worker routines.
 	wg                         *sync.WaitGroup
-	libP2PNode                 *Node
-	libP2PNodeFactory          LibP2PFactoryFunc
+	libP2PNode                 *node.Node
+	libP2PNodeFactory          node.LibP2PFactoryFunc
 	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
 	bitswapMetrics             module.BitswapMetrics
 	rootBlockID                flow.Identifier
 	validators                 []network.MessageValidator
-	peerManagerFactory         PeerManagerFactoryFunc
-	peerManager                PeerManager
+	peerManagerFactory         p2p.PeerManagerFactoryFunc
+	peerManager                p2p.PeerManager
 	unicastMessageTimeout      time.Duration
-	idTranslator               IDTranslator
+	idTranslator               p2p.IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
 	codec                      network.Codec
 	slashingViolationsConsumer slashing.ViolationsConsumer
@@ -108,7 +109,7 @@ func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOp
 	}
 }
 
-func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
+func WithPeerManager(peerManagerFunc p2p.PeerManagerFactoryFunc) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.peerManagerFactory = peerManagerFunc
 	}
@@ -127,13 +128,13 @@ func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
 func NewMiddleware(
 	log zerolog.Logger,
-	libP2PNodeFactory LibP2PFactoryFunc,
+	libP2PNodeFactory node.LibP2PFactoryFunc,
 	flowID flow.Identifier,
 	met module.NetworkMetrics,
 	bitswapMet module.BitswapMetrics,
 	rootBlockID flow.Identifier,
 	unicastMessageTimeout time.Duration,
-	idTranslator IDTranslator,
+	idTranslator p2p.IDTranslator,
 	codec network.Codec,
 	slashingViolationsConsumer slashing.ViolationsConsumer,
 	opts ...MiddlewareOption,
@@ -192,7 +193,7 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 }
 
 // isProtocolParticipant returns a PeerFilter that returns true if a peer is a staked node.
-func (m *Middleware) isProtocolParticipant() PeerFilter {
+func (m *Middleware) isProtocolParticipant() p2p.PeerFilter {
 	return func(p peer.ID) error {
 		if _, ok := m.ov.Identity(p); !ok {
 			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.Pretty())
@@ -202,11 +203,11 @@ func (m *Middleware) isProtocolParticipant() PeerFilter {
 }
 
 func (m *Middleware) NewBlobService(channel channels.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
-	return NewBlobService(m.libP2PNode.Host(), m.libP2PNode.routing, channel.String(), ds, m.bitswapMetrics, m.log, opts...)
+	return blob.NewBlobService(m.libP2PNode.Host(), m.libP2PNode.Routing(), channel.String(), ds, m.bitswapMetrics, m.log, opts...)
 }
 
 func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.PingInfoProvider) network.PingService {
-	return NewPingService(m.libP2PNode.Host(), pingProtocol, m.log, provider)
+	return ping.NewPingService(m.libP2PNode.Host(), pingProtocol, m.log, provider)
 }
 
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
@@ -247,7 +248,7 @@ func (m *Middleware) UpdateNodeAddresses() {
 	m.log.Info().Msg("Updating protocol state node addresses")
 
 	ids := m.ov.Identities()
-	newInfos, invalid := PeerInfosFromIDs(ids)
+	newInfos, invalid := node.PeerInfosFromIDs(ids)
 
 	for id, err := range invalid {
 		m.log.Err(err).Str("node_id", id.String()).Msg("failed to extract peer info from identity")
@@ -258,11 +259,11 @@ func (m *Middleware) UpdateNodeAddresses() {
 
 	// set old addresses to expire
 	for _, oldInfo := range m.previousProtocolStatePeers {
-		m.libP2PNode.host.Peerstore().SetAddrs(oldInfo.ID, oldInfo.Addrs, peerstore.TempAddrTTL)
+		m.libP2PNode.Host().Peerstore().SetAddrs(oldInfo.ID, oldInfo.Addrs, peerstore.TempAddrTTL)
 	}
 
 	for _, info := range newInfos {
-		m.libP2PNode.host.Peerstore().SetAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
+		m.libP2PNode.Host().Peerstore().SetAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
 	}
 
 	m.previousProtocolStatePeers = newInfos
@@ -296,7 +297,7 @@ func (m *Middleware) start(ctx context.Context) error {
 
 	// create and use a peer manager if a peer manager factory was passed in during initialization
 	if m.peerManagerFactory != nil {
-		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, func() peer.IDSlice {
+		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.Host(), func() peer.IDSlice {
 			return m.topologyPeers()
 		}, m.log)
 		if err != nil {
@@ -382,8 +383,8 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
 	// connection creation is being attempted, and remove it from protected list once stream created.
 	tag := fmt.Sprintf("%v:%v", msg.ChannelID, msg.Type)
-	m.libP2PNode.host.ConnManager().Protect(peerID, tag)
-	defer m.libP2PNode.host.ConnManager().Unprotect(peerID, tag)
+	m.libP2PNode.Host().ConnManager().Protect(peerID, tag)
+	defer m.libP2PNode.Host().ConnManager().Unprotect(peerID, tag)
 
 	// create new stream
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
@@ -444,7 +445,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 // it is a callback that gets called for each incoming stream by libp2p with a new stream object
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	// qualify the logger with local and remote address
-	log := streamLogger(m.log, s)
+	log := p2putils.StreamLogger(m.log, s)
 
 	log.Info().Msg("incoming stream received")
 
@@ -535,12 +536,12 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 
 	topic := channels.TopicFromChannel(channel, m.rootBlockID)
 
-	var peerFilter PeerFilter
+	var peerFilter p2p.PeerFilter
 	var validators []validator.PubSubMessageValidator
 	if channels.IsPublicChannel(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
 		// return true for every node.
-		peerFilter = allowAllPeerFilter()
+		peerFilter = node.AllowAllPeerFilter()
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
@@ -704,10 +705,10 @@ func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) err
 	}
 
 	msgSize := len(data)
-	if msgSize > DefaultMaxPubSubMsgSize {
+	if msgSize > node.DefaultMaxPubSubMsgSize {
 		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
 		// hence return an error as this message is undeliverable
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, node.DefaultMaxPubSubMsgSize)
 	}
 
 	topic := channels.TopicFromChannel(channel, m.rootBlockID)
@@ -765,7 +766,7 @@ func (m *Middleware) peerManagerUpdate() {
 }
 
 // peerMgr returns the PeerManager and true if this middleware was started with one, (nil, false) otherwise
-func (m *Middleware) peerMgr() (PeerManager, bool) {
+func (m *Middleware) peerMgr() (p2p.PeerManager, bool) {
 	if m.peerManager != nil {
 		return m.peerManager, true
 	}
