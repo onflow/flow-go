@@ -1,6 +1,10 @@
 package meter
 
-import "github.com/onflow/cadence/runtime/common"
+import (
+	"github.com/onflow/cadence/runtime/common"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 type MetringOperationType uint
 
@@ -41,6 +45,7 @@ const (
 
 type MeteredComputationIntensities map[common.ComputationKind]uint
 type MeteredMemoryIntensities map[common.MemoryKind]uint
+type MeteredStorageInteractionMap map[StorageInteractionKey]uint64
 
 type Meter interface {
 	// merge child funcionality
@@ -59,10 +64,17 @@ type Meter interface {
 	TotalMemoryEstimate() uint64
 	TotalMemoryLimit() uint64
 
-	// TODO move storage metering to here
-	// MeterStorageRead(byteSize uint) error
-	// MeterStorageWrite(byteSize uint) error
-	// TotalBytesReadFromStorage() int
-	// TotalBytesWroteToStorage() int
-	// TotalBytesOfStorageInteractions() int
+	// storage metering
+	MeterStorageRead(storageKey StorageInteractionKey, value flow.RegisterValue, enforceLimit bool) error
+	MeterStorageWrite(storageKey StorageInteractionKey, value flow.RegisterValue, enforceLimit bool) error
+	StorageUpdateSizeMap() MeteredStorageInteractionMap
+	TotalBytesReadFromStorage() uint64
+	TotalBytesWrittenToStorage() uint64
+	TotalStorageReadCount() uint64
+	TotalStorageWriteCount() uint64
+	TotalBytesOfStorageInteractions() uint64
+}
+
+type StorageInteractionKey struct {
+	Owner, Key string
 }
