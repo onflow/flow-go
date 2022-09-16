@@ -5,10 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -90,18 +88,11 @@ func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, d
 		return err
 	}
 
-	buf, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	spew.Dump(buf)
-
 	adminCommandResponse := AdminCommandResponse{
 		Output: output,
 	}
 
-	//err = json.NewDecoder(resp.Body).Decode(&adminCommandResponse)
-	err = json.NewDecoder(bytes.NewBuffer(buf)).Decode(&adminCommandResponse)
+	err = json.NewDecoder(resp.Body).Decode(&adminCommandResponse)
 	if err != nil {
 		return err
 	}
