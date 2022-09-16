@@ -1,8 +1,6 @@
 package fvm
 
 import (
-	"github.com/onflow/cadence/runtime"
-
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -10,13 +8,6 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-var _ runtime.Interface = &TransactionEnv{}
-
-// TransactionEnv is a read-write environment used for executing flow transactions.
-type TransactionEnv struct {
-	commonEnv
-}
 
 // DEPRECATED.  DO NOT USE
 //
@@ -29,7 +20,7 @@ func NewTransactionEnvironment(
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
-) *TransactionEnv {
+) environment.Environment {
 	return NewTransactionEnv(
 		ctx,
 		sth,
@@ -46,32 +37,30 @@ func NewTransactionEnv(
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
-) *TransactionEnv {
+) environment.Environment {
 	txID := tx.ID()
 	// TODO set the flags on context
-	tracer := environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
-	meter := environment.NewMeter(sth)
 
-	env := &TransactionEnv{
-		commonEnv: newCommonEnv(
-			ctx,
-			sth,
-			programs,
-			tracer,
-			meter,
-		),
-	}
+	env := newFacadeEnvironment(
+		ctx,
+		sth,
+		programs,
+		environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing),
+		environment.NewMeter(sth),
+	)
 
 	env.TransactionInfo = environment.NewTransactionInfo(
 		txIndex,
 		txID,
-		tracer,
+		ctx.TransactionFeesEnabled,
+		ctx.LimitAccountStorage,
+		env.Tracer,
 		tx.Authorizers,
 		ctx.Chain.ServiceAddress(),
 	)
 	env.EventEmitter = environment.NewEventEmitter(
-		tracer,
-		meter,
+		env.Tracer,
+		env.Meter,
 		ctx.Chain,
 		txID,
 		txIndex,
@@ -84,8 +73,8 @@ func NewTransactionEnv(
 		ctx.Chain,
 		env.accounts,
 		ctx.ServiceAccountEnabled,
-		tracer,
-		meter,
+		env.Tracer,
+		env.Meter,
 		ctx.Metrics,
 		env.SystemContracts)
 	env.AccountFreezer = environment.NewAccountFreezer(
@@ -93,8 +82,8 @@ func NewTransactionEnv(
 		env.accounts,
 		env.TransactionInfo)
 	env.ContractUpdater = handler.NewContractUpdater(
-		tracer,
-		meter,
+		env.Tracer,
+		env.Meter,
 		env.accounts,
 		env.TransactionInfo,
 		ctx.Chain,
@@ -105,16 +94,11 @@ func NewTransactionEnv(
 		env.Runtime)
 
 	env.AccountKeyUpdater = handler.NewAccountKeyUpdater(
-		tracer,
-		meter,
+		env.Tracer,
+		env.Meter,
 		env.accounts,
 		sth,
 		env)
-
-	env.Runtime.SetEnvironment(env)
-
-	// TODO(patrick): rm this hack
-	env.fullEnv = env
 
 	return env
 }
