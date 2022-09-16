@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestWeightedComputationMetering(t *testing.T) {
@@ -466,12 +465,11 @@ func TestStorageLimits(t *testing.T) {
 
 		err := meter1.MeterStorageRead(key1, val1, true /* enforced */)
 
-		storageCapExceedError := errors.NewStorageCapacityExceededError(
-			flow.EmptyAddress,
+		ledgerInteractionLimitExceedError := errors.NewLedgerInteractionLimitExceededError(
 			meter.GetStorageKeyValueSizeForTesting(key1, val1),
 			testLimit,
 		)
-		require.ErrorAs(t, err, &storageCapExceedError)
+		require.ErrorAs(t, err, &ledgerInteractionLimitExceedError)
 	})
 
 	t.Run("metering storage written - exceeding limit - not enforced", func(t *testing.T) {
@@ -498,12 +496,11 @@ func TestStorageLimits(t *testing.T) {
 
 		err := meter1.MeterStorageWrite(key1, val1, true /* enforced */)
 
-		storageCapExceedError := errors.NewStorageCapacityExceededError(
-			flow.EmptyAddress,
+		ledgerInteractionLimitExceedError := errors.NewLedgerInteractionLimitExceededError(
 			meter.GetStorageKeyValueSizeForTesting(key1, val1),
 			testLimit,
 		)
-		require.ErrorAs(t, err, &storageCapExceedError)
+		require.ErrorAs(t, err, &ledgerInteractionLimitExceedError)
 	})
 
 	t.Run("metering storage read and written - within limit", func(t *testing.T) {
@@ -581,12 +578,11 @@ func TestStorageLimits(t *testing.T) {
 
 		// write of key2
 		err = meter1.MeterStorageWrite(key2, val2, true)
-		storageCapExceedError := errors.NewStorageCapacityExceededError(
-			flow.EmptyAddress,
+		ledgerInteractionLimitExceedError := errors.NewLedgerInteractionLimitExceededError(
 			size1+size2,
 			testLimit,
 		)
-		require.ErrorAs(t, err, &storageCapExceedError)
+		require.ErrorAs(t, err, &ledgerInteractionLimitExceedError)
 	})
 
 	t.Run("merge storage metering", func(t *testing.T) {

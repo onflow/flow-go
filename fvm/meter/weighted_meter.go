@@ -449,7 +449,8 @@ func (m *WeightedMeter) TotalMemoryEstimate() uint64 {
 
 // MeterStorageRead captures storage read bytes count and returns an error
 // if it goes beyond the total interaction limit and limit is enforced
-func (m *WeightedMeter) MeterStorageRead(storageKey StorageInteractionKey,
+func (m *WeightedMeter) MeterStorageRead(
+	storageKey StorageInteractionKey,
 	value flow.RegisterValue,
 	enforceLimit bool) error {
 
@@ -461,20 +462,13 @@ func (m *WeightedMeter) MeterStorageRead(storageKey StorageInteractionKey,
 		m.storageUpdateSizeMap[storageKey] = readByteSize
 	}
 
-	if enforceLimit &&
-		m.TotalBytesOfStorageInteractions() > m.storageInteractionLimit {
-		return errors.NewStorageCapacityExceededError(
-			flow.EmptyAddress, // we don't care about account address for now
-			m.TotalBytesOfStorageInteractions(),
-			m.storageInteractionLimit)
-	}
-
-	return nil
+	return m.checkStorageInteractionLimit(enforceLimit)
 }
 
 // MeterStorageRead captures storage written bytes count and returns an error
 // if it goes beyond the total interaction limit and limit is enforced
-func (m *WeightedMeter) MeterStorageWrite(storageKey StorageInteractionKey,
+func (m *WeightedMeter) MeterStorageWrite(
+	storageKey StorageInteractionKey,
 	value flow.RegisterValue,
 	enforceLimit bool) error {
 	// all writes are on a View which only writes the latest updated value to storage at commit
@@ -488,14 +482,15 @@ func (m *WeightedMeter) MeterStorageWrite(storageKey StorageInteractionKey,
 	m.totalStorageBytesWritten += updateSize
 	m.storageUpdateSizeMap[storageKey] = updateSize
 
+	return m.checkStorageInteractionLimit(enforceLimit)
+}
+
+func (m *WeightedMeter) checkStorageInteractionLimit(enforceLimit bool) error {
 	if enforceLimit &&
 		m.TotalBytesOfStorageInteractions() > m.storageInteractionLimit {
-		return errors.NewStorageCapacityExceededError(
-			flow.EmptyAddress, // we don't care about account address for now
-			m.TotalBytesOfStorageInteractions(),
-			m.storageInteractionLimit)
+		return errors.NewLedgerInteractionLimitExceededError(
+			m.TotalBytesOfStorageInteractions(), m.storageInteractionLimit)
 	}
-
 	return nil
 }
 
@@ -534,7 +529,8 @@ func getStorageKeyValueSize(storageKey StorageInteractionKey,
 	return uint64(len(storageKey.Owner) + len(storageKey.Key) + len(value))
 }
 
-func GetStorageKeyValueSizeForTesting(storageKey StorageInteractionKey,
+func GetStorageKeyValueSizeForTesting(
+	storageKey StorageInteractionKey,
 	value flow.RegisterValue) uint64 {
 	return getStorageKeyValueSize(storageKey, value)
 }
