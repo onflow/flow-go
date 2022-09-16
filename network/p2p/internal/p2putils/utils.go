@@ -2,6 +2,7 @@ package p2putils
 
 import (
 	"github.com/libp2p/go-libp2p/core/network"
+
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
