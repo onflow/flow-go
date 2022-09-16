@@ -19,6 +19,7 @@ import (
 	pc "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -322,7 +323,7 @@ type nodeBuilderOption func(p2p.NodeBuilder)
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 	return func(nb p2p.NodeBuilder) {
 		nb.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2p.NewDHT(c, h,
+			return p2pdht.NewDHT(c, h,
 				pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix),
 				zerolog.Nop(),
 				metrics.NewNoopCollector(),

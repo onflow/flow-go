@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 
 	"github.com/onflow/flow-go/network/p2p/translator"
 
@@ -837,10 +838,10 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 				),
 			).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
+				return p2pdht.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
 					builder.Logger,
 					builder.Metrics.Network,
-					p2p.AsClient(),
+					p2pdht.AsClient(),
 					dht.BootstrapPeers(pis...),
 				)
 			}).

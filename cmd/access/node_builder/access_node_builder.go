@@ -13,6 +13,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -982,13 +983,13 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			).
 			SetConnectionManager(connManager).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2p.NewDHT(
+				return dht.NewDHT(
 					ctx,
 					h,
 					unicast.FlowPublicDHTProtocolID(builder.SporkID),
 					builder.Logger,
 					builder.PublicNetworkConfig.Metrics,
-					p2p.AsServer(),
+					dht.AsServer(),
 				)
 			}).
 			SetPubSub(pubsub.NewGossipSub).

@@ -1,4 +1,4 @@
-package p2p_test
+package dht_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -35,10 +35,10 @@ func TestFindPeerWithDHT(t *testing.T) {
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
 	sporkId := unittest.IdentifierFixture()
-	dhtServerNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", 2, p2pfixtures.WithDHTOptions(p2p.AsServer()))
+	dhtServerNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", 2, p2pfixtures.WithDHTOptions(dht.AsServer()))
 	require.Len(t, dhtServerNodes, 2)
 
-	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", count-2, p2pfixtures.WithDHTOptions(p2p.AsClient()))
+	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", count-2, p2pfixtures.WithDHTOptions(dht.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
 	defer p2pfixtures.StopNodes(t, nodes)
@@ -118,12 +118,12 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 	// create one node running the DHT Server (mimicking the staked AN)
-	dhtServerNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", 1, p2pfixtures.WithDHTOptions(p2p.AsServer()))
+	dhtServerNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", 1, p2pfixtures.WithDHTOptions(dht.AsServer()))
 	require.Len(t, dhtServerNodes, 1)
 	dhtServerNode := dhtServerNodes[0]
 
 	// crate other nodes running the DHT Client (mimicking the unstaked ANs)
-	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", count-1, p2pfixtures.WithDHTOptions(p2p.AsClient()))
+	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", count-1, p2pfixtures.WithDHTOptions(dht.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
 	defer p2pfixtures.StopNodes(t, nodes)

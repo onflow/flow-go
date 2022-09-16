@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,7 +81,7 @@ func NodeFixture(
 		SetConnectionManager(connManager).
 		SetPubSub(pubsub.NewGossipSub).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2p.NewDHT(c, h,
+			return p2pdht.NewDHT(c, h,
 				protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
 				parameters.Logger,
 				noopMetrics,

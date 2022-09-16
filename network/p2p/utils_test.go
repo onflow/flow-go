@@ -7,6 +7,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -31,7 +32,7 @@ func withSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
 func createNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, opts ...nodeOpt) *p2p.Node {
 	builder := p2p.NewNodeBuilder(logger, "0.0.0.0:0", networkKey, sporkID).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2p.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
+			return dht.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
 		SetPubSub(pubsub.NewGossipSub).
 		SetResourceManager(test.NewResourceManager(t))
