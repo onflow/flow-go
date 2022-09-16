@@ -97,7 +97,6 @@ func (cs *EngineSuite) TestSendVote() {
 
 // TestBroadcastProposalWithDelay tests broadcasting proposals with different inputs
 func (cs *EngineSuite) TestBroadcastProposalWithDelay() {
-
 	// add execution node to participants to make sure we exclude them from broadcast
 	cs.participants = append(cs.participants, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))
 
