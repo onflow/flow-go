@@ -84,7 +84,7 @@ type Middleware struct {
 	rootBlockID                flow.Identifier
 	validators                 []network.MessageValidator
 	peerManagerFactory         PeerManagerFactoryFunc
-	peerManager                *PeerManager
+	peerManager                PeerManager
 	unicastMessageTimeout      time.Duration
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
@@ -765,7 +765,7 @@ func (m *Middleware) peerManagerUpdate() {
 }
 
 // peerMgr returns the PeerManager and true if this middleware was started with one, (nil, false) otherwise
-func (m *Middleware) peerMgr() (*PeerManager, bool) {
+func (m *Middleware) peerMgr() (PeerManager, bool) {
 	if m.peerManager != nil {
 		return m.peerManager, true
 	}
