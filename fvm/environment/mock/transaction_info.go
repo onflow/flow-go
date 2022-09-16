@@ -52,6 +52,20 @@ func (_m *TransactionInfo) IsServiceAccountAuthorizer() bool {
 	return r0
 }
 
+// LimitAccountStorage provides a mock function with given fields:
+func (_m *TransactionInfo) LimitAccountStorage() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // SigningAccounts provides a mock function with given fields:
 func (_m *TransactionInfo) SigningAccounts() []common.Address {
 	ret := _m.Called()
@@ -63,6 +77,20 @@ func (_m *TransactionInfo) SigningAccounts() []common.Address {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]common.Address)
 		}
+	}
+
+	return r0
+}
+
+// TransactionFeesEnabled provides a mock function with given fields:
+func (_m *TransactionInfo) TransactionFeesEnabled() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
