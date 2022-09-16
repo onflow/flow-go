@@ -23,7 +23,8 @@ func IsNodeAuthorizedAt(snapshot Snapshot, id flow.Identifier) (bool, error) {
 // IsNodeAuthorizedWithRoleAt returns whether the node with the given ID is a valid
 // un-ejected network participant with the specified role as of the given state snapshot.
 // Expected errors during normal operations:
-//  * storage.ErrNotFound if snapshot references an unknown block
+//   - storage.ErrNotFound if snapshot references an unknown block
+//
 // All other errors are unexpected and potential symptoms of internal state corruption.
 func IsNodeAuthorizedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow.Role) (bool, error) {
 	return CheckNodeStatusAt(
@@ -38,7 +39,8 @@ func IsNodeAuthorizedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow
 // CheckNodeStatusAt returns whether the node with the given ID is a valid identity at the given
 // state snapshot, and satisfies all checks.
 // Expected errors during normal operations:
-//  * storage.ErrNotFound if snapshot references an unknown block
+//   - storage.ErrNotFound if snapshot references an unknown block
+//
 // All other errors are unexpected and potential symptoms of internal state corruption.
 func CheckNodeStatusAt(snapshot Snapshot, id flow.Identifier, checks ...flow.IdentityFilter) (bool, error) {
 	identity, err := snapshot.Identity(id)
@@ -88,10 +90,10 @@ func PreviousEpochExists(snap Snapshot) (bool, error) {
 
 // FindGuarantors decodes the signer indices from the guarantee, and finds the guarantor identifiers from protocol state
 // Expected Error returns during normal operations:
-//  * signature.InvalidSignerIndicesError if `signerIndices` does not encode a valid set of collection guarantors
-//  * storage.ErrNotFound if the guarantee's ReferenceBlockID is not found
-//  * protocol.ErrEpochNotCommitted if epoch has not been committed yet
-//  * protocol.ErrClusterNotFound if cluster is not found by the given chainID
+//   - signature.InvalidSignerIndicesError if `signerIndices` does not encode a valid set of collection guarantors
+//   - storage.ErrNotFound if the guarantee's ReferenceBlockID is not found
+//   - protocol.ErrEpochNotCommitted if epoch has not been committed yet
+//   - protocol.ErrClusterNotFound if cluster is not found by the given chainID
 func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Identifier, error) {
 	snapshot := state.AtBlockID(guarantee.ReferenceBlockID)
 	epochs := snapshot.Epochs()

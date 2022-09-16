@@ -111,8 +111,10 @@ func TestSnapshot_Params(t *testing.T) {
 }
 
 // TestSnapshot_Descendants builds a sample chain with next structure:
-// A (finalized) <- B <- C <- D <- E <- F
-//               <- G <- H <- I <- J
+//
+//	A (finalized) <- B <- C <- D <- E <- F
+//	              <- G <- H <- I <- J
+//
 // snapshot.Descendants has to return [B, C, D, E, F, G, H, I, J].
 func TestSnapshot_Descendants(t *testing.T) {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
@@ -136,8 +138,10 @@ func TestSnapshot_Descendants(t *testing.T) {
 }
 
 // TestSnapshot_ValidDescendants builds a sample chain with next structure:
-// A (finalized) <- B <- C <- D <- E <- F
-//               <- G <- H <- I <- J
+//
+//	A (finalized) <- B <- C <- D <- E <- F
+//	              <- G <- H <- I <- J
+//
 // snapshot.Descendants has to return [B, C, D, E, G, H, I]. [F, J] should be excluded because they aren't valid
 func TestSnapshot_ValidDescendants(t *testing.T) {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())

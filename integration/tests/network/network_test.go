@@ -2,21 +2,21 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestNetwork tests the 1-k messaging at the network layer using the default Flow network topology
@@ -61,7 +61,7 @@ func TestNetwork(t *testing.T) {
 	targets := ids[1:]
 
 	event := &message.TestMessage{
-		Text: fmt.Sprintf("hello"),
+		Text: "hello",
 	}
 
 	// kick off a read loop for each of the nodes (except the first)
@@ -77,7 +77,7 @@ func TestNetwork(t *testing.T) {
 
 	// seed a message, it should propagate to all nodes.
 	// (unlike regular nodes, a ghost node subscribes to all topics)
-	err = ghostClient.Send(ctx, network.PushGuarantees, event, targets...)
+	err = ghostClient.Send(ctx, channels.PushGuarantees, event, targets...)
 	require.NoError(t, err)
 
 	// wait for all read loops to finish

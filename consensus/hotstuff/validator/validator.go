@@ -31,8 +31,9 @@ func New(
 
 // ValidateTC validates the TimeoutCertificate `tc`.
 // During normal operations, the following error returns are expected:
-//  * model.InvalidTCError if the TC is invalid
-//  * model.ErrViewForUnknownEpoch if the TC refers unknown epoch
+//   - model.InvalidTCError if the TC is invalid
+//   - model.ErrViewForUnknownEpoch if the TC refers unknown epoch
+//
 // Any other error should be treated as exception
 func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	newestQC := tc.NewestQC
@@ -128,8 +129,9 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 
 // ValidateQC validates the Quorum Certificate `qc`.
 // During normal operations, the following error returns are expected:
-//  * model.InvalidQCError if the QC is invalid
-//  * model.ErrViewForUnknownEpoch if the QC refers unknown epoch
+//   - model.InvalidQCError if the QC is invalid
+//   - model.ErrViewForUnknownEpoch if the QC refers unknown epoch
+//
 // Any other error should be treated as exception
 func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 	// Retrieve the initial identities of consensus participants for this epoch,
@@ -195,8 +197,9 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 // A block is considered as valid if it's a valid extension of existing forks.
 // Note it doesn't check if it's conflicting with finalized block
 // During normal operations, the following error returns are expected:
-//  * model.InvalidBlockError if the block is invalid
-//  * model.ErrViewForUnknownEpoch if the proposal refers unknown epoch
+//   - model.InvalidBlockError if the block is invalid
+//   - model.ErrViewForUnknownEpoch if the proposal refers unknown epoch
+//
 // Any other error should be treated as exception
 func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	qc := proposal.Block.QC
@@ -287,8 +290,9 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 // ValidateVote validates the vote and returns the identity of the voter who signed
 // vote - the vote to be validated
 // During normal operations, the following error returns are expected:
-//  * model.InvalidVoteError for invalid votes
-//  * model.ErrViewForUnknownEpoch if the vote refers unknown epoch
+//   - model.InvalidVoteError for invalid votes
+//   - model.ErrViewForUnknownEpoch if the vote refers unknown epoch
+//
 // Any other error should be treated as exception
 func (v *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
 	voter, err := v.committee.IdentityByEpoch(vote.View, vote.SignerID)

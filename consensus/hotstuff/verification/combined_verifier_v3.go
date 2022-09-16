@@ -48,12 +48,13 @@ func NewCombinedVerifierV3(committee hotstuff.Replicas, packer hotstuff.Packer) 
 // VerifyVote verifies the validity of a combined signature from a vote.
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
-// * model.InvalidFormatError if the signature has an incompatible format.
-// * model.ErrInvalidSignature is the signature is invalid
-// * model.InvalidSignerError if signer is _not_ part of the random beacon committee
-// * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
-// * unexpected errors should be treated as symptoms of bugs or uncovered
-//   edge cases in the logic (i.e. as fatal)
+//   - model.InvalidFormatError if the signature has an incompatible format.
+//   - model.ErrInvalidSignature is the signature is invalid
+//   - model.InvalidSignerError if signer is _not_ part of the random beacon committee
+//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+//   - unexpected errors should be treated as symptoms of bugs or uncovered
+//     edge cases in the logic (i.e. as fatal)
+//
 // This implementation already support the cases, where the DKG committee is a
 // _strict subset_ of the full consensus committee.
 func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, view uint64, blockID flow.Identifier) error {
@@ -112,15 +113,16 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, v
 // VerifyQC checks the cryptographic validity of the QC's `sigData` for the
 // given block. It is the responsibility of the calling code to ensure
 // that all `signers` are authorized, without duplicates. Return values:
-//  * nil if `sigData` is cryptographically valid
-//  * model.InsufficientSignaturesError if `signers` is empty.
-//    Depending on the order of checks in the higher-level logic this error might
-//    be an indicator of a external byzantine input or an internal bug.
-//  * model.InvalidFormatError if `sigData` has an incompatible format
-//  * model.ErrInvalidSignature if a signature is invalid
-//  * model.InvalidSignerError if a signer is _not_ part of the random beacon committee
-//  * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
-//  * error if running into any unexpected exception (i.e. fatal error)
+//   - nil if `sigData` is cryptographically valid
+//   - model.InsufficientSignaturesError if `signers` is empty.
+//     Depending on the order of checks in the higher-level logic this error might
+//     be an indicator of a external byzantine input or an internal bug.
+//   - model.InvalidFormatError if `sigData` has an incompatible format
+//   - model.ErrInvalidSignature if a signature is invalid
+//   - model.InvalidSignerError if a signer is _not_ part of the random beacon committee
+//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+//   - error if running into any unexpected exception (i.e. fatal error)
+//
 // This implementation already support the cases, where the DKG committee is a
 // _strict subset_ of the full consensus committee.
 func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error {
@@ -242,12 +244,12 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 // VerifyTC checks cryptographic validity of the TC's `sigData` w.r.t. the
 // given view. It is the responsibility of the calling code to ensure
 // that all `signers` are authorized, without duplicates. Return values:
-//  * nil if `sigData` is cryptographically valid
-//  * model.InsufficientSignaturesError if `signers is empty.
-//  * model.InvalidFormatError if `signers`/`highQCViews` have differing lengths
-//  * model.ErrInvalidSignature if a signature is invalid
-//  * unexpected errors should be treated as symptoms of bugs or uncovered
-//	  edge cases in the logic (i.e. as fatal)
+//   - nil if `sigData` is cryptographically valid
+//   - model.InsufficientSignaturesError if `signers is empty.
+//   - model.InvalidFormatError if `signers`/`highQCViews` have differing lengths
+//   - model.ErrInvalidSignature if a signature is invalid
+//   - unexpected errors should be treated as symptoms of bugs or uncovered
+//     edge cases in the logic (i.e. as fatal)
 func (c *CombinedVerifierV3) VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
 	return verifyTC(signers, sigData, view, highQCViews, c.timeoutObjectHasher)
 }

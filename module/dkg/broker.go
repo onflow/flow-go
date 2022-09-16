@@ -461,10 +461,11 @@ func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMess
 // verifyBroadcastMessage checks the DKG instance of a broadcast
 // message, as well as the signature against the staking key of the sender.
 // Returns:
-// * true, nil if the message contents are valid and have a valid signature
-// * false, nil if the message contents are valid but have an invalid signature
-// * false, err if the message contents are invalid, or could not be checked,
-//   or the signature could not be checked
+//   - true, nil if the message contents are valid and have a valid signature
+//   - false, nil if the message contents are valid but have an invalid signature
+//   - false, err if the message contents are invalid, or could not be checked,
+//     or the signature could not be checked
+//
 // TODO differentiate errors
 func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (bool, error) {
 	err := b.hasValidDKGInstanceID(bcastMsg.DKGMessage)

@@ -109,12 +109,12 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 
 // dkg.go functions
 func NewFeldmanVSS(size int, threshold int, myIndex int,
-	processor DKGProcessor, leaderIndex int) (DKGState, error) {
+	processor DKGProcessor, dealerIndex int) (DKGState, error) {
 	panic(relic_panic)
 }
 
 func NewFeldmanVSSQual(size int, threshold int, myIndex int,
-	processor DKGProcessor, leaderIndex int) (DKGState, error) {
+	processor DKGProcessor, dealerIndex int) (DKGState, error) {
 	panic(relic_panic)
 }
 

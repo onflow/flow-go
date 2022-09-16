@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -104,7 +104,7 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	block.Header.ChainID = ""
 	block.Header.Height = 0
 
-	cs.hotstuff.On("SubmitProposal", block.Header, parent.View).Return().Once()
+	cs.hotstuff.On("SubmitProposal", block.Header, parent.View).Once()
 
 	// submit to broadcast proposal
 	err := cs.engine.BroadcastProposalWithDelay(block.Header, 0)
@@ -153,6 +153,7 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 // TestSubmittingMultipleVotes tests that we can send multiple votes and they
 // are queued and processed in expected way
 func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
+
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	voteCount := 15
@@ -173,7 +174,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 				SigData:  vote.SigData,
 			}).Return().Once()
 			// execute the vote submission
-			_ = cs.engine.Process(network.ConsensusCommittee, originID, &vote)
+			_ = cs.engine.Process(channels.ConsensusCommittee, originID, &vote)
 		}
 		wg.Done()
 	}()
@@ -186,8 +187,8 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
-		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
-		_ = cs.engine.Process(network.ConsensusCommittee, originID, proposal)
+		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View)
+		_ = cs.engine.Process(channels.ConsensusCommittee, originID, proposal)
 		wg.Done()
 	}()
 

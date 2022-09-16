@@ -37,7 +37,7 @@ type QCContractClient interface {
 	Voted(ctx context.Context) (bool, error)
 }
 
-// EpochLookup enables lookup up epochs by view.
+// EpochLookup enables looking up epochs by view.
 type EpochLookup interface {
 
 	// EpochForViewWithFallback returns the counter of the epoch that the input view belongs to.

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -158,7 +157,7 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	blockID := block.ID()
 
 	span, ctx, _ := e.tracer.StartBlockSpan(e.unit.Ctx(), blockID, trace.VERProcessFinalizedBlock)
-	defer span.Finish()
+	defer span.End()
 
 	e.processFinalizedBlock(ctx, block)
 }
@@ -225,9 +224,8 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 // chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
 func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionResult, incorporatingBlock flow.Identifier) (flow.ChunkList, error) {
-	var span opentracing.Span
-	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
-	defer span.Finish()
+	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
+	defer span.End()
 
 	assignment, err := e.assigner.Assign(result, incorporatingBlock)
 	if err != nil {

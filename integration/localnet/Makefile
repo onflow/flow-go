@@ -14,6 +14,7 @@ CONSENSUS_DELAY=800ms
 COLLECTION_DELAY=950ms
 
 PROFILER=false
+PROFILE_UPLOADER=false
 TRACING=true
 EXTENSIVE_TRACING=false
 CADENCE_TRACING=false
@@ -45,6 +46,7 @@ else
 		-epoch-staking-phase-length=$(STAKINGLEN) \
 		-epoch-dkg-phase-length=$(DKGLEN) \
 		-profiler=$(PROFILER) \
+		-profile-uploader=$(PROFILE_UPLOADER) \
 		-tracing=$(TRACING) \
 		-cadence-tracing=$(CADENCE_TRACING) \
 		-extensive-tracing=$(EXTENSIVE_TRACING) \
@@ -62,14 +64,8 @@ init-light:
 init-short-epochs:
 	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 init
 
-# Uninstall logging plugin
-.PHONY: uninstall-docker-plugin
-uninstall-docker-plugin:
-	$(shell docker plugin inspect loki >/dev/null 2>&1 && \
-		(docker plugin disable loki; docker plugin rm loki))
-
 .PHONY: start
-start: uninstall-docker-plugin
+start:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
@@ -80,4 +76,15 @@ stop:
 
 .PHONY: load
 load:
-	go run --tags relic ../loader -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
+	go run --tags relic ../benchmark/cmd/manual -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
+
+.PHONY: tps-test
+tps-test:
+	go run --tags relic ../benchmark/cmd/ci -log-level info -tps 25 -tps-durations 10m
+
+.PHONY: tps-test-ci
+tps-test-ci:
+	make init
+	make start
+	go run --tags relic ../benchmark/cmd/ci -ci-run -tps 1
+	make stop

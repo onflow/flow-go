@@ -37,7 +37,9 @@ func (s *SealValidationSuite) SetupTest() {
 
 // TestSealValid tests that a candidate block with a valid seal passes validation.
 // We test with the following fork:
-//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+//
+//	... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+//
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestSealValid() {
@@ -50,14 +52,16 @@ func (s *SealValidationSuite) TestSealValid() {
 // incorporated in the direct parent. In other words, there must be at least a 1-block gap
 // between the block incorporating the result and the block sealing the result. Enforcing
 // such gap is important for the following reason:
-//  * We need the Source of Randomness for the block that _incorporates_ the sealed result,
-//    to compute the verifier assignment. Therefore, we require that the block _incorporating_
-//    the result has at least one child in the fork, _before_ we include the seal.
-//  * Thereby, we guarantee that a verifier assignment can be computed without needing
-//    unverified information (the unverified qc) from the block that we are just constructing.
+//   - We need the Source of Randomness for the block that _incorporates_ the sealed result,
+//     to compute the verifier assignment. Therefore, we require that the block _incorporating_
+//     the result has at least one child in the fork, _before_ we include the seal.
+//   - Thereby, we guarantee that a verifier assignment can be computed without needing
+//     unverified information (the unverified qc) from the block that we are just constructing.
+//
 // We test with the following fork:
-//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2
-//                                                                 └-- ░newBlock{ Seal[B0] }░
+//
+//	... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2
+//	                                                              └-- ░newBlock{ Seal[B0] }░
 func (s *SealValidationSuite) TestSeal_EnforceGap() {
 	b1, _, _, _, sealB0 := s.generateBasicTestFork()
 
@@ -74,7 +78,9 @@ func (s *SealValidationSuite) TestSeal_EnforceGap() {
 
 // TestSealInvalidBlockID tests that we reject seal with invalid blockID for
 // submitted seal. We test with the following fork:
-//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+//
+//	... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+//
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestSealInvalidBlockID() {
@@ -88,7 +94,9 @@ func (s *SealValidationSuite) TestSealInvalidBlockID() {
 
 // TestSealInvalidAggregatedSigCount tests that we reject seal with invalid number of
 // approval signatures for submitted seal. We test with the following fork:
-//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+//
+//	... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+//
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
@@ -109,7 +117,9 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 // is 0, a seal which has 0 signatures for at least one chunk will be accepted,
 // and that the emergency-seal metric will be incremented.
 // We test with the following fork:
-//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+//
+//	... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+//
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire0ApprovalEmergencyNotTriggered() {
@@ -262,7 +272,9 @@ func (s *SealValidationSuite) TestSealDuplicatedApproval() {
 
 // TestSealInvalidChunkAssignment tests that we reject seal with invalid signerID of approval signature for
 // submitted seal. We test with the following fork:
-//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+//
+//	... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+//
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
@@ -277,13 +289,18 @@ func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
 // TestHighestSeal tests that Validate will pick the seal corresponding to the
 // highest block when the payload contains multiple seals that are not ordered.
 // We test with the following known fork:
-//    ... <- B1 <- B2 <- B3{Receipt(B2), Result(B2)} <- B4{Receipt(B3), Result(B3)} <- B5
+//
+//	... <- B1 <- B2 <- B3{Receipt(B2), Result(B2)} <- B4{Receipt(B3), Result(B3)} <- B5
+//
 // with
-//  * B1 is the latest sealed block: we use s.LatestSealedBlock,
-//    which has the result s.LatestExecutionResult
-//  * B2 is the latest finalized block: we use s.LatestFinalizedBlock
+//   - B1 is the latest sealed block: we use s.LatestSealedBlock,
+//     which has the result s.LatestExecutionResult
+//   - B2 is the latest finalized block: we use s.LatestFinalizedBlock
+//
 // Now we consider the new candidate block B6:
-//    ... <- B5 <-B6{ SealResult(B3), SealResult(B2) }
+//
+//	... <- B5 <-B6{ SealResult(B3), SealResult(B2) }
+//
 // Note that the order of the seals is specifically reversed. We expect that
 // the validator handles this without error.
 func (s *SealValidationSuite) TestHighestSeal() {
@@ -339,18 +356,24 @@ func (s *SealValidationSuite) TestHighestSeal() {
 // TestValidatePayload_SealsSkipBlock verifies that proposed seals
 // are rejected if the chain of proposed seals skips a block.
 // We test with the following known fork:
-//    S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- B4
+//
+//	S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- B4
+//
 // where S is the latest sealed block.
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details)
 //
 // Now we consider the new candidate block X:
-//    S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- B4 <-X
+//
+//	S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- B4 <-X
+//
 // It would be valid for X to seal the chain of execution results R(B0), R(B1), R(B2)
 // We test the two distinct failure cases:
-//  (i) X has no seal for the immediately next unsealed block B0
+// (i) X has no seal for the immediately next unsealed block B0
 // (ii) X has a seal for the immediately next unsealed block B0 but skips
-//      the seal for one of the following blocks (here B1)
+//
+//	the seal for one of the following blocks (here B1)
+//
 // In addition, we also run a valid test case to confirm the proper construction of the test
 func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 
@@ -413,23 +436,25 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 // TestExtendSeal_ExecutionDisconnected verifies that the Seal Validator only
 // accepts a seals, if their execution results connect.
 // Specifically, we test that the counter-example is rejected:
-//  * we have the chain in storage:
-//     S <- A{Result[S]_1, Result[S]_2, ReceiptMeta[S]_1, ReceiptMeta[S]_2}
-//           <- B{Result[A]_1, Result[A]_2, ReceiptMeta[A]_1, ReceiptMeta[A]_2}
-//             <- C{Result[B]_1, Result[B]_2, ReceiptMeta[B]_1, ReceiptMeta[B]_2}
-//                 <- D{Seal for Result[S]_1}
-//  * Note that we are explicitly testing the handling of an execution fork that
-//    was incorporated _before_ the seal
-//       Blocks:      S  <-----------   A    <-----------   B
-//      Results:   Result[S]_1  <-  Result[A]_1  <-  Result[B]_1 :: the root of this execution tree is sealed
-//                 Result[S]_2  <-  Result[A]_2  <-  Result[B]_2 :: the root of this execution tree conflicts with sealed result
-//  * Now we consider the new candidate block X:
+//   - we have the chain in storage:
+//     .     S <- A{Result[S]_1, Result[S]_2, ReceiptMeta[S]_1, ReceiptMeta[S]_2}
+//     .           <- B{Result[A]_1, Result[A]_2, ReceiptMeta[A]_1, ReceiptMeta[A]_2}
+//     .             <- C{Result[B]_1, Result[B]_2, ReceiptMeta[B]_1, ReceiptMeta[B]_2}
+//     .                 <- D{Seal for Result[S]_1}
+//   - Note that we are explicitly testing the handling of an execution fork that
+//     was incorporated _before_ the seal
+//     .       Blocks:      S  <-----------   A    <-----------   B
+//     .      Results:   Result[S]_1  <-  Result[A]_1  <-  Result[B]_1 :: the root of this execution tree is sealed
+//     .                 Result[S]_2  <-  Result[A]_2  <-  Result[B]_2 :: the root of this execution tree conflicts with sealed result
+//   - Now we consider the new candidate block X:
 //     S <- A{..} <- B{..} <- C{..} <- D{..} <- X
+//
 // We test the two distinct failure cases:
-//   (i) illegal to seal Result[A]_2, because it is _not_ derived from the sealed result
-//       (we verify checking of the payload seals with respect to the existing seals)
-//  (ii) illegal to seal Result[A]_1 followed by Result[B]_2, as Result[B]_2 not _not_ derived
-//       from the sealed result (we verify checking of the payload seals with respect to each other)
+//   - (i) illegal to seal Result[A]_2, because it is _not_ derived from the sealed result
+//     (we verify checking of the payload seals with respect to the existing seals)
+//   - (ii) illegal to seal Result[A]_1 followed by Result[B]_2, as Result[B]_2 not _not_ derived
+//     from the sealed result (we verify checking of the payload seals with respect to each other)
+//
 // In addition, we also run a valid test case to confirm the proper construction of the test
 func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 
@@ -502,7 +527,9 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 
 // TestSealValid tests that a candidate block with a valid seal passes validation.
 // We test with the following fork:
-//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ...
+//
+//	... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ...
+//
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestExtendSealDuplicate() {
@@ -543,7 +570,9 @@ func (s *SealValidationSuite) TestExtendSealDuplicate() {
 
 // TestExtendSeal_NoIncorporatedResult tests that seals are rejected if _no_ for the sealed block
 // was incorporated in blocks. We test with the following fork:
-//   ... <- LatestSealedBlock <- B0 <- B1 <- B2 <- ░newBlock{ Seal[B0]}░
+//
+//	... <- LatestSealedBlock <- B0 <- B1 <- B2 <- ░newBlock{ Seal[B0]}░
+//
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestExtendSeal_NoIncorporatedResult() {
@@ -579,7 +608,9 @@ func (s *SealValidationSuite) TestExtendSeal_NoIncorporatedResult() {
 
 // TestExtendSeal_DifferentIncorporatedResult tests that seals are rejected if a result is sealed that is
 // different than the one incorporated in this fork. We test with the following fork:
-//   ... <- LatestSealedBlock <- B0 <- B1{ ER0a } <- B2 <- ░newBlock{ Seal[ER0b] }░
+//
+//	... <- LatestSealedBlock <- B0 <- B1{ ER0a } <- B2 <- ░newBlock{ Seal[ER0b] }░
+//
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestExtendSeal_DifferentIncorporatedResult() {
@@ -605,8 +636,10 @@ func (s *SealValidationSuite) TestExtendSeal_DifferentIncorporatedResult() {
 // TestExtendSeal_ResultIncorporatedOnDifferentFork tests that seals are rejected if they correspond
 // to ExecutionResults that are incorporated in a different fork
 // We test with the following fork:
-//   ... <- LatestSealedBlock <- B0 <- B1 <- B2 <- ░newBlock{ Seal[ER0]}░
-//                                 └-- A1{ ER0 }
+//
+//	... <- LatestSealedBlock <- B0 <- B1 <- B2 <- ░newBlock{ Seal[ER0]}░
+//	                              └-- A1{ ER0 }
+//
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestExtendSeal_ResultIncorporatedOnDifferentFork() {
@@ -698,12 +731,14 @@ func (s *SealValidationSuite) makeBlockSealingResult(parentBlock *flow.Header, s
 }
 
 // generateBasicTestFork initializes the following fork (basis for many tests):
-//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0] }░
+//
+//	... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0] }░
+//
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details).
 // Notes:
-//  * the result for `LatestSealedBlock` is `LatestExecutionResult` (already initialized in test setup)
-//  * as block B0, we use `LatestFinalizedBlock` (already initialized in test setup)
+//   - the result for `LatestSealedBlock` is `LatestExecutionResult` (already initialized in test setup)
+//   - as block B0, we use `LatestFinalizedBlock` (already initialized in test setup)
 //
 // Returns: (B1, B2, newBlock, Receipt[B0], Seal[B0])
 func (s *SealValidationSuite) generateBasicTestFork() (*flow.Block, *flow.Block, *flow.Block, *flow.ExecutionReceipt, *flow.Seal) {
