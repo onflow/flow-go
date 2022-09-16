@@ -266,6 +266,7 @@ func sendDataToBigQuery(
 	if err != nil {
 		return fmt.Errorf("unable to create bigquery client: %w", err)
 	}
+	defer bqClient.Close()
 
 	dataset := bqClient.Dataset(datasetName)
 	table := dataset.Table(tableName)
