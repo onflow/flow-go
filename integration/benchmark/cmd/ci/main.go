@@ -72,7 +72,6 @@ func main() {
 	tpsDurationsFlag := flag.String("tps-durations", "10m", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	ciFlag := flag.Bool("ci-run", false, "whether or not the run is part of CI")
 	sliceSize := flag.String("sliceSize", "2m", "the amount of time that each slice covers")
-	timeout := flag.String("test-timeout", "10m", "the amount of time in addition to the duration that the test will wait before timing out")
 	flag.Parse()
 
 	// Version and Commit Info
@@ -172,11 +171,12 @@ func main() {
 	// run load
 	lg.Start()
 
-	// prepare data slices
-	dataSlices := make([]dataSlice, 0)
-	defer prepareDataForBigQuery(dataSlices, *ciFlag)
+	testRunDuration := time.NewTicker(loadCase.duration)
+	defer testRunDuration.Stop()
 
-	defer lg.Stop()
+	// prepare data slices
+	dataSlices := make(chan dataSlice)
+	defer prepareDataForBigQuery(dataSlices, *ciFlag)
 
 	sliceDuration, _ := time.ParseDuration(*sliceSize)
 
@@ -189,12 +189,19 @@ func main() {
 		goVersion,
 		osVersion)
 
-	//replace with channel stuff?
-	time.Sleep(loadCase.duration)
+	select {
+	case <-testRunDuration.C:
+		lg.Stop()
+	case <-ctx.Done(): //TODO: the loader currently doesn't ever cancel the context
+		lg.Stop()
+		// add logging here to express the *why* of lg choose to cancel the context.
+		// when the loader cancels its own context it may also call Stop() on itself
+		// this may become redundant.
+	}
 }
 
 func recordTransactionData(
-	slices []dataSlice,
+	slices chan dataSlice,
 	lg *benchmark.ContLoadGenerator,
 	sliceDuration time.Duration,
 	runStartTime time.Time,
@@ -208,7 +215,6 @@ func recordTransactionData(
 	t := time.NewTicker(sliceDuration)
 	defer t.Stop()
 
-	stopped := lg.GetStoppedChannel()
 	for {
 		select {
 		case <-t.C:
@@ -233,14 +239,21 @@ func recordTransactionData(
 			startExecutedTransactions = endExecutedTransaction
 			startTime = endTime
 
-			slices = append(slices, slice)
-		case <-stopped:
+			slices <- slice
+		case <-lg.Done():
+			close(slices)
 			return
 		}
 	}
 }
 
-func prepareDataForBigQuery(slices []dataSlice, ci bool) {
+func prepareDataForBigQuery(slicesChannel chan dataSlice, ci bool) {
+	slices := make([]dataSlice, 0)
+
+	for len(slicesChannel) != 0 {
+		slices = append(slices, <-slicesChannel)
+	}
+
 	jsonText, err := json.Marshal(slices)
 	if err != nil {
 		println("Error converting slice data to json")
