@@ -137,38 +137,40 @@ func (cs *EngineSuite) TestBroadcastProposalWithDelay() {
 		header.View--
 	})
 
-	// unset chain and height to make sure they are correctly reconstructed
-	headerFromHotstuff := *block.Header // copy header
-	headerFromHotstuff.ChainID = ""
-	headerFromHotstuff.Height = 0
+	cs.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
+		// unset chain and height to make sure they are correctly reconstructed
+		headerFromHotstuff := *block.Header // copy header
+		headerFromHotstuff.ChainID = ""
+		headerFromHotstuff.Height = 0
 
-	// keep a duplicate of the correct header to check against leader
-	header := block.Header
-	// make sure chain ID and height were reconstructed and we broadcast to correct nodes
-	header.ChainID = "test"
-	header.Height = 11
-	expectedBroadcastMsg := &messages.BlockProposal{
-		Header:  header,
-		Payload: block.Payload,
-	}
+		// keep a duplicate of the correct header to check against leader
+		header := block.Header
+		// make sure chain ID and height were reconstructed and we broadcast to correct nodes
+		header.ChainID = "test"
+		header.Height = 11
+		expectedBroadcastMsg := &messages.BlockProposal{
+			Header:  header,
+			Payload: block.Payload,
+		}
 
-	submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-	cs.hotstuff.On("SubmitProposal", &headerFromHotstuff, parent.View).
-		Run(func(args mock.Arguments) { close(submitted) }).
-		Once()
+		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
+		cs.hotstuff.On("SubmitProposal", &headerFromHotstuff, parent.View).
+			Run(func(args mock.Arguments) { close(submitted) }).
+			Once()
 
-	broadcasted := make(chan struct{}) // closed when proposal is broadcast
-	*cs.con = *mocknetwork.NewConduit(cs.T())
-	cs.con.On("Publish", expectedBroadcastMsg, cs.participants[1].NodeID, cs.participants[2].NodeID).
-		Run(func(_ mock.Arguments) { close(broadcasted) }).
-		Return(nil).
-		Once()
+		broadcasted := make(chan struct{}) // closed when proposal is broadcast
+		*cs.con = *mocknetwork.NewConduit(cs.T())
+		cs.con.On("Publish", expectedBroadcastMsg, cs.participants[1].NodeID, cs.participants[2].NodeID).
+			Run(func(_ mock.Arguments) { close(broadcasted) }).
+			Return(nil).
+			Once()
 
-	// submit to broadcast proposal
-	err := cs.engine.BroadcastProposalWithDelay(&headerFromHotstuff, 0)
-	require.NoError(cs.T(), err, "header broadcast should pass")
+		// submit to broadcast proposal
+		err := cs.engine.BroadcastProposalWithDelay(&headerFromHotstuff, 0)
+		require.NoError(cs.T(), err, "header broadcast should pass")
 
-	unittest.AssertClosesBefore(cs.T(), util.AllClosed(broadcasted, submitted), time.Second)
+		unittest.AssertClosesBefore(cs.T(), util.AllClosed(broadcasted, submitted), time.Second)
+	})
 }
 
 // TestSubmittingMultipleVotes tests that we can send multiple votes and they
