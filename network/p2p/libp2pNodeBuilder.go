@@ -19,8 +19,9 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
-	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/p2p/dht"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"

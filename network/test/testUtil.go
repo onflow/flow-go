@@ -19,9 +19,10 @@ import (
 	pc "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
-	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+
+	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/translator"

@@ -13,11 +13,12 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
-	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+
+	"github.com/onflow/flow-go/network/p2p/dht"
 
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/translator"

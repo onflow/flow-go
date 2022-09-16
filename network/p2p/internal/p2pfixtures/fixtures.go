@@ -16,10 +16,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
-	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"

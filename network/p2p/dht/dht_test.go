@@ -9,9 +9,10 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/network/p2p/dht"
 
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 
