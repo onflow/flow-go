@@ -19,6 +19,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/rs/zerolog"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
@@ -62,13 +63,13 @@ func DefaultLibP2PNodeFactory(
 			SetConnectionManager(connManager).
 			SetConnectionGater(connGater).
 			SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-				return NewDHT(
+				return dht.NewDHT(
 					ctx,
 					host,
 					unicast.FlowDHTProtocolID(sporkId),
 					log,
 					metrics,
-					AsServer(),
+					dht.AsServer(),
 				)
 			}).
 			SetPubSub(pubsub.NewGossipSub)
