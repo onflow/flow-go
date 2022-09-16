@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
 var directionLookUp = map[network.Direction]string{
@@ -215,16 +214,6 @@ func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logge
 		Str("local_peer", stream.Conn().LocalPeer().String()).
 		Str("local_address", stream.Conn().LocalMultiaddr().String()).Logger()
 	return logger
-}
-
-// flowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil
-func flowStream(conn network.Conn) network.Stream {
-	for _, s := range conn.GetStreams() {
-		if unicast.IsFlowProtocolStream(s) {
-			return s
-		}
-	}
-	return nil
 }
 
 // allowAllPeerFilter returns a peer filter that does not do any filtering.

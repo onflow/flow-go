@@ -648,7 +648,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 			)
 		}
 
-		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, p2p.NewPublicNetworkIDTranslator())
+		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
 		return nil
 	})

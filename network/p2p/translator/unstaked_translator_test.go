@@ -1,4 +1,4 @@
-package p2p_test
+package translator_test
 
 import (
 	"crypto/rand"
@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/stretchr/testify/require"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
@@ -48,7 +48,7 @@ func TestIDTranslationSecp256k1(t *testing.T) {
 
 func TestUnstakedTranslationRoundTrip(t *testing.T) {
 	max_iterations := 50
-	unstakedTranslator := p2p.NewPublicNetworkIDTranslator()
+	unstakedTranslator := translator.NewPublicNetworkIDTranslator()
 
 	tested_vectors := 0
 

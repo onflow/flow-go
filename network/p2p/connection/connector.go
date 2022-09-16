@@ -1,4 +1,4 @@
-package p2p
+package connection
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -29,7 +31,7 @@ type Libp2pConnector struct {
 	pruneConnections bool
 }
 
-var _ Connector = &Libp2pConnector{}
+var _ p2p.Connector = &Libp2pConnector{}
 
 // UnconvertibleIdentitiesError is an error which reports all the flow.Identifiers that could not be converted to
 // peer.AddrInfo
@@ -138,7 +140,7 @@ func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 
 		// retain the connection if there is a Flow One-to-One stream on that connection
 		// (we do not want to sever a connection with on going direct one-to-one traffic)
-		flowStream := flowStream(conn)
+		flowStream := p2putils.FlowStream(conn)
 		if flowStream != nil {
 			log.Info().
 				Str("stream_protocol", string(flowStream.Protocol())).

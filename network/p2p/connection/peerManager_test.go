@@ -1,4 +1,4 @@
-package p2p_test
+package connection_test
 
 import (
 	"math/rand"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -64,7 +64,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		Return(nil)
 
 	// create the peer manager (but don't start it)
-	pm := p2p.NewPeerManager(suite.log, p2p.DefaultPeerUpdateInterval, func() peer.IDSlice {
+	pm := connection.NewPeerManager(suite.log, connection.DefaultPeerUpdateInterval, func() peer.IDSlice {
 		return pids
 	}, connector)
 
@@ -137,7 +137,7 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	}).Return(nil)
 
 	peerUpdateInterval := 10 * time.Millisecond
-	pm := p2p.NewPeerManager(suite.log, peerUpdateInterval, func() peer.IDSlice {
+	pm := connection.NewPeerManager(suite.log, peerUpdateInterval, func() peer.IDSlice {
 		return pids
 	}, connector)
 
@@ -173,7 +173,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 		}
 	}).Return(nil)
 
-	pm := p2p.NewPeerManager(suite.log, peerUpdateInterval, func() peer.IDSlice {
+	pm := connection.NewPeerManager(suite.log, peerUpdateInterval, func() peer.IDSlice {
 		return pids
 	}, connector)
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
@@ -205,7 +205,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	connector.On("UpdatePeers", mock.Anything, mock.Anything).Return(nil).
 		WaitUntil(connectPeerGate) // blocks call for connectPeerGate channel
-	pm := p2p.NewPeerManager(suite.log, peerUpdateInterval, func() peer.IDSlice {
+	pm := connection.NewPeerManager(suite.log, peerUpdateInterval, func() peer.IDSlice {
 		return pids
 	}, connector)
 

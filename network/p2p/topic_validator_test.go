@@ -9,6 +9,7 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/stretchr/testify/require"
 
@@ -33,9 +34,9 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
 	defer nodeFixtureCtxCancel()
 
-	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleConsensus), withLogger(logger))
-	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleConsensus), withLogger(logger))
-	defer stopNodes(t, []*p2p.Node{sn1, sn2})
+	sn1, identity1 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
+	sn2, identity2 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
+	defer p2pfixtures.StopNodes(t, []*p2p.Node{sn1, sn2})
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -108,9 +109,9 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
 	defer nodeFixtureCtxCancel()
 
-	sn1, _ := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleConsensus), withLogger(logger))
-	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleConsensus), withLogger(logger))
-	defer stopNodes(t, []*p2p.Node{sn1, sn2})
+	sn1, _ := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
+	sn2, identity2 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
+	defer p2pfixtures.StopNodes(t, []*p2p.Node{sn1, sn2})
 
 	// unauthenticated messages should not be dropped on public channels
 	channel := channels.PublicSyncCommittee
@@ -166,10 +167,10 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
 	defer nodeFixtureCtxCancel()
 
-	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleConsensus))
-	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleConsensus))
-	an1, identity3 := nodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), withRole(flow.RoleAccess))
-	defer stopNodes(t, []*p2p.Node{sn1, sn2, an1})
+	sn1, identity1 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
+	sn2, identity2 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
+	an1, identity3 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleAccess))
+	defer p2pfixtures.StopNodes(t, []*p2p.Node{sn1, sn2, an1})
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -275,9 +276,9 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
 	defer nodeFixtureCtxCancel()
 
-	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_1", withRole(flow.RoleConsensus))
-	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_2", withRole(flow.RoleConsensus))
-	defer stopNodes(t, []*p2p.Node{sn1, sn2})
+	sn1, identity1 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "consensus_1", p2pfixtures.WithRole(flow.RoleConsensus))
+	sn2, identity2 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "consensus_2", p2pfixtures.WithRole(flow.RoleConsensus))
+	defer p2pfixtures.StopNodes(t, []*p2p.Node{sn1, sn2})
 
 	// try to publish BlockProposal on invalid SyncCommittee channel
 	channel := channels.SyncCommittee
@@ -349,10 +350,10 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
 	defer nodeFixtureCtxCancel()
 
-	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_1", withRole(flow.RoleConsensus))
-	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_2", withRole(flow.RoleConsensus))
-	an1, identity3 := nodeFixture(t, nodeFixtureCtx, sporkId, "access_1", withRole(flow.RoleAccess))
-	defer stopNodes(t, []*p2p.Node{sn1, sn2, an1})
+	sn1, identity1 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "consensus_1", p2pfixtures.WithRole(flow.RoleConsensus))
+	sn2, identity2 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "consensus_2", p2pfixtures.WithRole(flow.RoleConsensus))
+	an1, identity3 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "access_1", p2pfixtures.WithRole(flow.RoleAccess))
+	defer p2pfixtures.StopNodes(t, []*p2p.Node{sn1, sn2, an1})
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -444,10 +445,10 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
 	defer nodeFixtureCtxCancel()
 
-	ln1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "collection_1", withRole(flow.RoleCollection))
-	ln2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "collection_2", withRole(flow.RoleCollection))
-	ln3, identity3 := nodeFixture(t, nodeFixtureCtx, sporkId, "collection_3", withRole(flow.RoleCollection))
-	defer stopNodes(t, []*p2p.Node{ln1, ln2, ln3})
+	ln1, identity1 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "collection_1", p2pfixtures.WithRole(flow.RoleCollection))
+	ln2, identity2 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "collection_2", p2pfixtures.WithRole(flow.RoleCollection))
+	ln3, identity3 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "collection_3", p2pfixtures.WithRole(flow.RoleCollection))
+	defer p2pfixtures.StopNodes(t, []*p2p.Node{ln1, ln2, ln3})
 
 	channel := channels.SyncCluster(flow.Testnet)
 	topic := channels.TopicFromChannel(channel, sporkId)

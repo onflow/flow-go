@@ -1,27 +1,17 @@
-package p2p
+package connection
 
 import (
-	"context"
 	"fmt"
 	mrand "math/rand"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 )
-
-// Connector connects to peer and disconnects from peer using the underlying networking library
-type Connector interface {
-
-	// UpdatePeers connects to the given peer.IDs. It also disconnects from any other peers with which it may have
-	// previously established connection.
-	// UpdatePeers implementation should be idempotent such that multiple calls to connect to the same peer should not
-	// create multiple connections
-	UpdatePeers(ctx context.Context, peerIDs peer.IDSlice)
-}
 
 // DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections
 var DefaultPeerUpdateInterval = 10 * time.Minute
@@ -32,7 +22,7 @@ type PeerManager struct {
 	logger             zerolog.Logger
 	peersProvider      PeersProvider // callback to retrieve list of peers to connect to
 	peerRequestQ       chan struct{} // a channel to queue a peer update request
-	connector          Connector     // connector to connect or disconnect from peers
+	connector          p2p.Connector // connector to connect or disconnect from peers
 	peerUpdateInterval time.Duration // interval the peer manager runs on
 }
 
@@ -49,7 +39,7 @@ type PeersProvider func() peer.IDSlice
 
 // NewPeerManager creates a new peer manager which calls the peersProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
-func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, peersProvider PeersProvider, connector Connector) *PeerManager {
+func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, peersProvider PeersProvider, connector p2p.Connector) *PeerManager {
 	pm := &PeerManager{
 		unit:               engine.NewUnit(),
 		logger:             logger,

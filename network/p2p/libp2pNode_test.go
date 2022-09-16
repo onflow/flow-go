@@ -55,14 +55,14 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	node, _ := nodeFixture(
+	node, _ := p2pfixtures.NodeFixture(
 		t,
 		ctx,
 		unittest.IdentifierFixture(),
 		"test_single_node_life_cycle",
 	)
 
-	stopNode(t, node)
+	p2pfixtures.StopNode(t, node)
 }
 
 // TestGetPeerInfo evaluates the deterministic translation between the nodes address and
@@ -95,8 +95,8 @@ func TestAddPeers(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_add_peers", count)
-	defer stopNodes(t, nodes)
+	nodes, identities := p2pfixtures.NodesFixture(t, ctx, unittest.IdentifierFixture(), "test_add_peers", count)
+	defer p2pfixtures.StopNodes(t, nodes)
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, identity := range identities[1:] {
@@ -116,10 +116,10 @@ func TestRemovePeers(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_remove_peers", count)
+	nodes, identities := p2pfixtures.NodesFixture(t, ctx, unittest.IdentifierFixture(), "test_remove_peers", count)
 	peerInfos, errs := p2p.PeerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
-	defer stopNodes(t, nodes)
+	defer p2pfixtures.StopNodes(t, nodes)
 
 	// add nodes two and three to the first node as its peers
 	for _, pInfo := range peerInfos[1:] {
@@ -143,24 +143,24 @@ func TestConnGater(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 
 	node1Peers := make(map[peer.ID]struct{})
-	node1, identity1 := nodeFixture(t, ctx, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) error {
+	node1, identity1 := p2pfixtures.NodeFixture(t, ctx, sporkID, "test_conn_gater", p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
 		if _, ok := node1Peers[pid]; !ok {
 			return fmt.Errorf("peer id not found: %s", pid.Pretty())
 		}
 		return nil
 	}))
-	defer stopNode(t, node1)
+	defer p2pfixtures.StopNode(t, node1)
 	node1Info, err := p2p.PeerAddressInfo(identity1)
 	assert.NoError(t, err)
 
 	node2Peers := make(map[peer.ID]struct{})
-	node2, identity2 := nodeFixture(t, ctx, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) error {
+	node2, identity2 := p2pfixtures.NodeFixture(t, ctx, sporkID, "test_conn_gater", p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
 		if _, ok := node2Peers[pid]; !ok {
 			return fmt.Errorf("id not found: %s", pid.Pretty())
 		}
 		return nil
 	}))
-	defer stopNode(t, node2)
+	defer p2pfixtures.StopNode(t, node2)
 	node2Info, err := p2p.PeerAddressInfo(identity2)
 	assert.NoError(t, err)
 

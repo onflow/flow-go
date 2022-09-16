@@ -1,4 +1,4 @@
-package p2p_test
+package connection_test
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,8 +30,8 @@ func TestPeerManager_Integration(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_peer_manager", count)
-	defer stopNodes(t, nodes)
+	nodes, identities := p2pfixtures.NodesFixture(t, ctx, unittest.IdentifierFixture(), "test_peer_manager", count)
+	defer p2pfixtures.StopNodes(t, nodes)
 
 	thisNode := nodes[0]
 	topologyPeers := identities[1:]
@@ -42,13 +44,13 @@ func TestPeerManager_Integration(t *testing.T) {
 	}
 
 	// setup
-	connector, err := p2p.NewLibp2pConnector(unittest.Logger(), thisNode.Host(), p2p.ConnectionPruningEnabled)
+	connector, err := connection.NewLibp2pConnector(unittest.Logger(), thisNode.Host(), connection.ConnectionPruningEnabled)
 	require.NoError(t, err)
 
 	idTranslator, err := translator.NewFixedTableIdentityTranslator(identities)
 	require.NoError(t, err)
 
-	peerManager := p2p.NewPeerManager(unittest.Logger(), p2p.DefaultPeerUpdateInterval, func() peer.IDSlice {
+	peerManager := connection.NewPeerManager(unittest.Logger(), connection.DefaultPeerUpdateInterval, func() peer.IDSlice {
 		// peerManager is furnished with a full topology that connects to all nodes
 		// in the topologyPeers.
 		peers := peer.IDSlice{}

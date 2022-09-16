@@ -9,6 +9,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,6 +21,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// Workaround for https://github.com/stretchr/testify/pull/808
+const ticksForAssertEventually = 10 * time.Millisecond
+
 // TestFindPeerWithDHT checks that if a node is configured to participate in the DHT, it is
 // able to create new streams with peers even without knowing their address info beforehand.
 func TestFindPeerWithDHT(t *testing.T) {
@@ -30,13 +34,13 @@ func TestFindPeerWithDHT(t *testing.T) {
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
 	sporkId := unittest.IdentifierFixture()
-	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 2, withDHTOptions(p2p.AsServer()))
+	dhtServerNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", 2, p2pfixtures.WithDHTOptions(p2p.AsServer()))
 	require.Len(t, dhtServerNodes, 2)
 
-	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-2, withDHTOptions(p2p.AsClient()))
+	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", count-2, p2pfixtures.WithDHTOptions(p2p.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	defer stopNodes(t, nodes)
+	defer p2pfixtures.StopNodes(t, nodes)
 
 	getDhtServerAddr := func(i uint) peer.AddrInfo {
 		return peer.AddrInfo{ID: dhtServerNodes[i].Host().ID(), Addrs: dhtServerNodes[i].Host().Addrs()}
@@ -113,15 +117,15 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 	// create one node running the DHT Server (mimicking the staked AN)
-	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 1, withDHTOptions(p2p.AsServer()))
+	dhtServerNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", 1, p2pfixtures.WithDHTOptions(p2p.AsServer()))
 	require.Len(t, dhtServerNodes, 1)
 	dhtServerNode := dhtServerNodes[0]
 
 	// crate other nodes running the DHT Client (mimicking the unstaked ANs)
-	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-1, withDHTOptions(p2p.AsClient()))
+	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", count-1, p2pfixtures.WithDHTOptions(p2p.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	defer stopNodes(t, nodes)
+	defer p2pfixtures.StopNodes(t, nodes)
 
 	// Step 2: Connect all nodes running a DHT client to the node running the DHT server
 	// This has to be done before subscribing to any topic, otherwise the node gives up on advertising
