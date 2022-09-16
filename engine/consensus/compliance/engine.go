@@ -285,11 +285,14 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
+	doneSignal := ctx.Done()
+	newMessageSignal := e.messageHandler.GetNotifier()
+
 	for {
 		select {
-		case <-ctx.Done():
+		case <-doneSignal:
 			return
-		case <-e.messageHandler.GetNotifier():
+		case <-newMessageSignal:
 			err := e.processAvailableMessages() // no errors expected during normal operations
 			if err != nil {
 				ctx.Throw(err)
