@@ -1061,7 +1061,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 		run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				ctx.MaxStateInteractionSize = 500_000
-				//ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
+				// ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1102,7 +1102,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 		run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				ctx.MaxStateInteractionSize = 500_000
-				//ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
+				// ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1769,8 +1769,8 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
-				require.Equal(t, (&errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
-				require.Equal(t, uint64(0), tx.Err.(*errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
+				require.Equal(t, (errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
+				require.Equal(t, uint64(0), tx.Err.(errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
 			}),
 	)
 
@@ -1807,7 +1807,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
-				require.IsType(t, &errors.CadenceRuntimeError{}, tx.Err)
+				require.IsType(t, errors.CadenceRuntimeError{}, tx.Err)
 
 				// send it again
 				tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
@@ -1815,8 +1815,8 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
-				require.Equal(t, (&errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
-				require.Equal(t, uint64(1), tx.Err.(*errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
+				require.Equal(t, (errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
+				require.Equal(t, uint64(1), tx.Err.(errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
 			}),
 	)
 }

@@ -31,7 +31,7 @@ func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []
 	a := flow.HexToAddress("1234")
 	b := flow.HexToAddress("5678")
 
-	//create accounts
+	// create accounts
 	accounts := environment.NewAccounts(stTxn)
 	err := accounts.Create(aPubKeys, a)
 	require.NoError(t, err)
@@ -197,11 +197,11 @@ func TestAccountFreezing(t *testing.T) {
 		require.Error(t, proc.Err)
 
 		// find frozen account specific error
-		require.IsType(t, &errors.CadenceRuntimeError{}, proc.Err)
-		err = proc.Err.(*errors.CadenceRuntimeError).Unwrap()
+		require.IsType(t, errors.CadenceRuntimeError{}, proc.Err)
+		err = proc.Err.(errors.CadenceRuntimeError).Unwrap()
 
-		require.IsType(t, &runtime.Error{}, err)
-		err = err.(*runtime.Error).Err
+		require.IsType(t, runtime.Error{}, err)
+		err = err.(runtime.Error).Err
 
 		require.IsType(t, &runtime.ParsingCheckingError{}, err)
 		err = err.(*runtime.ParsingCheckingError).Err
@@ -215,7 +215,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.IsType(t, &sema.ImportedProgramError{}, checkerErrors[0])
 
 		importedCheckerError := checkerErrors[0].(*sema.ImportedProgramError).Err
-		accountFrozenError := &errors.FrozenAccountError{}
+		accountFrozenError := errors.FrozenAccountError{}
 
 		require.True(t, errors.As(importedCheckerError, &accountFrozenError))
 		require.Equal(t, address, accountFrozenError.Address())
@@ -341,11 +341,11 @@ func TestAccountFreezing(t *testing.T) {
 		require.Error(t, proc.Err)
 
 		// find frozen account specific error
-		require.IsType(t, &errors.CadenceRuntimeError{}, proc.Err)
-		err = proc.Err.(*errors.CadenceRuntimeError).Unwrap()
+		require.IsType(t, errors.CadenceRuntimeError{}, proc.Err)
+		err = proc.Err.(errors.CadenceRuntimeError).Unwrap()
 
-		require.IsType(t, &runtime.Error{}, err)
-		err = err.(*runtime.Error).Err
+		require.IsType(t, runtime.Error{}, err)
+		err = err.(runtime.Error).Err
 
 		require.IsType(t, &runtime.ParsingCheckingError{}, err)
 		err = err.(*runtime.ParsingCheckingError).Err
@@ -359,7 +359,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.IsType(t, &sema.ImportedProgramError{}, checkerErrors[0])
 
 		importedCheckerError := checkerErrors[0].(*sema.ImportedProgramError).Err
-		accountFrozenError := &errors.FrozenAccountError{}
+		accountFrozenError := errors.FrozenAccountError{}
 
 		require.True(t, errors.As(importedCheckerError, &accountFrozenError))
 		require.Equal(t, frozenAddress, accountFrozenError.Address())
@@ -538,8 +538,8 @@ func TestAccountFreezing(t *testing.T) {
 			require.Error(t, frozenProc.Err)
 
 			// find frozen account specific error
-			require.IsType(t, &errors.FrozenAccountError{}, frozenProc.Err)
-			accountFrozenError := frozenProc.Err.(*errors.FrozenAccountError)
+			require.IsType(t, errors.FrozenAccountError{}, frozenProc.Err)
+			accountFrozenError := frozenProc.Err.(errors.FrozenAccountError)
 			require.Equal(t, frozenAddress, accountFrozenError.Address())
 		})
 
@@ -572,8 +572,8 @@ func TestAccountFreezing(t *testing.T) {
 			require.Error(t, frozenProc.Err)
 
 			// find frozen account specific error
-			require.IsType(t, &errors.FrozenAccountError{}, frozenProc.Err)
-			accountFrozenError := frozenProc.Err.(*errors.FrozenAccountError)
+			require.IsType(t, errors.FrozenAccountError{}, frozenProc.Err)
+			accountFrozenError := frozenProc.Err.(errors.FrozenAccountError)
 			require.Equal(t, frozenAddress, accountFrozenError.Address())
 		})
 
@@ -606,8 +606,8 @@ func TestAccountFreezing(t *testing.T) {
 			require.Error(t, frozenProc.Err)
 
 			// find frozen account specific error
-			require.IsType(t, &errors.FrozenAccountError{}, frozenProc.Err)
-			accountFrozenError := frozenProc.Err.(*errors.FrozenAccountError)
+			require.IsType(t, errors.FrozenAccountError{}, frozenProc.Err)
+			accountFrozenError := frozenProc.Err.(errors.FrozenAccountError)
 			require.Equal(t, frozenAddress, accountFrozenError.Address())
 		})
 
