@@ -77,7 +77,7 @@ func TestGenerateTestMatrix(t *testing.T) {
 
 	matrix := generateTestMatrix(targetPackages, otherPackages)
 
-	// should be 3 groups in test matrix: abc, ghi, other
+	// should be 3 groups in test matrix: abc, ghi, others
 	require.Equal(t, 3, len(matrix))
 
 	require.Contains(t, matrix, testMatrix{
