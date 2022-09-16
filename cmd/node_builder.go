@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -234,7 +235,7 @@ func DefaultBaseConfig() *BaseConfig {
 		secretsdir:                      NotSet,
 		secretsDBEnabled:                true,
 		level:                           "info",
-		PeerUpdateInterval:              p2p.DefaultPeerUpdateInterval,
+		PeerUpdateInterval:              connection.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout:           p2p.DefaultUnicastTimeout,
 		metricsPort:                     8080,
 		profilerEnabled:                 false,
@@ -252,7 +253,7 @@ func DefaultBaseConfig() *BaseConfig {
 
 		// By default we let networking layer trim connections to all nodes that
 		// are no longer part of protocol state.
-		NetworkConnectionPruning: p2p.ConnectionPruningEnabled,
+		NetworkConnectionPruning: connection.ConnectionPruningEnabled,
 
 		HeroCacheMetricsEnable: false,
 		SyncCoreConfig:         chainsync.DefaultConfig(),
