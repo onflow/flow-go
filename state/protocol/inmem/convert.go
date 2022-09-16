@@ -14,7 +14,6 @@ import (
 // FromSnapshot generates a memory-backed snapshot from the input snapshot.
 // Typically, this would be used to convert a database-backed snapshot to
 // one that can easily be serialized to disk or to network.
-//
 func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 
 	var (

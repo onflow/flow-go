@@ -55,7 +55,7 @@ const (
 	ErrCodeStorageCapacityExceeded  ErrorCode = 1103
 	//  Deprecated: ErrCodeGasLimitExceededError  ErrorCode = 1104
 	ErrCodeEventLimitExceededError                   ErrorCode = 1105
-	ErrCodeLedgerIntractionLimitExceededError        ErrorCode = 1106
+	ErrCodeLedgerInteractionLimitExceededError       ErrorCode = 1106
 	ErrCodeStateKeySizeLimitError                    ErrorCode = 1107
 	ErrCodeStateValueSizeLimitError                  ErrorCode = 1108
 	ErrCodeTransactionFeeDeductionFailedError        ErrorCode = 1109
@@ -72,6 +72,7 @@ const (
 	ErrCodeAccountAlreadyExistsError         ErrorCode = 1203
 	ErrCodeFrozenAccountError                ErrorCode = 1204
 	ErrCodeAccountStorageNotInitializedError ErrorCode = 1205
+	ErrCodeAccountPublicKeyLimitError        ErrorCode = 1206
 
 	// contract errors 1250 - 1300
 	// ErrCodeContractError          ErrorCode = 1250 - reserved

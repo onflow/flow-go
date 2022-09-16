@@ -29,18 +29,19 @@ import (
 // has its own processing thread. Therefore, the test must be concurrency safe and ensure that the Follower
 // has asynchronously processed the submitted blocks _before_ we assert whether all callbacks were run.
 // We use the following knowledge about the Follower's _internal_ processing:
-//   * The Follower is running in a single go-routine, pulling one event at a time from an
+//   - The Follower is running in a single go-routine, pulling one event at a time from an
 //     _unbuffered_ channel. The test will send blocks to the Follower's input channel and block there
 //     until the Follower receives the block from the channel. Hence, when all sends have completed, the
 //     Follower has processed all blocks but the last one. Furthermore, the last block has already been
 //     received.
-//   * Therefore, the Follower will only pick up a shutdown signal _after_ it processed the last block.
+//   - Therefore, the Follower will only pick up a shutdown signal _after_ it processed the last block.
 //     Hence, waiting for the Follower's `Done()` channel guarantees that it complete processing any
 //     blocks that are in the event loop.
+//
 // For this test, most of the Follower's injected components are mocked out.
 // As we test the mocked components separately, we assume:
-//   * The mocked components work according to specification.
-//   * Especially, we assume that Forks works according to specification, i.e. that the determination of
+//   - The mocked components work according to specification.
+//   - Especially, we assume that Forks works according to specification, i.e. that the determination of
 //     finalized blocks is correct and events are emitted in the desired order (both are tested separately).
 func TestHotStuffFollower(t *testing.T) {
 	suite.Run(t, new(HotStuffFollowerSuite))
@@ -178,7 +179,7 @@ func (s *HotStuffFollowerSuite) TestSubmitProposal() {
 
 	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
-	s.submitWithTimeout(nextBlock, rootBlockView)
+	s.submitProposal(nextBlock, rootBlockView)
 }
 
 // TestFollowerFinalizedBlock verifies that when submitting 2 extra blocks
@@ -189,13 +190,13 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	expectedFinalized := s.mockConsensus.extendBlock(s.rootHeader.View+1, s.rootHeader)
 	s.notifier.On("OnBlockIncorporated", blockWithID(expectedFinalized.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(expectedFinalized.ID())).Return(nil).Once()
-	s.submitWithTimeout(expectedFinalized, s.rootHeader.View)
+	s.submitProposal(expectedFinalized, s.rootHeader.View)
 
 	// direct 1-chain on top of expectedFinalized
 	nextBlock := s.mockConsensus.extendBlock(expectedFinalized.View+1, expectedFinalized)
 	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
-	s.submitWithTimeout(nextBlock, expectedFinalized.View)
+	s.submitProposal(nextBlock, expectedFinalized.View)
 
 	// indirect 2-chain on top of expectedFinalized
 	lastBlock := nextBlock
@@ -204,7 +205,7 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	s.notifier.On("OnFinalizedBlock", blockWithID(expectedFinalized.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
 	s.updater.On("MakeFinal", blockID(expectedFinalized.ID())).Return(nil).Once()
-	s.submitWithTimeout(nextBlock, lastBlock.View)
+	s.submitProposal(nextBlock, lastBlock.View)
 }
 
 // TestOutOfOrderBlocks verifies that when submitting a variety of blocks with view numbers
@@ -212,28 +213,26 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 // for all the added blocks. Furthermore, we construct the test such that the follower should finalize
 // eventually a bunch of blocks in one go.
 // The following illustrates the tree of submitted blocks, with notation
-//   * [a, b] is a block at view "b" with a QC with view "a",
-//     e.g., [1, 2] means a block at view "2" with an included  QC for view "1"
 //
-//                                                       [52078+14, 52078+20] (should finalize this fork)
-//                                                                          |
-//                                                                          |
-//                                                       [52078+13, 52078+14]
-//                                                                          |
-//                                                                          |
-//                          [52078+11, 52078+17]         [52078+ 9, 52078+13]   [52078+ 9, 52078+10]
-//                          |                                               |  /
-//                          |                                               | /
-//   [52078+ 7, 52078+ 8]   [52078+ 7, 52078+11]         [52078+ 5, 52078+ 9]   [52078+ 5, 52078+ 6]
-//                        \ |                                               |  /
-//                         \|                                               | /
-//   [52078+ 3, 52078+ 4]   [52078+ 3, 52078+ 7]         [52078+ 1, 52078+ 5]   [52078+ 1, 52078+ 2]
-//                        \ |                                               |  /
-//                         \|                                               | /
-//                          [52078+ 0, 52078+ 3]         [52078+ 0, 52078+ 1]
-//                                             \         /
-//                                              \       /
-//                                            [52078+ 0, x] (root block; no qc to parent)
+//	                                                    [52078+14, 52078+20] (should finalize this fork)
+//	                                                                       |
+//	                                                                       |
+//	                                                    [52078+13, 52078+14]
+//	                                                                       |
+//	                                                                       |
+//	                       [52078+11, 52078+17]         [52078+ 9, 52078+13]   [52078+ 9, 52078+10]
+//	                       |                                               |  /
+//	                       |                                               | /
+//	[52078+ 7, 52078+ 8]   [52078+ 7, 52078+11]         [52078+ 5, 52078+ 9]   [52078+ 5, 52078+ 6]
+//	                     \ |                                               |  /
+//	                      \|                                               | /
+//	[52078+ 3, 52078+ 4]   [52078+ 3, 52078+ 7]         [52078+ 1, 52078+ 5]   [52078+ 1, 52078+ 2]
+//	                     \ |                                               |  /
+//	                      \|                                               | /
+//	                       [52078+ 0, 52078+ 3]         [52078+ 0, 52078+ 1]
+//	                                          \         /
+//	                                           \       /
+//	                                         [52078+ 0, x] (root block; no qc to parent)
 func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 	// in the following, we reference the block's by their view minus the view of the
 	// root block (52078). E.g. block [52078+ 9, 52078+10] would be referenced as `block10`
@@ -267,20 +266,20 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 
 	// now we feed the blocks in some wild view order into the Follower
 	// (Caution: we still have to make sure the parent is known, before we give its child to the Follower)
-	s.submitWithTimeout(block03, rootView)
-	s.submitWithTimeout(block07, rootView+3)
-	s.submitWithTimeout(block11, rootView+7)
-	s.submitWithTimeout(block01, rootView)
-	s.submitWithTimeout(block05, rootView+1)
-	s.submitWithTimeout(block17, rootView+11)
-	s.submitWithTimeout(block09, rootView+5)
-	s.submitWithTimeout(block06, rootView+5)
-	s.submitWithTimeout(block10, rootView+9)
-	s.submitWithTimeout(block04, rootView+3)
-	s.submitWithTimeout(block13, rootView+9)
-	s.submitWithTimeout(block14, rootView+13)
-	s.submitWithTimeout(block08, rootView+7)
-	s.submitWithTimeout(block02, rootView+1)
+	s.submitProposal(block03, rootView)
+	s.submitProposal(block07, rootView+3)
+	s.submitProposal(block11, rootView+7)
+	s.submitProposal(block01, rootView)
+	s.submitProposal(block05, rootView+1)
+	s.submitProposal(block17, rootView+11)
+	s.submitProposal(block09, rootView+5)
+	s.submitProposal(block06, rootView+5)
+	s.submitProposal(block10, rootView+9)
+	s.submitProposal(block04, rootView+3)
+	s.submitProposal(block13, rootView+9)
+	s.submitProposal(block14, rootView+13)
+	s.submitProposal(block08, rootView+7)
+	s.submitProposal(block02, rootView+1)
 
 	// Block 20 should now finalize the fork up to and including block13
 	s.notifier.On("OnFinalizedBlock", blockWithID(block01.ID())).Return().Once()
@@ -291,7 +290,7 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 	s.updater.On("MakeFinal", blockID(block09.ID())).Return(nil).Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(block13.ID())).Return().Once()
 	s.updater.On("MakeFinal", blockID(block13.ID())).Return(nil).Once()
-	s.submitWithTimeout(block20, rootView+14)
+	s.submitProposal(block20, rootView+14)
 }
 
 // blockWithID returns a testify `argumentMatcher` that only accepts blocks with the given ID
@@ -304,11 +303,9 @@ func blockID(expectedBlockID flow.Identifier) interface{} {
 	return mock.MatchedBy(func(blockID flow.Identifier) bool { return expectedBlockID == blockID })
 }
 
-// submitWithTimeout submits the given (proposal, parentView) pair to the Follower. As the follower
-// might block on this call, we add a timeout that fails the test, in case of a dead-lock.
-func (s *HotStuffFollowerSuite) submitWithTimeout(proposal *flow.Header, parentView uint64) {
-	proposalProcessed := s.follower.SubmitProposal(proposal, parentView)
-	unittest.AssertClosesBefore(s.T(), proposalProcessed, time.Second)
+// submitProposal submits the given (proposal, parentView) pair to the Follower.
+func (s *HotStuffFollowerSuite) submitProposal(proposal *flow.Header, parentView uint64) {
+	s.follower.SubmitProposal(proposal, parentView)
 }
 
 // MockConsensus is used to generate Blocks for a mocked consensus committee

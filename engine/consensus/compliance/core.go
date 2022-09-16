@@ -8,9 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
-	"github.com/uber/jaeger-client-go"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -103,19 +102,18 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 
 	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONCompOnBlockProposal)
 	if isSampled {
-		span.LogFields(log.Uint64("view", proposal.Header.View))
-		span.LogFields(log.String("origin_id", originID.String()))
-
-		// set proposer as a tag so we can filter based on proposer
-		span.SetTag("proposer", proposal.Header.ProposerID.String())
-		if sc, ok := span.Context().(jaeger.SpanContext); ok {
-			traceID = sc.TraceID().String()
-		}
+		span.SetAttributes(
+			attribute.Int64("view", int64(proposal.Header.View)),
+			attribute.String("origin_id", originID.String()),
+			attribute.String("proposer", proposal.Header.ProposerID.String()),
+		)
+		traceID = span.SpanContext().TraceID().String()
 	}
-	defer span.Finish()
+	defer span.End()
 
 	header := proposal.Header
 	log := c.log.With().
+		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
@@ -166,36 +164,21 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 
 	// there are two possibilities if the proposal is neither already pending
 	// processing in the cache, nor has already been processed:
-	// 1) the proposal is unverifiable because parent or ancestor is unknown
-	// => we cache the proposal and request the missing link
+	// 1) the proposal is unverifiable because the parent is unknown
+	// => we cache the proposal
 	// 2) the proposal is connected to finalized state through an unbroken chain
 	// => we verify the proposal and forward it to hotstuff if valid
 
-	// if we can connect the proposal to an ancestor in the cache, it means
-	// there is a missing link; we cache it and request the missing link
-	ancestor, found := c.pending.ByID(header.ParentID)
+	// if the parent is a pending block (disconnected from the incorporated state), we cache this block as well.
+	// we don't have to request its parent block or its ancestor again, because as a
+	// pending block, its parent block must have been requested.
+	// if there was problem requesting its parent or ancestors, the sync engine's forward
+	// syncing with range requests for finalized blocks will request for the blocks.
+	_, found := c.pending.ByID(header.ParentID)
 	if found {
 		// add the block to the cache
 		_ = c.pending.Add(originID, proposal)
 		c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
-
-		// go to the first missing ancestor
-		ancestorID := ancestor.Header.ParentID
-		ancestorHeight := ancestor.Header.Height - 1
-		for {
-			ancestor, found := c.pending.ByID(ancestorID)
-			if !found {
-				break
-			}
-			ancestorID = ancestor.Header.ParentID
-			ancestorHeight = ancestor.Header.Height - 1
-		}
-
-		c.sync.RequestBlock(ancestorID, ancestorHeight)
-		log.Debug().
-			Uint64("ancestor_height", ancestorHeight).
-			Hex("ancestor_id", ancestorID[:]).
-			Msg("requesting missing ancestor for proposal")
 
 		return nil
 	}
@@ -295,8 +278,8 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 // processBlockProposal processes the given block proposal. The proposal must connect to
 // the finalized state.
 // Expected errors during normal operations:
-//  * engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
-//  * engine.InvalidInputError if the block proposal is invalid
+//   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
+//   - engine.InvalidInputError if the block proposal is invalid
 func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	startTime := time.Now()
 	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
@@ -306,9 +289,11 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 
 	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), id, trace.ConCompProcessBlockProposal)
 	if isSampled {
-		span.SetTag("proposer", header.ProposerID.String())
+		span.SetAttributes(
+			attribute.String("proposer", header.ProposerID.String()),
+		)
 	}
-	defer span.Finish()
+	defer span.End()
 
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
@@ -350,6 +335,7 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 	log.Info().Msg("forwarding block proposal to hotstuff")
+
 	c.hotstuff.SubmitProposal(header, parent.View)
 
 	return nil
@@ -361,9 +347,11 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 
 	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), vote.BlockID, trace.CONCompOnBlockVote)
 	if isSampled {
-		span.LogFields(log.String("origin_id", originID.String()))
+		span.SetAttributes(
+			attribute.String("origin_id", originID.String()),
+		)
 	}
-	defer span.Finish()
+	defer span.End()
 
 	v := &model.Vote{
 		View:     vote.View,

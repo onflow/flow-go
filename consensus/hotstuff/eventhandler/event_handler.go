@@ -19,20 +19,20 @@ import (
 // EventHandler is implemented in event-driven way, it reacts to incoming events and performs certain actions.
 // It doesn't perform any actions on its own. There are 3 main responsibilities of EventHandler, vote, propose,
 // timeout. There are specific scenarios that lead to each of those actions.
-//  - create vote: voting logic is triggered by OnReceiveProposal, after receiving proposal we have all required information
-//  to create a valid vote. Compliance engine makes sure that we receive proposals, whose parents are known.
-//  Creating a vote can be triggered ONLY by receiving proposal.
-//  - create timeout: creating model.TimeoutObject[TO] is triggered by OnLocalTimeout, after reaching deadline for current round.
-//  EventHandler gets notified about it and has to create a model.TimeoutObject and broadcast it to other replicas.
-//  Creating a TO can be triggered by reaching round deadline or triggered as part of Bracha broadcast when superminority
-//  of replicas have contributed to TC creation and created a partial TC.
-//  - create a proposal: proposing logic is more complicated. Creating a proposal is triggered by the EventHandler receiving
-//  a QC or TC that induces a view change to a view where the replica is primary. As an edge case, the EventHandler
-//  can receive a QC or TC that triggers the view change, but we can't create a proposal in case we are missing parent block the newest QC refers to.
-//  In case we already have the QC, but are still missing the respective parent, OnReceiveProposal can trigger the proposing logic
-//  as well, but only when receiving proposal for view lower than active view.
-//  To summarize, to make a valid proposal for view N we need to have a QC or TC for N-1 and know the proposal with blockID
-//  NewestQC.BlockID.
+//   - create vote: voting logic is triggered by OnReceiveProposal, after receiving proposal we have all required information
+//     to create a valid vote. Compliance engine makes sure that we receive proposals, whose parents are known.
+//     Creating a vote can be triggered ONLY by receiving proposal.
+//   - create timeout: creating model.TimeoutObject[TO] is triggered by OnLocalTimeout, after reaching deadline for current round.
+//     EventHandler gets notified about it and has to create a model.TimeoutObject and broadcast it to other replicas.
+//     Creating a TO can be triggered by reaching round deadline or triggered as part of Bracha broadcast when superminority
+//     of replicas have contributed to TC creation and created a partial TC.
+//   - create a proposal: proposing logic is more complicated. Creating a proposal is triggered by the EventHandler receiving
+//     a QC or TC that induces a view change to a view where the replica is primary. As an edge case, the EventHandler
+//     can receive a QC or TC that triggers the view change, but we can't create a proposal in case we are missing parent block the newest QC refers to.
+//     In case we already have the QC, but are still missing the respective parent, OnReceiveProposal can trigger the proposing logic
+//     as well, but only when receiving proposal for view lower than active view.
+//     To summarize, to make a valid proposal for view N we need to have a QC or TC for N-1 and know the proposal with blockID
+//     NewestQC.BlockID.
 type EventHandler struct {
 	log               zerolog.Logger
 	paceMaker         hotstuff.PaceMaker
@@ -353,9 +353,10 @@ func (e *EventHandler) processPendingBlocks() error {
 }
 
 // proposeForNewViewIfPrimary will only be called when we may able to propose a block, after processing a new event.
-// * after entering a new view as a result of processing a QC or TC, then we may propose for the newly entered view
-// * after receiving a proposal (but not changing view), if that proposal is referenced by our highest known QC,
-//   and the proposal was previously unknown, then we can propose a block in the current view
+//   - after entering a new view as a result of processing a QC or TC, then we may propose for the newly entered view
+//   - after receiving a proposal (but not changing view), if that proposal is referenced by our highest known QC,
+//     and the proposal was previously unknown, then we can propose a block in the current view
+//
 // It reads the current view, and generates a proposal if we are the leader.
 // No errors are expected during normal operation.
 func (e *EventHandler) proposeForNewViewIfPrimary() error {

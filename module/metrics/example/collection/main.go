@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/example"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/queue"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -30,8 +30,8 @@ func main() {
 			NetworkCollector:    metrics.NewNetworkCollector(),
 		}
 
-		topic1 := network.TestNetworkChannel.String()
-		topic2 := network.TestMetricsChannel.String()
+		topic1 := channels.TestNetworkChannel.String()
+		topic2 := channels.TestMetricsChannel.String()
 		message1 := "CollectionRequest"
 		message2 := "ClusterBlockProposal"
 

@@ -49,6 +49,9 @@ func (rs *ReceiptState) WaitForReceiptFromAny(t *testing.T, blockID flow.Identif
 	}, receiptTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive execution receipt for block ID %x from any node within %v seconds", blockID,
 			receiptTimeout))
+
+	rs.RLock()
+	defer rs.RUnlock()
 	for _, r := range rs.receipts[blockID] {
 		return r
 	}

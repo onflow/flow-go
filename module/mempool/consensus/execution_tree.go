@@ -130,20 +130,21 @@ func (et *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.
 
 // ReachableReceipts returns a slice of ExecutionReceipt, whose result
 // is computationally reachable from resultID. Context:
-//  * Conceptually, the Execution results form a tree, which we refer to as
-//    Execution Tree. A fork in the execution can be due to a fork in the main
-//    chain. Furthermore, the execution forks if ENs disagree about the result
-//    for the same block.
-//  * As the ID of an execution result contains the BlockID, which the result
-//    for, all Execution Results with the same ID necessarily are for the same
-//    block. All Execution Receipts committing to the same result from an
-//    equivalence class and can be represented as one vertex in the Execution
-//    Tree.
-//  * An execution result r1 points (field ExecutionResult.ParentResultID) to
-//    its parent result r0 , whose end state was used as the starting state
-//    to compute r1. Formally, we have an edge r0 -> r1 in the Execution Tree,
-//    if a result r1 is stored in the mempool, whose ParentResultID points to
-//    r0.
+//   - Conceptually, the Execution results form a tree, which we refer to as
+//     Execution Tree. A fork in the execution can be due to a fork in the main
+//     chain. Furthermore, the execution forks if ENs disagree about the result
+//     for the same block.
+//   - As the ID of an execution result contains the BlockID, which the result
+//     for, all Execution Results with the same ID necessarily are for the same
+//     block. All Execution Receipts committing to the same result from an
+//     equivalence class and can be represented as one vertex in the Execution
+//     Tree.
+//   - An execution result r1 points (field ExecutionResult.ParentResultID) to
+//     its parent result r0 , whose end state was used as the starting state
+//     to compute r1. Formally, we have an edge r0 -> r1 in the Execution Tree,
+//     if a result r1 is stored in the mempool, whose ParentResultID points to
+//     r0.
+//
 // ReachableReceipts traverses the Execution Tree from the provided resultID.
 // Execution Receipts are traversed in a parent-first manner, meaning that
 // a receipt committing to the parent result is traversed first _before_

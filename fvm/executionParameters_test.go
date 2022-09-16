@@ -4,19 +4,21 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/environment"
+	fvmmock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
-	fvmmock "github.com/onflow/flow-go/fvm/mock"
+	"github.com/onflow/flow-go/fvm/meter"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/runtime/testutil"
 )
 
 func TestGetExecutionMemoryWeights(t *testing.T) {
@@ -26,17 +28,14 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 		address common.Address,
 		path cadence.Path,
 		context runtime.Context,
-	) (cadence.Value, error)) fvm.Environment {
-		r := &TestReadStoredRuntime{
-			readStored: readStored,
-		}
-		vm := fvm.VirtualMachine{
-			Runtime: r,
-		}
+	) (cadence.Value, error)) environment.Environment {
 		envMock := &fvmmock.Environment{}
-		envMock.On("VM").
-			Return(&vm).
-			Once()
+		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
+			reusableRuntime.NewReusableCadenceRuntime(
+				&testutil.TestInterpreterRuntime{
+					ReadStoredFunc: readStored,
+				}))
+		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
 	}
 
@@ -50,8 +49,7 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionMemoryWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if can't parse stored",
@@ -64,8 +62,7 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionMemoryWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if get stored returns error",
@@ -110,19 +107,19 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 				})
 			weights, err := fvm.GetExecutionMemoryWeights(envMock, address)
 			require.NoError(t, err)
-			require.InDeltaMapValues(t, weighted.DefaultMemoryWeights, weights, 0)
+			require.InDeltaMapValues(t, meter.DefaultMemoryWeights, weights, 0)
 		},
 	)
 	t.Run("return merged if some dict is stored",
 		func(t *testing.T) {
-			expectedWeights := weighted.ExecutionMemoryWeights{}
+			expectedWeights := meter.ExecutionMemoryWeights{}
 			var existingWeightKey common.MemoryKind
 			var existingWeightValue uint64
-			for k, v := range weighted.DefaultMemoryWeights {
+			for k, v := range meter.DefaultMemoryWeights {
 				expectedWeights[k] = v
 			}
 			// change one existing value
-			for kind, u := range weighted.DefaultMemoryWeights {
+			for kind, u := range meter.DefaultMemoryWeights {
 				existingWeightKey = kind
 				existingWeightValue = u
 				expectedWeights[kind] = u + 1
@@ -158,17 +155,14 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 		address common.Address,
 		path cadence.Path,
 		context runtime.Context,
-	) (cadence.Value, error)) fvm.Environment {
-		r := &TestReadStoredRuntime{
-			readStored: readStored,
-		}
-		vm := fvm.VirtualMachine{
-			Runtime: r,
-		}
+	) (cadence.Value, error)) environment.Environment {
 		envMock := &fvmmock.Environment{}
-		envMock.On("VM").
-			Return(&vm).
-			Once()
+		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
+			reusableRuntime.NewReusableCadenceRuntime(
+				&testutil.TestInterpreterRuntime{
+					ReadStoredFunc: readStored,
+				}))
+		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
 	}
 
@@ -182,8 +176,7 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionEffortWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if can't parse stored",
@@ -196,8 +189,7 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionEffortWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if get stored returns error",
@@ -242,19 +234,19 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 				})
 			weights, err := fvm.GetExecutionEffortWeights(envMock, address)
 			require.NoError(t, err)
-			require.InDeltaMapValues(t, weighted.DefaultComputationWeights, weights, 0)
+			require.InDeltaMapValues(t, meter.DefaultComputationWeights, weights, 0)
 		},
 	)
 	t.Run("return merged if some dict is stored",
 		func(t *testing.T) {
-			expectedWeights := weighted.ExecutionEffortWeights{}
+			expectedWeights := meter.ExecutionEffortWeights{}
 			var existingWeightKey common.ComputationKind
 			var existingWeightValue uint64
-			for k, v := range weighted.DefaultComputationWeights {
+			for k, v := range meter.DefaultComputationWeights {
 				expectedWeights[k] = v
 			}
 			// change one existing value
-			for kind, u := range weighted.DefaultComputationWeights {
+			for kind, u := range meter.DefaultComputationWeights {
 				existingWeightKey = kind
 				existingWeightValue = u
 				expectedWeights[kind] = u + 1
@@ -281,62 +273,4 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 			require.InDeltaMapValues(t, expectedWeights, weights, 0)
 		},
 	)
-}
-
-var _ runtime.Runtime = &TestReadStoredRuntime{}
-
-type TestReadStoredRuntime struct {
-	readStored func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error)
-}
-
-func (t *TestReadStoredRuntime) SetDebugger(debugger *interpreter.Debugger) {
-	panic("not implemented")
-}
-
-func (t *TestReadStoredRuntime) ExecuteScript(runtime.Script, runtime.Context) (cadence.Value, error) {
-	panic("not implemented")
-}
-
-func (t *TestReadStoredRuntime) ExecuteTransaction(runtime.Script, runtime.Context) error {
-	panic("not implemented")
-}
-
-func (t *TestReadStoredRuntime) InvokeContractFunction(common.AddressLocation, string, []interpreter.Value, []sema.Type, runtime.Context) (cadence.Value, error) {
-	panic("not implemented")
-}
-
-func (t *TestReadStoredRuntime) ParseAndCheckProgram([]byte, runtime.Context) (*interpreter.Program, error) {
-	panic("not implemented")
-}
-
-func (t *TestReadStoredRuntime) SetCoverageReport(*runtime.CoverageReport) {
-	panic("not implemented")
-}
-
-func (t *TestReadStoredRuntime) SetContractUpdateValidationEnabled(bool) {
-	panic("not implemented")
-}
-
-func (t *TestReadStoredRuntime) SetAtreeValidationEnabled(bool) {
-	panic("not implemented")
-}
-
-func (t *TestReadStoredRuntime) SetTracingEnabled(bool) {
-	panic("not implemented")
-}
-
-func (t *TestReadStoredRuntime) SetInvalidatedResourceValidationEnabled(bool) {
-	panic("not implemented")
-}
-
-func (t *TestReadStoredRuntime) SetResourceOwnerChangeHandlerEnabled(bool) {
-	panic("not implemented")
-}
-
-func (t *TestReadStoredRuntime) ReadStored(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-	return t.readStored(address, path, context)
-}
-
-func (t *TestReadStoredRuntime) ReadLinked(common.Address, cadence.Path, runtime.Context) (cadence.Value, error) {
-	panic("not implemented")
 }

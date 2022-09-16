@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	mockcomponent "github.com/onflow/flow-go/module/component/mock"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // MeshEngine is a simple engine that is used for testing the correctness of
@@ -17,19 +18,19 @@ import (
 type MeshEngine struct {
 	sync.Mutex
 	t        *testing.T
-	con      network.Conduit      // used to directly communicate with the network
-	originID flow.Identifier      // used to keep track of the id of the sender of the messages
-	event    chan interface{}     // used to keep track of the events that the node receives
-	channel  chan network.Channel // used to keep track of the channels that events are received on
-	received chan struct{}        // used as an indicator on reception of messages for testing
+	con      network.Conduit       // used to directly communicate with the network
+	originID flow.Identifier       // used to keep track of the id of the sender of the messages
+	event    chan interface{}      // used to keep track of the events that the node receives
+	channel  chan channels.Channel // used to keep track of the channels that events are received on
+	received chan struct{}         // used as an indicator on reception of messages for testing
 	mockcomponent.Component
 }
 
-func NewMeshEngine(t *testing.T, net network.Network, cap int, channel network.Channel) *MeshEngine {
+func NewMeshEngine(t *testing.T, net network.Network, cap int, channel channels.Channel) *MeshEngine {
 	te := &MeshEngine{
 		t:        t,
 		event:    make(chan interface{}, cap),
-		channel:  make(chan network.Channel, cap),
+		channel:  make(chan channels.Channel, cap),
 		received: make(chan struct{}, cap),
 	}
 
@@ -48,7 +49,7 @@ func (e *MeshEngine) SubmitLocal(event interface{}) {
 
 // Submit is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (e *MeshEngine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *MeshEngine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	go func() {
 		err := e.Process(channel, originID, event)
 		if err != nil {
@@ -66,7 +67,7 @@ func (e *MeshEngine) ProcessLocal(event interface{}) error {
 
 // Process receives an originID and an event and casts them into the corresponding fields of the
 // MeshEngine. It then flags the received channel on reception of an event.
-func (e *MeshEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *MeshEngine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	e.Lock()
 	defer e.Unlock()
 

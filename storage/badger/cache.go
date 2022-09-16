@@ -116,7 +116,7 @@ func (c *Cache) Remove(key interface{}) {
 	c.cache.Remove(key)
 }
 
-// Insert will add an resource directly to the cache with the given ID
+// Insert will add a resource directly to the cache with the given ID
 func (c *Cache) Insert(key interface{}, resource interface{}) {
 	// cache the resource and eject least recently used one if we reached limit
 	evicted := c.cache.Add(key, resource)
@@ -125,12 +125,12 @@ func (c *Cache) Insert(key interface{}, resource interface{}) {
 	}
 }
 
-// PutTx will return tx which adds an resource to the cache with the given ID.
+// PutTx will return tx which adds a resource to the cache with the given ID.
 func (c *Cache) PutTx(key interface{}, resource interface{}) func(*transaction.Tx) error {
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 
 	return func(tx *transaction.Tx) error {
-		err := storeOps(tx) // execute operations to store recourse
+		err := storeOps(tx) // execute operations to store resource
 		if err != nil {
 			return fmt.Errorf("could not store resource: %w", err)
 		}

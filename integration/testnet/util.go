@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"os/user"
@@ -71,18 +70,6 @@ func toNodeInfos(confs []ContainerConfig) []bootstrap.NodeInfo {
 	return infos
 }
 
-// filterContainerConfigs filters a list of container configs.
-func filterContainerConfigs(confs []ContainerConfig, shouldInclude func(ContainerConfig) bool) []ContainerConfig {
-	filtered := make([]ContainerConfig, 0, len(confs))
-	for _, conf := range confs {
-		if !shouldInclude(conf) {
-			continue
-		}
-		filtered = append(filtered, conf)
-	}
-	return filtered
-}
-
 func getSeed() ([]byte, error) {
 	seedLen := int(math.Max(crypto.SeedMinLenDKG, crypto.KeyGenSeedMinLenBLSBLS12381))
 	seed := make([]byte, seedLen)
@@ -108,7 +95,7 @@ func WriteJSON(path string, data interface{}) error {
 }
 
 func WriteFile(path string, data []byte) error {
-	err := ioutil.WriteFile(path, data, 0644)
+	err := os.WriteFile(path, data, 0644)
 	return err
 }
 

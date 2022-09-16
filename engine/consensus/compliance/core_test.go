@@ -24,6 +24,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	netint "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -194,7 +195,7 @@ func (cs *CommonSuite) SetupTest() {
 	// set up network module mock
 	cs.net = &mocknetwork.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
+		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return cs.con
 		},
 		nil,
@@ -279,7 +280,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
+	cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View)
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -305,7 +306,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.headerDB[parent.ID()] = parent.Header
 	cs.headerDB[ancestor.ID()] = ancestor.Header
 
-	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return()
+	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View)
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -390,10 +391,10 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
-	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return().Once()
+	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.View).Once()
+	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Once()
+	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Once()
+	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Once()
 
 	// execute the connected children handling
 	err := cs.core.processBlockAndDescendants(proposal)

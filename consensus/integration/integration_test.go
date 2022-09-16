@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -136,11 +136,11 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 // entirely (return value `true`) or should be delivered (return value `false`). The second
 // return value specifies the delay by which the message should be delivered.
 // Implementations must be CONCURRENCY SAFE.
-type BlockOrDelayFunc func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration)
+type BlockOrDelayFunc func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration)
 
 // blockNothing specifies that _all_ messages should be delivered without delay.
 // I.e. this function returns always `false` (no blocking), `0` (no delay).
-func blockNothing(_ network.Channel, _ interface{}, _, _ *Node) (bool, time.Duration) {
+func blockNothing(_ channels.Channel, _ interface{}, _, _ *Node) (bool, time.Duration) {
 	return false, 0
 }
 
@@ -153,7 +153,7 @@ func blockNodes(denyList ...*Node) BlockOrDelayFunc {
 		blackList[n.id.ID()] = n
 	}
 	// no concurrency protection needed as blackList is only read but not modified
-	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		if _, ok := blackList[sender.id.ID()]; ok {
 			return true, 0
 		}

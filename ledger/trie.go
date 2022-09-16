@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+
+	"github.com/fxamacker/cbor/v2"
 
 	cryptoHash "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
@@ -207,10 +210,122 @@ func ToPath(pathBytes []byte) (Path, error) {
 	return path, nil
 }
 
+// encKey represents an encoded ledger key.
+type encKey []byte
+
+// Size returns the byte size of the encoded key.
+func (k encKey) Size() int {
+	return len(k)
+}
+
+// String returns the string representation of the encoded key.
+func (k encKey) String() string {
+	return hex.EncodeToString(k)
+}
+
+// Equals compares this encoded key to another encoded key.
+// A nil encoded key is equivalent to an empty encoded key.
+func (k encKey) Equals(other encKey) bool {
+	return bytes.Equal(k, other)
+}
+
+// DeepCopy returns a deep copy of the encoded key.
+func (k encKey) DeepCopy() encKey {
+	newK := make([]byte, len(k))
+	copy(newK, k)
+	return newK
+}
+
 // Payload is the smallest immutable storable unit in ledger
 type Payload struct {
+	// encKey is key encoded using PayloadVersion.
+	// Version and type data are not encoded to save 3 bytes.
+	// NOTE: encKey translates to Key{} when encKey is
+	//       one of these three values:
+	//       nil, []byte{}, []byte{0,0}.
+	encKey encKey
+	value  Value
+}
+
+// serializablePayload is used to serialize ledger.Payload.
+// Encoder only serializes exported fields and ledger.Payload's
+// key and value fields are not exported.  So it is necessary to
+// use serializablePayload for encoding.
+type serializablePayload struct {
 	Key   Key
 	Value Value
+}
+
+// MarshalJSON returns JSON encoding of p.
+func (p Payload) MarshalJSON() ([]byte, error) {
+	k, err := p.Key()
+	if err != nil {
+		return nil, err
+	}
+	sp := serializablePayload{Key: k, Value: p.value}
+	return json.Marshal(sp)
+}
+
+// UnmarshalJSON unmarshals a JSON value of payload.
+func (p *Payload) UnmarshalJSON(b []byte) error {
+	if p == nil {
+		return errors.New("UnmarshalJSON on nil Payload")
+	}
+	var sp serializablePayload
+	if err := json.Unmarshal(b, &sp); err != nil {
+		return err
+	}
+	p.encKey = encodeKey(&sp.Key, PayloadVersion)
+	p.value = sp.Value
+	return nil
+}
+
+// MarshalCBOR returns CBOR encoding of p.
+func (p Payload) MarshalCBOR() ([]byte, error) {
+	k, err := p.Key()
+	if err != nil {
+		return nil, err
+	}
+	sp := serializablePayload{Key: k, Value: p.value}
+	return cbor.Marshal(sp)
+}
+
+// UnmarshalCBOR unmarshals a CBOR value of payload.
+func (p *Payload) UnmarshalCBOR(b []byte) error {
+	if p == nil {
+		return errors.New("UnmarshalCBOR on nil payload")
+	}
+	var sp serializablePayload
+	if err := cbor.Unmarshal(b, &sp); err != nil {
+		return err
+	}
+	p.encKey = encodeKey(&sp.Key, PayloadVersion)
+	p.value = sp.Value
+	return nil
+}
+
+// Key returns payload key.
+// Error indicates that ledger.Key can't be created from payload key, so
+// migration and reporting (known callers) should abort.
+// CAUTION: do not modify returned key because it shares underlying data with payload key.
+func (p *Payload) Key() (Key, error) {
+	if p == nil || len(p.encKey) == 0 {
+		return Key{}, nil
+	}
+	k, err := decodeKey(p.encKey, true, PayloadVersion)
+	if err != nil {
+		return Key{}, err
+	}
+	return *k, nil
+}
+
+// Value returns payload value.
+// CAUTION: do not modify returned value because it shares underlying data with payload value.
+func (p *Payload) Value() Value {
+	if p == nil {
+		return Value{}
+	}
+	return p.value
 }
 
 // Size returns the size of the payload
@@ -218,33 +333,30 @@ func (p *Payload) Size() int {
 	if p == nil {
 		return 0
 	}
-	return p.Key.Size() + p.Value.Size()
+	return p.encKey.Size() + p.value.Size()
 }
 
 // IsEmpty returns true if payload is nil or value is empty
 func (p *Payload) IsEmpty() bool {
-	return p == nil || p.Value.Size() == 0
+	return p == nil || p.value.Size() == 0
 }
 
 // TODO fix me
 func (p *Payload) String() string {
 	// TODO improve this key, values
-	return p.Key.String() + " " + p.Value.String()
+	return p.encKey.String() + " " + p.value.String()
 }
 
 // Equals compares this payload to another payload
 // A nil payload is equivalent to an empty payload.
 func (p *Payload) Equals(other *Payload) bool {
-	if p == nil || (len(p.Key.KeyParts) == 0 && len(p.Value) == 0) {
-		return other == nil || (len(other.Key.KeyParts) == 0 && len(other.Value) == 0)
+	if p == nil || (p.encKey.Size() == 0 && p.value.Size() == 0) {
+		return other == nil || (other.encKey.Size() == 0 && other.value.Size() == 0)
 	}
 	if other == nil {
 		return false
 	}
-	if p.Key.Equals(&other.Key) && p.Value.Equals(other.Value) {
-		return true
-	}
-	return false
+	return p.encKey.Equals(other.encKey) && p.value.Equals(other.value)
 }
 
 // ValueEquals compares this payload value to another payload value.
@@ -264,7 +376,7 @@ func (p *Payload) ValueEquals(other *Payload) bool {
 		return true
 	}
 	// Compare values since both payloads are not empty.
-	return p.Value.Equals(other.Value)
+	return p.value.Equals(other.value)
 }
 
 // DeepCopy returns a deep copy of the payload
@@ -272,14 +384,15 @@ func (p *Payload) DeepCopy() *Payload {
 	if p == nil {
 		return nil
 	}
-	k := p.Key.DeepCopy()
-	v := p.Value.DeepCopy()
-	return &Payload{Key: k, Value: v}
+	k := p.encKey.DeepCopy()
+	v := p.value.DeepCopy()
+	return &Payload{encKey: k, value: v}
 }
 
 // NewPayload returns a new payload
 func NewPayload(key Key, value Value) *Payload {
-	return &Payload{Key: key, Value: value}
+	ek := encodeKey(&key, PayloadVersion)
+	return &Payload{encKey: ek, value: value}
 }
 
 // EmptyPayload returns an empty payload

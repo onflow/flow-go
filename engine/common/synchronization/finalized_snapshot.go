@@ -107,7 +107,8 @@ func (f *FinalizedHeaderCache) Done() <-chan struct{} {
 }
 
 // onFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-//  (1) Updates local state of last finalized snapshot.
+// (1) Updates local state of last finalized snapshot.
+//
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (f *FinalizedHeaderCache) onFinalizedBlock(block *model.Block) {

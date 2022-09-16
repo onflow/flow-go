@@ -11,7 +11,7 @@ import (
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/dkg"
 	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -93,7 +93,7 @@ func TestForwardIncomingMessages(t *testing.T) {
 		close(doneCh)
 	}()
 
-	err := e.Process(network.DKGCommittee, originID, &expectedMsg.DKGMessage)
+	err := e.Process(channels.DKGCommittee, originID, &expectedMsg.DKGMessage)
 	require.NoError(t, err)
 
 	unittest.RequireCloseBefore(t, doneCh, time.Second, "message not received")

@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -81,7 +81,7 @@ func TestOneNodeBehind(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
-	hub.WithFilter(func(channelID network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	hub.WithFilter(func(channelID channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		if receiver == nodes[0] {
 			return false, hotstuffTimeout + time.Millisecond
 		}
@@ -116,7 +116,7 @@ func TestTimeoutRebroadcast(t *testing.T) {
 	// nodeID -> view -> numTimeoutMessages
 	lock := new(sync.Mutex)
 	blockedTimeoutObjectsTracker := make(map[flow.Identifier]map[uint64]uint64)
-	hub.WithFilter(func(channelID network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	hub.WithFilter(func(channelID channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		switch m := event.(type) {
 		case *messages.BlockProposal:
 			return m.Header.View == 5, 0 // drop proposals only for view 5

@@ -6,12 +6,12 @@ import (
 
 	"github.com/spf13/pflag"
 
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 
-	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -35,13 +35,13 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/collection"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/epochs"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/synchronization"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -57,6 +57,7 @@ func main() {
 		maxCollectionByteSize         uint64
 		maxCollectionTotalGas         uint64
 		builderExpiryBuffer           uint
+		builderPayerRateLimitDryRun   bool
 		builderPayerRateLimit         float64
 		builderUnlimitedPayers        []string
 		hotstuffTimeout               time.Duration
@@ -80,7 +81,7 @@ func main() {
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
-		mainChainSyncCore *synchronization.Core
+		mainChainSyncCore *chainsync.Core
 		followerEng       *followereng.Engine
 		colMetrics        module.CollectionMetrics
 		err               error
@@ -116,6 +117,8 @@ func main() {
 			"how many additional cluster members we propagate transactions to")
 		flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
 			"expiry buffer for transactions in proposed collections")
+		flags.BoolVar(&builderPayerRateLimitDryRun, "builder-rate-limit-dry-run", false,
+			"determines whether rate limit configuration should be enforced (false), or only logged (true)")
 		flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", builder.DefaultMaxPayerTransactionRate, // no rate limiting
 			"rate limit for each payer (transactions/collection)")
 		flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
@@ -207,7 +210,7 @@ func main() {
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
-			mainChainSyncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+			mainChainSyncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -308,7 +311,7 @@ func main() {
 				followerCore,
 				mainChainSyncCore,
 				node.Tracer,
-				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+				followereng.WithComplianceOptions(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -376,7 +379,7 @@ func main() {
 				return coll, err
 			}
 			return provider.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
-				network.ProvideCollections,
+				channels.ProvideCollections,
 				filter.HasRole(flow.RoleAccess, flow.RoleExecution),
 				retrieve,
 			)
@@ -415,10 +418,12 @@ func main() {
 				node.Tracer,
 				colMetrics,
 				push,
+				node.Logger,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithMaxCollectionByteSize(maxCollectionByteSize),
 				builder.WithMaxCollectionTotalGas(maxCollectionTotalGas),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
+				builder.WithRateLimitDryRun(builderPayerRateLimitDryRun),
 				builder.WithMaxPayerTransactionRate(builderPayerRateLimit),
 				builder.WithUnlimitedPayers(unlimitedPayers...),
 			)

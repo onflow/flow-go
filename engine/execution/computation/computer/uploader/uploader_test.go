@@ -2,16 +2,12 @@ package uploader
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"runtime/debug"
 	"sync"
 	"testing"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -174,44 +170,35 @@ func Test_AsyncUploader(t *testing.T) {
 		require.Equal(t, 1, callCount)
 	})
 
+	t.Run("onComplete callback called if set", func(t *testing.T) {
+		var onCompleteCallbackCalled = false
+
+		wgUploadCalleded := sync.WaitGroup{}
+		wgUploadCalleded.Add(1)
+
+		uploader := &DummyUploader{
+			f: func() error {
+				wgUploadCalleded.Done()
+				return nil
+			},
+		}
+
+		async := NewAsyncUploader(uploader, 1*time.Nanosecond, 1, zerolog.Nop(), &DummyCollector{})
+		async.SetOnCompleteCallback(func(computationResult *execution.ComputationResult, err error) {
+			onCompleteCallbackCalled = true
+		})
+
+		err := async.Upload(computationResult)
+		require.NoError(t, err)
+
+		wgUploadCalleded.Wait()
+		<-async.Done()
+
+		require.True(t, onCompleteCallbackCalled)
+	})
 }
 
-func Test_GCPBucketUploader(t *testing.T) {
-	testutils.SkipUnless(t, testutils.TEST_REQUIRES_GCP_ACCESS, "requires GCP Bucket setup")
-
-	bucketName := os.Getenv("FLOW_TEST_GCP_BUCKET_NAME")
-	if bucketName == "" {
-		t.Fatal("please set FLOW_TEST_GCP_BUCKET_NAME environmental variable")
-	}
-	uploader, err := NewGCPBucketUploader(context.Background(), bucketName, zerolog.Nop())
-	require.NoError(t, err)
-
-	cr := generateComputationResult(t)
-
-	buffer := &bytes.Buffer{}
-	err = WriteComputationResultsTo(cr, buffer)
-	require.NoError(t, err)
-
-	err = uploader.Upload(cr)
-
-	require.NoError(t, err)
-
-	// check uploaded object
-	client, err := storage.NewClient(context.Background())
-	require.NoError(t, err)
-	bucket := client.Bucket(bucketName)
-
-	objectName := GCPBlockDataObjectName(cr)
-
-	reader, err := bucket.Object(objectName).NewReader(context.Background())
-	require.NoError(t, err)
-
-	readBytes, err := ioutil.ReadAll(reader)
-	require.NoError(t, err)
-
-	require.Equal(t, buffer.Bytes(), readBytes)
-}
-
+// DummyUploader is an Uploader implementation with an Upload() callback
 type DummyUploader struct {
 	f func() error
 }
@@ -220,6 +207,7 @@ func (d *DummyUploader) Upload(_ *execution.ComputationResult) error {
 	return d.f()
 }
 
+// FailingUploader mocks upload failure cases
 type FailingUploader struct {
 	failTimes int
 	callCount int
@@ -237,6 +225,7 @@ func (d *FailingUploader) Upload(_ *execution.ComputationResult) error {
 	return nil
 }
 
+// DummyCollector is test uploader metrics implementation
 type DummyCollector struct {
 	metrics.NoopCollector
 	Counter       atomic.Int64

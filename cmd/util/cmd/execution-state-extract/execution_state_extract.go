@@ -2,8 +2,10 @@ package extract
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	mgr "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
@@ -43,9 +45,6 @@ func extractExecutionState(
 	if err != nil {
 		return fmt.Errorf("cannot create disk WAL: %w", err)
 	}
-	defer func() {
-		<-diskWal.Done()
-	}()
 
 	led, err := complete.NewLedger(
 		diskWal,
@@ -57,6 +56,23 @@ func extractExecutionState(
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
+	const (
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	if err != nil {
+		return fmt.Errorf("cannot create compactor: %w", err)
+	}
+
+	<-compactor.Ready()
+
+	defer func() {
+		<-led.Done()
+		<-compactor.Done()
+	}()
+
 	var migrations []ledger.Migration
 	var preCheckpointReporters, postCheckpointReporters []ledger.Reporter
 	newState := ledger.State(targetHash)
@@ -66,7 +82,7 @@ func extractExecutionState(
 			Log:       log,
 			OutputDir: outputDir,
 		}
-		accountStatusMigration := mgr.AccountStatusMigration{Logger: log}
+		accountStatusMigration := mgr.NewAccountStatusMigration(log)
 		legacyControllerMigration := mgr.LegacyControllerMigration{Logger: log}
 
 		migrations = []ledger.Migration{

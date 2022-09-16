@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -194,7 +194,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 				SigData:  vote.SigData,
 			}).Return().Once()
 			// execute the vote submission
-			err := cs.engine.Process(network.ConsensusCommittee, originID, &vote)
+			err := cs.engine.Process(channels.ConsensusCommittee, originID, &vote)
 			cs.Assert().NoError(err)
 		}
 		wg.Done()
@@ -209,7 +209,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
 		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
-		err := cs.engine.Process(network.ConsensusCommittee, originID, proposal)
+		err := cs.engine.Process(channels.ConsensusCommittee, originID, proposal)
 		cs.Assert().NoError(err)
 		wg.Done()
 	}()

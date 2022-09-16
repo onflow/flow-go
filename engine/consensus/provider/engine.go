@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -57,7 +58,7 @@ func New(
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(network.PushBlocks, e)
+	con, err := net.Register(channels.PushBlocks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -93,7 +94,7 @@ func (e *Engine) ProvideProposal(proposal *messages.BlockProposal) {
 
 // Process logs a warning for all received messages, as this engine's channel
 // is send-only - no inbound messages are expected.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	e.log.Warn().
 		Str("channel", channel.String()).
 		Str("origin_id", originID.String()).
