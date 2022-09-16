@@ -6,8 +6,9 @@ import (
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/network/p2p/translator"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/network/p2p/keyutils"

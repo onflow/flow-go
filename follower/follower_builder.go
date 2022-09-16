@@ -12,8 +12,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
-	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/p2p/translator"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
