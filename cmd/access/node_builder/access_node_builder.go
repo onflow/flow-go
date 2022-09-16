@@ -13,6 +13,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -1012,7 +1013,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	logger := builder.Logger.With().Bool("staked", false).Logger()
 
 	// disable connection pruning for the access node which supports the observer
-	peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningDisabled, builder.PeerUpdateInterval)
+	peerManagerFactory := connection.PeerManagerFactory(connection.ConnectionPruningDisabled, builder.PeerUpdateInterval)
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, builder.Metrics.Network)
 
 	builder.Middleware = p2p.NewMiddleware(
