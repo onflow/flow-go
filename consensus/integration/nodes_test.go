@@ -397,7 +397,7 @@ func createNode(
 		Hex("node_id", localID[:]).
 		Logger()
 
-	stopConsumer := stopper.AddNode(node)
+	stopper.AddNode(node)
 
 	counterConsumer := &CounterConsumer{
 		finalized: func(total uint) {
@@ -408,7 +408,6 @@ func createNode(
 	// log with node index
 	logConsumer := notifications.NewLogConsumer(log)
 	notifier := pubsub.NewDistributor()
-	notifier.AddConsumer(stopConsumer)
 	notifier.AddConsumer(counterConsumer)
 	notifier.AddConsumer(logConsumer)
 

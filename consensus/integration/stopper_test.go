@@ -6,23 +6,18 @@ import (
 
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-type StopperConsumer struct {
-	notifications.NoopConsumer
-}
 
 // Stopper is responsible for detecting a stopping condition, and stopping all nodes.
 //
 // Design motivation:
-//  - We can stop each node as soon as it enters a certain view. But the problem
-//    is if some fast node reaches a view earlier and gets stopped, it won't
-//    be available for other nodes to sync, and slow nodes will never be able
-//    to catch up.
-//  - A better strategy is to wait until all nodes have entered a certain view,
-//    then stop them all - this is what the Stopper does.
+//   - We can stop each node as soon as it enters a certain view. But the problem
+//     is if some fast node reaches a view earlier and gets stopped, it won't
+//     be available for other nodes to sync, and slow nodes will never be able
+//     to catch up.
+//   - A better strategy is to wait until all nodes have entered a certain view,
+//     then stop them all - this is what the Stopper does.
 type Stopper struct {
 	sync.Mutex
 	running  map[flow.Identifier]struct{}
@@ -47,15 +42,17 @@ func NewStopper(finalizedCount uint, tolerate int) *Stopper {
 	}
 }
 
-func (s *Stopper) AddNode(n *Node) *StopperConsumer {
+// AddNode registers a node with the Stopper, so that the stopping condition is
+// adjusted to account for this node (ie. we will now also wait for the added
+// node to finalize the desired number of blocks).
+func (s *Stopper) AddNode(n *Node) {
 	s.Lock()
 	defer s.Unlock()
 	s.running[n.id.ID()] = struct{}{}
-	stopConsumer := &StopperConsumer{}
-	return stopConsumer
 }
 
 // WithStopFunc adds a function to use to stop all nodes (typically the cancel function of the context used to start them).
+// Caution: not safe for concurrent use by multiple goroutines.
 func (s *Stopper) WithStopFunc(stop func()) {
 	s.stopFunc = stop
 }
