@@ -62,7 +62,6 @@ func (suite *Suite) SetupTest() {
 
 // TestBroadcastProposal_Success should broadcast a valid block.
 func (suite *Suite) TestBroadcastProposal_Success() {
-
 	proposal := unittest.ProposalFixture()
 	proposal.Header.ProposerID = suite.me.NodeID()
 

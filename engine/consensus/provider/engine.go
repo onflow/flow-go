@@ -105,20 +105,17 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 // network (non-consensus nodes). We broadcast to consensus nodes in compliance engine.
 // TODO error handling - differentiate expected errors in Snapshot
 func (e *Engine) broadcastProposal(proposal *messages.BlockProposal) error {
-
 	// sanity check: we should only broadcast proposals that we proposed here
 	if e.me.NodeID() != proposal.Header.ProposerID {
 		return fmt.Errorf("sanity check failed: attempted to provide another node's proposal (%x!=%x)", e.me.NodeID(), proposal.Header.ProposerID)
 	}
 
 	blockID := proposal.Header.ID()
-
 	log := e.log.With().
 		Uint64("block_view", proposal.Header.View).
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", proposal.Header.ParentID[:]).
 		Logger()
-
 	log.Info().Msg("block proposal submitted for propagation")
 
 	// broadcast to unejected non-consensus nodes
@@ -136,9 +133,7 @@ func (e *Engine) broadcastProposal(proposal *messages.BlockProposal) error {
 		e.log.Err(err).Msg("failed to broadcast block")
 		return nil
 	}
-
 	e.message.MessageSent(metrics.EngineConsensusProvider, metrics.MessageBlockProposal)
-
 	log.Info().Msg("block proposal propagated to non-consensus nodes")
 
 	return nil

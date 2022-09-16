@@ -290,8 +290,7 @@ func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready co
 		case <-ctx.Done():
 			return
 		case <-e.messageHandler.GetNotifier():
-			// TODO expected errors?
-			err := e.processAvailableMessages()
+			err := e.processAvailableMessages() // no errors expected during normal operations
 			if err != nil {
 				ctx.Throw(err)
 			}
@@ -301,7 +300,8 @@ func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready co
 
 // processAvailableMessages processes any available messages until the message queue is empty.
 // Only returns when all inbound queues are empty (or the engine is terminated).
-// TODO error docs
+// No errors are expected during normal operation. All returned exceptions are potential
+// symptoms of internal state corruption and should be fatal.
 func (e *Engine) processAvailableMessages() error {
 	for {
 
