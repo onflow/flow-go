@@ -344,7 +344,7 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	}
 
 	// Submit the model to hotstuff for processing. Note: HotStuff requires also the view of the parent block for
-	// reconstructing the proposal's QC. Since this information is not inclused in the header, we first query the parent.
+	// reconstructing the proposal's QC. Since this information is not included in the header, we first query the parent.
 	parent, err := c.headers.ByBlockID(header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
