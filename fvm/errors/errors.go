@@ -28,6 +28,14 @@ type Failure interface {
 	error
 }
 
+type errorWrapper struct {
+	err error
+}
+
+func (e errorWrapper) Unwrap() error {
+	return e.err
+}
+
 // Is is a utility function to call std error lib `Is` function for instance equality checks.
 func Is(err error, target error) bool {
 	return stdErrors.Is(err, target)
@@ -87,5 +95,5 @@ func HandleRuntimeError(err error) error {
 	}
 
 	// All other errors are non-fatal Cadence errors.
-	return NewCadenceRuntimeError(&runErr)
+	return NewCadenceRuntimeError(runErr)
 }
