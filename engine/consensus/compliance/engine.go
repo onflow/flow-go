@@ -439,7 +439,7 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 			log.Err(err).Msg("could not broadcast timeout")
 			return
 		}
-		log.Info().Msg("consensus timeout broadcast")
+		log.Info().Msg("consensus timeout was broadcast")
 
 		// TODO(active-pacemaker): update metrics
 		//e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
@@ -535,7 +535,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 		e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
 
-		log.Info().Msg("block proposal broadcasted")
+		log.Info().Msg("block proposal was broadcast")
 
 		// submit the proposal to the provider engine to forward it to other node roles
 		e.prov.ProvideProposal(proposal)
