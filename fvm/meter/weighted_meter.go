@@ -252,8 +252,9 @@ type MeterParameters struct {
 	computationLimit   uint64
 	computationWeights ExecutionEffortWeights
 
-	memoryLimit   uint64
-	memoryWeights ExecutionMemoryWeights
+	isMemoryLimitSet bool
+	memoryLimit      uint64
+	memoryWeights    ExecutionMemoryWeights
 }
 
 func DefaultParameters() MeterParameters {
@@ -284,6 +285,7 @@ func (params MeterParameters) WithComputationWeights(
 func (params MeterParameters) WithMemoryLimit(limit uint64) MeterParameters {
 	newParams := params
 	newParams.memoryLimit = limit
+	newParams.isMemoryLimitSet = true
 	return newParams
 }
 
@@ -306,6 +308,13 @@ func (params MeterParameters) TotalComputationLimit() uint {
 
 func (params MeterParameters) MemoryWeights() ExecutionMemoryWeights {
 	return params.memoryWeights
+}
+
+// IsMemoryLimitSet returns if memory limit has been set by WithMemoryLimit()
+// It is useful when metering parameters are loaded from state. We need to
+// know if state has this value available to decide whether to override existing value.
+func (params MeterParameters) IsMemoryLimitSet() bool {
+	return params.isMemoryLimitSet
 }
 
 // TotalMemoryLimit returns the total memory limit

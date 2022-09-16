@@ -376,3 +376,18 @@ func TestMemoryWeights(t *testing.T) {
 		)
 	}
 }
+
+func TestMeterParameters(t *testing.T) {
+	t.Run("IsMemoryLimitSet return false - without WithMemoryLimit() called", func(t *testing.T) {
+		meterParams := meter.DefaultParameters()
+		require.False(t, meterParams.IsMemoryLimitSet())
+		require.Equal(t, uint64(math.MaxUint64), meterParams.TotalMemoryLimit())
+	})
+
+	t.Run("IsMemoryLimitSet return true - with WithMemoryLimit() called", func(t *testing.T) {
+		testMemoryLimit := uint64(123)
+		meterParams := meter.DefaultParameters().WithMemoryLimit(testMemoryLimit)
+		require.True(t, meterParams.IsMemoryLimitSet())
+		require.Equal(t, testMemoryLimit, meterParams.TotalMemoryLimit())
+	})
+}
