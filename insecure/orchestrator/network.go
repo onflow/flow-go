@@ -111,9 +111,14 @@ func (on *Network) stop() error {
 // dispatch both the incoming (i.e., ingress) as well as the outgoing (i.e., egress)
 // messages to the orchestrator network by calling the InboundHandler method of it remotely.
 func (on *Network) Observe(message *insecure.Message) {
+	if message.Ingress == nil && message.Egress == nil {
+		// In BFT testing framework, it is a bug to has neither ingress nor egress not set.
+		on.logger.Fatal().Msg("could not observe message - both ingress and egress messages can't be nil")
+		return // return to avoid changing the behavior by tweaking the log level.
+	}
 	if message.Ingress != nil && message.Egress != nil {
-		// In BFT testing framework, it is a bug to have both ingress and egress messages not set.
-		on.logger.Fatal().Msg("received message with both ingress and egress set")
+		// In BFT testing framework, it is a bug to have both ingress and egress messages set.
+		on.logger.Fatal().Msg("could not observe message - both ingress and egress messages can't be set")
 		return // return to avoid changing the behavior by tweaking the log level.
 	}
 	if message.Egress != nil {
@@ -121,15 +126,12 @@ func (on *Network) Observe(message *insecure.Message) {
 			on.logger.Fatal().Err(err).Msg("could not process egress message of corrupt node")
 			return // return to avoid changing the behavior by tweaking the log level.
 		}
-	} else if message.Ingress != nil {
+	}
+	if message.Ingress != nil {
 		if err := on.processIngressMessage(message.Ingress); err != nil {
 			on.logger.Fatal().Err(err).Msg("could not process ingress message of corrupt node")
 			return // return to avoid changing the behavior by tweaking the log level.
 		}
-	} else {
-		// In BFT testing framework, it is a bug to has neither ingress nor egress set.
-		on.logger.Fatal().Msg("received message with neither ingress nor egress")
-		return // return to avoid changing the behavior by tweaking the log level.
 	}
 }
 
