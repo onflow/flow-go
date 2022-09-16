@@ -125,7 +125,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.ClusterBlockProposal)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
+					core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 				}
 				return ok
 			},
@@ -135,7 +135,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*events.SyncedClusterBlock)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
+					core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
 				}
 				return ok
 			},
@@ -156,7 +156,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.ClusterBlockVote)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
+					core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
 				}
 				return ok
 			},
@@ -179,7 +179,7 @@ func NewEngine(
 		unit:                       engine.NewUnit(),
 		lm:                         lifecycle.NewLifecycleManager(),
 		log:                        engineLog,
-		metrics:                    core.metrics,
+		metrics:                    core.engineMetrics,
 		me:                         me,
 		headers:                    core.headers,
 		payloads:                   payloads,

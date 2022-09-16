@@ -33,10 +33,10 @@ import (
 type Core struct {
 	log               zerolog.Logger // used to log relevant actions with context
 	config            compliance.Config
-	metrics           module.EngineMetrics
-	tracer            module.Tracer
-	mempool           module.MempoolMetrics
+	engineMetrics     module.EngineMetrics
+	mempoolMetrics    module.MempoolMetrics
 	complianceMetrics module.ComplianceMetrics
+	tracer            module.Tracer
 	cleaner           storage.Cleaner
 	headers           storage.Headers
 	payloads          storage.Payloads
@@ -74,9 +74,9 @@ func NewCore(
 	e := &Core{
 		log:               log.With().Str("compliance", "core").Logger(),
 		config:            config,
-		metrics:           collector,
+		engineMetrics:     collector,
 		tracer:            tracer,
-		mempool:           mempool,
+		mempoolMetrics:    mempool,
 		complianceMetrics: complianceMetrics,
 		cleaner:           cleaner,
 		headers:           headers,
@@ -88,7 +88,7 @@ func NewCore(
 		voteAggregator:    voteAggregator,
 		timeoutAggregator: timeoutAggregator,
 	}
-	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
+	e.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 
 	return e, nil
 }
@@ -178,7 +178,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	if found {
 		// add the block to the cache
 		_ = c.pending.Add(originID, proposal)
-		c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
+		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		return nil
 	}
@@ -189,7 +189,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	_, err = c.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
 		_ = c.pending.Add(originID, proposal)
-		c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
+		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
 		log.Debug().Msg("requesting missing parent for proposal")
@@ -207,7 +207,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
 	err = c.processBlockAndDescendants(proposal)
-	c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
+	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
@@ -403,5 +403,5 @@ func (c *Core) ProcessFinalizedView(finalizedView uint64) {
 	c.pending.PruneByView(finalizedView)
 
 	// always record the metric
-	c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
+	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 }

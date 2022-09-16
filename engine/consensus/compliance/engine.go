@@ -46,16 +46,16 @@ const defaultTimeoutObjectsQueueCapacity = 1000
 // and forwards outbound messages to the networking layer.
 // `compliance.Core` implements the actual compliance logic.
 type Engine struct {
-	log      zerolog.Logger
-	mempool  module.MempoolMetrics
-	metrics  module.EngineMetrics
-	me       module.Local
-	headers  storage.Headers
-	payloads storage.Payloads
-	tracer   module.Tracer
-	state    protocol.State
-	prov     consensus.ProposalProvider
-	core     *Core
+	log            zerolog.Logger
+	mempoolMetrics module.MempoolMetrics
+	engineMetrics  module.EngineMetrics
+	me             module.Local
+	headers        storage.Headers
+	payloads       storage.Payloads
+	tracer         module.Tracer
+	state          protocol.State
+	prov           consensus.ProposalProvider
+	core           *Core
 	// queues for inbound messsages
 	pendingBlocks         engine.MessageStore
 	pendingRangeResponses engine.MessageStore
@@ -88,7 +88,7 @@ func NewEngine(
 	// TODO can be removed along with https://github.com/dapperlabs/flow-go/issues/6254
 	rangeResponseQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultRangeResponseQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockResponseQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceBlockResponseQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for block-sync responses: %w", err)
@@ -100,7 +100,7 @@ func NewEngine(
 	// Inbound FIFO queue for `messages.BlockProposal`s
 	blocksQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound block proposals: %w", err)
@@ -110,7 +110,7 @@ func NewEngine(
 	// Inbound FIFO queue for `messages.BlockVote`s
 	votesQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound votes: %w", err)
@@ -134,7 +134,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockResponse)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockResponse)
+					core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockResponse)
 				}
 				return ok
 			},
@@ -144,7 +144,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockProposal)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
+					core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
 				}
 				return ok
 			},
@@ -154,7 +154,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*events.SyncedBlock)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+					core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
 				}
 				return ok
 			},
@@ -175,7 +175,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockVote)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
+					core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
 				}
 				return ok
 			},
@@ -197,8 +197,8 @@ func NewEngine(
 	eng := &Engine{
 		log:                        log.With().Str("compliance", "engine").Logger(),
 		me:                         me,
-		mempool:                    core.mempool,
-		metrics:                    core.metrics,
+		mempoolMetrics:             core.mempoolMetrics,
+		engineMetrics:              core.engineMetrics,
 		headers:                    core.headers,
 		payloads:                   core.payloads,
 		pendingRangeResponses:      pendingRangeResponses,
@@ -379,7 +379,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 			log.Err(err).Msg("could not send vote")
 			return
 		}
-		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
+		e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
 		log.Info().Msg("block vote transmitted")
 	}()
 
@@ -530,7 +530,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			log.Err(err).Msg("could not send proposal message")
 		}
 
-		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
+		e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
 
 		log.Info().Msg("block proposal broadcasted")
 
