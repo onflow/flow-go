@@ -7,7 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -15,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -27,14 +35,6 @@ import (
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 type testAccount struct {
@@ -75,7 +75,7 @@ func mustFundAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, e
 		accs.seq++
 
 		tx := fvm.Transaction(transferTx, uint32(i))
-		err = vm.Run(execCtx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(execCtx, tx, ledger)
 		require.NoError(b, err)
 		require.NoError(b, tx.Err)
 	}
@@ -87,7 +87,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 	tracer, err := trace.NewTracer(zerolog.Nop(), "", "", 4)
 	require.NoError(b, err)
 
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{}))
+	vm := fvm.NewVM()
 
 	chain := flow.Emulator.Chain()
 	execCtx := fvm.NewContext(
@@ -96,7 +96,9 @@ func BenchmarkComputeBlock(b *testing.B) {
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithTracer(tracer),
 		fvm.WithReusableCadenceRuntimePool(
-			fvm.NewReusableCadenceRuntimePool(ReusableCadenceRuntimePoolSize)),
+			reusableRuntime.NewReusableCadenceRuntimePool(
+				ReusableCadenceRuntimePoolSize,
+				runtime.Config{})),
 	)
 	ledger := testutil.RootBootstrappedLedger(
 		vm,
@@ -130,7 +132,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), tracer, zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(b, err)
 
-	programsCache, err := NewProgramsCache(1000)
+	programsCache, err := programs.NewChainPrograms(
+		programs.DefaultProgramsCacheSize)
 	require.NoError(b, err)
 
 	engine := &Manager{

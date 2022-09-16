@@ -10,9 +10,9 @@ import (
 	"time"
 
 	badger "github.com/ipfs/go-ds-badger2"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/routing"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -1012,7 +1012,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 
 	// disable connection pruning for the access node which supports the observer
 	peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningDisabled, builder.PeerUpdateInterval)
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger)
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, builder.Metrics.Network)
 
 	builder.Middleware = p2p.NewMiddleware(
 		logger,

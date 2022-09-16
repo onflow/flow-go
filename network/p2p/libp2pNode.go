@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/libp2p/go-libp2p-core/host"
-	libp2pnet "github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/host"
+	libp2pnet "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/slashing"
@@ -40,7 +40,7 @@ const (
 type Node struct {
 	sync.Mutex
 	unicastManager *unicast.Manager
-	host           host.Host                               // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	host           host.Host                               // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
 	pubSub         *pubsub.PubSub                          // reference to the libp2p PubSub component
 	logger         zerolog.Logger                          // used to provide logging
 	topics         map[channels.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance

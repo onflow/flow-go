@@ -33,7 +33,19 @@ const (
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
+	// DEPRECATED. DO NOT USE
+	//
+	// TODO(patrick): remove after emulator is updated.
 	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
+
+	RunV2(fvm.Context, fvm.Procedure, state.View) error
+
+	// DEPRECATED. DO NOT USE
+	//
+	// TODO(patrick): remove after emulator is updated.
+	GetAccount(fvm.Context, flow.Address, state.View, *programs.Programs) (*flow.Account, error)
+
+	GetAccountV2(fvm.Context, flow.Address, state.View) (*flow.Account, error)
 }
 
 // ViewCommitter commits views's deltas to the ledger and collects the proofs
@@ -132,10 +144,12 @@ func (e *blockComputer) executeBlock(
 
 	blockCtx := fvm.NewContextFromParent(
 		e.vmCtx,
-		fvm.WithBlockHeader(block.Block.Header))
+		fvm.WithBlockHeader(block.Block.Header),
+		fvm.WithBlockPrograms(programs))
 	systemChunkCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
-		fvm.WithBlockHeader(block.Block.Header))
+		fvm.WithBlockHeader(block.Block.Header),
+		fvm.WithBlockPrograms(programs))
 	collections := block.Collections()
 
 	chunksSize := len(collections) + 1 // + 1 system chunk
@@ -188,7 +202,7 @@ func (e *blockComputer) executeBlock(
 
 	for i, collection := range collections {
 		colView := stateView.NewChild()
-		txIndex, err = e.executeCollection(blockSpan, collectionIndex, txIndex, blockCtx, colView, programs, collection, res)
+		txIndex, err = e.executeCollection(blockSpan, collectionIndex, txIndex, blockCtx, colView, collection, res)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection at txIndex %v: %w", txIndex, err)
 		}
@@ -205,7 +219,7 @@ func (e *blockComputer) executeBlock(
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
 	colView := stateView.NewChild()
-	systemCol, err := e.executeSystemCollection(blockSpan, collectionIndex, txIndex, systemChunkCtx, colView, programs, res)
+	systemCol, err := e.executeSystemCollection(blockSpan, collectionIndex, txIndex, systemChunkCtx, colView, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
@@ -273,7 +287,6 @@ func (e *blockComputer) executeSystemCollection(
 	txIndex uint32,
 	systemChunkCtx fvm.Context,
 	collectionView state.View,
-	programs *programs.Programs,
 	res *execution.ComputationResult,
 ) (*flow.Collection, error) {
 	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeSystemCollection)
@@ -284,7 +297,7 @@ func (e *blockComputer) executeSystemCollection(
 		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
 	}
 
-	err = e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res, true)
+	err = e.executeTransaction(tx, colSpan, collectionView, systemChunkCtx, collectionIndex, txIndex, res, true)
 
 	if err != nil {
 		return nil, err
@@ -316,7 +329,6 @@ func (e *blockComputer) executeCollection(
 	txIndex uint32,
 	blockCtx fvm.Context,
 	collectionView state.View,
-	programs *programs.Programs,
 	collection *entity.CompleteCollection,
 	res *execution.ComputationResult,
 ) (uint32, error) {
@@ -340,7 +352,7 @@ func (e *blockComputer) executeCollection(
 
 	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsReporter(e.metrics), fvm.WithTracer(e.tracer))
 	for _, txBody := range collection.Transactions {
-		err := e.executeTransaction(txBody, colSpan, collectionView, programs, txCtx, collectionIndex, txIndex, res, false)
+		err := e.executeTransaction(txBody, colSpan, collectionView, txCtx, collectionIndex, txIndex, res, false)
 		txIndex++
 		if err != nil {
 			return txIndex, err
@@ -363,7 +375,6 @@ func (e *blockComputer) executeTransaction(
 	txBody *flow.TransactionBody,
 	colSpan otelTrace.Span,
 	collectionView state.View,
-	programs *programs.Programs,
 	ctx fvm.Context,
 	collectionIndex int,
 	txIndex uint32,
@@ -414,7 +425,7 @@ func (e *blockComputer) executeTransaction(
 			Bool("system_chunk", isSystemChunk).
 			Logger()),
 	)
-	err := e.vm.Run(childCtx, tx, txView, programs)
+	err := e.vm.RunV2(childCtx, tx, txView)
 	if err != nil {
 		return fmt.Errorf("failed to execute transaction %v for block %v at height %v: %w",
 			txID.String(),

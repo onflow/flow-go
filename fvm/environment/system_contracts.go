@@ -1,16 +1,90 @@
-package fvm
+package environment
 
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
+// ContractFunctionSpec specify all the information, except the function's
+// address and arguments, needed to invoke the contract function.
+type ContractFunctionSpec struct {
+	AddressFromChain func(flow.Chain) flow.Address
+	LocationName     string
+	FunctionName     string
+	ArgumentTypes    []sema.Type
+}
+
+// SystemContracts provides methods for invoking system contract functions as
+// service account.
+type SystemContracts struct {
+	chain flow.Chain
+
+	tracer  *Tracer
+	logger  *ProgramLogger
+	runtime *Runtime
+}
+
+func NewSystemContracts(
+	chain flow.Chain,
+	tracer *Tracer,
+	logger *ProgramLogger,
+	runtime *Runtime,
+) *SystemContracts {
+	return &SystemContracts{
+		chain:   chain,
+		tracer:  tracer,
+		logger:  logger,
+		runtime: runtime,
+	}
+}
+
+func (sys *SystemContracts) Invoke(
+	spec ContractFunctionSpec,
+	arguments []cadence.Value,
+) (
+	cadence.Value,
+	error,
+) {
+	contractLocation := common.AddressLocation{
+		Address: common.Address(spec.AddressFromChain(sys.chain)),
+		Name:    spec.LocationName,
+	}
+
+	span := sys.tracer.StartSpanFromRoot(trace.FVMInvokeContractFunction)
+	span.SetAttributes(
+		attribute.String(
+			"transaction.ContractFunctionCall",
+			contractLocation.String()+"."+spec.FunctionName))
+	defer span.End()
+
+	runtime := sys.runtime.BorrowCadenceRuntime()
+	defer sys.runtime.ReturnCadenceRuntime(runtime)
+
+	value, err := runtime.InvokeContractFunction(
+		contractLocation,
+		spec.FunctionName,
+		arguments,
+		spec.ArgumentTypes,
+	)
+	if err != nil {
+		sys.logger.Logger().
+			Info().
+			Err(err).
+			Str("contract", contractLocation.String()).
+			Str("function", spec.FunctionName).
+			Msg("Contract function call executed with error")
+	}
+	return value, err
+}
+
 func FlowFeesAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(flowFeesAccountIndex)
+	address, _ := chain.AddressAtIndex(FlowFeesAccountIndex)
 	return address
 }
 

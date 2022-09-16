@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -55,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -606,7 +605,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		nil,
 		prov,
 		computation.ComputationConfig{
-			ProgramsCacheSize:        computation.DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       computation.DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: computation.DefaultScriptExecutionTimeLimit,
 		},
@@ -872,9 +871,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.VerifierEngine == nil {
-		rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
-		vm := fvm.NewVirtualMachine(rt)
+		vm := fvm.NewVM()
 
 		blockFinder := environment.NewBlockFinder(node.Headers)
 

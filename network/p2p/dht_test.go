@@ -6,13 +6,14 @@ import (
 	"time"
 
 	golog "github.com/ipfs/go-log"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
@@ -148,7 +149,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, n := range nodes {
-		s, err := n.Subscribe(topic, codec, unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger()))
+		s, err := n.Subscribe(topic, codec, unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 		require.NoError(t, err)
 
 		go func(s *pubsub.Subscription, nodeID peer.ID) {

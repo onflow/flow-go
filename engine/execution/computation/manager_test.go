@@ -15,7 +15,6 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -53,11 +52,9 @@ import (
 var scriptLogThreshold = 1 * time.Second
 
 func TestComputeBlockWithStorage(t *testing.T) {
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
@@ -138,7 +135,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
-	programsCache, err := NewProgramsCache(10)
+	programsCache, err := programs.NewChainPrograms(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
@@ -186,7 +183,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		computationResult: computationResult,
 	}
 
-	programsCache, err := NewProgramsCache(10)
+	programsCache, err := programs.NewChainPrograms(10)
 	require.NoError(t, err)
 
 	fakeUploader := &FakeUploader{}
@@ -220,9 +217,7 @@ func TestExecuteScript(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
@@ -263,7 +258,7 @@ func TestExecuteScript(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 		},
@@ -325,7 +320,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 		},
@@ -370,10 +365,10 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() VirtualMachine {
+			NewCustomVirtualMachine: func() computer.VirtualMachine {
 				return &PanickingVM{}
 			},
 		},
@@ -420,10 +415,10 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       1 * time.Millisecond,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() VirtualMachine {
+			NewCustomVirtualMachine: func() computer.VirtualMachine {
 				return &LongRunningVM{duration: 2 * time.Millisecond}
 			},
 		},
@@ -470,10 +465,10 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       1 * time.Second,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() VirtualMachine {
+			NewCustomVirtualMachine: func() computer.VirtualMachine {
 				return &LongRunningVM{duration: 0}
 			},
 		},
@@ -490,10 +485,18 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 type PanickingVM struct{}
 
 func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
+	return p.RunV2(f, procedure, view)
+}
+
+func (p *PanickingVM) RunV2(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
 func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
+	panic("not expected")
+}
+
+func (p *PanickingVM) GetAccountV2(f fvm.Context, address flow.Address, view state.View) (*flow.Account, error) {
 	panic("not expected")
 }
 
@@ -502,6 +505,10 @@ type LongRunningVM struct {
 }
 
 func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
+	return l.RunV2(f, procedure, view)
+}
+
+func (l *LongRunningVM) RunV2(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	time.Sleep(l.duration)
 	// satisfy value marshaller
 	if scriptProcedure, is := procedure.(*fvm.ScriptProcedure); is {
@@ -512,6 +519,10 @@ func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.V
 }
 
 func (l *LongRunningVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
+	panic("not expected")
+}
+
+func (l *LongRunningVM) GetAccountV2(f fvm.Context, address flow.Address, view state.View) (*flow.Account, error) {
 	panic("not expected")
 }
 
@@ -555,7 +566,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		nil,
 		nil,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -595,7 +606,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		nil,
 		nil,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -646,7 +657,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		nil,
 		nil,
 		ComputationConfig{
-			ProgramsCacheSize:        DefaultProgramsCacheSize,
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -655,7 +666,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 	programs := programs.NewEmptyPrograms()
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, programs)
+	env := fvm.NewScriptEnv(context.Background(), ctx, stTxn, programs)
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -681,10 +692,12 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	require.NoError(t, err)
 
-	v, err := vm.Runtime.ReadStored(
+	rt := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(rt)
+
+	v, err := rt.ReadStored(
 		commonAddress,
 		cadence.NewPath("storage", "x"),
-		runtime.Context{Interface: env},
 	)
 
 	// the save should not update account storage by writing the delta from the child view back to the parent

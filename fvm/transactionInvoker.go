@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	programsCache "github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -25,8 +26,7 @@ func NewTransactionInvoker() TransactionInvoker {
 }
 
 func (i TransactionInvoker) Process(
-	vm *VirtualMachine,
-	ctx *Context,
+	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programsCache.Programs,
@@ -47,7 +47,7 @@ func (i TransactionInvoker) Process(
 		return err
 	}
 
-	var modifiedSets programsCache.ModifiedSets
+	var modifiedSets programsCache.ModifiedSetsInvalidator
 	defer func() {
 		// based on the contract and frozen account updates we decide how to
 		// clean up the programs for failed transactions we also do the same as
@@ -80,37 +80,24 @@ func (i TransactionInvoker) Process(
 		}
 	}()
 
-	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	env := NewTransactionEnv(ctx, sth, programs, proc.Transaction, proc.TxIndex, span)
 
-	location := common.TransactionLocation(proc.ID)
-
-	runtimeEnv := env.BorrowCadenceRuntime()
-	defer env.ReturnCadenceRuntime(runtimeEnv)
+	rt := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(rt)
 
 	var txError error
-	err = vm.Runtime.ExecuteTransaction(
+	err = rt.ExecuteTransaction(
 		runtime.Script{
 			Source:    proc.Transaction.Script,
 			Arguments: proc.Transaction.Arguments,
 		},
-		runtime.Context{
-			Interface:   env,
-			Location:    location,
-			Environment: runtimeEnv,
-		},
-	)
+		common.TransactionLocation(proc.ID))
+
 	if err != nil {
-		var interactionLimitExceededErr *errors.LedgerInteractionLimitExceededError
-		if errors.As(err, &interactionLimitExceededErr) {
-			// If it is this special interaction limit error, just set it directly as the tx error
-			txError = err
-		} else {
-			// Otherwise, do what we use to do
-			txError = fmt.Errorf(
-				"transaction invocation failed when executing transaction: %w",
-				errors.HandleRuntimeError(err),
-			)
-		}
+		txError = fmt.Errorf(
+			"transaction invocation failed when executing transaction: %w",
+			err,
+		)
 	}
 
 	// read computationUsed from the environment. This will be used to charge fees.
@@ -136,7 +123,7 @@ func (i TransactionInvoker) Process(
 	// this writes back the contract contents to accounts
 	// if any error occurs we fail the tx
 	// this needs to happen before checking limits, so that contract changes are committed to the state
-	modifiedSets, err = env.Commit()
+	modifiedSets, err = env.FlushPendingUpdates()
 	if err != nil && txError == nil {
 		txError = fmt.Errorf("transaction invocation failed when committing Environment: %w", err)
 	}
@@ -156,7 +143,13 @@ func (i TransactionInvoker) Process(
 		sth.DisableAllLimitEnforcements()
 		defer sth.EnableAllLimitEnforcements()
 
-		modifiedSets = programsCache.ModifiedSets{}
+		// log transaction as failed
+		ctx.Logger.Info().
+			Err(txError).
+			Msg("transaction executed with error")
+
+		modifiedSets = programsCache.ModifiedSetsInvalidator{}
+		env.Reset()
 
 		// drop delta since transaction failed
 		err := sth.RestartNestedTransaction(nestedTxnId)
@@ -166,14 +159,6 @@ func (i TransactionInvoker) Process(
 				err,
 			)
 		}
-
-		// log transaction as failed
-		ctx.Logger.Info().
-			Msg("transaction executed with error")
-
-		// TODO(patrick): make env reusable on error
-		// reset env
-		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
@@ -203,11 +188,11 @@ func (i TransactionInvoker) Process(
 }
 
 func (i TransactionInvoker) deductTransactionFees(
-	env *TransactionEnv,
+	env environment.Environment,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	computationUsed uint64) (err error) {
-	if !env.ctx.TransactionFeesEnabled {
+	if !env.TransactionFeesEnabled() {
 		return nil
 	}
 
@@ -230,7 +215,7 @@ func (i TransactionInvoker) deductTransactionFees(
 }
 
 // logExecutionIntensities logs execution intensities of the transaction
-func (i TransactionInvoker) logExecutionIntensities(ctx *Context, sth *state.StateHolder, txHash string) {
+func (i TransactionInvoker) logExecutionIntensities(ctx Context, sth *state.StateHolder, txHash string) {
 	if ctx.Logger.Debug().Enabled() {
 		computation := zerolog.Dict()
 		for s, u := range sth.ComputationIntensities() {

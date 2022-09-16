@@ -3,9 +3,12 @@ package fvm
 import (
 	"math"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/programs"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -42,7 +45,8 @@ type Context struct {
 	TransactionProcessors         []TransactionProcessor
 	ScriptProcessors              []ScriptProcessor
 	Logger                        zerolog.Logger
-	ReusableCadenceRuntimePool    ReusableCadenceRuntimePool
+	ReusableCadenceRuntimePool    reusableRuntime.ReusableCadenceRuntimePool
+	BlockPrograms                 *programs.Programs
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -99,8 +103,10 @@ func defaultContext() Context {
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvoker(),
 		},
-		Logger:                     zerolog.Nop(),
-		ReusableCadenceRuntimePool: NewReusableCadenceRuntimePool(0),
+		Logger: zerolog.Nop(),
+		ReusableCadenceRuntimePool: reusableRuntime.NewReusableCadenceRuntimePool(
+			0,
+			runtime.Config{}),
 	}
 }
 
@@ -320,9 +326,20 @@ func WithTransactionFeesEnabled(enabled bool) Option {
 
 // WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
 // use for creating the cadence runtime.
-func WithReusableCadenceRuntimePool(pool ReusableCadenceRuntimePool) Option {
+func WithReusableCadenceRuntimePool(
+	pool reusableRuntime.ReusableCadenceRuntimePool,
+) Option {
 	return func(ctx Context) Context {
 		ctx.ReusableCadenceRuntimePool = pool
+		return ctx
+	}
+}
+
+// WithBlockPrograms sets the programs cache storage to be used by the
+// transaction/script.
+func WithBlockPrograms(programs *programs.Programs) Option {
+	return func(ctx Context) Context {
+		ctx.BlockPrograms = programs
 		return ctx
 	}
 }

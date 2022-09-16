@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -41,9 +39,8 @@ import (
 )
 
 func TestPrograms_TestContractUpdates(t *testing.T) {
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	chain := flow.Mainnet.Chain()
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -130,7 +127,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
-	programsCache, err := NewProgramsCache(10)
+	programsCache, err := programs.NewChainPrograms(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
@@ -193,9 +190,8 @@ func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header
 //	            -> Block1211 (emit event - version should be 2)
 func TestPrograms_TestBlockForks(t *testing.T) {
 	block := unittest.BlockFixture()
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	chain := flow.Emulator.Chain()
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 	execCtx := fvm.NewContext(
 		fvm.WithBlockHeader(block.Header),
 		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: &block}}),
@@ -230,7 +226,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
-	programsCache, err := NewProgramsCache(10)
+	programsCache, err := programs.NewChainPrograms(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
@@ -280,8 +276,6 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block11, res = createTestBlockAndRun(t, engine, block1, col11, block11View)
 		// cache should include value for this block
 		require.NotNil(t, programsCache.Get(block11.ID()))
-		// cache should have changes
-		require.True(t, programsCache.Get(block11.ID()).HasChanges())
 		// 1st event should be contract deployed
 		assert.EqualValues(t, "flow.AccountContractAdded", res.Events[0][0].Type)
 	})
@@ -301,8 +295,6 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block111, res = createTestBlockAndRun(t, engine, block11, col111, block111View)
 		// cache should include a program for this block
 		require.NotNil(t, programsCache.Get(block111.ID()))
-		// cache should have changes
-		require.True(t, programsCache.Get(block111.ID()).HasChanges())
 
 		require.Len(t, res.Events, 2)
 
