@@ -29,7 +29,7 @@ import (
 )
 
 type LoadCase struct {
-	tps      int
+	tps      uint
 	duration time.Duration
 }
 
@@ -116,7 +116,7 @@ func main() {
 		log.Fatal().Err(err).Str("value", *tpsDurationsFlag).
 			Msg("could not parse tps-durations flag")
 	}
-	loadCase := LoadCase{tps: int(tps), duration: tpsDuration}
+	loadCase := LoadCase{tps: uint(tps), duration: tpsDuration}
 
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
@@ -134,11 +134,9 @@ func main() {
 	// prepare load generator
 	log.Info().
 		Str("load_type", loadType).
-		Int("tps", loadCase.tps).
+		Uint("tps", loadCase.tps).
 		Dur("duration", loadCase.duration).
 		Msgf("Running load case...")
-
-	loaderMetrics.SetTPSConfigured(loadCase.tps)
 
 	lg, err := benchmark.New(
 		ctx,
@@ -152,9 +150,8 @@ func main() {
 			FlowTokenAddress:      &flowTokenAddress,
 		},
 		benchmark.LoadParams{
-			TPS:              loadCase.tps,
-			NumberOfAccounts: loadCase.tps * accountMultiplier,
-			LoadType:         loadType,
+			NumberOfAccounts: int(loadCase.tps) * accountMultiplier,
+			LoadType:         benchmark.LoadType(loadType),
 			FeedbackEnabled:  feedbackEnabled,
 		},
 		benchmark.ConstExecParams{
@@ -174,7 +171,12 @@ func main() {
 	}
 
 	// run load
-	lg.Start()
+	err = lg.SetTPS(loadCase.tps)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("unable to set tps")
+	}
+	// TODO(rbtz): pass metrics to the load generator
+	loaderMetrics.SetTPSConfigured(loadCase.tps)
 
 	// prepare data slices
 	sliceDuration, _ := time.ParseDuration(*sliceSize)

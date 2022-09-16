@@ -25,7 +25,7 @@ import (
 )
 
 type LoadCase struct {
-	tps      int
+	tps      uint
 	duration time.Duration
 }
 
@@ -96,7 +96,7 @@ func main() {
 
 	// run load cases
 	for i, c := range parseLoadCases(log, tpsFlag, tpsDurationsFlag) {
-		log.Info().Str("load_type", *loadTypeFlag).Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
+		log.Info().Str("load_type", *loadTypeFlag).Int("number", i).Uint("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
 
 		loaderMetrics.SetTPSConfigured(c.tps)
 
@@ -115,8 +115,7 @@ func main() {
 					FlowTokenAddress:      &flowTokenAddress,
 				},
 				benchmark.LoadParams{
-					TPS:              c.tps,
-					NumberOfAccounts: c.tps * *accountMultiplierFlag,
+					NumberOfAccounts: int(c.tps) * *accountMultiplierFlag,
 					LoadType:         benchmark.LoadType(*loadTypeFlag),
 					FeedbackEnabled:  *feedbackEnabled,
 				},
@@ -135,7 +134,11 @@ func main() {
 			if err != nil {
 				log.Fatal().Err(err).Msgf("unable to init loader")
 			}
-			lg.Start()
+
+			err = lg.SetTPS(uint(c.tps))
+			if err != nil {
+				log.Fatal().Err(err).Msgf("unable to set tps")
+			}
 		}
 
 		waitC := make(<-chan time.Time)
@@ -169,7 +172,7 @@ func parseLoadCases(log zerolog.Logger, tpsFlag, tpsDurationsFlag *string) []Loa
 			log.Fatal().Err(err).Str("value", s).
 				Msg("could not parse tps flag, expected comma separated list of integers")
 		}
-		cases = append(cases, LoadCase{tps: int(t)})
+		cases = append(cases, LoadCase{tps: uint(t)})
 	}
 
 	tpsDurationsStrings := strings.Split(*tpsDurationsFlag, ",")

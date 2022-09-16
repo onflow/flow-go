@@ -58,6 +58,8 @@ type ContLoadGenerator struct {
 	accounts            []*flowAccount
 	availableAccounts   chan *flowAccount // queue with accounts available for workers
 	workerStatsTracker  *WorkerStatsTracker
+	mu                  sync.Mutex
+	workFunc            workFunc
 	workers             []*Worker
 	stopped             bool // TODO(ajm): remove this and just use the channel in Init()
 	stoppedChannel      chan struct{}
@@ -73,7 +75,6 @@ type NetworkParams struct {
 }
 
 type LoadParams struct {
-	TPS              int
 	NumberOfAccounts int
 	LoadType         LoadType
 
@@ -143,7 +144,7 @@ func New(
 		}
 	}
 
-	lGen := &ContLoadGenerator{
+	lg := &ContLoadGenerator{
 		log:                 log,
 		loaderMetrics:       loaderMetrics,
 		loadParams:          loadParams,
@@ -159,7 +160,19 @@ func New(
 		stoppedChannel:      make(chan struct{}),
 	}
 
-	return lGen, nil
+	// TODO(rbtz): hide load implementation behind an interface
+	switch loadParams.LoadType {
+	case TokenTransferLoadType:
+		lg.workFunc = lg.sendTokenTransferTx
+	case TokenAddKeysLoadType:
+		lg.workFunc = lg.sendAddKeyTx
+	case ConstExecCostLoadType:
+		lg.workFunc = lg.sendConstExecCostTx
+	default:
+		lg.workFunc = lg.sendFavContractTx
+	}
+
+	return lg, nil
 }
 
 // TODO(rbtz): make part of New
@@ -199,6 +212,8 @@ func (lg *ContLoadGenerator) Init() error {
 			return err
 		}
 	}
+
+	lg.workerStatsTracker.StartPrinting(1 * time.Second)
 
 	return nil
 }
@@ -241,31 +256,47 @@ func (lg *ContLoadGenerator) setupFavContract() error {
 	return nil
 }
 
-func (lg *ContLoadGenerator) Start() {
-	// spawn workers
-	for i := 0; i < lg.loadParams.TPS; i++ {
-		var worker Worker
-
-		// TODO(rbtz): create an interface for different load types: Start()
-		switch lg.loadParams.LoadType {
-		case TokenTransferLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.sendTokenTransferTx)
-		case TokenAddKeysLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.sendAddKeyTx)
-		case ConstExecCostLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.sendConstExecCostTx)
-		// other types
-		default:
-			worker = NewWorker(i, 1*time.Second, lg.sendFavContractTx)
-		}
-
+func (lg *ContLoadGenerator) startWorkers(numWorkers, diff int) {
+	for i := 0; i < diff; i++ {
+		worker := NewWorker(numWorkers+i, 1*time.Second, lg.workFunc)
 		worker.Start()
-		lg.workerStatsTracker.AddWorker()
-
-		lg.workers = append(lg.workers, &worker)
+		lg.workers = append(lg.workers, worker)
 	}
+	lg.workerStatsTracker.AddWorkers(diff)
+}
 
-	lg.workerStatsTracker.StartPrinting(1 * time.Second)
+func (lg *ContLoadGenerator) stopWorkers(numWorkers, diff int) {
+	wg := sync.WaitGroup{}
+	wg.Add(diff)
+
+	start := numWorkers - diff
+	for i := start; i < numWorkers; i++ {
+		go func(w *Worker) {
+			defer wg.Done()
+			lg.log.Debug().Int("workerID", w.workerID).Msg("stopping worker")
+			w.Stop()
+		}(lg.workers[i])
+	}
+	wg.Wait()
+
+	lg.workers = lg.workers[:start]
+	lg.workerStatsTracker.AddWorkers(-diff)
+}
+
+func (lg *ContLoadGenerator) SetTPS(num uint) error {
+	lg.mu.Lock()
+	defer lg.mu.Unlock()
+
+	numWorkers := len(lg.workers)
+	diff := int(num) - numWorkers
+
+	switch {
+	case diff > 0:
+		lg.startWorkers(numWorkers, diff)
+	case diff < 0:
+		lg.stopWorkers(numWorkers, -diff)
+	}
+	return nil
 }
 
 func (lg *ContLoadGenerator) Stop() {
@@ -277,19 +308,9 @@ func (lg *ContLoadGenerator) Stop() {
 	defer lg.log.Debug().Msg("stopped generator")
 
 	lg.stopped = true
-	wg := sync.WaitGroup{}
-	wg.Add(len(lg.workers))
-	for _, w := range lg.workers {
-		w := w
 
-		go func() {
-			defer wg.Done()
-
-			lg.log.Debug().Int("workerID", w.workerID).Msg("stopping worker")
-			w.Stop()
-		}()
-	}
-	wg.Wait()
+	lg.log.Debug().Msg("stopping workers")
+	_ = lg.SetTPS(0)
 	lg.workerStatsTracker.StopPrinting()
 	lg.log.Debug().Msg("stopping follower")
 	lg.follower.Stop()
