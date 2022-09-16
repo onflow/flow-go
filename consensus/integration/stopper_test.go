@@ -16,13 +16,13 @@ type StopperConsumer struct {
 
 // Stopper is responsible for detecting a stopping condition, and stopping all nodes.
 //
-// How to stop nodes?
-// We can stop each node as soon as it enters a certain view. But the problem
-// is if some fast nodes reaches a view earlier and gets stopped, it won't
-// be available for other nodes to sync, and slow nodes will never be able
-// to catch up.
-// A better strategy is to wait until all nodes has entered a certain view,
-// then stop them all - this is what the Stopper does.
+// Design motivation:
+//  - We can stop each node as soon as it enters a certain view. But the problem
+//    is if some fast node reaches a view earlier and gets stopped, it won't
+//    be available for other nodes to sync, and slow nodes will never be able
+//    to catch up.
+//  - A better strategy is to wait until all nodes have entered a certain view,
+//    then stop them all - this is what the Stopper does.
 type Stopper struct {
 	sync.Mutex
 	running  map[flow.Identifier]struct{}

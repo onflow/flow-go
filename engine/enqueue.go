@@ -18,7 +18,10 @@ type Message struct {
 // being handled by the engine.
 type MessageStore interface {
 	// Put adds the message to the message store. It returns true if the message
-	// is stored, and false if it is dropped.
+	// is stored, and false if it is immediately dropped.
+	// Note: depending on the implementation, message stores might drop messages
+	// later according to their internal ejection policy. In other words, a return 
+	// value of `true` does _not imply_ that the message is eventually processed. 
 	Put(*Message) bool
 	// Get retrieves the next message from the message store. It returns true if
 	// a message is retrieved, and false if the message store is empty.

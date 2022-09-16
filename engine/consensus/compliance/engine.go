@@ -73,6 +73,7 @@ type Engine struct {
 
 var _ network.MessageProcessor = (*Engine)(nil)
 var _ hotstuff.Communicator = (*Engine)(nil)
+var _ component.Component = (*Engine)(nil)
 
 func NewEngine(
 	log zerolog.Logger,
@@ -304,7 +305,6 @@ func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready co
 // symptoms of internal state corruption and should be fatal.
 func (e *Engine) processAvailableMessages() error {
 	for {
-
 		msg, ok := e.pendingRangeResponses.Get()
 		if ok {
 			blockResponse := msg.Payload.(*messages.BlockResponse)
@@ -348,7 +348,7 @@ func (e *Engine) processAvailableMessages() error {
 			continue
 		}
 
-		// when there is no more messages in the queue, back to the processMessagesLoop to wait
+		// when there are no more messages in the queue, back to the processMessagesLoop to wait
 		// for the next incoming message to arrive.
 		return nil
 	}
