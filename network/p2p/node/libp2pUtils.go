@@ -13,7 +13,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
@@ -176,19 +175,6 @@ func PeerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifi
 		validIDs = append(validIDs, peerInfo)
 	}
 	return validIDs, invalidIDs
-}
-
-// notEjectedPeerFilter returns a PeerFilter that will return an error if the peer is unknown or ejected.
-func notEjectedPeerFilter(idProvider id.IdentityProvider) p2p.PeerFilter {
-	return func(p peer.ID) error {
-		if id, found := idProvider.ByPeerID(p); !found {
-			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.Pretty())
-		} else if id.Ejected {
-			return fmt.Errorf("node with the peer_id %s is ejected", id.NodeID)
-		}
-
-		return nil
-	}
 }
 
 // AllowAllPeerFilter returns a peer filter that does not do any filtering.
