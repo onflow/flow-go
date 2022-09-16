@@ -3,8 +3,9 @@ package p2p
 import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/flow-go/module"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/module"
 )
 
 // PeerManagerFactoryFunc is a factory function type for generating a PeerManager instance using the given host,
