@@ -437,7 +437,12 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msg("storing the checkpoint to the file")
 
-	err = realWAL.StoreCheckpointConcurrently([]*trie.MTrie{newTrie}, outputDir, &l.logger)
+	err = os.MkdirAll(outputDir, os.ModePerm)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %v: %w", outputDir, err)
+	}
+
+	err = realWAL.StoreCheckpointV6([]*trie.MTrie{newTrie}, outputDir, "root.checkpoint", &l.logger)
 
 	// Writing the checkpoint takes time to write and copy.
 	// Without relying on an exit code or stdout, we need to know when the copy is complete.

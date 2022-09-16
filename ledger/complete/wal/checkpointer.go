@@ -488,7 +488,7 @@ func logProgress(msg string, estimatedSubtrieNodeCount int, logger *zerolog.Logg
 	return func(nodeCounter uint64) {
 		percentage, ok := reportProgress(int(nodeCounter), lookup)
 		if ok {
-			logger.Info().Msgf("%s completion percentage: %v %", msg, percentage)
+			logger.Info().Msgf("%s completion percentage: %v percent", msg, percentage)
 		}
 	}
 }
