@@ -70,8 +70,6 @@ type Meter interface {
 	StorageUpdateSizeMap() MeteredStorageInteractionMap
 	TotalBytesReadFromStorage() uint64
 	TotalBytesWrittenToStorage() uint64
-	TotalStorageReadCount() uint64
-	TotalStorageWriteCount() uint64
 	TotalBytesOfStorageInteractions() uint64
 }
 

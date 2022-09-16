@@ -390,13 +390,11 @@ func TestStorageLimits(t *testing.T) {
 		// first read of key1
 		err := meter1.MeterStorageRead(key1, val1, false)
 		require.NoError(t, err)
-		require.Equal(t, meter1.TotalStorageReadCount(), uint64(1))
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1)
 
 		// second read of key1
 		err = meter1.MeterStorageRead(key1, val1, false)
 		require.NoError(t, err)
-		require.Equal(t, meter1.TotalStorageReadCount(), uint64(1))
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1)
 
 		// first read of key2
@@ -406,7 +404,6 @@ func TestStorageLimits(t *testing.T) {
 
 		err = meter1.MeterStorageRead(key2, val2, false)
 		require.NoError(t, err)
-		require.Equal(t, meter1.TotalStorageReadCount(), uint64(2))
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1+size2)
 	})
 
@@ -422,20 +419,17 @@ func TestStorageLimits(t *testing.T) {
 		// first write of key1
 		err := meter1.MeterStorageWrite(key1, val1, false)
 		require.NoError(t, err)
-		require.Equal(t, meter1.TotalStorageWriteCount(), uint64(1))
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(), meter.GetStorageKeyValueSizeForTesting(key1, val1))
 
 		// second write of key1 with val2
 		err = meter1.MeterStorageWrite(key1, val2, false)
 		require.NoError(t, err)
-		require.Equal(t, meter1.TotalStorageWriteCount(), uint64(1))
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(), meter.GetStorageKeyValueSizeForTesting(key1, val2))
 
 		// first write of key2
 		key2 := meter.StorageInteractionKey{Owner: "", Key: "2"}
 		err = meter1.MeterStorageWrite(key2, val2, false)
 		require.NoError(t, err)
-		require.Equal(t, meter1.TotalStorageWriteCount(), uint64(2))
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(),
 			meter.GetStorageKeyValueSizeForTesting(key1, val2)+meter.GetStorageKeyValueSizeForTesting(key2, val2))
 	})
@@ -450,7 +444,6 @@ func TestStorageLimits(t *testing.T) {
 
 		err := meter1.MeterStorageRead(key1, val1, false /* not enforced */)
 		require.NoError(t, err)
-		require.Equal(t, meter1.TotalStorageReadCount(), uint64(1))
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), meter.GetStorageKeyValueSizeForTesting(key1, val1))
 	})
 
@@ -518,14 +511,12 @@ func TestStorageLimits(t *testing.T) {
 		// read of key1
 		err := meter1.MeterStorageRead(key1, val1, false)
 		require.NoError(t, err)
-		require.Equal(t, meter1.TotalStorageReadCount(), uint64(1))
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1)
 		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), size1)
 
 		// write of key2
 		err = meter1.MeterStorageWrite(key2, val2, false)
 		require.NoError(t, err)
-		require.Equal(t, meter1.TotalStorageWriteCount(), uint64(1))
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(), size2)
 		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), size1+size2)
 	})
@@ -545,14 +536,12 @@ func TestStorageLimits(t *testing.T) {
 		// read of key1
 		err := meter1.MeterStorageRead(key1, val1, false)
 		require.NoError(t, err)
-		require.Equal(t, meter1.TotalStorageReadCount(), uint64(1))
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1)
 		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), size1)
 
 		// write of key2
 		err = meter1.MeterStorageWrite(key2, val2, false)
 		require.NoError(t, err)
-		require.Equal(t, meter1.TotalStorageWriteCount(), uint64(1))
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(), size2)
 		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), size1+size2)
 	})
@@ -572,7 +561,6 @@ func TestStorageLimits(t *testing.T) {
 		// read of key1
 		err := meter1.MeterStorageRead(key1, val1, true)
 		require.NoError(t, err)
-		require.Equal(t, meter1.TotalStorageReadCount(), uint64(1))
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1)
 		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), size1)
 
@@ -620,8 +608,6 @@ func TestStorageLimits(t *testing.T) {
 		// merge
 		meter1.MergeMeter(meter2)
 
-		require.Equal(t, meter1.TotalStorageReadCount(), uint64(2))
-		require.Equal(t, meter1.TotalStorageWriteCount(), uint64(2))
 		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), readSize1*2+writeSize1+writeSize2)
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), readSize1*2)
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(), writeSize1+writeSize2)

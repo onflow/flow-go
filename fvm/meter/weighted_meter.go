@@ -338,8 +338,6 @@ type WeightedMeter struct {
 	memoryIntensities      MeteredMemoryIntensities
 
 	storageUpdateSizeMap     map[StorageInteractionKey]uint64
-	storageReadCounter       uint64
-	storageWriteCounter      uint64
 	totalStorageBytesRead    uint64
 	totalStorageBytesWritten uint64
 }
@@ -393,8 +391,6 @@ func (m *WeightedMeter) MergeMeter(child Meter) {
 	for key, value := range child.StorageUpdateSizeMap() {
 		m.storageUpdateSizeMap[key] += value
 	}
-	m.storageReadCounter += child.TotalStorageReadCount()
-	m.storageWriteCounter += child.TotalStorageWriteCount()
 	m.totalStorageBytesRead += child.TotalBytesReadFromStorage()
 	m.totalStorageBytesWritten += child.TotalBytesWrittenToStorage()
 }
@@ -456,7 +452,6 @@ func (m *WeightedMeter) MeterStorageRead(
 
 	// all reads are on a View which only read from storage at the first read of a given key
 	if _, ok := m.storageUpdateSizeMap[storageKey]; !ok {
-		m.storageReadCounter++
 		readByteSize := getStorageKeyValueSize(storageKey, value)
 		m.totalStorageBytesRead += readByteSize
 		m.storageUpdateSizeMap[storageKey] = readByteSize
@@ -473,11 +468,9 @@ func (m *WeightedMeter) MeterStorageWrite(
 	enforceLimit bool) error {
 	// all writes are on a View which only writes the latest updated value to storage at commit
 	if old, ok := m.storageUpdateSizeMap[storageKey]; ok {
-		m.storageWriteCounter--
 		m.totalStorageBytesWritten -= old
 	}
 
-	m.storageWriteCounter++
 	updateSize := getStorageKeyValueSize(storageKey, value)
 	m.totalStorageBytesWritten += updateSize
 	m.storageUpdateSizeMap[storageKey] = updateSize
@@ -499,19 +492,9 @@ func (m *WeightedMeter) TotalBytesReadFromStorage() uint64 {
 	return m.totalStorageBytesRead
 }
 
-// TotalStorageReadCount returns the total count of storage read
-func (m *WeightedMeter) TotalStorageReadCount() uint64 {
-	return m.storageReadCounter
-}
-
 // TotalBytesReadFromStorage returns total number of byte written to storage
 func (m *WeightedMeter) TotalBytesWrittenToStorage() uint64 {
 	return m.totalStorageBytesWritten
-}
-
-// TotalStorageWriteCount returns the total count of storage write
-func (m *WeightedMeter) TotalStorageWriteCount() uint64 {
-	return m.storageWriteCounter
 }
 
 // TotalBytesOfStorageInteractions returns total number of byte read and written from/to storage
