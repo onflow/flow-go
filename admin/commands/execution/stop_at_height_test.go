@@ -17,7 +17,7 @@ func TestCommandParsing(t *testing.T) {
 
 		req := &admin.CommandRequest{
 			Data: map[string]interface{}{
-				"height": 21,
+				"height": float64(21), // raw json parses to float64
 				"crash":  true,
 			},
 		}
