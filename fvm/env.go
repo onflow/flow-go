@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -21,12 +20,15 @@ import (
 // TODO(patrick): rm after emulator is updated
 type Environment = environment.Environment
 
-// Parts of the environment that are common to all transaction and script
-// executions.
-type commonEnv struct {
+var _ environment.Environment = &facadeEnvironment{}
+
+// facadeEnvironment exposes various fvm business logic as a single interface.
+type facadeEnvironment struct {
 	*environment.Tracer
 	environment.Meter
 	*environment.ProgramLogger
+	*environment.Runtime
+
 	*environment.UUIDGenerator
 
 	*environment.UnsafeRandomGenerator
@@ -47,39 +49,39 @@ type commonEnv struct {
 	*environment.SystemContracts
 
 	handler.ContractUpdater
+	handler.AccountKeyUpdater
 
-	// TODO(patrick): rm
-	ctx Context
-
-	sth         *state.StateHolder
-	programs    *handler.ProgramsHandler
-	accounts    environment.Accounts
-	accountKeys *handler.AccountKeyHandler
-
-	// TODO(patrick): rm once fully refactored
-	fullEnv environment.Environment
+	programs *handler.ProgramsHandler
+	accounts environment.Accounts
 }
 
-func newCommonEnv(
+func newFacadeEnvironment(
 	ctx Context,
 	stateTransaction *state.StateHolder,
 	programs handler.TransactionPrograms,
 	tracer *environment.Tracer,
 	meter environment.Meter,
-) commonEnv {
+) *facadeEnvironment {
 	accounts := environment.NewAccounts(stateTransaction)
 	programsHandler := handler.NewProgramsHandler(programs, stateTransaction)
-	systemContracts := environment.NewSystemContracts()
+	logger := environment.NewProgramLogger(
+		tracer,
+		ctx.Logger,
+		ctx.Metrics,
+		ctx.CadenceLoggingEnabled,
+	)
+	runtime := environment.NewRuntime(ctx.ReusableCadenceRuntimePool)
+	systemContracts := environment.NewSystemContracts(
+		ctx.Chain,
+		tracer,
+		logger,
+		runtime)
 
-	return commonEnv{
-		Tracer: tracer,
-		Meter:  meter,
-		ProgramLogger: environment.NewProgramLogger(
-			tracer,
-			ctx.Logger,
-			ctx.Metrics,
-			ctx.CadenceLoggingEnabled,
-		),
+	env := &facadeEnvironment{
+		Tracer:        tracer,
+		Meter:         meter,
+		ProgramLogger: logger,
+		Runtime:       runtime,
 		UUIDGenerator: environment.NewUUIDGenerator(
 			tracer,
 			meter,
@@ -117,32 +119,23 @@ func newCommonEnv(
 			accounts,
 		),
 		SystemContracts: systemContracts,
-		ctx:             ctx,
-		sth:             stateTransaction,
 		programs:        programsHandler,
 		accounts:        accounts,
+
+		TransactionInfo:   environment.NoTransactionInfo{},
+		EventEmitter:      environment.NoEventEmitter{},
+		AccountCreator:    environment.NoAccountCreator{},
+		AccountFreezer:    environment.NoAccountFreezer{},
+		ContractUpdater:   handler.NoContractUpdater{},
+		AccountKeyUpdater: handler.NoAccountKeyUpdater{},
 	}
+
+	env.Runtime.SetEnvironment(env)
+
+	return env
 }
 
-func (env *commonEnv) Chain() flow.Chain {
-	return env.ctx.Chain
-}
-
-func (env *commonEnv) LimitAccountStorage() bool {
-	return env.ctx.LimitAccountStorage
-}
-
-func (env *commonEnv) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
-	return env.ctx.ReusableCadenceRuntimePool.Borrow(env.fullEnv)
-}
-
-func (env *commonEnv) ReturnCadenceRuntime(
-	reusable *runtime.ReusableCadenceRuntime,
-) {
-	env.ctx.ReusableCadenceRuntimePool.Return(reusable)
-}
-
-func (env *commonEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
+func (env *facadeEnvironment) GetProgram(location common.Location) (*interpreter.Program, error) {
 	defer env.StartSpanFromRoot(trace.FVMEnvGetProgram).End()
 
 	err := env.MeterComputation(environment.ComputationKindGetProgram, 1)
@@ -167,7 +160,7 @@ func (env *commonEnv) GetProgram(location common.Location) (*interpreter.Program
 	return nil, nil
 }
 
-func (env *commonEnv) SetProgram(location common.Location, program *interpreter.Program) error {
+func (env *facadeEnvironment) SetProgram(location common.Location, program *interpreter.Program) error {
 	defer env.StartSpanFromRoot(trace.FVMEnvSetProgram).End()
 
 	err := env.MeterComputation(environment.ComputationKindSetProgram, 1)
@@ -182,7 +175,7 @@ func (env *commonEnv) SetProgram(location common.Location, program *interpreter.
 	return nil
 }
 
-func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, error) {
+func (env *facadeEnvironment) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, error) {
 	defer env.StartExtensiveTracingSpanFromRoot(trace.FVMEnvDecodeArgument).End()
 
 	v, err := jsoncdc.Decode(env, b)
@@ -194,22 +187,24 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 	return v, err
 }
 
-// Commit commits changes and return a list of updated keys
-func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
+func (env *facadeEnvironment) FlushPendingUpdates() (
+	programs.ModifiedSetsInvalidator,
+	error,
+) {
 	keys, err := env.ContractUpdater.Commit()
-	return programs.ModifiedSets{
+	return programs.ModifiedSetsInvalidator{
 		ContractUpdateKeys: keys,
 		FrozenAccounts:     env.FrozenAccounts(),
 	}, err
 }
 
-func (env *commonEnv) Reset() {
+func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
 	env.AccountFreezer.Reset()
 }
 
-func (commonEnv) ResourceOwnerChanged(
+func (facadeEnvironment) ResourceOwnerChanged(
 	*interpreter.Interpreter,
 	*interpreter.CompositeValue,
 	common.Address,
