@@ -14,6 +14,9 @@ on:
       - 'auto-cadence-upgrade/**'
       - 'feature/**'
       - 'v[0-9]+.[0-9]+'
+  workflow_run:
+    workflows: ["Ephemeral BN2 Setup for PR"]
+    branches: ['feature/**', master]
 
 env:
   GO_VERSION: 1.19
