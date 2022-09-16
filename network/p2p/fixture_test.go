@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -111,7 +112,7 @@ func nodeFixture(
 	parameters := &nodeFixtureParameters{
 		handlerFunc: func(network.Stream) {},
 		unicasts:    nil,
-		key:         generateNetworkingKey(t),
+		key:         p2pfixtures.NetworkingKeyFixtures(t),
 		address:     defaultAddress,
 		logger:      unittest.Logger().Level(zerolog.ErrorLevel),
 	}
@@ -180,17 +181,9 @@ func stopNode(t *testing.T, node *p2p.Node) {
 	unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop node on ime")
 }
 
-// generateNetworkingKey is a test helper that generates a ECDSA flow key pair.
-func generateNetworkingKey(t *testing.T) fcrypto.PrivateKey {
-	seed := unittest.SeedFixture(48)
-	key, err := fcrypto.GeneratePrivateKey(fcrypto.ECDSASecp256k1, seed)
-	require.NoError(t, err)
-	return key
-}
-
 // silentNodeFixture returns a TCP listener and a node which never replies
 func silentNodeFixture(t *testing.T) (net.Listener, flow.Identity) {
-	key := generateNetworkingKey(t)
+	key := p2pfixtures.NetworkingKeyFixtures(t)
 
 	lst, err := net.Listen("tcp4", ":0")
 	require.NoError(t, err)

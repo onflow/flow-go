@@ -9,6 +9,7 @@ import (
 
 	"github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -38,7 +39,7 @@ func (suite *PeerManagerTestSuite) SetupTest() {
 func (suite *PeerManagerTestSuite) generatePeerIDs(n int) peer.IDSlice {
 	pids := peer.IDSlice{}
 	for i := 0; i < n; i++ {
-		key := generateNetworkingKey(suite.T())
+		key := p2pfixtures.NetworkingKeyFixtures(suite.T())
 		pid, err := keyutils.PeerIDFromFlowPublicKey(key.PublicKey())
 		require.NoError(suite.T(), err)
 		pids = append(pids, pid)

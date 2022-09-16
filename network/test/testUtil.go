@@ -19,6 +19,7 @@ import (
 	pc "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -178,7 +179,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			metrics,
 			sporkID,
 			p2p.DefaultUnicastTimeout,
-			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
+			translator.NewIdentityProviderIDTranslator(idProviders[i]),
 			codec,
 			consumer,
 			p2p.WithPeerManager(peerManagerFactory),

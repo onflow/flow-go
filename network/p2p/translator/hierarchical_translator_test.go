@@ -1,33 +1,34 @@
-package p2p_test
+package translator_test
 
 import (
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"gotest.tools/assert"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type HierarchicalTranslatorTestSuite struct {
 	suite.Suite
-	translator *p2p.HierarchicalIDTranslator
+	translator *translator.HierarchicalIDTranslator
 	ids        flow.IdentityList
 }
 
 func (suite *HierarchicalTranslatorTestSuite) SetupTest() {
 	suite.ids = unittest.IdentityListFixture(2, unittest.WithKeys)
-	t1, err := p2p.NewFixedTableIdentityTranslator(suite.ids[:1])
+	t1, err := translator.NewFixedTableIdentityTranslator(suite.ids[:1])
 	require.NoError(suite.T(), err)
-	t2, err := p2p.NewFixedTableIdentityTranslator(suite.ids[1:])
+	t2, err := translator.NewFixedTableIdentityTranslator(suite.ids[1:])
 	require.NoError(suite.T(), err)
 
-	suite.translator = p2p.NewHierarchicalIDTranslator(t1, t2)
+	suite.translator = translator.NewHierarchicalIDTranslator(t1, t2)
 }
 
 func TestHierarchicalTranslator(t *testing.T) {
@@ -55,7 +56,7 @@ func (suite *HierarchicalTranslatorTestSuite) TestTranslationFailure() {
 	_, err := suite.translator.GetPeerID(fid)
 	require.Error(suite.T(), err)
 
-	key, err := keyutils.LibP2PPrivKeyFromFlow(generateNetworkingKey(suite.T()))
+	key, err := keyutils.LibP2PPrivKeyFromFlow(p2pfixtures.NetworkingKeyFixtures(suite.T()))
 	require.NoError(suite.T(), err)
 	pid, err := peer.IDFromPrivateKey(key)
 	require.NoError(suite.T(), err)

@@ -1,10 +1,11 @@
-package p2p
+package translator
 
 import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -14,10 +15,10 @@ import (
 // When asked to translate an ID, it will iterate through all of the IDTranslators it was
 // given and return the first successful translation.
 type HierarchicalIDTranslator struct {
-	translators []IDTranslator
+	translators []p2p.IDTranslator
 }
 
-func NewHierarchicalIDTranslator(translators ...IDTranslator) *HierarchicalIDTranslator {
+func NewHierarchicalIDTranslator(translators ...p2p.IDTranslator) *HierarchicalIDTranslator {
 	return &HierarchicalIDTranslator{translators}
 }
 

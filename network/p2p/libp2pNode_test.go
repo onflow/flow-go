@@ -8,6 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -19,7 +20,7 @@ import (
 // TestMultiAddress evaluates correct translations from
 // dns and ip4 to libp2p multi-address
 func TestMultiAddress(t *testing.T) {
-	key := generateNetworkingKey(t)
+	key := p2pfixtures.NetworkingKeyFixtures(t)
 
 	tt := []struct {
 		identity     *flow.Identity
@@ -69,7 +70,7 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 // yields the same info or not.
 func TestGetPeerInfo(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		key := generateNetworkingKey(t)
+		key := p2pfixtures.NetworkingKeyFixtures(t)
 
 		// creates node-i identity
 		identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))

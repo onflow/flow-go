@@ -9,6 +9,7 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -41,7 +42,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	//NOTE: identity2 is not in the ids list simulating an un-staked node
 	ids := flow.IdentityList{&identity1}
-	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
+	translator, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	// peer filter used by the topic validator to check if node is staked
@@ -175,7 +176,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
 
-	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
+	translator, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
@@ -283,7 +284,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2}
-	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
+	translator, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
@@ -357,7 +358,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
-	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
+	translator, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
@@ -452,7 +453,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
-	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
+	translator, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	logger := unittest.Logger()

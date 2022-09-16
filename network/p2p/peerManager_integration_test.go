@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -44,7 +45,7 @@ func TestPeerManager_Integration(t *testing.T) {
 	connector, err := p2p.NewLibp2pConnector(unittest.Logger(), thisNode.Host(), p2p.ConnectionPruningEnabled)
 	require.NoError(t, err)
 
-	idTranslator, err := p2p.NewFixedTableIdentityTranslator(identities)
+	idTranslator, err := translator.NewFixedTableIdentityTranslator(identities)
 	require.NoError(t, err)
 
 	peerManager := p2p.NewPeerManager(unittest.Logger(), p2p.DefaultPeerUpdateInterval, func() peer.IDSlice {

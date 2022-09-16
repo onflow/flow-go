@@ -8,6 +8,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -36,7 +37,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	defer cancel()
 
 	// create and start node 1 on localhost and random port
-	node1key := generateNetworkingKey(t)
+	node1key := p2pfixtures.NetworkingKeyFixtures(t)
 	sporkId := unittest.IdentifierFixture()
 
 	node1, id1 := nodeFixture(t,
@@ -50,7 +51,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	t.Logf("libp2p ID for %s: %s", id1.NodeID.String(), node1.Host().ID())
 
 	// create and start node 2 on localhost and random port
-	node2key := generateNetworkingKey(t)
+	node2key := p2pfixtures.NetworkingKeyFixtures(t)
 	node2, id2 := nodeFixture(t,
 		ctx,
 		sporkId,
@@ -69,7 +70,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	stopNode(t, node2)
 
 	// start node2 with the same name, ip and port but with the new key
-	node2keyNew := generateNetworkingKey(t)
+	node2keyNew := p2pfixtures.NetworkingKeyFixtures(t)
 	assert.False(t, node2key.Equals(node2keyNew))
 	node2, id2New := nodeFixture(t,
 		ctx,
