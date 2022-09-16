@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/desertbit/timer"
 	"net"
 	"os"
 	"strconv"
@@ -138,17 +139,26 @@ func main() {
 			lg.Start()
 		}
 
+		var testRunDuration *timer.Timer
 		// if the duration is 0, we run this case forever
 		if c.duration.Nanoseconds() == 0 {
-			for {
-				time.Sleep(time.Minute)
-			}
+			testRunDuration = timer.NewStoppedTimer()
+		} else {
+			testRunDuration = timer.NewTimer(c.duration)
 		}
 
-		time.Sleep(c.duration)
-
-		if lg != nil {
-			lg.Stop()
+		select {
+		case <-testRunDuration.C:
+			if lg != nil {
+				lg.Stop()
+			}
+		case <-ctx.Done(): //TODO: the loader currently doesn't ever cancel the context
+			if lg != nil {
+				lg.Stop()
+			}
+			// add logging here to express the *why* of the canceled the context.
+			// when the loader cancels its own context it may also call Stop() on itself
+			// this may become redundant.
 		}
 	}
 }

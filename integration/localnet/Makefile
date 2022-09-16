@@ -80,7 +80,11 @@ load:
 
 .PHONY: tps-test
 tps-test:
-	go run --tags relic ../benchmark/cmd/ci -log-level info -tps 25 -tps-durations 10m
+	go run --tags relic ../benchmark/cmd/manual -log-level info -tps 25 -tps-durations 1m
+
+.PHONY: tps-ci-smoke
+tps-ci-smoke:
+	go run --tags relic ../benchmark/cmd/ci -log-level info -tps 25 -tps-durations 2m -slice-size 15s -ci-run
 
 .PHONY: tps-test-ci
 tps-test-ci:

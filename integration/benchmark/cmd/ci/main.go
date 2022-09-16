@@ -71,7 +71,7 @@ func main() {
 	tpsFlag := flag.String("tps", "300", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
 	tpsDurationsFlag := flag.String("tps-durations", "10m", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	ciFlag := flag.Bool("ci-run", false, "whether or not the run is part of CI")
-	sliceSize := flag.String("sliceSize", "2m", "the amount of time that each slice covers")
+	sliceSize := flag.String("slice-size", "2m", "the amount of time that each slice covers")
 	flag.Parse()
 
 	// Version and Commit Info
@@ -171,7 +171,7 @@ func main() {
 	// run load
 	lg.Start()
 
-	testRunDuration := time.NewTicker(loadCase.duration)
+	testRunDuration := time.NewTimer(loadCase.duration)
 	defer testRunDuration.Stop()
 
 	// prepare data slices
@@ -206,7 +206,7 @@ func recordTransactionData(
 	sliceDuration time.Duration,
 	runStartTime time.Time,
 	gitSha, goVersion, osVersion string) {
-
+	fmt.Print("We have entered 'recordTransactionData()'\n")
 	// grab time into start time
 	startTime := time.Now()
 	// grab total executed transactions into start transactions
@@ -240,8 +240,10 @@ func recordTransactionData(
 			startTime = endTime
 
 			slices <- slice
+			fmt.Printf("Slice Generated for time starting at: %v\n", slice.StartTime)
 		case <-lg.Done():
 			close(slices)
+			fmt.Printf("Ending collection of slices, %v slices generated.", len(slices))
 			return
 		}
 	}
