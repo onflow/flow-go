@@ -9,9 +9,9 @@ import (
 
 // Config contains the configuration parameters for ExponentialIncrease-LinearDecrease
 // timeout.Controller
-// - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
-//   this results in exponential growing timeout duration on multiple subsequent timeouts
-// - on progress: MULTIPLICATIVE timeout decrease
+//   - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
+//     this results in exponential growing timeout duration on multiple subsequent timeouts
+//   - on progress: MULTIPLICATIVE timeout decrease
 type Config struct {
 	// ReplicaTimeout is the duration of a view before we time out [MILLISECONDS]
 	// ReplicaTimeout is the only variable quantity
@@ -66,17 +66,18 @@ func NewDefaultConfig() Config {
 }
 
 // NewConfig creates a new TimoutConfig.
-//  * startReplicaTimeout: starting timeout value for replica round [Milliseconds]
-//    Consistency requirement: `startReplicaTimeout` cannot be smaller than `minReplicaTimeout`
-//  * minReplicaTimeout: minimal timeout value for replica round [Milliseconds]
-//    Consistency requirement: must be non-negative
-//  * maxReplicaTimeout: maximal timeout value for replica round [Milliseconds]
-//    Consistency requirement: must be non-negative and larger than minReplicaTimeout
-//  * timeoutIncrease: multiplicative factor for increasing timeout
-//    Consistency requirement: must be strictly larger than 1
-//  * timeoutDecrease: multiplicative factor for timeout decrease
-//    Consistency requirement: must be in open interval (0,1); boundary values not allowed
-//  * blockRateDelay: a delay to delay the proposal broadcasting [Milliseconds]
+//   - startReplicaTimeout: starting timeout value for replica round [Milliseconds]
+//     Consistency requirement: `startReplicaTimeout` cannot be smaller than `minReplicaTimeout`
+//   - minReplicaTimeout: minimal timeout value for replica round [Milliseconds]
+//     Consistency requirement: must be non-negative
+//   - maxReplicaTimeout: maximal timeout value for replica round [Milliseconds]
+//     Consistency requirement: must be non-negative and larger than minReplicaTimeout
+//   - timeoutIncrease: multiplicative factor for increasing timeout
+//     Consistency requirement: must be strictly larger than 1
+//   - timeoutDecrease: multiplicative factor for timeout decrease
+//     Consistency requirement: must be in open interval (0,1); boundary values not allowed
+//   - blockRateDelay: a delay to delay the proposal broadcasting [Milliseconds]
+//
 // Returns `model.ConfigurationError` is any of the consistency requirements is violated.
 func NewConfig(
 	startReplicaTimeout time.Duration,

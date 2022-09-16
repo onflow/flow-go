@@ -15,7 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
-	swarm "github.com/libp2p/go-libp2p-swarm"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -596,22 +596,26 @@ func TestConnectionGating(t *testing.T) {
 
 	// create 2 nodes
 	node1Peers := make(map[peer.ID]struct{})
-	node1, node1Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
-		_, ok := node1Peers[p]
-		return ok
+	node1, node1Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) error {
+		if _, ok := node1Peers[p]; !ok {
+			return fmt.Errorf("id not found: %s", p.Pretty())
+		}
+		return nil
 	}))
+	defer stopNode(t, node1)
 
 	node2Peers := make(map[peer.ID]struct{})
-	node2, node2Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
-		_, ok := node2Peers[p]
-		return ok
+	node2, node2Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) error {
+		if _, ok := node2Peers[p]; !ok {
+			return fmt.Errorf("id not found: %s", p.Pretty())
+		}
+		return nil
 	}))
+	defer stopNode(t, node2)
 
-	defer stopNode(t, node1)
 	node1Info, err := p2p.PeerAddressInfo(node1Id)
 	assert.NoError(t, err)
 
-	defer stopNode(t, node2)
 	node2Info, err := p2p.PeerAddressInfo(node2Id)
 	assert.NoError(t, err)
 

@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
+	synccore "github.com/onflow/flow-go/module/chainsync"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
@@ -45,7 +46,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
-	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
@@ -182,10 +182,6 @@ func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
 	return infos
 }
 
-// n - the total number of nodes to be created
-// finalizedCount - the number of finalized blocks before stopping the tests
-// tolerate - the number of node to tolerate that don't need to reach the finalization count
-// 						before stopping the tests
 func createNodes(
 	t *testing.T,
 	participants *ConsensusParticipants,

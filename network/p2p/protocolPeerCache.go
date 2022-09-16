@@ -77,7 +77,13 @@ func (p *protocolPeerCache) removeProtocols(peerID peer.ID, protocols []protocol
 func (p *protocolPeerCache) getPeers(pid protocol.ID) map[peer.ID]struct{} {
 	p.RLock()
 	defer p.RUnlock()
-	return p.protocolPeers[pid]
+
+	// it is not safe to return a reference to the map, so we make a copy
+	peersCopy := make(map[peer.ID]struct{}, len(p.protocolPeers[pid]))
+	for peerID := range p.protocolPeers[pid] {
+		peersCopy[peerID] = struct{}{}
+	}
+	return peersCopy
 }
 
 func (p *protocolPeerCache) consumeSubscription(logger zerolog.Logger, h host.Host, sub event.Subscription) {

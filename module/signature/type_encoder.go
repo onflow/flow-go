@@ -21,8 +21,8 @@ func EncodeSingleSig(sigType encoding.SigType, sig crypto.Signature) []byte {
 // DecodeSingleSig decodes the signature data into a cryptographic signature and a type as required by
 // the consensus design. Cryptographic validity of signatures is _not_ checked.
 // It returns:
-//  - 0, nil, ErrInvalidSignatureFormat if the sig type is invalid (covers nil or empty sigData)
-//  - sigType, signature, nil if the sig type is valid and the decoding is done successfully.
+//   - 0, nil, ErrInvalidSignatureFormat if the sig type is invalid (covers nil or empty sigData)
+//   - sigType, signature, nil if the sig type is valid and the decoding is done successfully.
 func DecodeSingleSig(sigData []byte) (encoding.SigType, crypto.Signature, error) {
 	if len(sigData) == 0 {
 		return 0, nil, fmt.Errorf("empty sig data: %w", ErrInvalidSignatureFormat)
@@ -53,12 +53,12 @@ func EncodeDoubleSig(stakingSig crypto.Signature, beaconSig crypto.Signature) []
 // Cryptographic validity of signatures is _not_ checked.
 // Decomposition of the sigData is purely done based on length.
 // It returns:
-//  - staking signature, random beacon signature, nil:
-//    if sigData is twice the size of a BLS signature bytes long, we use the leading half as staking signature
-//    and the tailing half random beacon sig
-//  - staking signature, nil, nil:
-//    if sigData is the size of a BLS signature, we interpret sigData entirely as staking signature
-//  - nil, nil, ErrInvalidSignatureFormat if the sig type is invalid (covers nil or empty sigData)
+//   - staking signature, random beacon signature, nil:
+//     if sigData is twice the size of a BLS signature bytes long, we use the leading half as staking signature
+//     and the tailing half random beacon sig
+//   - staking signature, nil, nil:
+//     if sigData is the size of a BLS signature, we interpret sigData entirely as staking signature
+//   - nil, nil, ErrInvalidSignatureFormat if the sig type is invalid (covers nil or empty sigData)
 func DecodeDoubleSig(sigData []byte) (crypto.Signature, crypto.Signature, error) {
 	sigLength := len(sigData)
 	switch sigLength {

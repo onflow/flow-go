@@ -4,14 +4,14 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // PendingMessage is a pending message to be sent
 type PendingMessage struct {
 	// The sender node id
 	From    flow.Identifier
-	Channel network.Channel
+	Channel channels.Channel
 	Event   interface{}
 	// The id of the receiver nodes
 	TargetIDs []flow.Identifier
@@ -72,10 +72,11 @@ func (b *Buffer) Deliver(sendOne func(*PendingMessage) bool) {
 		}
 	}
 
-	// add the unsent messages back to the buffer
 	b.Lock()
+	defer b.Unlock()
+
+	// add the unsent messages back to the buffer
 	b.pending = append(unsent, b.pending...)
-	b.Unlock()
 }
 
 // takeAll takes all pending messages from the buffer and empties the buffer.

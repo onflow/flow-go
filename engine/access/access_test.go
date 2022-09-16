@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
+
 	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/access"
@@ -30,12 +32,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -78,11 +79,11 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
+
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
 	params.On("Root").Return(header, nil)
 	suite.state.On("Params").Return(params).Maybe()
-
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 
@@ -285,8 +286,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, nil)
-		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, nil)
+		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
 
 		backend := backend.New(suite.state,
 			nil,
@@ -562,7 +563,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// setup mocks
 		originID := unittest.IdentifierFixture()
 		conduit := new(mocknetwork.Conduit)
-		suite.net.On("Register", network.ReceiveReceipts, mock.Anything).Return(conduit, nil).
+		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 
@@ -585,7 +586,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -622,7 +623,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
 			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
-		rpcEng := rpcEngBuilder.WithLegacy().Build()
+		require.NoError(suite.T(), err)
+		rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
@@ -630,17 +632,17 @@ func (suite *Suite) TestGetSealedTransaction() {
 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
+		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
+		err = blocks.Store(&block)
+		require.NoError(suite.T(), err)
+		suite.snapshot.On("Head").Return(block.Header, nil).Twice()
+
 		background, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		ctx, _ := irrecoverable.WithSignaler(background)
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
-
-		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-		err = blocks.Store(&block)
-		require.NoError(suite.T(), err)
-		suite.snapshot.On("Head").Return(block.Header, nil).Once()
 
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
@@ -656,7 +658,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		ingestEng.OnCollection(originID, &collection)
 
 		for _, r := range executionReceipts {
-			err = ingestEng.Process(network.ReceiveReceipts, enNodeIDs[0], r)
+			err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
 			require.NoError(suite.T(), err)
 		}
 
@@ -688,7 +690,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		suite.backend = backend.New(suite.state,
 			suite.collClient,
@@ -722,7 +724,8 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 
 		conduit := new(mocknetwork.Conduit)
-		suite.net.On("Register", network.ReceiveReceipts, mock.Anything).Return(conduit, nil).Once()
+		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
+			Once()
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
@@ -862,6 +865,9 @@ func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	epochs.On("Current").Return(epoch)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs)
+	snap.On("SealingSegment").Return(&flow.SealingSegment{Blocks: unittest.BlockFixtures(2)}, nil).Maybe()
+
+	suite.state.On("AtBlockID", mock.Anything).Return(snap).Once() // initial height lookup in ingestion engine
 	suite.state.On("AtBlockID", refBlockID).Return(snap)
 
 	return block, collection

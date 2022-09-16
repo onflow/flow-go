@@ -2,7 +2,6 @@ package compressor
 
 import (
 	"io"
-	"io/ioutil"
 
 	"github.com/pierrec/lz4"
 
@@ -18,7 +17,7 @@ func NewLz4Compressor() *Lz4Compressor {
 }
 
 func (lz4Comp Lz4Compressor) NewReader(r io.Reader) (io.ReadCloser, error) {
-	return ioutil.NopCloser(lz4.NewReader(r)), nil
+	return io.NopCloser(lz4.NewReader(r)), nil
 }
 
 func (lz4Comp Lz4Compressor) NewWriter(w io.Writer) (network.WriteCloseFlusher, error) {

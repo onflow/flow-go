@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/engine/execution/state"
-	fvmState "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -40,10 +40,10 @@ func registerIDToKey(registerID flow.RegisterID) ledger.Key {
 }
 
 type AccountsAtreeLedger struct {
-	Accounts fvmState.Accounts
+	Accounts environment.Accounts
 }
 
-func NewAccountsAtreeLedger(accounts fvmState.Accounts) *AccountsAtreeLedger {
+func NewAccountsAtreeLedger(accounts environment.Accounts) *AccountsAtreeLedger {
 	return &AccountsAtreeLedger{Accounts: accounts}
 }
 

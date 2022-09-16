@@ -8,8 +8,9 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,17 +20,15 @@ import (
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state
 // with the default accounts and contracts required by the Flow virtual machine.
 type BootstrapProcedure struct {
-	vm        *VirtualMachine
 	ctx       Context
 	sth       *state.StateHolder
 	programs  *programs.Programs
-	accounts  state.Accounts
 	rootBlock *flow.Header
 
 	// genesis parameters
-	serviceAccountPublicKey flow.AccountPublicKey
-	initialTokenSupply      cadence.UFix64
-	addressGenerator        flow.AddressGenerator
+	accountKeys        BootstrapAccountKeys
+	initialTokenSupply cadence.UFix64
+	accountCreator     environment.BootstrapAccountCreator
 
 	accountCreationFee               cadence.UFix64
 	minimumStorageReservation        cadence.UFix64
@@ -42,8 +41,8 @@ type BootstrapProcedure struct {
 	restrictedContractDeployment *bool
 
 	transactionFees        BootstrapProcedureFeeParameters
-	executionEffortWeights weightedMeter.ExecutionEffortWeights
-	executionMemoryWeights weightedMeter.ExecutionMemoryWeights
+	executionEffortWeights meter.ExecutionEffortWeights
+	executionMemoryWeights meter.ExecutionMemoryWeights
 	// executionMemoryLimit of 0 means that it won't be set in the state. The FVM will use the default value from the context.
 	executionMemoryLimit uint64
 
@@ -53,6 +52,14 @@ type BootstrapProcedure struct {
 	// list of initial network participants for whom we will create/stake flow
 	// accounts and retrieve epoch-related resources
 	identities flow.IdentityList
+}
+
+type BootstrapAccountKeys struct {
+	ServiceAccountPublicKeys       []flow.AccountPublicKey
+	FungibleTokenAccountPublicKeys []flow.AccountPublicKey
+	FlowTokenAccountPublicKeys     []flow.AccountPublicKey
+	FlowFeesAccountPublicKeys      []flow.AccountPublicKey
+	NodeAccountPublicKeys          []flow.AccountPublicKey
 }
 
 type BootstrapProcedureFeeParameters struct {
@@ -118,6 +125,15 @@ var DefaultTransactionFees = func() BootstrapProcedureFeeParameters {
 	}
 }()
 
+// WithBootstrapAccountKeys sets the public keys of the accounts that will be created during bootstrapping
+// by default all accounts are created with the ServiceAccountPublicKey specified when calling `Bootstrap`.
+func WithBootstrapAccountKeys(keys BootstrapAccountKeys) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.accountKeys = keys
+		return bp
+	}
+}
+
 func WithAccountCreationFee(fee cadence.UFix64) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.accountCreationFee = fee
@@ -132,14 +148,14 @@ func WithTransactionFee(fees BootstrapProcedureFeeParameters) BootstrapProcedure
 	}
 }
 
-func WithExecutionEffortWeights(weights weightedMeter.ExecutionEffortWeights) BootstrapProcedureOption {
+func WithExecutionEffortWeights(weights meter.ExecutionEffortWeights) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.executionEffortWeights = weights
 		return bp
 	}
 }
 
-func WithExecutionMemoryWeights(weights weightedMeter.ExecutionMemoryWeights) BootstrapProcedureOption {
+func WithExecutionMemoryWeights(weights meter.ExecutionMemoryWeights) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.executionMemoryWeights = weights
 		return bp
@@ -209,9 +225,14 @@ func Bootstrap(
 	opts ...BootstrapProcedureOption,
 ) *BootstrapProcedure {
 	bootstrapProcedure := &BootstrapProcedure{
-		serviceAccountPublicKey: serviceAccountPublicKey,
-		transactionFees:         BootstrapProcedureFeeParameters{0, 0, 0},
-		epochConfig:             epochs.DefaultEpochConfig(),
+		transactionFees: BootstrapProcedureFeeParameters{0, 0, 0},
+		epochConfig:     epochs.DefaultEpochConfig(),
+	}
+	bootstrapProcedure.accountKeys = BootstrapAccountKeys{
+		ServiceAccountPublicKeys:       []flow.AccountPublicKey{serviceAccountPublicKey},
+		FungibleTokenAccountPublicKeys: []flow.AccountPublicKey{serviceAccountPublicKey},
+		FlowTokenAccountPublicKeys:     []flow.AccountPublicKey{serviceAccountPublicKey},
+		NodeAccountPublicKeys:          []flow.AccountPublicKey{serviceAccountPublicKey},
 	}
 
 	for _, applyOption := range opts {
@@ -220,8 +241,7 @@ func Bootstrap(
 	return bootstrapProcedure
 }
 
-func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
-	b.vm = vm
+func (b *BootstrapProcedure) Run(ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	b.ctx = NewContextFromParent(
 		ctx,
 		WithContractDeploymentRestricted(false))
@@ -230,11 +250,12 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.programs = programs
 
 	// initialize the account addressing state
-	b.accounts = state.NewAccounts(b.sth)
-	addressGenerator := state.NewStateBoundAddressGenerator(b.sth, ctx.Chain)
-	b.addressGenerator = addressGenerator
+	b.accountCreator = environment.NewBootstrapAccountCreator(
+		b.sth,
+		ctx.Chain,
+		environment.NewAccounts(b.sth))
 
-	service := b.createServiceAccount(b.serviceAccountPublicKey)
+	service := b.createServiceAccount()
 
 	b.deployContractAuditVouchers(service)
 	fungibleToken := b.deployFungibleToken()
@@ -305,13 +326,12 @@ func (proc *BootstrapProcedure) MemoryLimit(_ Context) uint64 {
 	return math.MaxUint64
 }
 
-func (b *BootstrapProcedure) createAccount() flow.Address {
-	address, err := b.addressGenerator.NextAddress()
-	if err != nil {
-		panic(fmt.Sprintf("failed to generate address: %s", err))
-	}
+func (proc *BootstrapProcedure) ShouldDisableMemoryAndInteractionLimits(_ Context) bool {
+	return true
+}
 
-	err = b.accounts.Create(nil, address)
+func (b *BootstrapProcedure) createAccount(publicKeys []flow.AccountPublicKey) flow.Address {
+	address, err := b.accountCreator.CreateBootstrapAccount(publicKeys)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create account: %s", err))
 	}
@@ -319,13 +339,9 @@ func (b *BootstrapProcedure) createAccount() flow.Address {
 	return address
 }
 
-func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicKey) flow.Address {
-	address, err := b.addressGenerator.NextAddress()
-	if err != nil {
-		panic(fmt.Sprintf("failed to generate address: %s", err))
-	}
-
-	err = b.accounts.Create([]flow.AccountPublicKey{accountKey}, address)
+func (b *BootstrapProcedure) createServiceAccount() flow.Address {
+	address, err := b.accountCreator.CreateBootstrapAccount(
+		b.accountKeys.ServiceAccountPublicKeys)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}
@@ -334,9 +350,9 @@ func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicK
 }
 
 func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
-	fungibleToken := b.createAccount()
+	fungibleToken := b.createAccount(b.accountKeys.FungibleTokenAccountPublicKeys)
 
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployFungibleTokenContractTransaction(fungibleToken),
@@ -349,8 +365,8 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 }
 
 func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address) flow.Address {
-	flowToken := b.createAccount()
-	txError, err := b.vm.invokeMetaTransaction(
+	flowToken := b.createAccount(b.accountKeys.FlowTokenAccountPublicKeys)
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployFlowTokenContractTransaction(
@@ -366,9 +382,9 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 }
 
 func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken flow.Address) flow.Address {
-	flowFees := b.createAccount()
+	flowFees := b.createAccount(b.accountKeys.FlowFeesAccountPublicKeys)
 
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployTxFeesContractTransaction(
@@ -392,7 +408,7 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 	)
 
 	// deploy storage fees contract on the service account
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployStorageFeesContractTransaction(
@@ -409,7 +425,7 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 func (b *BootstrapProcedure) deployContractAuditVouchers(service flow.Address) {
 	contract := contracts.FlowContractAudits()
 
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployContractTransaction(
@@ -424,7 +440,7 @@ func (b *BootstrapProcedure) deployContractAuditVouchers(service flow.Address) {
 }
 
 func (b *BootstrapProcedure) createMinter(service, flowToken flow.Address) {
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.CreateFlowTokenMinterTransaction(
@@ -439,7 +455,7 @@ func (b *BootstrapProcedure) createMinter(service, flowToken flow.Address) {
 
 func (b *BootstrapProcedure) deployDKG(service flow.Address) {
 	contract := contracts.FlowDKG()
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployContractTransaction(service, contract, "FlowDKG"),
@@ -453,7 +469,7 @@ func (b *BootstrapProcedure) deployDKG(service flow.Address) {
 
 func (b *BootstrapProcedure) deployQC(service flow.Address) {
 	contract := contracts.FlowQC()
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployContractTransaction(service, contract, "FlowClusterQC"),
@@ -473,7 +489,7 @@ func (b *BootstrapProcedure) deployIDTableStaking(service, fungibleToken, flowTo
 		flowFees.HexWithPrefix(),
 		true)
 
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployIDTableStakingTransaction(service,
@@ -501,10 +517,10 @@ func (b *BootstrapProcedure) deployEpoch(service, fungibleToken, flowToken, flow
 
 	context := NewContextFromParent(b.ctx,
 		WithBlockHeader(b.rootBlock),
-		WithBlocks(&NoopBlockFinder{}),
+		WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		context,
 		Transaction(
 			blueprints.DeployEpochTransaction(service, contract, b.epochConfig),
@@ -524,7 +540,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 		service.HexWithPrefix(),
 	)
 
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployContractTransaction(
@@ -542,7 +558,7 @@ func (b *BootstrapProcedure) mintInitialTokens(
 	service, fungibleToken, flowToken flow.Address,
 	initialSupply cadence.UFix64,
 ) {
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.MintFlowTokenTransaction(
@@ -564,7 +580,7 @@ func (b *BootstrapProcedure) setupParameters(
 	storagePerFlow cadence.UFix64,
 	restrictedAccountCreationEnabled cadence.Bool,
 ) {
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.SetupParametersTransaction(
@@ -582,7 +598,7 @@ func (b *BootstrapProcedure) setupParameters(
 }
 
 func (b *BootstrapProcedure) setupFees(service, flowFees flow.Address, surgeFactor, inclusionEffortCost, executionEffortCost cadence.UFix64) {
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.SetupFeesTransaction(
@@ -626,7 +642,7 @@ func (b *BootstrapProcedure) setupExecutionEffortWeights(service flow.Address) {
 		panic(fmt.Sprintf("failed to setup execution effort weights %s", err.Error()))
 	}
 
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			tb,
@@ -650,7 +666,7 @@ func (b *BootstrapProcedure) setupExecutionMemoryWeights(service flow.Address) {
 		panic(fmt.Sprintf("failed to setup execution memory weights %s", err.Error()))
 	}
 
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			tb,
@@ -668,7 +684,7 @@ func (b *BootstrapProcedure) setExecutionMemoryLimitTransaction(service flow.Add
 		panic(fmt.Sprintf("failed to setup execution memory limit %s", err.Error()))
 	}
 
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			tb,
@@ -682,7 +698,7 @@ func (b *BootstrapProcedure) setExecutionMemoryLimitTransaction(service flow.Add
 func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 	service, fungibleToken, flowToken, feeContract flow.Address,
 ) {
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.SetupStorageForServiceAccountsTransaction(
@@ -699,7 +715,7 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 
 func (b *BootstrapProcedure) setStakingAllowlist(service flow.Address, allowedIDs []flow.Identifier) {
 
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.SetStakingAllowlistTransaction(
@@ -717,10 +733,10 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 	for _, id := range b.identities {
 
 		// create a staking account for the node
-		nodeAddress := b.createAccount()
+		nodeAddress := b.createAccount(b.accountKeys.NodeAccountPublicKeys)
 
 		// give a vault resource to the staking account
-		txError, err := b.vm.invokeMetaTransaction(
+		txError, err := b.invokeMetaTransaction(
 			b.ctx,
 			Transaction(
 				blueprints.SetupAccountTransaction(fungibleToken,
@@ -734,7 +750,7 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 		panicOnMetaInvokeErrf("failed to setup machine account: %s", txError, err)
 
 		// fund the staking account
-		txError, err = b.vm.invokeMetaTransaction(
+		txError, err = b.invokeMetaTransaction(
 			b.ctx,
 			Transaction(blueprints.FundAccountTransaction(service,
 				fungibleToken,
@@ -749,7 +765,7 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 		// register the node
 		// for collection/consensus nodes this will also create the machine account
 		// and set it up with the QC/DKG participant resource
-		txError, err = b.vm.invokeMetaTransaction(
+		txError, err = b.invokeMetaTransaction(
 			b.ctx,
 			Transaction(blueprints.RegisterNodeTransaction(service,
 				flowToken,
@@ -765,7 +781,7 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 
 func (b *BootstrapProcedure) deployStakingProxyContract(service flow.Address) {
 	contract := contracts.FlowStakingProxy()
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployContractTransaction(service, contract, "StakingProxy"),
@@ -780,12 +796,10 @@ func (b *BootstrapProcedure) deployStakingProxyContract(service flow.Address) {
 func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fungibleTokenAddress,
 	flowTokenAddress flow.Address) {
 
-	publicKeys := make([]cadence.Value, 1)
-	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(b.serviceAccountPublicKey)
+	publicKeys, err := flow.EncodeRuntimeAccountPublicKeys(b.accountKeys.ServiceAccountPublicKeys)
 	if err != nil {
 		panic(err)
 	}
-	publicKeys[0] = blueprints.BytesToCadenceArray(encodedPublicKey)
 
 	contract := contracts.FlowLockedTokens(
 		fungibleTokenAddress.Hex(),
@@ -794,7 +808,7 @@ func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fu
 		service.Hex(),
 		service.Hex())
 
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployLockedTokensTransaction(service, contract, publicKeys),
@@ -818,7 +832,7 @@ func (b *BootstrapProcedure) deployStakingCollection(service flow.Address, fungi
 		service.Hex(),
 		service.Hex(),
 		service.Hex())
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployContractTransaction(service, contract, "FlowStakingCollection"),
@@ -839,7 +853,7 @@ func (b *BootstrapProcedure) setContractDeploymentRestrictions(service flow.Addr
 	if err != nil {
 		panic(err)
 	}
-	txError, err := b.vm.invokeMetaTransaction(
+	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			txBody,
@@ -851,12 +865,6 @@ func (b *BootstrapProcedure) setContractDeploymentRestrictions(service flow.Addr
 	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
 }
 
-const (
-	fungibleTokenAccountIndex = 2
-	flowTokenAccountIndex     = 3
-	flowFeesAccountIndex      = 4
-)
-
 func panicOnMetaInvokeErrf(msg string, txError errors.Error, err error) {
 	if txError != nil {
 		panic(fmt.Sprintf(msg, txError.Error()))
@@ -867,16 +875,39 @@ func panicOnMetaInvokeErrf(msg string, txError errors.Error, err error) {
 }
 
 func FungibleTokenAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(fungibleTokenAccountIndex)
+	address, _ := chain.AddressAtIndex(environment.FungibleTokenAccountIndex)
 	return address
 }
 
 func FlowTokenAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(flowTokenAccountIndex)
+	address, _ := chain.AddressAtIndex(environment.FlowTokenAccountIndex)
 	return address
 }
 
-func FlowFeesAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(flowFeesAccountIndex)
-	return address
+// invokeMetaTransaction invokes a meta transaction inside the context of an
+// outer transaction.
+//
+// Errors that occur in a meta transaction are propagated as a single error
+// that can be captured by the Cadence runtime and eventually disambiguated by
+// the parent context.
+func (b *BootstrapProcedure) invokeMetaTransaction(
+	parentCtx Context,
+	tx *TransactionProcedure,
+	stTxn *state.StateHolder,
+	programs *programs.Programs,
+) (
+	errors.Error,
+	error,
+) {
+	invoker := NewTransactionInvoker()
+
+	// do not deduct fees or check storage in meta transactions
+	ctx := NewContextFromParent(parentCtx,
+		WithAccountStorageLimit(false),
+		WithTransactionFeesEnabled(false),
+	)
+
+	err := invoker.Process(ctx, tx, stTxn, programs)
+	txErr, fatalErr := errors.SplitErrorTypes(err)
+	return txErr, fatalErr
 }

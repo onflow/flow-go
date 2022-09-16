@@ -22,6 +22,11 @@ type Config struct {
 	// block.
 	ExpiryBuffer uint
 
+	// DryRunRateLimit will, when enabled, log when a transaction would have
+	// been omitted from a collection due to rate limiting settings. Rate
+	// limiting settings are not actually enforced while dry-run is true.
+	DryRunRateLimit bool
+
 	// MaxPayerTransactionRate is the maximum number of transactions per payer
 	// per collection. Fractional values greater than 1 are rounded down.
 	// Fractional values 0<k<1 mean that only 1 transaction every ceil(1/k)
@@ -45,6 +50,7 @@ func DefaultConfig() Config {
 	return Config{
 		MaxCollectionSize:       flow.DefaultMaxCollectionSize,
 		ExpiryBuffer:            DefaultExpiryBuffer,
+		DryRunRateLimit:         false,
 		MaxPayerTransactionRate: DefaultMaxPayerTransactionRate,
 		UnlimitedPayers:         make(map[flow.Address]struct{}), // no unlimited payers
 		MaxCollectionByteSize:   flow.DefaultMaxCollectionByteSize,
@@ -63,6 +69,12 @@ func WithMaxCollectionSize(size uint) Opt {
 func WithExpiryBuffer(buf uint) Opt {
 	return func(c *Config) {
 		c.ExpiryBuffer = buf
+	}
+}
+
+func WithRateLimitDryRun(dryRun bool) Opt {
+	return func(c *Config) {
+		c.DryRunRateLimit = dryRun
 	}
 }
 

@@ -11,17 +11,13 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// proposalTask struct used to send a proposal and done channel in one message
-type proposalTask struct {
-	*model.Proposal
-	done chan struct{} // closed when the proposal has finished being processed
-}
-
 // FollowerLoop implements interface FollowerLoop
+// TODO: should implement component.Component interface
 type FollowerLoop struct {
 	log           zerolog.Logger
 	followerLogic FollowerLogic
-	proposals     chan *proposalTask
+	// TODO: change this to an inbound queue, to be consistent with our design
+	proposals chan *model.Proposal
 
 	runner runner.SingleRunner // lock for preventing concurrent state transitions
 }
@@ -31,7 +27,7 @@ func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*Follower
 	return &FollowerLoop{
 		log:           log,
 		followerLogic: followerLogic,
-		proposals:     make(chan *proposalTask),
+		proposals:     make(chan *model.Proposal),
 		runner:        runner.NewSingleRunner(),
 	}, nil
 }
@@ -41,12 +37,9 @@ func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*Follower
 //
 // Block proposals must be submitted in order, i.e. a proposal's parent must
 // have been previously processed by the FollowerLoop.
-func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) <-chan struct{} {
+func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) {
 	received := time.Now()
-	proposal := &proposalTask{
-		Proposal: model.ProposalFromFlow(proposalHeader, parentView),
-		done:     make(chan struct{}),
-	}
+	proposal := model.ProposalFromFlow(proposalHeader, parentView)
 
 	fl.proposals <- proposal
 
@@ -57,14 +50,12 @@ func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView u
 		Uint64("view", proposal.Block.View).
 		Dur("busy_duration", busyDuration).
 		Msg("busy duration to handle a proposal")
-
-	return proposal.done
 }
 
 // loop will synchronously processes all events.
 // All errors from FollowerLogic are fatal:
-//   * known critical error: some prerequisites of the HotStuff follower have been broken
-//   * unknown critical error: bug-related
+//   - known critical error: some prerequisites of the HotStuff follower have been broken
+//   - unknown critical error: bug-related
 func (fl *FollowerLoop) loop() {
 	shutdownSignal := fl.runner.ShutdownSignal()
 	for {
@@ -76,9 +67,7 @@ func (fl *FollowerLoop) loop() {
 
 		select {
 		case p := <-fl.proposals:
-			err := fl.followerLogic.AddBlock(p.Proposal)
-			close(p.done)
-
+			err := fl.followerLogic.AddBlock(p)
 			if err != nil { // all errors are fatal
 				fl.log.Error().
 					Hex("block_id", logging.ID(p.Block.BlockID)).

@@ -48,7 +48,7 @@ func setupTest() *FetcherEngineTestSuite {
 	s := &FetcherEngineTestSuite{
 		log:                   unittest.Logger(),
 		metrics:               &module.VerificationMetrics{},
-		tracer:                &trace.NoopTracer{},
+		tracer:                trace.NewNoopTracer(),
 		verifier:              &mocknetwork.Engine{},
 		state:                 &protocol.State{},
 		pendingChunks:         &mempool.ChunkStatuses{},

@@ -5,6 +5,8 @@ package flow
 import (
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/onflow/cadence"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 )
@@ -56,6 +58,24 @@ func EncodeAccountPublicKey(a AccountPublicKey) ([]byte, error) {
 	}
 
 	return rlp.EncodeToBytes(&w)
+}
+
+func EncodeRuntimeAccountPublicKeys(keys []AccountPublicKey) ([]cadence.Value, error) {
+	encodedKeys := make([]cadence.Value, len(keys))
+	for i, key := range keys {
+		k, err := EncodeRuntimeAccountPublicKey(key)
+		if err != nil {
+			return nil, err
+		}
+
+		values := make([]cadence.Value, len(k))
+		for j, v := range k {
+			values[j] = cadence.NewUInt8(v)
+		}
+		encodedKeys[i] = cadence.NewArray(values)
+	}
+
+	return encodedKeys, nil
 }
 
 func EncodeRuntimeAccountPublicKey(a AccountPublicKey) ([]byte, error) {

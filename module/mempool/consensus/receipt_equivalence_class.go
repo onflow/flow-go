@@ -40,9 +40,9 @@ func NewReceiptsOfSameResult(result *flow.ExecutionResult, block *flow.Header) (
 
 // AddReceipt adds the receipt to the ReceiptsOfSameResult (if not already stored).
 // Returns:
-//  * uint: number of receipts added (consistent API with AddReceipts()),
-//          Possible values: 0 or 1
-//  * error in case of unforeseen problems
+//   - uint: number of receipts added (consistent API with AddReceipts()),
+//     Possible values: 0 or 1
+//   - error in case of unforeseen problems
 func (rsr *ReceiptsOfSameResult) AddReceipt(receipt *flow.ExecutionReceipt) (uint, error) {
 	if receipt.ExecutionResult.ID() != rsr.resultID {
 		return 0, errors.New("cannot add receipt for different result")
@@ -58,8 +58,8 @@ func (rsr *ReceiptsOfSameResult) AddReceipt(receipt *flow.ExecutionReceipt) (uin
 
 // AddReceipts adds the receipts to the ReceiptsOfSameResult (the ones not already stored).
 // Returns:
-//  * uint: number of receipts added
-//  * error in case of unforeseen problems
+//   - uint: number of receipts added
+//   - error in case of unforeseen problems
 func (rsr *ReceiptsOfSameResult) AddReceipts(receipts ...*flow.ExecutionReceipt) (uint, error) {
 	receiptsAdded := uint(0)
 	for i := 0; i < len(receipts); i++ {
