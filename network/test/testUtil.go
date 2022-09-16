@@ -19,6 +19,7 @@ import (
 	pc "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -108,7 +109,7 @@ func GenerateIDs(
 	libP2PNodes := make([]*p2p.Node, n)
 	tagObservables := make([]observable.Observable, n)
 
-	o := &optsConfig{peerUpdateInterval: p2p.DefaultPeerUpdateInterval}
+	o := &optsConfig{peerUpdateInterval: connection.DefaultPeerUpdateInterval}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -151,7 +152,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
 
-	o := &optsConfig{peerUpdateInterval: p2p.DefaultPeerUpdateInterval}
+	o := &optsConfig{peerUpdateInterval: connection.DefaultPeerUpdateInterval}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -169,7 +170,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 
 		idProviders[i] = NewUpdatableIDProvider(identities)
 
-		peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningEnabled, o.peerUpdateInterval)
+		peerManagerFactory := connection.PeerManagerFactory(connection.ConnectionPruningEnabled, o.peerUpdateInterval)
 
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
