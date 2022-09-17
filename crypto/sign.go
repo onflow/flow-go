@@ -219,7 +219,7 @@ type PublicKey interface {
 	Verify(Signature, []byte, hash.Hasher) (bool, error)
 	// Encode returns a bytes representation of the public key.
 	Encode() []byte
-	// Encode returns a compressed byte representation of the public key.
+	// EncodeCompressed returns a compressed byte representation of the public key.
 	// The compressed serialization concept is generic to elliptic curves,
 	// but we refer to individual curve parameters for details of the compressed format
 	EncodeCompressed() []byte

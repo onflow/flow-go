@@ -106,7 +106,7 @@ func (s *JointFeldmanState) init() {
 // (including the instance group private key) when the current
 // participant is the dealer.
 //
-// The returned erorr is :
+// The returned error is :
 //    - dkgInvalidStateTransitionError if the DKG instance is already running.
 //    - error if an unexpected exception occurs
 //    - nil otherwise.
@@ -128,7 +128,7 @@ func (s *JointFeldmanState) Start(seed []byte) error {
 
 // NextTimeout sets the next timeout of the protocol if any timeout applies.
 //
-// The returned erorr is :
+// The returned error is :
 //    - dkgInvalidStateTransitionError if the DKG instance was not running.
 //    - dkgInvalidStateTransitionError if the DKG instance already called the 2 required timeouts.
 //    - nil otherwise.
