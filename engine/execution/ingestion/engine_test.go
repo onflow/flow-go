@@ -11,12 +11,6 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/rs/zerolog/log"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
-
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
@@ -42,6 +36,10 @@ import (
 	storage "github.com/onflow/flow-go/storage/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
+	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -74,8 +72,7 @@ type testingContext struct {
 	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
 	collectionRequester *module.MockRequester
 	identities          flow.IdentityList
-	stopAtHeight        *atomic.Uint64
-	stopAtHeightCrash   *atomic.Bool
+	stopAtHeight        *StopAtHeight
 
 	mu *sync.Mutex
 }
@@ -159,8 +156,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
-	stopAtHeight := atomic.NewUint64(0)
-	stopAtHeightCrash := atomic.NewBool(false)
+	stopAtHeight := NewStopAtHeight()
 
 	engine, err = New(
 		log,
@@ -188,7 +184,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		nil,
 		nil,
 		stopAtHeight,
-		stopAtHeightCrash,
 	)
 	require.NoError(t, err)
 
@@ -209,7 +204,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		broadcastedReceipts: make(map[flow.Identifier]*flow.ExecutionReceipt),
 		identities:          identityList,
 		stopAtHeight:        stopAtHeight,
-		stopAtHeightCrash:   stopAtHeightCrash,
 
 		mu: &sync.Mutex{},
 	})
@@ -957,7 +951,7 @@ func TestStopAtHeight(t *testing.T) {
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header)
 
 		// stop at block C
-		ctx.stopAtHeight.Store(blockSealed.Height + 3)
+		ctx.stopAtHeight.Set(blockSealed.Height+3, false)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
 		logBlocks(blocks)
@@ -1382,8 +1376,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		false,
 		nil,
 		nil,
-		atomic.NewUint64(0),
-		atomic.NewBool(false),
+		NewStopAtHeight(),
 	)
 
 	require.NoError(t, err)

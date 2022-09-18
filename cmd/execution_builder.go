@@ -136,9 +136,8 @@ type ExecutionNode struct {
 	diskWAL                       *wal.DiskWAL
 	blockDataUploaders            []uploader.Uploader
 	executionDataStore            execution_data.ExecutionDataStore
-	toTriggerCheckpoint           *atomic.Bool   // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
-	stopAtHeight                  *atomic.Uint64 // stop the node at given block height
-	stopAtHeightCrash             *atomic.Bool   // if node stops at height, does it crash or not
+	toTriggerCheckpoint           *atomic.Bool            // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	stopAtHeight                  *ingestion.StopAtHeight // stop the node at given block height
 	executionDataDatastore        *badger.Datastore
 	executionDataPruner           *pruner.Pruner
 	executionDataBlobstore        blobs.Blobstore
@@ -150,8 +149,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		builder:             builder.FlowNodeBuilder,
 		exeConf:             builder.exeConf,
 		toTriggerCheckpoint: atomic.NewBool(false),
-		stopAtHeight:        atomic.NewUint64(0),
-		stopAtHeightCrash:   atomic.NewBool(false),
+		stopAtHeight:        ingestion.NewStopAtHeight(),
 	}
 
 	builder.FlowNodeBuilder.
@@ -162,7 +160,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return executionCommands.NewTriggerCheckpointCommand(exeNode.toTriggerCheckpoint)
 		}).
 		AdminCommand("stop-at-height", func(config *NodeConfig) commands.AdminCommand {
-			return executionCommands.NewStopAtHeightCommand(exeNode.stopAtHeight, exeNode.stopAtHeightCrash)
+			return executionCommands.NewStopAtHeightCommand(exeNode.stopAtHeight)
 		}).
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand()
@@ -732,7 +730,6 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploaders,
 		exeNode.stopAtHeight,
-		exeNode.stopAtHeightCrash,
 	)
 
 	// TODO: we should solve these mutual dependencies better

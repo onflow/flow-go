@@ -8,10 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"go.uber.org/atomic"
-
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
@@ -37,6 +33,8 @@ import (
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // An Engine receives and saves incoming blocks.
@@ -72,8 +70,7 @@ type Engine struct {
 	pauseExecution         bool
 	executionDataPruner    *pruner.Pruner
 	uploaders              []uploader.Uploader
-	stopAtHeight           *atomic.Uint64
-	stopAtHeightCrash      *atomic.Bool
+	stopAtHeight           *StopAtHeight
 }
 
 func New(
@@ -101,8 +98,7 @@ func New(
 	pauseExecution bool,
 	pruner *pruner.Pruner,
 	uploaders []uploader.Uploader,
-	stopAtHeight *atomic.Uint64,
-	stopAtHeightCrash *atomic.Bool,
+	stopAtHeight *StopAtHeight,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -138,7 +134,6 @@ func New(
 		executionDataPruner:    pruner,
 		uploaders:              uploaders,
 		stopAtHeight:           stopAtHeight,
-		stopAtHeightCrash:      stopAtHeightCrash,
 	}
 
 	// move to state syncing engine
@@ -432,10 +427,11 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 	}
 
 	// skips blocks at or above requested stop height
-	stopHeight := e.stopAtHeight.Load()
-	if stopHeight > 0 && b.Height >= stopHeight {
-		e.log.Warn().Msgf("Skipping execution of %s at height %d because stop has been requested at height %d", b.ID(), b.Height, stopHeight)
-		return
+	if stopEnabled, stopHeight, _ := e.stopAtHeight.Get(); stopEnabled {
+		if b.Height >= stopHeight {
+			e.log.Warn().Msgf("Skipping execution of %s at height %d because stop has been requested at height %d", b.ID(), b.Height, stopHeight)
+			return
+		}
 	}
 
 	blockID := b.ID()
@@ -462,17 +458,17 @@ func (e *Engine) BlockFinalized(h *flow.Header) {
 		return
 	}
 
-	stopHeight := e.stopAtHeight.Load()
+	stopEnabled, stopHeight, stopCrash := e.stopAtHeight.Get()
+
 	// skip if no stop at height has been requested
-	if stopHeight == 0 {
+	if !stopEnabled {
 		return
 	}
 
 	// once finalization reached stop height we can be sure no other fork will be valid at this height,
 	// so it is safe to stop or crash now
 	if h.Height >= stopHeight {
-
-		if e.stopAtHeightCrash.Load() {
+		if stopCrash {
 			e.log.Fatal().Msgf("Crashing as finalization reached requested stop height %d", stopHeight)
 		} else {
 			e.pauseExecution = true

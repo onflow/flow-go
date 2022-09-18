@@ -4,10 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
-
 	"github.com/onflow/flow-go/admin"
+	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCommandParsing(t *testing.T) {
@@ -83,13 +82,9 @@ func TestCommandParsing(t *testing.T) {
 
 func TestCommandsSetsValues(t *testing.T) {
 
-	height := atomic.NewUint64(0)
-	crash := atomic.NewBool(false)
+	stopAtHeight := ingestion.NewStopAtHeight()
 
-	cmd := StopAtHeightCommand{
-		height: height,
-		crash:  crash,
-	}
+	cmd := NewStopAtHeightCommand(stopAtHeight)
 
 	req := &admin.CommandRequest{
 		ValidatorData: StopAtHeightReq{
@@ -101,7 +96,10 @@ func TestCommandsSetsValues(t *testing.T) {
 	_, err := cmd.Handler(context.TODO(), req)
 	require.NoError(t, err)
 
-	require.Equal(t, uint64(37), height.Load())
-	require.Equal(t, true, crash.Load())
+	set, height, crash := stopAtHeight.Get()
+
+	require.True(t, set)
+	require.Equal(t, uint64(37), height)
+	require.Equal(t, true, crash)
 
 }

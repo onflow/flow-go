@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rs/zerolog/log"
-	"go.uber.org/atomic"
-
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
+	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/rs/zerolog/log"
 )
 
 var _ commands.AdminCommand = (*StopAtHeightCommand)(nil)
@@ -16,14 +15,12 @@ var _ commands.AdminCommand = (*StopAtHeightCommand)(nil)
 // StopAtHeightCommand will send a signal to engine to stop/crash EN
 // at given height
 type StopAtHeightCommand struct {
-	height *atomic.Uint64
-	crash  *atomic.Bool
+	stopAtHeight *ingestion.StopAtHeight
 }
 
-func NewStopAtHeightCommand(height *atomic.Uint64, crash *atomic.Bool) *StopAtHeightCommand {
+func NewStopAtHeightCommand(sah *ingestion.StopAtHeight) *StopAtHeightCommand {
 	return &StopAtHeightCommand{
-		height: height,
-		crash:  crash,
+		stopAtHeight: sah,
 	}
 }
 
@@ -35,8 +32,7 @@ type StopAtHeightReq struct {
 func (s *StopAtHeightCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	sah := req.ValidatorData.(StopAtHeightReq)
 
-	oldHeight := s.height.Swap(sah.height)
-	oldCrash := s.crash.Swap(sah.crash)
+	_, oldHeight, oldCrash := s.stopAtHeight.Set(sah.height, sah.crash)
 
 	log.Info().Msgf("admintool: EN will stop at height %d and crash: %t, previous values: %d %t", sah.height, sah.crash, oldHeight, oldCrash)
 
@@ -44,8 +40,6 @@ func (s *StopAtHeightCommand) Handler(ctx context.Context, req *admin.CommandReq
 }
 
 func (s *StopAtHeightCommand) Validator(req *admin.CommandRequest) error {
-
-	sahr := StopAtHeightReq{}
 
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
@@ -62,7 +56,6 @@ func (s *StopAtHeightCommand) Validator(req *admin.CommandRequest) error {
 	if !ok || height <= 0 {
 		return errInvalidHeightValue
 	}
-	sahr.height = uint64(height)
 
 	result, ok = input["crash"]
 	errInvalidCrashValue := fmt.Errorf("invalid value for \"crash\": expected a boolean, but got: %v", result)
@@ -74,9 +67,10 @@ func (s *StopAtHeightCommand) Validator(req *admin.CommandRequest) error {
 		return errInvalidCrashValue
 	}
 
-	sahr.crash = crash
-
-	req.ValidatorData = sahr
+	req.ValidatorData = StopAtHeightReq{
+		height: uint64(height),
+		crash:  crash,
+	}
 
 	return nil
 }
