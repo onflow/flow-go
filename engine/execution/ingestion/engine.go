@@ -454,6 +454,8 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 	}
 }
 
+// BlockFinalized implements part of state.protocol.Consumer interface.
+// Method gets called for every finalized block
 func (e *Engine) BlockFinalized(h *flow.Header) {
 
 	if e.pauseExecution {

@@ -76,6 +76,7 @@ func (bs *BlockState) WaitForBlockById(t *testing.T, blockId flow.Identifier) *m
 	return blockProposal
 }
 
+// WaitForBlocksByHeight waits until a block at height is observed, and returns all observed blocks at that height.
 func (bs *BlockState) WaitForBlocksByHeight(t *testing.T, height uint64) []*messages.BlockProposal {
 	var blockProposals []*messages.BlockProposal
 

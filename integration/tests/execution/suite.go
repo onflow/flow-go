@@ -62,6 +62,9 @@ type AdminCommandResponse struct {
 	Output any `json:"output"`
 }
 
+// SendExecutionAdminCommand sends admin command to EN. data will be serialized to JSON and sent as data part of the command request.
+// Response will be deserialized into output object.
+// It bubbles up errors from (un)marshalling of data and handling the request
 func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, data any, output any) error {
 	enContainer := s.net.ContainerByID(s.exe1ID)
 
@@ -72,7 +75,7 @@ func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, d
 
 	marshal, err := json.Marshal(request)
 	if err != nil {
-		return err
+		return fmt.Errorf("error while marshalling request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST",
@@ -80,12 +83,12 @@ func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, d
 		bytes.NewBuffer(marshal),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("error while building request: %w", err)
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("error while sending request: %w", err)
 	}
 
 	adminCommandResponse := AdminCommandResponse{
@@ -94,7 +97,7 @@ func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, d
 
 	err = json.NewDecoder(resp.Body).Decode(&adminCommandResponse)
 	if err != nil {
-		return err
+		return fmt.Errorf("error while reading/decoding response: %w", err)
 	}
 
 	return nil
