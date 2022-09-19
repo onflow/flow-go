@@ -21,6 +21,9 @@ type RateLimiter interface {
 	// IsRateLimited returns true if a peer is rate limited.
 	IsRateLimited(peerID peer.ID) bool
 
+	// SetTimeNowFunc allows users to override the underlying time module used.
+	SetTimeNowFunc(now GetTimeNow)
+
 	// Stop sends cleanup signal to underlying rate limiters and rate limited peers maps. After the rate limiter
 	// is stopped it can not be reused.
 	Stop()
@@ -32,3 +35,11 @@ type RateLimiter interface {
 // GetTimeNow callback used to get the current time. This allows us to improve testing by manipulating the current time
 // as opposed to using time.Now directly.
 type GetTimeNow func() time.Time
+
+type RateLimiterOpt func(limiter RateLimiter)
+
+func WithGetTimeNowFunc(now GetTimeNow) RateLimiterOpt {
+	return func(limiter RateLimiter) {
+		limiter.SetTimeNowFunc(now)
+	}
+}

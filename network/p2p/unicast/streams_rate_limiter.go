@@ -1,6 +1,8 @@
 package unicast
 
 import (
+	"time"
+	
 	"golang.org/x/time/rate"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -21,13 +23,17 @@ type StreamsRateLimiterImpl struct {
 
 // NewStreamsRateLimiter returns a new StreamsRateLimiterImpl. The cleanup loop will be started in a
 // separate goroutine and should be stopped by calling Close.
-func NewStreamsRateLimiter(limit rate.Limit, burst int, now GetTimeNow) *StreamsRateLimiterImpl {
+func NewStreamsRateLimiter(limit rate.Limit, burst int, opts ...RateLimiterOpt) *StreamsRateLimiterImpl {
 	l := &StreamsRateLimiterImpl{
 		rateLimitedPeers: newRateLimitedPeersMap(rateLimiterTTL, cleanUpTickDuration),
 		limiters:         newLimiterMap(rateLimiterTTL, cleanUpTickDuration),
 		limit:            limit,
 		burst:            burst,
-		now:              now,
+		now:              time.Now,
+	}
+
+	for _, opt := range opts {
+		opt(l)
 	}
 
 	go l.limiters.cleanupLoop()
@@ -65,6 +71,11 @@ func (s *StreamsRateLimiterImpl) Start() {
 func (s *StreamsRateLimiterImpl) Stop() {
 	s.limiters.close()
 	s.rateLimitedPeers.close()
+}
+
+// SetTimeNowFunc overrides the default time.Now func with the GetTimeNow func provided.
+func (s *StreamsRateLimiterImpl) SetTimeNowFunc(now GetTimeNow) {
+	s.now = now
 }
 
 // getLimiter returns limiter for the peerID, if a limiter does not exist one is created and stored.

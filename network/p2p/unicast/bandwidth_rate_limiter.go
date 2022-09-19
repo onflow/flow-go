@@ -1,6 +1,8 @@
 package unicast
 
 import (
+	"time"
+
 	"golang.org/x/time/rate"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -20,13 +22,17 @@ type BandWidthRateLimiterImpl struct {
 
 // NewBandWidthRateLimiter returns a new BandWidthRateLimiterImpl. The cleanup loop will be started in a
 // separate goroutine and should be stopped by calling Close.
-func NewBandWidthRateLimiter(limit rate.Limit, burst int, now GetTimeNow) *BandWidthRateLimiterImpl {
+func NewBandWidthRateLimiter(limit rate.Limit, burst int, opts ...RateLimiterOpt) *BandWidthRateLimiterImpl {
 	l := &BandWidthRateLimiterImpl{
 		rateLimitedPeers: newRateLimitedPeersMap(rateLimiterTTL, cleanUpTickDuration),
 		limiters:         newLimiterMap(rateLimiterTTL, cleanUpTickDuration),
 		limit:            limit,
 		burst:            burst,
-		now:              now,
+		now:              time.Now,
+	}
+
+	for _, opt := range opts {
+		opt(l)
 	}
 
 	go l.limiters.cleanupLoop()
@@ -52,6 +58,11 @@ func (b *BandWidthRateLimiterImpl) Allow(peerID peer.ID, msg *message.Message) b
 // IsRateLimited returns true is a peer is currently rate limited.
 func (b *BandWidthRateLimiterImpl) IsRateLimited(peerID peer.ID) bool {
 	return b.rateLimitedPeers.exists(peerID)
+}
+
+// SetTimeNowFunc overrides the default time.Now func with the GetTimeNow func provided.
+func (b *BandWidthRateLimiterImpl) SetTimeNowFunc(now GetTimeNow) {
+	b.now = now
 }
 
 // Start starts cleanup loop for underlying caches.

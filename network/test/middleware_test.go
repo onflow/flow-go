@@ -196,7 +196,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 	testtime := unittest.NewTestTime()
 
 	// setup streams rate limiter
-	streamsRateLimiter := unicast.NewStreamsRateLimiter(limit, burst, testtime.Now)
+	streamsRateLimiter := unicast.NewStreamsRateLimiter(limit, burst, unicast.WithGetTimeNowFunc(testtime.Now))
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.
@@ -286,7 +286,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	testtime := unittest.NewTestTime()
 
 	// setup bandwidth rate limiter
-	bandwidthRateLimiter := unicast.NewBandWidthRateLimiter(limit, burst, testtime.Now)
+	bandwidthRateLimiter := unicast.NewBandWidthRateLimiter(limit, burst, unicast.WithGetTimeNowFunc(testtime.Now))
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.

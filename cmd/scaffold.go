@@ -304,7 +304,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 	// setup unicast stream rate limiter
 	if fnb.BaseConfig.UnicastStreamCreationRateLimit > 0 && fnb.BaseConfig.UnicastStreamCreationBurstLimit > 0 {
-		unicastStreamsRateLimiter := unicast.NewStreamsRateLimiter(rate.Limit(fnb.BaseConfig.UnicastStreamCreationRateLimit), fnb.BaseConfig.UnicastStreamCreationBurstLimit, time.Now)
+		unicastStreamsRateLimiter := unicast.NewStreamsRateLimiter(rate.Limit(fnb.BaseConfig.UnicastStreamCreationRateLimit), fnb.BaseConfig.UnicastStreamCreationBurstLimit)
 		unicastRateLimiters.StreamRateLimiter = unicastStreamsRateLimiter
 
 		// avoid connection gating and pruning during dry run
@@ -318,7 +318,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 	// setup unicast bandwidth rate limiter
 	if fnb.BaseConfig.UnicastBandwidthRateLimit > 0 && fnb.BaseConfig.UnicastBandwidthBurstLimit > 0 {
-		unicastBandwidthRateLimiter := unicast.NewBandWidthRateLimiter(rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit), fnb.BaseConfig.UnicastBandwidthBurstLimit, time.Now)
+		unicastBandwidthRateLimiter := unicast.NewBandWidthRateLimiter(rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit), fnb.BaseConfig.UnicastBandwidthBurstLimit)
 		unicastRateLimiters.BandWidthRateLimiter = unicastBandwidthRateLimiter
 
 		// avoid connection gating and pruning during dry run
