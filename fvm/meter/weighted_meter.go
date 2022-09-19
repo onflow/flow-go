@@ -9,6 +9,49 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO(patrick): rm after emulator is updated ...
+const (
+	// [2_000, 3_000) reserved for the FVM
+	_ common.ComputationKind = iota + 2_000
+	ComputationKindHash
+	ComputationKindVerifySignature
+	ComputationKindAddAccountKey
+	ComputationKindAddEncodedAccountKey
+	ComputationKindAllocateStorageIndex
+	ComputationKindCreateAccount
+	ComputationKindEmitEvent
+	ComputationKindGenerateUUID
+	ComputationKindGetAccountAvailableBalance
+	ComputationKindGetAccountBalance
+	ComputationKindGetAccountContractCode
+	ComputationKindGetAccountContractNames
+	ComputationKindGetAccountKey
+	ComputationKindGetBlockAtHeight
+	ComputationKindGetCode
+	ComputationKindGetCurrentBlockHeight
+	ComputationKindGetProgram
+	ComputationKindGetStorageCapacity
+	ComputationKindGetStorageUsed
+	ComputationKindGetValue
+	ComputationKindRemoveAccountContractCode
+	ComputationKindResolveLocation
+	ComputationKindRevokeAccountKey
+	ComputationKindRevokeEncodedAccountKey
+	ComputationKindSetProgram
+	ComputationKindSetValue
+	ComputationKindUpdateAccountContractCode
+	ComputationKindValidatePublicKey
+	ComputationKindValueExists
+)
+
+type MeteredComputationIntensities map[common.ComputationKind]uint
+type MeteredMemoryIntensities map[common.MemoryKind]uint
+type MeteredStorageInteractionMap map[StorageInteractionKey]uint64
+
+type StorageInteractionKey struct {
+	Owner, Key string
+}
+
 // MeterExecutionInternalPrecisionBytes are the amount of bytes that are used internally by the WeigthedMeter
 // to allow for metering computation smaller than one unit of computation. This allows for more fine weights.
 // A weight of 1 unit of computation is equal to 1<<16. The minimum possible weight is 1/65536.
@@ -345,7 +388,7 @@ type WeightedMeter struct {
 type WeightedMeterOptions func(*WeightedMeter)
 
 // NewMeter constructs a new Meter
-func NewMeter(params MeterParameters) Meter {
+func NewMeter(params MeterParameters) *WeightedMeter {
 	m := &WeightedMeter{
 		MeterParameters:        params,
 		computationIntensities: make(MeteredComputationIntensities),
@@ -357,7 +400,7 @@ func NewMeter(params MeterParameters) Meter {
 }
 
 // NewChild construct a new Meter instance with the same limits as parent
-func (m *WeightedMeter) NewChild() Meter {
+func (m *WeightedMeter) NewChild() *WeightedMeter {
 	return &WeightedMeter{
 		MeterParameters:        m.MeterParameters,
 		computationIntensities: make(MeteredComputationIntensities),
@@ -367,14 +410,12 @@ func (m *WeightedMeter) NewChild() Meter {
 }
 
 // MergeMeter merges the input meter into the current meter and checks for the limits
-func (m *WeightedMeter) MergeMeter(child Meter) {
-
-	var childComputationUsed uint64
-	if basic, ok := child.(*WeightedMeter); ok {
-		childComputationUsed = basic.computationUsed
-	} else {
-		childComputationUsed = uint64(child.TotalComputationUsed()) << MeterExecutionInternalPrecisionBytes
+func (m *WeightedMeter) MergeMeter(child *WeightedMeter) {
+	if child == nil {
+		return
 	}
+
+	var childComputationUsed = child.computationUsed
 	m.computationUsed = m.computationUsed + childComputationUsed
 
 	for key, intensity := range child.ComputationIntensities() {

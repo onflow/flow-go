@@ -34,7 +34,7 @@ type mapKey struct {
 // all register touches
 type State struct {
 	view             View
-	meter            meter.Meter
+	meter            *meter.WeightedMeter
 	updatedAddresses map[flow.Address]struct{}
 	updateSize       map[mapKey]uint64
 	stateLimits
@@ -101,7 +101,7 @@ func (s *State) View() View {
 	return s.view
 }
 
-func (s *State) Meter() meter.Meter {
+func (s *State) Meter() *meter.WeightedMeter {
 	return s.meter
 }
 

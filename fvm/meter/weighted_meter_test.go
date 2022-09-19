@@ -231,7 +231,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 	})
 
 	t.Run("add intensity - test limits - computation", func(t *testing.T) {
-		var m meter.Meter
+		var m *meter.WeightedMeter
 		reset := func() {
 			m = meter.NewMeter(
 				meter.DefaultParameters().
@@ -296,7 +296,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 	})
 
 	t.Run("add intensity - test limits - memory", func(t *testing.T) {
-		var m meter.Meter
+		var m *meter.WeightedMeter
 		reset := func() {
 			m = meter.NewMeter(
 				meter.DefaultParameters().
