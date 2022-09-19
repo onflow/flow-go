@@ -175,16 +175,11 @@ func NewMiddleware(
 		idTranslator:               idTranslator,
 		codec:                      codec,
 		slashingViolationsConsumer: slashingViolationsConsumer,
+		unicastRateLimiters:        unicast.NoopRateLimiters(),
 	}
 
 	for _, opt := range opts {
 		opt(mw)
-	}
-
-	// if no unicast rate limiters set
-	if mw.unicastRateLimiters == nil {
-		// noop
-		mw.unicastRateLimiters = unicast.NoopRateLimiters()
 	}
 
 	cm := component.NewComponentManagerBuilder().
