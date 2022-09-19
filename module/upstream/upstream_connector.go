@@ -9,6 +9,7 @@ import (
 	"github.com/sethvargo/go-retry"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/model/flow"
