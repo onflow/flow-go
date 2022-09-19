@@ -389,7 +389,7 @@ func (m *WeightedMeter) MergeMeter(child Meter) {
 
 	// merge storage meters
 	for key, value := range child.StorageUpdateSizeMap() {
-		m.storageUpdateSizeMap[key] += value
+		m.storageUpdateSizeMap[key] = value
 	}
 	m.totalStorageBytesRead += child.TotalBytesReadFromStorage()
 	m.totalStorageBytesWritten += child.TotalBytesWrittenToStorage()

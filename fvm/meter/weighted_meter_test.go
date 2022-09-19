@@ -615,7 +615,7 @@ func TestStorageLimits(t *testing.T) {
 		storageUpdateSizeMap := meter1.StorageUpdateSizeMap()
 		readKey1Val, ok := storageUpdateSizeMap[readKey1]
 		require.True(t, ok)
-		require.Equal(t, readKey1Val, readSize1*2)
+		require.Equal(t, readKey1Val, readSize1) // meter merge only takes child values for rw bookkeeping
 		writeKey1Val, ok := storageUpdateSizeMap[writeKey1]
 		require.True(t, ok)
 		require.Equal(t, writeKey1Val, writeSize1)
