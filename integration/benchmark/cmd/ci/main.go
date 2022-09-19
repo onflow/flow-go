@@ -76,7 +76,6 @@ func main() {
 
 	// Version and Commit Info
 	gitSha := build.Commit()
-
 	goVersion := runtime.Version()
 	osVersion := runtime.GOOS + runtime.GOARCH
 
@@ -131,7 +130,11 @@ func main() {
 	}
 
 	// prepare load generator
-	log.Info().Str("load_type", loadType).Int("tps", loadCase.tps).Dur("duration", loadCase.duration).Msgf("Running load case...")
+	log.Info().
+		Str("load_type", loadType).
+		Int("tps", loadCase.tps).
+		Dur("duration", loadCase.duration).
+		Msgf("Running load case...")
 
 	loaderMetrics.SetTPSConfigured(loadCase.tps)
 
@@ -203,7 +206,6 @@ func recordTransactionData(
 	sliceDuration time.Duration,
 	runStartTime time.Time,
 	gitSha, goVersion, osVersion string) {
-	fmt.Print("We have entered 'recordTransactionData()'\n")
 	// get initial values for first slice
 	startTime := time.Now()
 	startExecutedTransactions := lg.GetTxExecuted()

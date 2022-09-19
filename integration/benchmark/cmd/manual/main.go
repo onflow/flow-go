@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/desertbit/timer"
 	"net"
 	"os"
 	"strconv"
@@ -139,16 +138,16 @@ func main() {
 			lg.Start()
 		}
 
-		var testRunDuration *timer.Timer
-		// if the duration is 0, we run this case forever
+		var runDuration time.Duration
+		// if the duration is 0, we run this case with a 24-hour timeout
 		if c.duration.Nanoseconds() == 0 {
-			testRunDuration = timer.NewStoppedTimer()
+			runDuration, _ = time.ParseDuration("24h")
 		} else {
-			testRunDuration = timer.NewTimer(c.duration)
+			runDuration = c.duration
 		}
 
 		select {
-		case <-testRunDuration.C:
+		case <-time.After(runDuration):
 			if lg != nil {
 				lg.Stop()
 			}
