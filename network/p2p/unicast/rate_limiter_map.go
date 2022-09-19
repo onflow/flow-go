@@ -16,20 +16,20 @@ type rateLimiterMapItem struct {
 
 // rateLimiterMap stores a rate.Limiter for each peer in an underlying map.
 type rateLimiterMap struct {
-	mu          sync.Mutex
-	ttl         time.Duration
-	cleanupTick time.Duration
-	limiters    map[peer.ID]*rateLimiterMapItem
-	done        chan struct{}
+	mu              sync.Mutex
+	ttl             time.Duration
+	cleanupInterval time.Duration
+	limiters        map[peer.ID]*rateLimiterMapItem
+	done            chan struct{}
 }
 
 func newLimiterMap(ttl, cleanupTick time.Duration) *rateLimiterMap {
 	return &rateLimiterMap{
-		mu:          sync.Mutex{},
-		limiters:    make(map[peer.ID]*rateLimiterMapItem),
-		ttl:         ttl,
-		cleanupTick: cleanupTick,
-		done:        make(chan struct{}),
+		mu:              sync.Mutex{},
+		limiters:        make(map[peer.ID]*rateLimiterMapItem),
+		ttl:             ttl,
+		cleanupInterval: cleanupTick,
+		done:            make(chan struct{}),
 	}
 }
 
@@ -76,7 +76,7 @@ func (r *rateLimiterMap) cleanup(removeAll bool) {
 
 // cleanupLoop starts a loop that periodically removes stale peers.
 func (r *rateLimiterMap) cleanupLoop() {
-	ticker := time.NewTicker(r.cleanupTick)
+	ticker := time.NewTicker(r.cleanupInterval)
 	for {
 		select {
 		case <-ticker.C:
