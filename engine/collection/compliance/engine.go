@@ -19,9 +19,10 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
@@ -41,27 +42,32 @@ const defaultTimeoutObjectsQueueCapacity = 1000
 // Engine is a wrapper struct for `Core` which implements cluster consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
-	unit                       *engine.Unit
-	lm                         *lifecycle.LifecycleManager
-	log                        zerolog.Logger
-	metrics                    module.EngineMetrics
-	me                         module.Local
-	headers                    storage.Headers
-	payloads                   storage.ClusterPayloads
-	state                      protocol.State
-	core                       *Core
-	pendingBlocks              engine.MessageStore
-	pendingVotes               engine.MessageStore
-	pendingTimeouts            engine.MessageStore
-	messageHandler             *engine.MessageHandler
+	log      zerolog.Logger
+	metrics  module.EngineMetrics
+	me       module.Local
+	headers  storage.Headers
+	payloads storage.ClusterPayloads
+	state    protocol.State
+	core     *Core
+	// quues for inbound messages
+	pendingBlocks engine.MessageStore
+	// TODO remove pendingVotes and pendingTimeouts - we will pass these directly to the Aggregator
+	pendingVotes    engine.MessageStore
+	pendingTimeouts engine.MessageStore
+	messageHandler  *engine.MessageHandler
+	// tracking finalized view
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
 	con                        network.Conduit
-	stopHotstuff               context.CancelFunc
 	cluster                    flow.IdentityList // consensus participants in our cluster
+
+	cm *component.ComponentManager
+	component.Component
 }
 
+var _ network.MessageProcessor = (*Engine)(nil)
 var _ hotstuff.Communicator = (*Engine)(nil)
+var _ component.Component = (*Engine)(nil)
 
 func NewEngine(
 	log zerolog.Logger,
@@ -176,8 +182,6 @@ func NewEngine(
 	)
 
 	eng := &Engine{
-		unit:                       engine.NewUnit(),
-		lm:                         lifecycle.NewLifecycleManager(),
 		log:                        engineLog,
 		metrics:                    core.engineMetrics,
 		me:                         me,
@@ -194,17 +198,23 @@ func NewEngine(
 		cluster:                    currentCluster,
 	}
 
+	// register network conduit
 	chainID, err := core.state.Params().ChainID()
 	if err != nil {
 		return nil, fmt.Errorf("could not get chain ID: %w", err)
 	}
-
-	// register network conduit
 	conduit, err := net.Register(channels.ConsensusCluster(chainID), eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	eng.con = conduit
+
+	// create the component manager and worker threads
+	eng.cm = component.NewComponentManagerBuilder().
+		AddWorker(eng.processMessagesLoop). // TODO
+		AddWorker(nil).
+		Build()
+	eng.Component = eng.cm
 
 	return eng, nil
 }
@@ -223,68 +233,37 @@ func (e *Engine) WithSync(sync module.BlockRequester) *Engine {
 	return e
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For consensus engine, this is true once the underlying consensus
-// algorithm has started.
-func (e *Engine) Ready() <-chan struct{} {
+func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	if e.core.hotstuff == nil {
-		panic("must initialize compliance engine with hotstuff engine")
+		ctx.Throw(fmt.Errorf("must initialize compliance engine with hotstuff engine"))
 	}
-	e.lm.OnStart(func() {
-		e.unit.Launch(e.loop)
-		e.unit.Launch(e.finalizationProcessingLoop)
+	if e.core.sync == nil {
+		ctx.Throw(fmt.Errorf("must initialize compliance engine with sync engine"))
+	}
 
-		ctx, cancel := context.WithCancel(context.Background())
-		signalerCtx, hotstuffErrChan := irrecoverable.WithSignaler(ctx)
-		e.stopHotstuff = cancel
+	e.log.Info().Msg("starting hotstuff")
+	e.core.hotstuff.Start(ctx)
+	e.log.Info().Msg("hotstuff started")
 
-		// TODO: this workaround for handling fatal HotStuff errors is required only
-		//  because this engine and epochmgr do not use the Component pattern yet
-		e.unit.Launch(func() {
-			e.handleHotStuffError(hotstuffErrChan)
-		})
+	e.log.Info().Msg("starting compliance engine")
+	e.Component.Start(ctx)
+	e.log.Info().Msg("compliance engine started")
+}
 
-		e.core.hotstuff.Start(signalerCtx)
-		// wait for request handler to startup
-		<-e.core.hotstuff.Ready()
-	})
-	return e.lm.Started()
+// Ready returns a ready channel that is closed once the engine has fully started.
+// For the consensus engine, we wait for hotstuff to start.
+func (e *Engine) Ready() <-chan struct{} {
+	// NOTE: this will create long-lived goroutines each time Ready is called
+	// Since Ready is called infrequently, that is OK. If the call frequency changes, change this code.
+	return util.AllReady(e.cm, e.core.hotstuff)
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	e.lm.OnStop(func() {
-		e.log.Info().Msg("shutting down hotstuff eventloop")
-		e.stopHotstuff()
-		<-e.core.hotstuff.Done()
-		e.log.Info().Msg("all components have been shut down")
-		<-e.unit.Done()
-	})
-	return e.lm.Stopped()
-}
-
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.ProcessLocal(event)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	err := e.Process(channel, originID, event)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.messageHandler.Process(e.me.NodeID(), event)
+	// NOTE: this will create long-lived goroutines each time Done is called
+	// Since Done is called infrequently, that is OK. If the call frequency changes, change this code.
+	return util.AllDone(e.cm, e.core.hotstuff)
 }
 
 // Process processes the given event from the node with the given origin ID in
@@ -301,15 +280,20 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 	return nil
 }
 
-func (e *Engine) loop() {
+// processMessagesLoop processes available block, vote, and timeout messages as they are queued.
+func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	doneSignal := ctx.Done()
+	newMessageSignal := e.messageHandler.GetNotifier()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-doneSignal:
 			return
-		case <-e.messageHandler.GetNotifier():
-			err := e.processAvailableMessages()
+		case <-newMessageSignal:
+			err := e.processAvailableMessages(ctx)
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+				ctx.Throw(err)
 			}
 		}
 	}
@@ -318,10 +302,10 @@ func (e *Engine) loop() {
 // processAvailableMessages processes any available messages from the inbound queues.
 // Only returns when all inbound queues are empty (or the engine is terminated).
 // No errors expected during normal operations.
-func (e *Engine) processAvailableMessages() error {
+func (e *Engine) processAvailableMessages(ctx context.Context) error {
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return nil
 		default:
 		}
@@ -545,13 +529,16 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
-func (e *Engine) finalizationProcessingLoop() {
-	finalizationNotifier := e.finalizationEventsNotifier.Channel()
+func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	doneSignal := ctx.Done()
+	blockFinalizedSignal := e.finalizationEventsNotifier.Channel()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-doneSignal:
 			return
-		case <-finalizationNotifier:
+		case <-blockFinalizedSignal:
 			e.core.ProcessFinalizedView(e.finalizedView.Value())
 		}
 	}
