@@ -211,8 +211,8 @@ func NewEngine(
 
 	// create the component manager and worker threads
 	eng.cm = component.NewComponentManagerBuilder().
-		AddWorker(eng.processMessagesLoop). // TODO
-		AddWorker(nil).
+		AddWorker(eng.processMessagesLoop).
+		AddWorker(eng.finalizationProcessingLoop).
 		Build()
 	eng.Component = eng.cm
 
