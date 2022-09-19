@@ -565,6 +565,11 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			}
 		}
 
+		// check unicast bandwidth rate limiter for peer
+		if !m.unicastRateLimiters.BandwidthAllowed(remotePeer, role, &msg) {
+			return
+		}
+
 		// TODO: once we've implemented per topic message size limits per the TODO above,
 		// we can remove this check
 		maxSize := unicastMaxMsgSize(&msg)
@@ -577,11 +582,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 				Str("channel", msg.ChannelID).
 				Int("maxSize", maxSize).
 				Msg("received message exceeded permissible message maxSize")
-			return
-		}
-
-		// check unicast bandwidth rate limiter for peer
-		if !m.unicastRateLimiters.BandwidthAllowed(remotePeer, role, &msg) {
 			return
 		}
 
