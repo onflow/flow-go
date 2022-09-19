@@ -539,6 +539,7 @@ func storeUniqueNodes(
 			}
 		}
 
+		fmt.Println("=====> writing node")
 		encNode := flattener.EncodeNode(n, lchildIndex, rchildIndex, scratch)
 		_, err := writer.Write(encNode)
 		if err != nil {

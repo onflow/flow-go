@@ -34,7 +34,7 @@ func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	// validate the subtrie node checksum
 	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum)
 	if err != nil {
-		return nil, fmt.Errorf("could not read top level nodes count: %w", err)
+		return nil, fmt.Errorf("could not read top level nodes: %w", err)
 	}
 
 	return tries, nil
@@ -87,22 +87,9 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 
 	resultChs := make([]chan *resultReadSubTrie, 0, 16)
 	for i := 0; i < 16; i++ {
-		// TODO: move to readCheckpointSubTrie
-		filepath, _, err := filePathSubTries(dir, fileName, i)
-		if err != nil {
-			return nil, err
-		}
-		f, err := os.Open(filepath)
-		if err != nil {
-			return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
-		}
-		defer func(f *os.File) {
-			f.Close()
-		}(f)
-
 		resultCh := make(chan *resultReadSubTrie)
 		go func(i int) {
-			nodes, err := readCheckpointSubTrie(f, subtrieChecksums[i])
+			nodes, err := readCheckpointSubTrie(dir, fileName, i, subtrieChecksums[i])
 			resultCh <- &resultReadSubTrie{
 				Nodes: nodes,
 				Err:   err,
@@ -130,8 +117,20 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 // 2. nodes
 // 3. node count
 // 4. checksum
-func readCheckpointSubTrie(f *os.File, checksum uint32) ([]*node.Node, error) {
+func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint32) ([]*node.Node, error) {
 	// TODO: read and validate checksum
+
+	filepath, _, err := filePathSubTries(dir, fileName, index)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
+	}
+	defer func(f *os.File) {
+		f.Close()
+	}(f)
 
 	nodesCount, err := readSubTriesNodeCount(f)
 	if err != nil {
@@ -149,6 +148,7 @@ func readCheckpointSubTrie(f *os.File, checksum uint32) ([]*node.Node, error) {
 	scratch := make([]byte, 1024*4)           // must not be less than 1024
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	for i := uint64(1); i <= nodesCount; i++ {
+		fmt.Println("==== reading sub trie node", i)
 		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= uint64(i) {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
@@ -177,13 +177,14 @@ type subTrie struct {
 }
 
 func readSubTriesNodeCount(f *os.File) (uint64, error) {
-	const footerOffset = encNodeCountSize + crc32SumSize
 	const footerSize = encNodeCountSize // footer doesn't include crc32 sum
-	footer := make([]byte, footerSize)  // must not be less than 1024
+	const footerOffset = footerSize + crc32SumSize
 	_, err := f.Seek(-footerOffset, io.SeekEnd)
 	if err != nil {
 		return 0, fmt.Errorf("cannot seek to footer: %w", err)
 	}
+
+	footer := make([]byte, footerSize) // must not be less than 1024
 	_, err = io.ReadFull(f, footer)
 	if err != nil {
 		return 0, fmt.Errorf("could not read footer: %w", err)
@@ -239,6 +240,11 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	totalNodeCount := uint64(totalSubTrieNodeCount) + topLevelNodesCount
 	// TODO: read subtrie Node count and validate
 
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, fmt.Errorf("could not seek to 0: %w", err)
+	}
+
 	reader := NewCRC32Reader(bufio.NewReaderSize(file, defaultBufioReadSize))
 
 	// Scratch buffer is used as temporary buffer that reader can read into.
@@ -248,12 +254,14 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	// be large enough to handle almost all payloads and 100% of interim nodes.
 	scratch := make([]byte, 1024*4) // must not be less than 1024
 
+	fmt.Println("=========", totalSubTrieNodeCount, topLevelNodesCount, totalNodeCount, subtrieNodes)
 	// read the nodes from subtrie level to the root level
-	for i := uint64(totalSubTrieNodeCount) + 1; i <= totalNodeCount; i++ {
+	for i := uint64(1); i <= topLevelNodesCount; i++ {
 		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
-			if nodeIndex > uint64(i) {
+			if nodeIndex > i+uint64(totalSubTrieNodeCount) {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}
+
 			return getNodeByIndex(subtrieNodes, topLevelNodes, nodeIndex)
 		})
 		if err != nil {
@@ -263,9 +271,11 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 		topLevelNodes[i] = node
 	}
 
+	fmt.Println("=========", topLevelNodes, triesCount)
 	// read the trie root nodes
 	for i := uint16(0); i < triesCount; i++ {
 		trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+			fmt.Println("get node at index", nodeIndex)
 			return getNodeByIndex(subtrieNodes, topLevelNodes, nodeIndex)
 		})
 
@@ -301,7 +311,7 @@ func readNodeCount(f *os.File) (uint64, uint16, error) {
 func computeTotalSubTrieNodeCount(groups [][]*node.Node) int {
 	total := 0
 	for _, group := range groups {
-		total += len(group)
+		total += (len(group) - 1) // the first item in group is <nil>
 	}
 	return total
 }
@@ -309,14 +319,30 @@ func computeTotalSubTrieNodeCount(groups [][]*node.Node) int {
 func getNodeByIndex(subtrieNodes [][]*node.Node, topLevelNodes []*node.Node, index uint64) (*node.Node, error) {
 	offset := index
 	for _, subtries := range subtrieNodes {
-		if index < uint64(len(subtries)) {
+		if len(subtries) < 1 {
+			return nil, fmt.Errorf("subtries should have at least 1 item")
+		}
+		if subtries[0] != nil {
+			return nil, fmt.Errorf("subtrie[0] %v isn't nil", subtries[0])
+		}
+
+		if offset < uint64(len(subtries)) {
 			return subtries[offset], nil
 		}
-		offset -= uint64(len(subtries))
+		offset -= uint64(len(subtries) - 1)
+	}
+
+	// TODO: move this check outside
+	if len(topLevelNodes) < 1 {
+		return nil, fmt.Errorf("top trie should have at least 1 item")
+	}
+
+	if topLevelNodes[0] != nil {
+		return nil, fmt.Errorf("top trie [0] %v isn't nil", topLevelNodes[0])
 	}
 
 	if offset >= uint64(len(topLevelNodes)) {
-		return nil, fmt.Errorf("can not find node by index: %v", index)
+		return nil, fmt.Errorf("can not find node by index: %v in subtrieNodes %v, topLevelNodes %v", index, subtrieNodes, topLevelNodes)
 	}
 
 	return topLevelNodes[offset], nil
