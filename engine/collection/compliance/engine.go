@@ -360,8 +360,9 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		SigData: sigData,
 	}
 
-	// TODO: this is a hot-fix to mitigate the effects of the following Unicast call blocking occasionally
-	e.unit.Launch(func() {
+	// spawn a goroutine to asynchronously send the vote
+	// we do this so that network operations do not block the HotStuff EventLoop
+	go func() {
 		// send the vote the desired recipient
 		err := e.con.Unicast(vote, recipientID)
 		if err != nil {
@@ -370,7 +371,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		}
 		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
 		log.Info().Msg("collection vote transmitted")
-	})
+	}()
 
 	return nil
 }
@@ -382,6 +383,7 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
 		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
 		Uint64("timeout_view", timeout.View)
+
 	if timeout.LastViewTC != nil {
 		logContext.
 			Uint64("last_view_tc_view", timeout.LastViewTC.View).
@@ -390,7 +392,10 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 	log := logContext.Logger()
 
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
-	e.unit.Launch(func() {
+
+	// spawn a goroutine to asynchronously broadcast the timeout object
+	// we do this so that network operations do not block the HotStuff EventLoop
+	go func() {
 		// Retrieve all collection nodes in our cluster (excluding myself).
 		// Note: retrieving the final state requires a time-intensive database read.
 		//       Therefore, we execute this in a separate routine, because
@@ -424,7 +429,7 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 		// TODO(active-pacemaker): update metrics
 		//e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 		//e.core.collectionMetrics.ClusterBlockProposed(block)
-	})
+	}()
 
 	return nil
 }
@@ -445,8 +450,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	// fill in the fields that can't be populated by HotStuff
-	//TODO clean this up - currently we set these fields in builder, then lose
-	// them in HotStuff, then need to set them again here
+	// TODO clean this up - currently we set these fields in builder, then lose them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
@@ -469,7 +473,16 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		Logger()
 
 	log.Debug().Msg("processing cluster broadcast request from hotstuff")
-	e.unit.LaunchAfter(delay, func() {
+
+	// spawn a goroutine to asynchronously broadcast the proposal - we do this
+	// to introduce a pre-proposal delay without blocking the Hotstuff EventLoop thread
+	go func() {
+		select {
+		case <-time.After(delay):
+		case <-e.cm.ShutdownSignal():
+			return
+		}
+
 		// retrieve all collection nodes in our cluster
 		recipients, err := e.state.Final().Identities(filter.And(
 			filter.In(e.cluster),
@@ -489,15 +502,12 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		}
 
 		err = e.con.Publish(msg, recipients.NodeIDs()...)
-		if errors.Is(err, network.EmptyTargetList) {
-			return
-		}
 		if err != nil {
-			log.Error().Err(err).Msg("could not broadcast proposal")
-			return
+			if errors.Is(err, network.EmptyTargetList) {
+				return
+			}
+			log.Err(err).Msg("could not send proposal message")
 		}
-
-		log.Info().Msg("cluster proposal was broadcast")
 
 		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 		block := &cluster.Block{
@@ -505,7 +515,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Payload: payload,
 		}
 		e.core.collectionMetrics.ClusterBlockProposed(block)
-	})
+	}()
 
 	return nil
 }
@@ -540,25 +550,6 @@ func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, r
 			return
 		case <-blockFinalizedSignal:
 			e.core.ProcessFinalizedView(e.finalizedView.Value())
-		}
-	}
-}
-
-// handleHotStuffError accepts the error channel from the HotStuff component and
-// crashes the node if any error is detected.
-//
-//	 TODO: this function should be removed in favour of refactoring this engine and
-//		 the epochmgr engine to use the Component pattern, so that irrecoverable errors
-//		 can be bubbled all the way to the node scaffold
-func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
-	for {
-		select {
-		case <-e.unit.Quit():
-			return
-		case err := <-hotstuffErrs:
-			if err != nil {
-				e.log.Fatal().Err(err).Msg("encountered fatal error in HotStuff")
-			}
 		}
 	}
 }

@@ -465,6 +465,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	// fill in the fields that can't be populated by HotStuff
+	// TODO clean this up - currently we set these fields in builder, then lose them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
@@ -526,14 +527,14 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 		// broadcast the proposal to consensus nodes
 		err = e.con.Publish(proposal, recipients.NodeIDs()...)
-		if errors.Is(err, network.EmptyTargetList) {
-			return
-		}
 		if err != nil {
+			if errors.Is(err, network.EmptyTargetList) {
+				return
+			}
 			log.Err(err).Msg("could not send proposal message")
+		} else {
+			e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
 		}
-
-		e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
 
 		log.Info().Msg("block proposal was broadcast")
 
