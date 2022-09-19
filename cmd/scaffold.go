@@ -185,10 +185,11 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 
 	// unicast stream handler rate limits
-	fnb.flags.IntVar(&fnb.BaseConfig.UnicastStreamCreationRateLimit, "unicast-stream-rate-limit", 0, "number of unicast streams that can be created by a single peer per second")
-	fnb.flags.IntVar(&fnb.BaseConfig.UnicastStreamCreationBurstLimit, "unicast-stream-burst-limit", 0, "number of unicast streams that can be created by a single peer at once")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastStreamCreationRateLimit, "unicast-stream-rate-limit", 0, "amount of unicast streams that can be created by a single peer per second")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastStreamCreationBurstLimit, "unicast-stream-burst-limit", 0, "amount of unicast streams that can be created by a single peer at one time")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthRateLimit, "unicast-bandwidth-rate-limit", 0, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
-	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitDryRun, "unicast-rate-limit-dry-run", true, "only log and emit metrics when a peer exceeds rate limits")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", 0, "bandwidth size in bytes a peer is allowed to send at one time")
+	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitDryRun, "unicast-rate-limit-dry-run", true, "disable peer disconnects and connections gating when rate limiting peers")
 
 }
 
