@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -35,8 +34,8 @@ var ErrNotAuthorizedForEpoch = fmt.Errorf("we are not an authorized participant 
 type EpochComponents struct {
 	*component.ComponentManager
 	state             cluster.State
-	prop              network.Engine
-	sync              network.Engine
+	prop              component.Component
+	sync              module.ReadyDoneAware
 	hotstuff          module.HotStuff
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
@@ -46,8 +45,8 @@ var _ component.Component = (*EpochComponents)(nil)
 
 func NewEpochComponents(
 	state cluster.State,
-	prop network.Engine,
-	sync network.Engine,
+	prop component.Component,
+	sync module.ReadyDoneAware,
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,

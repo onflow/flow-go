@@ -43,7 +43,7 @@ type Engine struct {
 	me           module.Local
 	participants flow.IdentityList
 	con          network.Conduit
-	comp         network.Engine // compliance layer engine
+	comp         network.MessageProcessor // compliance layer engine
 
 	pollInterval time.Duration
 	scanInterval time.Duration
@@ -66,7 +66,7 @@ func New(
 	participants flow.IdentityList,
 	state cluster.State,
 	blocks storage.ClusterBlocks,
-	comp network.Engine,
+	comp network.MessageProcessor,
 	core module.SyncCore,
 	opts ...commonsync.OptionFunc,
 ) (*Engine, error) {
@@ -307,7 +307,12 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 			OriginID: originID,
 			Block:    block,
 		}
-		e.comp.SubmitLocal(synced)
+		// forward the block to the compliance engine for validation and processing
+		// we use the network.MessageProcessor interface here because the block is un-validated
+		err := e.comp.Process(channels.SyncCluster(block.Header.ChainID), originID, synced)
+		if err != nil {
+			e.log.Err(err).Msg("received unexpected error from compliance engine")
+		}
 	}
 }
 
