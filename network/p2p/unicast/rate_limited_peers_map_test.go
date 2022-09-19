@@ -55,13 +55,13 @@ func TestRateLimitedPeersMap_cleanup(t *testing.T) {
 	m.peers[peerID3].lastActive = start.Add(-20 * time.Minute)
 
 	// light clean up will only remove expired keys
-	m.cleanup(false)
+	m.cleanup()
 	require.True(t, m.exists(peerID1))
 	require.False(t, m.exists(peerID2))
 	require.False(t, m.exists(peerID3))
 
 	// full cleanup removes all keys
-	m.cleanup(true)
+	m.cleanup()
 	require.False(t, m.exists(peerID1))
 }
 

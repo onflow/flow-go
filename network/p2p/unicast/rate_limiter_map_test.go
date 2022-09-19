@@ -63,7 +63,7 @@ func TestLimiterMap_cleanup(t *testing.T) {
 	m.limiters[peerID3].lastActive = start.Add(-20 * time.Minute)
 
 	// light clean up will only remove expired keys
-	m.cleanup(false)
+	m.cleanup()
 
 	_, ok := m.get(peerID1)
 	require.True(t, ok)
@@ -73,7 +73,7 @@ func TestLimiterMap_cleanup(t *testing.T) {
 	require.False(t, ok)
 
 	// full cleanup removes all keys
-	m.cleanup(true)
+	m.cleanup()
 	_, ok = m.get(peerID1)
 	require.False(t, ok)
 }

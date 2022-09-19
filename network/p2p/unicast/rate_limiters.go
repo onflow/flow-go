@@ -38,16 +38,6 @@ func NewRateLimiters(messageLimiter, bandwidthLimiter RateLimiter, onRateLimited
 	}
 }
 
-// NoopRateLimiters returns noop rate limiters.
-func NoopRateLimiters() *RateLimiters {
-	return &RateLimiters{
-		MessageRateLimiter:   nil,
-		BandWidthRateLimiter: nil,
-		OnRateLimitedPeer:    nil,
-		dryRun:               true,
-	}
-}
-
 // MessageAllowed will return result from MessageRateLimiter.Allow. It will invoke the OnRateLimitedPeerFunc
 // callback each time a peer is not allowed.
 func (r *RateLimiters) MessageAllowed(peerID peer.ID) bool {
