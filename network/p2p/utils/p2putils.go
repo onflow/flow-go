@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"net"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -21,7 +22,7 @@ func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 		return peer.AddrInfo{}, fmt.Errorf("could not translate identity to networking info %s: %w", identity.NodeID.String(), err)
 	}
 
-	addr := p2putils.MultiAddressStr(ip, port)
+	addr := MultiAddressStr(ip, port)
 	maddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
 		return peer.AddrInfo{}, err
@@ -50,4 +51,20 @@ func PeerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifi
 		validIDs = append(validIDs, peerInfo)
 	}
 	return validIDs, invalidIDs
+}
+
+// MultiAddressStr receives a node ip and port and returns
+// its corresponding Libp2p MultiAddressStr in string format
+// in current implementation IP part of the node address is
+// either an IP or a dns4.
+// https://docs.libp2p.io/concepts/addressing/
+func MultiAddressStr(ip, port string) string {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP != nil {
+		// returns parsed ip version of the multi-address
+		return fmt.Sprintf("/ip4/%s/tcp/%s", ip, port)
+	}
+	// could not parse it as an IP address and returns the dns version of the
+	// multi-address
+	return fmt.Sprintf("/dns4/%s/tcp/%s", ip, port)
 }

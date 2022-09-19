@@ -44,7 +44,7 @@ func TestMultiAddress(t *testing.T) {
 		ip, port, _, err := p2putils.NetworkingInfo(*tc.identity)
 		require.NoError(t, err)
 
-		actualAddress := p2putils.MultiAddressStr(ip, port)
+		actualAddress := utils.MultiAddressStr(ip, port)
 		assert.Equal(t, tc.multiaddress, actualAddress, "incorrect multi-address translation")
 	}
 

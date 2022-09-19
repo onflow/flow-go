@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -38,7 +39,7 @@ func TestPeerManager_Integration(t *testing.T) {
 	topologyPeers := identities[1:]
 
 	// adds address of all other nodes into the peer store of this node, so that it can dial them.
-	info, invalid := p2p.PeerInfosFromIDs(topologyPeers)
+	info, invalid := utils.PeerInfosFromIDs(topologyPeers)
 	require.Empty(t, invalid)
 	for _, i := range info {
 		thisNode.Host().Peerstore().SetAddrs(i.ID, i.Addrs, peerstore.PermanentAddrTTL)

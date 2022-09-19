@@ -134,22 +134,6 @@ func NetworkingInfo(identity flow.Identity) (string, string, crypto.PubKey, erro
 	return ip, port, lkey, nil
 }
 
-// MultiAddressStr receives a node ip and port and returns
-// its corresponding Libp2p MultiAddressStr in string format
-// in current implementation IP part of the node address is
-// either an IP or a dns4.
-// https://docs.libp2p.io/concepts/addressing/
-func MultiAddressStr(ip, port string) string {
-	parsedIP := net.ParseIP(ip)
-	if parsedIP != nil {
-		// returns parsed ip version of the multi-address
-		return fmt.Sprintf("/ip4/%s/tcp/%s", ip, port)
-	}
-	// could not parse it as an IP address and returns the dns version of the
-	// multi-address
-	return fmt.Sprintf("/dns4/%s/tcp/%s", ip, port)
-}
-
 // IPPortFromMultiAddress returns the IP/hostname and the port for the given multi-addresses
 // associated with a libp2p host
 func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error) {

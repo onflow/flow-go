@@ -21,9 +21,9 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/p2p/dht"
@@ -273,7 +273,7 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 		return nil, fmt.Errorf("could not split node address %s:%w", address, err)
 	}
 
-	sourceMultiAddr, err := multiaddr.NewMultiaddr(p2putils.MultiAddressStr(ip, port))
+	sourceMultiAddr, err := multiaddr.NewMultiaddr(utils.MultiAddressStr(ip, port))
 	if err != nil {
 		return nil, fmt.Errorf("failed to translate Flow address to Libp2p multiaddress: %w", err)
 	}
