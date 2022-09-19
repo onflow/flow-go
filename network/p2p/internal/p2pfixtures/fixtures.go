@@ -23,12 +23,11 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
 	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
-	"github.com/onflow/flow-go/network/p2p/node"
-
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 
 	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -60,7 +59,7 @@ func NodeFixture(
 	sporkID flow.Identifier,
 	dhtPrefix string,
 	opts ...NodeFixtureParameterOption,
-) (*node.Node, flow.Identity) {
+) (*p2pnode.Node, flow.Identity) {
 	// default parameters
 	parameters := &NodeFixtureParameters{
 		HandlerFunc: func(network.Stream) {},
@@ -186,13 +185,13 @@ func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 }
 
 // StopNodes stop all nodes in the input slice
-func StopNodes(t *testing.T, nodes []*node.Node) {
+func StopNodes(t *testing.T, nodes []*p2pnode.Node) {
 	for _, n := range nodes {
 		StopNode(t, n)
 	}
 }
 
-func StopNode(t *testing.T, n *node.Node) {
+func StopNode(t *testing.T, n *p2pnode.Node) {
 	done, err := n.Stop()
 	assert.NoError(t, err)
 	unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop node on ime")
@@ -239,11 +238,11 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 
 // NodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func NodesFixture(t *testing.T, ctx context.Context, sporkID flow.Identifier, dhtPrefix string, count int, opts ...NodeFixtureParameterOption) ([]*node.Node,
+func NodesFixture(t *testing.T, ctx context.Context, sporkID flow.Identifier, dhtPrefix string, count int, opts ...NodeFixtureParameterOption) ([]*p2pnode.Node,
 	flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
-	var nodes []*node.Node
+	var nodes []*p2pnode.Node
 
 	defer func() {
 		if err != nil && nodes != nil {
@@ -273,7 +272,7 @@ func WithSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
 	}
 }
 
-func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, opts ...nodeOpt) *node.Node {
+func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, opts ...nodeOpt) *p2pnode.Node {
 	builder := p2pbuilder.NewNodeBuilder(logger, "0.0.0.0:0", networkKey, sporkID).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())

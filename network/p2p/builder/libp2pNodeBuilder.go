@@ -23,7 +23,7 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/node"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/utils"
 
@@ -31,6 +31,7 @@ import (
 
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
@@ -39,7 +40,7 @@ import (
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
-type LibP2PFactoryFunc func(context.Context) (*node.Node, error)
+type LibP2PFactoryFunc func(context.Context) (*p2pnode.Node, error)
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
@@ -54,7 +55,7 @@ func DefaultLibP2PNodeFactory(
 	role string,
 ) LibP2PFactoryFunc {
 
-	return func(ctx context.Context) (*node.Node, error) {
+	return func(ctx context.Context) (*p2pnode.Node, error) {
 		connManager := connection.NewConnManager(log, metrics)
 
 		// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
@@ -104,7 +105,7 @@ type NodeBuilder interface {
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 	SetPubSub(func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)) NodeBuilder
-	Build(context.Context) (*node.Node, error)
+	Build(context.Context) (*p2pnode.Node, error)
 }
 
 type LibP2PNodeBuilder struct {
@@ -170,7 +171,7 @@ func (builder *LibP2PNodeBuilder) SetPubSub(f func(context.Context, host.Host, .
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*node.Node, error) {
+func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*p2pnode.Node, error) {
 	if builder.routingFactory == nil {
 		return nil, errors.New("routing factory is not set")
 	}
@@ -214,7 +215,7 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*node.Node, error)
 	}
 
 	psOpts := append(
-		DefaultPubsubOptions(node.DefaultMaxPubSubMsgSize),
+		DefaultPubsubOptions(p2pnode.DefaultMaxPubSubMsgSize),
 		pubsub.WithDiscovery(discoveryRouting.NewRoutingDiscovery(rsys)),
 		pubsub.WithMessageIdFn(DefaultMessageIDFunction),
 	)
@@ -228,12 +229,12 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*node.Node, error)
 		return nil, err
 	}
 
-	pCache, err := node.NewProtocolPeerCache(builder.logger, host)
+	pCache, err := p2pnode.NewProtocolPeerCache(builder.logger, host)
 	if err != nil {
 		return nil, err
 	}
 
-	n := node.NewNode(builder.logger, host, pubSub, rsys, pCache, unicast.NewUnicastManager(
+	n := p2pnode.NewNode(builder.logger, host, pubSub, rsys, pCache, unicast.NewUnicastManager(
 		builder.logger,
 		unicast.NewLibP2PStreamFactory(host),
 		builder.sporkID,

@@ -1,4 +1,4 @@
-package node_test
+package p2pnode_test
 
 import (
 	"fmt"
@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/utils/unittest"

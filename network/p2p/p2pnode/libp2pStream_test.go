@@ -1,4 +1,4 @@
-package node_test
+package p2pnode_test
 
 import (
 	"bufio"
@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
-	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
@@ -210,7 +209,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 		p2pfixtures.WithPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
 	otherNode, otherId := p2pfixtures.NodeFixture(t, ctx, sporkId, "test_create_stream_fallback")
 
-	defer p2pfixtures.StopNodes(t, []*node.Node{thisNode, otherNode})
+	defer p2pfixtures.StopNodes(t, []*p2pnode.Node{thisNode, otherNode})
 
 	// Assert that there is no outbound stream to the target yet (neither default nor preferred)
 	defaultProtocolId := unicast.FlowProtocolID(sporkId)
@@ -322,7 +321,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	pInfo, err := utils.PeerAddressInfo(*id2)
 	require.NoError(t, err)
 	nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-	maxTimeToWait := node.MaxConnectAttempt * unicast.MaxConnectAttemptSleepDuration * time.Millisecond
+	maxTimeToWait := p2pnode.MaxConnectAttempt * unicast.MaxConnectAttemptSleepDuration * time.Millisecond
 
 	// need to add some buffer time so that RequireReturnsBefore waits slightly longer than maxTimeToWait to avoid
 	// a race condition
@@ -432,7 +431,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 		p2pfixtures.WithPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}),
 	)
 
-	defer p2pfixtures.StopNodes(t, []*node.Node{node1, node2})
+	defer p2pfixtures.StopNodes(t, []*p2pnode.Node{node1, node2})
 
 	testUnicastOverStreamRoundTrip(t, ctx, id1, node1, id2, node2, ch)
 }
@@ -444,9 +443,9 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 func testUnicastOverStreamRoundTrip(t *testing.T,
 	ctx context.Context,
 	id1 flow.Identity,
-	node1 *node.Node,
+	node1 *p2pnode.Node,
 	id2 flow.Identity,
-	node2 *node.Node,
+	node2 *p2pnode.Node,
 	ch <-chan string) {
 
 	pInfo1, err := utils.PeerAddressInfo(id1)

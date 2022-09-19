@@ -11,7 +11,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
@@ -39,7 +38,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	sn1, identity1 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
 	sn2, identity2 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
-	defer p2pfixtures.StopNodes(t, []*node.Node{sn1, sn2})
+	defer p2pfixtures.StopNodes(t, []*p2pnode.Node{sn1, sn2})
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -114,7 +113,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 
 	sn1, _ := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
 	sn2, identity2 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
-	defer p2pfixtures.StopNodes(t, []*node.Node{sn1, sn2})
+	defer p2pfixtures.StopNodes(t, []*p2pnode.Node{sn1, sn2})
 
 	// unauthenticated messages should not be dropped on public channels
 	channel := channels.PublicSyncCommittee
@@ -173,7 +172,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	sn1, identity1 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
 	sn2, identity2 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
 	an1, identity3 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleAccess))
-	defer p2pfixtures.StopNodes(t, []*node.Node{sn1, sn2, an1})
+	defer p2pfixtures.StopNodes(t, []*p2pnode.Node{sn1, sn2, an1})
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -281,7 +280,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 
 	sn1, identity1 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "consensus_1", p2pfixtures.WithRole(flow.RoleConsensus))
 	sn2, identity2 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "consensus_2", p2pfixtures.WithRole(flow.RoleConsensus))
-	defer p2pfixtures.StopNodes(t, []*node.Node{sn1, sn2})
+	defer p2pfixtures.StopNodes(t, []*p2pnode.Node{sn1, sn2})
 
 	// try to publish BlockProposal on invalid SyncCommittee channel
 	channel := channels.SyncCommittee
@@ -356,7 +355,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	sn1, identity1 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "consensus_1", p2pfixtures.WithRole(flow.RoleConsensus))
 	sn2, identity2 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "consensus_2", p2pfixtures.WithRole(flow.RoleConsensus))
 	an1, identity3 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "access_1", p2pfixtures.WithRole(flow.RoleAccess))
-	defer p2pfixtures.StopNodes(t, []*node.Node{sn1, sn2, an1})
+	defer p2pfixtures.StopNodes(t, []*p2pnode.Node{sn1, sn2, an1})
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -451,7 +450,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	ln1, identity1 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "collection_1", p2pfixtures.WithRole(flow.RoleCollection))
 	ln2, identity2 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "collection_2", p2pfixtures.WithRole(flow.RoleCollection))
 	ln3, identity3 := p2pfixtures.NodeFixture(t, nodeFixtureCtx, sporkId, "collection_3", p2pfixtures.WithRole(flow.RoleCollection))
-	defer p2pfixtures.StopNodes(t, []*node.Node{ln1, ln2, ln3})
+	defer p2pfixtures.StopNodes(t, []*p2pnode.Node{ln1, ln2, ln3})
 
 	channel := channels.SyncCluster(flow.Testnet)
 	topic := channels.TopicFromChannel(channel, sporkId)

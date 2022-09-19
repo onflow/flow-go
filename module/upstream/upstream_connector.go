@@ -9,7 +9,6 @@ import (
 	"github.com/sethvargo/go-retry"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -21,13 +20,13 @@ type upstreamConnector struct {
 	lm                  *lifecycle.LifecycleManager
 	bootstrapIdentities flow.IdentityList
 	logger              zerolog.Logger
-	unstakedNode        *node.Node
+	unstakedNode        *p2pnode.Node
 	cancel              context.CancelFunc
 	retryInitialTimeout time.Duration
 	maxRetries          uint64
 }
 
-func NewUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *node.Node, logger zerolog.Logger) *upstreamConnector {
+func NewUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *p2pnode.Node, logger zerolog.Logger) *upstreamConnector {
 	return &upstreamConnector{
 		lm:                  lifecycle.NewLifecycleManager(),
 		bootstrapIdentities: bootstrapIdentities,

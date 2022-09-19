@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
-	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -73,7 +72,7 @@ func TestFilterSubscribe(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	testPublish := func(wg *sync.WaitGroup, from *node.Node, sub *pubsub.Subscription) {
+	testPublish := func(wg *sync.WaitGroup, from *p2pnode.Node, sub *pubsub.Subscription) {
 		data := []byte("hello")
 
 		err := from.Publish(context.TODO(), badTopic, data)

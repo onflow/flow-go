@@ -1,5 +1,5 @@
-// Package p2p encapsulates the libp2p library
-package node
+// Package p2pnode encapsulates the libp2p library
+package p2pnode
 
 import (
 	"context"

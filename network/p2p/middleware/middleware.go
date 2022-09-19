@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/p2p/builder"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
-	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/utils"
 
@@ -79,7 +78,7 @@ type Middleware struct {
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
 	// and worker routines.
 	wg                         *sync.WaitGroup
-	libP2PNode                 *node.Node
+	libP2PNode                 *p2pnode.Node
 	libP2PNodeFactory          builder.LibP2PFactoryFunc
 	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
@@ -708,10 +707,10 @@ func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) err
 	}
 
 	msgSize := len(data)
-	if msgSize > node.DefaultMaxPubSubMsgSize {
+	if msgSize > p2pnode.DefaultMaxPubSubMsgSize {
 		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
 		// hence return an error as this message is undeliverable
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, node.DefaultMaxPubSubMsgSize)
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, p2pnode.DefaultMaxPubSubMsgSize)
 	}
 
 	topic := channels.TopicFromChannel(channel, m.rootBlockID)

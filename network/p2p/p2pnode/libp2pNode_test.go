@@ -1,4 +1,4 @@
-package node_test
+package p2pnode_test
 
 import (
 	"context"

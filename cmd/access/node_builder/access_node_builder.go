@@ -64,7 +64,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -187,7 +186,7 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	LibP2PNode                 *node.Node
+	LibP2PNode                 *p2pnode.Node
 	FollowerState              protocol.MutableState
 	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
@@ -976,7 +975,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 //   - No connection gater
 //   - Default Flow libp2p pubsub options
 func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
-	return func(ctx context.Context) (*node.Node, error) {
+	return func(ctx context.Context) (*p2pnode.Node, error) {
 		connManager := connection.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
 
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
