@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
-	"github.com/rs/zerolog/log"
 )
 
 var _ commands.AdminCommand = (*StopAtHeightCommand)(nil)
