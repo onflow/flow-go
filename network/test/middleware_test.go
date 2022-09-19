@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -25,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -379,7 +380,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 	// so the generated payload is 1000 bytes below the maximum unicast message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := networkPayloadFixture(m.T(), uint(p2p.DefaultMaxUnicastMsgSize)+1000)
+	payload := networkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
@@ -406,7 +407,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	msg, _ := createMessage(sourceNode, targetNode, "")
 
 	// creates a network payload with a size greater than the default max size
-	payload := networkPayloadFixture(m.T(), uint(p2p.DefaultMaxUnicastMsgSize)+1000)
+	payload := networkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
@@ -456,7 +457,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	// so the generated payload is 1000 bytes below the maximum publish message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := networkPayloadFixture(m.T(), uint(p2p.DefaultMaxPubSubMsgSize)+1000)
+	payload := networkPayloadFixture(m.T(), uint(node.DefaultMaxPubSubMsgSize)+1000)
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}

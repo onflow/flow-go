@@ -12,6 +12,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/node"
+	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/rs/zerolog"
 
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
@@ -102,7 +107,7 @@ type FollowerServiceBuilder struct {
 	*FollowerServiceConfig
 
 	// components
-	LibP2PNode              *p2p.Node
+	LibP2PNode              *node.Node
 	FollowerState           protocol.MutableState
 	SyncCore                *synchronization.Core
 	FinalizationDistributor *pubsub.FinalizationDistributor
@@ -368,7 +373,7 @@ func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
 		Me:                  nodeID,
 		MiddlewareFactory:   func() (network.Middleware, error) { return builder.Middleware, nil },
 		Topology:            topology,
-		SubscriptionManager: p2p.NewChannelSubscriptionManager(middleware),
+		SubscriptionManager: subscription.NewChannelSubscriptionManager(middleware),
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
@@ -557,12 +562,12 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 //   - No connection gater
 //   - No connection manager
 //   - Default libp2p pubsub options
-func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
-	return func(ctx context.Context) (*p2p.Node, error) {
+func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
+	return func(ctx context.Context) (*node.Node, error) {
 		var pis []peer.AddrInfo
 
 		for _, b := range builder.bootstrapIdentities {
-			pi, err := p2p.PeerAddressInfo(*b)
+			pi, err := utils.PeerAddressInfo(*b)
 
 			if err != nil {
 				return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
@@ -571,10 +576,10 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			pis = append(pis, pi)
 		}
 
-		node, err := p2p.NewNodeBuilder(builder.Logger, builder.BaseConfig.BindAddr, networkKey, builder.SporkID).
+		node, err := p2pbuilder.NewNodeBuilder(builder.Logger, builder.BaseConfig.BindAddr, networkKey, builder.SporkID).
 			SetSubscriptionFilter(
-				p2p.NewRoleBasedFilter(
-					p2p.UnstakedRole, builder.IdentityProvider,
+				subscription.NewRoleBasedFilter(
+					subscription.UnstakedRole, builder.IdentityProvider,
 				),
 			).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
@@ -700,21 +705,21 @@ func (builder *FollowerServiceBuilder) enqueueConnectWithStakedAN() {
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
-	factoryFunc p2p.LibP2PFactoryFunc,
+	factoryFunc p2pbuilder.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) network.Middleware {
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
-	builder.Middleware = p2p.NewMiddleware(
+	builder.Middleware = middleware.NewMiddleware(
 		builder.Logger,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
 		builder.Metrics.Bitswap,
 		builder.SporkID,
-		p2p.DefaultUnicastTimeout,
+		middleware.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
 		slashingViolationsConsumer,
-		p2p.WithMessageValidators(validators...),
+		middleware.WithMessageValidators(validators...),
 		// no peer manager
 		// use default identifier provider
 	)

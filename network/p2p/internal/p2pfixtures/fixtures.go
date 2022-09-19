@@ -16,6 +16,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	"github.com/onflow/flow-go/network/p2p"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/rs/zerolog"
@@ -76,10 +79,10 @@ func NodeFixture(
 		unittest.WithRole(parameters.Role))
 
 	noopMetrics := metrics.NewNoopCollector()
-	connManager := node.NewConnManager(parameters.Logger, noopMetrics)
+	connManager := connection.NewConnManager(parameters.Logger, noopMetrics)
 	resourceManager := test.NewResourceManager(t)
 
-	builder := node.NewNodeBuilder(parameters.Logger, parameters.Address, parameters.Key, sporkID).
+	builder := p2pbuilder.NewNodeBuilder(parameters.Logger, parameters.Address, parameters.Key, sporkID).
 		SetConnectionManager(connManager).
 		SetPubSub(pubsub.NewGossipSub).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
@@ -93,9 +96,12 @@ func NodeFixture(
 		SetResourceManager(resourceManager)
 
 	if parameters.PeerFilter != nil {
-		filters := []node.PeerFilter{parameters.PeerFilter}
+		filters := []p2p.PeerFilter{parameters.PeerFilter}
 		// set parameters.peerFilter as the default peerFilter for both callbacks
-		connGater := node.NewConnGater(parameters.Logger, node.WithOnInterceptPeerDialFilters(filters), node.WithOnInterceptSecuredFilters(filters))
+		connGater := connection.NewConnGater(
+			parameters.Logger,
+			connection.WithOnInterceptPeerDialFilters(filters),
+			connection.WithOnInterceptSecuredFilters(filters))
 		builder.SetConnectionGater(connGater)
 	}
 
@@ -123,7 +129,7 @@ type NodeFixtureParameters struct {
 	Key         crypto.PrivateKey
 	Address     string
 	DhtOptions  []dht.Option
-	PeerFilter  node.PeerFilter
+	PeerFilter  p2p.PeerFilter
 	Role        flow.Role
 	Logger      zerolog.Logger
 }
@@ -160,7 +166,7 @@ func WithDHTOptions(opts ...dht.Option) NodeFixtureParameterOption {
 	}
 }
 
-func WithPeerFilter(filter node.PeerFilter) NodeFixtureParameterOption {
+func WithPeerFilter(filter p2p.PeerFilter) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.PeerFilter = filter
 	}
@@ -258,16 +264,16 @@ func NodesFixture(t *testing.T, ctx context.Context, sporkID flow.Identifier, dh
 	return nodes, identities
 }
 
-type nodeOpt func(node.NodeBuilder)
+type nodeOpt func(p2pbuilder.NodeBuilder)
 
 func WithSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
-	return func(builder node.NodeBuilder) {
+	return func(builder p2pbuilder.NodeBuilder) {
 		builder.SetSubscriptionFilter(filter)
 	}
 }
 
 func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, opts ...nodeOpt) *node.Node {
-	builder := node.NewNodeBuilder(logger, "0.0.0.0:0", networkKey, sporkID).
+	builder := p2pbuilder.NewNodeBuilder(logger, "0.0.0.0:0", networkKey, sporkID).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
