@@ -18,6 +18,13 @@ import (
 	"github.com/onflow/flow-go/network/message"
 )
 
+const (
+	_  = iota
+	kb = 1 << (10 * iota)
+	mb
+	gb
+)
+
 const maxPingMessageSize = 5 * kb
 
 const pingTimeout = time.Second * 60

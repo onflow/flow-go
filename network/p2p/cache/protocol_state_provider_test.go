@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -22,7 +22,7 @@ import (
 
 type ProtocolStateProviderTestSuite struct {
 	suite.Suite
-	provider     *p2p.ProtocolStateIDCache
+	provider     *cache.ProtocolStateIDCache
 	distributor  *events.Distributor
 	state        protocol.State
 	snapshot     protocol.Snapshot
@@ -55,7 +55,7 @@ func (suite *ProtocolStateProviderTestSuite) SetupTest() {
 
 	suite.triggerUpdate()
 
-	provider, err := p2p.NewProtocolStateIDCache(zerolog.Logger{}, state, suite.distributor)
+	provider, err := cache.NewProtocolStateIDCache(zerolog.Logger{}, state, suite.distributor)
 	require.NoError(suite.T(), err)
 
 	suite.provider = provider
