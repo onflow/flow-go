@@ -67,12 +67,7 @@ func (r *rateLimitedPeersMap) cleanup(removeAll bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for peerID, item := range r.peers {
-		if removeAll {
-			r.removeUnlocked(peerID)
-			continue
-		}
-
-		if r.isExpired(item) {
+		if removeAll || r.isExpired(item) {
 			r.removeUnlocked(peerID)
 		}
 	}
