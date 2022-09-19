@@ -36,9 +36,6 @@ func NewStreamsRateLimiter(limit rate.Limit, burst int, opts ...RateLimiterOpt) 
 		opt(l)
 	}
 
-	go l.limiters.cleanupLoop()
-	go l.rateLimitedPeers.cleanupLoop()
-
 	return l
 }
 
