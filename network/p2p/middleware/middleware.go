@@ -20,7 +20,6 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
-	"github.com/onflow/flow-go/network/p2p/builder"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -79,7 +78,7 @@ type Middleware struct {
 	// and worker routines.
 	wg                         *sync.WaitGroup
 	libP2PNode                 *p2pnode.Node
-	libP2PNodeFactory          builder.LibP2PFactoryFunc
+	libP2PNodeFactory          p2pbuilder.LibP2PFactoryFunc
 	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
@@ -130,7 +129,7 @@ func WithPeerManager(peerManagerFunc p2p.PeerManagerFactoryFunc) MiddlewareOptio
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
 func NewMiddleware(
 	log zerolog.Logger,
-	libP2PNodeFactory builder.LibP2PFactoryFunc,
+	libP2PNodeFactory p2pbuilder.LibP2PFactoryFunc,
 	flowID flow.Identifier,
 	met module.NetworkMetrics,
 	bitswapMet module.BitswapMetrics,

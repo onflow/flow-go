@@ -1,4 +1,4 @@
-package builder
+package p2pbuilder
 
 import (
 	"context"

@@ -21,7 +21,6 @@ import (
 	"github.com/spf13/pflag"
 	"google.golang.org/api/option"
 
-	"github.com/onflow/flow-go/network/p2p/builder"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/ping"
@@ -276,7 +275,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		myAddr = fnb.BaseConfig.BindAddr
 	}
 
-	libP2PNodeFactory := builder.DefaultLibP2PNodeFactory(
+	libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 		fnb.Logger,
 		myAddr,
 		fnb.NetworkKey,
