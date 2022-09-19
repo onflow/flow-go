@@ -175,8 +175,6 @@ func main() {
 	sliceDuration, _ := time.ParseDuration(*sliceSize)
 	bufferSize := (loadCase.duration / sliceDuration) * 5
 	dataSlices := make(chan dataSlice, bufferSize)
-	defer prepareDataForBigQuery(dataSlices, *ciFlag)
-
 	go recordTransactionData(
 		dataSlices,
 		lg,
@@ -195,6 +193,8 @@ func main() {
 		// when the loader cancels its own context it may also call Stop() on itself
 		// this may become redundant.
 	}
+
+	prepareDataForBigQuery(dataSlices, *ciFlag)
 }
 
 func recordTransactionData(
@@ -204,9 +204,8 @@ func recordTransactionData(
 	runStartTime time.Time,
 	gitSha, goVersion, osVersion string) {
 	fmt.Print("We have entered 'recordTransactionData()'\n")
-	// grab time into start time
+	// get initial values for first slice
 	startTime := time.Now()
-	// grab total executed transactions into start transactions
 	startExecutedTransactions := lg.GetTxExecuted()
 
 	t := time.NewTicker(sliceDuration)
@@ -233,14 +232,13 @@ func recordTransactionData(
 				AfterExTxs:   endExecutedTransaction,
 				RunStartTime: runStartTime}
 
+			// set start values for next slice
 			startExecutedTransactions = endExecutedTransaction
 			startTime = endTime
 
 			slices <- slice
-			fmt.Printf("Slice Generated for time starting at: %v\n", slice.StartTime)
 		case <-lg.Done():
 			close(slices)
-			fmt.Printf("Ending collection of slices, %v slices generated.", len(slices))
 			return
 		}
 	}

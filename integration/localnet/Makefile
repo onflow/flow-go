@@ -84,7 +84,7 @@ tps-test:
 
 .PHONY: tps-ci-smoke
 tps-ci-smoke:
-	go run --tags relic ../benchmark/cmd/ci -log-level info -tps 25 -tps-durations 2m -slice-size 15s -ci-run
+	go run --tags relic ../benchmark/cmd/ci -log-level info -tps 10 -tps-durations 2m -slice-size 10s -ci-run
 
 .PHONY: tps-test-ci
 tps-test-ci:
