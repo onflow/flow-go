@@ -23,7 +23,7 @@ func TestProtocolPeerCache(t *testing.T) {
 	// create three hosts, and a pcache for the first
 	h1, err := DefaultLibP2PHost(ctx, "0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
 	require.NoError(t, err)
-	pcache, err := newProtocolPeerCache(zerolog.Nop(), h1)
+	pcache, err := NewProtocolPeerCache(zerolog.Nop(), h1)
 	require.NoError(t, err)
 	h2, err := DefaultLibP2PHost(ctx, "0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
 	require.NoError(t, err)

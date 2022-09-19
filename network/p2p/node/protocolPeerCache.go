@@ -12,19 +12,19 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// protocolPeerCache store a mapping from protocol ID to peers who support that protocol
-type protocolPeerCache struct {
+// ProtocolPeerCache store a mapping from protocol ID to peers who support that protocol
+type ProtocolPeerCache struct {
 	protocolPeers map[protocol.ID]map[peer.ID]struct{}
 	sync.RWMutex
 }
 
-func newProtocolPeerCache(logger zerolog.Logger, h host.Host) (*protocolPeerCache, error) {
+func NewProtocolPeerCache(logger zerolog.Logger, h host.Host) (*ProtocolPeerCache, error) {
 	sub, err := h.EventBus().
 		Subscribe([]interface{}{new(event.EvtPeerIdentificationCompleted), new(event.EvtPeerProtocolsUpdated)})
 	if err != nil {
 		return nil, fmt.Errorf("could not subscribe to peer protocol update events: %w", err)
 	}
-	p := &protocolPeerCache{protocolPeers: make(map[protocol.ID]map[peer.ID]struct{})}
+	p := &ProtocolPeerCache{protocolPeers: make(map[protocol.ID]map[peer.ID]struct{})}
 	h.Network().Notify(&libp2pnet.NotifyBundle{
 		DisconnectedF: func(n libp2pnet.Network, c libp2pnet.Conn) {
 			peer := c.RemotePeer()
@@ -38,7 +38,7 @@ func newProtocolPeerCache(logger zerolog.Logger, h host.Host) (*protocolPeerCach
 	return p, nil
 }
 
-func (p *protocolPeerCache) removePeer(peerID peer.ID) {
+func (p *ProtocolPeerCache) removePeer(peerID peer.ID) {
 	p.Lock()
 	defer p.Unlock()
 	for pid, peers := range p.protocolPeers {
@@ -49,7 +49,7 @@ func (p *protocolPeerCache) removePeer(peerID peer.ID) {
 	}
 }
 
-func (p *protocolPeerCache) addProtocols(peerID peer.ID, protocols []protocol.ID) {
+func (p *ProtocolPeerCache) addProtocols(peerID peer.ID, protocols []protocol.ID) {
 	p.Lock()
 	defer p.Unlock()
 	for _, pid := range protocols {
@@ -62,7 +62,7 @@ func (p *protocolPeerCache) addProtocols(peerID peer.ID, protocols []protocol.ID
 	}
 }
 
-func (p *protocolPeerCache) removeProtocols(peerID peer.ID, protocols []protocol.ID) {
+func (p *ProtocolPeerCache) removeProtocols(peerID peer.ID, protocols []protocol.ID) {
 	p.Lock()
 	defer p.Unlock()
 	for _, pid := range protocols {
@@ -74,7 +74,7 @@ func (p *protocolPeerCache) removeProtocols(peerID peer.ID, protocols []protocol
 	}
 }
 
-func (p *protocolPeerCache) getPeers(pid protocol.ID) map[peer.ID]struct{} {
+func (p *ProtocolPeerCache) getPeers(pid protocol.ID) map[peer.ID]struct{} {
 	p.RLock()
 	defer p.RUnlock()
 
@@ -86,7 +86,7 @@ func (p *protocolPeerCache) getPeers(pid protocol.ID) map[peer.ID]struct{} {
 	return peersCopy
 }
 
-func (p *protocolPeerCache) consumeSubscription(logger zerolog.Logger, h host.Host, sub event.Subscription) {
+func (p *ProtocolPeerCache) consumeSubscription(logger zerolog.Logger, h host.Host, sub event.Subscription) {
 	defer sub.Close()
 	logger.Debug().Msg("starting peer protocol event subscription loop")
 	for e := range sub.Out() {

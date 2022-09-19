@@ -21,6 +21,7 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/rs/zerolog"
@@ -32,13 +33,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
-type LibP2PFactoryFunc func(context.Context) (*Node, error)
+type LibP2PFactoryFunc func(context.Context) (*node.Node, error)
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
@@ -103,7 +103,7 @@ type NodeBuilder interface {
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 	SetPubSub(func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)) NodeBuilder
-	Build(context.Context) (*Node, error)
+	Build(context.Context) (*node.Node, error)
 }
 
 type LibP2PNodeBuilder struct {
@@ -169,7 +169,7 @@ func (builder *LibP2PNodeBuilder) SetPubSub(f func(context.Context, host.Host, .
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
+func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*node.Node, error) {
 	if builder.routingFactory == nil {
 		return nil, errors.New("routing factory is not set")
 	}
@@ -203,19 +203,17 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	}
 
 	host, err := DefaultLibP2PHost(ctx, builder.addr, builder.networkKey, opts...)
-
 	if err != nil {
 		return nil, err
 	}
 
 	rsys, err := builder.routingFactory(ctx, host)
-
 	if err != nil {
 		return nil, err
 	}
 
 	psOpts := append(
-		DefaultPubsubOptions(DefaultMaxPubSubMsgSize),
+		DefaultPubsubOptions(node.DefaultMaxPubSubMsgSize),
 		pubsub.WithDiscovery(discoveryRouting.NewRoutingDiscovery(rsys)),
 		pubsub.WithMessageIdFn(DefaultMessageIDFunction),
 	)
@@ -225,33 +223,21 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	}
 
 	pubSub, err := builder.pubsubFactory(ctx, host, psOpts...)
-
 	if err != nil {
 		return nil, err
 	}
 
-	pCache, err := newProtocolPeerCache(builder.logger, host)
-
+	pCache, err := node.NewProtocolPeerCache(builder.logger, host)
 	if err != nil {
 		return nil, err
 	}
 
-	node := &Node{
-		topics:  make(map[channels.Topic]*pubsub.Topic),
-		subs:    make(map[channels.Topic]*pubsub.Subscription),
-		logger:  builder.logger,
-		routing: rsys,
-		host:    host,
-		unicastManager: unicast.NewUnicastManager(
-			builder.logger,
-			unicast.NewLibP2PStreamFactory(host),
-			builder.sporkID,
-		),
-		pCache: pCache,
-		pubSub: pubSub,
-	}
-
-	return node, nil
+	n := node.NewNode(builder.logger, host, pubSub, rsys, pCache, unicast.NewUnicastManager(
+		builder.logger,
+		unicast.NewLibP2PStreamFactory(host),
+		builder.sporkID,
+	))
+	return n, nil
 }
 
 // DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
@@ -287,7 +273,7 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 		return nil, fmt.Errorf("could not split node address %s:%w", address, err)
 	}
 
-	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiAddressStr(ip, port))
+	sourceMultiAddr, err := multiaddr.NewMultiaddr(p2putils.MultiAddressStr(ip, port))
 	if err != nil {
 		return nil, fmt.Errorf("failed to translate Flow address to Libp2p multiaddress: %w", err)
 	}
