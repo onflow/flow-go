@@ -171,14 +171,11 @@ func main() {
 	// run load
 	lg.Start()
 
-	testRunDuration := time.NewTimer(loadCase.duration)
-	defer testRunDuration.Stop()
-
 	// prepare data slices
-	dataSlices := make(chan dataSlice)
-	defer prepareDataForBigQuery(dataSlices, *ciFlag)
-
 	sliceDuration, _ := time.ParseDuration(*sliceSize)
+	bufferSize := (loadCase.duration / sliceDuration) * 5
+	dataSlices := make(chan dataSlice, bufferSize)
+	defer prepareDataForBigQuery(dataSlices, *ciFlag)
 
 	go recordTransactionData(
 		dataSlices,
@@ -190,7 +187,7 @@ func main() {
 		osVersion)
 
 	select {
-	case <-testRunDuration.C:
+	case <-time.After(loadCase.duration):
 		lg.Stop()
 	case <-ctx.Done(): //TODO: the loader currently doesn't ever cancel the context
 		lg.Stop()
