@@ -8,6 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/rs/zerolog"
 )
 
@@ -20,14 +21,14 @@ var _ connmgr.ConnectionGater = (*ConnGater)(nil)
 type ConnGaterOption func(*ConnGater)
 
 // WithOnInterceptPeerDialFilters sets peer filters for outbound connections.
-func WithOnInterceptPeerDialFilters(filters []PeerFilter) ConnGaterOption {
+func WithOnInterceptPeerDialFilters(filters []p2p.PeerFilter) ConnGaterOption {
 	return func(c *ConnGater) {
 		c.onInterceptPeerDialFilters = filters
 	}
 }
 
 // WithOnInterceptSecuredFilters sets peer filters for inbound secured connections.
-func WithOnInterceptSecuredFilters(filters []PeerFilter) ConnGaterOption {
+func WithOnInterceptSecuredFilters(filters []p2p.PeerFilter) ConnGaterOption {
 	return func(c *ConnGater) {
 		c.onInterceptSecuredFilters = filters
 	}
@@ -37,8 +38,8 @@ func WithOnInterceptSecuredFilters(filters []PeerFilter) ConnGaterOption {
 // It provides node allowlisting by libp2p peer.ID which is derived from the node public networking key
 type ConnGater struct {
 	sync.RWMutex
-	onInterceptPeerDialFilters []PeerFilter
-	onInterceptSecuredFilters  []PeerFilter
+	onInterceptPeerDialFilters []p2p.PeerFilter
+	onInterceptSecuredFilters  []p2p.PeerFilter
 	log                        zerolog.Logger
 }
 
@@ -120,7 +121,7 @@ func (c *ConnGater) InterceptUpgraded(network.Conn) (allow bool, reason control.
 	return true, 0
 }
 
-func (c *ConnGater) peerIDPassesAllFilters(p peer.ID, filters []PeerFilter) error {
+func (c *ConnGater) peerIDPassesAllFilters(p peer.ID, filters []p2p.PeerFilter) error {
 	for _, allowed := range filters {
 		if err := allowed(p); err != nil {
 			return err

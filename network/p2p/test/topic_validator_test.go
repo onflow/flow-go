@@ -9,8 +9,8 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/node"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
@@ -62,7 +62,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 		return nil
 	}
 
-	pInfo2, err := p2putils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -119,7 +119,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	channel := channels.PublicSyncCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
 
-	pInfo2, err := p2putils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -194,10 +194,10 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
 	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
 
-	pInfo1, err := p2putils.PeerAddressInfo(identity1)
+	pInfo1, err := utils.PeerAddressInfo(identity1)
 	require.NoError(t, err)
 
-	pInfo2, err := p2putils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2)
 	require.NoError(t, err)
 
 	// node1 is connected to node2, and the an1 is connected to node1
@@ -302,7 +302,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
 	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
 
-	pInfo2, err := p2putils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -376,10 +376,10 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
 	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
 
-	pInfo1, err := p2putils.PeerAddressInfo(identity1)
+	pInfo1, err := utils.PeerAddressInfo(identity1)
 	require.NoError(t, err)
 
-	pInfo2, err := p2putils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2)
 	require.NoError(t, err)
 
 	// node1 is connected to node2, and the an1 is connected to node1
@@ -472,10 +472,10 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
 	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
 
-	pInfo1, err := p2putils.PeerAddressInfo(identity1)
+	pInfo1, err := utils.PeerAddressInfo(identity1)
 	require.NoError(t, err)
 
-	pInfo2, err := p2putils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2)
 	require.NoError(t, err)
 
 	// ln3 <-> sn1 <-> sn2

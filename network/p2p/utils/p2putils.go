@@ -1,0 +1,36 @@
+package utils
+
+import (
+	"fmt"
+
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
+)
+
+// PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
+// A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
+//
+//	flow.Identity        ---> peer.AddrInfo
+//	|-- Address          --->   |-- []multiaddr.Multiaddr
+//	|-- NetworkPublicKey --->   |-- ID
+func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
+	ip, port, key, err := p2putils.NetworkingInfo(identity)
+	if err != nil {
+		return peer.AddrInfo{}, fmt.Errorf("could not translate identity to networking info %s: %w", identity.NodeID.String(), err)
+	}
+
+	addr := p2putils.MultiAddressStr(ip, port)
+	maddr, err := multiaddr.NewMultiaddr(addr)
+	if err != nil {
+		return peer.AddrInfo{}, err
+	}
+
+	id, err := peer.IDFromPublicKey(key)
+	if err != nil {
+		return peer.AddrInfo{}, fmt.Errorf("could not extract libp2p id from key:%w", err)
+	}
+	pInfo := peer.AddrInfo{ID: id, Addrs: []multiaddr.Multiaddr{maddr}}
+	return pInfo, err
+}

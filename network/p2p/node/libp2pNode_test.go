@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,12 +76,12 @@ func TestGetPeerInfo(t *testing.T) {
 		identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
 
 		// translates node-i address into info
-		info, err := p2putils.PeerAddressInfo(*identity)
+		info, err := utils.PeerAddressInfo(*identity)
 		require.NoError(t, err)
 
 		// repeats the translation for node-i
 		for j := 0; j < 10; j++ {
-			rinfo, err := p2putils.PeerAddressInfo(*identity)
+			rinfo, err := utils.PeerAddressInfo(*identity)
 			require.NoError(t, err)
 			assert.Equal(t, rinfo.String(), info.String(), "inconsistent id generated")
 		}
@@ -99,7 +100,7 @@ func TestAddPeers(t *testing.T) {
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, identity := range identities[1:] {
-		peerInfo, err := p2putils.PeerAddressInfo(*identity)
+		peerInfo, err := utils.PeerAddressInfo(*identity)
 		require.NoError(t, err)
 		require.NoError(t, nodes[0].AddPeer(ctx, peerInfo))
 	}
@@ -149,7 +150,7 @@ func TestConnGater(t *testing.T) {
 		return nil
 	}))
 	defer p2pfixtures.StopNode(t, node1)
-	node1Info, err := p2putils.PeerAddressInfo(identity1)
+	node1Info, err := utils.PeerAddressInfo(identity1)
 	assert.NoError(t, err)
 
 	node2Peers := make(map[peer.ID]struct{})
@@ -160,7 +161,7 @@ func TestConnGater(t *testing.T) {
 		return nil
 	}))
 	defer p2pfixtures.StopNode(t, node2)
-	node2Info, err := p2putils.PeerAddressInfo(identity2)
+	node2Info, err := utils.PeerAddressInfo(identity2)
 	assert.NoError(t, err)
 
 	node1.Host().Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.PermanentAddrTTL)

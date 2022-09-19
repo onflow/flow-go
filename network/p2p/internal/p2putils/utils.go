@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -37,32 +38,6 @@ func StreamLogger(log zerolog.Logger, stream network.Stream) zerolog.Logger {
 		Str("local_peer", stream.Conn().LocalPeer().String()).
 		Str("local_address", stream.Conn().LocalMultiaddr().String()).Logger()
 	return logger
-}
-
-// PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
-// A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
-//
-//	flow.Identity        ---> peer.AddrInfo
-//	|-- Address          --->   |-- []multiaddr.Multiaddr
-//	|-- NetworkPublicKey --->   |-- ID
-func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
-	ip, port, key, err := NetworkingInfo(identity)
-	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("could not translate identity to networking info %s: %w", identity.NodeID.String(), err)
-	}
-
-	addr := MultiAddressStr(ip, port)
-	maddr, err := multiaddr.NewMultiaddr(addr)
-	if err != nil {
-		return peer.AddrInfo{}, err
-	}
-
-	id, err := peer.IDFromPublicKey(key)
-	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("could not extract libp2p id from key:%w", err)
-	}
-	pInfo := peer.AddrInfo{ID: id, Addrs: []multiaddr.Multiaddr{maddr}}
-	return pInfo, err
 }
 
 var directionLookUp = map[network.Direction]string{
@@ -214,7 +189,7 @@ func PeerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifi
 	validIDs := make([]peer.AddrInfo, 0, len(ids))
 	invalidIDs := make(map[flow.Identifier]error)
 	for _, id := range ids {
-		peerInfo, err := PeerAddressInfo(*id)
+		peerInfo, err := utils.PeerAddressInfo(*id)
 		if err != nil {
 			invalidIDs[id.NodeID] = err
 			continue

@@ -8,8 +8,8 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
-	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/node"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -60,7 +60,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 		"test_crosstalk_prevention_on_network_key_change",
 		p2pfixtures.WithNetworkingPrivateKey(node2key),
 	)
-	peerInfo2, err := p2putils.PeerAddressInfo(id2)
+	peerInfo2, err := utils.PeerAddressInfo(id2)
 	require.NoError(t, err)
 
 	// create stream from node 1 to node 2
@@ -104,7 +104,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	node1, id1 := p2pfixtures.NodeFixture(t, ctx, sporkId1, "test_one_to_one_crosstalk_prevention")
 
 	defer p2pfixtures.StopNode(t, node1)
-	peerInfo1, err := p2putils.PeerAddressInfo(id1)
+	peerInfo1, err := utils.PeerAddressInfo(id1)
 	require.NoError(t, err)
 
 	// create and start node 2 on localhost and random port
@@ -160,7 +160,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	)
 	defer p2pfixtures.StopNode(t, node2)
 
-	pInfo2, err := p2putils.PeerAddressInfo(id2)
+	pInfo2, err := utils.PeerAddressInfo(id2)
 	require.NoError(t, err)
 
 	// spork topic is derived by suffixing the channel with the root block ID

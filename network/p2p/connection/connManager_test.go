@@ -7,7 +7,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -84,7 +84,7 @@ func testSequence(t *testing.T, sequence []fun, connMgr *connection.ConnManager)
 func generatePeerInfo(t *testing.T) peer.ID {
 	key := p2pfixtures.NetworkingKeyFixtures(t)
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
-	pInfo, err := p2putils.PeerAddressInfo(*identity)
+	pInfo, err := utils.PeerAddressInfo(*identity)
 	require.NoError(t, err)
 	return pInfo.ID
 }

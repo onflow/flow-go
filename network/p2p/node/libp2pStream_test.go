@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/node"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -46,7 +47,7 @@ func TestStreamClosing(t *testing.T) {
 	defer p2pfixtures.StopNodes(t, nodes)
 	defer cancel()
 
-	nodeInfo1, err := p2putils.PeerAddressInfo(*identities[1])
+	nodeInfo1, err := utils.PeerAddressInfo(*identities[1])
 	require.NoError(t, err)
 
 	senderWG := sync.WaitGroup{}
@@ -160,7 +161,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 	streamCount := 100
 	var streams []network.Stream
 	for i := 0; i < streamCount; i++ {
-		pInfo, err := p2putils.PeerAddressInfo(*id2)
+		pInfo, err := utils.PeerAddressInfo(*id2)
 		require.NoError(t, err)
 		nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 		anotherStream, err := nodes[0].CreateStream(ctx, pInfo.ID)
@@ -220,7 +221,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 	streamCount := 100
 	var streams []network.Stream
 	for i := 0; i < streamCount; i++ {
-		pInfo, err := p2putils.PeerAddressInfo(otherId)
+		pInfo, err := utils.PeerAddressInfo(otherId)
 		require.NoError(t, err)
 		thisNode.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 
@@ -267,7 +268,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	nodes, identities := p2pfixtures.NodesFixture(t, ctx, unittest.IdentifierFixture(), "test_create_stream_is_concurrency_safe", 2)
 	defer p2pfixtures.StopNodes(t, nodes)
 	require.Len(t, identities, 2)
-	nodeInfo1, err := p2putils.PeerAddressInfo(*identities[1])
+	nodeInfo1, err := utils.PeerAddressInfo(*identities[1])
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
@@ -317,7 +318,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	defer p2pfixtures.StopNode(t, node1)
 
 	id2 := identities[1]
-	pInfo, err := p2putils.PeerAddressInfo(*id2)
+	pInfo, err := utils.PeerAddressInfo(*id2)
 	require.NoError(t, err)
 	nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 	maxTimeToWait := node.MaxConnectAttempt * unicast.MaxConnectAttemptSleepDuration * time.Millisecond
@@ -447,9 +448,9 @@ func testUnicastOverStreamRoundTrip(t *testing.T,
 	node2 *node.Node,
 	ch <-chan string) {
 
-	pInfo1, err := p2putils.PeerAddressInfo(id1)
+	pInfo1, err := utils.PeerAddressInfo(id1)
 	require.NoError(t, err)
-	pInfo2, err := p2putils.PeerAddressInfo(id2)
+	pInfo2, err := utils.PeerAddressInfo(id2)
 	require.NoError(t, err)
 
 	// Create stream from node 1 to node 2
@@ -520,7 +521,7 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 		require.NoError(t, listener.Close())
 	}()
 
-	silentNodeInfo, err := p2putils.PeerAddressInfo(silentNodeId)
+	silentNodeInfo, err := utils.PeerAddressInfo(silentNodeId)
 	require.NoError(t, err)
 
 	timeout := 1 * time.Second
@@ -554,7 +555,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 
 	defer p2pfixtures.StopNodes(t, goodNodes)
 	require.Len(t, goodNodeIds, 2)
-	goodNodeInfo1, err := p2putils.PeerAddressInfo(*goodNodeIds[1])
+	goodNodeInfo1, err := utils.PeerAddressInfo(*goodNodeIds[1])
 	require.NoError(t, err)
 
 	// create a silent node which never replies
@@ -562,7 +563,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	defer func() {
 		require.NoError(t, listener.Close())
 	}()
-	silentNodeInfo, err := p2putils.PeerAddressInfo(silentNodeId)
+	silentNodeInfo, err := utils.PeerAddressInfo(silentNodeId)
 	require.NoError(t, err)
 
 	// creates a stream to unresponsive node and makes sure that the stream creation is blocked
@@ -616,10 +617,10 @@ func TestConnectionGating(t *testing.T) {
 	}))
 	defer p2pfixtures.StopNode(t, node2)
 
-	node1Info, err := p2putils.PeerAddressInfo(node1Id)
+	node1Info, err := utils.PeerAddressInfo(node1Id)
 	assert.NoError(t, err)
 
-	node2Info, err := p2putils.PeerAddressInfo(node2Id)
+	node2Info, err := utils.PeerAddressInfo(node2Id)
 	assert.NoError(t, err)
 
 	requireError := func(err error) {
