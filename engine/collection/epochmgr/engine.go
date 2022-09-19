@@ -9,14 +9,12 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 )
@@ -32,70 +30,6 @@ var ErrNotAuthorizedForEpoch = fmt.Errorf("we are not an authorized participant 
 // ErrTimeout is returned when the timeout is exceeded before an epoch's components
 // are successfully started or stopped.
 var ErrTimeout = fmt.Errorf("timeout exceeded")
-
-// EpochComponents represents all dependencies for running an epoch.
-type EpochComponents struct {
-	*component.ComponentManager
-	state             cluster.State
-	prop              component.Component
-	sync              module.ReadyDoneAware
-	hotstuff          module.HotStuff
-	voteAggregator    hotstuff.VoteAggregator
-	timeoutAggregator hotstuff.TimeoutAggregator
-}
-
-var _ component.Component = (*EpochComponents)(nil)
-
-func NewEpochComponents(
-	state cluster.State,
-	prop component.Component,
-	sync module.ReadyDoneAware,
-	hotstuff module.HotStuff,
-	voteAggregator hotstuff.VoteAggregator,
-	timeoutAggregator hotstuff.TimeoutAggregator,
-) *EpochComponents {
-	components := &EpochComponents{
-		state:             state,
-		prop:              prop,
-		sync:              sync,
-		hotstuff:          hotstuff,
-		voteAggregator:    voteAggregator,
-		timeoutAggregator: timeoutAggregator,
-	}
-
-	builder := component.NewComponentManagerBuilder()
-	// start new worker that will start child components and wait for them to finish
-	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		// start vote and timeout aggregators, hotstuff will be started by compliance engine
-		voteAggregator.Start(ctx)
-		timeoutAggregator.Start(ctx)
-		// wait until all components start
-		<-util.AllReady(components.prop, components.sync, components.voteAggregator, components.timeoutAggregator)
-
-		// signal that startup has finished, and we are ready to go
-		ready()
-
-		// wait for shutdown to be commenced
-		<-ctx.Done()
-		// wait for compliance engine and event loop to shut down
-		<-util.AllDone(components.prop, components.sync, components.voteAggregator, components.timeoutAggregator)
-	})
-	components.ComponentManager = builder.Build()
-
-	return components
-}
-
-type StartableEpochComponents struct {
-	*EpochComponents
-	cancel context.CancelFunc // used to stop the epoch components
-}
-
-func NewStartableEpochComponents(components *EpochComponents, cancel context.CancelFunc) *StartableEpochComponents {
-	return &StartableEpochComponents{
-		EpochComponents: components,
-		cancel:          cancel,
-	}
-}
 
 // Engine is the epoch manager, which coordinates the lifecycle of other modules
 // and processes that are epoch-dependent. The manager is responsible for
@@ -120,35 +54,10 @@ type Engine struct {
 	epochTransitionEvents        chan *flow.Header // sends first block of new epoch
 	epochSetupPhaseStartedEvents chan *flow.Header // sends first block of EpochSetup phase
 	epochStopEvents              chan uint64       // sends counter of epoch to stop
+	epochStartedEvents           chan chan error   // sends signaller context error channel for a new epoch
 
 	cm *component.ComponentManager
 	component.Component
-}
-
-// getEpoch retrieves the stored (running) epoch components for the given epoch counter.
-// If no epoch with the counter is stored, returns (nil, false).
-// Safe for concurrent use.
-func (e *Engine) getEpoch(counter uint64) (*StartableEpochComponents, bool) {
-	e.mu.Lock()
-	epoch, ok := e.epochs[counter]
-	e.mu.Unlock()
-	return epoch, ok
-}
-
-// putEpoch inserts the given epoch components.
-// Safe for concurrent use.
-func (e *Engine) putEpoch(counter uint64, components *StartableEpochComponents) {
-	e.mu.Lock()
-	e.epochs[counter] = components
-	e.mu.Unlock()
-}
-
-// removeEpoch removes the epoch components with the given counter.
-// Safe for concurrent use.
-func (e *Engine) removeEpoch(counter uint64) {
-	e.mu.Lock()
-	delete(e.epochs, counter)
-	e.mu.Unlock()
 }
 
 var _ component.Component = (*Engine)(nil)
@@ -274,7 +183,8 @@ func (e *Engine) Done() <-chan struct{} {
 // createEpochComponents instantiates and returns epoch-scoped components for
 // the given epoch, using the configured factory.
 //
-// Returns ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
+// Error returns:
+// - ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
 func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
 
 	state, prop, sync, hot, voteAggregator, timeoutAggregator, err := e.factory.Create(epoch)
@@ -296,7 +206,7 @@ func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
 	e.epochSetupPhaseStartedEvents <- first
 }
 
-// TODO docs
+// handleEpochTransitionLoop handles EpochTransition protocol events.
 func (e *Engine) handleEpochTransitionLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -313,7 +223,7 @@ func (e *Engine) handleEpochTransitionLoop(ctx irrecoverable.SignalerContext, re
 	}
 }
 
-// TODO docs
+// handleEpochSetupPhaseStartedLoop handles EpochSetupPhaseStarted protocol events.
 func (e *Engine) handleEpochSetupPhaseStartedLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -328,7 +238,8 @@ func (e *Engine) handleEpochSetupPhaseStartedLoop(ctx irrecoverable.SignalerCont
 	}
 }
 
-// TODO docs
+// handleStopEpochLoop handles internal events indicating that a prior epoch's
+// components should be stopped.
 func (e *Engine) handleStopEpochLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -345,11 +256,35 @@ func (e *Engine) handleStopEpochLoop(ctx irrecoverable.SignalerContext, ready co
 	}
 }
 
+func (e *Engine) handleEpochStartedLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case errCh := <-e.epochStartedEvents:
+			go e.handleEpochErrors(ctx, errCh)
+		}
+	}
+}
+
+func (e *Engine) handleEpochErrors(ctx irrecoverable.SignalerContext, errCh <-chan error) {
+	select {
+	case <-ctx.Done():
+		return
+	case err := <-errCh:
+		if err != nil {
+			ctx.Throw(err)
+		}
+	}
+}
+
 // onEpochTransition is called when we transition to a new epoch. It arranges
 // to shut down the last epoch's components and starts up the new epoch's.
+//
 // No errors are expected during normal operation.
-func (e *Engine) onEpochTransition(ctx context.Context, first *flow.Header) error {
-	// TODO locking
+func (e *Engine) onEpochTransition(ctx irrecoverable.SignalerContext, first *flow.Header) error {
 	epoch := e.state.AtBlockID(first.ID()).Epochs().Current()
 	counter, err := epoch.Counter()
 	if err != nil {
@@ -366,7 +301,7 @@ func (e *Engine) onEpochTransition(ctx context.Context, first *flow.Header) erro
 		Logger()
 
 	// exit early and log if the epoch already exists
-	_, exists := e.getEpoch(counter)
+	_, exists := e.getEpochComponents(counter)
 	if exists {
 		log.Warn().Msg("epoch transition: components for new epoch already setup, exiting...")
 		return nil
@@ -446,18 +381,17 @@ func (e *Engine) onEpochSetupPhaseStarted(ctx context.Context, nextEpoch protoco
 //
 // Error returns:
 // - ErrTimeout if the timeout is exceeded before the epoch components are done.
-func (e *Engine) startEpochComponents(ctx context.Context, counter uint64, components *EpochComponents) error {
+func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, counter uint64, components *EpochComponents) error {
 
-	// TODO handle errs
-	signalerCtx, cancel, errCh := irrecoverable.WithSignallerAndCancel(ctx)
-	_ = errCh
+	epochCtx, cancel, errCh := irrecoverable.WithSignallerAndCancel(engineCtx)
 
 	// start component using its own context
-	components.Start(signalerCtx)
+	components.Start(epochCtx)
+	go e.handleEpochErrors(engineCtx, errCh)
 
 	select {
 	case <-components.Ready():
-		e.putEpoch(counter, NewStartableEpochComponents(components, cancel))
+		e.storeEpochComponents(counter, NewStartableEpochComponents(components, cancel))
 		return nil
 	case <-time.After(e.startupTimeout):
 		cancel() // cancel current context if we didn't start in time
@@ -473,7 +407,7 @@ func (e *Engine) startEpochComponents(ctx context.Context, counter uint64, compo
 // - ErrTimeout if the timeout is exceeded before the epoch components are done.
 func (e *Engine) stopEpochComponents(counter uint64) error {
 
-	components, exists := e.getEpoch(counter)
+	components, exists := e.getEpochComponents(counter)
 	if !exists {
 		e.log.Warn().Msgf("attempted to stop non-existent epoch %d", counter)
 		return nil
@@ -490,4 +424,30 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 	case <-time.After(e.startupTimeout):
 		return fmt.Errorf("could not stop epoch %d components after %s: %w", counter, e.startupTimeout, ErrTimeout)
 	}
+}
+
+// getEpochComponents retrieves the stored (running) epoch components for the given epoch counter.
+// If no epoch with the counter is stored, returns (nil, false).
+// Safe for concurrent use.
+func (e *Engine) getEpochComponents(counter uint64) (*StartableEpochComponents, bool) {
+	e.mu.Lock()
+	epoch, ok := e.epochs[counter]
+	e.mu.Unlock()
+	return epoch, ok
+}
+
+// storeEpochComponents stores the given epoch components in the engine's mapping.
+// Safe for concurrent use.
+func (e *Engine) storeEpochComponents(counter uint64, components *StartableEpochComponents) {
+	e.mu.Lock()
+	e.epochs[counter] = components
+	e.mu.Unlock()
+}
+
+// removeEpoch removes the epoch components with the given counter.
+// Safe for concurrent use.
+func (e *Engine) removeEpoch(counter uint64) {
+	e.mu.Lock()
+	delete(e.epochs, counter)
+	e.mu.Unlock()
 }
