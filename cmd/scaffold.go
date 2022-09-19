@@ -195,7 +195,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
 
 		// setup the Ping provider to return the software version and the sealed block height
-		pingInfoProvider := &ping.PingInfoProviderImpl{
+		pingInfoProvider := &ping.InfoProvider{
 			SoftwareVersionFun: func() string {
 				return build.Semver()
 			},

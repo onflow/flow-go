@@ -28,24 +28,24 @@ const maxPingMessageSize = 5 * kb
 
 const pingTimeout = time.Second * 60
 
-// PingService handles the outbound and inbound ping requests and response
-type PingService struct {
+// Service handles the outbound and inbound ping requests and response
+type Service struct {
 	host             host.Host
 	pingProtocolID   protocol.ID
 	pingInfoProvider fnetwork.PingInfoProvider
 	logger           zerolog.Logger
 }
 
-type PingInfoProviderImpl struct {
+type InfoProvider struct {
 	SoftwareVersionFun   func() string
 	SealedBlockHeightFun func() (uint64, error)
 	HotstuffViewFun      func() (uint64, error)
 }
 
-func (p PingInfoProviderImpl) SoftwareVersion() string {
+func (p InfoProvider) SoftwareVersion() string {
 	return p.SoftwareVersionFun()
 }
-func (p PingInfoProviderImpl) SealedBlockHeight() uint64 {
+func (p InfoProvider) SealedBlockHeight() uint64 {
 	height, err := p.SealedBlockHeightFun()
 	// if the node is unable to report the latest sealed block height, then report 0 instead of failing the ping
 	if err != nil {
@@ -54,7 +54,7 @@ func (p PingInfoProviderImpl) SealedBlockHeight() uint64 {
 	return height
 }
 
-func (p PingInfoProviderImpl) HotstuffView() uint64 {
+func (p InfoProvider) HotstuffView() uint64 {
 	view, err := p.HotstuffViewFun()
 	if err != nil {
 		return uint64(0)
@@ -67,15 +67,15 @@ func NewPingService(
 	pingProtocolID protocol.ID,
 	logger zerolog.Logger,
 	pingProvider fnetwork.PingInfoProvider,
-) *PingService {
-	ps := &PingService{host: h, pingProtocolID: pingProtocolID, pingInfoProvider: pingProvider, logger: logger}
+) *Service {
+	ps := &Service{host: h, pingProtocolID: pingProtocolID, pingInfoProvider: pingProvider, logger: logger}
 
 	h.SetStreamHandler(pingProtocolID, ps.pingHandler)
 	return ps
 }
 
 // PingHandler receives the inbound stream for Flow ping protocol and respond back with the PingResponse message
-func (ps *PingService) pingHandler(s network.Stream) {
+func (ps *Service) pingHandler(s network.Stream) {
 
 	errCh := make(chan error, 1)
 	defer close(errCh)
@@ -157,7 +157,7 @@ func (ps *PingService) pingHandler(s network.Stream) {
 }
 
 // Ping sends a Ping request to the remote node and returns the response, rtt and error if any.
-func (ps *PingService) Ping(ctx context.Context, peerID peer.ID) (message.PingResponse, time.Duration, error) {
+func (ps *Service) Ping(ctx context.Context, peerID peer.ID) (message.PingResponse, time.Duration, error) {
 	pingError := func(err error) error {
 		return fmt.Errorf("failed to ping peer %s: %w", peerID, err)
 	}
@@ -182,7 +182,7 @@ func (ps *PingService) Ping(ctx context.Context, peerID peer.ID) (message.PingRe
 	return resp, rtt, nil
 }
 
-func (ps *PingService) ping(ctx context.Context, p peer.ID) (message.PingResponse, time.Duration, error) {
+func (ps *Service) ping(ctx context.Context, p peer.ID) (message.PingResponse, time.Duration, error) {
 
 	// create a done channel to indicate Ping request-response is done or an error has occurred
 	done := make(chan error, 1)
