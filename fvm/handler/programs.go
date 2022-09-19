@@ -3,10 +3,16 @@ package handler
 import (
 	"fmt"
 
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 // TODO(patrick): remove and switch to *programs.TransactionPrograms once
@@ -16,80 +22,170 @@ type TransactionPrograms interface {
 	Set(loc common.Location, prog *interpreter.Program, state *state.State)
 }
 
-// ProgramsHandler manages operations using Programs storage.
-// It's separation of concern for hostEnv
-// Cadence contract guarantees that Get/Set methods will be called in a LIFO manner,
-// so we use stack based approach here. During successful execution stack should be cleared
-// naturally, making cleanup method essentially no-op. But if something goes wrong, all nested
-// views must be merged in order to make sure they are recorded
-type ProgramsHandler struct {
-	masterState *state.StateHolder
-	Programs    TransactionPrograms
+// Programs manages operations around cadence program parsing.
+//
+// Note that cadence guarantees that Get/Set methods are called in a LIFO
+// manner. Hence, we create new nested transactions on Get calls and commit
+// these nested transactions on Set calls in order to capture the states
+// needed for parsing the programs.
+type Programs struct {
+	tracer *environment.Tracer
+	meter  environment.Meter
 
-	// NOTE: non-address programs are not reusable across transactions, hence
-	// they are kept out of the shared program cache.
-	nonAddressPrograms map[common.LocationID]*interpreter.Program
+	stateTransaction *state.StateHolder
+	accounts         environment.Accounts
+
+	transactionPrograms TransactionPrograms
 }
 
-// NewProgramsHandler construts a new ProgramHandler
-func NewProgramsHandler(programs TransactionPrograms, stateHolder *state.StateHolder) *ProgramsHandler {
-	return &ProgramsHandler{
-		masterState:        stateHolder,
-		Programs:           programs,
-		nonAddressPrograms: map[common.LocationID]*interpreter.Program{},
+// NewPrograms construts a new ProgramHandler
+func NewPrograms(
+	tracer *environment.Tracer,
+	meter environment.Meter,
+	stateTransaction *state.StateHolder,
+	accounts environment.Accounts,
+	transactionPrograms TransactionPrograms,
+) *Programs {
+	return &Programs{
+		tracer:              tracer,
+		meter:               meter,
+		stateTransaction:    stateTransaction,
+		accounts:            accounts,
+		transactionPrograms: transactionPrograms,
 	}
 }
 
-func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Program) error {
+func (programs *Programs) set(
+	location common.Location,
+	program *interpreter.Program,
+) error {
 	// ignore empty locations
 	if location == nil {
 		return nil
 	}
 
+	// transactionPrograms only cache state for AddressLocation, so for non
+	// address location, simply set the state to nil.
 	address, ok := location.(common.AddressLocation)
-
-	// program cache track only for AddressLocation, so for anything other
-	// simply put a value
 	if !ok {
-		h.nonAddressPrograms[location.ID()] = program
+		programs.transactionPrograms.Set(address, program, nil)
 		return nil
 	}
 
-	state, err := h.masterState.CommitParseRestricted(address)
+	state, err := programs.stateTransaction.CommitParseRestricted(address)
 	if err != nil {
 		return err
 	}
 
-	h.Programs.Set(address, program, state)
+	programs.transactionPrograms.Set(address, program, state)
 	return nil
 }
 
-func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, bool) {
+func (programs *Programs) get(
+	location common.Location,
+) (
+	*interpreter.Program,
+	bool,
+) {
 	// ignore empty locations
 	if location == nil {
 		return nil, false
 	}
 
-	address, ok := location.(common.AddressLocation)
-
-	// program cache track only for AddressLocation
-	if !ok {
-		prog, ok := h.nonAddressPrograms[location.ID()]
-		return prog, ok
-	}
-
-	program, state, has := h.Programs.Get(address)
+	program, state, has := programs.transactionPrograms.Get(location)
 	if has {
-		err := h.masterState.AttachAndCommitParseRestricted(state)
-		if err != nil {
-			panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
+		if state != nil {
+			err := programs.stateTransaction.AttachAndCommitParseRestricted(
+				state)
+			if err != nil {
+				panic(fmt.Sprintf(
+					"merge error while getting program, panic: %s",
+					err))
+			}
 		}
 		return program, true
 	}
 
-	_, err := h.masterState.BeginParseRestrictedNestedTransaction(address)
-	if err != nil {
-		panic(err)
+	address, ok := location.(common.AddressLocation)
+	if ok {
+		// Address location program is reusable across transactions.  Create
+		// a nested transaction here in order to capture the states read to
+		// parse the program.
+		_, err := programs.stateTransaction.BeginParseRestrictedNestedTransaction(
+			address)
+		if err != nil {
+			panic(err)
+		}
 	}
 	return nil, false
+}
+
+func (programs *Programs) GetProgram(
+	location common.Location,
+) (
+	*interpreter.Program,
+	error,
+) {
+	defer programs.tracer.StartSpanFromRoot(trace.FVMEnvGetProgram).End()
+
+	err := programs.meter.MeterComputation(environment.ComputationKindGetProgram, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get program failed: %w", err)
+	}
+
+	if addressLocation, ok := location.(common.AddressLocation); ok {
+		address := flow.Address(addressLocation.Address)
+
+		freezeError := programs.accounts.CheckAccountNotFrozen(address)
+		if freezeError != nil {
+			return nil, fmt.Errorf("get program failed: %w", freezeError)
+		}
+	}
+
+	program, has := programs.get(location)
+	if has {
+		return program, nil
+	}
+
+	return nil, nil
+}
+
+func (programs *Programs) SetProgram(
+	location common.Location,
+	program *interpreter.Program,
+) error {
+	defer programs.tracer.StartSpanFromRoot(trace.FVMEnvSetProgram).End()
+
+	err := programs.meter.MeterComputation(environment.ComputationKindSetProgram, 1)
+	if err != nil {
+		return fmt.Errorf("set program failed: %w", err)
+	}
+
+	err = programs.set(location, program)
+	if err != nil {
+		return fmt.Errorf("set program failed: %w", err)
+	}
+	return nil
+}
+
+func (programs *Programs) DecodeArgument(
+	bytes []byte,
+	_ cadence.Type,
+) (
+	cadence.Value,
+	error,
+) {
+	defer programs.tracer.StartExtensiveTracingSpanFromRoot(
+		trace.FVMEnvDecodeArgument).End()
+
+	v, err := jsoncdc.Decode(programs.meter, bytes)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"decodeing argument failed: %w",
+			errors.NewInvalidArgumentErrorf(
+				"argument is not json decodable: %w",
+				err))
+	}
+
+	return v, err
 }
