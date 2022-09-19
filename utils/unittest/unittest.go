@@ -324,6 +324,12 @@ func RunWithTempDirWithoutRemove(t testing.TB, f func(string)) {
 	f(dbDir)
 }
 
+// Useful for debugging purpose
+func RunWithTempDirWithoutRemove(t testing.TB, f func(string)) {
+	dbDir := TempDir(t)
+	f(dbDir)
+}
+
 func badgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB, error)) *badger.DB {
 	opts := badger.
 		DefaultOptions(dir).
