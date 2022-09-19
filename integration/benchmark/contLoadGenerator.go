@@ -262,7 +262,6 @@ func (lg *ContLoadGenerator) startWorkers(numWorkers, diff int) {
 		worker.Start()
 		lg.workers = append(lg.workers, worker)
 	}
-	lg.workerStatsTracker.AddWorkers(diff)
 }
 
 func (lg *ContLoadGenerator) stopWorkers(numWorkers, diff int) {
@@ -280,7 +279,6 @@ func (lg *ContLoadGenerator) stopWorkers(numWorkers, diff int) {
 	wg.Wait()
 
 	lg.workers = lg.workers[:start]
-	lg.workerStatsTracker.AddWorkers(-diff)
 }
 
 func (lg *ContLoadGenerator) SetTPS(num uint) error {
@@ -296,6 +294,7 @@ func (lg *ContLoadGenerator) SetTPS(num uint) error {
 	case diff < 0:
 		lg.stopWorkers(numWorkers, -diff)
 	}
+	lg.workerStatsTracker.AddWorkers(diff)
 	return nil
 }
 
