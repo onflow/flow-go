@@ -40,7 +40,7 @@ func NewBandWidthRateLimiter(limit rate.Limit, burst int, opts ...RateLimiterOpt
 
 // Allow checks the cached limiter for the peer and returns limiter.AllowN(msg.Size())
 // which will check if a peer is able to send a message of msg.Size().
-// If a limiter is not cached for a one is created.
+// If a limiter is not cached one is created.
 func (b *BandWidthRateLimiterImpl) Allow(peerID peer.ID, msg *message.Message) bool {
 	limiter := b.getLimiter(peerID)
 	if !limiter.AllowN(b.now(), msg.Size()) {
