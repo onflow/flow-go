@@ -148,7 +148,7 @@ func (n *Node) RemovePeer(peerID peer.ID) error {
 }
 
 func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
-	pMap := n.pCache.getPeers(pid)
+	pMap := n.pCache.GetPeers(pid)
 	peers := make(peer.IDSlice, 0, len(pMap))
 	for p := range pMap {
 		peers = append(peers, p)

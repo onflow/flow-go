@@ -29,7 +29,7 @@ func NewProtocolPeerCache(logger zerolog.Logger, h host.Host) (*ProtocolPeerCach
 		DisconnectedF: func(n libp2pnet.Network, c libp2pnet.Conn) {
 			peer := c.RemotePeer()
 			if len(n.ConnsToPeer(peer)) == 0 {
-				p.removePeer(peer)
+				p.RemovePeer(peer)
 			}
 		},
 	})
@@ -38,7 +38,7 @@ func NewProtocolPeerCache(logger zerolog.Logger, h host.Host) (*ProtocolPeerCach
 	return p, nil
 }
 
-func (p *ProtocolPeerCache) removePeer(peerID peer.ID) {
+func (p *ProtocolPeerCache) RemovePeer(peerID peer.ID) {
 	p.Lock()
 	defer p.Unlock()
 	for pid, peers := range p.protocolPeers {
@@ -49,7 +49,7 @@ func (p *ProtocolPeerCache) removePeer(peerID peer.ID) {
 	}
 }
 
-func (p *ProtocolPeerCache) addProtocols(peerID peer.ID, protocols []protocol.ID) {
+func (p *ProtocolPeerCache) AddProtocols(peerID peer.ID, protocols []protocol.ID) {
 	p.Lock()
 	defer p.Unlock()
 	for _, pid := range protocols {
@@ -62,7 +62,7 @@ func (p *ProtocolPeerCache) addProtocols(peerID peer.ID, protocols []protocol.ID
 	}
 }
 
-func (p *ProtocolPeerCache) removeProtocols(peerID peer.ID, protocols []protocol.ID) {
+func (p *ProtocolPeerCache) RemoveProtocols(peerID peer.ID, protocols []protocol.ID) {
 	p.Lock()
 	defer p.Unlock()
 	for _, pid := range protocols {
@@ -74,7 +74,7 @@ func (p *ProtocolPeerCache) removeProtocols(peerID peer.ID, protocols []protocol
 	}
 }
 
-func (p *ProtocolPeerCache) getPeers(pid protocol.ID) map[peer.ID]struct{} {
+func (p *ProtocolPeerCache) GetPeers(pid protocol.ID) map[peer.ID]struct{} {
 	p.RLock()
 	defer p.RUnlock()
 
@@ -98,10 +98,10 @@ func (p *ProtocolPeerCache) consumeSubscription(logger zerolog.Logger, h host.Ho
 				logger.Err(err).Str("peer", evt.Peer.String()).Msg("failed to get protocols for peer")
 				continue
 			}
-			p.addProtocols(evt.Peer, protocol.ConvertFromStrings(protocols))
+			p.AddProtocols(evt.Peer, protocol.ConvertFromStrings(protocols))
 		case event.EvtPeerProtocolsUpdated:
-			p.addProtocols(evt.Peer, evt.Added)
-			p.removeProtocols(evt.Peer, evt.Removed)
+			p.AddProtocols(evt.Peer, evt.Added)
+			p.RemoveProtocols(evt.Peer, evt.Removed)
 		}
 	}
 	logger.Debug().Msg("exiting peer protocol event subscription loop")

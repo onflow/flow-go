@@ -1,4 +1,4 @@
-package node
+package node_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +25,7 @@ func TestProtocolPeerCache(t *testing.T) {
 	// create three hosts, and a pcache for the first
 	h1, err := p2pbuilder.DefaultLibP2PHost(ctx, "0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
 	require.NoError(t, err)
-	pcache, err := NewProtocolPeerCache(zerolog.Nop(), h1)
+	pcache, err := node.NewProtocolPeerCache(zerolog.Nop(), h1)
 	require.NoError(t, err)
 	h2, err := p2pbuilder.DefaultLibP2PHost(ctx, "0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
 	require.NoError(t, err)
@@ -47,8 +48,8 @@ func TestProtocolPeerCache(t *testing.T) {
 
 	// check that h1's pcache reflects the protocols supported by h2 and h3
 	assert.Eventually(t, func() bool {
-		peers2 := pcache.getPeers(p2)
-		peers3 := pcache.getPeers(p3)
+		peers2 := pcache.GetPeers(p2)
+		peers3 := pcache.GetPeers(p3)
 		_, ok2 := peers2[h2.ID()]
 		_, ok3 := peers3[h3.ID()]
 		return len(peers2) == 1 && len(peers3) == 1 && ok2 && ok3
@@ -59,7 +60,7 @@ func TestProtocolPeerCache(t *testing.T) {
 
 	// check that h1's pcache reflects the change
 	assert.Eventually(t, func() bool {
-		return len(pcache.getPeers(p2)) == 0
+		return len(pcache.GetPeers(p2)) == 0
 	}, 3*time.Second, 50*time.Millisecond)
 
 	// add support for p4 on h2 and h3
@@ -69,7 +70,7 @@ func TestProtocolPeerCache(t *testing.T) {
 
 	// check that h1's pcache reflects the change
 	assert.Eventually(t, func() bool {
-		peers4 := pcache.getPeers(p4)
+		peers4 := pcache.GetPeers(p4)
 		_, ok2 := peers4[h2.ID()]
 		_, ok3 := peers4[h3.ID()]
 		return len(peers4) == 2 && ok2 && ok3
