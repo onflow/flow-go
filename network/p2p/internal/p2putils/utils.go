@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -180,23 +179,6 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 		return ipOrHostname, port, nil
 	}
 	return "", "", fmt.Errorf("ip address or hostname not found")
-}
-
-// PeerInfosFromIDs converts the given flow.Identities to peer.AddrInfo.
-// For each identity, if the conversion succeeds, the peer.AddrInfo is included in the result else it is
-// included in the error map with the corresponding error
-func PeerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifier]error) {
-	validIDs := make([]peer.AddrInfo, 0, len(ids))
-	invalidIDs := make(map[flow.Identifier]error)
-	for _, id := range ids {
-		peerInfo, err := utils.PeerAddressInfo(*id)
-		if err != nil {
-			invalidIDs[id.NodeID] = err
-			continue
-		}
-		validIDs = append(validIDs, peerInfo)
-	}
-	return validIDs, invalidIDs
 }
 
 // AllowAllPeerFilter returns a peer filter that does not do any filtering.

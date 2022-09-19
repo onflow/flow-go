@@ -21,6 +21,7 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/rs/zerolog"
 
@@ -52,7 +53,7 @@ func DefaultLibP2PNodeFactory(
 	role string,
 ) LibP2PFactoryFunc {
 
-	return func(ctx context.Context) (*Node, error) {
+	return func(ctx context.Context) (*node.Node, error) {
 		connManager := connection.NewConnManager(log, metrics)
 
 		// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks

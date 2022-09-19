@@ -117,7 +117,7 @@ func TestRemovePeers(t *testing.T) {
 
 	// create nodes
 	nodes, identities := p2pfixtures.NodesFixture(t, ctx, unittest.IdentifierFixture(), "test_remove_peers", count)
-	peerInfos, errs := p2putils.PeerInfosFromIDs(identities)
+	peerInfos, errs := utils.PeerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
 	defer p2pfixtures.StopNodes(t, nodes)
 
