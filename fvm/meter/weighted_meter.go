@@ -418,18 +418,18 @@ func (m *WeightedMeter) MergeMeter(child *WeightedMeter) {
 	var childComputationUsed = child.computationUsed
 	m.computationUsed = m.computationUsed + childComputationUsed
 
-	for key, intensity := range child.ComputationIntensities() {
+	for key, intensity := range child.computationIntensities {
 		m.computationIntensities[key] += intensity
 	}
 
 	m.memoryEstimate = m.memoryEstimate + child.TotalMemoryEstimate()
 
-	for key, intensity := range child.MemoryIntensities() {
+	for key, intensity := range child.memoryIntensities {
 		m.memoryIntensities[key] += intensity
 	}
 
 	// merge storage meters
-	for key, value := range child.StorageUpdateSizeMap() {
+	for key, value := range child.storageUpdateSizeMap {
 		m.storageUpdateSizeMap[key] = value
 	}
 	m.totalStorageBytesRead += child.TotalBytesReadFromStorage()
@@ -543,11 +543,6 @@ func (m *WeightedMeter) TotalBytesOfStorageInteractions() uint64 {
 	return m.TotalBytesReadFromStorage() + m.TotalBytesWrittenToStorage()
 }
 
-// StorageUpdateSizeMap returns all the measured storage meters
-func (m *WeightedMeter) StorageUpdateSizeMap() MeteredStorageInteractionMap {
-	return m.storageUpdateSizeMap
-}
-
 func getStorageKeyValueSize(storageKey StorageInteractionKey,
 	value flow.RegisterValue) uint64 {
 	return uint64(len(storageKey.Owner) + len(storageKey.Key) + len(value))
@@ -557,4 +552,8 @@ func GetStorageKeyValueSizeForTesting(
 	storageKey StorageInteractionKey,
 	value flow.RegisterValue) uint64 {
 	return getStorageKeyValueSize(storageKey, value)
+}
+
+func (m *WeightedMeter) GetStorageUpdateSizeMapForTesting() MeteredStorageInteractionMap {
+	return m.storageUpdateSizeMap
 }
