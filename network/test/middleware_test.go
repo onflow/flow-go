@@ -12,7 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -25,6 +24,7 @@ import (
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -160,7 +160,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	overlay := m.createOverlay(providers[0])
 	overlay.On("Receive",
 		m.ids[0].NodeID,
-		mock.AnythingOfType("*message.Message"),
+		mockery.AnythingOfType("*message.Message"),
 	).Return(nil)
 	newMw.SetOverlay(overlay)
 	newMw.Start(m.mwCtx)
@@ -185,7 +185,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	require.NoError(m.T(), err)
 }
 
-func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
+func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// limiter limit will be set to 5 events/sec the 6th event per interval will be rate limited
 	limit := rate.Limit(5)
 
@@ -195,15 +195,15 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 	// create test time
 	testtime := unittest.NewTestTime()
 
-	// setup streams rate limiter
-	streamsRateLimiter := unicast.NewStreamsRateLimiter(limit, burst, unicast.WithGetTimeNowFunc(testtime.Now))
+	// setup message rate limiter
+	messageRateLimiter := unicast.NewMessageRateLimiter(limit, burst, unicast.WithGetTimeNowFunc(testtime.Now))
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
-	// after 5 rate limits we will close ch.
+	// after 5 rate limits we will close ch. O
 	ch := make(chan struct{})
 	var rateLimits uint64
 	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason unicast.RateLimitReason) {
-		require.Equal(m.T(), reason, unicast.StreamCount)
+		require.Equal(m.T(), reason, unicast.MessageCount)
 
 		// we only expect messages from the first middleware on the test suite
 		expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
@@ -212,18 +212,27 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 
 		// update hook calls
 		atomic.AddUint64(&rateLimits, 1)
-		close(ch)
 	}
 
-	rateLimiters := unicast.NewRateLimiters(streamsRateLimiter, nil, onRateLimit, false)
+	rateLimiters := unicast.NewRateLimiters(messageRateLimiter, nil, onRateLimit, false)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
 	defer testnet.StopNodes(m.T(), libP2PNodes)
 
 	// create middleware
-	opts := WithUnicastRateLimiters(rateLimiters)
-	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer, opts)
+	netmet := mock.NewNetworkMetrics(m.T())
+	calls := 0
+	netmet.On("NetworkMessageReceived", mockery.Anything, mockery.Anything, mockery.Anything).Times(5).Run(func(args mockery.Arguments) {
+		calls++
+		if calls == 5 {
+			close(ch)
+		}
+	})
+	// we expect 5 messages to be processed the rest will be rate limited
+	defer netmet.AssertNumberOfCalls(m.T(), "NetworkMessageReceived", 5)
+
+	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer, WithUnicastRateLimiters(rateLimiters), WithNetworkMetrics(netmet))
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -233,7 +242,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 	overlay := m.createOverlay(providers[0])
 	overlay.On("Receive",
 		m.ids[0].NodeID,
-		mock.AnythingOfType("*message.Message"),
+		mockery.AnythingOfType("*message.Message"),
 	).Return(nil)
 
 	newMw.SetOverlay(overlay)
@@ -247,21 +256,20 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 	// needed to enable ID translation
 	m.providers[0].SetIdentities(idList)
 
-	msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
-
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
-	// for the duration of a simulated second we will send 6 messages. The 6th message will be
+	// for the duration of a simulated second we will send 10 messages. The 10th message will be
 	// rate limited.
 	start := testtime.Now()
 	end := start.Add(time.Second)
 	for testtime.Now().Before(end) {
+		// a message is sent every 167 milliseconds which equates to around 6 req/sec surpassing our limit
+		testtime.Advance(168 * time.Millisecond)
+
+		msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, fmt.Sprintf("hello-%s", testtime.Now().String()))
 		err := m.mws[0].SendDirect(msg, newId.NodeID)
 		require.NoError(m.T(), err)
-
-		// a message is sent every 167 milliseconds which equates to around 6 req/sec surpassing our limit
-		testtime.Advance(167 * time.Millisecond)
 	}
 
 	// wait for all rate limits before shutting down middleware
@@ -322,7 +330,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	overlay := m.createOverlay(providers[0])
 	overlay.On("Receive",
 		m.ids[0].NodeID,
-		mock.AnythingOfType("*message.Message"),
+		mockery.AnythingOfType("*message.Message"),
 	).Return(nil)
 
 	newMw.SetOverlay(overlay)
@@ -381,7 +389,7 @@ func (m *MiddlewareTestSuite) createOverlay(provider *UpdatableIDProvider) *mock
 	}, nil)
 	// this test is not testing the topic validator, especially in spoofing,
 	// so we always return a valid identity
-	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(), true)
+	overlay.On("Identity", mockery.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(), true)
 	return overlay
 }
 
@@ -730,6 +738,7 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg strin
 
 	m := &message.Message{
 		ChannelID: testChannel.String(),
+		Type:      flow.MakeID(payload).String(),
 		EventID:   []byte("1"),
 		OriginID:  originID[:],
 		TargetIDs: [][]byte{targetID[:]},

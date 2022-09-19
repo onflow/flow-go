@@ -170,13 +170,13 @@ type BaseConfig struct {
 
 	// UnicastRateLimitDryRun will disable connection disconnects and gating when unicast rate limiters are configured
 	UnicastRateLimitDryRun bool
-	// UnicastStreamCreationRateLimit amount of unicast streams that can be created by a peer per second.
-	UnicastStreamCreationRateLimit int
-	// UnicastStreamCreationBurstLimit amount of unicast streams that can be created by a peer at once.
-	UnicastStreamCreationBurstLimit int
+	// UnicastMessageRateLimit amount of unicast messages that can be sent by a peer per second.
+	UnicastMessageRateLimit int
+	// UnicastMessageBurstLimit amount of unicast messages that can be sent by a peer at once.
+	UnicastMessageBurstLimit int
 	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
 	UnicastBandwidthRateLimit int
-	// UnicastStreamCreationBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
+	// UnicastBandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
 	UnicastBandwidthBurstLimit int
 }
 

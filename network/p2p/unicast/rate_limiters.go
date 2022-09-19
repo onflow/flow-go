@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	StreamCount RateLimitReason = "streamcount"
-	Bandwidth   RateLimitReason = "bandwidth"
+	MessageCount RateLimitReason = "messagecount"
+	Bandwidth    RateLimitReason = "bandwidth"
 )
 
 type RateLimitReason string
@@ -22,16 +22,16 @@ type OnRateLimitedPeerFunc func(pid peer.ID, role, msgType string, topic channel
 
 // RateLimiters used to manage stream and bandwidth rate limiters
 type RateLimiters struct {
-	StreamRateLimiter    RateLimiter
+	MessageRateLimiter   RateLimiter
 	BandWidthRateLimiter RateLimiter
 	OnRateLimitedPeer    OnRateLimitedPeerFunc // the callback called each time a peer is rate limited
 	dryRun               bool
 }
 
 // NewRateLimiters returns *RateLimiters
-func NewRateLimiters(streamLimiter, bandwidthLimiter RateLimiter, onRateLimitedPeer OnRateLimitedPeerFunc, dryRun bool) *RateLimiters {
+func NewRateLimiters(messageLimiter, bandwidthLimiter RateLimiter, onRateLimitedPeer OnRateLimitedPeerFunc, dryRun bool) *RateLimiters {
 	return &RateLimiters{
-		StreamRateLimiter:    streamLimiter,
+		MessageRateLimiter:   messageLimiter,
 		BandWidthRateLimiter: bandwidthLimiter,
 		OnRateLimitedPeer:    onRateLimitedPeer,
 		dryRun:               dryRun,
@@ -41,22 +41,22 @@ func NewRateLimiters(streamLimiter, bandwidthLimiter RateLimiter, onRateLimitedP
 // NoopRateLimiters returns noop rate limiters.
 func NoopRateLimiters() *RateLimiters {
 	return &RateLimiters{
-		StreamRateLimiter:    nil,
+		MessageRateLimiter:   nil,
 		BandWidthRateLimiter: nil,
 		OnRateLimitedPeer:    nil,
 		dryRun:               true,
 	}
 }
 
-// StreamAllowed will return result from StreamRateLimiter.Allow. It will invoke the OnRateLimitedPeerFunc
+// MessageAllowed will return result from MessageRateLimiter.Allow. It will invoke the OnRateLimitedPeerFunc
 // callback each time a peer is not allowed.
-func (r *RateLimiters) StreamAllowed(peerID peer.ID) bool {
-	if r.StreamRateLimiter == nil {
+func (r *RateLimiters) MessageAllowed(peerID peer.ID) bool {
+	if r.MessageRateLimiter == nil {
 		return true
 	}
 
-	if !r.StreamRateLimiter.Allow(peerID, nil) {
-		r.onRateLimitedPeer(peerID, "", "", "", StreamCount)
+	if !r.MessageRateLimiter.Allow(peerID, nil) {
+		r.onRateLimitedPeer(peerID, "", "", "", MessageCount)
 
 		// avoid rate limiting during dry run
 		return r.dryRun
@@ -91,8 +91,8 @@ func (r *RateLimiters) onRateLimitedPeer(peerID peer.ID, role, msgType string, t
 
 // Start starts the cleanup loop for all limiters
 func (r *RateLimiters) Start() {
-	if r.StreamRateLimiter != nil {
-		go r.StreamRateLimiter.Start()
+	if r.MessageRateLimiter != nil {
+		go r.MessageRateLimiter.Start()
 	}
 
 	if r.BandWidthRateLimiter != nil {
@@ -102,8 +102,8 @@ func (r *RateLimiters) Start() {
 
 // Stop stops all limiters.
 func (r *RateLimiters) Stop() {
-	if r.StreamRateLimiter != nil {
-		r.StreamRateLimiter.Stop()
+	if r.MessageRateLimiter != nil {
+		r.MessageRateLimiter.Stop()
 	}
 
 	if r.BandWidthRateLimiter != nil {

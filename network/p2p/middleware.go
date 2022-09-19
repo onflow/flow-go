@@ -330,9 +330,7 @@ func (m *Middleware) start(ctx context.Context) error {
 	}
 
 	// starting rate limiters kicks off cleanup loop
-	if m.unicastRateLimiters != nil {
-		m.unicastRateLimiters.Start()
-	}
+	m.unicastRateLimiters.Start()
 
 	return nil
 }
@@ -385,9 +383,7 @@ func (m *Middleware) stop() {
 	m.wg.Wait()
 
 	// clean up rate limiter resources
-	if m.unicastRateLimiters != nil {
-		m.unicastRateLimiters.Stop()
-	}
+	m.unicastRateLimiters.Stop()
 }
 
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
@@ -398,7 +394,7 @@ func (m *Middleware) stop() {
 // a more efficient candidate.
 //
 // The following benign errors can be returned:
-// - he peer ID for the target node ID cannot be found.
+// - the peer ID for the target node ID cannot be found.
 // - the msg size was too large.
 // - failed to send message to peer.
 //
@@ -500,11 +496,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	remotePeer := s.Conn().RemotePeer()
 
-	// check if unicast stream creation is rate limited for peer
-	if !m.unicastRateLimiters.StreamAllowed(remotePeer) {
-		return
-	}
-
 	defer func() {
 		if success {
 			err := s.Close()
@@ -539,21 +530,29 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	r := ggio.NewDelimitedReader(s, LargeMsgMaxUnicastMsgSize)
 
 	for {
+		// check if peer is currently rate limited before continuing to process stream.
+		if m.unicastRateLimiters.MessageRateLimiter.IsRateLimited(remotePeer) {
+			return
+		}
+
 		if ctx.Err() != nil {
 			return
 		}
 
 		var msg message.Message
-
 		// read the next message (blocking call)
 		err = r.ReadMsg(&msg)
-
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 
 			m.log.Err(err).Msg("failed to read message")
+			return
+		}
+
+		// check if unicast messages have reached rate limit before processing next message
+		if !m.unicastRateLimiters.MessageAllowed(remotePeer) {
 			return
 		}
 

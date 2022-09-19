@@ -185,8 +185,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 
 	// unicast stream handler rate limits
-	fnb.flags.IntVar(&fnb.BaseConfig.UnicastStreamCreationRateLimit, "unicast-stream-rate-limit", 0, "amount of unicast streams that can be created by a single peer per second")
-	fnb.flags.IntVar(&fnb.BaseConfig.UnicastStreamCreationBurstLimit, "unicast-stream-burst-limit", 0, "amount of unicast streams that can be created by a single peer at one time")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageRateLimit, "unicast-message-rate-limit", 0, "amount of unicast messages that sent by a peer per second")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageBurstLimit, "unicast-message-burst-limit", 0, "amount of unicast messages that can be sent by a peer at one time")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthRateLimit, "unicast-bandwidth-rate-limit", 0, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", 0, "bandwidth size in bytes a peer is allowed to send at one time")
 	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitDryRun, "unicast-rate-limit-dry-run", true, "disable peer disconnects and connections gating when rate limiting peers")
@@ -304,13 +304,13 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	unicastRateLimiters := unicast.NewRateLimiters(nil, nil, onUnicastRateLimit, fnb.BaseConfig.UnicastRateLimitDryRun)
 
 	// setup unicast stream rate limiter
-	if fnb.BaseConfig.UnicastStreamCreationRateLimit > 0 && fnb.BaseConfig.UnicastStreamCreationBurstLimit > 0 {
-		unicastStreamsRateLimiter := unicast.NewStreamsRateLimiter(rate.Limit(fnb.BaseConfig.UnicastStreamCreationRateLimit), fnb.BaseConfig.UnicastStreamCreationBurstLimit)
-		unicastRateLimiters.StreamRateLimiter = unicastStreamsRateLimiter
+	if fnb.BaseConfig.UnicastMessageRateLimit > 0 && fnb.BaseConfig.UnicastMessageBurstLimit > 0 {
+		unicastMessageRateLimiter := unicast.NewMessageRateLimiter(rate.Limit(fnb.BaseConfig.UnicastMessageRateLimit), fnb.BaseConfig.UnicastMessageBurstLimit)
+		unicastRateLimiters.MessageRateLimiter = unicastMessageRateLimiter
 
 		// avoid connection gating and pruning during dry run
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
-			f := rateLimiterPeerFilter(unicastStreamsRateLimiter)
+			f := rateLimiterPeerFilter(unicastMessageRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, f)
 			peerManagerFilters = append(peerManagerFilters, f)

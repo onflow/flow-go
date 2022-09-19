@@ -146,11 +146,14 @@ func GenerateIDs(
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
 func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, codec network.Codec, consumer slashing.ViolationsConsumer, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
-	metrics := metrics.NewNoopCollector()
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
-
-	o := &optsConfig{peerUpdateInterval: p2p.DefaultPeerUpdateInterval}
+	bitswapmet := metrics.NewNoopCollector()
+	o := &optsConfig{
+		peerUpdateInterval:  p2p.DefaultPeerUpdateInterval,
+		unicastRateLimiters: unicast.NoopRateLimiters(),
+		networkMetrics:      metrics.NewNoopCollector(),
+	}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -174,8 +177,8 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		mws[i] = p2p.NewMiddleware(logger,
 			factory,
 			nodeId,
-			metrics,
-			metrics,
+			o.networkMetrics,
+			bitswapmet,
 			sporkID,
 			p2p.DefaultUnicastTimeout,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
@@ -269,6 +272,7 @@ type optsConfig struct {
 	connectionGating    bool
 	unicastRateLimiters *unicast.RateLimiters
 	peerUpdateInterval  time.Duration
+	networkMetrics      module.NetworkMetrics
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
@@ -293,6 +297,12 @@ func WithPeerUpdateInterval(interval time.Duration) func(*optsConfig) {
 func WithUnicastRateLimiters(limiters *unicast.RateLimiters) func(*optsConfig) {
 	return func(o *optsConfig) {
 		o.unicastRateLimiters = limiters
+	}
+}
+
+func WithNetworkMetrics(m module.NetworkMetrics) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.networkMetrics = m
 	}
 }
 
