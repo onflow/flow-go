@@ -63,11 +63,11 @@ func (r *rateLimitedPeersMap) removeUnlocked(peerID peer.ID) {
 }
 
 // cleanup check the TTL for all keys in map and remove isExpired keys.
-func (r *rateLimitedPeersMap) cleanup(removeAll bool) {
+func (r *rateLimitedPeersMap) cleanup() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for peerID, item := range r.peers {
-		if removeAll || r.isExpired(item) {
+		if r.isExpired(item) {
 			r.removeUnlocked(peerID)
 		}
 	}
@@ -79,11 +79,10 @@ func (r *rateLimitedPeersMap) cleanupLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			r.cleanup(false)
+			r.cleanup()
 		case _, ok := <-r.done:
 			// clean up and return when channel is closed
 			if !ok {
-				r.cleanup(true)
 				return
 			}
 		}
