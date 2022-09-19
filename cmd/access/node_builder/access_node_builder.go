@@ -18,18 +18,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
-	"github.com/onflow/flow-go/network/p2p/cache"
-	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/node"
-	"github.com/onflow/flow-go/network/p2p/subscription"
-
-	"github.com/onflow/flow-go/network/p2p/dht"
-
-	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/translator"
-
 	"github.com/onflow/flow/protobuf/go/flow/access"
+
+	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/admin/commands"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
@@ -41,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -69,6 +59,14 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	"github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/node"
+	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	relaynet "github.com/onflow/flow-go/network/relay"
 	"github.com/onflow/flow-go/network/slashing"
