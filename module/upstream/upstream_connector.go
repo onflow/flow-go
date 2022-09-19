@@ -5,11 +5,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p/node"
-	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/network/p2p/node"
+	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/lifecycle"

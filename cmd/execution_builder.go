@@ -15,12 +15,13 @@ import (
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/rs/zerolog"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/network/p2p/blob"
 
 	"github.com/onflow/flow-go/module/mempool/queue"
 

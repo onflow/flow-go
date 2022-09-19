@@ -16,9 +16,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/slashing"
 
@@ -30,10 +31,9 @@ import (
 )
 
 const (
-	_  = iota
-	kb = 1 << (10 * iota)
+	_ = iota
+	_ = 1 << (10 * iota)
 	mb
-	gb
 )
 
 const (

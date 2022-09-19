@@ -16,6 +16,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/p2p/builder"
@@ -23,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/utils"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -41,20 +42,20 @@ import (
 )
 
 const (
-	_  = iota
-	kb = 1 << (10 * iota)
+	_ = iota
+	_ = 1 << (10 * iota)
 	mb
 	gb
 )
 
 const (
-	// defines maximum message size in unicast mode for most messages
+	// DefaultMaxUnicastMsgSize defines maximum message size in unicast mode for most messages
 	DefaultMaxUnicastMsgSize = 10 * mb // 10 mb
 
-	// defines maximum message size in unicast mode for large messages
+	// LargeMsgMaxUnicastMsgSize defines maximum message size in unicast mode for large messages
 	LargeMsgMaxUnicastMsgSize = gb // 1 gb
 
-	// default maximum time to wait for a default unicast request to complete
+	// DefaultUnicastTimeout default maximum time to wait for a default unicast request to complete
 	// assuming at least a 1mb/sec connection
 	DefaultUnicastTimeout = 5 * time.Second
 

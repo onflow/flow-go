@@ -12,13 +12,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/rs/zerolog"
+
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/utils"
-	"github.com/rs/zerolog"
 
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 

@@ -8,8 +8,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 var _ connmgr.ConnectionGater = (*ConnGater)(nil)

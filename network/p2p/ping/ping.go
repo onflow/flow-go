@@ -11,8 +11,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 
 	fnetwork "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
@@ -21,8 +22,6 @@ import (
 const (
 	_  = iota
 	kb = 1 << (10 * iota)
-	mb
-	gb
 )
 
 const maxPingMessageSize = 5 * kb
