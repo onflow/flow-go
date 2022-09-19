@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -206,7 +207,7 @@ func SilentNodeFixture(t *testing.T) (net.Listener, flow.Identity) {
 
 	go acceptAndHang(t, lst)
 
-	ip, port, err := node.IPPortFromMultiAddress(addrs...)
+	ip, port, err := p2putils.IPPortFromMultiAddress(addrs...)
 	require.NoError(t, err)
 
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(ip+":"+port))

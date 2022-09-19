@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
-	"github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,10 +40,10 @@ func TestMultiAddress(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		ip, port, _, err := node.NetworkingInfo(*tc.identity)
+		ip, port, _, err := p2putils.NetworkingInfo(*tc.identity)
 		require.NoError(t, err)
 
-		actualAddress := node.MultiAddressStr(ip, port)
+		actualAddress := p2putils.MultiAddressStr(ip, port)
 		assert.Equal(t, tc.multiaddress, actualAddress, "incorrect multi-address translation")
 	}
 
@@ -117,7 +116,7 @@ func TestRemovePeers(t *testing.T) {
 
 	// create nodes
 	nodes, identities := p2pfixtures.NodesFixture(t, ctx, unittest.IdentifierFixture(), "test_remove_peers", count)
-	peerInfos, errs := node.PeerInfosFromIDs(identities)
+	peerInfos, errs := p2putils.PeerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
 	defer p2pfixtures.StopNodes(t, nodes)
 

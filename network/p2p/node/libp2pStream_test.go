@@ -154,7 +154,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 	id2 := identities[1]
 
 	// Assert that there is no outbound stream to the target yet
-	require.Equal(t, 0, node.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
+	require.Equal(t, 0, p2putils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	streamCount := 100
@@ -168,7 +168,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 		require.NoError(t, err)
 		require.NotNil(t, anotherStream)
 		// assert that the stream count within libp2p incremented (a new stream was created)
-		require.Equal(t, i+1, node.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
+		require.Equal(t, i+1, p2putils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
 		// assert that the same connection is reused
 		require.Len(t, nodes[0].Host().Network().Conns(), 1)
 		streams = append(streams, anotherStream)
@@ -186,7 +186,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 		}()
 		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not close streams on time")
 		// assert that the stream count within libp2p decremented
-		require.Equal(t, i, node.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
+		require.Equal(t, i, p2putils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
 	}
 }
 
@@ -213,8 +213,8 @@ func TestCreateStream_FallBack(t *testing.T) {
 	// Assert that there is no outbound stream to the target yet (neither default nor preferred)
 	defaultProtocolId := unicast.FlowProtocolID(sporkId)
 	preferredProtocolId := unicast.FlowGzipProtocolId(sporkId)
-	require.Equal(t, 0, node.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
-	require.Equal(t, 0, node.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
+	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
+	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	streamCount := 100
@@ -231,8 +231,8 @@ func TestCreateStream_FallBack(t *testing.T) {
 
 		// number of default-protocol streams must be incremented, while preferred ones must be zero, since the other node
 		// only supports default ones.
-		require.Equal(t, i+1, node.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
-		require.Equal(t, 0, node.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
+		require.Equal(t, i+1, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
+		require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
 
 		// assert that the same connection is reused
 		require.Len(t, thisNode.Host().Network().Conns(), 1)
@@ -253,8 +253,8 @@ func TestCreateStream_FallBack(t *testing.T) {
 
 		// number of default-protocol streams must be decremented, while preferred ones must be zero, since the other node
 		// only supports default ones.
-		require.Equal(t, i, node.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
-		require.Equal(t, 0, node.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
+		require.Equal(t, i, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
+		require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
 	}
 }
 
