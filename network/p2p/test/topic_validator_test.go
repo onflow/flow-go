@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
