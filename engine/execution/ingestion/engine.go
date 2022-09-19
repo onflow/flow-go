@@ -71,6 +71,7 @@ type Engine struct {
 	executionDataPruner    *pruner.Pruner
 	uploaders              []uploader.Uploader
 	stopAtHeight           *StopAtHeight
+	stopAfterExecuting     flow.Identifier
 }
 
 func New(
@@ -134,6 +135,7 @@ func New(
 		executionDataPruner:    pruner,
 		uploaders:              uploaders,
 		stopAtHeight:           stopAtHeight,
+		stopAfterExecuting:     flow.ZeroID,
 	}
 
 	// move to state syncing engine
@@ -466,14 +468,24 @@ func (e *Engine) BlockFinalized(h *flow.Header) {
 	}
 
 	// once finalization reached stop height we can be sure no other fork will be valid at this height,
-	// so it is safe to stop or crash now
-	if h.Height >= stopHeight {
-		if stopCrash {
-			e.log.Fatal().Msgf("Crashing as finalization reached requested stop height %d", stopHeight)
-		} else {
-			e.pauseExecution = true
-			e.log.Warn().Msgf("Pausing execution as finalization reached requested stop height %d", stopHeight)
+	// if this block's parent has been executed, we are safe to stop or crash.
+	// This will happen during normal execution, where blocks are executed before they are finalized
+	// However, if the node is not up-to-date, finalization might lead, but we want to crash only after
+	// the execution reached the stop height
+	if h.Height == stopHeight {
+
+		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, h.ParentID)
+		if err != nil {
+			e.log.Error().Err(err).Str("block_id", h.ID().String()).Msg("failed to check if the block has been executed")
+			return
 		}
+
+		if executed {
+			e.stopExecution(stopCrash, stopHeight)
+		} else {
+			e.stopAfterExecuting = h.ParentID
+		}
+
 	}
 }
 
@@ -695,6 +707,14 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	if e.executionDataPruner != nil {
 		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
+	}
+
+	if e.stopAfterExecuting == executableBlock.ID() {
+		// double check. Even if requested stop height has been changed multiple times,
+		// as long as it matches this block we are safe to terminate
+		if set, height, crash := e.stopAtHeight.Get(); set && height == executableBlock.Height()-1 {
+			e.stopExecution(crash, height)
+		}
 	}
 }
 
@@ -1301,6 +1321,15 @@ func (e *Engine) retryUpload() (err error) {
 		}
 	}
 	return err
+}
+
+func (e *Engine) stopExecution(crash bool, height uint64) {
+	if crash {
+		e.log.Fatal().Msgf("Crashing as finalization reached requested stop height %d", height)
+	} else {
+		e.pauseExecution = true
+		e.log.Warn().Msgf("Pausing execution as finalization reached requested stop height %d", height)
+	}
 }
 
 func GenerateExecutionReceipt(
