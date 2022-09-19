@@ -566,12 +566,13 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
-	finalizationNotifier := e.finalizationEventsNotifier.Channel()
+	doneSignal := ctx.Done()
+	blockFinalizedSignal := e.finalizationEventsNotifier.Channel()
 	for {
 		select {
-		case <-ctx.Done():
+		case <-doneSignal:
 			return
-		case <-finalizationNotifier:
+		case <-blockFinalizedSignal:
 			e.core.ProcessFinalizedView(e.finalizedView.Value())
 		}
 	}
