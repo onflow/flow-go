@@ -249,8 +249,8 @@ func recordTransactionData(
 func prepareDataForBigQuery(slicesChannel chan dataSlice, ci bool) {
 	slices := make([]dataSlice, 0)
 
-	for len(slicesChannel) != 0 {
-		slices = append(slices, <-slicesChannel)
+	for slice := range slicesChannel {
+		slices = append(slices, slice)
 	}
 
 	jsonText, err := json.Marshal(slices)

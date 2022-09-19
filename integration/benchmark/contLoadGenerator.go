@@ -83,7 +83,7 @@ type LoadParams struct {
 
 // New returns a new load generator
 func New(
-// TODO(rbtz): use context
+	// TODO(rbtz): use context
 	ctx context.Context,
 	log zerolog.Logger,
 	loaderMetrics *metrics.LoaderCollector,
@@ -269,6 +269,11 @@ func (lg *ContLoadGenerator) Start() {
 }
 
 func (lg *ContLoadGenerator) Stop() {
+	if lg.stopped {
+		lg.log.Warn().Msg("Stop() called on generator when already stopped")
+		return
+	}
+
 	defer lg.log.Debug().Msg("stopped generator")
 
 	lg.stopped = true
