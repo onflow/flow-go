@@ -14,20 +14,20 @@ type rateLimitedPeerMapItem struct {
 // rateLimitedPeersMap concurrency safe struct that stores rate limited peers in a map.
 // Map keys will expire or be deleted from the map based on the configured TTL.
 type rateLimitedPeersMap struct {
-	mu          sync.Mutex
-	ttl         time.Duration
-	cleanupTick time.Duration
-	peers       map[peer.ID]*rateLimitedPeerMapItem
-	done        chan struct{}
+	mu              sync.Mutex
+	ttl             time.Duration
+	cleanupInterval time.Duration
+	peers           map[peer.ID]*rateLimitedPeerMapItem
+	done            chan struct{}
 }
 
 func newRateLimitedPeersMap(ttl, cleanupTick time.Duration) *rateLimitedPeersMap {
 	return &rateLimitedPeersMap{
-		mu:          sync.Mutex{},
-		ttl:         ttl,
-		cleanupTick: cleanupTick,
-		peers:       make(map[peer.ID]*rateLimitedPeerMapItem),
-		done:        make(chan struct{}),
+		mu:              sync.Mutex{},
+		ttl:             ttl,
+		cleanupInterval: cleanupTick,
+		peers:           make(map[peer.ID]*rateLimitedPeerMapItem),
+		done:            make(chan struct{}),
 	}
 }
 
@@ -75,7 +75,7 @@ func (r *rateLimitedPeersMap) cleanup(removeAll bool) {
 
 // cleanupLoop starts a loop that periodically removes stale peers.
 func (r *rateLimitedPeersMap) cleanupLoop() {
-	ticker := time.NewTicker(r.cleanupTick)
+	ticker := time.NewTicker(r.cleanupInterval)
 	for {
 		select {
 		case <-ticker.C:
@@ -97,5 +97,5 @@ func (r *rateLimitedPeersMap) close() {
 
 // isExpired returns true if configured ttl has passed for an item.
 func (r *rateLimitedPeersMap) isExpired(item *rateLimitedPeerMapItem) bool {
-	return time.Since(item.lastActive) > rateLimiterTTL
+	return time.Since(item.lastActive) > r.ttl
 }

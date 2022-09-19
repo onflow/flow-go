@@ -98,5 +98,5 @@ func (r *rateLimiterMap) close() {
 
 // isExpired returns true if configured ttl has passed for an item.
 func (r *rateLimiterMap) isExpired(item *rateLimiterMapItem) bool {
-	return time.Since(item.lastActive) > rateLimiterTTL
+	return time.Since(item.lastActive) > r.ttl
 }
