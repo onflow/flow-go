@@ -16,6 +16,11 @@ import (
 	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
+	"github.com/onflow/flow-go/network/p2p/builder"
+	"github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/ping"
+	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -189,7 +194,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
 
 		// setup the Ping provider to return the software version and the sealed block height
-		pingInfoProvider := &p2p.PingInfoProviderImpl{
+		pingInfoProvider := &ping.PingInfoProviderImpl{
 			SoftwareVersionFun: func() string {
 				return build.Semver()
 			},
@@ -270,7 +275,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		myAddr = fnb.BaseConfig.BindAddr
 	}
 
-	libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
+	libP2PNodeFactory := builder.DefaultLibP2PNodeFactory(
 		fnb.Logger,
 		myAddr,
 		fnb.NetworkKey,
@@ -281,19 +286,19 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.BaseConfig.NodeRole,
 	)
 
-	var mwOpts []p2p.MiddlewareOption
+	var mwOpts []middleware.MiddlewareOption
 	if len(fnb.MsgValidators) > 0 {
-		mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
+		mwOpts = append(mwOpts, middleware.WithMessageValidators(fnb.MsgValidators...))
 	}
 
 	peerManagerFactory := connection.PeerManagerFactory(fnb.NetworkConnectionPruning, fnb.PeerUpdateInterval)
 	mwOpts = append(mwOpts,
-		p2p.WithPeerManager(peerManagerFactory),
-		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
+		middleware.WithPeerManager(peerManagerFactory),
+		middleware.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
 	)
 
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
-	fnb.Middleware = p2p.NewMiddleware(
+	fnb.Middleware = middleware.NewMiddleware(
 		fnb.Logger,
 		libP2PNodeFactory,
 		fnb.Me.NodeID(),
@@ -307,7 +312,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		mwOpts...,
 	)
 
-	subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
+	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 	if fnb.HeroCacheMetricsEnable {
 		heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
@@ -734,7 +739,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
 	fnb.Module("id providers", func(node *NodeConfig) error {
-		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
+		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
 			return err
 		}
@@ -1466,7 +1471,7 @@ func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
 	return inmem.SnapshotFromEncodable(snapshot), nil
 }
 
-// Loads the private info for this node from disk (eg. private staking/network keys).
+// LoadPrivateNodeInfo the private info for this node from disk (e.g., private staking/network keys).
 func LoadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
 	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID))
 	data, err := io.ReadFile(path)

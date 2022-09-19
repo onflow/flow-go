@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -237,7 +238,7 @@ func DefaultBaseConfig() *BaseConfig {
 		secretsDBEnabled:                true,
 		level:                           "info",
 		PeerUpdateInterval:              connection.DefaultPeerUpdateInterval,
-		UnicastMessageTimeout:           p2p.DefaultUnicastTimeout,
+		UnicastMessageTimeout:           middleware.DefaultUnicastTimeout,
 		metricsPort:                     8080,
 		profilerEnabled:                 false,
 		uploaderEnabled:                 false,
