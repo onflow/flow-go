@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // MeterExecutionInternalPrecisionBytes are the amount of bytes that are used internally by the WeigthedMeter
@@ -254,16 +255,19 @@ type MeterParameters struct {
 
 	memoryLimit   uint64
 	memoryWeights ExecutionMemoryWeights
+
+	storageInteractionLimit uint64
 }
 
 func DefaultParameters() MeterParameters {
 	// This is needed to work around golang's compiler bug
 	umax := uint(math.MaxUint)
 	return MeterParameters{
-		computationLimit:   uint64(umax) << MeterExecutionInternalPrecisionBytes,
-		memoryLimit:        math.MaxUint64,
-		computationWeights: DefaultComputationWeights,
-		memoryWeights:      DefaultMemoryWeights,
+		computationLimit:        uint64(umax) << MeterExecutionInternalPrecisionBytes,
+		memoryLimit:             math.MaxUint64,
+		computationWeights:      DefaultComputationWeights,
+		memoryWeights:           DefaultMemoryWeights,
+		storageInteractionLimit: math.MaxUint64,
 	}
 }
 
@@ -292,6 +296,14 @@ func (params MeterParameters) WithMemoryWeights(
 ) MeterParameters {
 	newParams := params
 	newParams.memoryWeights = weights
+	return newParams
+}
+
+func (params MeterParameters) WithStorageInteractionLimit(
+	maxStorageInteractionLimit uint64,
+) MeterParameters {
+	newParams := params
+	newParams.storageInteractionLimit = maxStorageInteractionLimit
 	return newParams
 }
 
@@ -324,6 +336,10 @@ type WeightedMeter struct {
 
 	computationIntensities MeteredComputationIntensities
 	memoryIntensities      MeteredMemoryIntensities
+
+	storageUpdateSizeMap     map[StorageInteractionKey]uint64
+	totalStorageBytesRead    uint64
+	totalStorageBytesWritten uint64
 }
 
 type WeightedMeterOptions func(*WeightedMeter)
@@ -334,6 +350,7 @@ func NewMeter(params MeterParameters) Meter {
 		MeterParameters:        params,
 		computationIntensities: make(MeteredComputationIntensities),
 		memoryIntensities:      make(MeteredMemoryIntensities),
+		storageUpdateSizeMap:   make(MeteredStorageInteractionMap),
 	}
 
 	return m
@@ -345,6 +362,7 @@ func (m *WeightedMeter) NewChild() Meter {
 		MeterParameters:        m.MeterParameters,
 		computationIntensities: make(MeteredComputationIntensities),
 		memoryIntensities:      make(MeteredMemoryIntensities),
+		storageUpdateSizeMap:   make(MeteredStorageInteractionMap),
 	}
 }
 
@@ -368,6 +386,13 @@ func (m *WeightedMeter) MergeMeter(child Meter) {
 	for key, intensity := range child.MemoryIntensities() {
 		m.memoryIntensities[key] += intensity
 	}
+
+	// merge storage meters
+	for key, value := range child.StorageUpdateSizeMap() {
+		m.storageUpdateSizeMap[key] = value
+	}
+	m.totalStorageBytesRead += child.TotalBytesReadFromStorage()
+	m.totalStorageBytesWritten += child.TotalBytesWrittenToStorage()
 }
 
 // MeterComputation captures computation usage and returns an error if it goes beyond the limit
@@ -416,4 +441,79 @@ func (m *WeightedMeter) MemoryIntensities() MeteredMemoryIntensities {
 // TotalMemoryEstimate returns the total memory used
 func (m *WeightedMeter) TotalMemoryEstimate() uint64 {
 	return m.memoryEstimate
+}
+
+// MeterStorageRead captures storage read bytes count and returns an error
+// if it goes beyond the total interaction limit and limit is enforced
+func (m *WeightedMeter) MeterStorageRead(
+	storageKey StorageInteractionKey,
+	value flow.RegisterValue,
+	enforceLimit bool) error {
+
+	// all reads are on a View which only read from storage at the first read of a given key
+	if _, ok := m.storageUpdateSizeMap[storageKey]; !ok {
+		readByteSize := getStorageKeyValueSize(storageKey, value)
+		m.totalStorageBytesRead += readByteSize
+		m.storageUpdateSizeMap[storageKey] = readByteSize
+	}
+
+	return m.checkStorageInteractionLimit(enforceLimit)
+}
+
+// MeterStorageRead captures storage written bytes count and returns an error
+// if it goes beyond the total interaction limit and limit is enforced
+func (m *WeightedMeter) MeterStorageWrite(
+	storageKey StorageInteractionKey,
+	value flow.RegisterValue,
+	enforceLimit bool) error {
+	// all writes are on a View which only writes the latest updated value to storage at commit
+	if old, ok := m.storageUpdateSizeMap[storageKey]; ok {
+		m.totalStorageBytesWritten -= old
+	}
+
+	updateSize := getStorageKeyValueSize(storageKey, value)
+	m.totalStorageBytesWritten += updateSize
+	m.storageUpdateSizeMap[storageKey] = updateSize
+
+	return m.checkStorageInteractionLimit(enforceLimit)
+}
+
+func (m *WeightedMeter) checkStorageInteractionLimit(enforceLimit bool) error {
+	if enforceLimit &&
+		m.TotalBytesOfStorageInteractions() > m.storageInteractionLimit {
+		return errors.NewLedgerInteractionLimitExceededError(
+			m.TotalBytesOfStorageInteractions(), m.storageInteractionLimit)
+	}
+	return nil
+}
+
+// TotalBytesReadFromStorage returns total number of byte read from storage
+func (m *WeightedMeter) TotalBytesReadFromStorage() uint64 {
+	return m.totalStorageBytesRead
+}
+
+// TotalBytesReadFromStorage returns total number of byte written to storage
+func (m *WeightedMeter) TotalBytesWrittenToStorage() uint64 {
+	return m.totalStorageBytesWritten
+}
+
+// TotalBytesOfStorageInteractions returns total number of byte read and written from/to storage
+func (m *WeightedMeter) TotalBytesOfStorageInteractions() uint64 {
+	return m.TotalBytesReadFromStorage() + m.TotalBytesWrittenToStorage()
+}
+
+// StorageUpdateSizeMap returns all the measured storage meters
+func (m *WeightedMeter) StorageUpdateSizeMap() MeteredStorageInteractionMap {
+	return m.storageUpdateSizeMap
+}
+
+func getStorageKeyValueSize(storageKey StorageInteractionKey,
+	value flow.RegisterValue) uint64 {
+	return uint64(len(storageKey.Owner) + len(storageKey.Key) + len(value))
+}
+
+func GetStorageKeyValueSizeForTesting(
+	storageKey StorageInteractionKey,
+	value flow.RegisterValue) uint64 {
+	return getStorageKeyValueSize(storageKey, value)
 }
