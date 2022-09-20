@@ -20,20 +20,20 @@ const (
 	// Long-lived test networks
 
 	// Testnet is the chain ID for the testnet chain.
-	Testnet ChainID = "flow-testnet"
+	Testnet ChainID = "flow:testnet"
 	// Stagingnet is the chain ID for internal stagingnet chain.
-	Stagingnet ChainID = "flow-stagingnet"
+	Stagingnet ChainID = "flow:stagingnet"
 
 	// Transient test networks
 
 	// Benchnet is the chain ID for the transient benchmarking chain.
-	Benchnet ChainID = "flow-benchnet"
+	Benchnet ChainID = "flow:benchnet"
 	// Localnet is the chain ID for the local development chain.
-	Localnet ChainID = "flow-localnet"
+	Localnet ChainID = "flow:localnet"
 	// Emulator is the chain ID for the emulated chain.
-	Emulator ChainID = "flow-emulator"
+	Emulator ChainID = "flow:emulator"
 	// BftTestnet is the chain ID for testing attack vector scenarios.
-	BftTestnet ChainID = "flow-bft-test-net"
+	BftTestnet ChainID = "flow:bft-test-net"
 
 	// MonotonicEmulator is the chain ID for the emulated node chain with monotonic address generation.
 	MonotonicEmulator ChainID = "flow-emulator-monotonic"
