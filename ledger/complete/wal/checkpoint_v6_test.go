@@ -77,39 +77,46 @@ func createSimpleTrie(t *testing.T) []*trie.MTrie {
 func TestEncodeSubTrie(t *testing.T) {
 	file := "checkpoint"
 	logger := unittest.Logger()
-	index := 0
 	tries := createSimpleTrie(t)
 	estimatedSubtrieNodeCount := estimateSubtrieNodeCount(tries)
 	subtrieRoots := createSubTrieRoots(tries)
-	fmt.Println(subtrieRoots)
-	roots := subtrieRoots[index]
 
-	unittest.RunWithTempDir(t, func(dir string) {
-		indices, nodeCount, checksum, err := storeCheckpointSubTrie(
-			index, roots, estimatedSubtrieNodeCount, dir, file, &logger)
-		require.NoError(t, err)
+	for index, roots := range subtrieRoots {
+		fmt.Println("testing for", index, "roots")
+		unittest.RunWithTempDir(t, func(dir string) {
+			indices, nodeCount, checksum, err := storeCheckpointSubTrie(
+				index, roots, estimatedSubtrieNodeCount, dir, file, &logger)
+			require.NoError(t, err)
 
-		require.Len(t, indices, len(roots)+1) // +1 means the default (nil: 0) is included
-		// each root should be included in the indices
-		for _, root := range roots {
-			_, ok := indices[root]
-			require.True(t, ok, "each root should be included in the indices")
-		}
+			fmt.Println("indices", indices, "roots", roots)
+			if len(indices) > 1 {
+				require.Len(t, indices, len(roots)+1, // +1 means the default (nil: 0) is included
+					"indices %v should include all roots %v", indices, roots)
+			}
+			// each root should be included in the indices
+			for _, root := range roots {
+				_, ok := indices[root]
+				require.True(t, ok, "each root should be included in the indices")
+			}
 
-		logger.Info().Msgf("sub trie checkpoint stored, indices: %v, node count: %v, checksum: %v",
-			indices, nodeCount, checksum)
+			logger.Info().Msgf("sub trie checkpoint stored, indices: %v, node count: %v, checksum: %v",
+				indices, nodeCount, checksum)
 
-		// all the nodes
-		nodes, err := readCheckpointSubTrie(dir, file, index, checksum)
-		require.NoError(t, err)
+			// all the nodes
+			nodes, err := readCheckpointSubTrie(dir, file, index, checksum)
+			require.NoError(t, err)
 
-		for _, root := range roots {
-			index, _ := indices[root]
-			require.Equal(t, root.Hash(), nodes[index].Hash(),
-				"readCheckpointSubTrie should return nodes where the root should be found "+
-					"by the index specified by the indices returned by storeCheckpointSubTrie")
-		}
-	})
+			for _, root := range roots {
+				if root == nil {
+					continue
+				}
+				index, _ := indices[root]
+				require.Equal(t, root.Hash(), nodes[index].Hash(),
+					"readCheckpointSubTrie should return nodes where the root should be found "+
+						"by the index specified by the indices returned by storeCheckpointSubTrie")
+			}
+		})
+	}
 }
 
 func randomNode() *node.Node {
