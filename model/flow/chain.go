@@ -36,7 +36,7 @@ const (
 	BftTestnet ChainID = "flow:bft-test-net"
 
 	// MonotonicEmulator is the chain ID for the emulated node chain with monotonic address generation.
-	MonotonicEmulator ChainID = "flow-emulator-monotonic"
+	MonotonicEmulator ChainID = "flow:emulator-monotonic"
 )
 
 // Transient returns whether the chain ID is for a transient network.
