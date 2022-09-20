@@ -11,6 +11,7 @@ for f in bootstrap/execution-state/*; do
 
     # Create the secret after string manipulation
     kubectl create secret generic $PREFIXREMOVED --from-file=$f;
+    kubectl label secret $PREFIXREMOVED "service=flow"
 done
 
 # Create private-root-information secrets required to run network
@@ -29,6 +30,7 @@ for f in bootstrap/private-root-information/*/*; do
     
     # Create the secret after string manipulation
     kubectl create secret generic $KEYNAME --from-file=$f;
+    kubectl label secret $KEYNAME "service=flow"
 done
 
 # Create public-root-information secrets required to run network
@@ -42,4 +44,5 @@ for f in bootstrap/public-root-information/*.json; do
 
     # Create the secret after string manipulation
     kubectl create secret generic $PREFIXREMOVED --from-file=$f ; 
+    kubectl label secret $PREFIXREMOVED "service=flow"
 done
