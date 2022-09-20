@@ -1,10 +1,11 @@
 package fvm
 
 import (
-	"github.com/onflow/cadence/runtime/sema"
 	"math"
 
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
