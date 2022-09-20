@@ -312,8 +312,13 @@ func computeTotalSubTrieNodeCount(groups [][]*node.Node) int {
 	return total
 }
 
+// each group in subtrieNodes and topLevelNodes start with `nil`
 func getNodeByIndex(subtrieNodes [][]*node.Node, topLevelNodes []*node.Node, index uint64) (*node.Node, error) {
-	offset := index
+	if index == 0 {
+		// item at index 0 is nil
+		return nil, nil
+	}
+	offset := index - 1 // index.> 0, won't underflow
 	for _, subtries := range subtrieNodes {
 		if len(subtries) < 1 {
 			return nil, fmt.Errorf("subtries should have at least 1 item")
@@ -322,8 +327,9 @@ func getNodeByIndex(subtrieNodes [][]*node.Node, topLevelNodes []*node.Node, ind
 			return nil, fmt.Errorf("subtrie[0] %v isn't nil", subtries[0])
 		}
 
-		if offset < uint64(len(subtries)) {
-			return subtries[offset], nil
+		if offset < uint64(len(subtries)-1) {
+			// +1 because first item is always nil
+			return subtries[offset+1], nil
 		}
 		offset -= uint64(len(subtries) - 1)
 	}
@@ -337,7 +343,7 @@ func getNodeByIndex(subtrieNodes [][]*node.Node, topLevelNodes []*node.Node, ind
 		return nil, fmt.Errorf("top trie [0] %v isn't nil", topLevelNodes[0])
 	}
 
-	if offset >= uint64(len(topLevelNodes)) {
+	if offset >= uint64(len(topLevelNodes)-1) {
 		return nil, fmt.Errorf("can not find node by index: %v in subtrieNodes %v, topLevelNodes %v", index, subtrieNodes, topLevelNodes)
 	}
 
