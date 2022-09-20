@@ -9,6 +9,7 @@ metadata:
     app: {{ $k }}
     branch: {{ $.Values.branch }}
     nodeType: execution
+    service: flow
 
 spec:
   serviceName: {{ $k }}
@@ -17,6 +18,7 @@ spec:
     matchLabels:
       app: {{ $k }}
       nodeType: execution
+      service: flow
 
   template:
     metadata:
@@ -24,6 +26,7 @@ spec:
         app: {{ $k }}
         branch: {{ $.Values.branch }}
         nodeType: execution
+        service: flow
     spec:
       containers:
         - name: {{ $k }}
