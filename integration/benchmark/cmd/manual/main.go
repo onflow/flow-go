@@ -29,10 +29,6 @@ type LoadCase struct {
 	duration time.Duration
 }
 
-const (
-	MaxRuntime = time.Hour * 24
-)
-
 func main() {
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
 	loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\", \"const-exec\")")
@@ -142,16 +138,14 @@ func main() {
 			lg.Start()
 		}
 
-		var runDuration time.Duration
-		// if the duration is 0, we run this case with a 24-hour timeout
-		if c.duration.Nanoseconds() == 0 {
-			runDuration = MaxRuntime
-		} else {
-			runDuration = c.duration
+		waitC := make(<-chan time.Time)
+		// if the duration is 0, we run this case forever
+		if c.duration.Nanoseconds() != 0 {
+			waitC = time.After(c.duration)
 		}
 
 		select {
-		case <-time.After(runDuration):
+		case <-waitC:
 			if lg != nil {
 				lg.Stop()
 			}
