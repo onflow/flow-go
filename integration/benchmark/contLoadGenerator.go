@@ -168,8 +168,10 @@ func New(
 		lg.workFunc = lg.sendAddKeyTx
 	case ConstExecCostLoadType:
 		lg.workFunc = lg.sendConstExecCostTx
-	default:
+	case CompHeavyLoadType, EventHeavyLoadType, LedgerHeavyLoadType:
 		lg.workFunc = lg.sendFavContractTx
+	default:
+		return nil, fmt.Errorf("unknown load type: %s", loadParams.LoadType)
 	}
 
 	return lg, nil
