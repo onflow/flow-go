@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -16,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Engine represents the provider engine, used to spread block proposals across
@@ -33,6 +33,9 @@ type Engine struct {
 	state   protocol.State  // used to access the  protocol state
 	me      module.Local    // used to access local node information
 }
+
+var _ network.MessageProcessor = (*Engine)(nil)
+var _ consensus.ProposalProvider = (*Engine)(nil)
 
 // New creates a new block provider engine.
 func New(
@@ -78,75 +81,46 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
+// ProvideProposal asynchronously submits our proposal to all non-consensus nodes.
+func (e *Engine) ProvideProposal(proposal *messages.BlockProposal) {
 	e.unit.Launch(func() {
-		err := e.ProcessLocal(event)
+		err := e.broadcastProposal(proposal)
 		if err != nil {
-			engine.LogError(e.log, err)
+			// TODO: once error handling in broadcastProposal is updated, this can ctx.Throw instead of logging
+			e.log.Err(err).Msg("unexpected error while broadcasting proposal")
 		}
 	})
 }
 
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.Process(channel, originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(e.me.NodeID(), event)
-	})
-}
-
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
+// Process logs a warning for all received messages, as this engine's channel
+// is send-only - no inbound messages are expected.
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
+	e.log.Warn().
+		Str("channel", channel.String()).
+		Str("origin_id", originID.String()).
+		Msgf("received unexpected message (%T), dropping...", event)
+	return nil
 }
 
-// process processes the given ingestion engine event. Events that are given
-// to this function originate within the provider engine on the node with the
-// given origin ID.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
-	case *messages.BlockProposal:
-		return e.onBlockProposal(originID, ev)
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
+// broadcastProposal is used when we want to broadcast a local block to the rest  of the
+// network (non-consensus nodes). We broadcast to consensus nodes in compliance engine.
+// TODO error handling - differentiate expected errors in Snapshot
+func (e *Engine) broadcastProposal(proposal *messages.BlockProposal) error {
+	// sanity check: we should only broadcast proposals that we proposed here
+	if e.me.NodeID() != proposal.Header.ProposerID {
+		return fmt.Errorf("sanity check failed: attempted to provide another node's proposal (%x!=%x)", e.me.NodeID(), proposal.Header.ProposerID)
 	}
-}
 
-// onBlockProposal is used when we want to broadcast a local block to the network.
-func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+	blockID := proposal.Header.ID()
 	log := e.log.With().
-		Hex("origin_id", originID[:]).
 		Uint64("block_view", proposal.Header.View).
-		Hex("block_id", logging.Entity(proposal.Header)).
+		Hex("block_id", blockID[:]).
 		Hex("parent_id", proposal.Header.ParentID[:]).
-		Hex("signer", proposal.Header.ProposerID[:]).
 		Logger()
-
 	log.Info().Msg("block proposal submitted for propagation")
 
-	// currently, only accept blocks that come from our local consensus
-	localID := e.me.NodeID()
-	if originID != localID {
-		return engine.NewInvalidInputErrorf("non-local block (nodeID: %x)", originID)
-	}
-
-	// determine the nodes we should send the block to
-	recipients, err := e.state.Final().Identities(filter.And(
+	// broadcast to unejected non-consensus nodes
+	recipients, err := e.state.AtBlockID(blockID).Identities(filter.And(
 		filter.Not(filter.Ejected),
 		filter.Not(filter.HasRole(flow.RoleConsensus)),
 	))
@@ -157,11 +131,10 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// submit the block to the targets
 	err = e.con.Publish(proposal, recipients.NodeIDs()...)
 	if err != nil {
-		return fmt.Errorf("could not broadcast block: %w", err)
+		e.log.Err(err).Msg("failed to broadcast block")
+		return nil
 	}
-
 	e.message.MessageSent(metrics.EngineConsensusProvider, metrics.MessageBlockProposal)
-
 	log.Info().Msg("block proposal propagated to non-consensus nodes")
 
 	return nil

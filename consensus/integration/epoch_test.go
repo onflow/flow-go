@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -49,21 +47,17 @@ func TestUnweightedNode(t *testing.T) {
 		10_000,
 	)
 
-	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-
-	runNodes(signalerCtx, nodes)
+	start()
 
 	unittest.AssertClosesBefore(t, stopper.stopped, 60*time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
 
-	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
@@ -89,14 +83,11 @@ func TestStaticEpochTransition(t *testing.T) {
 		4,
 	)
 
-	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-
-	runNodes(signalerCtx, nodes)
+	start()
 
 	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
 
@@ -109,7 +100,6 @@ func TestStaticEpochTransition(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, firstEpochCounter+1, afterCounter)
 
-	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
@@ -148,14 +138,11 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 		4,
 	)
 
-	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-
-	runNodes(signalerCtx, nodes)
+	start()
 
 	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
 
@@ -168,7 +155,6 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, firstEpochCounter+1, afterCounter)
 
-	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
@@ -203,14 +189,11 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 		4,
 	)
 
-	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, start := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-
-	runNodes(signalerCtx, nodes)
+	start()
 
 	unittest.AssertClosesBefore(t, stopper.stopped, 60*time.Second)
 
@@ -223,7 +206,6 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, firstEpochCounter+1, afterCounter)
 
-	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 

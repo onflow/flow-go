@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	consensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	realModule "github.com/onflow/flow-go/module"
@@ -33,10 +34,16 @@ import (
 )
 
 func TestComplianceCore(t *testing.T) {
-	suite.Run(t, new(ComplianceCoreSuite))
+	suite.Run(t, new(CoreSuite))
 }
 
-type ComplianceCoreSuite struct {
+// CoreSuite tests the compliance core logic.
+type CoreSuite struct {
+	CommonSuite
+}
+
+// CommonSuite is shared between compliance core and engine testing.
+type CommonSuite struct {
 	suite.Suite
 
 	// engine parameters
@@ -61,7 +68,7 @@ type ComplianceCoreSuite struct {
 	snapshot          *protocol.Snapshot
 	con               *mocknetwork.Conduit
 	net               *mocknetwork.Network
-	prov              *mocknetwork.Engine
+	prov              *consensus.ProposalProvider
 	pending           *module.PendingBlockBuffer
 	hotstuff          *module.HotStuff
 	sync              *module.BlockRequester
@@ -72,13 +79,7 @@ type ComplianceCoreSuite struct {
 	core *Core
 }
 
-func doneChan() <-chan struct{} {
-	c := make(chan struct{})
-	close(c)
-	return c
-}
-
-func (cs *ComplianceCoreSuite) SetupTest() {
+func (cs *CommonSuite) SetupTest() {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
 
@@ -201,8 +202,8 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	)
 
 	// set up the provider engine
-	cs.prov = &mocknetwork.Engine{}
-	cs.prov.On("SubmitLocal", mock.Anything).Return()
+	cs.prov = &consensus.ProposalProvider{}
+	cs.prov.On("ProvideProposal", mock.Anything).Return()
 
 	// set up pending module mock
 	cs.pending = &module.PendingBlockBuffer{}
@@ -229,12 +230,6 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.pending.On("Size").Return(uint(0))
 	cs.pending.On("PruneByView", mock.Anything).Return()
 
-	closed := func() <-chan struct{} {
-		channel := make(chan struct{})
-		close(channel)
-		return channel
-	}()
-
 	// set up hotstuff module mock
 	cs.hotstuff = module.NewHotStuff(cs.T())
 
@@ -244,7 +239,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// set up synchronization module mock
 	cs.sync = &module.BlockRequester{}
 	cs.sync.On("RequestBlock", mock.Anything, mock.Anything).Return(nil)
-	cs.sync.On("Done", mock.Anything).Return(closed)
+	cs.sync.On("Done", mock.Anything).Return(unittest.ClosedChannel())
 
 	// set up no-op metrics mock
 	cs.metrics = metrics.NewNoopCollector()
@@ -275,7 +270,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.core.hotstuff = cs.hotstuff
 }
 
-func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
+func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 
 	// create a proposal that directly descends from the latest finalized header
 	originID := cs.participants[1].NodeID
@@ -288,7 +283,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View)
 
 	// it should be processed without error
-	err := cs.core.OnBlockProposal(originID, proposal, false)
+	err := cs.core.OnBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
@@ -298,7 +293,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	cs.hotstuff.AssertExpectations(cs.T())
 }
 
-func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
+func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := cs.participants[1].NodeID
@@ -314,7 +309,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View)
 
 	// it should be processed without error
-	err := cs.core.OnBlockProposal(originID, proposal, false)
+	err := cs.core.OnBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
@@ -324,7 +319,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.hotstuff.AssertExpectations(cs.T())
 }
 
-func (cs *ComplianceCoreSuite) TestOnBlockProposalSkipProposalThreshold() {
+func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 
 	// create a proposal which is far enough ahead to be dropped
 	originID := cs.participants[1].NodeID
@@ -332,7 +327,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	block.Header.Height = cs.head.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
 	proposal := unittest.ProposalFromBlock(&block)
 
-	err := cs.core.OnBlockProposal(originID, proposal, false)
+	err := cs.core.OnBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err)
 
 	// block should be dropped - not added to state or cache
@@ -340,7 +335,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	cs.pending.AssertNotCalled(cs.T(), "Add", originID, mock.Anything)
 }
 
-func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
+func (cs *CoreSuite) TestOnBlockProposalInvalidExtension() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := cs.participants[1].NodeID
@@ -363,7 +358,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 	cs.state.On("Extend", mock.Anything, mock.Anything).Return(errors.New("dummy error"))
 
 	// it should be processed without error
-	err := cs.core.OnBlockProposal(originID, proposal, false)
+	err := cs.core.OnBlockProposal(originID, proposal)
 	require.Error(cs.T(), err, "proposal with invalid extension should fail")
 
 	// we should extend the state with the header
@@ -373,7 +368,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 	cs.hotstuff.AssertExpectations(cs.T())
 }
 
-func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
+func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
 	parent := unittest.BlockWithParentFixture(cs.head)
@@ -412,7 +407,7 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header.ID())
 }
 
-func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
+func (cs *CoreSuite) TestOnSubmitVote() {
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	vote := messages.BlockVote{
@@ -438,7 +433,7 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 
 // TestOnSubmitTimeout tests that submitting messages.TimeoutObject adds model.TimeoutObject into
 // TimeoutAggregator.
-func (cs *ComplianceCoreSuite) TestOnSubmitTimeout() {
+func (cs *CoreSuite) TestOnSubmitTimeout() {
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	timeout := messages.TimeoutObject{
@@ -461,7 +456,7 @@ func (cs *ComplianceCoreSuite) TestOnSubmitTimeout() {
 	require.NoError(cs.T(), err, "timeout object should pass")
 }
 
-func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
+func (cs *CoreSuite) TestProposalBufferingOrder() {
 
 	// create a proposal that we will not submit until the end
 	originID := cs.participants[1].NodeID
@@ -493,7 +488,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 		)
 
 		// process and make sure no error occurs (as they are unverifiable)
-		err := cs.core.OnBlockProposal(originID, proposal, false)
+		err := cs.core.OnBlockProposal(originID, proposal)
 		require.NoError(cs.T(), err, "proposal buffering should pass")
 
 		// make sure no block is forwarded to hotstuff
@@ -519,7 +514,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	)
 
 	// process the root proposal
-	err := cs.core.OnBlockProposal(originID, missing, false)
+	err := cs.core.OnBlockProposal(originID, missing)
 	require.NoError(cs.T(), err, "root proposal should pass")
 
 	// make sure we submitted all four proposals
