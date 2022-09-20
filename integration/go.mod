@@ -4,7 +4,6 @@ go 1.19
 
 require (
 	github.com/dapperlabs/testingdock v0.4.4
-	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
