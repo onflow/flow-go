@@ -20,6 +20,8 @@ func TestChannelList_Contain(t *testing.T) {
 	require.False(t, list.Contains("d"))
 }
 
+// TestChannelList_Exclude tests that the channel list Exclude method returns a new channel list
+// with the excluded channels removed.
 func TestChannelList_Exclude(t *testing.T) {
 	list := channels.ChannelList{"a", "b", "c"}
 	require.ElementsMatch(t, channels.ChannelList{"a", "b"}, list.Exclude(channels.ChannelList{"c"}))
