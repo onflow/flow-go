@@ -102,7 +102,14 @@ k8s-secrets-create:
 	bash ./create-secrets.sh
 
 helm-deploy:
-	helm upgrade --install -f ./values.yml ${NAMESPACE} ./flow --debug
+	helm upgrade --install -f ./values.yml ${NAMESPACE} ./flow --debug --namespace ${NAMESPACE}
+
+k8s-delete:
+	helm delete ${NAMESPACE} --namespace ${NAMESPACE}
+	kubectl delete pvc -l service=flow --namespace ${NAMESPACE}
+
+k8s-delete-secrets:
+	kubectl delete secrets -l service=flow  --namespace ${NAMESPACE}
 
 k8s-expose-locally:
 	kubectl port-forward service/access1 9000:9000 --namespace ${NAMESPACE}
