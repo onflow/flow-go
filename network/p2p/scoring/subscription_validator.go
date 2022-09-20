@@ -35,7 +35,7 @@ func (v *SubscriptionValidator) MustSubscribedToAllowedTopics(pid peer.ID) error
 	}
 
 	for _, topic := range topics {
-		if p2putils.AllowedSubscription(flowId.Role, topic) {
+		if !p2putils.AllowedSubscription(flowId.Role, topic) {
 			return fmt.Errorf("unauthorized subscription: %s", topic)
 		}
 	}
