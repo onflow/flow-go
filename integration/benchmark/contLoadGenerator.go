@@ -58,13 +58,13 @@ type ContLoadGenerator struct {
 	accounts            []*flowAccount
 	availableAccounts   chan *flowAccount // queue with accounts available for workers
 	workerStatsTracker  *WorkerStatsTracker
-	mu                  sync.Mutex
-	workFunc            workFunc
-	workers             []*Worker
-	stopped             bool // TODO(ajm): remove this and just use the channel in Init()
 	stoppedChannel      chan struct{}
 	follower            TxFollower
 	availableAccountsLo int
+	workFunc            workFunc
+
+	workersMutex sync.Mutex
+	workers      []*Worker
 }
 
 type NetworkParams struct {
@@ -177,10 +177,19 @@ func New(
 	return lg, nil
 }
 
+func (lg *ContLoadGenerator) stopped() bool {
+	select {
+	case <-lg.stoppedChannel:
+		return true
+	default:
+		return false
+	}
+}
+
 // TODO(rbtz): make part of New
 func (lg *ContLoadGenerator) Init() error {
 	for i := 0; i < lg.loadParams.NumberOfAccounts; i += accountCreationBatchSize {
-		if lg.stopped {
+		if lg.stopped() {
 			return nil
 		}
 
@@ -258,29 +267,39 @@ func (lg *ContLoadGenerator) setupFavContract() error {
 	return nil
 }
 
-func (lg *ContLoadGenerator) startWorkers(numWorkers, diff int) {
-	for i := 0; i < diff; i++ {
-		worker := NewWorker(numWorkers+i, 1*time.Second, lg.workFunc)
+func (lg *ContLoadGenerator) startWorkers(num int) error {
+	for i := 0; i < num; i++ {
+		worker := NewWorker(len(lg.workers), 1*time.Second, lg.workFunc)
 		worker.Start()
 		lg.workers = append(lg.workers, worker)
 	}
+	lg.workerStatsTracker.AddWorkers(num)
+	return nil
 }
 
-func (lg *ContLoadGenerator) stopWorkers(numWorkers, diff int) {
-	wg := sync.WaitGroup{}
-	wg.Add(diff)
+func (lg *ContLoadGenerator) stopWorkers(num int) error {
+	if num > len(lg.workers) {
+		return fmt.Errorf("can't stop %d workers, only %d available", num, len(lg.workers))
+	}
 
-	start := numWorkers - diff
-	for i := start; i < numWorkers; i++ {
+	wg := sync.WaitGroup{}
+	wg.Add(num)
+
+	idx := len(lg.workers) - num
+	toRemove := lg.workers[idx:]
+	lg.workers = lg.workers[:idx]
+
+	for _, w := range toRemove {
 		go func(w *Worker) {
 			defer wg.Done()
 			lg.log.Debug().Int("workerID", w.workerID).Msg("stopping worker")
 			w.Stop()
-		}(lg.workers[i])
+		}(w)
 	}
 	wg.Wait()
+	lg.workerStatsTracker.AddWorkers(-num)
 
-	lg.workers = lg.workers[:start]
+	return nil
 }
 
 // SetTPS compares the given TPS to the current TPS to determine whether to increase
@@ -288,31 +307,28 @@ func (lg *ContLoadGenerator) stopWorkers(numWorkers, diff int) {
 // It increases/decreases the load by adjusting the number of workers, since each worker
 // is responsible for sending the load at 1 TPS.
 func (lg *ContLoadGenerator) SetTPS(desired uint) error {
-	lg.mu.Lock()
-	defer lg.mu.Unlock()
+	lg.workersMutex.Lock()
+	defer lg.workersMutex.Unlock()
 
 	currentTPS := len(lg.workers)
 	diff := int(desired) - currentTPS
 
 	switch {
 	case diff > 0:
-		lg.startWorkers(currentTPS, diff)
+		return lg.startWorkers(diff)
 	case diff < 0:
-		lg.stopWorkers(currentTPS, -diff)
+		return lg.stopWorkers(-diff)
 	}
-	lg.workerStatsTracker.AddWorkers(diff)
 	return nil
 }
 
 func (lg *ContLoadGenerator) Stop() {
-	if lg.stopped {
+	if lg.stopped() {
 		lg.log.Warn().Msg("Stop() called on generator when already stopped")
 		return
 	}
 
 	defer lg.log.Debug().Msg("stopped generator")
-
-	lg.stopped = true
 
 	lg.log.Debug().Msg("stopping workers")
 	_ = lg.SetTPS(0)
