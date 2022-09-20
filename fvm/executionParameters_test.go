@@ -77,7 +77,7 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 				})
 			_, err := fvm.GetExecutionMemoryWeights(envMock, address)
 			require.Error(t, err)
-			require.EqualError(t, err, someErr.Error())
+			require.ErrorContains(t, err, someErr.Error())
 		},
 	)
 	t.Run("return error if get stored returns error",
@@ -89,7 +89,7 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 				})
 			_, err := fvm.GetExecutionMemoryWeights(envMock, address)
 			require.Error(t, err)
-			require.EqualError(t, err, someErr.Error())
+			require.ErrorContains(t, err, someErr.Error())
 		},
 	)
 	t.Run("no error if a dictionary is stored",
@@ -209,7 +209,7 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 				})
 			_, err := fvm.GetExecutionEffortWeights(envMock, address)
 			require.Error(t, err)
-			require.EqualError(t, err, someErr.Error())
+			require.ErrorContains(t, err, someErr.Error())
 		},
 	)
 	t.Run("return error if get stored returns error",
@@ -221,7 +221,7 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 				})
 			_, err := fvm.GetExecutionEffortWeights(envMock, address)
 			require.Error(t, err)
-			require.EqualError(t, err, someErr.Error())
+			require.ErrorContains(t, err, someErr.Error())
 		},
 	)
 	t.Run("no error if a dictionary is stored",
