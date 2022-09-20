@@ -42,7 +42,7 @@ func (cl ChannelList) ID() flow.Identifier {
 	return flow.MakeID(cl)
 }
 
-// Contains retuns true if the ChannelList contains the given channel.
+// Contains returns true if the ChannelList contains the given channel.
 func (cl ChannelList) Contains(channel Channel) bool {
 	for _, c := range cl {
 		if c == channel {
@@ -50,4 +50,15 @@ func (cl ChannelList) Contains(channel Channel) bool {
 		}
 	}
 	return false
+}
+
+// Exclude returns list of channels that are in the ChannelList but not in the other list.
+func (cl ChannelList) Exclude(other ChannelList) ChannelList {
+	var result ChannelList
+	for _, c := range cl {
+		if !other.Contains(c) {
+			result = append(result, c)
+		}
+	}
+	return result
 }
