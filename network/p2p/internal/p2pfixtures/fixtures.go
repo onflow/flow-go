@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 
@@ -291,14 +292,23 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 }
 
 func PeerIdFixture(t *testing.T) peer.ID {
-	id := unittest.IdentityFixture()
-	_, _, key, err := p2putils.NetworkingInfo(*id)
+	key, err := generateNetworkingKey(unittest.IdentifierFixture())
 	require.NoError(t, err)
 
-	peerID, err := peer.IDFromPublicKey(key)
+	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(key.PublicKey())
+	require.NoError(t, err)
+
+	peerID, err := peer.IDFromPublicKey(pubKey)
 	require.NoError(t, err)
 
 	return peerID
+}
+
+// generateNetworkingKey generates a Flow ECDSA key using the given seed
+func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
+	copy(seed, s[:])
+	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 }
 
 func PeerIdsFixture(t *testing.T, n int) []peer.ID {
