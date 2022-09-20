@@ -5,7 +5,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 )
@@ -42,11 +41,11 @@ type facadeEnvironment struct {
 	environment.AccountFreezer
 
 	*environment.AccountKeyReader
-	handler.AccountKeyUpdater
+	environment.AccountKeyUpdater
 
 	*environment.ContractReader
-	handler.ContractUpdater
-	*handler.Programs
+	environment.ContractUpdater
+	*environment.Programs
 
 	accounts environment.Accounts
 }
@@ -54,7 +53,7 @@ type facadeEnvironment struct {
 func newFacadeEnvironment(
 	ctx Context,
 	stateTransaction *state.StateHolder,
-	programs handler.TransactionPrograms,
+	programs environment.TransactionPrograms,
 	tracer *environment.Tracer,
 	meter environment.Meter,
 ) *facadeEnvironment {
@@ -122,15 +121,15 @@ func newFacadeEnvironment(
 			meter,
 			accounts,
 		),
-		AccountKeyUpdater: handler.NoAccountKeyUpdater{},
+		AccountKeyUpdater: environment.NoAccountKeyUpdater{},
 
 		ContractReader: environment.NewContractReader(
 			tracer,
 			meter,
 			accounts,
 		),
-		ContractUpdater: handler.NoContractUpdater{},
-		Programs: handler.NewPrograms(
+		ContractUpdater: environment.NoContractUpdater{},
+		Programs: environment.NewPrograms(
 			tracer,
 			meter,
 			stateTransaction,
