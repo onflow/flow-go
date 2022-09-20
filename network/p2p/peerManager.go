@@ -1,15 +1,11 @@
 package p2p
 
 import (
-	"context"
-	"fmt"
-	mrand "math/rand"
-	"time"
-
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
+<<<<<<< HEAD
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
@@ -147,11 +143,21 @@ func (pm *PeerManager) updatePeers(ctx context.Context) {
 
 	// get all the peer ids to connect to
 	peers := pm.peersProvider()
+=======
+	"github.com/onflow/flow-go/module"
+)
 
-	pm.logger.Trace().
-		Str("peers", fmt.Sprintf("%v", peers)).
-		Msg("connecting to peers")
+// PeerManagerFactoryFunc is a factory function type for generating a PeerManager instance using the given host,
+// peersProvider and logger
+type PeerManagerFactoryFunc func(host host.Host, peersProvider PeersProvider, logger zerolog.Logger) (PeerManager, error)
 
+type PeersProvider func() peer.IDSlice
+>>>>>>> master
+
+type PeerManager interface {
+	module.ReadyDoneAware
+
+<<<<<<< HEAD
 	// ask the connector to connect to all peers in the list
 	pm.connector.UpdatePeers(ctx, peers)
 }
@@ -159,4 +165,12 @@ func (pm *PeerManager) updatePeers(ctx context.Context) {
 // ForceUpdatePeers initiates an update to the peer connections of this node immediately
 func (pm *PeerManager) ForceUpdatePeers(ctx context.Context) {
 	pm.updatePeers(ctx)
+=======
+	// RequestPeerUpdate requests an update to the peer connections of this node.
+	// If a peer update has already been requested (either as a periodic request or an on-demand request) and is outstanding,
+	// then this call is a no-op.
+	RequestPeerUpdate()
+
+	ForceUpdatePeers()
+>>>>>>> master
 }

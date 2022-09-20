@@ -21,10 +21,9 @@ import (
 
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/test"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -106,7 +105,7 @@ func nodeFixture(
 	sporkID flow.Identifier,
 	dhtPrefix string,
 	opts ...nodeFixtureParameterOption,
-) (*p2p.Node, flow.Identity) {
+) (*p2pnode.Node, flow.Identity) {
 	// default parameters
 	parameters := &nodeFixtureParameters{
 		handlerFunc: func(network.Stream) {},
@@ -167,40 +166,6 @@ func nodeFixture(
 	return n, *identity
 }
 
-// startNodes start all nodes in the input slice using the provided context, timing out if nodes are
-// not all Ready() before duration expires
-func startNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []*p2p.Node, timeout time.Duration) {
-	rdas := make([]module.ReadyDoneAware, 0, len(nodes))
-	for _, node := range nodes {
-		node.Start(ctx)
-		rdas = append(rdas, node)
-	}
-	unittest.RequireComponentsReadyBefore(t, timeout, rdas...)
-}
-
-// startNode start a single node using the provided context, timing out if nodes are not all Ready()
-// before duration expires
-func startNode(t *testing.T, ctx irrecoverable.SignalerContext, node *p2p.Node, timeout time.Duration) {
-	node.Start(ctx)
-	unittest.RequireComponentsReadyBefore(t, timeout, node)
-}
-
-// stopNodes stops all nodes in the input slice using the provided cancel func, timing out if nodes are
-// not all Done() before duration expires
-func stopNodes(t *testing.T, nodes []*p2p.Node, cancel context.CancelFunc, timeout time.Duration) {
-	cancel()
-	for _, node := range nodes {
-		unittest.RequireComponentsDoneBefore(t, timeout, node)
-	}
-}
-
-// stopNode stops a single node using the provided cancel func, timing out if nodes are not all Done()
-// before duration expires
-func stopNode(t *testing.T, node *p2p.Node, cancel context.CancelFunc, timeout time.Duration) {
-	cancel()
-	unittest.RequireComponentsDoneBefore(t, timeout, node)
-}
-
 // generateNetworkingKey is a test helper that generates a ECDSA flow key pair.
 func generateNetworkingKey(t *testing.T) fcrypto.PrivateKey {
 	seed := unittest.SeedFixture(48)
@@ -256,8 +221,8 @@ func nodesFixture(
 	dhtPrefix string,
 	count int,
 	opts ...nodeFixtureParameterOption,
-) ([]*p2p.Node, flow.IdentityList) {
-	var nodes []*p2p.Node
+) ([]*p2pnode.Node, flow.IdentityList) {
+	var nodes []*p2pnode.Node
 
 	// creating nodes
 	var identities flow.IdentityList

@@ -44,8 +44,16 @@ import (
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/cache"
+	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
@@ -98,7 +106,7 @@ type FollowerServiceBuilder struct {
 	*FollowerServiceConfig
 
 	// components
-	LibP2PNode              *p2p.Node
+	LibP2PNode              *p2pnode.Node
 	FollowerState           protocol.MutableState
 	SyncCore                *synchronization.Core
 	FinalizationDistributor *pubsub.FinalizationDistributor
@@ -364,7 +372,7 @@ func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
 		Me:                  nodeID,
 		MiddlewareFactory:   func() (network.Middleware, error) { return builder.Middleware, nil },
 		Topology:            topology,
-		SubscriptionManager: p2p.NewChannelSubscriptionManager(middleware),
+		SubscriptionManager: subscription.NewChannelSubscriptionManager(middleware),
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
@@ -442,7 +450,7 @@ func (builder *FollowerServiceBuilder) initNodeInfo() error {
 		return fmt.Errorf("could not get peer ID from public key: %w", err)
 	}
 
-	builder.NodeID, err = p2p.NewPublicNetworkIDTranslator().GetFlowID(builder.peerID)
+	builder.NodeID, err = translator.NewPublicNetworkIDTranslator().GetFlowID(builder.peerID)
 	if err != nil {
 		return fmt.Errorf("could not get flow node ID: %w", err)
 	}
@@ -455,14 +463,14 @@ func (builder *FollowerServiceBuilder) initNodeInfo() error {
 
 func (builder *FollowerServiceBuilder) InitIDProviders() {
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
-		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
+		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
 		if err != nil {
 			return err
 		}
 
 		builder.IdentityProvider = idCache
 
-		builder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewPublicNetworkIDTranslator())
+		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
 		// use the default identifier provider
 		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
@@ -552,12 +560,12 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 //   - No connection manager
 //   - No peer manager
 //   - Default libp2p pubsub options
-func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
-	return func() (*p2p.Node, error) {
+func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
+	return func() (*p2pnode.Node, error) {
 		var pis []peer.AddrInfo
 
 		for _, b := range builder.bootstrapIdentities {
-			pi, err := p2p.PeerAddressInfo(*b)
+			pi, err := utils.PeerAddressInfo(*b)
 
 			if err != nil {
 				return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
@@ -566,17 +574,17 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			pis = append(pis, pi)
 		}
 
-		node, err := p2p.NewNodeBuilder(builder.Logger, builder.BaseConfig.BindAddr, networkKey, builder.SporkID).
+		node, err := p2pbuilder.NewNodeBuilder(builder.Logger, builder.BaseConfig.BindAddr, networkKey, builder.SporkID).
 			SetSubscriptionFilter(
-				p2p.NewRoleBasedFilter(
-					p2p.UnstakedRole, builder.IdentityProvider,
+				subscription.NewRoleBasedFilter(
+					subscription.UnstakedRole, builder.IdentityProvider,
 				),
 			).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
+				return p2pdht.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
 					builder.Logger,
 					builder.Metrics.Network,
-					p2p.AsClient(),
+					p2pdht.AsClient(),
 					dht.BootstrapPeers(pis...),
 				)
 			}).
@@ -625,7 +633,7 @@ func (builder *FollowerServiceBuilder) Build() (cmd.Node, error) {
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
 func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
-	var libp2pNode *p2p.Node
+	var libp2pNode *p2pnode.Node
 	builder.
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			libP2PFactory := builder.initLibP2PFactory(node.NetworkKey)
@@ -689,21 +697,21 @@ func (builder *FollowerServiceBuilder) enqueueConnectWithStakedAN() {
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
-	libp2pNode *p2p.Node,
+	libp2pNode *p2pnode.Node,
 	validators ...network.MessageValidator) network.Middleware {
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
-	builder.Middleware = p2p.NewMiddleware(
+	builder.Middleware = middleware.NewMiddleware(
 		builder.Logger,
 		libp2pNode,
 		nodeID,
 		networkMetrics,
 		builder.Metrics.Bitswap,
 		builder.SporkID,
-		p2p.DefaultUnicastTimeout,
+		middleware.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
 		slashingViolationsConsumer,
-		p2p.WithMessageValidators(validators...),
+		middleware.WithMessageValidators(validators...),
 		// use default identifier provider
 	)
 
