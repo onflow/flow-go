@@ -5,7 +5,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module"
 )
 
 const (
@@ -72,7 +72,7 @@ type ScoreOption struct {
 	peerThresholdParams *pubsub.PeerScoreThresholds
 }
 
-func NewScoreOption(logger zerolog.Logger, idProvider id.IdentityProvider) *ScoreOption {
+func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider) *ScoreOption {
 	return &ScoreOption{
 		logger:    logger.With().Str("module", "pubsub_score_option").Logger(),
 		validator: NewSubscriptionValidator(idProvider),

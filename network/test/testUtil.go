@@ -96,7 +96,7 @@ func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 	return res
 }
 
-func NewTagWatchingConnManager(log zerolog.Logger, idProvider id.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
+func NewTagWatchingConnManager(log zerolog.Logger, idProvider module.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
 	cm := connection.NewConnManager(log, metrics)
 	return &TagWatchingConnManager{
 		ConnManager: cm,
@@ -140,7 +140,7 @@ func GenerateIDs(
 
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
 
-		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, o.connectionGating, idProvider, opts...)
+		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, idProvider, opts...)
 
 		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
@@ -340,10 +340,8 @@ func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 func generateLibP2PNode(
 	t *testing.T,
 	logger zerolog.Logger,
-	id flow.Identity,
 	key crypto.PrivateKey,
-	connGating bool,
-	idProvider id.IdentityProvider,
+	idProvider module.IdentityProvider,
 	opts ...nodeBuilderOption,
 ) (*p2pnode.Node, observable.Observable) {
 

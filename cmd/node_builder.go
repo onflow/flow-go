@@ -17,15 +17,15 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p/connection"
 
-	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/crypto"
+
+	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
@@ -200,9 +200,9 @@ type NodeConfig struct {
 	NetworkKey        crypto.PrivateKey
 
 	// ID providers
-	IdentityProvider             id.IdentityProvider
+	IdentityProvider             module.IdentityProvider
 	IDTranslator                 p2p.IDTranslator
-	SyncEngineIdentifierProvider id.IdentifierProvider
+	SyncEngineIdentifierProvider module.IdentifierProvider
 
 	// root state information
 	RootSnapshot protocol.Snapshot

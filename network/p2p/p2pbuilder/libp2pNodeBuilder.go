@@ -26,7 +26,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
@@ -48,7 +47,7 @@ func DefaultLibP2PNodeFactory(
 	address string,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
-	idProvider id.IdentityProvider,
+	idProvider module.IdentityProvider,
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
 	role string,
@@ -102,7 +101,7 @@ type NodeBuilder interface {
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
-	EnableGossipSubPeerScoring(id.IdentityProvider) NodeBuilder
+	EnableGossipSubPeerScoring(module.IdentityProvider) NodeBuilder
 	Build(context.Context) (*p2pnode.Node, error)
 }
 
@@ -116,7 +115,7 @@ type LibP2PNodeBuilder struct {
 	resourceManager      network.ResourceManager
 	connManager          connmgr.ConnManager
 	connGater            connmgr.ConnectionGater
-	idProvider           id.IdentityProvider
+	idProvider           module.IdentityProvider
 	gossipSubPeerScoring bool // whether to enable gossipsub peer scoring
 	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
 	pubsubFactory        func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
@@ -166,7 +165,7 @@ func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider id.IdentityProvider) NodeBuilder {
+func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.IdentityProvider) NodeBuilder {
 	builder.gossipSubPeerScoring = true
 	builder.idProvider = provider
 	return builder

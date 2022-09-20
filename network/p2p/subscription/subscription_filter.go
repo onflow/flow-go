@@ -5,15 +5,15 @@ import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 
+	"github.com/onflow/flow-go/module"
 	p2putils "github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/id"
 )
 
 // RoleBasedFilter implements a subscription filter that filters subscriptions based on a node's role.
 type RoleBasedFilter struct {
-	idProvider id.IdentityProvider
+	idProvider module.IdentityProvider
 	myRole     flow.Role
 }
 
@@ -21,7 +21,7 @@ const UnstakedRole = flow.Role(0)
 
 var _ pubsub.SubscriptionFilter = (*RoleBasedFilter)(nil)
 
-func NewRoleBasedFilter(role flow.Role, idProvider id.IdentityProvider) *RoleBasedFilter {
+func NewRoleBasedFilter(role flow.Role, idProvider module.IdentityProvider) *RoleBasedFilter {
 	filter := &RoleBasedFilter{
 		idProvider: idProvider,
 		myRole:     role,
