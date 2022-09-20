@@ -296,6 +296,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		return nil
 	})
 
+	// peer manager won't be created until all PeerManagerDependencies are ready.
 	fnb.DependableComponent("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		return fnb.LibP2PNode.PeerManagerComponent(), nil
 	}, fnb.PeerManagerDependencies)

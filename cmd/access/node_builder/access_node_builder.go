@@ -442,7 +442,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			}
 
 			// add blobservice into ReadyDoneAware dependency passed to peer manager
-			// this configures peer manager to wait for the blobservice to be ready before starting
+			// this starts the blob service and configures peer manager to wait for the blobservice
+			// to be ready before starting
 			bsDependable.Init(bs)
 
 			builder.ExecutionDataDownloader = execution_data.NewDownloader(bs)

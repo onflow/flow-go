@@ -164,9 +164,12 @@ func NewMiddleware(
 			ready()
 
 			<-ctx.Done()
+			mw.log.Info().Str("component", "middleware").Msg("stopping subroutines")
 
 			// wait for the readConnection and readSubscription routines to stop
 			mw.wg.Wait()
+
+			mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
 		}).Build()
 
 	mw.Component = cm
