@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -54,6 +55,11 @@ func RandomAddressFixture() flow.Address {
 		panic(err)
 	}
 	return addr
+}
+
+// Uint64InRange returns a uint64 value drawn from the uniform random distribution [min,max].
+func Uint64InRange(min, max uint64) uint64 {
+	return min + uint64(rand.Intn(int(max)+1-int(min)))
 }
 
 func RandomSDKAddressFixture() sdk.Address {
@@ -2063,7 +2069,7 @@ func NetworkingPrivKeyFixture() crypto.PrivateKey {
 	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
 }
 
-//StakingPrivKeyFixture returns a random BLS12381 private keyf
+// StakingPrivKeyFixture returns a random BLS12381 private keyf
 func StakingPrivKeyFixture() crypto.PrivateKey {
 	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
 }
@@ -2112,9 +2118,9 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 	return results
 }
 
-func AllowAllPeerFilter() func(peer.ID) bool {
-	return func(_ peer.ID) bool {
-		return true
+func AllowAllPeerFilter() func(peer.ID) error {
+	return func(_ peer.ID) error {
+		return nil
 	}
 }
 
@@ -2133,4 +2139,19 @@ func NewSealingConfigs(val uint) module.SealingConfigsSetter {
 		panic(err)
 	}
 	return instance
+}
+
+func PeerIDFromFlowID(identity *flow.Identity) (peer.ID, error) {
+	networkKey := identity.NetworkPubKey
+	peerPK, err := keyutils.LibP2PPublicKeyFromFlow(networkKey)
+	if err != nil {
+		return "", err
+	}
+
+	peerID, err := peer.IDFromPublicKey(peerPK)
+	if err != nil {
+		return "", err
+	}
+
+	return peerID, nil
 }

@@ -6,6 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/crypto"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/engine/ghost/client"
@@ -14,11 +18,8 @@ import (
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestExecutionStateSealing(t *testing.T) {
@@ -62,11 +63,7 @@ func (ss *SealingSuite) Verification() *client.GhostClient {
 }
 
 func (ss *SealingSuite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "sealing.go").
-		Str("testcase", ss.T().Name()).
-		Logger()
-	ss.log = logger
+	ss.log = unittest.LoggerForTest(ss.Suite.T(), zerolog.InfoLevel)
 	ss.log.Info().Msgf("================> SetupTest")
 
 	// seed random generator
@@ -290,11 +287,11 @@ SearchLoop:
 ReceiptLoop:
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := ss.Execution().Send(ctx, network.PushReceipts, &receipt, ss.conIDs...)
-		err = ss.Execution2().Send(ctx, network.PushReceipts, &receipt2, ss.conIDs...)
+		err1 := ss.Execution().Send(ctx, channels.PushReceipts, &receipt, ss.conIDs...)
+		err2 := ss.Execution2().Send(ctx, channels.PushReceipts, &receipt2, ss.conIDs...)
 		cancel()
-		if err != nil {
-			ss.T().Logf("could not send execution receipt: %s\n", err)
+		if err1 != nil || err2 != nil {
+			ss.T().Logf("could not send execution receipt: %s/%s\n", err1, err2)
 			continue
 		}
 		break ReceiptLoop
@@ -338,7 +335,7 @@ ReceiptLoop:
 ApprovalLoop:
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := ss.Verification().Send(ctx, network.PushApprovals, &approval, ss.conIDs...)
+		err := ss.Verification().Send(ctx, channels.PushApprovals, &approval, ss.conIDs...)
 		cancel()
 		if err != nil {
 			ss.T().Logf("could not send result approval: %s\n", err)

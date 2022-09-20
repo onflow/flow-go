@@ -3,7 +3,7 @@ package epochs_test
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"testing"
 
@@ -45,7 +45,7 @@ type Suite struct {
 
 func (suite *Suite) SetupTest() {
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 	suite.local = new(module.Local)
 	suite.signer = new(hotstuff.Signer)
 	suite.client = new(module.QCContractClient)

@@ -54,11 +54,11 @@ func WithCapacity(capacity int) ConstructorOption {
 // queue's length changes, the queue calls the provided callback with the new
 // length. By default, the QueueLengthObserver is a NoOp.
 // CAUTION:
-//  * QueueLengthObserver implementations must be non-blocking
-//  * The values published to queue length observer might be in different order
-//    than the actual length values at the time of insertion. This is a
-//    performance optimization, which allows to reduce the duration during
-//    which the queue is internally locked when inserting elements.
+//   - QueueLengthObserver implementations must be non-blocking
+//   - The values published to queue length observer might be in different order
+//     than the actual length values at the time of insertion. This is a
+//     performance optimization, which allows to reduce the duration during
+//     which the queue is internally locked when inserting elements.
 func WithLengthObserver(callback QueueLengthObserver) ConstructorOption {
 	return func(queue *FifoQueue) error {
 		if callback == nil {

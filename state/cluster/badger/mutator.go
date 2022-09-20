@@ -42,7 +42,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 	blockID := block.ID()
 
 	span, ctx, _ := m.tracer.StartCollectionSpan(context.Background(), blockID, trace.COLClusterStateMutatorExtend)
-	defer span.Finish()
+	defer span.End()
 
 	err := m.State.db.View(func(tx *badger.Txn) error {
 
@@ -93,7 +93,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		// do this by tracing back until we see a parent block that is the
 		// latest finalized block, or reach height below the finalized boundary
 
-		setupSpan.Finish()
+		setupSpan.End()
 		checkAnsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckAncestry)
 
 		// start with the extending block's parent
@@ -116,9 +116,14 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			parentID = ancestor.ParentID
 		}
 
-		checkAnsSpan.Finish()
+		checkAnsSpan.End()
 		checkTxsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
-		defer checkTxsSpan.Finish()
+		defer checkTxsSpan.End()
+
+		// no validation of transactions is necessary for empty collections
+		if payload.Collection.Len() == 0 {
+			return nil
+		}
 
 		// a valid collection must reference a valid reference block
 		// NOTE: it is valid for a collection to be expired at this point,
@@ -214,7 +219,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 	}
 
 	insertDbSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
-	defer insertDbSpan.Finish()
+	defer insertDbSpan.End()
 
 	// insert the new block
 	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(block))

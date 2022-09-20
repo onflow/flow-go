@@ -15,6 +15,8 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module/id"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -164,9 +166,10 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
 // A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
-// flow.Identity           ---> peer.AddrInfo
-//    |-- Address          --->   |-- []multiaddr.Multiaddr
-//    |-- NetworkPublicKey --->   |-- ID
+//
+//	flow.Identity        ---> peer.AddrInfo
+//	|-- Address          --->   |-- []multiaddr.Multiaddr
+//	|-- NetworkPublicKey --->   |-- ID
 func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	ip, port, key, err := NetworkingInfo(identity)
 	if err != nil {
@@ -223,4 +226,24 @@ func flowStream(conn network.Conn) network.Stream {
 		}
 	}
 	return nil
+}
+
+// allowAllPeerFilter returns a peer filter that does not do any filtering.
+func allowAllPeerFilter() PeerFilter {
+	return func(p peer.ID) error {
+		return nil
+	}
+}
+
+// notEjectedPeerFilter returns a PeerFilter that will return an error if the peer is unknown or ejected.
+func notEjectedPeerFilter(idProvider id.IdentityProvider) PeerFilter {
+	return func(p peer.ID) error {
+		if id, found := idProvider.ByPeerID(p); !found {
+			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.Pretty())
+		} else if id.Ejected {
+			return fmt.Errorf("node with the peer_id %s is ejected", id.NodeID)
+		}
+
+		return nil
+	}
 }

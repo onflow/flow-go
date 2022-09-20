@@ -37,12 +37,16 @@ type QCContractClient interface {
 	Voted(ctx context.Context) (bool, error)
 }
 
-/// EpochLookup provides a method to find epochs by view.
+// EpochLookup enables looking up epochs by view.
 type EpochLookup interface {
 
-	// EpochForView returns the counter of the epoch that the view belongs to.
-	EpochForView(view uint64) (epochCounter uint64, err error)
-
-	// EpochForViewWithFallback returns the counter of the epoch that the view belongs to.
+	// EpochForViewWithFallback returns the counter of the epoch that the input view belongs to.
+	// If epoch fallback has been triggered, returns the last committed epoch counter
+	// in perpetuity for any inputs beyond the last committed epoch view range.
+	// For example, if we trigger epoch fallback during epoch 10, and reach the final
+	// view of epoch 10 before epoch 11 has finished being setup, this function will
+	// return 10 even for input views beyond the final view of epoch 10.
+	//
+	// Returns model.ErrViewForUnknownEpoch if the input does not fall within the range of a known epoch.
 	EpochForViewWithFallback(view uint64) (epochCounter uint64, err error)
 }

@@ -14,7 +14,7 @@ import (
 // a database.
 //
 // DEFINITIONS and CONVENTIONS:
-//   * HEIGHT of a node v in a tree is the number of edges on the longest downward path
+//   - HEIGHT of a node v in a tree is the number of edges on the longest downward path
 //     between v and a tree leaf. The height of a tree is the heights of its root.
 //     The height of a Trie is always the height of the fully-expanded tree.
 type PSMT struct {
@@ -57,21 +57,21 @@ func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 }
 
 // Update updates registers and returns rootValue after updates
-// in case of error, it returns a list of keys for which update failed
+// in case of error, it returns a list of paths for which update failed
 func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) (ledger.RootHash, error) {
-	var failedKeys []ledger.Key
+	var failedPaths []ledger.Path
 	for i, path := range paths {
 		payload := payloads[i]
 		// lookup the path and update the value
 		node, found := p.pathLookUp[path]
 		if !found {
-			failedKeys = append(failedKeys, payload.Key)
+			failedPaths = append(failedPaths, path)
 			continue
 		}
-		node.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value, node.height)
+		node.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), node.height)
 	}
-	if len(failedKeys) > 0 {
-		return ledger.RootHash(hash.DummyHash), &ledger.ErrMissingKeys{Keys: failedKeys}
+	if len(failedPaths) > 0 {
+		return ledger.RootHash(hash.DummyHash), &ErrMissingPath{Paths: failedPaths}
 	}
 	// after updating all the nodes, compute the value recursively only once
 	return ledger.RootHash(p.root.forceComputeHash()), nil
@@ -138,7 +138,7 @@ func NewPSMT(
 		currentNode.payload = payload
 		// update node's hash value only for inclusion proofs (for others we assume default value)
 		if pr.Inclusion {
-			currentNode.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value, currentNode.height)
+			currentNode.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), currentNode.height)
 		}
 		// keep a reference to this node by path (for update purpose)
 		psmt.pathLookUp[path] = currentNode

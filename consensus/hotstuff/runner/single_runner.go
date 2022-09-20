@@ -60,8 +60,8 @@ func (s *SingleRunner) Start(f func()) <-chan struct{} {
 
 // Abort() will abort the SingleRunner. Note that the channel returned from Start() will never be
 // closed if the SingleRunner is aborted before Start() is called. This mimics the real world case:
-//    * consider a runner at a starting position of a race waiting for the start signal
-//    * if the runner to told to abort the race _before_ the start signal occurred, the runner will never start
+//   - consider a runner at a starting position of a race waiting for the start signal
+//   - if the runner to told to abort the race _before_ the start signal occurred, the runner will never start
 func (s *SingleRunner) Abort() <-chan struct{} {
 	s.stateTransition.Lock()
 	s.unsafeCommenceShutdown()

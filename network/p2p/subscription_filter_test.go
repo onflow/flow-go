@@ -13,7 +13,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -39,15 +40,15 @@ func TestFilterSubscribe(t *testing.T) {
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.Host())))
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(unstakedNode.Host())))
 
-	badTopic := network.TopicFromChannel(network.SyncCommittee, sporkId)
+	badTopic := channels.TopicFromChannel(channels.SyncCommittee, sporkId)
 
-	sub1, err := node1.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub1, err := node1.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 	require.NoError(t, err)
 
-	sub2, err := node2.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub2, err := node2.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 	require.NoError(t, err)
 
-	unstakedSub, err := unstakedNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	unstakedSub, err := unstakedNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -111,26 +112,26 @@ func TestCanSubscribe(t *testing.T) {
 		unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop collection node on time")
 	}()
 
-	goodTopic := network.TopicFromChannel(network.ProvideCollections, sporkId)
-	_, err := collectionNode.Subscribe(goodTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	goodTopic := channels.TopicFromChannel(channels.ProvideCollections, sporkId)
+	_, err := collectionNode.Subscribe(goodTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 	require.NoError(t, err)
 
-	var badTopic network.Topic
-	allowedChannels := make(map[network.Channel]struct{})
-	for _, ch := range network.ChannelsByRole(flow.RoleCollection) {
+	var badTopic channels.Topic
+	allowedChannels := make(map[channels.Channel]struct{})
+	for _, ch := range channels.ChannelsByRole(flow.RoleCollection) {
 		allowedChannels[ch] = struct{}{}
 	}
-	for _, ch := range network.Channels() {
+	for _, ch := range channels.Channels() {
 		if _, ok := allowedChannels[ch]; !ok {
-			badTopic = network.TopicFromChannel(ch, sporkId)
+			badTopic = channels.TopicFromChannel(ch, sporkId)
 			break
 		}
 	}
-	_, err = collectionNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	_, err = collectionNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 	require.Error(t, err)
 
-	clusterTopic := network.TopicFromChannel(network.ChannelSyncCluster(flow.Emulator), sporkId)
-	_, err = collectionNode.Subscribe(clusterTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	clusterTopic := channels.TopicFromChannel(channels.SyncCluster(flow.Emulator), sporkId)
+	_, err = collectionNode.Subscribe(clusterTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 	require.NoError(t, err)
 }
 

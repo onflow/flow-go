@@ -331,7 +331,6 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 // until all such transactions have expired. In fact, since these transactions
 // can NOT be included by clusters in the new epoch, we MUST continue producing
 // these collections within the previous epoch's clusters.
-//
 func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint64) {
 
 	stopAtHeight := epochMaxHeight + flow.DefaultTransactionExpiry + 1

@@ -1,23 +1,16 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 
-	"github.com/ipfs/go-blockservice"
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	badger "github.com/ipfs/go-ds-badger2"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/mocknetwork"
 )
 
 var (
@@ -38,25 +31,16 @@ func Execute() {
 	}
 }
 
-func initBlobservice() (network.BlobService, datastore.Batching) {
+func initBlobstore() (blobs.Blobstore, datastore.Batching) {
 	ds, err := badger.NewDatastore(flagBlobstoreDir, &badger.DefaultOptions)
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not init badger datastore")
 	}
 
-	blockStore := blockstore.NewBlockstore(ds)
+	blobstore := blobs.NewBlobstore(ds)
 
-	blockService := blockservice.New(blockStore, nil)
-
-	blobService := new(mocknetwork.BlobService)
-
-	blobService.On("GetBlobs", mock.Anything, mock.AnythingOfType("[]cid.Cid")).
-		Return(func(ctx context.Context, ks []cid.Cid) <-chan blobs.Blob {
-			return blockService.GetBlocks(ctx, ks)
-		})
-
-	return blobService, ds
+	return blobstore, ds
 }
 
 func init() {

@@ -58,7 +58,7 @@ func TestUnweightedNode(t *testing.T) {
 
 	runNodes(signalerCtx, nodes)
 
-	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
+	unittest.AssertClosesBefore(t, stopper.stopped, 60*time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -212,7 +212,7 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 
 	runNodes(signalerCtx, nodes)
 
-	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
+	unittest.AssertClosesBefore(t, stopper.stopped, 60*time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
