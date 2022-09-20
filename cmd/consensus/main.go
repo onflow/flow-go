@@ -122,6 +122,7 @@ func main() {
 		blockTimer                   protocol.BlockTimer
 		finalizedHeader              *synceng.FinalizedHeaderCache
 		committee                    *committees.Consensus
+		epochLookup                  *epochs.EpochLookup
 		hotstuffModules              *consensus.HotstuffModules
 		dkgState                     *bstorage.DKGState
 		safeBeaconKeys               *bstorage.SafeBeaconPrivateKeys
@@ -533,6 +534,11 @@ func main() {
 			node.ProtocolEvents.AddConsumer(committee)
 			return committee, err
 		}).
+		Component("epoch lookup", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			epochLookup, err = epochs.NewEpochLookup(node.State)
+			node.ProtocolEvents.AddConsumer(epochLookup)
+			return epochLookup, err
+		}).
 		Component("hotstuff modules", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
@@ -552,7 +558,6 @@ func main() {
 			// wrap Main consensus committee with metrics
 			wrappedCommittee := committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
-			epochLookup := epochs.NewEpochLookup(node.State)
 			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, safeBeaconKeys)
 
 			// initialize the combined signer for hotstuff
