@@ -11,7 +11,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
-func TestSubscriptionProvider(t *testing.T) {
+// TestSubscriptionProvider_GetSubscribedTopics tests that the SubscriptionProvider returns the correct
+// list of topics a peer is subscribed to.
+func TestSubscriptionProvider_GetSubscribedTopics(t *testing.T) {
 	tp := mockp2p.NewTopicProvider(t)
 	sp := scoring.NewSubscriptionProvider(tp)
 
