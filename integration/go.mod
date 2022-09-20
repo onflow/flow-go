@@ -14,7 +14,7 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v0.2.0
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/onflow/cadence v0.25.0
+	github.com/onflow/cadence v0.25.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220720151516-797b149ceaaa
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220720151516-797b149ceaaa
 	github.com/onflow/flow-emulator v0.33.4-0.20220708171627-a9c955cd26c6
@@ -299,5 +299,3 @@ require (
 //replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
 
 replace github.com/onflow/flow-go => ../
-
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.25.0-patch.1
