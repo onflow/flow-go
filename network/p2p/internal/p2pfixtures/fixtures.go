@@ -12,6 +12,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
@@ -287,4 +288,23 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 	require.NoError(t, err)
 
 	return libp2pNode
+}
+
+func PeerIdFixture(t *testing.T) peer.ID {
+	id := unittest.IdentityFixture()
+	_, _, key, err := p2putils.NetworkingInfo(*id)
+	require.NoError(t, err)
+
+	peerID, err := peer.IDFromPublicKey(key)
+	require.NoError(t, err)
+
+	return peerID
+}
+
+func PeerIdsFixture(t *testing.T, n int) []peer.ID {
+	peerIDs := make([]peer.ID, n)
+	for i := 0; i < n; i++ {
+		peerIDs[i] = PeerIdFixture(t)
+	}
+	return peerIDs
 }
