@@ -3,8 +3,9 @@ package scoring
 import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/module/id"
 )
 
 const (
