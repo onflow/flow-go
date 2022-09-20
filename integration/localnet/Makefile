@@ -91,7 +91,7 @@ tps-test-ci:
 	make stop
 
 gen-bootstrap:
-	go run -tags relic ../../cmd/bootstrap genconfig --address-format "%s%d.jp-brown:3569" --access 2 --collection 6 --consensus 3 --execution 2 --verification 1 --weight 1000 -o ./ --config ./bootstrap/conf/node-config.json
+	go run -tags relic ../../cmd/bootstrap genconfig --address-format "%s%d.${NAMESPACE}:3569" --access 2 --collection 6 --consensus 3 --execution 2 --verification 1 --weight 1000 -o ./ --config ./bootstrap/conf/node-config.json
 	go run -tags relic ../../cmd/bootstrap keygen --machine-account --config ./bootstrap/conf/node-config.json -o ./bootstrap/keys
 	echo {} > ./bootstrap/conf/partner-stakes.json
 	mkdir ./bootstrap/partner-nodes
@@ -101,5 +101,15 @@ gen-bootstrap:
 k8s-secrets-create:
 	bash ./create-secrets.sh
 
-k8s-deploy:
+helm-deploy:
 	helm upgrade --install -f ./values.yml ${NAMESPACE} ./flow --debug
+
+k8s-expose-locally:
+	kubectl port-forward service/access1 9000:9000 --namespace ${NAMESPACE}
+
+k8s-pod-health:
+	kubectl get pods
+
+k8s-test-network-accessibility:
+	flow blocks get latest --host localhost:9000
+	flow accounts create --network benchnet --key  e0ef5e52955e6542287db4528b3e8acc84a2c204eee9609f7c3120d1dac5a11b1bcb39677511db14354aa8c1a0ef62151220d97f015d49a8f0b78b653b570bfd --signer benchnet-account -f ./flow.json
