@@ -100,10 +100,10 @@ func (suite *AccessSuite) TestAPIsAvailable() {
 	suite.T().Run("TestAccessConnection", func(t *testing.T) {
 		grpcAddress := fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort])
 
-		conn, err := grpc.DialContext(suite.ctx, grpcAddress,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithTimeout(1*time.Second),
-		)
+		ctx, cancel := context.WithTimeout(suite.ctx, 1*time.Second)
+		defer cancel()
+
+		conn, err := grpc.DialContext(ctx, grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err, "failed to connect to access node")
 		defer conn.Close()
 
