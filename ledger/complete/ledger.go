@@ -4,13 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
@@ -295,7 +294,7 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 		return nil, fmt.Errorf("could not get proofs: %w", err)
 	}
 
-	proofToGo := encoding.EncodeTrieBatchProof(batchProof)
+	proofToGo := ledger.EncodeTrieBatchProof(batchProof)
 
 	if len(paths) > 0 {
 		l.metrics.ProofSize(uint32(len(proofToGo) / len(paths)))
@@ -525,6 +524,6 @@ func runReport(r ledger.Reporter, p []ledger.Payload, commit ledger.State, l zer
 func writeStatusFile(fileName string, e error) error {
 	checkpointStatus := map[string]bool{"succeeded": e == nil}
 	checkpointStatusJson, _ := json.MarshalIndent(checkpointStatus, "", " ")
-	err := ioutil.WriteFile(fileName, checkpointStatusJson, 0644)
+	err := os.WriteFile(fileName, checkpointStatusJson, 0644)
 	return err
 }

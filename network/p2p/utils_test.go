@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/routing"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/test"
 )
 
 const maxConnectAttempt = 3
@@ -32,7 +33,8 @@ func createNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2p.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
-		SetPubSub(pubsub.NewGossipSub)
+		SetPubSub(pubsub.NewGossipSub).
+		SetResourceManager(test.NewResourceManager(t))
 
 	for _, opt := range opts {
 		opt(builder)

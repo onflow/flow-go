@@ -2,12 +2,13 @@ package p2p_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -157,9 +158,11 @@ func TestConnGater(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 
 	node1Peers := make(map[peer.ID]struct{})
-	node1, identity1 := nodeFixture(t, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) bool {
-		_, ok := node1Peers[pid]
-		return ok
+	node1, identity1 := nodeFixture(t, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) error {
+		if _, ok := node1Peers[pid]; !ok {
+			return fmt.Errorf("peer id not found: %s", pid.Pretty())
+		}
+		return nil
 	}))
 
 	startNode(t, signalCtx, node1, 100*time.Millisecond)
@@ -169,9 +172,11 @@ func TestConnGater(t *testing.T) {
 	assert.NoError(t, err)
 
 	node2Peers := make(map[peer.ID]struct{})
-	node2, identity2 := nodeFixture(t, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) bool {
-		_, ok := node2Peers[pid]
-		return ok
+	node2, identity2 := nodeFixture(t, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) error {
+		if _, ok := node2Peers[pid]; !ok {
+			return fmt.Errorf("id not found: %s", pid.Pretty())
+		}
+		return nil
 	}))
 	startNode(t, signalCtx, node2, 100*time.Millisecond)
 	defer stopNode(t, node2, cancel, 100*time.Millisecond)

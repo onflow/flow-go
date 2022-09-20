@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/ipfs/go-datastore"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
@@ -62,17 +62,18 @@ type Network struct {
 	codec                       network.Codec
 	me                          module.Local
 	mw                          network.Middleware
-	top                         network.Topology // used to determine fanout connections
 	metrics                     module.NetworkMetrics
 	receiveCache                *netcache.ReceiveCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
 	subscriptionManager         network.SubscriptionManager // used to keep track of subscribed channels
 	conduitFactory              network.ConduitFactory
+	topology                    network.Topology
 	registerEngineRequests      chan *registerEngineRequest
 	registerBlobServiceRequests chan *registerBlobServiceRequest
 }
 
-var _ network.Network = (*Network)(nil)
+var _ network.Network = &Network{}
+var _ network.Overlay = &Network{}
 
 type registerEngineRequest struct {
 	channel          channels.Channel
@@ -99,44 +100,46 @@ type registerBlobServiceResp struct {
 
 var ErrNetworkShutdown = errors.New("network has already shutdown")
 
+type NetworkParameters struct {
+	Logger              zerolog.Logger
+	Codec               network.Codec
+	Me                  module.Local
+	MiddlewareFactory   func() (network.Middleware, error)
+	Topology            network.Topology
+	SubscriptionManager network.SubscriptionManager
+	Metrics             module.NetworkMetrics
+	IdentityProvider    id.IdentityProvider
+	ReceiveCache        *netcache.ReceiveCache
+	Options             []NetworkOptFunction
+}
+
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
 // csize determines the size of the cache dedicated to keep track of received messages
-func NewNetwork(
-	log zerolog.Logger,
-	codec network.Codec,
-	me module.Local,
-	mwFactory func() (network.Middleware, error),
-	top network.Topology,
-	sm network.SubscriptionManager,
-	metrics module.NetworkMetrics,
-	identityProvider id.IdentityProvider,
-	receiveCache *netcache.ReceiveCache,
-	options ...NetworkOptFunction,
-) (*Network, error) {
+func NewNetwork(param *NetworkParameters) (*Network, error) {
 
-	mw, err := mwFactory()
+	mw, err := param.MiddlewareFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
 	}
 
 	n := &Network{
-		logger:                      log,
-		codec:                       codec,
-		me:                          me,
+		logger:                      param.Logger,
+		codec:                       param.Codec,
+		me:                          param.Me,
 		mw:                          mw,
-		receiveCache:                receiveCache,
-		top:                         top,
-		metrics:                     metrics,
-		subscriptionManager:         sm,
-		identityProvider:            identityProvider,
+		receiveCache:                param.ReceiveCache,
+		topology:                    param.Topology,
+		metrics:                     param.Metrics,
+		subscriptionManager:         param.SubscriptionManager,
+		identityProvider:            param.IdentityProvider,
 		conduitFactory:              conduit.NewDefaultConduitFactory(),
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 	}
 
-	for _, opt := range options {
+	for _, opt := range param.Options {
 		opt(n)
 	}
 
@@ -233,12 +236,12 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 		Msg("channel successfully registered")
 
 	// create the conduit
-	conduit, err := n.conduitFactory.NewConduit(parent, channel)
+	newConduit, err := n.conduitFactory.NewConduit(parent, channel)
 	if err != nil {
 		return nil, fmt.Errorf("could not create conduit using factory: %w", err)
 	}
 
-	return conduit, nil
+	return newConduit, nil
 }
 
 func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel channels.Channel, ds datastore.Batching, opts []network.BlobServiceOption) (network.BlobService, error) {
@@ -321,21 +324,6 @@ func (n *Network) Identities() flow.IdentityList {
 
 func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 	return n.identityProvider.ByPeerID(pid)
-}
-
-// Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
-// Independent invocations of Topology on different nodes collectively constructs a connected network graph.
-func (n *Network) Topology() (flow.IdentityList, error) {
-	n.Lock()
-	defer n.Unlock()
-
-	subscribedChannels := n.subscriptionManager.Channels()
-
-	top, err := n.top.GenerateFanout(n.Identities(), subscribedChannels)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate topology: %w, subscribed: %d", err, len(subscribedChannels))
-	}
-	return top, nil
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message, decodedMsgPayload interface{}) error {
@@ -546,6 +534,10 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	}
 
 	n.metrics.MessageProcessingFinished(qm.Target.String(), time.Since(startTimestamp))
+}
+
+func (n *Network) Topology() flow.IdentityList {
+	return n.topology.Fanout(n.Identities())
 }
 
 func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {

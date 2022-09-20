@@ -2,22 +2,24 @@ package p2p_test
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
-	validator "github.com/onflow/flow-go/network/validator/pubsub"
+	"github.com/onflow/flow-go/network/slashing"
+	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,13 +31,12 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create a hooked logger
-	var hook unittest.LoggerHook
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := nodeFixture(t, sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleConsensus), withLogger(logger))
-	sn2, _ := nodeFixture(t, sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleConsensus), withLogger(logger))
+	sn1, identity1 := nodeFixture(t, sporkId, sn2, identity2, withRole(flow.RoleConsensus), withLogger(logger))
+	sn2, identity2 := nodeFixture(t, sporkId, sn2, identity2, withRole(flow.RoleConsensus), withLogger(logger))
 
 	nodes := []*p2p.Node{sn1, sn2}
 	startNodes(t, signalCtx, nodes, 100*time.Millisecond)
@@ -50,32 +51,37 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	require.NoError(t, err)
 
 	// peer filter used by the topic validator to check if node is staked
-	isStaked := func(pid peer.ID) bool {
+	isStaked := func(pid peer.ID) error {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
-			return false
+			return fmt.Errorf("could not translate the peer_id %s to a Flow identifier: %w", pid.Pretty(), err)
 		}
-		_, ok := ids.ByNodeID(fid)
-		return ok
+
+		if _, ok := ids.ByNodeID(fid); !ok {
+			return fmt.Errorf("flow id not found: %x", fid)
+		}
+
+		return nil
 	}
+
+	pInfo2, err := p2p.PeerAddressInfo(identity2)
+	require.NoError(t, err)
 
 	// node1 is connected to node2
 	// sn1 <-> sn2
-	require.NoError(t, sn1.AddPeer(ctx, *host.InfoFromHost(sn2.Host())))
+	require.NoError(t, sn1.AddPeer(ctx, pInfo2))
 
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
 	// sn1 will subscribe with is staked callback that should force the TopicValidator to drop the message received from sn2
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), isStaked)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), isStaked, slashingViolationsConsumer)
 	require.NoError(t, err)
 
 	// sn2 will subscribe with an unauthenticated callback to allow it to send the unauthenticated message
-	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
 	require.NoError(t, err)
 
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(sn1.ListPeers(topic.String())) > 0 &&
-			len(sn2.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	// let nodes form the mesh
+	time.Sleep(time.Second)
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
@@ -109,8 +115,8 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	logger := unittest.Logger()
 
-	sn1, _ := nodeFixture(t, sporkId, "TestTopicValidator_PublicChannel", withRole(flow.RoleConsensus), withLogger(logger))
-	sn2, _ := nodeFixture(t, sporkId, "TestTopicValidator_PublicChannel", withRole(flow.RoleConsensus), withLogger(logger))
+	sn1, _ := nodeFixture(t, sporkId, t.Name(), withRole(flow.RoleConsensus), withLogger(logger))
+	sn2, identity2 := nodeFixture(t, sporkId, t.Name(), withRole(flow.RoleConsensus), withLogger(logger))
 
 	nodes := []*p2p.Node{sn1, sn2}
 	startNodes(t, signalCtx, nodes, 100*time.Millisecond)
@@ -120,21 +126,22 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	channel := channels.PublicSyncCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
 
+	pInfo2, err := p2p.PeerAddressInfo(identity2)
+	require.NoError(t, err)
+
 	// node1 is connected to node2
 	// sn1 <-> sn2
-	require.NoError(t, sn1.AddPeer(ctx, *host.InfoFromHost(sn2.Host())))
+	require.NoError(t, sn1.AddPeer(ctx, pInfo2))
 
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
 	// sn1 & sn2 will subscribe with unauthenticated callback to allow it to send and receive unauthenticated messages
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
 	require.NoError(t, err)
-	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
 	require.NoError(t, err)
 
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(sn1.ListPeers(topic.String())) > 0 &&
-			len(sn2.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	// let nodes form the mesh
+	time.Sleep(time.Second)
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
@@ -167,14 +174,13 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create a hooked logger
-	var hook unittest.LoggerHook
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := nodeFixture(t, sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
-	sn2, identity2 := nodeFixture(t, sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
-	an1, identity3 := nodeFixture(t, sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleAccess))
+	sn1, identity1 := nodeFixture(t, sporkId, t.Name(), withRole(flow.RoleConsensus))
+	sn2, identity2 := nodeFixture(t, sporkId, t.Name(), withRole(flow.RoleConsensus))
+	an1, identity3 := nodeFixture(t, sporkId, t.Name(), withRole(flow.RoleAccess))
 
 	nodes := []*p2p.Node{sn1, sn2, an1}
 	startNodes(t, signalCtx, nodes, 100*time.Millisecond)
@@ -188,34 +194,40 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}
 
 		return ids.ByNodeID(fid)
-	})
+	}
+	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
+	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
+
+	pInfo1, err := p2p.PeerAddressInfo(identity1)
+	require.NoError(t, err)
+
+	pInfo2, err := p2p.PeerAddressInfo(identity2)
+	require.NoError(t, err)
 
 	// node1 is connected to node2, and the an1 is connected to node1
 	// an1 <-> sn1 <-> sn2
-	require.NoError(t, sn1.AddPeer(ctx, *host.InfoFromHost(sn2.Host())))
-	require.NoError(t, an1.AddPeer(ctx, *host.InfoFromHost(sn1.Host())))
+	require.NoError(t, sn1.AddPeer(ctx, pInfo2))
+	require.NoError(t, an1.AddPeer(ctx, pInfo1))
 
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
 	// sn1 and sn2 subscribe to the topic with the topic validator
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer, pubsubMessageValidator)
 	require.NoError(t, err)
-	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer, pubsubMessageValidator)
 	require.NoError(t, err)
-	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
 	require.NoError(t, err)
 
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(sn1.ListPeers(topic.String())) > 0 &&
-			len(sn2.ListPeers(topic.String())) > 0 &&
-			len(an1.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	// let nodes form the mesh
+	time.Sleep(time.Second)
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel5s()
@@ -276,7 +288,6 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create a hooked logger
-	var hook unittest.LoggerHook
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
@@ -296,29 +307,34 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}
+
 		return ids.ByNodeID(fid)
-	})
+	}
+	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
+	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
+
+	pInfo2, err := p2p.PeerAddressInfo(identity2)
+	require.NoError(t, err)
 
 	// node1 is connected to node2
 	// sn1 <-> sn2
-	require.NoError(t, sn1.AddPeer(ctx, *host.InfoFromHost(sn2.Host())))
+	require.NoError(t, sn1.AddPeer(ctx, pInfo2))
 
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer, pubsubMessageValidator)
 	require.NoError(t, err)
-	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
 	require.NoError(t, err)
 
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(sn1.ListPeers(topic.String())) > 0 &&
-			len(sn2.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	// let nodes form the mesh
+	time.Sleep(time.Second)
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
@@ -351,7 +367,6 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create a hooked logger
-	var hook unittest.LoggerHook
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
@@ -371,33 +386,40 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}
+
 		return ids.ByNodeID(fid)
-	})
+	}
+	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
+	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
+
+	pInfo1, err := p2p.PeerAddressInfo(identity1)
+	require.NoError(t, err)
+
+	pInfo2, err := p2p.PeerAddressInfo(identity2)
+	require.NoError(t, err)
 
 	// node1 is connected to node2, and the an1 is connected to node1
 	// an1 <-> sn1 <-> sn2
-	require.NoError(t, sn1.AddPeer(ctx, *host.InfoFromHost(sn2.Host())))
-	require.NoError(t, an1.AddPeer(ctx, *host.InfoFromHost(sn1.Host())))
+	require.NoError(t, sn1.AddPeer(ctx, pInfo2))
+	require.NoError(t, an1.AddPeer(ctx, pInfo1))
 
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer, pubsubMessageValidator)
 	require.NoError(t, err)
-	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
 	require.NoError(t, err)
-	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
 	require.NoError(t, err)
 
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(sn1.ListPeers(topic.String())) > 0 &&
-			len(sn2.ListPeers(topic.String())) > 0 &&
-			len(an1.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	// let nodes form the mesh
+	time.Sleep(time.Second)
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
@@ -464,31 +486,39 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(unittest.Logger(), channel, func(pid peer.ID) (*flow.Identity, bool) {
+	logger := unittest.Logger()
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}
+
 		return ids.ByNodeID(fid)
-	})
+	}
+	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
+	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
+
+	pInfo1, err := p2p.PeerAddressInfo(identity1)
+	require.NoError(t, err)
+
+	pInfo2, err := p2p.PeerAddressInfo(identity2)
+	require.NoError(t, err)
 
 	// ln3 <-> sn1 <-> sn2
-	require.NoError(t, ln1.AddPeer(ctx, *host.InfoFromHost(ln2.Host())))
-	require.NoError(t, ln3.AddPeer(ctx, *host.InfoFromHost(ln1.Host())))
+	require.NoError(t, ln1.AddPeer(ctx, pInfo2))
+	require.NoError(t, ln3.AddPeer(ctx, pInfo1))
 
-	sub1, err := ln1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	sub1, err := ln1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer, pubsubMessageValidator)
 	require.NoError(t, err)
-	sub2, err := ln2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub2, err := ln2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer, pubsubMessageValidator)
 	require.NoError(t, err)
-	sub3, err := ln3.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub3, err := ln3.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer, pubsubMessageValidator)
 	require.NoError(t, err)
 
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(ln1.ListPeers(topic.String())) > 0 &&
-			len(ln2.ListPeers(topic.String())) > 0 &&
-			len(ln3.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	// let nodes form the mesh
+	time.Sleep(time.Second)
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()

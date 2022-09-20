@@ -10,9 +10,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
 )
@@ -94,8 +94,8 @@ func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identif
 
 // process processes events for the synchronization request handler engine.
 // Error returns:
-//  * IncompatibleInputTypeError if input has unexpected type
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+//   - IncompatibleInputTypeError if input has unexpected type
+//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (r *RequestHandler) process(originID flow.Identifier, event interface{}) error {
 	return r.requestMessageHandler.Process(originID, event)
 }
@@ -195,10 +195,10 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	// enforce client-side max request size
 	var maxSize uint
 	// TODO: clean up this logic
-	if core, ok := r.core.(*synchronization.Core); ok {
+	if core, ok := r.core.(*chainsync.Core); ok {
 		maxSize = core.Config.MaxSize
 	} else {
-		maxSize = synchronization.DefaultConfig().MaxSize
+		maxSize = chainsync.DefaultConfig().MaxSize
 	}
 	maxHeight := req.FromHeight + uint64(maxSize)
 	if maxHeight < req.ToHeight {
@@ -257,10 +257,10 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 
 	// TODO: clean up this logic
 	var maxSize uint
-	if core, ok := r.core.(*synchronization.Core); ok {
+	if core, ok := r.core.(*chainsync.Core); ok {
 		maxSize = core.Config.MaxSize
 	} else {
-		maxSize = synchronization.DefaultConfig().MaxSize
+		maxSize = chainsync.DefaultConfig().MaxSize
 	}
 
 	if len(req.BlockIDs) > int(maxSize) {

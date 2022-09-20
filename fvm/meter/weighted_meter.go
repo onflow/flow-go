@@ -1,9 +1,12 @@
 package meter
 
 import (
+	"math"
+
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // MeterExecutionInternalPrecisionBytes are the amount of bytes that are used internally by the WeigthedMeter
@@ -246,71 +249,125 @@ func _() {
 	_ = x[int(common.MemoryKindLast)-len(DefaultMemoryWeights)-1]
 }
 
+type MeterParameters struct {
+	computationLimit   uint64
+	computationWeights ExecutionEffortWeights
+
+	memoryLimit   uint64
+	memoryWeights ExecutionMemoryWeights
+
+	storageInteractionLimit uint64
+}
+
+func DefaultParameters() MeterParameters {
+	// This is needed to work around golang's compiler bug
+	umax := uint(math.MaxUint)
+	return MeterParameters{
+		computationLimit:        uint64(umax) << MeterExecutionInternalPrecisionBytes,
+		memoryLimit:             math.MaxUint64,
+		computationWeights:      DefaultComputationWeights,
+		memoryWeights:           DefaultMemoryWeights,
+		storageInteractionLimit: math.MaxUint64,
+	}
+}
+
+func (params MeterParameters) WithComputationLimit(limit uint) MeterParameters {
+	newParams := params
+	newParams.computationLimit = uint64(limit) << MeterExecutionInternalPrecisionBytes
+	return newParams
+}
+
+func (params MeterParameters) WithComputationWeights(
+	weights ExecutionEffortWeights,
+) MeterParameters {
+	newParams := params
+	newParams.computationWeights = weights
+	return newParams
+}
+
+func (params MeterParameters) WithMemoryLimit(limit uint64) MeterParameters {
+	newParams := params
+	newParams.memoryLimit = limit
+	return newParams
+}
+
+func (params MeterParameters) WithMemoryWeights(
+	weights ExecutionMemoryWeights,
+) MeterParameters {
+	newParams := params
+	newParams.memoryWeights = weights
+	return newParams
+}
+
+func (params MeterParameters) WithStorageInteractionLimit(
+	maxStorageInteractionLimit uint64,
+) MeterParameters {
+	newParams := params
+	newParams.storageInteractionLimit = maxStorageInteractionLimit
+	return newParams
+}
+
+func (params MeterParameters) ComputationWeights() ExecutionEffortWeights {
+	return params.computationWeights
+}
+
+// TotalComputationLimit returns the total computation limit
+func (params MeterParameters) TotalComputationLimit() uint {
+	return uint(params.computationLimit >> MeterExecutionInternalPrecisionBytes)
+}
+
+func (params MeterParameters) MemoryWeights() ExecutionMemoryWeights {
+	return params.memoryWeights
+}
+
+// TotalMemoryLimit returns the total memory limit
+func (params MeterParameters) TotalMemoryLimit() uint64 {
+	return params.memoryLimit
+}
+
 // WeightedMeter collects memory and computation usage and enforces limits
 // for any each memory/computation usage call it sums intensity multiplied by the weight of the intensity to the total
 // memory/computation usage metrics and returns error if limits are not met.
 type WeightedMeter struct {
-	computationUsed  uint64
-	computationLimit uint64
-	memoryEstimate   uint64
-	memoryLimit      uint64
+	MeterParameters
+
+	computationUsed uint64
+	memoryEstimate  uint64
 
 	computationIntensities MeteredComputationIntensities
 	memoryIntensities      MeteredMemoryIntensities
 
-	computationWeights ExecutionEffortWeights
-	memoryWeights      ExecutionMemoryWeights
+	storageUpdateSizeMap     map[StorageInteractionKey]uint64
+	totalStorageBytesRead    uint64
+	totalStorageBytesWritten uint64
 }
 
 type WeightedMeterOptions func(*WeightedMeter)
 
 // NewMeter constructs a new Meter
-func NewMeter(computationLimit, memoryLimit uint, options ...WeightedMeterOptions) Meter {
-
+func NewMeter(params MeterParameters) Meter {
 	m := &WeightedMeter{
-		computationLimit:       uint64(computationLimit) << MeterExecutionInternalPrecisionBytes,
-		memoryLimit:            uint64(memoryLimit),
-		computationWeights:     DefaultComputationWeights,
-		memoryWeights:          DefaultMemoryWeights,
+		MeterParameters:        params,
 		computationIntensities: make(MeteredComputationIntensities),
 		memoryIntensities:      make(MeteredMemoryIntensities),
-	}
-
-	for _, option := range options {
-		option(m)
+		storageUpdateSizeMap:   make(MeteredStorageInteractionMap),
 	}
 
 	return m
 }
 
-// WithComputationWeights sets the weights for computation intensities
-func WithComputationWeights(weights ExecutionEffortWeights) WeightedMeterOptions {
-	return func(m *WeightedMeter) {
-		m.computationWeights = weights
-	}
-}
-
-// WithMemoryWeights sets the weights for the memory intensities
-func WithMemoryWeights(weights ExecutionMemoryWeights) WeightedMeterOptions {
-	return func(m *WeightedMeter) {
-		m.memoryWeights = weights
-	}
-}
-
 // NewChild construct a new Meter instance with the same limits as parent
 func (m *WeightedMeter) NewChild() Meter {
 	return &WeightedMeter{
-		computationLimit:       m.computationLimit,
-		memoryLimit:            m.memoryLimit,
-		computationWeights:     m.computationWeights,
-		memoryWeights:          m.memoryWeights,
+		MeterParameters:        m.MeterParameters,
 		computationIntensities: make(MeteredComputationIntensities),
 		memoryIntensities:      make(MeteredMemoryIntensities),
+		storageUpdateSizeMap:   make(MeteredStorageInteractionMap),
 	}
 }
 
 // MergeMeter merges the input meter into the current meter and checks for the limits
-func (m *WeightedMeter) MergeMeter(child Meter, enforceLimits bool) error {
+func (m *WeightedMeter) MergeMeter(child Meter) {
 
 	var childComputationUsed uint64
 	if basic, ok := child.(*WeightedMeter); ok {
@@ -319,34 +376,23 @@ func (m *WeightedMeter) MergeMeter(child Meter, enforceLimits bool) error {
 		childComputationUsed = uint64(child.TotalComputationUsed()) << MeterExecutionInternalPrecisionBytes
 	}
 	m.computationUsed = m.computationUsed + childComputationUsed
-	if enforceLimits && m.computationUsed > m.computationLimit {
-		return errors.NewComputationLimitExceededError(uint64(m.TotalComputationLimit()))
-	}
 
 	for key, intensity := range child.ComputationIntensities() {
 		m.computationIntensities[key] += intensity
 	}
 
-	var childMemoryEstimate uint64
-	if basic, ok := child.(*WeightedMeter); ok {
-		childMemoryEstimate = basic.memoryEstimate
-	} else {
-		childMemoryEstimate = uint64(child.TotalMemoryEstimate())
-	}
-	m.memoryEstimate = m.memoryEstimate + childMemoryEstimate
-	if enforceLimits && m.memoryEstimate > m.memoryLimit {
-		return errors.NewMemoryLimitExceededError(uint64(m.TotalMemoryLimit()))
-	}
+	m.memoryEstimate = m.memoryEstimate + child.TotalMemoryEstimate()
 
 	for key, intensity := range child.MemoryIntensities() {
 		m.memoryIntensities[key] += intensity
 	}
-	return nil
-}
 
-// SetComputationWeights sets the computation weights
-func (m *WeightedMeter) SetComputationWeights(weights ExecutionEffortWeights) {
-	m.computationWeights = weights
+	// merge storage meters
+	for key, value := range child.StorageUpdateSizeMap() {
+		m.storageUpdateSizeMap[key] = value
+	}
+	m.totalStorageBytesRead += child.TotalBytesReadFromStorage()
+	m.totalStorageBytesWritten += child.TotalBytesWrittenToStorage()
 }
 
 // MeterComputation captures computation usage and returns an error if it goes beyond the limit
@@ -373,16 +419,6 @@ func (m *WeightedMeter) TotalComputationUsed() uint {
 	return uint(m.computationUsed >> MeterExecutionInternalPrecisionBytes)
 }
 
-// TotalComputationLimit returns the total computation limit
-func (m *WeightedMeter) TotalComputationLimit() uint {
-	return uint(m.computationLimit >> MeterExecutionInternalPrecisionBytes)
-}
-
-// SetMemoryWeights sets the memory weights
-func (m *WeightedMeter) SetMemoryWeights(weights ExecutionMemoryWeights) {
-	m.memoryWeights = weights
-}
-
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit
 func (m *WeightedMeter) MeterMemory(kind common.MemoryKind, intensity uint) error {
 	m.memoryIntensities[kind] += intensity
@@ -403,16 +439,81 @@ func (m *WeightedMeter) MemoryIntensities() MeteredMemoryIntensities {
 }
 
 // TotalMemoryEstimate returns the total memory used
-func (m *WeightedMeter) TotalMemoryEstimate() uint {
-	return uint(m.memoryEstimate)
+func (m *WeightedMeter) TotalMemoryEstimate() uint64 {
+	return m.memoryEstimate
 }
 
-// TotalMemoryLimit returns the total memory limit
-func (m *WeightedMeter) TotalMemoryLimit() uint {
-	return uint(m.memoryLimit)
+// MeterStorageRead captures storage read bytes count and returns an error
+// if it goes beyond the total interaction limit and limit is enforced
+func (m *WeightedMeter) MeterStorageRead(
+	storageKey StorageInteractionKey,
+	value flow.RegisterValue,
+	enforceLimit bool) error {
+
+	// all reads are on a View which only read from storage at the first read of a given key
+	if _, ok := m.storageUpdateSizeMap[storageKey]; !ok {
+		readByteSize := getStorageKeyValueSize(storageKey, value)
+		m.totalStorageBytesRead += readByteSize
+		m.storageUpdateSizeMap[storageKey] = readByteSize
+	}
+
+	return m.checkStorageInteractionLimit(enforceLimit)
 }
 
-// SetTotalMemoryLimit sets the total memory limit
-func (m *WeightedMeter) SetTotalMemoryLimit(limit uint64) {
-	m.memoryLimit = limit
+// MeterStorageRead captures storage written bytes count and returns an error
+// if it goes beyond the total interaction limit and limit is enforced
+func (m *WeightedMeter) MeterStorageWrite(
+	storageKey StorageInteractionKey,
+	value flow.RegisterValue,
+	enforceLimit bool) error {
+	// all writes are on a View which only writes the latest updated value to storage at commit
+	if old, ok := m.storageUpdateSizeMap[storageKey]; ok {
+		m.totalStorageBytesWritten -= old
+	}
+
+	updateSize := getStorageKeyValueSize(storageKey, value)
+	m.totalStorageBytesWritten += updateSize
+	m.storageUpdateSizeMap[storageKey] = updateSize
+
+	return m.checkStorageInteractionLimit(enforceLimit)
+}
+
+func (m *WeightedMeter) checkStorageInteractionLimit(enforceLimit bool) error {
+	if enforceLimit &&
+		m.TotalBytesOfStorageInteractions() > m.storageInteractionLimit {
+		return errors.NewLedgerInteractionLimitExceededError(
+			m.TotalBytesOfStorageInteractions(), m.storageInteractionLimit)
+	}
+	return nil
+}
+
+// TotalBytesReadFromStorage returns total number of byte read from storage
+func (m *WeightedMeter) TotalBytesReadFromStorage() uint64 {
+	return m.totalStorageBytesRead
+}
+
+// TotalBytesReadFromStorage returns total number of byte written to storage
+func (m *WeightedMeter) TotalBytesWrittenToStorage() uint64 {
+	return m.totalStorageBytesWritten
+}
+
+// TotalBytesOfStorageInteractions returns total number of byte read and written from/to storage
+func (m *WeightedMeter) TotalBytesOfStorageInteractions() uint64 {
+	return m.TotalBytesReadFromStorage() + m.TotalBytesWrittenToStorage()
+}
+
+// StorageUpdateSizeMap returns all the measured storage meters
+func (m *WeightedMeter) StorageUpdateSizeMap() MeteredStorageInteractionMap {
+	return m.storageUpdateSizeMap
+}
+
+func getStorageKeyValueSize(storageKey StorageInteractionKey,
+	value flow.RegisterValue) uint64 {
+	return uint64(len(storageKey.Owner) + len(storageKey.Key) + len(value))
+}
+
+func GetStorageKeyValueSizeForTesting(
+	storageKey StorageInteractionKey,
+	value flow.RegisterValue) uint64 {
+	return getStorageKeyValueSize(storageKey, value)
 }

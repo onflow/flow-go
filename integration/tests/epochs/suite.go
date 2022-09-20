@@ -41,12 +41,11 @@ type Suite struct {
 	suite.Suite
 	log zerolog.Logger
 	lib.TestnetStateTracker
-	ctx         context.Context
-	cancel      context.CancelFunc
-	net         *testnet.FlowNetwork
-	nodeConfigs []testnet.NodeConfig
-	ghostID     flow.Identifier
-	client      *testnet.Client
+	ctx     context.Context
+	cancel  context.CancelFunc
+	net     *testnet.FlowNetwork
+	ghostID flow.Identifier
+	client  *testnet.Client
 
 	// Epoch config (lengths in views)
 	StakingAuctionLen uint64
@@ -60,11 +59,7 @@ func (s *Suite) SetupTest() {
 	require.Greater(s.T(), s.EpochLen, s.StakingAuctionLen+s.DKGPhaseLen*3)
 
 	s.ctx, s.cancel = context.WithCancel(context.Background())
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", s.T().Name()).
-		Logger()
-	s.log = logger
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	defer func() {
 		s.log.Info().Msg("================> Finish SetupTest")
@@ -344,6 +339,7 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 		s.client.SDKServiceAddress(),
 		sdk.Identifier(latestBlockID),
 	)
+	require.NoError(s.T(), err)
 
 	err = s.client.SignAndSendTransaction(ctx, createStakingCollectionTx)
 	require.NoError(s.T(), err)
@@ -641,20 +637,6 @@ func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64) 
 	actualCounter, err := snapshot.Epochs().Current().Counter()
 	require.NoError(s.T(), err)
 	require.Equalf(s.T(), expectedCounter, actualCounter, "expected to be in epoch %d got %d", expectedCounter, actualCounter)
-}
-
-// assertQCVotingSuccessful asserts that the QC has completed successfully
-func (s *Suite) assertQCVotingSuccessful(ctx context.Context, env templates.Environment) {
-	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetVotingCompletedScript(env), []cadence.Value{})
-	require.NoError(s.T(), err)
-	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected qc voting to have completed successfully")
-}
-
-// assertDKGSuccessful asserts that the DKG has completed successfully
-func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environment) {
-	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetDKGCompletedScript(env), []cadence.Value{})
-	require.NoError(s.T(), err)
-	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected dkg to have completed successfully")
 }
 
 // assertLatestFinalizedBlockHeightHigher will assert that the difference between snapshot height and latest finalized height

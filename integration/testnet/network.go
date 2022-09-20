@@ -3,8 +3,9 @@ package testnet
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -561,8 +562,6 @@ func AsGhost() func(config *NodeConfig) {
 			panic("a node cannot be both corrupted and ghost at the same time")
 		}
 		config.Ghost = true
-		// using the fully-connected topology to ensure a ghost node is always connected to all other nodes in the network,
-		config.AdditionalFlags = append(config.AdditionalFlags, "--topology=fully-connected")
 	}
 }
 
@@ -581,7 +580,7 @@ func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 
 // integrationBootstrapDir creates a temporary directory at /tmp/flow-integration-bootstrap
 func integrationBootstrapDir() (string, error) {
-	return ioutil.TempDir(TmpRoot, integrationBootstrap)
+	return os.MkdirTemp(TmpRoot, integrationBootstrap)
 }
 
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.ChainID) *FlowNetwork {
@@ -702,7 +701,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 }
 
 func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
-	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-consensus-follower")
+	tmpdir, err := os.MkdirTemp(TmpRoot, "flow-consensus-follower")
 	require.NoError(t, err)
 
 	// create a directory for the follower database
@@ -757,6 +756,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	// it should be able to figure out the rest on its own.
 	follower, err := consensus_follower.NewConsensusFollower(followerConf.NetworkingPrivKey, bindAddr,
 		[]consensus_follower.BootstrapNodeInfo{bootstrapNodeInfo}, opts...)
+	require.NoError(t, err)
 
 	net.ConsensusFollowers[followerConf.NodeID] = follower
 }
@@ -806,14 +806,14 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 
 		// write to file
 		outputFile := fmt.Sprintf("%s/private-root-information/%s_key", net.BootstrapDir, conf.ObserverName)
-		err = ioutil.WriteFile(outputFile, output, 0600)
+		err = os.WriteFile(outputFile, output, 0600)
 		if err != nil {
 			panic(err)
 		}
 	}()
 
 	// Setup directories
-	tmpdir, _ := ioutil.TempDir(TmpRoot, "flow-integration-node")
+	tmpdir, _ := os.MkdirTemp(TmpRoot, "flow-integration-node")
 	flowDataDir := filepath.Join(tmpdir, DefaultFlowDataDir)
 	nodeBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
 	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
@@ -837,7 +837,7 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 				fmt.Sprintf("--upstream-node-addresses=%s:%s", conf.AccessName, conf.AccessGRPCSecurePort),
 				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
 				fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", conf.ObserverName),
-				fmt.Sprintf("--bind=0.0.0.0:0"),
+				"--bind=0.0.0.0:0",
 				fmt.Sprintf("--rpc-addr=%s:%s", conf.ObserverName, "9000"),
 				fmt.Sprintf("--secure-rpc-addr=%s:%s", conf.ObserverName, "9001"),
 				fmt.Sprintf("--http-addr=%s:%s", conf.ObserverName, "8000"),
@@ -891,7 +891,7 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	containerID := container.ID
 	return func() {
 		// shutdown func
-		net.cli.ContainerStop(ctx, containerID, nil)
+		_ = net.cli.ContainerStop(ctx, containerID, nil)
 	}, nil
 }
 
@@ -922,7 +922,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	// get a temporary directory in the host. On macOS the default tmp
 	// directory is NOT accessible to Docker by default, so we use /tmp
 	// instead.
-	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-integration-node")
+	tmpdir, err := os.MkdirTemp(TmpRoot, "flow-integration-node")
 	if err != nil {
 		return fmt.Errorf("could not get tmp dir: %w", err)
 	}
@@ -946,7 +946,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
 	t.Logf("create profiler dir: %v", flowProfilerDir)
 	err = os.MkdirAll(flowProfilerDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -1025,7 +1025,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			// create directories for execution state trie and values in the tmp
 			// host directory.
-			tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
+			tmpLedgerDir, err := os.MkdirTemp(tmpdir, "flow-integration-trie")
 			require.NoError(t, err)
 
 			opts.HostConfig.Binds = append(
@@ -1035,12 +1035,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
 
-			tmpExeDataDir, err := ioutil.TempDir(tmpdir, "execution-data")
+			exeDataDir := filepath.Join(tmpdir, "execution-data")
+			err = os.Mkdir(exeDataDir, 0700)
 			require.NoError(t, err)
 
 			opts.HostConfig.Binds = append(
 				opts.HostConfig.Binds,
-				fmt.Sprintf("%s:%s:rw", tmpExeDataDir, DefaultExecutionDataServiceDir),
+				fmt.Sprintf("%s:%s:rw", exeDataDir, DefaultExecutionDataServiceDir),
 			)
 
 			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
@@ -1134,7 +1135,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 	if nodeConf.Corrupted {
 		// corrupted nodes are running with a Corrupted Conduit Factory (CCF), hence need to bind their
-		// CCF port to local host so they can be accessible by the attack network.
+		// CCF port to local host, so they can be accessible by the orchestrator network.
 		hostPort := testingdock.RandomPort(t)
 		nodeContainer.bindPort(hostPort, strconv.Itoa(cmd.CorruptibleConduitFactoryPort))
 		net.CorruptedPortMapping[nodeConf.NodeID] = hostPort
@@ -1501,8 +1502,8 @@ func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 }
 
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
-//   * a cluster-specific root block
-//   * a cluster-specific root QC
+//   - a cluster-specific root block
+//   - a cluster-specific root QC
 func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) ([]*cluster.Block, flow.AssignmentList, []*flow.QuorumCertificate, error) {
 
 	participantsUnsorted := toParticipants(confs)
@@ -1552,76 +1553,4 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 	}
 
 	return rootBlocks, assignments, qcs, nil
-}
-
-// writePrivateKeyFiles writes the staking and machine account private key files.
-func writePrivateKeyFiles(bootstrapDir string, chainID flow.ChainID, nodeInfos []bootstrap.NodeInfo) error {
-
-	// write private key files for each node (staking key, random beacon key, machine account key)
-	//
-	// for the machine account key, we keep track of the address index to map
-	// the Flow address of the machine account to the key.
-	addressIndex := uint64(4)
-	for _, nodeInfo := range nodeInfos {
-		fmt.Println("writing private files for ", nodeInfo.NodeID)
-		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, nodeInfo.NodeID))
-
-		// retrieve private representation of the node
-		private, err := nodeInfo.Private()
-		if err != nil {
-			return err
-		}
-
-		err = WriteJSON(path, private)
-		if err != nil {
-			return err
-		}
-
-		// We use the network key for the machine account. Normally it would be
-		// a separate key.
-
-		// Accounts are generated in a known order during bootstrapping, and
-		// account addresses are deterministic based on order for a given chain
-		// configuration. During the bootstrapping we create 4 Flow accounts besides
-		// the service account (index 0) so node accounts will start at index 5.
-		//
-		// All nodes have a staking account created for them, only collection and
-		// consensus nodes have a second machine account created.
-		//
-		// The accounts are created in the same order defined by the identity list
-		// provided to BootstrapProcedure, which is the same order as this iteration.
-		if nodeInfo.Role == flow.RoleCollection || nodeInfo.Role == flow.RoleConsensus {
-			// increment the address index to account for both the staking account
-			// and the machine account.
-			// now addressIndex points to the machine account address index
-			addressIndex += 2
-		} else {
-			// increment the address index to account for the staking account
-			// we don't need to persist anything related to the staking account
-			addressIndex += 1
-			continue
-		}
-
-		accountAddress, err := chainID.Chain().AddressAtIndex(addressIndex)
-		if err != nil {
-			return err
-		}
-
-		info := bootstrap.NodeMachineAccountInfo{
-			Address:           accountAddress.HexWithPrefix(),
-			EncodedPrivateKey: private.NetworkPrivKey.Encode(),
-			KeyIndex:          0,
-			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
-			HashAlgorithm:     crypto.SHA3_256,
-		}
-
-		infoPath := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeInfo.NodeID))
-
-		err = WriteJSON(infoPath, info)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

@@ -7,20 +7,27 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-bitswap"
 	bsnet "github.com/ipfs/go-bitswap/network"
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	provider "github.com/ipfs/go-ipfs-provider"
 	"github.com/ipfs/go-ipfs-provider/simple"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/rs/zerolog"
+	"golang.org/x/time/rate"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+
+	ipld "github.com/ipfs/go-ipld-format"
 )
 
 type blobService struct {
@@ -62,12 +69,25 @@ func WithHashOnRead(enabled bool) network.BlobServiceOption {
 	}
 }
 
+// WithRateLimit sets a rate limit on reads from the underlying datastore that allows up
+// to r bytes per second and permits bursts of at most b bytes. Note that b should be
+// set to at least the max blob size, otherwise blobs larger than b cannot be read from
+// the blobstore.
+func WithRateLimit(r float64, b int) network.BlobServiceOption {
+	return func(bs network.BlobService) {
+		blobService := bs.(*blobService)
+		blobService.blockStore = newRateLimitedBlockStore(blobService.blockStore, r, b)
+	}
+}
+
 // NewBlobService creates a new BlobService.
 func NewBlobService(
 	host host.Host,
 	r routing.ContentRouting,
 	prefix string,
 	ds datastore.Batching,
+	metrics module.BitswapMetrics,
+	logger zerolog.Logger,
 	opts ...network.BlobServiceOption,
 ) *blobService {
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
@@ -84,9 +104,34 @@ func NewBlobService(
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			bs.blockService = blockservice.New(bs.blockStore, bitswap.New(ctx, bsNetwork, bs.blockStore, bs.config.BitswapOptions...))
+			btswp := bitswap.New(ctx, bsNetwork, bs.blockStore, bs.config.BitswapOptions...)
+			bs.blockService = blockservice.New(bs.blockStore, btswp)
 
 			ready()
+
+			ticker := time.NewTicker(15 * time.Second)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					stat, err := btswp.Stat()
+					if err != nil {
+						logger.Err(err).Str("component", "blob_service").Str("prefix", prefix).Msg("failed to get bitswap stats")
+						continue
+					}
+
+					metrics.Peers(prefix, len(stat.Peers))
+					metrics.Wantlist(prefix, len(stat.Wantlist))
+					metrics.BlobsReceived(prefix, stat.BlocksReceived)
+					metrics.DataReceived(prefix, stat.DataReceived)
+					metrics.BlobsSent(prefix, stat.BlocksSent)
+					metrics.DataSent(prefix, stat.DataSent)
+					metrics.DupBlobsReceived(prefix, stat.DupBlksReceived)
+					metrics.DupDataReceived(prefix, stat.DupDataReceived)
+					metrics.MessagesReceived(prefix, stat.MessagesReceived)
+				}
+			}
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			bs.reprovider = simple.NewReprovider(ctx, bs.config.ReprovideInterval, r, simple.NewBlockstoreProvider(bs.blockStore))
@@ -122,7 +167,12 @@ func (bs *blobService) TriggerReprovide(ctx context.Context) error {
 }
 
 func (bs *blobService) GetBlob(ctx context.Context, c cid.Cid) (blobs.Blob, error) {
-	return bs.blockService.GetBlock(ctx, c)
+	blob, err := bs.blockService.GetBlock(ctx, c)
+	if ipld.IsNotFound(err) {
+		return nil, network.ErrBlobNotFound
+	}
+
+	return blob, err
 }
 
 func (bs *blobService) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan blobs.Blob {
@@ -157,4 +207,34 @@ func (s *blobServiceSession) GetBlob(ctx context.Context, c cid.Cid) (blobs.Blob
 
 func (s *blobServiceSession) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan blobs.Blob {
 	return s.session.GetBlocks(ctx, ks)
+}
+
+type rateLimitedBlockStore struct {
+	blockstore.Blockstore
+	limiter *rate.Limiter
+	metrics module.RateLimitedBlockstoreMetrics
+}
+
+func newRateLimitedBlockStore(bs blockstore.Blockstore, r float64, b int) *rateLimitedBlockStore {
+	return &rateLimitedBlockStore{
+		Blockstore: bs,
+		limiter:    rate.NewLimiter(rate.Limit(r), b),
+		metrics:    metrics.NewRateLimitedBlockstoreCollector(),
+	}
+}
+
+func (r *rateLimitedBlockStore) Get(ctx context.Context, c cid.Cid) (blocks.Block, error) {
+	size, err := r.Blockstore.GetSize(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.limiter.WaitN(ctx, size)
+	if err != nil {
+		return nil, err
+	}
+
+	r.metrics.BytesRead(size)
+
+	return r.Blockstore.Get(ctx, c)
 }

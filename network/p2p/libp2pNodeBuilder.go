@@ -6,17 +6,17 @@ import (
 	"fmt"
 	"net"
 
-	libp2p "github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/routing"
-	"github.com/libp2p/go-libp2p-core/transport"
-	discovery "github.com/libp2p/go-libp2p-discovery"
+	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/config"
-	"github.com/libp2p/go-tcp-transport"
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/libp2p/go-libp2p/core/transport"
+	discoveryRouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
@@ -52,11 +52,13 @@ func DefaultLibP2PNodeFactory(
 
 	return func() (*Node, error) {
 		connManager := NewConnManager(log, metrics)
-		connGater := NewConnGater(log, func(pid peer.ID) bool {
-			_, found := idProvider.ByPeerID(pid)
 
-			return found
-		})
+		// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
+		peerFilter := notEjectedPeerFilter(idProvider)
+		connGater := NewConnGater(log,
+			WithOnInterceptPeerDialFilters([]PeerFilter{peerFilter}),
+			WithOnInterceptSecuredFilters([]PeerFilter{peerFilter}),
+		)
 
 		builder := NewNodeBuilder(log, address, flowKey, sporkId).
 			SetBasicResolver(resolver).
@@ -94,6 +96,7 @@ func DefaultMessageIDFunction(msg *pb.Message) string {
 type NodeBuilder interface {
 	SetBasicResolver(madns.BasicResolver) NodeBuilder
 	SetSubscriptionFilter(pubsub.SubscriptionFilter) NodeBuilder
+	SetResourceManager(network.ResourceManager) NodeBuilder
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
@@ -109,6 +112,7 @@ type LibP2PNodeBuilder struct {
 	logger             zerolog.Logger
 	basicResolver      madns.BasicResolver
 	subscriptionFilter pubsub.SubscriptionFilter
+	resourceManager    network.ResourceManager
 	connManager        connmgr.ConnManager
 	connGater          connmgr.ConnectionGater
 	routingFactory     func(context.Context, host.Host) (routing.Routing, error)
@@ -139,6 +143,12 @@ func (builder *LibP2PNodeBuilder) SetBasicResolver(br madns.BasicResolver) NodeB
 // SetSubscriptionFilter sets the pubsub subscription filter for the node.
 func (builder *LibP2PNodeBuilder) SetSubscriptionFilter(filter pubsub.SubscriptionFilter) NodeBuilder {
 	builder.subscriptionFilter = filter
+	return builder
+}
+
+// SetResourceManager sets the resource manager for the node.
+func (builder *LibP2PNodeBuilder) SetResourceManager(manager network.ResourceManager) NodeBuilder {
+	builder.resourceManager = manager
 	return builder
 }
 
@@ -194,6 +204,10 @@ func (builder *LibP2PNodeBuilder) Build() (*Node, error) {
 		opts = append(opts, libp2p.MultiaddrResolver(resolver))
 	}
 
+	if builder.resourceManager != nil {
+		opts = append(opts, libp2p.ResourceManager(builder.resourceManager))
+	}
+
 	if builder.connManager != nil {
 		opts = append(opts, libp2p.ConnectionManager(builder.connManager))
 	}
@@ -239,7 +253,7 @@ func (builder *LibP2PNodeBuilder) Build() (*Node, error) {
 
 			psOpts := append(
 				DefaultPubsubOptions(DefaultMaxPubSubMsgSize),
-				pubsub.WithDiscovery(discovery.NewRoutingDiscovery(node.routing)),
+				pubsub.WithDiscovery(discoveryRouting.NewRoutingDiscovery(node.routing)),
 				pubsub.WithMessageIdFn(DefaultMessageIDFunction),
 			)
 

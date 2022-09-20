@@ -6,6 +6,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -31,13 +32,12 @@ func NewTransactionVerifier(keyWeightThreshold int) *TransactionVerifier {
 }
 
 func (v *TransactionVerifier) Process(
-	_ *VirtualMachine,
-	ctx *Context,
+	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	_ *programs.Programs,
 ) error {
-	return v.verifyTransaction(proc, *ctx, sth)
+	return v.verifyTransaction(proc, ctx, sth)
 }
 
 func newInvalidEnvelopeSignatureError(txSig flow.TransactionSignature, err error) error {
@@ -62,7 +62,7 @@ func (v *TransactionVerifier) verifyTransaction(
 	}
 
 	tx := proc.Transaction
-	accounts := state.NewAccounts(sth)
+	accounts := environment.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
 		err := errors.NewInvalidAddressErrorf(tx.Payer, "payer address is invalid")
 		return fmt.Errorf("transaction verification failed: %w", err)
@@ -77,7 +77,16 @@ func (v *TransactionVerifier) verifyTransaction(
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
 
-	err = v.checkAccountsAreNotFrozen(tx, accounts)
+	// TODO(Janez): move disabling limits out of the verifier. Verifier should not be metered anyway.
+	// TODO(Janez): verification is part of inclusion fees, not execution fees.
+
+	// check accounts uses the state, but if the limits are too low, this might fail.
+	// we shouldn't fail here if the limits are too low as fee deduction won't happen
+	sth.RunWithAllLimitsDisabled(
+		func() {
+			err = v.checkAccountsAreNotFrozen(tx, accounts)
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
@@ -87,6 +96,7 @@ func (v *TransactionVerifier) verifyTransaction(
 	}
 
 	payloadWeights, proposalKeyVerifiedInPayload, err = v.verifyAccountSignatures(
+		sth,
 		accounts,
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
@@ -101,6 +111,7 @@ func (v *TransactionVerifier) verifyTransaction(
 	var proposalKeyVerifiedInEnvelope bool
 
 	envelopeWeights, proposalKeyVerifiedInEnvelope, err = v.verifyAccountSignatures(
+		sth,
 		accounts,
 		tx.EnvelopeSignatures,
 		tx.EnvelopeMessage(),
@@ -141,8 +152,24 @@ func (v *TransactionVerifier) verifyTransaction(
 	return nil
 }
 
+// getPublicKey skips checking limits when getting the public key
+func (v *TransactionVerifier) getPublicKey(
+	sth *state.StateHolder,
+	accounts environment.Accounts,
+	address flow.Address,
+	keyIndex uint64,
+) (pub flow.AccountPublicKey, err error) {
+	sth.RunWithAllLimitsDisabled(
+		func() {
+			pub, err = accounts.GetPublicKey(address, keyIndex)
+		},
+	)
+	return
+}
+
 func (v *TransactionVerifier) verifyAccountSignatures(
-	accounts state.Accounts,
+	sth *state.StateHolder,
+	accounts environment.Accounts,
 	signatures []flow.TransactionSignature,
 	message []byte,
 	proposalKey flow.ProposalKey,
@@ -156,7 +183,7 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 
 	for _, txSig := range signatures {
 
-		accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyIndex)
+		accountKey, err := v.getPublicKey(sth, accounts, txSig.Address, txSig.KeyIndex)
 		if err != nil {
 			return nil, false, errorBuilder(txSig, err)
 		}
@@ -247,25 +274,19 @@ func (v *TransactionVerifier) checkSignatureDuplications(tx *flow.TransactionBod
 	return nil
 }
 
-func (c *TransactionVerifier) checkAccountsAreNotFrozen(
+func (v *TransactionVerifier) checkAccountsAreNotFrozen(
 	tx *flow.TransactionBody,
-	accounts state.Accounts,
+	accounts environment.Accounts,
 ) error {
-	for _, authorizer := range tx.Authorizers {
+	authorizers := make([]flow.Address, 0, len(tx.Authorizers)+2)
+	authorizers = append(authorizers, tx.Authorizers...)
+	authorizers = append(authorizers, tx.ProposalKey.Address, tx.Payer)
+
+	for _, authorizer := range authorizers {
 		err := accounts.CheckAccountNotFrozen(authorizer)
 		if err != nil {
 			return fmt.Errorf("checking frozen account failed: %w", err)
 		}
-	}
-
-	err := accounts.CheckAccountNotFrozen(tx.ProposalKey.Address)
-	if err != nil {
-		return fmt.Errorf("checking frozen account failed: %w", err)
-	}
-
-	err = accounts.CheckAccountNotFrozen(tx.Payer)
-	if err != nil {
-		return fmt.Errorf("checking frozen account failed: %w", err)
 	}
 
 	return nil

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -27,19 +26,18 @@ type ExecutionError interface {
 // DestroyedCompositeError,  ForceAssignmentToNonNilResourceError, ForceNilError,
 // TypeMismatchError, InvalidPathDomainError, OverwriteError, CyclicLinkError,
 // ArrayIndexOutOfBoundsError, ...
+// The Cadence error might have occurred because of an inner fvm Error.
 type CadenceRuntimeError struct {
-	err *runtime.Error
+	errorWrapper
 }
 
 // NewCadenceRuntimeError constructs a new CadenceRuntimeError and wraps a cadence runtime error
-func NewCadenceRuntimeError(err *runtime.Error) *CadenceRuntimeError {
-	return &CadenceRuntimeError{err: err}
-}
-
-// IsCadenceRuntimeError returns true if error has this type
-func IsCadenceRuntimeError(err error) bool {
-	var t *CadenceRuntimeError
-	return errors.As(err, &t)
+func NewCadenceRuntimeError(err runtime.Error) CadenceRuntimeError {
+	return CadenceRuntimeError{
+		errorWrapper: errorWrapper{
+			err: err,
+		},
+	}
 }
 
 func (e CadenceRuntimeError) Error() string {
@@ -51,23 +49,21 @@ func (e CadenceRuntimeError) Code() ErrorCode {
 	return ErrCodeCadenceRunTimeError
 }
 
-// Unwrap returns the wrapped err
-func (e CadenceRuntimeError) Unwrap() error {
-	return e.err
-}
-
 // An TransactionFeeDeductionFailedError indicates that a there was an error deducting transaction fees from the transaction Payer
 type TransactionFeeDeductionFailedError struct {
+	errorWrapper
+
 	Payer  flow.Address
 	TxFees uint64
-	err    error
 }
 
 // NewTransactionFeeDeductionFailedError constructs a new TransactionFeeDeductionFailedError
-func NewTransactionFeeDeductionFailedError(payer flow.Address, err error) *TransactionFeeDeductionFailedError {
-	return &TransactionFeeDeductionFailedError{
+func NewTransactionFeeDeductionFailedError(payer flow.Address, err error) TransactionFeeDeductionFailedError {
+	return TransactionFeeDeductionFailedError{
 		Payer: payer,
-		err:   err,
+		errorWrapper: errorWrapper{
+			err: err,
+		},
 	}
 }
 
@@ -80,19 +76,14 @@ func (e TransactionFeeDeductionFailedError) Code() ErrorCode {
 	return ErrCodeTransactionFeeDeductionFailedError
 }
 
-// Unwrap returns the wrapped err
-func (e TransactionFeeDeductionFailedError) Unwrap() error {
-	return e.err
-}
-
 // An ComputationLimitExceededError indicates that computation has exceeded its limit.
 type ComputationLimitExceededError struct {
 	limit uint64
 }
 
 // NewComputationLimitExceededError constructs a new ComputationLimitExceededError
-func NewComputationLimitExceededError(limit uint64) *ComputationLimitExceededError {
-	return &ComputationLimitExceededError{
+func NewComputationLimitExceededError(limit uint64) ComputationLimitExceededError {
+	return ComputationLimitExceededError{
 		limit: limit,
 	}
 }
@@ -112,7 +103,7 @@ func (e ComputationLimitExceededError) Error() string {
 
 // IsComputationLimitExceededError returns true if error has this type
 func IsComputationLimitExceededError(err error) bool {
-	var t *ComputationLimitExceededError
+	var t ComputationLimitExceededError
 	return errors.As(err, &t)
 }
 
@@ -122,8 +113,8 @@ type MemoryLimitExceededError struct {
 }
 
 // NewMemoryLimitExceededError constructs a new MemoryLimitExceededError
-func NewMemoryLimitExceededError(limit uint64) *MemoryLimitExceededError {
-	return &MemoryLimitExceededError{
+func NewMemoryLimitExceededError(limit uint64) MemoryLimitExceededError {
+	return MemoryLimitExceededError{
 		limit: limit,
 	}
 }
@@ -143,7 +134,7 @@ func (e MemoryLimitExceededError) Error() string {
 
 // IsMemoryLimitExceededError returns true if error has this type
 func IsMemoryLimitExceededError(err error) bool {
-	var t *MemoryLimitExceededError
+	var t MemoryLimitExceededError
 	return errors.As(err, &t)
 }
 
@@ -155,8 +146,8 @@ type StorageCapacityExceededError struct {
 }
 
 // NewStorageCapacityExceededError constructs a new StorageCapacityExceededError
-func NewStorageCapacityExceededError(address flow.Address, storageUsed, storageCapacity uint64) *StorageCapacityExceededError {
-	return &StorageCapacityExceededError{
+func NewStorageCapacityExceededError(address flow.Address, storageUsed, storageCapacity uint64) StorageCapacityExceededError {
+	return StorageCapacityExceededError{
 		address:         address,
 		storageUsed:     storageUsed,
 		storageCapacity: storageCapacity,
@@ -179,8 +170,11 @@ type EventLimitExceededError struct {
 }
 
 // NewEventLimitExceededError constructs a EventLimitExceededError
-func NewEventLimitExceededError(totalByteSize, limit uint64) *EventLimitExceededError {
-	return &EventLimitExceededError{totalByteSize: totalByteSize, limit: limit}
+func NewEventLimitExceededError(totalByteSize, limit uint64) EventLimitExceededError {
+	return EventLimitExceededError{
+		totalByteSize: totalByteSize,
+		limit:         limit,
+	}
 }
 
 func (e EventLimitExceededError) Error() string {
@@ -206,8 +200,13 @@ type StateKeySizeLimitError struct {
 }
 
 // NewStateKeySizeLimitError constructs a StateKeySizeLimitError
-func NewStateKeySizeLimitError(owner, key string, size, limit uint64) *StateKeySizeLimitError {
-	return &StateKeySizeLimitError{owner: owner, key: key, size: size, limit: limit}
+func NewStateKeySizeLimitError(owner, key string, size, limit uint64) StateKeySizeLimitError {
+	return StateKeySizeLimitError{
+		owner: owner,
+		key:   key,
+		size:  size,
+		limit: limit,
+	}
 }
 
 func (e StateKeySizeLimitError) Error() string {
@@ -227,8 +226,12 @@ type StateValueSizeLimitError struct {
 }
 
 // NewStateValueSizeLimitError constructs a StateValueSizeLimitError
-func NewStateValueSizeLimitError(value flow.RegisterValue, size, limit uint64) *StateValueSizeLimitError {
-	return &StateValueSizeLimitError{value: value, size: size, limit: limit}
+func NewStateValueSizeLimitError(value flow.RegisterValue, size, limit uint64) StateValueSizeLimitError {
+	return StateValueSizeLimitError{
+		value: value,
+		size:  size,
+		limit: limit,
+	}
 }
 
 func (e StateValueSizeLimitError) Error() string {
@@ -248,16 +251,19 @@ type LedgerInteractionLimitExceededError struct {
 }
 
 // NewLedgerInteractionLimitExceededError constructs a LedgerInteractionLimitExceededError
-func NewLedgerInteractionLimitExceededError(used, limit uint64) *LedgerInteractionLimitExceededError {
-	return &LedgerInteractionLimitExceededError{used: used, limit: limit}
+func NewLedgerInteractionLimitExceededError(used, limit uint64) LedgerInteractionLimitExceededError {
+	return LedgerInteractionLimitExceededError{
+		used:  used,
+		limit: limit,
+	}
 }
 
-func (e *LedgerInteractionLimitExceededError) Error() string {
+func (e LedgerInteractionLimitExceededError) Error() string {
 	return fmt.Sprintf("%s max interaction with storage has exceeded the limit (used: %d bytes, limit %d bytes)", e.Code().String(), e.used, e.limit)
 }
 
 // Code returns the error code for this error
-func (e *LedgerInteractionLimitExceededError) Code() ErrorCode {
+func (e LedgerInteractionLimitExceededError) Code() ErrorCode {
 	return ErrCodeLedgerInteractionLimitExceededError
 }
 
@@ -268,43 +274,19 @@ type OperationNotSupportedError struct {
 }
 
 // NewOperationNotSupportedError construct a new OperationNotSupportedError
-func NewOperationNotSupportedError(operation string) *OperationNotSupportedError {
-	return &OperationNotSupportedError{operation: operation}
+func NewOperationNotSupportedError(operation string) OperationNotSupportedError {
+	return OperationNotSupportedError{
+		operation: operation,
+	}
 }
 
-func (e *OperationNotSupportedError) Error() string {
+func (e OperationNotSupportedError) Error() string {
 	return fmt.Sprintf("%s operation (%s) is not supported in this environment", e.Code().String(), e.operation)
 }
 
 // Code returns the error code for this error
-func (e *OperationNotSupportedError) Code() ErrorCode {
+func (e OperationNotSupportedError) Code() ErrorCode {
 	return ErrCodeOperationNotSupportedError
-}
-
-// EncodingUnsupportedValueError indicates that Cadence attempted
-// to encode a value that is not supported.
-type EncodingUnsupportedValueError struct {
-	value interpreter.Value
-	path  []string
-}
-
-// NewEncodingUnsupportedValueError construct a new EncodingUnsupportedValueError
-func NewEncodingUnsupportedValueError(value interpreter.Value, path []string) *EncodingUnsupportedValueError {
-	return &EncodingUnsupportedValueError{value: value, path: path}
-}
-
-func (e *EncodingUnsupportedValueError) Error() string {
-	return fmt.Sprintf(
-		"%s encoding unsupported value to path [%s]: %[1]T, %[1]v",
-		e.Code().String(),
-		strings.Join(e.path, ","),
-		e.value,
-	)
-}
-
-// Code returns the error code for this error
-func (e *EncodingUnsupportedValueError) Code() ErrorCode {
-	return ErrCodeEncodingUnsupportedValue
 }
 
 // ScriptExecutionCancelledError indicates that Cadence Script execution
@@ -313,15 +295,19 @@ func (e *EncodingUnsupportedValueError) Code() ErrorCode {
 // note: this error is used by scripts only and
 // won't be emitted for transactions since transaction execution has to be deterministic.
 type ScriptExecutionCancelledError struct {
-	err error
+	errorWrapper
 }
 
 // NewScriptExecutionCancelledError construct a new ScriptExecutionCancelledError
-func NewScriptExecutionCancelledError(err error) *ScriptExecutionCancelledError {
-	return &ScriptExecutionCancelledError{err: err}
+func NewScriptExecutionCancelledError(err error) ScriptExecutionCancelledError {
+	return ScriptExecutionCancelledError{
+		errorWrapper: errorWrapper{
+			err: err,
+		},
+	}
 }
 
-func (e *ScriptExecutionCancelledError) Error() string {
+func (e ScriptExecutionCancelledError) Error() string {
 	return fmt.Sprintf(
 		"%s script execution is cancelled: %s",
 		e.Code().String(),
@@ -330,7 +316,7 @@ func (e *ScriptExecutionCancelledError) Error() string {
 }
 
 // Code returns the error code for this error
-func (e *ScriptExecutionCancelledError) Code() ErrorCode {
+func (e ScriptExecutionCancelledError) Code() ErrorCode {
 	return ErrCodeScriptExecutionCancelledError
 }
 
@@ -343,11 +329,11 @@ type ScriptExecutionTimedOutError struct {
 }
 
 // NewScriptExecutionTimedOutError construct a new ScriptExecutionTimedOutError
-func NewScriptExecutionTimedOutError() *ScriptExecutionTimedOutError {
-	return &ScriptExecutionTimedOutError{}
+func NewScriptExecutionTimedOutError() ScriptExecutionTimedOutError {
+	return ScriptExecutionTimedOutError{}
 }
 
-func (e *ScriptExecutionTimedOutError) Error() string {
+func (e ScriptExecutionTimedOutError) Error() string {
 	return fmt.Sprintf(
 		"%s script execution is timed out and did not finish executing within the maximum execution time allowed",
 		e.Code().String(),
@@ -355,23 +341,21 @@ func (e *ScriptExecutionTimedOutError) Error() string {
 }
 
 // Code returns the error code for this error
-func (e *ScriptExecutionTimedOutError) Code() ErrorCode {
+func (e ScriptExecutionTimedOutError) Code() ErrorCode {
 	return ErrCodeScriptExecutionTimedOutError
 }
 
 // An CouldNotGetExecutionParameterFromStateError indicates that computation has exceeded its limit.
 type CouldNotGetExecutionParameterFromStateError struct {
-	address    string
-	domain     string
-	identifier string
+	address string
+	path    string
 }
 
 // NewCouldNotGetExecutionParameterFromStateError constructs a new CouldNotGetExecutionParameterFromStateError
-func NewCouldNotGetExecutionParameterFromStateError(address, domain, identifier string) *CouldNotGetExecutionParameterFromStateError {
-	return &CouldNotGetExecutionParameterFromStateError{
-		address:    address,
-		domain:     domain,
-		identifier: identifier,
+func NewCouldNotGetExecutionParameterFromStateError(address, path string) CouldNotGetExecutionParameterFromStateError {
+	return CouldNotGetExecutionParameterFromStateError{
+		address: address,
+		path:    path,
 	}
 }
 
@@ -382,16 +366,9 @@ func (e CouldNotGetExecutionParameterFromStateError) Code() ErrorCode {
 
 func (e CouldNotGetExecutionParameterFromStateError) Error() string {
 	return fmt.Sprintf(
-		"%s could not get execution parameter from the state (address: %s path: %s/%s)",
+		"%s could not get execution parameter from the state (address: %s path: %s)",
 		e.Code().String(),
 		e.address,
-		e.domain,
-		e.identifier,
+		e.path,
 	)
-}
-
-// IsCouldNotGetExecutionParameterFromStateError returns true if error has this type
-func IsCouldNotGetExecutionParameterFromStateError(err error) bool {
-	var t *CouldNotGetExecutionParameterFromStateError
-	return errors.As(err, &t)
 }

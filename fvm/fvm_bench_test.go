@@ -10,7 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -32,7 +37,12 @@ import (
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/executiondatasync/tracker"
+	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -132,15 +142,15 @@ type BasicBlockExecutor struct {
 }
 
 func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
-	rt := fvm.NewInterpreterRuntime()
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithChain(chain),
+		fvm.WithLogger(logger),
 	}
-	fvmContext := fvm.NewContext(logger, opts...)
+	fvmContext := fvm.NewContext(opts...)
 
 	collector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -178,8 +188,22 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 	)
 	require.NoError(tb, err)
 
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
+
+	prov := provider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
 	ledgerCommitter := committer.NewLedgerViewCommitter(ledger, tracer)
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter)
+	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter, prov)
 	require.NoError(tb, err)
 
 	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))
@@ -277,7 +301,7 @@ type logExtractor struct {
 }
 
 type txWeights struct {
-	TXHash                string `json:"txHash"`
+	TXHash                string `json:"tx_id"`
 	LedgerInteractionUsed uint64 `json:"ledgerInteractionUsed"`
 	ComputationUsed       uint   `json:"computationUsed"`
 	MemoryEstimate        uint   `json:"memoryEstimate"`

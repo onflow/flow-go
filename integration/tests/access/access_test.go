@@ -12,12 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
-	grpcinsecure "google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials/insecure"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 func TestAccess(t *testing.T) {
@@ -44,11 +45,7 @@ func (s *AccessSuite) TearDownTest() {
 }
 
 func (suite *AccessSuite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "api.go").
-		Str("testcase", suite.T().Name()).
-		Logger()
-	suite.log = logger
+	suite.log = unittest.LoggerForTest(suite.Suite.T(), zerolog.InfoLevel)
 	suite.log.Info().Msg("================> SetupTest")
 	defer func() {
 		suite.log.Info().Msg("================> Finish SetupTest")
@@ -104,7 +101,7 @@ func (suite *AccessSuite) TestAPIsAvailable() {
 		grpcAddress := fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort])
 
 		conn, err := grpc.DialContext(suite.ctx, grpcAddress,
-			grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithTimeout(1*time.Second),
 		)
 		require.NoError(t, err, "failed to connect to access node")

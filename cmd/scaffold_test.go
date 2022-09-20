@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -51,7 +51,7 @@ func TestLoadSecretsEncryptionKey(t *testing.T) {
 			require.NoError(t, err)
 			key, err := utils.GenerateSecretsDBEncryptionKey()
 			require.NoError(t, err)
-			err = ioutil.WriteFile(path, key, 0700)
+			err = os.WriteFile(path, key, 0700)
 			require.NoError(t, err)
 
 			data, err := loadSecretsEncryptionKey(dir, myID)
@@ -217,6 +217,64 @@ func TestOverrideComponent(t *testing.T) {
 		"component 2 ready",
 		"component 3 initialized",
 		"component 3 ready",
+	}, logs)
+
+	cancel()
+	<-cm.Done()
+}
+
+func TestOverrideModules(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	nb := FlowNode("scaffold test")
+	nb.componentBuilder = component.NewComponentManagerBuilder()
+
+	logger := &testLog{}
+
+	name1 := "module 1"
+	nb.Module(name1, func(nodeConfig *NodeConfig) error {
+		logger.Logf("%s initialized", name1)
+		return nil
+	})
+
+	name2 := "module 2"
+	nb.Module(name2, func(nodeConfig *NodeConfig) error {
+		logger.Logf("%s initialized", name2)
+		return nil
+	})
+
+	name3 := "module 3"
+	nb.Module(name3, func(nodeConfig *NodeConfig) error {
+		logger.Logf("%s initialized", name3)
+		return nil
+	})
+
+	// Overrides second module
+	nb.OverrideModule(name2, func(nodeConfig *NodeConfig) error {
+		logger.Logf("%s overridden", name2)
+		return nil
+	})
+
+	err := nb.handleModules()
+	assert.NoError(t, err)
+
+	cm := nb.componentBuilder.Build()
+	require.NoError(t, err)
+
+	cm.Start(signalerCtx)
+
+	<-cm.Ready()
+
+	logs := logger.logs
+
+	assert.Len(t, logs, 3)
+
+	// components are initialized in a specific order, so check that the order is correct
+	assert.Equal(t, []string{
+		"module 1 initialized",
+		"module 2 overridden", // overridden version of 2 should be initialized.
+		"module 3 initialized",
 	}, logs)
 
 	cancel()
@@ -620,35 +678,9 @@ func testDependableComponentWaitForDependencies(t *testing.T) {
 
 func TestCreateUploader(t *testing.T) {
 	t.Parallel()
-
-	t.Run("create defualt uploader", func(t *testing.T) {
+	t.Run("create uploader", func(t *testing.T) {
 		t.Parallel()
 		nb := FlowNode("scaffold_uploader")
-		mockHttp := &http.Client{
-			Transport: &mockRoundTripper{
-				DoFunc: func(req *http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: 403,
-						Body:       ioutil.NopCloser(bytes.NewBufferString("")),
-					}, nil
-				},
-			},
-		}
-		testClient := gcemd.NewClient(mockHttp)
-		uploader, err := nb.createGCEProfileUploader(
-			testClient,
-
-			option.WithoutAuthentication(),
-			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-		)
-		require.ErrorContains(t, err, "403")
-		require.NotNil(t, uploader)
-	})
-
-	t.Run("create mocked uploader", func(t *testing.T) {
-		t.Parallel()
-		nb := FlowNode("scaffold_uploader")
-
 		mockHttp := &http.Client{
 			Transport: &mockRoundTripper{
 				DoFunc: func(req *http.Request) (*http.Response, error) {
@@ -656,12 +688,12 @@ func TestCreateUploader(t *testing.T) {
 					case "/computeMetadata/v1/project/project-id":
 						return &http.Response{
 							StatusCode: 200,
-							Body:       ioutil.NopCloser(bytes.NewBufferString("test-project-id")),
+							Body:       io.NopCloser(bytes.NewBufferString("test-project-id")),
 						}, nil
 					case "/computeMetadata/v1/instance/id":
 						return &http.Response{
 							StatusCode: 200,
-							Body:       ioutil.NopCloser(bytes.NewBufferString("test-instance-id")),
+							Body:       io.NopCloser(bytes.NewBufferString("test-instance-id")),
 						}, nil
 					default:
 						return nil, fmt.Errorf("unexpected request: %s", req.URL.Path)

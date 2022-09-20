@@ -13,21 +13,18 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go/crypto"
-
-	"github.com/onflow/flow-go/module/compliance"
-
 	"github.com/onflow/flow-go/admin/commands"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -137,46 +134,48 @@ type NodeBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
-	nodeIDHex                       string
-	AdminAddr                       string
-	AdminCert                       string
-	AdminKey                        string
-	AdminClientCAs                  string
-	BindAddr                        string
-	NodeRole                        string
-	DynamicStartupANAddress         string
-	DynamicStartupANPubkey          string
-	DynamicStartupEpochPhase        string
-	DynamicStartupEpoch             string
-	DynamicStartupSleepInterval     time.Duration
-	datadir                         string
-	secretsdir                      string
-	secretsDBEnabled                bool
-	InsecureSecretsDB               bool
-	level                           string
-	metricsPort                     uint
-	BootstrapDir                    string
-	PeerUpdateInterval              time.Duration
-	UnicastMessageTimeout           time.Duration
-	DNSCacheTTL                     time.Duration
-	profilerEnabled                 bool
-	uploaderEnabled                 bool
-	profilerDir                     string
-	profilerInterval                time.Duration
-	profilerDuration                time.Duration
-	profilerMemProfileRate          int
-	tracerEnabled                   bool
-	tracerSensitivity               uint
-	MetricsEnabled                  bool
-	guaranteesCacheSize             uint
-	receiptsCacheSize               uint
-	db                              *badger.DB
-	PreferredUnicastProtocols       []string
+	nodeIDHex                   string
+	AdminAddr                   string
+	AdminCert                   string
+	AdminKey                    string
+	AdminClientCAs              string
+	BindAddr                    string
+	NodeRole                    string
+	DynamicStartupANAddress     string
+	DynamicStartupANPubkey      string
+	DynamicStartupEpochPhase    string
+	DynamicStartupEpoch         string
+	DynamicStartupSleepInterval time.Duration
+	datadir                     string
+	secretsdir                  string
+	secretsDBEnabled            bool
+	InsecureSecretsDB           bool
+	level                       string
+	metricsPort                 uint
+	BootstrapDir                string
+	PeerUpdateInterval          time.Duration
+	UnicastMessageTimeout       time.Duration
+	DNSCacheTTL                 time.Duration
+	profilerEnabled             bool
+	uploaderEnabled             bool
+	profilerDir                 string
+	profilerInterval            time.Duration
+	profilerDuration            time.Duration
+	profilerMemProfileRate      int
+	tracerEnabled               bool
+	tracerSensitivity           uint
+	MetricsEnabled              bool
+	guaranteesCacheSize         uint
+	receiptsCacheSize           uint
+	db                          *badger.DB
+	PreferredUnicastProtocols   []string
+	// NetworkConnectionPruning determines whether connections to nodes
+	// that are not part of protocol state should be trimmed
+	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
+	NetworkConnectionPruning        bool
 	NetworkReceivedMessageCacheSize uint32
-	TopologyProtocolName            string
-	TopologyEdgeProbability         float64
 	HeroCacheMetricsEnable          bool
-	SyncCoreConfig                  synchronization.Config
+	SyncCoreConfig                  chainsync.Config
 	CodecFactory                    func() network.Codec
 	LibP2PNode                      *p2p.Node
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
@@ -204,7 +203,6 @@ type NodeConfig struct {
 	Resolver          madns.BasicResolver
 	Middleware        network.Middleware
 	Network           network.Network
-	ConduitFactory    network.ConduitFactory
 	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
@@ -268,11 +266,14 @@ func DefaultBaseConfig() *BaseConfig {
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
 		NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
-		TopologyProtocolName:            string(topology.TopicBased),
-		TopologyEdgeProbability:         topology.MaximumEdgeProbability,
-		HeroCacheMetricsEnable:          false,
-		SyncCoreConfig:                  synchronization.DefaultConfig(),
-		CodecFactory:                    codecFactory,
-		ComplianceConfig:                compliance.DefaultConfig(),
+
+		// By default we let networking layer trim connections to all nodes that
+		// are no longer part of protocol state.
+		NetworkConnectionPruning: p2p.ConnectionPruningEnabled,
+
+		HeroCacheMetricsEnable: false,
+		SyncCoreConfig:         chainsync.DefaultConfig(),
+		CodecFactory:           codecFactory,
+		ComplianceConfig:       compliance.DefaultConfig(),
 	}
 }

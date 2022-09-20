@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	libp2pnet "github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	libp2pnet "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"

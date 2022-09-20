@@ -28,7 +28,7 @@ func RolesByChannel(channel Channel) (flow.RoleList, bool) {
 	if IsClusterChannel(channel) {
 		return ClusterChannelRoles(channel), true
 	}
-	if PublicChannels().Contains(channel) {
+	if IsPublicChannel(channel) {
 		return flow.Roles(), true
 	}
 	roles, ok := channelRoleMap[channel]
@@ -103,6 +103,11 @@ func PublicChannels() ChannelList {
 		PublicSyncCommittee,
 		PublicReceiveBlocks,
 	}
+}
+
+// IsPublicChannel returns true if channel is in the public channels list
+func IsPublicChannel(channel Channel) bool {
+	return PublicChannels().Contains(channel)
 }
 
 // channels

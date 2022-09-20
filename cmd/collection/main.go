@@ -6,14 +6,11 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/model/bootstrap"
-	modulecompliance "github.com/onflow/flow-go/module/compliance"
-	"github.com/onflow/flow-go/module/mempool/herocache"
-
 	client "github.com/onflow/flow-go-sdk/access/grpc"
+
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
@@ -30,17 +27,20 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/collection"
+	"github.com/onflow/flow-go/module/chainsync"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/epochs"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -81,7 +81,7 @@ func main() {
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
-		mainChainSyncCore *synchronization.Core
+		mainChainSyncCore *chainsync.Core
 		followerEng       *followereng.Engine
 		colMetrics        module.CollectionMetrics
 		err               error
@@ -213,7 +213,7 @@ func main() {
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
-			mainChainSyncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+			mainChainSyncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {

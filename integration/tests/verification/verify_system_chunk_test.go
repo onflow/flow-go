@@ -19,7 +19,8 @@ type VerifySystemChunkSuite struct {
 // do not cause state change have different chunk Ids.
 func (suite *VerifySystemChunkSuite) TestSystemChunkIDsShouldBeDifferent() {
 	// // wait for next height finalized (potentially first height), called blockA
-	blockA := suite.BlockState.WaitForHighestFinalizedProgress(suite.T())
+	currentFinalized := suite.BlockState.HighestFinalizedHeight()
+	blockA := suite.BlockState.WaitForHighestFinalizedProgress(suite.T(), currentFinalized)
 	suite.T().Logf("blockA generated, height: %v ID: %v\n", blockA.Header.Height, blockA.Header.ID())
 
 	// waits for the next finalized block after blockA, called blockB.

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
@@ -16,11 +15,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -63,7 +62,7 @@ func Test_WAL(t *testing.T) {
 		led, err := complete.NewLedger(diskWal, size*10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), size, checkpointDistance, checkpointsToKeep)
+		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), size, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 		require.NoError(t, err)
 
 		<-compactor.Ready()
@@ -78,8 +77,8 @@ func Test_WAL(t *testing.T) {
 
 		for i := 0; i < size; i++ {
 
-			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-			values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+			keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+			values := testutils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
 			update, err := ledger.NewUpdate(state, keys, values)
 			require.NoError(t, err)
 			state, _, err = led.Set(update)
@@ -87,7 +86,7 @@ func Test_WAL(t *testing.T) {
 
 			data := make(map[string]ledger.Value, len(keys))
 			for j, key := range keys {
-				data[string(encoding.EncodeKey(&key))] = values[j]
+				data[string(ledger.EncodeKey(&key))] = values[j]
 			}
 
 			savedData[string(state[:])] = data
@@ -108,7 +107,7 @@ func Test_WAL(t *testing.T) {
 
 			keys := make([]ledger.Key, 0, len(data))
 			for keyString := range data {
-				key, err := encoding.DecodeKey([]byte(keyString))
+				key, err := ledger.DecodeKey([]byte(keyString))
 				require.NoError(t, err)
 				keys = append(keys, *key)
 			}
@@ -121,7 +120,7 @@ func Test_WAL(t *testing.T) {
 			require.NoError(t, err)
 
 			for i, key := range keys {
-				assert.Equal(t, data[string(encoding.EncodeKey(&key))], values[i])
+				assert.Equal(t, data[string(ledger.EncodeKey(&key))], values[i])
 			}
 		}
 
@@ -153,8 +152,8 @@ func Test_Checkpointing(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
-				values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+				keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
+				values := testutils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
 				update, err := ledger.NewUpdate(ledger.State(rootHash), keys, values)
 				require.NoError(t, err)
 
@@ -265,15 +264,15 @@ func Test_Checkpointing(t *testing.T) {
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.Equal(t, data[path].Value, values1[i])
-					require.Equal(t, data[path].Value, values2[i])
-					require.Equal(t, data[path].Value, values3[i])
+					require.Equal(t, data[path].Value(), values1[i])
+					require.Equal(t, data[path].Value(), values2[i])
+					require.Equal(t, data[path].Value(), values3[i])
 				}
 			}
 		})
 
-		keys2 := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-		values2 := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+		keys2 := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+		values2 := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 		t.Run("create segment after checkpoint", func(t *testing.T) {
 
 			//require.NoFileExists(t, path.Join(dir, "00000011"))
@@ -453,8 +452,8 @@ func TestCheckpointFileError(t *testing.T) {
 
 		// create WAL
 
-		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
-		values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+		keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
+		values := testutils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
 		update, err := ledger.NewUpdate(ledger.State(trie.EmptyTrieRootHash()), keys, values)
 		require.NoError(t, err)
 
@@ -533,11 +532,11 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 
 		emptyTrie := trie.NewEmptyMTrie()
 
-		p1 := utils.PathByUint8(0)
-		v1 := utils.LightPayload8('A', 'a')
+		p1 := testutils.PathByUint8(0)
+		v1 := testutils.LightPayload8('A', 'a')
 
-		p2 := utils.PathByUint8(1)
-		v2 := utils.LightPayload8('B', 'b')
+		p2 := testutils.PathByUint8(1)
+		v2 := testutils.LightPayload8('B', 'b')
 
 		paths := []ledger.Path{p1, p2}
 		payloads := []ledger.Payload{*v1, *v2}
@@ -547,7 +546,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 
 		someHash := updatedTrie.RootNode().LeftChild().Hash() // Hash of left child
 
-		file, err := ioutil.TempFile(dir, "temp-checkpoint")
+		file, err := os.CreateTemp(dir, "temp-checkpoint")
 		filepath := file.Name()
 		require.NoError(t, err)
 
@@ -565,7 +564,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 		})
 
 		t.Run("detects modified data", func(t *testing.T) {
-			b, err := ioutil.ReadFile(filepath)
+			b, err := os.ReadFile(filepath)
 			require.NoError(t, err)
 
 			index := bytes.Index(b, someHash[:])

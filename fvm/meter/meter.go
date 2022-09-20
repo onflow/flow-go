@@ -1,9 +1,14 @@
 package meter
 
-import "github.com/onflow/cadence/runtime/common"
+import (
+	"github.com/onflow/cadence/runtime/common"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 type MetringOperationType uint
 
+// TODO(patrick): rm after emulator is updated ...
 const (
 	// [2_000, 3_000) reserved for the FVM
 	_ common.ComputationKind = iota + 2_000
@@ -40,11 +45,12 @@ const (
 
 type MeteredComputationIntensities map[common.ComputationKind]uint
 type MeteredMemoryIntensities map[common.MemoryKind]uint
+type MeteredStorageInteractionMap map[StorageInteractionKey]uint64
 
 type Meter interface {
 	// merge child funcionality
 	NewChild() Meter
-	MergeMeter(child Meter, enforceLimits bool) error
+	MergeMeter(child Meter)
 
 	// computation metering
 	MeterComputation(kind common.ComputationKind, intensity uint) error
@@ -55,18 +61,18 @@ type Meter interface {
 	// memory metering
 	MeterMemory(kind common.MemoryKind, intensity uint) error
 	MemoryIntensities() MeteredMemoryIntensities
-	TotalMemoryEstimate() uint
-	TotalMemoryLimit() uint
+	TotalMemoryEstimate() uint64
+	TotalMemoryLimit() uint64
 
-	// TODO(patrick): make these non-optional arguments to NewMeter
-	SetComputationWeights(weights ExecutionEffortWeights)
-	SetMemoryWeights(weights ExecutionMemoryWeights)
-	SetTotalMemoryLimit(limit uint64)
+	// storage metering
+	MeterStorageRead(storageKey StorageInteractionKey, value flow.RegisterValue, enforceLimit bool) error
+	MeterStorageWrite(storageKey StorageInteractionKey, value flow.RegisterValue, enforceLimit bool) error
+	StorageUpdateSizeMap() MeteredStorageInteractionMap
+	TotalBytesReadFromStorage() uint64
+	TotalBytesWrittenToStorage() uint64
+	TotalBytesOfStorageInteractions() uint64
+}
 
-	// TODO move storage metering to here
-	// MeterStorageRead(byteSize uint) error
-	// MeterStorageWrite(byteSize uint) error
-	// TotalBytesReadFromStorage() int
-	// TotalBytesWroteToStorage() int
-	// TotalBytesOfStorageInteractions() int
+type StorageInteractionKey struct {
+	Owner, Key string
 }

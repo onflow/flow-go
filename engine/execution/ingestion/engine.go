@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -23,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -67,6 +69,8 @@ type Engine struct {
 	syncFast               bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	pauseExecution         bool
+	executionDataPruner    *pruner.Pruner
+	uploaders              []uploader.Uploader
 }
 
 func New(
@@ -92,6 +96,8 @@ func New(
 	syncFast bool,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pauseExecution bool,
+	pruner *pruner.Pruner,
+	uploaders []uploader.Uploader,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -124,6 +130,8 @@ func New(
 		syncFast:               syncFast,
 		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
 		pauseExecution:         pauseExecution,
+		executionDataPruner:    pruner,
+		uploaders:              uploaders,
 	}
 
 	// move to state syncing engine
@@ -141,6 +149,12 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	if !e.pauseExecution {
+		if computation.GetUploaderEnabled() {
+			if err := e.retryUpload(); err != nil {
+				e.log.Warn().Msg("failed to re-upload all ComputationResults")
+			}
+		}
+
 		err := e.reloadUnexecutedBlocks()
 		if err != nil {
 			e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
@@ -641,6 +655,10 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	if err != nil {
 		e.log.Err(err).Msg("failed in process block's children")
 	}
+
+	if e.executionDataPruner != nil {
+		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
+	}
 }
 
 // we've executed the block, now we need to check:
@@ -892,17 +910,22 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 // executed, the chained structure allows us to only check the head of each queue to see if
 // any block becomes executable.
 // for instance we have one queue whose head is A:
-// A <- B <- C
-//   ^- D <- E
+//
+//	A <- B <- C
+//	  ^- D <- E
+//
 // If we receive E <- F, then we will add it to the queue:
-// A <- B <- C
-//   ^- D <- E <- F
+//
+//	A <- B <- C
+//	  ^- D <- E <- F
+//
 // Even through there are 6 blocks, we only need to check if block A becomes executable.
 // when the parent block isn't in the queue, we add it as a new queue. for instance, if
 // we receive H <- G, then the queues will become:
-// A <- B <- C
-//   ^- D <- E
-// G
+//
+//	A <- B <- C
+//	  ^- D <- E
+//	G
 func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool, bool) {
 	for _, queue := range queues.All() {
 		if stored, isNew := queue.TryAdd(blockify); stored {
@@ -1231,6 +1254,16 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 				Msg("extensive log: executed tx content")
 		}
 	}
+}
+
+func (e *Engine) retryUpload() (err error) {
+	for _, u := range e.uploaders {
+		switch retryableUploaderWraper := u.(type) {
+		case uploader.RetryableUploaderWrapper:
+			err = retryableUploaderWraper.RetryUpload()
+		}
+	}
+	return err
 }
 
 func GenerateExecutionReceipt(

@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -56,8 +57,8 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		suite.T(),
 		count,
 		logger,
-		nil,
 		unittest.NetworkCodec(),
+		mocknetwork.NewViolationsConsumer(suite.T()),
 	)
 
 	errChan := StartNetworks(ctx, suite.T(), nodes, suite.nets, 100*time.Millisecond)

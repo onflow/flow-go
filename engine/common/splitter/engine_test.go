@@ -31,7 +31,7 @@ type Suite struct {
 }
 
 func (suite *Suite) SetupTest() {
-	suite.channel = channels.Channel("test-channel")
+	suite.channel = channels.TestNetworkChannel
 	suite.engine = splitter.New(zerolog.Logger{}, suite.channel)
 }
 

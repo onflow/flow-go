@@ -44,15 +44,29 @@ func (_m *Procedure) MemoryLimit(ctx fvm.Context) uint64 {
 	return r0
 }
 
-// Run provides a mock function with given fields: vm, ctx, sth, _a3
-func (_m *Procedure) Run(vm *fvm.VirtualMachine, ctx fvm.Context, sth *state.StateHolder, _a3 *programs.Programs) error {
-	ret := _m.Called(vm, ctx, sth, _a3)
+// Run provides a mock function with given fields: ctx, sth, _a2
+func (_m *Procedure) Run(ctx fvm.Context, sth *state.StateHolder, _a2 *programs.Programs) error {
+	ret := _m.Called(ctx, sth, _a2)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, *state.StateHolder, *programs.Programs) error); ok {
-		r0 = rf(vm, ctx, sth, _a3)
+	if rf, ok := ret.Get(0).(func(fvm.Context, *state.StateHolder, *programs.Programs) error); ok {
+		r0 = rf(ctx, sth, _a2)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ShouldDisableMemoryAndInteractionLimits provides a mock function with given fields: ctx
+func (_m *Procedure) ShouldDisableMemoryAndInteractionLimits(ctx fvm.Context) bool {
+	ret := _m.Called(ctx)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(fvm.Context) bool); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0

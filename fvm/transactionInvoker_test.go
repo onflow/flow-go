@@ -2,7 +2,6 @@ package fvm_test
 
 import (
 	"bytes"
-	"math"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -14,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -25,30 +23,26 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("parsing error in transaction", func(t *testing.T) {
 
-		rt := fvm.NewInterpreterRuntime()
-
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvoker := fvm.NewTransactionInvoker(log)
-
-		vm := fvm.NewVirtualMachine(rt)
+		txInvoker := fvm.NewTransactionInvoker()
 
 		code := `X`
 
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
-		context := fvm.NewContext(log)
+		context := fvm.NewContext(fvm.WithLogger(log))
 
-		sth := state.NewStateHolder(state.NewState(
+		stTxn := state.NewStateTransaction(
 			view,
-			meter.NewMeter(math.MaxUint64, math.MaxUint64),
-			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
-			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		))
+			state.DefaultParameters().
+				WithMaxKeySizeAllowed(context.MaxStateKeySize).
+				WithMaxValueSizeAllowed(context.MaxStateValueSize).
+				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
+		)
 
-		err := txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		err := txInvoker.Process(context, proc, stTxn, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -58,30 +52,26 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("checking error in transaction", func(t *testing.T) {
 
-		rt := fvm.NewInterpreterRuntime()
-
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvoker := fvm.NewTransactionInvoker(log)
-
-		vm := fvm.NewVirtualMachine(rt)
+		txInvoker := fvm.NewTransactionInvoker()
 
 		code := `transaction(arg: X) { }`
 
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
-		context := fvm.NewContext(log)
+		context := fvm.NewContext(fvm.WithLogger(log))
 
-		sth := state.NewStateHolder(state.NewState(
+		stTxn := state.NewStateTransaction(
 			view,
-			meter.NewMeter(math.MaxUint64, math.MaxUint64),
-			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
-			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		))
+			state.DefaultParameters().
+				WithMaxKeySizeAllowed(context.MaxStateKeySize).
+				WithMaxValueSizeAllowed(context.MaxStateValueSize).
+				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
+		)
 
-		err := txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		err := txInvoker.Process(context, proc, stTxn, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")

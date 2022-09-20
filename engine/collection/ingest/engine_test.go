@@ -3,7 +3,7 @@ package ingest
 import (
 	"context"
 	"errors"
-	"io/ioutil"
+	"io"
 	"testing"
 	"time"
 
@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -68,7 +69,7 @@ func (suite *Suite) SetupTest() {
 	suite.N_COLLECTORS = 4
 	suite.N_CLUSTERS = 2
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 	metrics := metrics.NewNoopCollector()
 
 	net := new(mocknetwork.Network)
@@ -157,7 +158,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.ErrUnknownReferenceBlock))
+		suite.Assert().True(errors.As(err, &engine.UnverifiableInputError{}))
 	})
 
 	suite.Run("un-parseable script", func() {
