@@ -1,6 +1,7 @@
 package unicast
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -60,9 +61,6 @@ func TestRateLimitedPeersMap_cleanup(t *testing.T) {
 	require.False(t, m.exists(peerID2))
 	require.False(t, m.exists(peerID3))
 
-	// full cleanup removes all keys
-	m.cleanup()
-	require.False(t, m.exists(peerID1))
 }
 
 // TestRateLimitedPeersMap_cleanupLoopDone checks that the cleanup loop runs when signal is sent on done channel.
@@ -90,15 +88,16 @@ func TestRateLimitedPeersMap_cleanupLoopDone(t *testing.T) {
 	m.store(peerID3)
 
 	// manually set lastActive on 2 items so that they are removed during cleanup
+	m.peers[peerID1].lastActive = start.Add(-10 * time.Minute)
 	m.peers[peerID2].lastActive = start.Add(-10 * time.Minute)
 	m.peers[peerID3].lastActive = start.Add(-20 * time.Minute)
 
 	// kick off clean up process, tick should happen immediately
 	go m.cleanupLoop()
+	time.Sleep(100 * time.Millisecond)
 	m.close()
 
-	time.Sleep(100 * time.Millisecond)
-
+	fmt.Println(m.peers)
 	require.False(t, m.exists(peerID1))
 	require.False(t, m.exists(peerID2))
 	require.False(t, m.exists(peerID3))

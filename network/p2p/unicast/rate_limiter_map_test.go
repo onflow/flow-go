@@ -71,11 +71,6 @@ func TestLimiterMap_cleanup(t *testing.T) {
 	require.False(t, ok)
 	_, ok = m.get(peerID3)
 	require.False(t, ok)
-
-	// full cleanup removes all keys
-	m.cleanup()
-	_, ok = m.get(peerID1)
-	require.False(t, ok)
 }
 
 // TestLimiterMap_cleanupLoopDone checks that the cleanup loop runs when signal is sent on done channel.
@@ -103,14 +98,14 @@ func TestLimiterMap_cleanupLoopDone(t *testing.T) {
 	m.store(peerID3, rate.NewLimiter(0, 0))
 
 	// manually set lastActive on 2 items so that they are removed during cleanup
+	m.limiters[peerID1].lastActive = start.Add(-10 * time.Minute)
 	m.limiters[peerID2].lastActive = start.Add(-10 * time.Minute)
 	m.limiters[peerID3].lastActive = start.Add(-20 * time.Minute)
 
 	// kick off clean up process, tick should happen immediately
 	go m.cleanupLoop()
-	m.close()
-
 	time.Sleep(100 * time.Millisecond)
+	m.close()
 
 	_, ok := m.get(peerID1)
 	require.False(t, ok)

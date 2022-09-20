@@ -21,11 +21,11 @@ type rateLimitedPeersMap struct {
 	done            chan struct{}
 }
 
-func newRateLimitedPeersMap(ttl, cleanupTick time.Duration) *rateLimitedPeersMap {
+func newRateLimitedPeersMap(ttl, cleanupInterval time.Duration) *rateLimitedPeersMap {
 	return &rateLimitedPeersMap{
 		mu:              sync.Mutex{},
 		ttl:             ttl,
-		cleanupInterval: cleanupTick,
+		cleanupInterval: cleanupInterval,
 		peers:           make(map[peer.ID]*rateLimitedPeerMapItem),
 		done:            make(chan struct{}),
 	}

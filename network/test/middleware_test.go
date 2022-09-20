@@ -214,7 +214,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		atomic.AddUint64(&rateLimits, 1)
 	}
 
-	rateLimiters := unicast.NewRateLimiters(messageRateLimiter, nil, onRateLimit, false)
+	rateLimiters := unicast.NewRateLimiters(messageRateLimiter, &unicast.NoopRateLimiter{}, onRateLimit, false)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
@@ -312,7 +312,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		close(ch)
 	}
 
-	rateLimiters := unicast.NewRateLimiters(nil, bandwidthRateLimiter, onRateLimit, false)
+	rateLimiters := unicast.NewRateLimiters(&unicast.NoopRateLimiter{}, bandwidthRateLimiter, onRateLimit, false)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)

@@ -84,7 +84,6 @@ func (r *rateLimiterMap) cleanupLoop() {
 		case _, ok := <-r.done:
 			// clean up and return when channel is closed
 			if !ok {
-				r.cleanup()
 				return
 			}
 		}
