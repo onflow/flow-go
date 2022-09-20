@@ -34,7 +34,7 @@ func (m *MessageProcessor) Process(channel channels.Channel, originID flow.Ident
 		Str("origin_id", fmt.Sprintf("%v", originID)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
 	lg.Debug().Msg("processing new incoming event")
-	attackerRegistered := m.ingressController.HandleIncomingEvent(channel, originID, event)
+	attackerRegistered := m.ingressController.HandleIncomingEvent(event, channel, originID)
 	if !attackerRegistered {
 		// No attack orchestrator registered yet, hence pass the ingress message back to the original processor.
 		err := m.originalProcessor.Process(channel, originID, event)

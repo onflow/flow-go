@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestHandleOutgoingEvent_AttackerObserve evaluates that the incoming messages to the corrupted network are routed to the
+// TestHandleOutgoingEvent_AttackerObserve evaluates that the incoming messages to the corrupt network are routed to the
 // registered attacker if one exists.
 func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	codec := unittest.NetworkCodec()

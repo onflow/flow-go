@@ -506,7 +506,8 @@ func (n *Network) HandleOutgoingEvent(
 	return nil
 }
 
-func (n *Network) HandleIncomingEvent(channel channels.Channel, originId flow.Identifier, event interface{}) bool {
+// HandleIncomingEvent returns true if an attacker is registered and false otherwise
+func (n *Network) HandleIncomingEvent(event interface{}, channel channels.Channel, originId flow.Identifier) bool {
 	lg := n.logger.With().
 		Hex("corrupt_id", logging.ID(n.me.NodeID())).
 		Str("channel", string(channel)).

@@ -8,8 +8,14 @@ import (
 	"github.com/onflow/flow-go/insecure"
 )
 
+// mockAttackerObserveClient is used for unit testing the corrupt network by abstracting away the gRPC implementation
+// It doesn't have any networking primitive, so we just can test the interaction between the corrupt network and the attacker observer client.
 type mockAttackerObserveClient struct {
 	grpc.ClientStream
+
+	// incomingBuffer imitates the gRPC buffer of the orchestrator network,
+	// i.e., when a corrupt network is relaying an ingress/egress message to an attacker for observation,
+	// the message goes to the gRPC buffer (i.e., incomingBuffer).
 	incomingBuffer chan *insecure.Message
 	closed         chan interface{}
 }
