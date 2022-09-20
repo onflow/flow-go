@@ -115,7 +115,7 @@ spec:
             {{ if $v.storage }}
             storage: {{ $v.storage }}
             {{ else}}
-            storage: {{ $.Values.access.defaults.storage }}
+            storage: {{ $.Values.verification.defaults.storage }}
             {{ end }}
 {{- end }}
 
