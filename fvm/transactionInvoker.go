@@ -52,11 +52,12 @@ func (i *TransactionInvoker) Process(
 		blockHeight = ctx.BlockHeader.Height
 	}
 
-	var env *TransactionEnv
 	var txError error
 
 	parentState := sth.State()
 	childState := sth.NewChild()
+
+	chainID := ctx.Chain.ChainID()
 
 	defer func() {
 		// an extra check for state holder health, this should never happen
@@ -78,8 +79,8 @@ func (i *TransactionInvoker) Process(
 
 		// backwards compatibility to enable rolling deploy
 		enforceLimits := sth.EnforceInteractionLimits()
-		if (ctx.Chain.ChainID() == flow.Mainnet && blockHeight > uint64(36419249)) ||
-			(ctx.Chain.ChainID() == flow.Testnet && blockHeight > uint64(78354421)) {
+		if (chainID == flow.Mainnet && blockHeight > uint64(36419249)) ||
+			(chainID == flow.Testnet && blockHeight > uint64(78354421)) {
 			enforceLimits = false
 		}
 
@@ -106,11 +107,12 @@ func (i *TransactionInvoker) Process(
 			Interface:         env,
 			Location:          location,
 			PredeclaredValues: predeclaredValues,
+			CheckerOptions:    ctx.CheckerOptions(),
 		},
 	)
 	if err != nil {
-		var interactionLimiExceededErr *errors.LedgerInteractionLimitExceededError
-		if errors.As(err, &interactionLimiExceededErr) {
+		var interactionLimitExceededErr *errors.LedgerInteractionLimitExceededError
+		if errors.As(err, &interactionLimitExceededErr) {
 			// If it is this special interaction limit error, just set it directly as the tx error
 			txError = err
 		} else {

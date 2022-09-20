@@ -132,8 +132,9 @@ func (i ScriptInvoker) Process(
 			Arguments: proc.Arguments,
 		},
 		runtime.Context{
-			Interface: env,
-			Location:  location,
+			Interface:      env,
+			Location:       location,
+			CheckerOptions: ctx.CheckerOptions(),
 		},
 	)
 

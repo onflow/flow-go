@@ -55,6 +55,7 @@ func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error)
 		runtime.Context{
 			Interface:         env,
 			PredeclaredValues: predeclaredValues,
+			CheckerOptions:    env.Context().CheckerOptions(),
 		},
 	)
 
