@@ -52,7 +52,7 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 	require.Error(t, err)
 
 	err = errors2.Unwrap(err)
-	require.IsType(t, &errors.ValueError{}, err)
+	require.IsType(t, errors.ValueError{}, err)
 
 	errorString := err.Error()
 	assert.True(t, utf8.ValidString(errorString))
@@ -80,7 +80,7 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_sign_algo(t *testi
 	_, err := NewAccountPublicKey(publicKey, sema.HashAlgorithmSHA2_384, 0, 0)
 
 	err = errors2.Unwrap(err)
-	require.IsType(t, &errors.ValueError{}, err)
+	require.IsType(t, errors.ValueError{}, err)
 
 	require.Contains(t, err.Error(), fmt.Sprintf("%d", invalidSignAlgo))
 
@@ -111,7 +111,7 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_hash_algo(t *testi
 	_, err := NewAccountPublicKey(publicKey, invalidHashAlgo, 0, 0)
 
 	err = errors2.Unwrap(err)
-	require.IsType(t, &errors.ValueError{}, err)
+	require.IsType(t, errors.ValueError{}, err)
 
 	require.Contains(t, err.Error(), fmt.Sprintf("%d", invalidHashAlgo))
 
@@ -133,14 +133,14 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_hash_algo(t *testi
 func TestNewAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 
 	publicKey := &runtime.PublicKey{
-		PublicKey: []byte{0xc3, 0x28}, //some invalid UTF8
+		PublicKey: []byte{0xc3, 0x28}, // some invalid UTF8
 		SignAlgo:  runtime.SignatureAlgorithmECDSA_P256,
 	}
 
 	_, err := NewAccountPublicKey(publicKey, runtime.HashAlgorithmSHA2_256, 0, 0)
 
 	err = errors2.Unwrap(err)
-	require.IsType(t, &errors.ValueError{}, err)
+	require.IsType(t, errors.ValueError{}, err)
 
 	errorString := err.Error()
 	assert.True(t, utf8.ValidString(errorString))
