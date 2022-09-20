@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	p2putils "github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/cobra"
@@ -14,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/p2p"
 )
 
 var (
@@ -185,7 +185,7 @@ func validateAddressFormat(address string) {
 	checkErr(err)
 
 	// create a libp2p address from the ip and port
-	lp2pAddr := p2p.MultiAddressStr(ip, port)
+	lp2pAddr := p2putils.MultiAddressStr(ip, port)
 	_, err = multiaddr.NewMultiaddr(lp2pAddr)
 	checkErr(err)
 }
