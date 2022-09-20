@@ -34,7 +34,7 @@ func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	// validate the subtrie node checksum
 	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum)
 	if err != nil {
-		return nil, fmt.Errorf("could not read top level nodes: %w", err)
+		return nil, fmt.Errorf("could not read top level nodes or tries: %w", err)
 	}
 
 	return tries, nil
@@ -237,7 +237,6 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	tries := make([]*trie.MTrie, triesCount)
 
 	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
-	totalNodeCount := uint64(totalSubTrieNodeCount) + topLevelNodesCount
 	// TODO: read subtrie Node count and validate
 
 	_, err = file.Seek(0, io.SeekStart)
@@ -254,7 +253,6 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	// be large enough to handle almost all payloads and 100% of interim nodes.
 	scratch := make([]byte, 1024*4) // must not be less than 1024
 
-	fmt.Println("=========", totalSubTrieNodeCount, topLevelNodesCount, totalNodeCount, subtrieNodes)
 	// read the nodes from subtrie level to the root level
 	for i := uint64(1); i <= topLevelNodesCount; i++ {
 		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
@@ -271,16 +269,14 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 		topLevelNodes[i] = node
 	}
 
-	fmt.Println("=========", topLevelNodes, triesCount)
 	// read the trie root nodes
 	for i := uint16(0); i < triesCount; i++ {
 		trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
-			fmt.Println("get node at index", nodeIndex)
 			return getNodeByIndex(subtrieNodes, topLevelNodes, nodeIndex)
 		})
 
 		if err != nil {
-			return nil, fmt.Errorf("cannot read trie at index %d: %w", i, err)
+			return nil, fmt.Errorf("cannot read root trie at index %d: %w", i, err)
 		}
 		tries[i] = trie
 	}
@@ -345,5 +341,6 @@ func getNodeByIndex(subtrieNodes [][]*node.Node, topLevelNodes []*node.Node, ind
 		return nil, fmt.Errorf("can not find node by index: %v in subtrieNodes %v, topLevelNodes %v", index, subtrieNodes, topLevelNodes)
 	}
 
-	return topLevelNodes[offset], nil
+	// +1 because first item is always nil
+	return topLevelNodes[offset+1], nil
 }
