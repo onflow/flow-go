@@ -111,7 +111,7 @@ func TestTransactionVerification(t *testing.T) {
 		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
 		require.Error(t, err)
 
-		var envelopeError *errors.InvalidEnvelopeSignatureError
+		var envelopeError errors.InvalidEnvelopeSignatureError
 		require.ErrorAs(t, err, &envelopeError)
 	})
 
@@ -147,7 +147,7 @@ func TestTransactionVerification(t *testing.T) {
 		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
 		require.Error(t, err)
 
-		var payloadError *errors.InvalidPayloadSignatureError
+		var payloadError errors.InvalidPayloadSignatureError
 		require.ErrorAs(t, err, &payloadError)
 	})
 
@@ -181,7 +181,7 @@ func TestTransactionVerification(t *testing.T) {
 		require.Error(t, err)
 
 		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
-		var payloadError *errors.InvalidPayloadSignatureError
+		var payloadError errors.InvalidPayloadSignatureError
 		require.ErrorAs(t, err, &payloadError)
 	})
 

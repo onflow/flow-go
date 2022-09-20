@@ -40,7 +40,7 @@ func TestChainPrograms(t *testing.T) {
 	prog1 := &interpreter.Program{}
 
 	block1.Set(loc1, prog1, nil)
-	block1.Cleanup(ModifiedSets{}) // aka commit
+	block1.Cleanup(ModifiedSetsInvalidator{}) // aka commit
 
 	foundProg, _, ok := block1.GetForTestingOnly(loc1)
 	require.True(t, ok)
@@ -60,7 +60,7 @@ func TestChainPrograms(t *testing.T) {
 	prog2 := &interpreter.Program{}
 
 	block2.Set(loc2, prog2, nil)
-	block2.Cleanup(ModifiedSets{}) // aka commit
+	block2.Cleanup(ModifiedSetsInvalidator{}) // aka commit
 
 	foundProg, _, ok = block2.GetForTestingOnly(loc1)
 	require.True(t, ok)
