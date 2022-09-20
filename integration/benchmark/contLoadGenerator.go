@@ -281,18 +281,22 @@ func (lg *ContLoadGenerator) stopWorkers(numWorkers, diff int) {
 	lg.workers = lg.workers[:start]
 }
 
-func (lg *ContLoadGenerator) SetTPS(num uint) error {
+// SetTPS compares the given TPS to the current TPS to determine whether to increase
+// or decrease the load.
+// It increases/decreases the load by adjusting the number of workers, since each worker
+// is responsible for sending the load at 1 TPS.
+func (lg *ContLoadGenerator) SetTPS(desired uint) error {
 	lg.mu.Lock()
 	defer lg.mu.Unlock()
 
-	numWorkers := len(lg.workers)
-	diff := int(num) - numWorkers
+	currentTPS := len(lg.workers)
+	diff := int(desired) - currentTPS
 
 	switch {
 	case diff > 0:
-		lg.startWorkers(numWorkers, diff)
+		lg.startWorkers(currentTPS, diff)
 	case diff < 0:
-		lg.stopWorkers(numWorkers, -diff)
+		lg.stopWorkers(currentTPS, -diff)
 	}
 	lg.workerStatsTracker.AddWorkers(diff)
 	return nil
