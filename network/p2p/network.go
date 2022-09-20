@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -537,7 +538,12 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 }
 
 func (n *Network) Topology() flow.IdentityList {
-	return n.topology.Fanout(n.Identities())
+	fanout := n.topology.Fanout(n.Identities())
+	me := n.Identities().Filter(filter.HasNodeID(n.me.NodeID()))[0]
+	if me.Role == flow.RoleAccess {
+		fanout.Union(n.Identities().Filter(filter.HasRole(flow.RoleExecution)))
+	}
+	return fanout
 }
 
 func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
