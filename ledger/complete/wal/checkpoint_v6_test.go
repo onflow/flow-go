@@ -136,6 +136,7 @@ func TestGetNodesByIndex(t *testing.T) {
 	topLevelNodes := []*node.Node{nil, ns[3]}
 
 	for i := uint64(1); i <= 4; i++ {
+		fmt.Println(i)
 		node, err := getNodeByIndex(subtrieNodes, topLevelNodes, i)
 		require.NoError(t, err, "cannot get node by index", i)
 		require.Equal(t, ns[i-1], node, "got wrong node by index", i)

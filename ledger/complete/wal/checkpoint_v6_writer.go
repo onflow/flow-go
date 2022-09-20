@@ -253,7 +253,10 @@ func storeSubTrieConcurrently(
 		}
 
 		for root, index := range result.Roots {
-			results[root] = index
+			// the original index is relative to the subtrie file itself.
+			// but we need a global index to be referenced by top level trie,
+			// therefore we need to add the nodeCounter
+			results[root] = index + nodeCounter
 		}
 		nodeCounter += result.NodeCount
 		checksums = append(checksums, result.Checksum)
@@ -431,7 +434,6 @@ func storeRootNodes(
 			return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(rootHash[:]))
 		}
 
-		fmt.Println("root index", rootIndex)
 		encTrie := encodeNode(t, rootIndex, scratch)
 		_, err := writer.Write(encTrie)
 		if err != nil {
