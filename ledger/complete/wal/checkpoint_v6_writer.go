@@ -66,6 +66,7 @@ func StoreCheckpointV6(
 	}
 
 	logger.Info().Msgf("subtrie have been stored. sub trie node count: %v", subTriesNodeCount)
+	fmt.Println("======>", subTrieRootIndices)
 
 	topTrieChecksum, err := storeTopLevelNodesAndTrieRoots(
 		tries, subTrieRootIndices, subTriesNodeCount, outputDir, outputFile, logger)
@@ -155,7 +156,7 @@ func storeTopLevelNodesAndTrieRoots(
 	topLevelNodeIndices, topLevelNodesCount, err := storeTopLevelNodes(
 		tries,
 		subTrieRootIndices,
-		subTriesNodeCount,
+		subTriesNodeCount+1, // the counter is 1 more than the node count, because the first item is nil
 		writer)
 
 	if err != nil {
