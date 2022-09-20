@@ -52,8 +52,6 @@ type mockReadyDone struct {
 	ready chan struct{}
 	done  chan struct{}
 
-	mu sync.Mutex
-
 	startOnce sync.Once
 	stopOnce  sync.Once
 }

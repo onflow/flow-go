@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -24,11 +25,15 @@ import (
 func TestPeerManager_Integration(t *testing.T) {
 	count := 5
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+
+	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_peer_manager", count)
-	defer stopNodes(t, nodes)
+	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), "test_peer_manager", count)
+
+	startNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	defer stopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	thisNode := nodes[0]
 	topologyPeers := identities[1:]
@@ -62,7 +67,7 @@ func TestPeerManager_Integration(t *testing.T) {
 
 	// initially no node should be in peer store of this node.
 	require.Empty(t, thisNode.Host().Network().Peers())
-	peerManager.ForceUpdatePeers()
+	peerManager.ForceUpdatePeers(ctx)
 	time.Sleep(1 * time.Second)
 	// after a forced update all other nodes must be added to the peer store of this node.
 	require.Len(t, thisNode.Host().Network().Peers(), count-1)
@@ -72,7 +77,7 @@ func TestPeerManager_Integration(t *testing.T) {
 	// kicks one node out of the othersIds; this imitates evicting, ejecting, or unstaking a node
 	evictedId := topologyPeers[0]     // evicted one
 	topologyPeers = topologyPeers[1:] // updates otherIds list
-	peerManager.ForceUpdatePeers()
+	peerManager.ForceUpdatePeers(ctx)
 	time.Sleep(1 * time.Second)
 	// after a forced update, the evicted one should be excluded from the peer store.
 	require.Len(t, thisNode.Host().Network().Peers(), count-2)

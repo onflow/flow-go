@@ -35,8 +35,8 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := nodeFixture(t, sporkId, sn2, identity2, withRole(flow.RoleConsensus), withLogger(logger))
-	sn2, identity2 := nodeFixture(t, sporkId, sn2, identity2, withRole(flow.RoleConsensus), withLogger(logger))
+	sn1, identity1 := nodeFixture(t, sporkId, t.Name(), withRole(flow.RoleConsensus), withLogger(logger))
+	sn2, identity2 := nodeFixture(t, sporkId, t.Name(), withRole(flow.RoleConsensus), withLogger(logger))
 
 	nodes := []*p2p.Node{sn1, sn2}
 	startNodes(t, signalCtx, nodes, 100*time.Millisecond)

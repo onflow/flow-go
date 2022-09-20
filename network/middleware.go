@@ -3,13 +3,14 @@
 package network
 
 import (
+	"context"
+
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 )
@@ -90,5 +91,5 @@ type PeerManager interface {
 	RequestPeerUpdate()
 
 	// ForceUpdatePeers initiates an update to the peer connections of this node immediately
-	ForceUpdatePeers(irrecoverable.SignalerContext)
+	ForceUpdatePeers(context.Context)
 }

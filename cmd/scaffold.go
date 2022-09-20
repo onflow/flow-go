@@ -1007,6 +1007,9 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	// the dependency list must be initialized outside of the component factory.
 	for _, f := range asyncComponents {
 		err = fnb.handleComponent(f, util.AllReady(f.dependencies...), func() {})
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

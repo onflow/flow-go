@@ -143,7 +143,7 @@ func (pm *PeerManager) RequestPeerUpdate() {
 
 // updatePeers updates the peers by connecting to all the nodes provided by the peersProvider callback and disconnecting from
 // previous nodes that are no longer in the new list of nodes.
-func (pm *PeerManager) updatePeers(ctx irrecoverable.SignalerContext) {
+func (pm *PeerManager) updatePeers(ctx context.Context) {
 
 	// get all the peer ids to connect to
 	peers := pm.peersProvider()
@@ -157,6 +157,6 @@ func (pm *PeerManager) updatePeers(ctx irrecoverable.SignalerContext) {
 }
 
 // ForceUpdatePeers initiates an update to the peer connections of this node immediately
-func (pm *PeerManager) ForceUpdatePeers(ctx irrecoverable.SignalerContext) {
+func (pm *PeerManager) ForceUpdatePeers(ctx context.Context) {
 	pm.updatePeers(ctx)
 }

@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/admin/commands"
-	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -672,13 +671,9 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 	// enqueue the regular network
 	builder.EnqueueNetworkInit()
 
-	builder.
-		AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
-			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
-		}).
-		AdminCommand("read-execution-data", func(conf *cmd.NodeConfig) commands.AdminCommand {
-			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataService)
-		})
+	builder.AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
+		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
+	})
 
 	// if this is an access node that supports public followers, enqueue the public network
 	if builder.supportsObserver {
@@ -1006,7 +1001,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 		connManager := p2p.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
 
 		// disable connection pruning for the access node which supports the observer
-		peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(builder.PeerUpdateInterval)}, p2p.WithConnectionPruning(false))
+		peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningDisabled, builder.PeerUpdateInterval)
 
 		libp2pNode, err := p2p.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
 			SetBasicResolver(builder.Resolver).
