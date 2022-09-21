@@ -1,4 +1,4 @@
-package handler
+package environment
 
 import (
 	"fmt"
@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -29,21 +28,21 @@ type TransactionPrograms interface {
 // these nested transactions on Set calls in order to capture the states
 // needed for parsing the programs.
 type Programs struct {
-	tracer *environment.Tracer
-	meter  environment.Meter
+	tracer *Tracer
+	meter  Meter
 
 	stateTransaction *state.StateHolder
-	accounts         environment.Accounts
+	accounts         Accounts
 
 	transactionPrograms TransactionPrograms
 }
 
 // NewPrograms construts a new ProgramHandler
 func NewPrograms(
-	tracer *environment.Tracer,
-	meter environment.Meter,
+	tracer *Tracer,
+	meter Meter,
 	stateTransaction *state.StateHolder,
-	accounts environment.Accounts,
+	accounts Accounts,
 	transactionPrograms TransactionPrograms,
 ) *Programs {
 	return &Programs{
@@ -128,7 +127,7 @@ func (programs *Programs) GetProgram(
 ) {
 	defer programs.tracer.StartSpanFromRoot(trace.FVMEnvGetProgram).End()
 
-	err := programs.meter.MeterComputation(environment.ComputationKindGetProgram, 1)
+	err := programs.meter.MeterComputation(ComputationKindGetProgram, 1)
 	if err != nil {
 		return nil, fmt.Errorf("get program failed: %w", err)
 	}
@@ -156,7 +155,7 @@ func (programs *Programs) SetProgram(
 ) error {
 	defer programs.tracer.StartSpanFromRoot(trace.FVMEnvSetProgram).End()
 
-	err := programs.meter.MeterComputation(environment.ComputationKindSetProgram, 1)
+	err := programs.meter.MeterComputation(ComputationKindSetProgram, 1)
 	if err != nil {
 		return fmt.Errorf("set program failed: %w", err)
 	}
