@@ -92,36 +92,6 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 
 }
 
-func TestState_InteractionMeasuring(t *testing.T) {
-	view := utils.NewSimpleView()
-	st := state.NewState(view, state.DefaultParameters())
-
-	key := "key1"
-	value := createByteArray(1)
-	err := st.Set("address", key, value, true)
-	keySize := uint64(len("address") + len(key))
-	size := keySize + uint64(len(value))
-	require.NoError(t, err)
-	require.Equal(t, uint64(0), st.ReadCounter)
-	require.Equal(t, uint64(0), st.TotalBytesRead)
-	require.Equal(t, uint64(1), st.WriteCounter)
-	require.Equal(t, size, st.TotalBytesWritten)
-
-	// should read from the delta
-	// should not impact totalBytesRead
-	v, err := st.Get("address", key, true)
-	require.NoError(t, err)
-	require.Equal(t, v, value)
-	require.Equal(t, uint64(0), st.TotalBytesRead)
-
-	// non existing key
-	// should be counted towards reading from the ledger
-	key2 := "key2"
-	_, err = st.Get("address", key2, true)
-	require.NoError(t, err)
-	require.Equal(t, keySize, st.TotalBytesRead)
-}
-
 func TestState_MaxValueSize(t *testing.T) {
 	view := utils.NewSimpleView()
 	st := state.NewState(view, state.DefaultParameters().WithMaxValueSizeAllowed(6))
