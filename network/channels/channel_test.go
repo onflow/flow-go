@@ -1,6 +1,7 @@
 package channels_test
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -28,4 +29,12 @@ func TestChannelList_Exclude(t *testing.T) {
 	require.ElementsMatch(t, channels.ChannelList{"a", "c"}, list.Exclude(channels.ChannelList{"b"}))
 	require.ElementsMatch(t, channels.ChannelList{"b", "c"}, list.Exclude(channels.ChannelList{"a"}))
 	require.ElementsMatch(t, channels.ChannelList{"a", "b", "c"}, list.Exclude(channels.ChannelList{"d"}))
+}
+
+// TestChannelList_Filter tests that the channel list Filter method returns a new channel list
+// with the filtered channels.
+func TestChannelList_Filter(t *testing.T) {
+	list := channels.ChannelList{"test-a", "test-b", "c", "d"}
+	require.ElementsMatch(t, channels.ChannelList{"test-a", "test-b"}, list.Filter(regexp.MustCompile("^test-.*")))
+	require.ElementsMatch(t, channels.ChannelList{"c", "d"}, list.Filter(regexp.MustCompile("^[^test].*")))
 }
