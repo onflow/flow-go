@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 )
 
@@ -16,7 +15,7 @@ func NewScriptEnvironment(
 	fvmContext Context,
 	vm *VirtualMachine,
 	sth *state.StateHolder,
-	programs handler.TransactionPrograms,
+	programs environment.TransactionPrograms,
 ) environment.Environment {
 	return NewScriptEnv(
 		reqContext,
@@ -29,7 +28,7 @@ func NewScriptEnv(
 	reqContext context.Context,
 	fvmContext Context,
 	sth *state.StateHolder,
-	programs handler.TransactionPrograms,
+	programs environment.TransactionPrograms,
 ) environment.Environment {
 	return newFacadeEnvironment(
 		fvmContext,

@@ -1,4 +1,4 @@
-package handler
+package environment
 
 import (
 	"fmt"
@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/environment"
 	stateMock "github.com/onflow/flow-go/fvm/mock/state"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -60,7 +59,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	stTxn := state.NewStateTransaction(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	accounts := NewAccounts(stTxn)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
 	err := accounts.Create(nil, address)
@@ -133,7 +132,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 	stTxn := state.NewStateTransaction(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	accounts := NewAccounts(stTxn)
 
 	authAdd := flow.HexToAddress("01")
 	rAdd := runtime.Address(authAdd)
@@ -258,7 +257,7 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 	stTxn := state.NewStateTransaction(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	accounts := NewAccounts(stTxn)
 
 	addressWithVoucher := flow.HexToAddress("01")
 	addressWithVoucherRuntime := runtime.Address(addressWithVoucher)
@@ -313,7 +312,7 @@ func TestContract_ContractUpdate(t *testing.T) {
 	stTxn := state.NewStateTransaction(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	accounts := NewAccounts(stTxn)
 
 	flowAddress := flow.HexToAddress("01")
 	runtimeAddress := runtime.Address(flowAddress)
@@ -411,7 +410,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 	stTxn := state.NewStateTransaction(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	accounts := NewAccounts(stTxn)
 
 	flowAddress := flow.HexToAddress("01")
 	runtimeAddress := runtime.Address(flowAddress)
