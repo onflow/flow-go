@@ -5,7 +5,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/scoring"
@@ -46,4 +48,29 @@ func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 
 	// as peer 1 has subscribed to unknown topics, the subscription validator should return an error.
 	require.Error(t, sv.MustSubscribedToAllowedTopics(peer1))
+}
+
+// TestSubscriptionValidator_ValidSubscription tests that when a peer has subscribed to valid
+// topics based on its Flow protocol role, the subscription validator returns no error.
+func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
+	idProvider := mock.NewIdentityProvider(t)
+	sp := mockp2p.NewSubscriptionProvider(t)
+
+	sv := scoring.NewSubscriptionValidator(idProvider)
+	sv.RegisterSubscriptionProvider(sp)
+
+	for _, role := range flow.Roles() {
+		peer := p2pfixtures.PeerIdFixture(t)
+		allowedChannels := channels.ChannelsByRole(role).Exclude(channels.ChannelList{"test-network", "test-metrics"})
+		sporkID := unittest.IdentifierFixture()
+
+		allowedTopics := make([]string, 0, len(allowedChannels))
+		for _, channel := range allowedChannels {
+			allowedTopics = append(allowedTopics, channels.TopicFromChannel(channel, sporkID).String())
+		}
+
+		idProvider.On("ByPeerID", peer).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
+		sp.On("GetSubscribedTopics", peer).Return(allowedTopics)
+		require.NoError(t, sv.MustSubscribedToAllowedTopics(peer))
+	}
 }
