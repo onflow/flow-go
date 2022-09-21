@@ -25,6 +25,9 @@ func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 
 	headerPath := filePathHeader(dir, fileName)
 	subtrieChecksums, topTrieChecksum, err := readHeader(headerPath)
+	if err != nil {
+		return nil, fmt.Errorf("could not read header: %w", err)
+	}
 
 	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums)
 	if err != nil {
@@ -62,22 +65,22 @@ func readHeader(filePath string) ([]uint32, uint32, error) {
 	return make([]uint32, 16), 0, nil
 }
 
-func readNodeCountAndTriesCount(f *os.File) (uint64, uint16, error) {
-	// read the node count and tries count from the end of the file
-	const footerOffset = encNodeCountSize + encTrieCountSize + crc32SumSize
-	const footerSize = encNodeCountSize + encTrieCountSize // footer doesn't include crc32 sum
-	footer := make([]byte, footerSize)                     // must not be less than 1024
-	_, err := f.Seek(-footerOffset, io.SeekEnd)
-	if err != nil {
-		return 0, 0, fmt.Errorf("cannot seek to footer: %w", err)
-	}
-	_, err = io.ReadFull(f, footer)
-	if err != nil {
-		return 0, 0, fmt.Errorf("could not read footer: %w", err)
-	}
-
-	return decodeFooter(footer)
-}
+// func readNodeCountAndTriesCount(f *os.File) (uint64, uint16, error) {
+// 	// read the node count and tries count from the end of the file
+// 	const footerOffset = encNodeCountSize + encTrieCountSize + crc32SumSize
+// 	const footerSize = encNodeCountSize + encTrieCountSize // footer doesn't include crc32 sum
+// 	footer := make([]byte, footerSize)                     // must not be less than 1024
+// 	_, err := f.Seek(-footerOffset, io.SeekEnd)
+// 	if err != nil {
+// 		return 0, 0, fmt.Errorf("cannot seek to footer: %w", err)
+// 	}
+// 	_, err = io.ReadFull(f, footer)
+// 	if err != nil {
+// 		return 0, 0, fmt.Errorf("could not read footer: %w", err)
+// 	}
+//
+// 	return decodeFooter(footer)
+// }
 
 func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32) ([][]*node.Node, error) {
 	// TODO: replace 16 with const
@@ -148,7 +151,6 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 	scratch := make([]byte, 1024*4)           // must not be less than 1024
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	for i := uint64(1); i <= nodesCount; i++ {
-		fmt.Println("==== reading sub trie node", i)
 		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= uint64(i) {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
@@ -171,11 +173,6 @@ type resultReadSubTrie struct {
 	Err   error
 }
 
-type subTrie struct {
-	file      *os.File
-	nodeCount uint64
-}
-
 func readSubTriesNodeCount(f *os.File) (uint64, error) {
 	const footerSize = encNodeCountSize // footer doesn't include crc32 sum
 	const footerOffset = footerSize + crc32SumSize
@@ -191,15 +188,6 @@ func readSubTriesNodeCount(f *os.File) (uint64, error) {
 	}
 
 	return decodeSubtrieFooter(footer)
-}
-
-func openFileByIndex(filePath string, index int) (*os.File, error) {
-	filepath := fmt.Sprintf("%v.%v", filePath, index)
-	file, err := os.Open(filepath)
-	if err != nil {
-		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
-	}
-	return file, nil
 }
 
 // 17th part file contains:
