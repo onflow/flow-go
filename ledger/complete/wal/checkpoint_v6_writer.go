@@ -8,11 +8,12 @@ import (
 	"io"
 	"os"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	utilsio "github.com/onflow/flow-go/utils/io"
-	"github.com/rs/zerolog"
 )
 
 const subtrieLevel = 4
@@ -66,7 +67,6 @@ func StoreCheckpointV6(
 	}
 
 	logger.Info().Msgf("subtrie have been stored. sub trie node count: %v", subTriesNodeCount)
-	fmt.Println("======>", subTrieRootIndices)
 
 	topTrieChecksum, err := storeTopLevelNodesAndTrieRoots(
 		tries, subTrieRootIndices, subTriesNodeCount, outputDir, outputFile, logger)
@@ -106,9 +106,22 @@ func storeCheckpointSummary(
 		}
 	}()
 
-	// write version and checksums
-	// writer := NewCRC33Writer(closable)
+	// write version
+	version := encodeVersion(MagicBytes, VersionV6)
+	writer := NewCRC32Writer(closable)
+	_, err = writer.Write(version)
+	if err != nil {
+		return fmt.Errorf("cannot write checksum summary header: %w", err)
+	}
 
+	// TODO: write checksums
+
+	// write checksum to the end of the file
+	checksum := writer.Crc32()
+	_, err = writer.Write(encodeCRC32Sum(checksum))
+	if err != nil {
+		return fmt.Errorf("cannot write CRC32 checksum to checkpoint summary: %w", err)
+	}
 	return nil
 }
 
@@ -496,4 +509,21 @@ func decodeCRC32Sum(encoded []byte) (uint32, error) {
 		return 0, fmt.Errorf("wrong crc32sum, expect %v, got %v", crc32SumSize, len(encoded))
 	}
 	return binary.BigEndian.Uint32(encoded), nil
+}
+
+func encodeVersion(magic uint16, version uint16) []byte {
+	// Write header: magic (2 bytes) + version (2 bytes)
+	header := make([]byte, encMagicSize+encVersionSize)
+	binary.BigEndian.PutUint16(header, magic)
+	binary.BigEndian.PutUint16(header[encMagicSize:], version)
+	return header
+}
+
+func decodeVersion(encoded []byte) (uint16, uint16, error) {
+	if len(encoded) != encMagicSize+encVersionSize {
+		return 0, 0, fmt.Errorf("wrong version, expect %v, got %v", encMagicSize+encVersionSize, len(encoded))
+	}
+	magicBytes := binary.BigEndian.Uint16(encoded)
+	version := binary.BigEndian.Uint16(encoded[encMagicSize:])
+	return magicBytes, version, nil
 }

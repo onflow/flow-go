@@ -5,14 +5,22 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
+
+func TestVersion(t *testing.T) {
+	m, v, err := decodeVersion(encodeVersion(MagicBytes, VersionV6))
+	require.NoError(t, err)
+	require.Equal(t, MagicBytes, m)
+	require.Equal(t, VersionV6, v)
+}
 
 func TestCRC32SumEncoding(t *testing.T) {
 	v := uint32(3)
@@ -34,18 +42,6 @@ func TestFooterEncoding(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, n1, n2)
 	require.Equal(t, r1, r2)
-}
-
-func createTries(n int) ([]*trie.MTrie, error) {
-	tries := make([]*trie.MTrie, 0)
-	for i := 0; i < n; i++ {
-		trie, err := randomMTrie()
-		if err != nil {
-			return nil, err
-		}
-		tries = append(tries, trie)
-	}
-	return tries, nil
 }
 
 func requireTriesEqual(t *testing.T, tries1, tries2 []*trie.MTrie) {
@@ -82,13 +78,11 @@ func TestEncodeSubTrie(t *testing.T) {
 	subtrieRoots := createSubTrieRoots(tries)
 
 	for index, roots := range subtrieRoots {
-		fmt.Println("testing for", index, "roots")
 		unittest.RunWithTempDir(t, func(dir string) {
 			indices, nodeCount, checksum, err := storeCheckpointSubTrie(
 				index, roots, estimatedSubtrieNodeCount, dir, file, &logger)
 			require.NoError(t, err)
 
-			fmt.Println("indices", indices, "roots", roots)
 			if len(indices) > 1 {
 				require.Len(t, indices, len(roots)+1, // +1 means the default (nil: 0) is included
 					"indices %v should include all roots %v", indices, roots)
@@ -110,7 +104,7 @@ func TestEncodeSubTrie(t *testing.T) {
 				if root == nil {
 					continue
 				}
-				index, _ := indices[root]
+				index := indices[root]
 				require.Equal(t, root.Hash(), nodes[index].Hash(),
 					"readCheckpointSubTrie should return nodes where the root should be found "+
 						"by the index specified by the indices returned by storeCheckpointSubTrie")

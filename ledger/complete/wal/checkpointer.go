@@ -48,6 +48,11 @@ const VersionV4 uint16 = 0x04
 // See EncodeNode() and EncodeTrie() for more details.
 const VersionV5 uint16 = 0x05
 
+// Version 6 includes these changes:
+// - trie nodes are stored in additional 17 checkpoint files, with .0, .1, .2, ... .16 as
+//   file name extension
+const VersionV6 uint16 = 0x06
+
 // MaxVersion is the latest checkpoint version we support.
 // Need to update MaxVersion when creating a newer version.
 const MaxVersion = VersionV5
@@ -578,13 +583,13 @@ func getNodesAtLevel(root *node.Node, level uint) []*node.Node {
 }
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
-	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
-	return LoadCheckpoint(filepath, &c.wal.log)
+	filename := NumberToFilename(checkpoint)
+	return LoadCheckpoint(c.dir, filename, &c.wal.log)
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
-	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
-	return LoadCheckpoint(filepath, &c.wal.log)
+	filename := bootstrap.FilenameWALRootCheckpoint
+	return LoadCheckpoint(c.dir, filename, &c.wal.log)
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
@@ -601,7 +606,8 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
-func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func LoadCheckpoint(dir string, filename string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+	filepath := path.Join(dir, filename)
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
@@ -616,10 +622,10 @@ func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, err
 		_ = file.Close()
 	}()
 
-	return readCheckpoint(file)
+	return readCheckpoint(file, dir, filename)
 }
 
-func readCheckpoint(f *os.File) ([]*trie.MTrie, error) {
+func readCheckpoint(f *os.File, dir string, filename string) ([]*trie.MTrie, error) {
 
 	// Read header: magic (2 bytes) + version (2 bytes)
 	header := make([]byte, headerSize)
@@ -649,6 +655,8 @@ func readCheckpoint(f *os.File) ([]*trie.MTrie, error) {
 		return readCheckpointV4(f)
 	case VersionV5:
 		return readCheckpointV5(f)
+	case VersionV6:
+		return ReadCheckpointV6(dir, filename)
 	default:
 		return nil, fmt.Errorf("unsupported file version %x", version)
 	}
