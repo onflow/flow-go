@@ -61,8 +61,6 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 	sv.RegisterSubscriptionProvider(sp)
 
 	for _, role := range flow.Roles() {
-		// mocks peer subscribed to all valid topics based on its Flow protocol role (excluding the
-		// test topics).
 		peer := p2pfixtures.PeerIdFixture(t)
 		allowedChannels := channels.ChannelsByRole(role).Filter(regexp.MustCompile("^(!?test).*"))
 		sporkID := unittest.IdentifierFixture()
@@ -72,8 +70,11 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 			allowedTopics = append(allowedTopics, channels.TopicFromChannel(channel, sporkID).String())
 		}
 
-		idProvider.On("ByPeerID", peer).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
-		sp.On("GetSubscribedTopics", peer).Return(allowedTopics)
-		require.NoError(t, sv.MustSubscribedToAllowedTopics(peer))
+		// peer should pass the subscription validator as it has subscribed to any subset of its allowed topics.
+		for i := range allowedTopics {
+			idProvider.On("ByPeerID", peer).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
+			sp.On("GetSubscribedTopics", peer).Return(allowedTopics[:i+1])
+			require.NoError(t, sv.MustSubscribedToAllowedTopics(peer))
+		}
 	}
 }
