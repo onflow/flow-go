@@ -1,6 +1,7 @@
 package channels
 
 import (
+	"regexp"
 	"sort"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -57,6 +58,17 @@ func (cl ChannelList) Exclude(other ChannelList) ChannelList {
 	var result ChannelList
 	for _, c := range cl {
 		if !other.Contains(c) {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+// Filter returns a new ChannelList containing only the Channels that satisfy the given predicate.
+func (cl ChannelList) Filter(regexp *regexp.Regexp) ChannelList {
+	var result ChannelList
+	for _, c := range cl {
+		if regexp.MatchString(c.String()) {
 			result = append(result, c)
 		}
 	}
