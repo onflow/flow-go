@@ -232,7 +232,7 @@ func CreateAccountsWithSimpleAddresses(
 
 	serviceAddress := chain.ServiceAddress()
 
-	for i, privateKey := range privateKeys {
+	for _, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
 		encPublicKey := accountKey.PublicKey.Encode()
 		cadPublicKey := BytesToCadenceArray(encPublicKey)
@@ -252,7 +252,7 @@ func CreateAccountsWithSimpleAddresses(
 			AddArgument(encCadPublicKey).
 			AddAuthorizer(serviceAddress)
 
-		tx := fvm.Transaction(txBody, uint32(i))
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 		err := vm.RunV2(ctx, tx, view)
 		if err != nil {
 			return nil, err

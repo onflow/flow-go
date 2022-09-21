@@ -23,6 +23,14 @@ import (
 	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
 
+	"github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/ping"
+	"github.com/onflow/flow-go/network/p2p/subscription"
+
+	"github.com/onflow/flow-go/network/p2p/connection"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/admin/commands/common"
@@ -198,7 +206,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
 
 		// setup the Ping provider to return the software version and the sealed block height
-		pingInfoProvider := &p2p.PingInfoProviderImpl{
+		pingInfoProvider := &ping.InfoProvider{
 			SoftwareVersionFun: func() string {
 				return build.Semver()
 			},
@@ -279,9 +287,9 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		myAddr = fnb.BaseConfig.BindAddr
 	}
 
-	var mwOpts []p2p.MiddlewareOption
+	var mwOpts []middleware.MiddlewareOption
 	if len(fnb.MsgValidators) > 0 {
-		mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
+		mwOpts = append(mwOpts, middleware.WithMessageValidators(fnb.MsgValidators...))
 	}
 
 	connGaterPeerDialFilters := make([]p2p.PeerFilter, 0)
@@ -331,9 +339,9 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		}
 	}
 
-	mwOpts = append(mwOpts, p2p.WithUnicastRateLimiters(unicastRateLimiters))
+	mwOpts = append(mwOpts, middleware.WithUnicastRateLimiters(unicastRateLimiters))
 
-	libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
+	libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 		fnb.Logger,
 		myAddr,
 		fnb.NetworkKey,
@@ -346,21 +354,20 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		connGaterInterceptSecureFilters,
 	)
 
-	peerManagerFactory := p2p.PeerManagerFactory(fnb.NetworkConnectionPruning, fnb.PeerUpdateInterval)
-
+	peerManagerFactory := connection.PeerManagerFactory(fnb.NetworkConnectionPruning, fnb.PeerUpdateInterval)
 	mwOpts = append(mwOpts,
-		p2p.WithPeerManager(peerManagerFactory),
-		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
+		middleware.WithPeerManager(peerManagerFactory),
+		middleware.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
 	)
 
 	// peerManagerFilters are used by the peerManager via the middleware to filter peers from the topology.
 	if len(peerManagerFilters) > 0 {
-		mwOpts = append(mwOpts, p2p.WithPeerManagerFilters(peerManagerFilters))
+		mwOpts = append(mwOpts, middleware.WithPeerManagerFilters(peerManagerFilters))
 	}
 
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
 
-	fnb.Middleware = p2p.NewMiddleware(
+	fnb.Middleware = middleware.NewMiddleware(
 		fnb.Logger,
 		libP2PNodeFactory,
 		fnb.Me.NodeID(),
@@ -374,7 +381,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		mwOpts...,
 	)
 
-	subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
+	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 	if fnb.HeroCacheMetricsEnable {
 		heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
@@ -777,8 +784,9 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
-	commits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
+	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
+	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
 
 	fnb.Storage = Storage{
 		Headers:      headers,
@@ -792,14 +800,15 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Transactions: transactions,
 		Collections:  collections,
 		Setups:       setups,
-		EpochCommits: commits,
+		EpochCommits: epochCommits,
 		Statuses:     statuses,
+		Commits:      commits,
 	}
 }
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
 	fnb.Module("id providers", func(node *NodeConfig) error {
-		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
+		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
 			return err
 		}
@@ -1531,7 +1540,7 @@ func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
 	return inmem.SnapshotFromEncodable(snapshot), nil
 }
 
-// Loads the private info for this node from disk (eg. private staking/network keys).
+// LoadPrivateNodeInfo the private info for this node from disk (e.g., private staking/network keys).
 func LoadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
 	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID))
 	data, err := io.ReadFile(path)

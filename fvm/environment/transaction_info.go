@@ -14,6 +14,12 @@ import (
 // Note that scripts have no associated transaction information, but must expose
 // the API in compliance with the runtime environment interface.
 type TransactionInfo interface {
+	TxIndex() uint32
+	TxID() flow.Identifier
+
+	TransactionFeesEnabled() bool
+	LimitAccountStorage() bool
+
 	SigningAccounts() []runtime.Address
 
 	IsServiceAccountAuthorizer() bool
@@ -24,6 +30,12 @@ type TransactionInfo interface {
 }
 
 type transactionInfo struct {
+	txIndex uint32
+	txId    flow.Identifier
+
+	transactionFeesEnabled bool
+	limitAccountStorage    bool
+
 	tracer *Tracer
 
 	authorizers                []runtime.Address
@@ -31,6 +43,10 @@ type transactionInfo struct {
 }
 
 func NewTransactionInfo(
+	txIndex uint32,
+	txId flow.Identifier,
+	transactionFeesEnabled bool,
+	limitAccountStorage bool,
 	tracer *Tracer,
 	authorizers []flow.Address,
 	serviceAccount flow.Address,
@@ -47,10 +63,30 @@ func NewTransactionInfo(
 	}
 
 	return &transactionInfo{
+		txIndex:                    txIndex,
+		txId:                       txId,
+		transactionFeesEnabled:     transactionFeesEnabled,
+		limitAccountStorage:        limitAccountStorage,
 		tracer:                     tracer,
 		authorizers:                runtimeAddresses,
 		isServiceAccountAuthorizer: isServiceAccountAuthorizer,
 	}
+}
+
+func (info *transactionInfo) TxIndex() uint32 {
+	return info.txIndex
+}
+
+func (info *transactionInfo) TxID() flow.Identifier {
+	return info.txId
+}
+
+func (info *transactionInfo) TransactionFeesEnabled() bool {
+	return info.transactionFeesEnabled
+}
+
+func (info *transactionInfo) LimitAccountStorage() bool {
+	return info.limitAccountStorage
 }
 
 func (info *transactionInfo) SigningAccounts() []runtime.Address {
@@ -71,6 +107,22 @@ var _ TransactionInfo = NoTransactionInfo{}
 
 // Scripts have no associated transaction information.
 type NoTransactionInfo struct {
+}
+
+func (NoTransactionInfo) TxIndex() uint32 {
+	return 0
+}
+
+func (NoTransactionInfo) TxID() flow.Identifier {
+	return flow.ZeroID
+}
+
+func (NoTransactionInfo) TransactionFeesEnabled() bool {
+	return false
+}
+
+func (NoTransactionInfo) LimitAccountStorage() bool {
+	return false
 }
 
 func (NoTransactionInfo) SigningAccounts() []runtime.Address {

@@ -10,9 +10,6 @@ import (
 )
 
 // TODO(patrick): rm
-type ModifiedSets = ModifiedSetsInvalidator
-
-// TODO(patrick): rm
 type Programs struct {
 	lock sync.RWMutex
 
@@ -77,13 +74,7 @@ func (p *Programs) Set(location common.Location, program *interpreter.Program, s
 	p.currentTxn.Set(location, program, state)
 }
 
-// HasChanges indicates if any changes has been introduced
-// essentially telling if this object is identical to its parent
-func (p *Programs) HasChanges() bool {
-	return true
-}
-
-func (p *Programs) Cleanup(modifiedSets ModifiedSets) {
+func (p *Programs) Cleanup(modifiedSets ModifiedSetsInvalidator) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 

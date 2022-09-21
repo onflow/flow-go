@@ -127,7 +127,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
-	programsCache, err := NewProgramsCache(10)
+	programsCache, err := programs.NewChainPrograms(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
@@ -226,7 +226,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
-	programsCache, err := NewProgramsCache(10)
+	programsCache, err := programs.NewChainPrograms(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
@@ -276,8 +276,6 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block11, res = createTestBlockAndRun(t, engine, block1, col11, block11View)
 		// cache should include value for this block
 		require.NotNil(t, programsCache.Get(block11.ID()))
-		// cache should have changes
-		require.True(t, programsCache.Get(block11.ID()).HasChanges())
 		// 1st event should be contract deployed
 		assert.EqualValues(t, "flow.AccountContractAdded", res.Events[0][0].Type)
 	})
@@ -297,8 +295,6 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block111, res = createTestBlockAndRun(t, engine, block11, col111, block111View)
 		// cache should include a program for this block
 		require.NotNil(t, programsCache.Get(block111.ID()))
-		// cache should have changes
-		require.True(t, programsCache.Get(block111.ID()).HasChanges())
 
 		require.Len(t, res.Events, 2)
 

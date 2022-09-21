@@ -59,7 +59,8 @@ type ContLoadGenerator struct {
 	availableAccounts   chan *flowAccount // queue with accounts available for workers
 	workerStatsTracker  *WorkerStatsTracker
 	workers             []*Worker
-	stopped             bool
+	stopped             bool // TODO(ajm): remove this and just use the channel in Init()
+	stoppedChannel      chan struct{}
 	follower            TxFollower
 	availableAccountsLo int
 }
@@ -155,6 +156,7 @@ func New(
 		workerStatsTracker:  NewWorkerStatsTracker(),
 		follower:            follower,
 		availableAccountsLo: loadParams.NumberOfAccounts,
+		stoppedChannel:      make(chan struct{}),
 	}
 
 	return lGen, nil
@@ -267,6 +269,11 @@ func (lg *ContLoadGenerator) Start() {
 }
 
 func (lg *ContLoadGenerator) Stop() {
+	if lg.stopped {
+		lg.log.Warn().Msg("Stop() called on generator when already stopped")
+		return
+	}
+
 	defer lg.log.Debug().Msg("stopped generator")
 
 	lg.stopped = true
@@ -286,6 +293,11 @@ func (lg *ContLoadGenerator) Stop() {
 	lg.workerStatsTracker.StopPrinting()
 	lg.log.Debug().Msg("stopping follower")
 	lg.follower.Stop()
+	close(lg.stoppedChannel)
+}
+
+func (lg *ContLoadGenerator) Done() <-chan struct{} {
+	return lg.stoppedChannel
 }
 
 func (lg *ContLoadGenerator) GetTxExecuted() int {

@@ -31,7 +31,7 @@ func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []
 	a := flow.HexToAddress("1234")
 	b := flow.HexToAddress("5678")
 
-	//create accounts
+	// create accounts
 	accounts := environment.NewAccounts(stTxn)
 	err := accounts.Create(aPubKeys, a)
 	require.NoError(t, err)
@@ -50,14 +50,13 @@ func TestAccountFreezing(t *testing.T) {
 
 		address, _, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		programsStorage := programs.NewEmptyPrograms()
+		blockPrograms := programs.NewEmptyPrograms()
 
 		// account should no be frozen
 		frozen, err := accounts.GetAccountFrozen(address)
 		require.NoError(t, err)
 		require.False(t, frozen)
 
-		vm := fvm.NewVM()
 		txInvoker := fvm.NewTransactionInvoker()
 
 		code := fmt.Sprintf(`
@@ -70,11 +69,13 @@ func TestAccountFreezing(t *testing.T) {
 
 		tx := flow.TransactionBody{Script: []byte(code)}
 		tx.AddAuthorizer(chain.ServiceAddress())
-		proc := fvm.Transaction(&tx, 0)
+		proc := fvm.Transaction(&tx, blockPrograms.NextTxIndexForTestingOnly())
 
-		context := fvm.NewContext(fvm.WithChain(chain))
+		context := fvm.NewContext(
+			fvm.WithChain(chain),
+			fvm.WithBlockPrograms(blockPrograms))
 
-		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
+		err = txInvoker.Process(context, proc, st, blockPrograms)
 		require.NoError(t, err)
 
 		// account should be frozen now
@@ -196,11 +197,11 @@ func TestAccountFreezing(t *testing.T) {
 		require.Error(t, proc.Err)
 
 		// find frozen account specific error
-		require.IsType(t, &errors.CadenceRuntimeError{}, proc.Err)
-		err = proc.Err.(*errors.CadenceRuntimeError).Unwrap()
+		require.IsType(t, errors.CadenceRuntimeError{}, proc.Err)
+		err = proc.Err.(errors.CadenceRuntimeError).Unwrap()
 
-		require.IsType(t, &runtime.Error{}, err)
-		err = err.(*runtime.Error).Err
+		require.IsType(t, runtime.Error{}, err)
+		err = err.(runtime.Error).Err
 
 		require.IsType(t, &runtime.ParsingCheckingError{}, err)
 		err = err.(*runtime.ParsingCheckingError).Err
@@ -214,7 +215,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.IsType(t, &sema.ImportedProgramError{}, checkerErrors[0])
 
 		importedCheckerError := checkerErrors[0].(*sema.ImportedProgramError).Err
-		accountFrozenError := &errors.FrozenAccountError{}
+		accountFrozenError := errors.FrozenAccountError{}
 
 		require.True(t, errors.As(importedCheckerError, &accountFrozenError))
 		require.Equal(t, address, accountFrozenError.Address())
@@ -255,7 +256,8 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
-				fvm.NewTransactionInvoker()))
+				fvm.NewTransactionInvoker()),
+			fvm.WithBlockPrograms(programsStorage))
 
 		err := vm.RunV2(context, procFrozen, st.ViewForTestingOnly())
 		require.NoError(t, err)
@@ -339,11 +341,11 @@ func TestAccountFreezing(t *testing.T) {
 		require.Error(t, proc.Err)
 
 		// find frozen account specific error
-		require.IsType(t, &errors.CadenceRuntimeError{}, proc.Err)
-		err = proc.Err.(*errors.CadenceRuntimeError).Unwrap()
+		require.IsType(t, errors.CadenceRuntimeError{}, proc.Err)
+		err = proc.Err.(errors.CadenceRuntimeError).Unwrap()
 
-		require.IsType(t, &runtime.Error{}, err)
-		err = err.(*runtime.Error).Err
+		require.IsType(t, runtime.Error{}, err)
+		err = err.(runtime.Error).Err
 
 		require.IsType(t, &runtime.ParsingCheckingError{}, err)
 		err = err.(*runtime.ParsingCheckingError).Err
@@ -357,7 +359,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.IsType(t, &sema.ImportedProgramError{}, checkerErrors[0])
 
 		importedCheckerError := checkerErrors[0].(*sema.ImportedProgramError).Err
-		accountFrozenError := &errors.FrozenAccountError{}
+		accountFrozenError := errors.FrozenAccountError{}
 
 		require.True(t, errors.As(importedCheckerError, &accountFrozenError))
 		require.Equal(t, frozenAddress, accountFrozenError.Address())
@@ -367,8 +369,9 @@ func TestAccountFreezing(t *testing.T) {
 
 		vm := fvm.NewVM()
 		// create default context
-		context := fvm.NewContext()
 		programsStorage := programs.NewEmptyPrograms()
+		context := fvm.NewContext(
+			fvm.WithBlockPrograms(programsStorage))
 
 		ledger := testutil.RootBootstrappedLedger(vm, context)
 
@@ -477,7 +480,8 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
 				fvm.NewTransactionVerifier(-1),
-				fvm.NewTransactionInvoker()))
+				fvm.NewTransactionInvoker()),
+			fvm.WithBlockPrograms(programsStorage))
 
 		// freeze account
 
@@ -492,11 +496,10 @@ func TestAccountFreezing(t *testing.T) {
 		tx := &flow.TransactionBody{Script: []byte(freezeTx)}
 		tx.AddAuthorizer(chain.ServiceAddress())
 
-		proc := fvm.Transaction(tx, 0)
+		proc := fvm.Transaction(tx, programsStorage.NextTxIndexForTestingOnly())
 
 		txInvoker := fvm.NewTransactionInvoker()
-		var err error
-		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
+		err := txInvoker.Process(context, proc, st, programsStorage)
 		require.NoError(t, err)
 
 		// make sure freeze status is correct
@@ -535,8 +538,8 @@ func TestAccountFreezing(t *testing.T) {
 			require.Error(t, frozenProc.Err)
 
 			// find frozen account specific error
-			require.IsType(t, &errors.FrozenAccountError{}, frozenProc.Err)
-			accountFrozenError := frozenProc.Err.(*errors.FrozenAccountError)
+			require.IsType(t, errors.FrozenAccountError{}, frozenProc.Err)
+			accountFrozenError := frozenProc.Err.(errors.FrozenAccountError)
 			require.Equal(t, frozenAddress, accountFrozenError.Address())
 		})
 
@@ -569,8 +572,8 @@ func TestAccountFreezing(t *testing.T) {
 			require.Error(t, frozenProc.Err)
 
 			// find frozen account specific error
-			require.IsType(t, &errors.FrozenAccountError{}, frozenProc.Err)
-			accountFrozenError := frozenProc.Err.(*errors.FrozenAccountError)
+			require.IsType(t, errors.FrozenAccountError{}, frozenProc.Err)
+			accountFrozenError := frozenProc.Err.(errors.FrozenAccountError)
 			require.Equal(t, frozenAddress, accountFrozenError.Address())
 		})
 
@@ -603,8 +606,8 @@ func TestAccountFreezing(t *testing.T) {
 			require.Error(t, frozenProc.Err)
 
 			// find frozen account specific error
-			require.IsType(t, &errors.FrozenAccountError{}, frozenProc.Err)
-			accountFrozenError := frozenProc.Err.(*errors.FrozenAccountError)
+			require.IsType(t, errors.FrozenAccountError{}, frozenProc.Err)
+			accountFrozenError := frozenProc.Err.(errors.FrozenAccountError)
 			require.Equal(t, frozenAddress, accountFrozenError.Address())
 		})
 
