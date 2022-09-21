@@ -1,6 +1,7 @@
 package scoring_test
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -60,8 +61,10 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 	sv.RegisterSubscriptionProvider(sp)
 
 	for _, role := range flow.Roles() {
+		// mocks peer subscribed to all valid topics based on its Flow protocol role (excluding the
+		// test topics).
 		peer := p2pfixtures.PeerIdFixture(t)
-		allowedChannels := channels.ChannelsByRole(role).Exclude(channels.ChannelList{"test-network", "test-metrics"})
+		allowedChannels := channels.ChannelsByRole(role).Filter(regexp.MustCompile("^(!?test).*"))
 		sporkID := unittest.IdentifierFixture()
 
 		allowedTopics := make([]string, 0, len(allowedChannels))
