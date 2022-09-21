@@ -62,7 +62,8 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 
 	for _, role := range flow.Roles() {
 		peer := p2pfixtures.PeerIdFixture(t)
-		allowedChannels := channels.ChannelsByRole(role).Filter(regexp.MustCompile("^(!?test).*"))
+		// allowed channels for the role excluding the test channels.
+		allowedChannels := channels.ChannelsByRole(role).ExcludePattern(regexp.MustCompile("^(test).*"))
 		sporkID := unittest.IdentifierFixture()
 
 		allowedTopics := make([]string, 0, len(allowedChannels))
@@ -76,5 +77,29 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 			sp.On("GetSubscribedTopics", peer).Return(allowedTopics[:i+1])
 			require.NoError(t, sv.MustSubscribedToAllowedTopics(peer))
 		}
+	}
+}
+
+// TestSubscriptionValidator_SubscribeToAllTopics tests that regardless of its role when a peer has subscribed to all
+// topics, the subscription validator returns an error.
+func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
+	idProvider := mock.NewIdentityProvider(t)
+	sp := mockp2p.NewSubscriptionProvider(t)
+
+	sv := scoring.NewSubscriptionValidator(idProvider)
+	sv.RegisterSubscriptionProvider(sp)
+
+	allChannels := channels.Channels().ExcludePattern(regexp.MustCompile("^(test).*"))
+	sporkID := unittest.IdentifierFixture()
+	allTopics := make([]string, 0, len(allChannels))
+	for _, channel := range allChannels {
+		allTopics = append(allTopics, channels.TopicFromChannel(channel, sporkID).String())
+	}
+
+	for _, role := range flow.Roles() {
+		peer := p2pfixtures.PeerIdFixture(t)
+		idProvider.On("ByPeerID", peer).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
+		sp.On("GetSubscribedTopics", peer).Return(allTopics)
+		require.Error(t, sv.MustSubscribedToAllowedTopics(peer), role)
 	}
 }
