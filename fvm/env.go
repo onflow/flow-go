@@ -97,6 +97,7 @@ func newFacadeEnvironment(
 			meter,
 			accounts,
 			systemContracts,
+			ctx.ServiceAccountEnabled,
 		),
 		TransactionInfo: environment.NoTransactionInfo{},
 
