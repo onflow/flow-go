@@ -7,10 +7,30 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // TODO(patrick): rm after emulator is updated
 type Environment = environment.Environment
+
+type EnvironmentParams struct {
+	Chain flow.Chain
+
+	environment.EventEmitterParams
+
+	environment.TransactionInfoParams
+
+	environment.ContractUpdaterParams
+}
+
+func DefaultEnvironmentParams() EnvironmentParams {
+	return EnvironmentParams{
+		Chain:                 flow.Mainnet.Chain(),
+		EventEmitterParams:    environment.DefaultEventEmitterParams(),
+		TransactionInfoParams: environment.DefaultTransactionInfoParams(),
+		ContractUpdaterParams: environment.DefaultContractUpdaterParams(),
+	}
+}
 
 var _ environment.Environment = &facadeEnvironment{}
 

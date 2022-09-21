@@ -48,11 +48,10 @@ func NewTransactionEnv(
 		environment.NewMeter(sth),
 	)
 
+	ctx.TxIndex = txIndex
+	ctx.TxId = txID
 	env.TransactionInfo = environment.NewTransactionInfo(
-		txIndex,
-		txID,
-		ctx.TransactionFeesEnabled,
-		ctx.LimitAccountStorage,
+		ctx.TransactionInfoParams,
 		env.Tracer,
 		tx.Authorizers,
 		ctx.Chain.ServiceAddress(),
@@ -64,8 +63,7 @@ func NewTransactionEnv(
 		txID,
 		txIndex,
 		tx.Payer,
-		ctx.ServiceEventCollectionEnabled,
-		ctx.EventCollectionByteSizeLimit,
+		ctx.EventEmitterParams,
 	)
 	env.AccountCreator = environment.NewAccountCreator(
 		sth,
@@ -86,8 +84,7 @@ func NewTransactionEnv(
 		env.accounts,
 		env.TransactionInfo,
 		ctx.Chain,
-		ctx.RestrictContractDeployment,
-		ctx.RestrictContractRemoval,
+		ctx.ContractUpdaterParams,
 		env.ProgramLogger,
 		env.SystemContracts,
 		env.Runtime)

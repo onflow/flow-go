@@ -17,6 +17,22 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
+type ContractUpdaterParams struct {
+	// Depricated: RestrictedDeploymentEnabled is deprecated use
+	// SetIsContractDeploymentRestrictedTransaction instead.
+	// Can be removed after all networks are migrated to
+	// SetIsContractDeploymentRestrictedTransaction
+	RestrictContractDeployment bool
+	RestrictContractRemoval    bool
+}
+
+func DefaultContractUpdaterParams() ContractUpdaterParams {
+	return ContractUpdaterParams{
+		RestrictContractDeployment: true,
+		RestrictContractRemoval:    true,
+	}
+}
+
 type sortableContractUpdates struct {
 	keys    []programs.ContractUpdateKey
 	updates []programs.ContractUpdate
@@ -97,9 +113,9 @@ type ContractUpdaterStubs interface {
 }
 
 type contractUpdaterStubsImpl struct {
-	chain                      flow.Chain
-	restrictContractDeployment bool
-	restrictContractRemoval    bool
+	chain flow.Chain
+
+	ContractUpdaterParams
 
 	logger          *ProgramLogger
 	systemContracts *SystemContracts
@@ -113,7 +129,7 @@ func (impl *contractUpdaterStubsImpl) RestrictedDeploymentEnabled() bool {
 		// fallback to the default value set by the configuration
 		// after the contract deployment bool is set by the state on all
 		// chains, this logic can be simplified
-		return impl.restrictContractDeployment
+		return impl.RestrictContractDeployment
 	}
 	return enabled
 }
@@ -154,7 +170,7 @@ func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
 func (impl *contractUpdaterStubsImpl) RestrictedRemovalEnabled() bool {
 	// TODO read this from the chain similar to the contract deployment
 	// but for now we would honor the fallback context flag
-	return impl.restrictContractRemoval
+	return impl.RestrictContractRemoval
 }
 
 // GetAuthorizedAccounts returns a list of addresses authorized by the service
@@ -227,8 +243,7 @@ func NewContractUpdaterForTesting(
 		accounts,
 		nil,
 		nil,
-		false,
-		false,
+		DefaultContractUpdaterParams(),
 		nil,
 		nil,
 		nil)
@@ -242,8 +257,7 @@ func NewContractUpdater(
 	accounts Accounts,
 	transactionInfo TransactionInfo,
 	chain flow.Chain,
-	restrictContractDeployment bool,
-	restrictContractRemoval bool,
+	params ContractUpdaterParams,
 	logger *ProgramLogger,
 	systemContracts *SystemContracts,
 	runtime *Runtime,
@@ -254,12 +268,11 @@ func NewContractUpdater(
 		accounts:        accounts,
 		transactionInfo: transactionInfo,
 		ContractUpdaterStubs: &contractUpdaterStubsImpl{
-			logger:                     logger,
-			chain:                      chain,
-			restrictContractDeployment: restrictContractDeployment,
-			restrictContractRemoval:    restrictContractRemoval,
-			systemContracts:            systemContracts,
-			runtime:                    runtime,
+			logger:                logger,
+			chain:                 chain,
+			ContractUpdaterParams: params,
+			systemContracts:       systemContracts,
+			runtime:               runtime,
 		},
 	}
 
