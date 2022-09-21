@@ -17,20 +17,19 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
-
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/test"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -56,7 +55,6 @@ func NetworkingKeyFixtures(t *testing.T) crypto.PrivateKey {
 // It returns the node and its identity.
 func NodeFixture(
 	t *testing.T,
-	ctx context.Context,
 	sporkID flow.Identifier,
 	dhtPrefix string,
 	opts ...NodeFixtureParameterOption,
@@ -106,7 +104,7 @@ func NodeFixture(
 		builder.SetConnectionGater(connGater)
 	}
 
-	n, err := builder.Build(ctx)
+	n, err := builder.Build()
 	require.NoError(t, err)
 
 	err = n.WithDefaultUnicastProtocol(parameters.HandlerFunc, parameters.Unicasts)
@@ -185,17 +183,38 @@ func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 	}
 }
 
-// StopNodes stop all nodes in the input slice
-func StopNodes(t *testing.T, nodes []*p2pnode.Node) {
-	for _, n := range nodes {
-		StopNode(t, n)
+// StartNodes start all nodes in the input slice using the provided context, timing out if nodes are
+// not all Ready() before duration expires
+func StartNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []*p2pnode.Node, timeout time.Duration) {
+	rdas := make([]module.ReadyDoneAware, 0, len(nodes))
+	for _, node := range nodes {
+		node.Start(ctx)
+		rdas = append(rdas, node)
+	}
+	unittest.RequireComponentsReadyBefore(t, timeout, rdas...)
+}
+
+// StartNode start a single node using the provided context, timing out if nodes are not all Ready()
+// before duration expires
+func StartNode(t *testing.T, ctx irrecoverable.SignalerContext, node *p2pnode.Node, timeout time.Duration) {
+	node.Start(ctx)
+	unittest.RequireComponentsReadyBefore(t, timeout, node)
+}
+
+// StopNodes stops all nodes in the input slice using the provided cancel func, timing out if nodes are
+// not all Done() before duration expires
+func StopNodes(t *testing.T, nodes []*p2pnode.Node, cancel context.CancelFunc, timeout time.Duration) {
+	cancel()
+	for _, node := range nodes {
+		unittest.RequireComponentsDoneBefore(t, timeout, node)
 	}
 }
 
-func StopNode(t *testing.T, n *p2pnode.Node) {
-	done, err := n.Stop()
-	assert.NoError(t, err)
-	unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop node on ime")
+// StopNode stops a single node using the provided cancel func, timing out if nodes are not all Done()
+// before duration expires
+func StopNode(t *testing.T, node *p2pnode.Node, cancel context.CancelFunc, timeout time.Duration) {
+	cancel()
+	unittest.RequireComponentsDoneBefore(t, timeout, node)
 }
 
 // SilentNodeFixture returns a TCP listener and a node which never replies
@@ -239,25 +258,16 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 
 // NodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func NodesFixture(t *testing.T, ctx context.Context, sporkID flow.Identifier, dhtPrefix string, count int, opts ...NodeFixtureParameterOption) ([]*p2pnode.Node,
+func NodesFixture(t *testing.T, sporkID flow.Identifier, dhtPrefix string, count int, opts ...NodeFixtureParameterOption) ([]*p2pnode.Node,
 	flow.IdentityList) {
 	// keeps track of errors on creating a node
-	var err error
 	var nodes []*p2pnode.Node
-
-	defer func() {
-		if err != nil && nodes != nil {
-			// stops all nodes upon an error in starting even one single node
-			StopNodes(t, nodes)
-			t.Fail()
-		}
-	}()
 
 	// creating nodes
 	var identities flow.IdentityList
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
-		node, identity := NodeFixture(t, ctx, sporkID, dhtPrefix, opts...)
+		node, identity := NodeFixture(t, sporkID, dhtPrefix, opts...)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}
@@ -285,7 +295,7 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 		opt(builder)
 	}
 
-	libp2pNode, err := builder.Build(context.TODO())
+	libp2pNode, err := builder.Build()
 	require.NoError(t, err)
 
 	return libp2pNode

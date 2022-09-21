@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -131,7 +130,7 @@ func TestRemovePeers(t *testing.T) {
 
 	// create nodes
 	nodes, identities := p2pfixtures.NodesFixture(t, unittest.IdentifierFixture(), "test_remove_peers", count)
-	peerInfos, errs := p2p.PeerInfosFromIDs(identities)
+	peerInfos, errs := utils.PeerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
 
 	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)

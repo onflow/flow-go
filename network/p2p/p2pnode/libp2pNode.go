@@ -60,35 +60,33 @@ type Node struct {
 	subs               map[channels.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
 	routing            routing.Routing
 	pCache             *ProtocolPeerCache
-	peerManager        *PeerManager
-	peerManagerFactory PeerManagerFactoryFunc
+	peerManager        p2p.PeerManager
+	peerManagerFactory p2p.PeerManagerFactoryFunc
 }
 
 // NewNode creates a new libp2p node and sets its parameters.
 func NewNode(
 	logger zerolog.Logger,
 	host host.Host,
-	pubSub *pubsub.PubSub,
-	routing routing.Routing,
 	pCache *ProtocolPeerCache,
-	uniMgr *unicast.Manager) *Node {
-
+	uniMgr *unicast.Manager,
+	peerManagerFactory p2p.PeerManagerFactoryFunc,
+) *Node {
 	return &Node{
-		uniMgr:  uniMgr,
-		host:    host,
-		pubSub:  pubSub,
-		logger:  logger.With().Str("component", "libp2p-node").Logger(),
-		topics:  make(map[channels.Topic]*pubsub.Topic),
-		subs:    make(map[channels.Topic]*pubsub.Subscription),
-		routing: routing,
-		pCache:  pCache,
+		uniMgr:             uniMgr,
+		host:               host,
+		logger:             logger.With().Str("component", "libp2p-node").Logger(),
+		topics:             make(map[channels.Topic]*pubsub.Topic),
+		subs:               make(map[channels.Topic]*pubsub.Subscription),
+		pCache:             pCache,
+		peerManagerFactory: peerManagerFactory,
 	}
 }
 
 var _ component.Component = (*Node)(nil)
 
 // stop terminates the libp2p node.
-func (n *Node) stop() error {
+func (n *Node) Stop() error {
 	var result error
 
 	n.logger.Debug().Msg("unsubscribing from all topics")
@@ -325,7 +323,7 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 // WithPeersProvider sets the PeersProvider for the peer manager.
 // If a peer manager factory is set, this method will build the peer manager and initialize it with
 // the provided PeersProvider.
-func (n *Node) WithPeersProvider(peersProvider connection.PeersProvider) error {
+func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) error {
 	if n.peerManagerFactory == nil {
 		return nil
 	}
@@ -366,6 +364,6 @@ func (n *Node) Routing() routing.Routing {
 	return n.routing
 }
 
-func (n *Node) SetPubsub(pubsub *pubsub.PubSub) {
+func (n *Node) SetPubSub(pubsub *pubsub.PubSub) {
 	n.pubSub = pubsub
 }

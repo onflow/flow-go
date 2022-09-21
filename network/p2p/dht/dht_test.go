@@ -37,10 +37,10 @@ func TestFindPeerWithDHT(t *testing.T) {
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
 	sporkId := unittest.IdentifierFixture()
-	dhtServerNodes, _ := p2pfixtures.NodesFixture(t, sporkId, "dht_test", 2, p2pfixtures.withDHTOptions(dht.AsServer()))
+	dhtServerNodes, _ := p2pfixtures.NodesFixture(t, sporkId, "dht_test", 2, p2pfixtures.WithDHTOptions(dht.AsServer()))
 	require.Len(t, dhtServerNodes, 2)
 
-	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, sporkId, "dht_test", count-2, p2pfixtures.withDHTOptions(dht.AsClient()))
+	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, sporkId, "dht_test", count-2, p2pfixtures.WithDHTOptions(dht.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
 	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)

@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
@@ -53,7 +52,7 @@ func DefaultLibP2PNodeFactory(
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
 	role string,
-	peerManagerFactory PeerManagerFactoryFunc,
+	peerManagerFactory p2p.PeerManagerFactoryFunc,
 ) LibP2PFactoryFunc {
 
 	return func() (*p2pnode.Node, error) {
@@ -107,7 +106,7 @@ type NodeBuilder interface {
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 	SetPubSub(func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)) NodeBuilder
-	SetPeerManagerFactory(PeerManagerFactoryFunc) NodeBuilder
+	SetPeerManagerFactory(p2p.PeerManagerFactoryFunc) NodeBuilder
 	Build() (*p2pnode.Node, error)
 }
 
@@ -123,7 +122,7 @@ type LibP2PNodeBuilder struct {
 	connGater          connmgr.ConnectionGater
 	routingFactory     func(context.Context, host.Host) (routing.Routing, error)
 	pubsubFactory      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
-	peerManagerFactory PeerManagerFactoryFunc
+	peerManagerFactory p2p.PeerManagerFactoryFunc
 }
 
 func NewNodeBuilder(
@@ -183,7 +182,7 @@ func (builder *LibP2PNodeBuilder) SetPubSub(f func(context.Context, host.Host, .
 }
 
 // SetPeerManagerFactory sets the peer manager factory function.
-func (builder *LibP2PNodeBuilder) SetPeerManagerFactory(fn PeerManagerFactoryFunc) NodeBuilder {
+func (builder *LibP2PNodeBuilder) SetPeerManagerFactory(fn p2p.PeerManagerFactoryFunc) NodeBuilder {
 	builder.peerManagerFactory = fn
 	return builder
 }
@@ -233,24 +232,13 @@ func (builder *LibP2PNodeBuilder) Build() (*p2pnode.Node, error) {
 		return nil, err
 	}
 
-	node := &Node{
-		topics: make(map[channels.Topic]*pubsub.Topic),
-		subs:   make(map[channels.Topic]*pubsub.Subscription),
-		logger: builder.logger,
-		host:   host,
-		unicastManager: unicast.NewUnicastManager(
-			builder.logger,
-			unicast.NewLibP2PStreamFactory(host),
-			builder.sporkID,
-		),
-		pCache:             pCache,
-		peerManagerFactory: builder.peerManagerFactory,
-	}
-	node := p2pnode.NewNode(builder.logger, host, pubSub, rsys, pCache, unicast.NewUnicastManager(
+	unicastManager := unicast.NewUnicastManager(
 		builder.logger,
 		unicast.NewLibP2PStreamFactory(host),
 		builder.sporkID,
-	))
+	)
+
+	node := p2pnode.NewNode(builder.logger, host, pCache, unicastManager, builder.peerManagerFactory)
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -284,7 +272,7 @@ func (builder *LibP2PNodeBuilder) Build() (*p2pnode.Node, error) {
 			ready()
 			<-ctx.Done()
 
-			err = node.stop()
+			err = node.Stop()
 			if err != nil {
 				// ignore context cancellation errors
 				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {

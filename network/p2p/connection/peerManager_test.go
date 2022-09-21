@@ -56,9 +56,6 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
-
 	// create some test ids
 	pids := suite.generatePeerIDs(10)
 
@@ -78,7 +75,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 
 	// very first call to updatepeer
 	suite.Run("updatePeers only connects to all peers the first time", func() {
-		pm.ForceUpdatePeers(signalCtx)
+		pm.ForceUpdatePeers(ctx)
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 1)
 	})
 
@@ -88,7 +85,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		newPIDs := suite.generatePeerIDs(1)
 		pids = append(pids, newPIDs...)
 
-		pm.ForceUpdatePeers(signalCtx)
+		pm.ForceUpdatePeers(ctx)
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 2)
 	})
 
@@ -97,7 +94,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		// delete an id
 		pids = removeRandomElement(pids)
 
-		pm.ForceUpdatePeers(signalCtx)
+		pm.ForceUpdatePeers(ctx)
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 3)
 	})
 
@@ -111,7 +108,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		newPIDs := suite.generatePeerIDs(2)
 		pids = append(pids, newPIDs...)
 
-		pm.ForceUpdatePeers(signalCtx)
+		pm.ForceUpdatePeers(ctx)
 
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 4)
 	})

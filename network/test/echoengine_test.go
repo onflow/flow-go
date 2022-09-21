@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -52,7 +52,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	suite.cancel = cancel
 
 	// both nodes should be of the same role to get connected on epidemic dissemination
-	var nodes []*p2p.Node
+	var nodes []*p2pnode.Node
 	suite.ids, nodes, suite.mws, suite.nets, _ = GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,

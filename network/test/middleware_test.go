@@ -62,7 +62,7 @@ type MiddlewareTestSuite struct {
 	suite.Suite
 	sync.RWMutex
 	size      int // used to determine number of middlewares under test
-	nodes     []*p2p.Node
+	nodes     []*p2pnode.Node
 	mws       []network.Middleware // used to keep track of middlewares under test
 	ov        []*mocknetwork.Overlay
 	obs       chan string // used to keep track of Protect events tagged by pubsub messages

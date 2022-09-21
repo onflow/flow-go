@@ -3,8 +3,6 @@
 package network
 
 import (
-	"context"
-
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -79,17 +77,4 @@ type Overlay interface {
 type Connection interface {
 	Send(msg interface{}) error
 	Receive() (interface{}, error)
-}
-
-// PeerManager adds and removes connections to peers periodically and on request
-type PeerManager interface {
-	component.Component
-
-	// RequestPeerUpdate requests an update to the peer connections of this node.
-	// If a peer update has already been requested (either as a periodic request or an on-demand
-	// request) and is outstanding, then this call is a no-op.
-	RequestPeerUpdate()
-
-	// ForceUpdatePeers initiates an update to the peer connections of this node immediately
-	ForceUpdatePeers(context.Context)
 }

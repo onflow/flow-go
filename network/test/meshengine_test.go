@@ -67,7 +67,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
-	var nodes []*p2p.Node
+	var nodes []*p2pnode.Node
 	suite.ids, nodes, suite.mws, suite.nets, obs = GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,

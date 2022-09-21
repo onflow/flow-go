@@ -46,7 +46,7 @@ func TestStreamClosing(t *testing.T) {
 		unittest.IdentifierFixture(),
 		"test_stream_closing",
 		2,
-		p2pfixtures.withDefaultStreamHandler(handler))
+		p2pfixtures.WithDefaultStreamHandler(handler))
 
 	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -336,8 +336,8 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	node1 := nodes[0]
 	node2 := nodes[1]
 
-	startNode(t, signalCtx1, node1, 100*time.Millisecond)
-	startNode(t, signalCtx2, node2, 100*time.Millisecond)
+	p2pfixtures.StartNode(t, signalCtx1, node1, 100*time.Millisecond)
+	p2pfixtures.StartNode(t, signalCtx2, node2, 100*time.Millisecond)
 
 	// stop node 2 immediately
 	p2pfixtures.StopNode(t, node2, cancel2, 100*time.Millisecond)

@@ -114,7 +114,7 @@ func TestCanSubscribe(t *testing.T) {
 	identity, privateKey := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 	sporkId := unittest.IdentifierFixture()
 
-	collectionNode := p2pfixtures.CreateNode(t, identity.NodeID, privateKey, sporkId, zerolog.Nop(), p2pfixtures.withSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
+	collectionNode := p2pfixtures.CreateNode(t, identity.NodeID, privateKey, sporkId, zerolog.Nop(), p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
 
 	p2pfixtures.StartNode(t, signalCtx, collectionNode, 100*time.Millisecond)
 	defer p2pfixtures.StopNode(t, collectionNode, cancel, 1*time.Second)
