@@ -138,17 +138,24 @@ func main() {
 			lg.Start()
 		}
 
+		waitC := make(<-chan time.Time)
 		// if the duration is 0, we run this case forever
-		if c.duration.Nanoseconds() == 0 {
-			for {
-				time.Sleep(time.Minute)
-			}
+		if c.duration.Nanoseconds() != 0 {
+			waitC = time.After(c.duration)
 		}
 
-		time.Sleep(c.duration)
-
-		if lg != nil {
-			lg.Stop()
+		select {
+		case <-waitC:
+			if lg != nil {
+				lg.Stop()
+			}
+		case <-ctx.Done(): //TODO: the loader currently doesn't ever cancel the context
+			if lg != nil {
+				lg.Stop()
+			}
+			// add logging here to express the *why* of the canceled the context.
+			// when the loader cancels its own context it may also call Stop() on itself
+			// this may become redundant.
 		}
 	}
 }
