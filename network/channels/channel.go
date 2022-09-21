@@ -53,8 +53,8 @@ func (cl ChannelList) Contains(channel Channel) bool {
 	return false
 }
 
-// Exclude returns list of channels that are in the ChannelList but not in the other list.
-func (cl ChannelList) Exclude(other ChannelList) ChannelList {
+// ExcludeChannels returns list of channels that are in the ChannelList but not in the other list.
+func (cl ChannelList) ExcludeChannels(other ChannelList) ChannelList {
 	var result ChannelList
 	for _, c := range cl {
 		if !other.Contains(c) {
@@ -64,13 +64,14 @@ func (cl ChannelList) Exclude(other ChannelList) ChannelList {
 	return result
 }
 
-// Filter returns a new ChannelList containing only the Channels that satisfy the given predicate.
-func (cl ChannelList) Filter(regexp *regexp.Regexp) ChannelList {
+// ExcludePattern returns a new ChannelList excluding the Channels that satisfy the given predicate.
+func (cl ChannelList) ExcludePattern(regexp *regexp.Regexp) ChannelList {
 	var result ChannelList
 	for _, c := range cl {
 		if regexp.MatchString(c.String()) {
-			result = append(result, c)
+			continue
 		}
+		result = append(result, c)
 	}
 	return result
 }
