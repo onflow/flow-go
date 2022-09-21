@@ -62,3 +62,11 @@ func (cl ChannelList) Exclude(other ChannelList) ChannelList {
 	}
 	return result
 }
+
+func (cl ChannelList) String() []string {
+	var result []string
+	for _, c := range cl {
+		result = append(result, c.String())
+	}
+	return result
+}
