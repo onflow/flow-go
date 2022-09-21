@@ -85,7 +85,7 @@ func NewNode(
 
 var _ component.Component = (*Node)(nil)
 
-// stop terminates the libp2p node.
+// Stop terminates the libp2p node.
 func (n *Node) Stop() error {
 	var result error
 
@@ -364,6 +364,6 @@ func (n *Node) Routing() routing.Routing {
 	return n.routing
 }
 
-func (n *Node) SetPubSub(pubsub *pubsub.PubSub) {
-	n.pubSub = pubsub
+func (n *Node) SetPubSub(ps *pubsub.PubSub) {
+	n.pubSub = ps
 }

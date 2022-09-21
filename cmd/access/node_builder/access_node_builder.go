@@ -988,11 +988,6 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 			return net, nil
 		}).
 		Component("peer manager", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// TODO: make this component start after its dependencies are ready. This will require a dependable type of component
-			// Depends on:
-			// * middleware
-			// * network
-			// * bitswap
 			return libp2pNode.PeerManagerComponent(), nil
 		})
 }

@@ -242,9 +242,7 @@ func (builder *LibP2PNodeBuilder) Build() (*p2pnode.Node, error) {
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			var err error
 			rsys, err := builder.routingFactory(ctx, host)
-
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create libp2p node routing: %w", err))
 			}
@@ -262,7 +260,6 @@ func (builder *LibP2PNodeBuilder) Build() (*p2pnode.Node, error) {
 			}
 
 			pubSub, err := builder.pubsubFactory(ctx, host, psOpts...)
-
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create libp2p node pubsub: %w", err))
 			}
