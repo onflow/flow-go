@@ -21,20 +21,20 @@ func TestChannelList_Contain(t *testing.T) {
 	require.False(t, list.Contains("d"))
 }
 
-// TestChannelList_Exclude tests that the channel list Exclude method returns a new channel list
+// TestChannelList_ExcludeChannels tests that the channel list ExcludeChannels method returns a new channel list
 // with the excluded channels removed.
-func TestChannelList_Exclude(t *testing.T) {
+func TestChannelList_ExcludeChannels(t *testing.T) {
 	list := channels.ChannelList{"a", "b", "c"}
-	require.ElementsMatch(t, channels.ChannelList{"a", "b"}, list.Exclude(channels.ChannelList{"c"}))
-	require.ElementsMatch(t, channels.ChannelList{"a", "c"}, list.Exclude(channels.ChannelList{"b"}))
-	require.ElementsMatch(t, channels.ChannelList{"b", "c"}, list.Exclude(channels.ChannelList{"a"}))
-	require.ElementsMatch(t, channels.ChannelList{"a", "b", "c"}, list.Exclude(channels.ChannelList{"d"}))
+	require.ElementsMatch(t, channels.ChannelList{"a", "b"}, list.ExcludeChannels(channels.ChannelList{"c"}))
+	require.ElementsMatch(t, channels.ChannelList{"a", "c"}, list.ExcludeChannels(channels.ChannelList{"b"}))
+	require.ElementsMatch(t, channels.ChannelList{"b", "c"}, list.ExcludeChannels(channels.ChannelList{"a"}))
+	require.ElementsMatch(t, channels.ChannelList{"a", "b", "c"}, list.ExcludeChannels(channels.ChannelList{"d"}))
 }
 
-// TestChannelList_Filter tests that the channel list Filter method returns a new channel list
+// TestChannelList_ExcludePattern tests that the channel list ExcludePattern method returns a new channel list
 // with the filtered channels.
-func TestChannelList_Filter(t *testing.T) {
+func TestChannelList_ExcludePattern(t *testing.T) {
 	list := channels.ChannelList{"test-a", "test-b", "c", "d"}
-	require.ElementsMatch(t, channels.ChannelList{"test-a", "test-b"}, list.Filter(regexp.MustCompile("^test-.*")))
-	require.ElementsMatch(t, channels.ChannelList{"c", "d"}, list.Filter(regexp.MustCompile("^[^test].*")))
+	require.ElementsMatch(t, channels.ChannelList{"c", "d"}, list.ExcludePattern(regexp.MustCompile("^(test).*")))
+	require.ElementsMatch(t, channels.ChannelList{"test-a", "test-b"}, list.ExcludePattern(regexp.MustCompile("^[cd].*")))
 }
