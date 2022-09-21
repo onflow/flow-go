@@ -21,9 +21,17 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []flow.AccountPublicKey) (flow.Address, flow.Address, *state.StateHolder) {
+func makeTwoAccounts(
+	t *testing.T,
+	aPubKeys []flow.AccountPublicKey,
+	bPubKeys []flow.AccountPublicKey,
+) (
+	flow.Address,
+	flow.Address,
+	*state.TransactionState,
+) {
 
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		utils.NewSimpleView(),
 		state.DefaultParameters(),
 	)
@@ -32,13 +40,13 @@ func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []
 	b := flow.HexToAddress("5678")
 
 	// create accounts
-	accounts := environment.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(txnState)
 	err := accounts.Create(aPubKeys, a)
 	require.NoError(t, err)
 	err = accounts.Create(bPubKeys, b)
 	require.NoError(t, err)
 
-	return a, b, stTxn
+	return a, b, txnState
 }
 
 func TestAccountFreezing(t *testing.T) {
@@ -420,7 +428,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
-		accountsService := environment.NewAccounts(state.NewStateTransaction(
+		accountsService := environment.NewAccounts(state.NewTransactionState(
 			ledger,
 			state.DefaultParameters(),
 		))
@@ -451,7 +459,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.Error(t, tx.Err)
 
-		accountsService = environment.NewAccounts(state.NewStateTransaction(
+		accountsService = environment.NewAccounts(state.NewTransactionState(
 			ledger,
 			state.DefaultParameters(),
 		))

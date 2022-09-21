@@ -28,7 +28,7 @@ func NewTransactionInvoker() TransactionInvoker {
 func (i TransactionInvoker) Process(
 	ctx Context,
 	proc *TransactionProcedure,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	programs *programsCache.TransactionPrograms,
 ) (processErr error) {
 
@@ -42,14 +42,14 @@ func (i TransactionInvoker) Process(
 		defer span.End()
 	}
 
-	nestedTxnId, err := sth.BeginNestedTransaction()
+	nestedTxnId, err := txnState.BeginNestedTransaction()
 	if err != nil {
 		return err
 	}
 
 	var modifiedSets programsCache.ModifiedSetsInvalidator
 	defer func() {
-		if sth.NumNestedTransactions() > 1 {
+		if txnState.NumNestedTransactions() > 1 {
 			if processErr == nil {
 				// This is a fvm internal programming error.  We forgot to
 				// call Commit somewhere in the control flow.  We should halt.
@@ -58,7 +58,7 @@ func (i TransactionInvoker) Process(
 						"nested transactions.")
 				return
 			} else {
-				err := sth.RestartNestedTransaction(nestedTxnId)
+				err := txnState.RestartNestedTransaction(nestedTxnId)
 				if err != nil {
 					// This should never happen since merging views should
 					// never fail.
@@ -86,13 +86,13 @@ func (i TransactionInvoker) Process(
 		// transaction without any deployed contracts
 		programs.AddInvalidator(modifiedSets)
 
-		err := sth.Commit(nestedTxnId)
+		err := txnState.Commit(nestedTxnId)
 		if err != nil {
 			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", err)
 		}
 	}()
 
-	env := NewTransactionEnv(ctx, sth, programs, proc.Transaction, proc.TxIndex, span)
+	env := NewTransactionEnv(ctx, txnState, programs, proc.Transaction, proc.TxIndex, span)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)
@@ -118,18 +118,18 @@ func (i TransactionInvoker) Process(
 
 	// log te execution intensities here, so tha they do not contain data from storage limit checks and
 	// transaction deduction, because the payer is not charged for those.
-	i.logExecutionIntensities(ctx, sth, txIDStr)
+	i.logExecutionIntensities(ctx, txnState, txIDStr)
 
 	// disable the limit checks on states
-	sth.DisableAllLimitEnforcements()
+	txnState.DisableAllLimitEnforcements()
 	// try to deduct fees even if there is an error.
 	// disable the limit checks on states
-	feesError := i.deductTransactionFees(env, proc, sth, computationUsed)
+	feesError := i.deductTransactionFees(env, proc, txnState, computationUsed)
 	if feesError != nil {
 		txError = feesError
 	}
 
-	sth.EnableAllLimitEnforcements()
+	txnState.EnableAllLimitEnforcements()
 
 	// applying contract changes
 	// this writes back the contract contents to accounts
@@ -145,15 +145,15 @@ func (i TransactionInvoker) Process(
 		// disable the computation/memory limit checks on storage checks,
 		// so we don't error from computation/memory limits on this part.
 		// We cannot charge the user for this part, since fee deduction already happened.
-		sth.DisableAllLimitEnforcements()
-		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.UpdatedAddresses())
-		sth.EnableAllLimitEnforcements()
+		txnState.DisableAllLimitEnforcements()
+		txError = NewTransactionStorageLimiter().CheckLimits(env, txnState.UpdatedAddresses())
+		txnState.EnableAllLimitEnforcements()
 	}
 
 	// it there was any transaction error clear changes and try to deduct fees again
 	if txError != nil {
-		sth.DisableAllLimitEnforcements()
-		defer sth.EnableAllLimitEnforcements()
+		txnState.DisableAllLimitEnforcements()
+		defer txnState.EnableAllLimitEnforcements()
 
 		// log transaction as failed
 		ctx.Logger.Info().
@@ -164,7 +164,7 @@ func (i TransactionInvoker) Process(
 		env.Reset()
 
 		// drop delta since transaction failed
-		err := sth.RestartNestedTransaction(nestedTxnId)
+		err := txnState.RestartNestedTransaction(nestedTxnId)
 		if err != nil {
 			return fmt.Errorf(
 				"cannot restart nested transaction: %w",
@@ -173,7 +173,7 @@ func (i TransactionInvoker) Process(
 		}
 
 		// try to deduct fees again, to get the fee deduction events
-		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
+		feesError = i.deductTransactionFees(env, proc, txnState, computationUsed)
 
 		// if fee deduction fails just do clean up and exit
 		if feesError != nil {
@@ -183,7 +183,7 @@ func (i TransactionInvoker) Process(
 			txError = feesError
 
 			// drop delta
-			_ = sth.RestartNestedTransaction(nestedTxnId)
+			_ = txnState.RestartNestedTransaction(nestedTxnId)
 		}
 	}
 
@@ -202,14 +202,15 @@ func (i TransactionInvoker) Process(
 func (i TransactionInvoker) deductTransactionFees(
 	env environment.Environment,
 	proc *TransactionProcedure,
-	sth *state.StateHolder,
-	computationUsed uint64) (err error) {
+	txnState *state.TransactionState,
+	computationUsed uint64,
+) (err error) {
 	if !env.TransactionFeesEnabled() {
 		return nil
 	}
 
-	if computationUsed > uint64(sth.TotalComputationLimit()) {
-		computationUsed = uint64(sth.TotalComputationLimit())
+	if computationUsed > uint64(txnState.TotalComputationLimit()) {
+		computationUsed = uint64(txnState.TotalComputationLimit())
 	}
 
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be
@@ -227,20 +228,24 @@ func (i TransactionInvoker) deductTransactionFees(
 }
 
 // logExecutionIntensities logs execution intensities of the transaction
-func (i TransactionInvoker) logExecutionIntensities(ctx Context, sth *state.StateHolder, txHash string) {
+func (i TransactionInvoker) logExecutionIntensities(
+	ctx Context,
+	txnState *state.TransactionState,
+	txHash string,
+) {
 	if ctx.Logger.Debug().Enabled() {
 		computation := zerolog.Dict()
-		for s, u := range sth.ComputationIntensities() {
+		for s, u := range txnState.ComputationIntensities() {
 			computation.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
 		memory := zerolog.Dict()
-		for s, u := range sth.MemoryIntensities() {
+		for s, u := range txnState.MemoryIntensities() {
 			memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
 		ctx.Logger.Info().
-			Uint64("ledgerInteractionUsed", sth.InteractionUsed()).
-			Uint("computationUsed", sth.TotalComputationUsed()).
-			Uint64("memoryEstimate", sth.TotalMemoryEstimate()).
+			Uint64("ledgerInteractionUsed", txnState.InteractionUsed()).
+			Uint("computationUsed", txnState.TotalComputationUsed()).
+			Uint64("memoryEstimate", txnState.TotalMemoryEstimate()).
 			Dict("computationIntensities", computation).
 			Dict("memoryIntensities", memory).
 			Msg("transaction execution data")
