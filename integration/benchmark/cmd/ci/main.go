@@ -203,6 +203,10 @@ func main() {
 	lg.Stop()
 	wg.Wait()
 
+	if len(dataSlices) == 0 {
+		log.Fatal().Msg("no data slices recorded")
+	}
+
 	err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to send data to bigquery")
