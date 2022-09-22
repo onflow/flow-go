@@ -1,8 +1,10 @@
 package scoring_test
 
 import (
+	"context"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -129,4 +132,18 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 			require.Error(t, sv.MustSubscribedToAllowedTopics(peer))
 		}
 	}
+}
+
+func TestLibP2PSubscriptionValidator(t *testing.T) {
+	ctx := context.Background()
+	sporkId := unittest.IdentifierFixture()
+	dhtPrefix := "subscription-validator-test"
+
+	idProvider := mock.NewIdentityProvider(t)
+
+	node1, _ := p2pfixtures.NodeFixture(t, ctx, sporkId, dhtPrefix, p2pfixtures.WithPeerScoringEnabled(idProvider))
+
+	time.Sleep(1 * time.Second)
+
+	p2pfixtures.StopNodes(t, []*p2pnode.Node{node1})
 }
