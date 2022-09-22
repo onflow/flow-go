@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
@@ -71,6 +72,7 @@ func NodeFixture(
 		Key:         NetworkingKeyFixtures(t),
 		Address:     defaultAddress,
 		Logger:      unittest.Logger().Level(zerolog.ErrorLevel),
+		Role:        flow.RoleCollection,
 	}
 
 	for _, opt := range opts {
@@ -327,4 +329,17 @@ func PeerIdsFixture(t *testing.T, n int) []peer.ID {
 		peerIDs[i] = PeerIdFixture(t)
 	}
 	return peerIDs
+}
+
+func MustEncodeEvent(t *testing.T, v interface{}) []byte {
+	bz, err := unittest.NetworkCodec().Encode(v)
+	require.NoError(t, err)
+
+	msg := message.Message{
+		Payload: bz,
+	}
+	data, err := msg.Marshal()
+	require.NoError(t, err)
+
+	return data
 }
