@@ -298,6 +298,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 		// if the item reached maximum amount of retries, drop
 		if item.NumAttempts >= e.cfg.RetryAttempts {
+			e.log.Debug().Str("entity_id", entityID.String()).Msg("dropping entity ID max amount of retries reached")
 			delete(e.items, entityID)
 			continue
 		}
@@ -382,6 +383,11 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	}()
 
 	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityRequest)
+	e.log.Debug().
+		Str("sender_node_id", e.me.NodeID().String()).
+		Uint64("nonce", req.Nonce).
+		Strs("entity_ids", flow.IdentifierList(req.EntityIDs).Strings()).
+		Msg("entity request sent")
 
 	return true, nil
 }
@@ -404,6 +410,11 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 }
 
 func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.EntityResponse) error {
+	e.log.Debug().
+		Str("origin_id", originID.String()).
+		Uint64("nonce", res.Nonce).
+		Strs("entity_ids", flow.IdentifierList(res.EntityIDs).Strings()).
+		Msg("entity response received")
 
 	if e.cfg.ValidateStaking {
 
