@@ -86,7 +86,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: header})
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
 
 	err = sn2.Publish(timedCtx, topic, data1)
 	require.NoError(t, err)
@@ -140,7 +140,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
 	// create a dummy sync request to publish from our SN node
-	data1 := getMsgFixtureBz(t, &messages.SyncRequest{Nonce: 0, Height: 0})
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.SyncRequest{Nonce: 0, Height: 0})
 
 	err = sn2.Publish(timedCtx, topic, data1)
 	require.NoError(t, err)
@@ -222,7 +222,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: header})
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
 
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
@@ -241,7 +241,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	timedCtx, cancel2s := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel2s()
 	header = unittest.BlockHeaderFixture()
-	data2 := getMsgFixtureBz(t, &messages.BlockProposal{Header: header})
+	data2 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
 
 	// the access node now publishes the block proposal message, AN are not authorized to publish block proposals
 	// the message should be rejected by the topic validator on sn1
@@ -324,7 +324,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: header})
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
 
 	// sn2 publishes the block proposal on the sync committee channel
 	err = sn2.Publish(timedCtx, topic, data1)
@@ -404,7 +404,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: header})
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
 
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
@@ -424,7 +424,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	// "eject" sn2 to ensure messages published by ejected nodes get rejected
 	identity2.Ejected = true
 	header = unittest.BlockHeaderFixture()
-	data3 := getMsgFixtureBz(t, &messages.BlockProposal{Header: header})
+	data3 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
 	timedCtx, cancel2s := context.WithTimeout(context.Background(), time.Second)
 	defer cancel2s()
 	err = sn2.Publish(timedCtx, topic, data3)
@@ -497,7 +497,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
 	// create a dummy sync request to publish from our LN node
-	data := getMsgFixtureBz(t, &messages.RangeRequest{})
+	data := p2pfixtures.MustEncodeEvent(t, &messages.RangeRequest{})
 
 	// ln2 publishes the sync request on the cluster channel
 	err = ln2.Publish(timedCtx, topic, data)
@@ -528,17 +528,4 @@ func checkReceive(ctx context.Context, t *testing.T, expectedData []byte, sub *p
 			wg.Done()
 		}()
 	}
-}
-
-func getMsgFixtureBz(t *testing.T, v interface{}) []byte {
-	bz, err := unittest.NetworkCodec().Encode(v)
-	require.NoError(t, err)
-
-	msg := message.Message{
-		Payload: bz,
-	}
-	data, err := msg.Marshal()
-	require.NoError(t, err)
-
-	return data
 }

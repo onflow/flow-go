@@ -6,14 +6,17 @@ import (
 	"testing"
 	"time"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -117,8 +120,8 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	for _, role := range flow.Roles() {
 		peer := p2pfixtures.PeerIdFixture(t)
 		unauthorizedChannels := channels.Channels(). // all channels
-			ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
-			ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
+								ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
+								ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
 		sporkID := unittest.IdentifierFixture()
 		unauthorizedTopics := make([]string, 0, len(unauthorizedChannels))
 		for _, channel := range unauthorizedChannels {
@@ -139,11 +142,23 @@ func TestLibP2PSubscriptionValidator(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	dhtPrefix := "subscription-validator-test"
 
-	idProvider := mock.NewIdentityProvider(t)
+	var idProvider module.IdentityProvider
+	nodes, ids := p2pfixtures.NodesFixture(t, ctx, sporkId, dhtPrefix, 3,
+		p2pfixtures.WithPeerScoringEnabled(idProvider),
+		p2pfixtures.WithRole(flow.RoleCollection))
+	idProvider = id.NewFixedIdentityProvider(ids)
+	defer p2pfixtures.StopNodes(t, nodes)
 
-	node1, _ := p2pfixtures.NodeFixture(t, ctx, sporkId, dhtPrefix, p2pfixtures.WithPeerScoringEnabled(idProvider))
+	subs := make([]*pubsub.Subscription, len(nodes))
+	topic := channels.TopicFromChannel(channels.PushGuarantees, sporkId)
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
 
+	for i, node := range nodes {
+		sub, err := node.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+		require.NoError(t, err)
+		subs[i] = sub
+	}
+
+	// let the subscriptions propagate
 	time.Sleep(1 * time.Second)
-
-	p2pfixtures.StopNodes(t, []*p2pnode.Node{node1})
 }
