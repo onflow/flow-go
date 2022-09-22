@@ -19,10 +19,10 @@ type Worker struct {
 	wg *sync.WaitGroup
 }
 
-func NewWorker(workerID int, interval time.Duration, work workFunc) Worker {
+func NewWorker(workerID int, interval time.Duration, work workFunc) *Worker {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return Worker{
+	return &Worker{
 		workerID: workerID,
 		interval: interval,
 		work:     work,
