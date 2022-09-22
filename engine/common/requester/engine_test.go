@@ -205,7 +205,10 @@ func TestDispatchRequestBatchSize(t *testing.T) {
 		},
 	).Return(nil)
 
+	local := module.NewLocal(t)
+	local.On("NodeID").Return(flow.ZeroID)
 	request := Engine{
+		me:       local,
 		unit:     engine.NewUnit(),
 		metrics:  metrics.NewNoopCollector(),
 		cfg:      cfg,
@@ -280,7 +283,11 @@ func TestOnEntityResponseValid(t *testing.T) {
 
 	done := make(chan struct{})
 	called := *atomic.NewUint64(0)
+
+	local := module.NewLocal(t)
+	local.On("NodeID").Return(flow.ZeroID).Maybe()
 	request := Engine{
+		me:       local,
 		unit:     engine.NewUnit(),
 		metrics:  metrics.NewNoopCollector(),
 		state:    state,
@@ -367,6 +374,9 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 	}
 
 	called := make(chan struct{})
+
+	local := module.NewLocal(t)
+	local.On("NodeID").Return(flow.ZeroID).Maybe()
 	request := Engine{
 		unit:     engine.NewUnit(),
 		metrics:  metrics.NewNoopCollector(),
@@ -420,8 +430,7 @@ func TestOriginValidation(t *testing.T) {
 	state := &protocol.State{}
 	state.On("Final").Return(final)
 
-	me := &module.Local{}
-
+	me := module.NewLocal(t)
 	me.On("NodeID").Return(meID)
 
 	nonce := rand.Uint64()
