@@ -109,7 +109,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.ClusterBlockProposal)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
+					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal, msg.OriginID)
 				}
 				return ok
 			},
@@ -119,7 +119,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*events.SyncedClusterBlock)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
+					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock, msg.OriginID)
 				}
 				return ok
 			},
@@ -140,7 +140,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.ClusterBlockVote)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
+					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote, msg.OriginID)
 				}
 				return ok
 			},

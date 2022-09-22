@@ -3,6 +3,8 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type EngineCollector struct {
@@ -27,14 +29,14 @@ func NewEngineCollector() *EngineCollector {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemEngine,
 			Help:      "the number of messages received by engines",
-		}, []string{EngineLabel, LabelMessage}),
+		}, []string{EngineLabel, LabelMessage, LabelNodeID}),
 
 		handled: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "messages_handled_total",
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemEngine,
 			Help:      "the number of messages handled by engines",
-		}, []string{EngineLabel, LabelMessage}),
+		}, []string{EngineLabel, LabelMessage, LabelNodeID}),
 	}
 
 	return ec
@@ -44,10 +46,10 @@ func (ec *EngineCollector) MessageSent(engine string, message string) {
 	ec.sent.With(prometheus.Labels{EngineLabel: engine, LabelMessage: message}).Inc()
 }
 
-func (ec *EngineCollector) MessageReceived(engine string, message string) {
-	ec.received.With(prometheus.Labels{EngineLabel: engine, LabelMessage: message}).Inc()
+func (ec *EngineCollector) MessageReceived(engine string, message string, originID flow.Identifier) {
+	ec.received.With(prometheus.Labels{EngineLabel: engine, LabelMessage: message, LabelNodeID: originID.String()}).Inc()
 }
 
-func (ec *EngineCollector) MessageHandled(engine string, message string) {
-	ec.handled.With(prometheus.Labels{EngineLabel: engine, LabelMessage: message}).Inc()
+func (ec *EngineCollector) MessageHandled(engine string, message string, originID flow.Identifier) {
+	ec.handled.With(prometheus.Labels{EngineLabel: engine, LabelMessage: message, LabelNodeID: originID.String()}).Inc()
 }

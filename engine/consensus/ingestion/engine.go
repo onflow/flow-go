@@ -69,7 +69,7 @@ func New(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*flow.CollectionGuarantee)
 				if ok {
-					engineMetrics.MessageReceived(metrics.EngineConsensusIngestion, metrics.MessageCollectionGuarantee)
+					engineMetrics.MessageReceived(metrics.EngineConsensusIngestion, metrics.MessageCollectionGuarantee, msg.OriginID)
 				}
 				return ok
 			},

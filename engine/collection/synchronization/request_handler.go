@@ -137,7 +137,7 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.SyncRequest)
 				if ok {
-					r.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageSyncRequest)
+					r.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageSyncRequest, msg.OriginID)
 				}
 				return ok
 			},
@@ -147,7 +147,7 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.RangeRequest)
 				if ok {
-					r.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageRangeRequest)
+					r.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageRangeRequest, msg.OriginID)
 				}
 				return ok
 			},
@@ -157,7 +157,7 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BatchRequest)
 				if ok {
-					r.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageBatchRequest)
+					r.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageBatchRequest, msg.OriginID)
 				}
 				return ok
 			},

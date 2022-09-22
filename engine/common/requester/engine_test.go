@@ -126,7 +126,10 @@ func TestDispatchRequestVarious(t *testing.T) {
 		},
 	).Return(nil)
 
+	local := module.NewLocal(t)
+	local.On("NodeID").Return(flow.ZeroID)
 	request := Engine{
+		me:       local,
 		unit:     engine.NewUnit(),
 		metrics:  metrics.NewNoopCollector(),
 		cfg:      cfg,

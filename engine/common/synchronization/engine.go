@@ -141,7 +141,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.SyncResponse)
 				if ok {
-					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncResponse, msg.OriginID)
 				}
 				return ok
 			},
@@ -151,7 +151,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockResponse)
 				if ok {
-					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse, msg.OriginID)
 				}
 				return ok
 			},
@@ -266,14 +266,14 @@ func (e *Engine) processAvailableResponses() {
 		msg, ok := e.pendingSyncResponses.Get()
 		if ok {
 			e.onSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
-			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageSyncResponse, msg.OriginID)
 			continue
 		}
 
 		msg, ok = e.pendingBlockResponses.Get()
 		if ok {
 			e.onBlockResponse(msg.OriginID, msg.Payload.(*messages.BlockResponse))
-			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageBlockResponse, msg.OriginID)
 			continue
 		}
 
