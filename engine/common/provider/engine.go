@@ -163,7 +163,18 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 	// try to retrieve each entity and skip missing ones
 	entities := make([]flow.Entity, 0, len(req.EntityIDs))
 	entityIDs := make([]flow.Identifier, 0, len(req.EntityIDs))
+	seen := make(map[flow.Identifier]struct{})
 	for _, entityID := range req.EntityIDs {
+		// skip requesting duplicate entity IDs
+		if _, ok := seen[entityID]; ok {
+			e.log.Debug().
+				Str("origin_id", originID.String()).
+				Str("entity_id", entityID.String()).
+				Uint64("req_nonce", req.Nonce).
+				Msg("duplicate entity ID in entity request")
+			continue
+		}
+
 		entity, err := e.retrieve(entityID)
 		if errors.Is(err, storage.ErrNotFound) {
 			continue
@@ -173,6 +184,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 		}
 		entities = append(entities, entity)
 		entityIDs = append(entityIDs, entityID)
+		seen[entityID] = struct{}{}
 	}
 
 	// encode all of the entities
