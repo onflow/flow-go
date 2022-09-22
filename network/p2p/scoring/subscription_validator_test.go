@@ -103,3 +103,30 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 		require.Error(t, sv.MustSubscribedToAllowedTopics(peer), role)
 	}
 }
+
+func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
+	idProvider := mock.NewIdentityProvider(t)
+	sp := mockp2p.NewSubscriptionProvider(t)
+
+	sv := scoring.NewSubscriptionValidator(idProvider)
+	sv.RegisterSubscriptionProvider(sp)
+
+	for _, role := range flow.Roles() {
+		peer := p2pfixtures.PeerIdFixture(t)
+		unauthorizedChannels := channels.Channels(). // all channels
+			ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
+			ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
+		sporkID := unittest.IdentifierFixture()
+		unauthorizedTopics := make([]string, 0, len(unauthorizedChannels))
+		for _, channel := range unauthorizedChannels {
+			unauthorizedTopics = append(unauthorizedTopics, channels.TopicFromChannel(channel, sporkID).String())
+		}
+
+		// peer should NOT pass subscription validator as it has subscribed to any subset of its unauthorized topics.
+		for i := range unauthorizedTopics {
+			idProvider.On("ByPeerID", peer).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
+			sp.On("GetSubscribedTopics", peer).Return(unauthorizedTopics[:i+1])
+			require.Error(t, sv.MustSubscribedToAllowedTopics(peer))
+		}
+	}
+}
