@@ -22,6 +22,10 @@ func (n *NoopRateLimiter) Stop() {}
 
 func (n *NoopRateLimiter) Start() {}
 
+func NewNoopRateLimiter() *NoopRateLimiter {
+	return &NoopRateLimiter{}
+}
+
 // NoopRateLimiters returns noop rate limiters.
 func NoopRateLimiters() *RateLimiters {
 	return &RateLimiters{

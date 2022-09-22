@@ -308,10 +308,10 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.Metrics.Network.OnRateLimitedUnicastMessage(role, msgType, topic.String(), reason.String())
 	}
 
-	// setup unicast rate limiters
-	unicastRateLimiters := unicast.NewRateLimiters(nil, nil, onUnicastRateLimit, fnb.BaseConfig.UnicastRateLimitDryRun)
+	// setup default noop unicast rate limiters
+	unicastRateLimiters := unicast.NewRateLimiters(unicast.NewNoopRateLimiter(), unicast.NewNoopRateLimiter(), onUnicastRateLimit, fnb.BaseConfig.UnicastRateLimitDryRun)
 
-	// setup unicast stream rate limiter
+	// override noop unicast message rate limiter
 	if fnb.BaseConfig.UnicastMessageRateLimit > 0 && fnb.BaseConfig.UnicastMessageBurstLimit > 0 {
 		unicastMessageRateLimiter := unicast.NewMessageRateLimiter(rate.Limit(fnb.BaseConfig.UnicastMessageRateLimit), fnb.BaseConfig.UnicastMessageBurstLimit)
 		unicastRateLimiters.MessageRateLimiter = unicastMessageRateLimiter
@@ -325,7 +325,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		}
 	}
 
-	// setup unicast bandwidth rate limiter
+	// override noop unicast bandwidth rate limiter
 	if fnb.BaseConfig.UnicastBandwidthRateLimit > 0 && fnb.BaseConfig.UnicastBandwidthBurstLimit > 0 {
 		unicastBandwidthRateLimiter := unicast.NewBandWidthRateLimiter(rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit), fnb.BaseConfig.UnicastBandwidthBurstLimit)
 		unicastRateLimiters.BandWidthRateLimiter = unicastBandwidthRateLimiter
@@ -339,6 +339,8 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		}
 	}
 
+	// by default if no rate limiter configuration was provided in the CLI args the default
+	// noop rate limiter will be used.
 	mwOpts = append(mwOpts, middleware.WithUnicastRateLimiters(unicastRateLimiters))
 
 	libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
