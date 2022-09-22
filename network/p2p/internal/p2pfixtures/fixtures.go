@@ -23,6 +23,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
@@ -126,17 +127,26 @@ func NodeFixture(
 }
 
 type NodeFixtureParameters struct {
-	HandlerFunc network.StreamHandler
-	Unicasts    []unicast.ProtocolName
-	Key         crypto.PrivateKey
-	Address     string
-	DhtOptions  []dht.Option
-	PeerFilter  p2p.PeerFilter
-	Role        flow.Role
-	Logger      zerolog.Logger
+	HandlerFunc        network.StreamHandler
+	Unicasts           []unicast.ProtocolName
+	Key                crypto.PrivateKey
+	Address            string
+	DhtOptions         []dht.Option
+	PeerFilter         p2p.PeerFilter
+	Role               flow.Role
+	Logger             zerolog.Logger
+	PeerScoringEnabled bool
+	IdProvider         module.IdentityProvider
 }
 
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
+
+func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.PeerScoringEnabled = true
+		p.IdProvider = idProvider
+	}
+}
 
 func WithDefaultStreamHandler(handler network.StreamHandler) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {

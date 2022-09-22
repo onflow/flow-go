@@ -118,7 +118,6 @@ type LibP2PNodeBuilder struct {
 	idProvider           module.IdentityProvider
 	gossipSubPeerScoring bool // whether to enable gossipsub peer scoring
 	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
-	pubsubFactory        func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 }
 
 func NewNodeBuilder(
@@ -174,10 +173,6 @@ func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.Ide
 func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*p2pnode.Node, error) {
 	if builder.routingFactory == nil {
 		return nil, errors.New("routing factory is not set")
-	}
-
-	if builder.pubsubFactory == nil {
-		return nil, errors.New("pubsub factory is not set")
 	}
 
 	var opts []libp2p.Option
