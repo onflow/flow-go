@@ -1,8 +1,13 @@
 [
   {
     "mode": "NULLABLE",
-    "name": "commit_sha",
+    "name": "gitSha",
     "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "runStartTime",
+    "type": "TIMESTAMP"
   },
   {
     "mode": "NULLABLE",
@@ -26,12 +31,12 @@
   },
   {
     "mode": "NULLABLE",
-    "name": "prometheusTransactionCountStart",
+    "name": "beforeExTxs",
     "type": "FLOAT"
   },
   {
     "mode": "NULLABLE",
-    "name": "prometheusTransactionCountEnd",
+    "name": "afterExTxs",
     "type": "FLOAT"
   },
   {
