@@ -76,6 +76,7 @@ func TestDelay(t *testing.T) {
 // TestOneNodeBehind verifies that if one node (here node 0) consistently experiences a significant
 // delay receiving messages beyond the hotstuff timeout, the committee still can reach consensus.
 func TestOneNodeBehind(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "active-pacemaker, on CI channel test doesn't stop, need to revisit stop conditions")
 	stopper := NewStopper(50, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
