@@ -52,19 +52,19 @@ import (
 func main() {
 
 	var (
-		txLimit                       uint
-		maxCollectionSize             uint
-		maxCollectionByteSize         uint64
-		maxCollectionTotalGas         uint64
-		builderExpiryBuffer           uint
-		builderPayerRateLimit         float64
-		builderUnlimitedPayers        []string
-		hotstuffMinTimeout            time.Duration
-		hotstuffTimeoutIncreaseFactor float64
-		hotstuffHappyPathRounds       uint64
-		blockRateDelay                time.Duration
-		startupTimeString             string
-		startupTime                   time.Time
+		txLimit                         uint
+		maxCollectionSize               uint
+		maxCollectionByteSize           uint64
+		maxCollectionTotalGas           uint64
+		builderExpiryBuffer             uint
+		builderPayerRateLimit           float64
+		builderUnlimitedPayers          []string
+		hotstuffMinTimeout              time.Duration
+		hotstuffTimeoutAdjustmentFactor float64
+		hotstuffHappyPathRounds         uint64
+		blockRateDelay                  time.Duration
+		startupTimeString               string
+		startupTime                     time.Time
 
 		mainConsensusCommittee  *committees.Consensus
 		followerState           protocol.MutableState
@@ -127,9 +127,8 @@ func main() {
 			"maximum total amount of maxgas of transactions in proposed collections")
 		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond,
 			"the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
-		flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor",
-			timeout.DefaultConfig.TimeoutIncrease,
-			"multiplicative increase of timeout value in case of time out event")
+		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor,
+			"adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathRounds, "hotstuff-happy-path-max-round-failures",
 			timeout.DefaultConfig.HappyPathRounds,
 			"number of failed rounds before first timeout increase")
@@ -456,7 +455,7 @@ func main() {
 			opts := []consensus.Option{
 				consensus.WithBlockRateDelay(blockRateDelay),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
+				consensus.WithTimeoutAdjustmentFactor(hotstuffTimeoutAdjustmentFactor),
 				consensus.WithHappyPathRounds(hotstuffHappyPathRounds),
 			}
 

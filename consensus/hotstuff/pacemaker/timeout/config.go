@@ -8,9 +8,9 @@ import (
 
 // Config contains the configuration parameters for a Truncated Exponential Backoff,
 // as implemented by the `timeout.Controller`
-//  - On timeout: increase timeout by multiplicative factor `TimeoutAdjustmentFactor`. This
-//    results in exponentially growing timeout duration on multiple subsequent timeouts.
-//  - On progress: decrease timeout by multiplicative factor `TimeoutAdjustmentFactor.
+//   - On timeout: increase timeout by multiplicative factor `TimeoutAdjustmentFactor`. This
+//     results in exponentially growing timeout duration on multiple subsequent timeouts.
+//   - On progress: decrease timeout by multiplicative factor `TimeoutAdjustmentFactor.
 type Config struct {
 	// MinReplicaTimeout is the minimum the timeout can decrease to [MILLISECONDS]
 	MinReplicaTimeout float64
@@ -38,7 +38,7 @@ func NewDefaultConfig() Config {
 	// This value is for instant message delivery.
 	minReplicaTimeout := 3 * time.Second
 	maxReplicaTimeout := 1 * time.Minute
-	timeoutIncreaseFactor := 1.2
+	timeoutAdjustmentFactorFactor := 1.2
 	// after 6 successively failed rounds, the pacemaker leaves the hot path and starts increasing timeouts (recovery mode)
 	happyPathRounds := uint64(6)
 	blockRateDelay := 0 * time.Millisecond
@@ -46,7 +46,7 @@ func NewDefaultConfig() Config {
 	conf, err := NewConfig(
 		minReplicaTimeout+blockRateDelay,
 		maxReplicaTimeout,
-		timeoutIncreaseFactor,
+		timeoutAdjustmentFactorFactor,
 		happyPathRounds,
 		blockRateDelay,
 	)
@@ -59,16 +59,16 @@ func NewDefaultConfig() Config {
 }
 
 // NewConfig creates a new TimoutConfig.
-//  * minReplicaTimeout: minimal timeout value for replica round [Milliseconds]
-//    Consistency requirement: must be non-negative
-//  * maxReplicaTimeout: maximal timeout value for replica round [Milliseconds]
-//    Consistency requirement: must be non-negative and cannot be smaller than minReplicaTimeout
-
-//  * timeoutIncrease: multiplicative factor for increasing timeout
-//    Consistency requirement: must be strictly larger than 1
-//  * happyPathRounds: number of successive failed rounds after which we will start increasing timeouts
-//  * blockRateDelay: a delay to delay the proposal broadcasting [Milliseconds]
-//    Consistency requirement: must be non-negative
+//   - minReplicaTimeout: minimal timeout value for replica round [Milliseconds]
+//     Consistency requirement: must be non-negative
+//   - maxReplicaTimeout: maximal timeout value for replica round [Milliseconds]
+//     Consistency requirement: must be non-negative and cannot be smaller than minReplicaTimeout
+//   - timeoutAdjustmentFactor: multiplicative factor for adjusting timeout duration
+//     Consistency requirement: must be strictly larger than 1
+//   - happyPathRounds: number of successive failed rounds after which we will start increasing timeouts
+//   - blockRateDelay: a delay to delay the proposal broadcasting [Milliseconds]
+//     Consistency requirement: must be non-negative
+//
 // Returns `model.ConfigurationError` is any of the consistency requirements is violated.
 func NewConfig(
 	minReplicaTimeout time.Duration,
@@ -83,19 +83,19 @@ func NewConfig(
 	if maxReplicaTimeout < minReplicaTimeout {
 		return Config{}, model.NewConfigurationErrorf("maxReplicaTimeout must be larger than minReplicaTimeout")
 	}
-	if timeoutIncrease <= 1 {
-		return Config{}, model.NewConfigurationErrorf("TimeoutIncrease must be strictly bigger than 1")
+	if timeoutAdjustmentFactor <= 1 {
+		return Config{}, model.NewConfigurationErrorf("timeoutAdjustmentFactor must be strictly bigger than 1")
 	}
 	if blockRateDelay < 0 {
 		return Config{}, model.NewConfigurationErrorf("blockRateDelay must be must be non-negative")
 	}
 
 	tc := Config{
-		MinReplicaTimeout: float64(minReplicaTimeout.Milliseconds()),
-		MaxReplicaTimeout: float64(maxReplicaTimeout.Milliseconds()),
-		TimeoutIncrease:   timeoutIncrease,
-		HappyPathRounds:   happyPathRounds,
-		BlockRateDelayMS:  float64(blockRateDelay.Milliseconds()),
+		MinReplicaTimeout:       float64(minReplicaTimeout.Milliseconds()),
+		MaxReplicaTimeout:       float64(maxReplicaTimeout.Milliseconds()),
+		TimeoutAdjustmentFactor: timeoutAdjustmentFactor,
+		HappyPathRounds:         happyPathRounds,
+		BlockRateDelayMS:        float64(blockRateDelay.Milliseconds()),
 	}
 	return tc, nil
 }

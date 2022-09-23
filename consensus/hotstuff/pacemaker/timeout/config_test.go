@@ -15,7 +15,7 @@ func TestConstructor(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, float64(1200), c.MinReplicaTimeout)
 	require.Equal(t, float64(2000), c.MaxReplicaTimeout)
-	require.Equal(t, float64(1.5), c.TimeoutIncrease)
+	require.Equal(t, float64(1.5), c.TimeoutAdjustmentFactor)
 	require.Equal(t, uint64(3), c.HappyPathRounds)
 	require.Equal(t, float64(1000), c.BlockRateDelayMS)
 
@@ -41,7 +41,7 @@ func TestDefaultConfig(t *testing.T) {
 	c := NewDefaultConfig()
 
 	require.Equal(t, float64(3000), c.MinReplicaTimeout)
-	require.Equal(t, float64(1.2), c.TimeoutIncrease)
+	require.Equal(t, float64(1.2), c.TimeoutAdjustmentFactor)
 	require.Equal(t, uint64(6), c.HappyPathRounds)
 	require.Equal(t, float64(0), c.BlockRateDelayMS)
 }
