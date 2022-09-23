@@ -29,12 +29,12 @@ func initTimeoutController(t *testing.T) *Controller {
 	return NewController(tc)
 }
 
-// Test_TimeoutInitialization timeouts are initialized ands reported properly
+// Test_TimeoutInitialization timeouts are initialized and reported properly
 func Test_TimeoutInitialization(t *testing.T) {
 	tc := initTimeoutController(t)
 	assert.Equal(t, tc.ReplicaTimeout().Milliseconds(), int64(minRepTimeout))
 
-	// verify that returned timeout channel
+	// verify that initially returned timeout channel is closed and `nil` is returned as `TimerInfo`
 	select {
 	case <-tc.Channel():
 		break
@@ -137,7 +137,7 @@ func Test_CombinedIncreaseDecreaseDynamics(t *testing.T) {
 			}
 		}
 
-		expectedRepTimeout := minRepTimeout * math.Pow(multiplicativeIncrease, float64(numberIncreases)) / math.Pow(multiplicativeIncrease, float64(numberDecreases))
+		expectedRepTimeout := minRepTimeout * math.Pow(multiplicativeIncrease, float64(numberIncreases - numberDecreases))
 		numericalError := math.Abs(expectedRepTimeout - float64(tc.ReplicaTimeout().Milliseconds()))
 		require.LessOrEqual(t, numericalError, 1.0) // at most one millisecond numerical error
 	}

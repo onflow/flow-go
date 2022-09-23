@@ -62,16 +62,18 @@ func NewDefaultConfig() Config {
 //  * minReplicaTimeout: minimal timeout value for replica round [Milliseconds]
 //    Consistency requirement: must be non-negative
 //  * maxReplicaTimeout: maximal timeout value for replica round [Milliseconds]
-//    Consistency requirement: must be non-negative and larger than minReplicaTimeout
+//    Consistency requirement: must be non-negative and cannot be smaller than minReplicaTimeout
+
 //  * timeoutIncrease: multiplicative factor for increasing timeout
 //    Consistency requirement: must be strictly larger than 1
-//  * happyPathRounds: number of failed rounds after which we will increase timeout
+//  * happyPathRounds: number of successive failed rounds after which we will start increasing timeouts
 //  * blockRateDelay: a delay to delay the proposal broadcasting [Milliseconds]
+//    Consistency requirement: must be non-negative
 // Returns `model.ConfigurationError` is any of the consistency requirements is violated.
 func NewConfig(
 	minReplicaTimeout time.Duration,
 	maxReplicaTimeout time.Duration,
-	timeoutIncrease float64,
+	timeoutAdjustmentFactor float64,
 	happyPathRounds uint64,
 	blockRateDelay time.Duration,
 ) (Config, error) {

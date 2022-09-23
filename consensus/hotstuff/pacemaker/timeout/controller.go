@@ -13,23 +13,23 @@ import (
 // duration(r) = t_min * b ^ (min(r * θ(r-k)), c), where c = b(t_max / t_min).
 // In described formula:
 //   k - is number of rounds we expect during hot path, after failing this many rounds,
-//   we will start increasing timeouts.
+//       we will start increasing timeouts.
 //   b - timeout increase factor
-//   r - number of failed rounds
+//   r - failed rounds counter
 //   θ - Heaviside step function
 // 	 t_min/t_max - minimum/maximum round duration
-// By manipulating with `r` after observing progress or lack of it we are achieving exponential increase/decrease
+// By manipulating `r` after observing progress or lack thereof, we are achieving exponential increase/decrease
 // of round durations.
-// - on timeout: increase number of failed rounds, this results in exponential growing round duration
-//   on multiple subsequent timeouts, after exceeding k.
-// - on progress: decrease number of failed rounds, this results in exponential decrease of round duration.
+//  - on timeout: increase number of failed rounds, this results in exponential growing round duration
+//    on multiple subsequent timeouts, after exceeding k.
+//  - on progress: decrease number of failed rounds, this results in exponential decrease of round duration.
 type Controller struct {
 	cfg                   Config
 	timer                 *time.Timer
 	timerInfo             *model.TimerInfo
 	timeoutChannel        <-chan time.Time
 	maxExponent           float64 // max exponent for exponential function, derived from maximum round duration
-	roundsWithoutProgress uint64  // number of failed rounds, higher value results in longer round duration
+	r uint64  // failed rounds counter, higher value results in longer round duration
 }
 
 // NewController creates a new Controller.
