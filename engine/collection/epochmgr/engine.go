@@ -363,7 +363,6 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
 func (e *Engine) onEpochSetupPhaseStarted(ctx context.Context, nextEpoch protocol.Epoch) {
-	// TODO error handling
 	err := e.voter.Vote(ctx, nextEpoch)
 	if err != nil {
 		e.log.Error().Err(err).Msg("failed to submit QC vote for next epoch")
