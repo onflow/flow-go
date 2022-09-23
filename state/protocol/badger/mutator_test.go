@@ -563,7 +563,6 @@ func TestExtendReceiptsValid(t *testing.T) {
 //
 // B8 is the final block of the epoch.
 // B9 is the first block of the NEXT epoch.
-//
 func TestExtendEpochTransitionValid(t *testing.T) {
 	// create a event consumer to test epoch transition events
 	consumer := mockprotocol.NewConsumer(t)
@@ -838,10 +837,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 // we should be able to have conflicting forks with two different instances of
 // the same service event for the same epoch
 //
-//         /--B1<--B3(R1)<--B5(S1)<--B7
-// ROOT <--+
-//         \--B2<--B4(R2)<--B6(S2)<--B8
-//
+//	         /--B1<--B3(R1)<--B5(S1)<--B7
+//	ROOT <--+
+//	         \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendConflictingEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
@@ -951,10 +949,9 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 // we should be able to have conflicting forks with two DUPLICATE instances of
 // the same service event for the same epoch
 //
-//         /--B1<--B3(R1)<--B5(S1)<--B7
-// ROOT <--+
-//         \--B2<--B4(R2)<--B6(S2)<--B8
-//
+//	        /--B1<--B3(R1)<--B5(S1)<--B7
+//	ROOT <--+
+//	        \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendDuplicateEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
@@ -1978,7 +1975,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
-		require.True(t, errors.As(err, &signature.ErrInvalidChecksum), err)
+		require.ErrorIs(t, err, signature.ErrInvalidChecksum)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// now the guarantee has invalid signer indices: the checksum should have 4 bytes, but it only has 1
@@ -1992,7 +1989,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
-		require.True(t, errors.As(err, &signature.ErrInvalidChecksum), err)
+		require.ErrorIs(t, err, signature.ErrInvalidChecksum)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// let's test even if the checksum is correct, but signer indices is still wrong because the tailing are not 0,
@@ -2005,7 +2002,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
-		require.True(t, errors.As(err, &signature.ErrIllegallyPaddedBitVector), err)
+		require.ErrorIs(t, err, signature.ErrIllegallyPaddedBitVector)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// test imcompatible bit vector length
@@ -2014,7 +2011,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
-		require.True(t, errors.As(err, &signature.ErrIncompatibleBitVectorLength), err)
+		require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// revert back to good value
@@ -2024,7 +2021,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].ReferenceBlockID = flow.ZeroID
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.True(t, errors.As(err, &storage.ErrNotFound), err)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// revert back to good value
@@ -2039,7 +2036,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].ChainID = flow.ChainID("some_bad_chain_ID")
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.True(t, errors.As(err, &realprotocol.ErrClusterNotFound), err)
+		require.ErrorIs(t, err, realprotocol.ErrClusterNotFound)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 	})
 }

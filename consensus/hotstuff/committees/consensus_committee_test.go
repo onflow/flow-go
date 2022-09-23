@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -211,7 +210,7 @@ func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
-		_, err := suite.committee.IdentitiesByEpoch(randUint64(201, 300))
+		_, err := suite.committee.IdentitiesByEpoch(unittest.Uint64InRange(201, 300))
 		return err == nil
 	}, 5*time.Second, 50*time.Millisecond)
 
@@ -240,7 +239,7 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochFallback() {
 	suite.committee.EpochEmergencyFallbackTriggered()
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
-		_, err := suite.committee.IdentitiesByEpoch(randUint64(201, 300))
+		_, err := suite.committee.IdentitiesByEpoch(unittest.Uint64InRange(201, 300))
 		return err == nil
 	}, 5*time.Second, 50*time.Millisecond)
 
@@ -347,35 +346,35 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 
 	t.Run("only epoch 1 committed", func(t *testing.T) {
 		t.Run("non-existent identity should return InvalidSignerError", func(t *testing.T) {
-			_, err := suite.committee.IdentityByEpoch(randUint64(1, 100), unittest.IdentifierFixture())
+			_, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), unittest.IdentifierFixture())
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("existent but non-committee-member identity should return InvalidSignerError", func(t *testing.T) {
 			t.Run("zero-weight consensus node", func(t *testing.T) {
-				_, err := suite.committee.IdentityByEpoch(randUint64(1, 100), zeroWeightConsensusIdentity.NodeID)
+				_, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), zeroWeightConsensusIdentity.NodeID)
 				require.True(t, model.IsInvalidSignerError(err))
 			})
 
 			t.Run("ejected consensus node", func(t *testing.T) {
-				_, err := suite.committee.IdentityByEpoch(randUint64(1, 100), ejectedConsensusIdentity.NodeID)
+				_, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), ejectedConsensusIdentity.NodeID)
 				require.True(t, model.IsInvalidSignerError(err))
 			})
 
 			t.Run("otherwise valid non-consensus node", func(t *testing.T) {
-				_, err := suite.committee.IdentityByEpoch(randUint64(1, 100), validNonConsensusIdentity.NodeID)
+				_, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), validNonConsensusIdentity.NodeID)
 				require.True(t, model.IsInvalidSignerError(err))
 			})
 		})
 
 		t.Run("should be able to retrieve real identity", func(t *testing.T) {
-			actual, err := suite.committee.IdentityByEpoch(randUint64(1, 100), realIdentity.NodeID)
+			actual, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), realIdentity.NodeID)
 			require.NoError(t, err)
 			require.Equal(t, realIdentity, actual)
 		})
 
 		t.Run("should return ErrViewForUnknownEpoch for view outside existing epoch", func(t *testing.T) {
-			_, err := suite.committee.IdentityByEpoch(randUint64(101, 1_000_000), epoch2Identity.NodeID)
+			_, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(101, 1_000_000), epoch2Identity.NodeID)
 			require.Error(t, err)
 			require.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
@@ -386,31 +385,31 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 
 	t.Run("epoch 1 and 2 committed", func(t *testing.T) {
 		t.Run("should be able to retrieve epoch 1 identity in epoch 1", func(t *testing.T) {
-			actual, err := suite.committee.IdentityByEpoch(randUint64(1, 100), realIdentity.NodeID)
+			actual, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), realIdentity.NodeID)
 			require.NoError(t, err)
 			require.Equal(t, realIdentity, actual)
 		})
 
 		t.Run("should be unable to retrieve epoch 1 identity in epoch 2", func(t *testing.T) {
-			_, err := suite.committee.IdentityByEpoch(randUint64(101, 200), realIdentity.NodeID)
+			_, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(101, 200), realIdentity.NodeID)
 			require.Error(t, err)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("should be unable to retrieve epoch 2 identity in epoch 1", func(t *testing.T) {
-			_, err := suite.committee.IdentityByEpoch(randUint64(1, 100), epoch2Identity.NodeID)
+			_, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), epoch2Identity.NodeID)
 			require.Error(t, err)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("should be able to retrieve epoch 2 identity in epoch 2", func(t *testing.T) {
-			actual, err := suite.committee.IdentityByEpoch(randUint64(101, 200), epoch2Identity.NodeID)
+			actual, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(101, 200), epoch2Identity.NodeID)
 			require.NoError(t, err)
 			require.Equal(t, epoch2Identity, actual)
 		})
 
 		t.Run("should return ErrViewForUnknownEpoch for view outside existing epochs", func(t *testing.T) {
-			_, err := suite.committee.IdentityByEpoch(randUint64(201, 1_000_000), epoch2Identity.NodeID)
+			_, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(201, 1_000_000), epoch2Identity.NodeID)
 			require.Error(t, err)
 			require.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
@@ -438,29 +437,29 @@ func (suite *ConsensusSuite) TestThresholds() {
 
 	t.Run("next epoch not ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
-			threshold, err := suite.committee.QuorumThresholdForView(randUint64(1, 100))
+			threshold, err := suite.committee.QuorumThresholdForView(unittest.Uint64InRange(1, 100))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToBuildQC(1000), threshold)
-			threshold, err = suite.committee.TimeoutThresholdForView(randUint64(1, 100))
+			threshold, err = suite.committee.TimeoutThresholdForView(unittest.Uint64InRange(1, 100))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToTimeout(1000), threshold)
 		})
 
 		t.Run("current epoch", func(t *testing.T) {
-			threshold, err := suite.committee.QuorumThresholdForView(randUint64(101, 200))
+			threshold, err := suite.committee.QuorumThresholdForView(unittest.Uint64InRange(101, 200))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToBuildQC(2000), threshold)
-			threshold, err = suite.committee.TimeoutThresholdForView(randUint64(101, 200))
+			threshold, err = suite.committee.TimeoutThresholdForView(unittest.Uint64InRange(101, 200))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToTimeout(2000), threshold)
 		})
 
 		t.Run("after current epoch - should return ErrViewForUnknownEpoch", func(t *testing.T) {
 			// get threshold for view in next epoch when it is not set up yet
-			_, err := suite.committee.QuorumThresholdForView(randUint64(201, 300))
+			_, err := suite.committee.QuorumThresholdForView(unittest.Uint64InRange(201, 300))
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
-			_, err = suite.committee.TimeoutThresholdForView(randUint64(201, 300))
+			_, err = suite.committee.TimeoutThresholdForView(unittest.Uint64InRange(201, 300))
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
@@ -472,38 +471,38 @@ func (suite *ConsensusSuite) TestThresholds() {
 
 	t.Run("next epoch ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
-			threshold, err := suite.committee.QuorumThresholdForView(randUint64(1, 100))
+			threshold, err := suite.committee.QuorumThresholdForView(unittest.Uint64InRange(1, 100))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToBuildQC(1000), threshold)
-			threshold, err = suite.committee.TimeoutThresholdForView(randUint64(1, 100))
+			threshold, err = suite.committee.TimeoutThresholdForView(unittest.Uint64InRange(1, 100))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToTimeout(1000), threshold)
 		})
 
 		t.Run("current epoch", func(t *testing.T) {
-			threshold, err := suite.committee.QuorumThresholdForView(randUint64(101, 200))
+			threshold, err := suite.committee.QuorumThresholdForView(unittest.Uint64InRange(101, 200))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToBuildQC(2000), threshold)
-			threshold, err = suite.committee.TimeoutThresholdForView(randUint64(101, 200))
+			threshold, err = suite.committee.TimeoutThresholdForView(unittest.Uint64InRange(101, 200))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToTimeout(2000), threshold)
 		})
 
 		t.Run("next epoch", func(t *testing.T) {
-			threshold, err := suite.committee.QuorumThresholdForView(randUint64(201, 300))
+			threshold, err := suite.committee.QuorumThresholdForView(unittest.Uint64InRange(201, 300))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToBuildQC(3000), threshold)
-			threshold, err = suite.committee.TimeoutThresholdForView(randUint64(201, 300))
+			threshold, err = suite.committee.TimeoutThresholdForView(unittest.Uint64InRange(201, 300))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToTimeout(3000), threshold)
 		})
 
 		t.Run("beyond known epochs", func(t *testing.T) {
 			// get threshold for view in next epoch when it is not set up yet
-			_, err := suite.committee.QuorumThresholdForView(randUint64(301, 10_000))
+			_, err := suite.committee.QuorumThresholdForView(unittest.Uint64InRange(301, 10_000))
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
-			_, err = suite.committee.TimeoutThresholdForView(randUint64(301, 10_000))
+			_, err = suite.committee.TimeoutThresholdForView(unittest.Uint64InRange(301, 10_000))
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
@@ -528,7 +527,7 @@ func (suite *ConsensusSuite) TestLeaderForView() {
 	t.Run("next epoch not ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
 			// get leader for view in previous epoch
-			leaderID, err := suite.committee.LeaderForView(randUint64(1, 100))
+			leaderID, err := suite.committee.LeaderForView(unittest.Uint64InRange(1, 100))
 			assert.NoError(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -536,7 +535,7 @@ func (suite *ConsensusSuite) TestLeaderForView() {
 
 		t.Run("current epoch", func(t *testing.T) {
 			// get leader for view in current epoch
-			leaderID, err := suite.committee.LeaderForView(randUint64(101, 200))
+			leaderID, err := suite.committee.LeaderForView(unittest.Uint64InRange(101, 200))
 			assert.NoError(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -544,7 +543,7 @@ func (suite *ConsensusSuite) TestLeaderForView() {
 
 		t.Run("after current epoch - should return ErrViewForUnknownEpoch", func(t *testing.T) {
 			// get leader for view in next epoch when it is not set up yet
-			_, err := suite.committee.LeaderForView(randUint64(201, 300))
+			_, err := suite.committee.LeaderForView(unittest.Uint64InRange(201, 300))
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
@@ -557,7 +556,7 @@ func (suite *ConsensusSuite) TestLeaderForView() {
 	t.Run("next epoch ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
 			// get leader for view in previous epoch
-			leaderID, err := suite.committee.LeaderForView(randUint64(1, 100))
+			leaderID, err := suite.committee.LeaderForView(unittest.Uint64InRange(1, 100))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -565,7 +564,7 @@ func (suite *ConsensusSuite) TestLeaderForView() {
 
 		t.Run("current epoch", func(t *testing.T) {
 			// get leader for view in current epoch
-			leaderID, err := suite.committee.LeaderForView(randUint64(101, 200))
+			leaderID, err := suite.committee.LeaderForView(unittest.Uint64InRange(101, 200))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -573,14 +572,14 @@ func (suite *ConsensusSuite) TestLeaderForView() {
 
 		t.Run("next epoch", func(t *testing.T) {
 			// get leader for view in next epoch after it has been set up
-			leaderID, err := suite.committee.LeaderForView(randUint64(201, 300))
+			leaderID, err := suite.committee.LeaderForView(unittest.Uint64InRange(201, 300))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
 		})
 
 		t.Run("beyond known epochs", func(t *testing.T) {
-			_, err := suite.committee.LeaderForView(randUint64(301, 1_000_000))
+			_, err := suite.committee.LeaderForView(unittest.Uint64InRange(301, 1_000_000))
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
@@ -644,7 +643,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 		com.EpochCommittedPhaseStarted(currentEpochCounter, firstBlockOfCommittedPhase)
 		// wait for the protocol event to be processed (async)
 		require.Eventually(t, func() bool {
-			_, err := com.IdentityByEpoch(randUint64(int(firstView), int(epochFinalView)), unittest.IdentifierFixture())
+			_, err := com.IdentityByEpoch(unittest.Uint64InRange(firstView, epochFinalView), unittest.IdentifierFixture())
 			return !errors.Is(err, model.ErrViewForUnknownEpoch)
 		}, time.Second, time.Millisecond)
 
@@ -673,11 +672,6 @@ func TestRemoveOldEpochs(t *testing.T) {
 			}
 		})
 	}
-}
-
-// randUint64 returns a uint64 in [min,max]
-func randUint64(min, max int) uint64 {
-	return uint64(min + rand.Intn(max+1-min))
 }
 
 // newMockEpoch returns a new mocked epoch with the given fields

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/engine"
@@ -53,17 +54,20 @@ func NewCore(
 // OnGuarantee is used to process collection guarantees received
 // from nodes that are not consensus nodes (notably collection nodes).
 // Returns expected errors:
-//  * engine.InvalidInputError if the collection violates protocol rules
-//  * engine.UnverifiableInputError if the reference block of the collection is unknown
-//  * engine.OutdatedInputError if the collection is already expired
+//   - engine.InvalidInputError if the collection violates protocol rules
+//   - engine.UnverifiableInputError if the reference block of the collection is unknown
+//   - engine.OutdatedInputError if the collection is already expired
+//
 // All other errors are unexpected and potential symptoms of internal state corruption.
 func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
 	span, _, isSampled := e.tracer.StartCollectionSpan(context.Background(), guarantee.CollectionID, trace.CONIngOnCollectionGuarantee)
 	if isSampled {
-		span.LogKV("originID", originID.String())
+		span.SetAttributes(
+			attribute.String("originID", originID.String()),
+		)
 	}
-	defer span.Finish()
+	defer span.End()
 
 	guaranteeID := guarantee.ID()
 
@@ -110,8 +114,9 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 // validateExpiry validates that the collection has not expired w.r.t. the local
 // latest finalized block.
 // Expected errors during normal operation:
-//  * engine.UnverifiableInputError if the reference block of the collection is unknown
-//  * engine.OutdatedInputError if the collection is already expired
+//   - engine.UnverifiableInputError if the reference block of the collection is unknown
+//   - engine.OutdatedInputError if the collection is already expired
+//
 // All other errors are unexpected and potential symptoms of internal state corruption.
 func (e *Core) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 	// get the last finalized header and the reference block header
@@ -140,14 +145,16 @@ func (e *Core) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 // in that they are all from the same cluster and that cluster is allowed to
 // produce the given collection w.r.t. the guarantee's reference block.
 // Expected errors during normal operation:
-//  * engine.InvalidInputError if the origin violates any requirements
-//  * engine.UnverifiableInputError if the reference block of the collection is unknown
+//   - engine.InvalidInputError if the origin violates any requirements
+//   - engine.UnverifiableInputError if the reference block of the collection is unknown
+//
 // All other errors are unexpected and potential symptoms of internal state corruption.
+//
 // TODO: Eventually we should check the signatures, ensure a quorum of the
-//	     cluster, and ensure HotStuff finalization rules. Likely a cluster-specific
-//	     version of the follower will be a good fit for this. For now, collection
-//	     nodes independently decide when a collection is finalized and we only check
-//	     that the guarantors are all from the same cluster. This implementation is NOT BFT.
+// cluster, and ensure HotStuff finalization rules. Likely a cluster-specific
+// version of the follower will be a good fit for this. For now, collection
+// nodes independently decide when a collection is finalized and we only check
+// that the guarantors are all from the same cluster. This implementation is NOT BFT.
 func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	// get the clusters to assign the guarantee and check if the guarantor is part of it
 	snapshot := e.state.AtBlockID(guarantee.ReferenceBlockID)
@@ -194,13 +201,14 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 // at the collection's reference block. Furthermore, the origin must be
 // an authorized (i.e. positive weight), non-ejected collector node.
 // Expected errors during normal operation:
-//  * engine.InvalidInputError if the origin violates any requirements
-//  * engine.UnverifiableInputError if the reference block of the collection is unknown
+//   - engine.InvalidInputError if the origin violates any requirements
+//   - engine.UnverifiableInputError if the reference block of the collection is unknown
+//
 // All other errors are unexpected and potential symptoms of internal state corruption.
 //
 // TODO: ultimately, the origin broadcasting a collection is irrelevant, as long as the
-//       collection itself is valid. The origin is only needed in case the guarantee is found
-//       to be invalid, in which case we might want to slash the origin.
+// collection itself is valid. The origin is only needed in case the guarantee is found
+// to be invalid, in which case we might want to slash the origin.
 func (e *Core) validateOrigin(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 	refState := e.state.AtBlockID(guarantee.ReferenceBlockID)
 	valid, err := protocol.IsNodeAuthorizedWithRoleAt(refState, originID, flow.RoleCollection)

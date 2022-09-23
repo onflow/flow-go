@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // RoleBasedFilter implements a subscription filter that filters subscriptions based on a node's role.
@@ -35,7 +35,7 @@ func (f *RoleBasedFilter) getRole(pid peer.ID) flow.Role {
 }
 
 func (f *RoleBasedFilter) allowed(role flow.Role, topic string) bool {
-	channel, ok := network.ChannelFromTopic(network.Topic(topic))
+	channel, ok := channels.ChannelFromTopic(channels.Topic(topic))
 	if !ok {
 		return false
 	}
@@ -44,9 +44,9 @@ func (f *RoleBasedFilter) allowed(role flow.Role, topic string) bool {
 		// TODO: eventually we should have block proposals relayed on a separate
 		// channel on the public network. For now, we need to make sure that
 		// full observer nodes can subscribe to the block proposal channel.
-		return append(network.PublicChannels(), network.ReceiveBlocks).Contains(channel)
+		return append(channels.PublicChannels(), channels.ReceiveBlocks).Contains(channel)
 	} else {
-		if roles, ok := network.RolesByChannel(channel); ok {
+		if roles, ok := channels.RolesByChannel(channel); ok {
 			return roles.Contains(role)
 		}
 

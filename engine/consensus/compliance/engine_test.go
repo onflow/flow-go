@@ -1,11 +1,13 @@
 package compliance
 
 import (
+	"context"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -14,75 +16,87 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestComplianceEngine(t *testing.T) {
-	suite.Run(t, new(ComplianceSuite))
+	suite.Run(t, new(EngineSuite))
 }
 
-type ComplianceSuite struct {
-	ComplianceCoreSuite
+// EngineSuite tests the compliance engine.
+type EngineSuite struct {
+	CommonSuite
 
+	ctx    irrecoverable.SignalerContext
+	cancel context.CancelFunc
+	errs   <-chan error
 	engine *Engine
 }
 
-func (cs *ComplianceSuite) SetupTest() {
-	cs.ComplianceCoreSuite.SetupTest()
+func (cs *EngineSuite) SetupTest() {
+	cs.CommonSuite.SetupTest()
+	cs.hotstuff.On("Start", mock.Anything)
+	cs.hotstuff.On("Ready", mock.Anything).Return(unittest.ClosedChannel()).Maybe()
+	cs.hotstuff.On("Done", mock.Anything).Return(unittest.ClosedChannel()).Maybe()
+
 	e, err := NewEngine(unittest.Logger(), cs.net, cs.me, cs.prov, cs.core)
 	require.NoError(cs.T(), err)
+	e.WithConsensus(cs.hotstuff)
 	cs.engine = e
 
-	ready := func() <-chan struct{} {
-		channel := make(chan struct{})
-		close(channel)
-		return channel
-	}()
+	cs.ctx, cs.cancel, cs.errs = irrecoverable.WithSignallerAndCancel(context.Background())
+	cs.engine.Start(cs.ctx)
+	go unittest.FailOnIrrecoverableError(cs.T(), cs.ctx.Done(), cs.errs)
 
-	cs.hotstuff.On("Start", mock.Anything)
-	cs.hotstuff.On("Ready", mock.Anything).Return(ready)
-	<-cs.engine.Ready()
+	unittest.AssertClosesBefore(cs.T(), cs.engine.Ready(), time.Second)
 }
 
-// TestSendVote tests that single vote can be send and properly processed
-func (cs *ComplianceSuite) TestSendVote() {
+// TearDownTest stops the engine and checks there are no errors thrown to the SignallerContext.
+func (cs *EngineSuite) TearDownTest() {
+	cs.cancel()
+	unittest.RequireCloseBefore(cs.T(), cs.engine.Done(), time.Second, "engine failed to stop")
+	select {
+	case err := <-cs.errs:
+		assert.NoError(cs.T(), err)
+	default:
+	}
+}
+
+// TestSendVote tests that single vote can be sent and properly processed
+func (cs *EngineSuite) TestSendVote() {
 	// create parameters to send a vote
 	blockID := unittest.IdentifierFixture()
 	view := rand.Uint64()
 	sig := unittest.SignatureFixture()
 	recipientID := unittest.IdentifierFixture()
+	vote := &messages.BlockVote{
+		BlockID: blockID,
+		View:    view,
+		SigData: sig,
+	}
+
+	done := make(chan struct{})
+	*cs.con = *mocknetwork.NewConduit(cs.T())
+	cs.con.On("Unicast", vote, recipientID).
+		Run(func(_ mock.Arguments) { close(done) }).
+		Return(nil).
+		Once()
 
 	// submit the vote
 	err := cs.engine.SendVote(blockID, view, sig, recipientID)
 	require.NoError(cs.T(), err, "should pass send vote")
 
-	done := func() <-chan struct{} {
-		channel := make(chan struct{})
-		close(channel)
-		return channel
-	}()
-
-	cs.hotstuff.On("Done", mock.Anything).Return(done)
-
-	// The vote is transmitted asynchronously. We allow 10ms for the vote to be received:
-	<-time.After(10 * time.Millisecond)
-	<-cs.engine.Done()
-
-	// check it was called with right params
-	vote := messages.BlockVote{
-		BlockID: blockID,
-		View:    view,
-		SigData: sig,
-	}
-	cs.con.AssertCalled(cs.T(), "Unicast", &vote, recipientID)
+	// wait for vote to be sent
+	unittest.AssertClosesBefore(cs.T(), done, time.Second)
 }
 
-// TestBroadcastProposalWithDelay tests broadcasting proposals with different
-// inputs
-func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
-
+// TestBroadcastProposalWithDelay tests broadcasting proposals with different inputs
+func (cs *EngineSuite) TestBroadcastProposalWithDelay() {
 	// add execution node to participants to make sure we exclude them from broadcast
 	cs.participants = append(cs.participants, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))
 
@@ -97,62 +111,71 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	block.Header.ProposerID = cs.myID
 	cs.payloadDB[block.ID()] = block.Payload
 
-	// keep a duplicate of the correct header to check against leader
-	header := block.Header
-
-	// unset chain and height to make sure they are correctly reconstructed
-	block.Header.ChainID = ""
-	block.Header.Height = 0
-
-	cs.hotstuff.On("SubmitProposal", block.Header, parent.View).Return().Once()
-
-	// submit to broadcast proposal
-	err := cs.engine.BroadcastProposalWithDelay(block.Header, 0)
-	require.NoError(cs.T(), err, "header broadcast should pass")
-
-	// make sure chain ID and height were reconstructed and
-	// we broadcast to correct nodes
-	header.ChainID = "test"
-	header.Height = 11
-	msg := &messages.BlockProposal{
-		Header:  header,
-		Payload: block.Payload,
-	}
-
-	done := func() <-chan struct{} {
-		channel := make(chan struct{})
-		close(channel)
-		return channel
-	}()
-
-	cs.hotstuff.On("Done", mock.Anything).Return(done)
-
-	<-time.After(10 * time.Millisecond)
-	<-cs.engine.Done()
-	cs.con.AssertCalled(cs.T(), "Publish", msg, cs.participants[1].NodeID, cs.participants[2].NodeID)
-
-	// should fail with wrong proposer
-	header.ProposerID = unittest.IdentifierFixture()
-	err = cs.engine.BroadcastProposalWithDelay(header, 0)
-	require.Error(cs.T(), err, "should fail with wrong proposer")
-	header.ProposerID = cs.myID
+	cs.Run("should fail with wrong proposer", func() {
+		header := *block.Header
+		header.ProposerID = unittest.IdentifierFixture()
+		err := cs.engine.BroadcastProposalWithDelay(&header, 0)
+		require.Error(cs.T(), err, "should fail with wrong proposer")
+		header.ProposerID = cs.myID
+	})
 
 	// should fail with changed (missing) parent
-	header.ParentID[0]++
-	err = cs.engine.BroadcastProposalWithDelay(header, 0)
-	require.Error(cs.T(), err, "should fail with missing parent")
-	header.ParentID[0]--
+	cs.Run("should fail with changed/missing parent", func() {
+		header := *block.Header
+		header.ParentID[0]++
+		err := cs.engine.BroadcastProposalWithDelay(&header, 0)
+		require.Error(cs.T(), err, "should fail with missing parent")
+		header.ParentID[0]--
+	})
 
 	// should fail with wrong block ID (payload unavailable)
-	header.View++
-	err = cs.engine.BroadcastProposalWithDelay(header, 0)
-	require.Error(cs.T(), err, "should fail with missing payload")
-	header.View--
+	cs.Run("should fail with wrong block ID", func() {
+		header := *block.Header
+		header.View++
+		err := cs.engine.BroadcastProposalWithDelay(&header, 0)
+		require.Error(cs.T(), err, "should fail with missing payload")
+		header.View--
+	})
+
+	cs.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
+		// unset chain and height to make sure they are correctly reconstructed
+		headerFromHotstuff := *block.Header // copy header
+		headerFromHotstuff.ChainID = ""
+		headerFromHotstuff.Height = 0
+
+		// keep a duplicate of the correct header to check against leader
+		header := block.Header
+		// make sure chain ID and height were reconstructed and we broadcast to correct nodes
+		header.ChainID = "test"
+		header.Height = 11
+		expectedBroadcastMsg := &messages.BlockProposal{
+			Header:  header,
+			Payload: block.Payload,
+		}
+
+		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
+		cs.hotstuff.On("SubmitProposal", &headerFromHotstuff, parent.View).
+			Run(func(args mock.Arguments) { close(submitted) }).
+			Once()
+
+		broadcasted := make(chan struct{}) // closed when proposal is broadcast
+		*cs.con = *mocknetwork.NewConduit(cs.T())
+		cs.con.On("Publish", expectedBroadcastMsg, cs.participants[1].NodeID, cs.participants[2].NodeID).
+			Run(func(_ mock.Arguments) { close(broadcasted) }).
+			Return(nil).
+			Once()
+
+		// submit to broadcast proposal
+		err := cs.engine.BroadcastProposalWithDelay(&headerFromHotstuff, 0)
+		require.NoError(cs.T(), err, "header broadcast should pass")
+
+		unittest.AssertClosesBefore(cs.T(), util.AllClosed(broadcasted, submitted), time.Second)
+	})
 }
 
 // TestSubmittingMultipleVotes tests that we can send multiple votes and they
 // are queued and processed in expected way
-func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
+func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	voteCount := 15
@@ -173,7 +196,8 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 				SigData:  vote.SigData,
 			}).Return().Once()
 			// execute the vote submission
-			_ = cs.engine.Process(network.ConsensusCommittee, originID, &vote)
+			err := cs.engine.Process(channels.ConsensusCommittee, originID, &vote)
+			cs.Assert().NoError(err)
 		}
 		wg.Done()
 	}()
@@ -187,45 +211,36 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
 		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
-		_ = cs.engine.Process(network.ConsensusCommittee, originID, proposal)
+		err := cs.engine.Process(channels.ConsensusCommittee, originID, proposal)
+		cs.Assert().NoError(err)
 		wg.Done()
 	}()
 
+	// wait for all messages to be delivered to the engine message queue
 	wg.Wait()
-
-	time.Sleep(time.Second)
-
-	// check that submit vote was called with correct parameters
-	cs.hotstuff.AssertExpectations(cs.T())
-	cs.voteAggregator.AssertExpectations(cs.T())
-}
-
-// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
-// was submitted from network layer.
-func (cs *ComplianceSuite) TestProcessUnsupportedMessageType() {
-	invalidEvent := uint64(42)
-	err := cs.engine.Process("ch", unittest.IdentifierFixture(), invalidEvent)
-	// shouldn't result in error since byzantine inputs are expected
-	require.NoError(cs.T(), err)
-	// in case of local processing error cannot be consumed since all inputs are trusted
-	err = cs.engine.ProcessLocal(invalidEvent)
-	require.Error(cs.T(), err)
-	require.True(cs.T(), engine.IsIncompatibleInputTypeError(err))
+	// wait for the votes queue to drain
+	assert.Eventually(cs.T(), func() bool {
+		return cs.engine.pendingVotes.(*engine.FifoMessageStore).Len() == 0
+	}, time.Second, time.Millisecond*10)
 }
 
 // TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
 // Tests the whole processing pipeline.
-func (cs *ComplianceSuite) TestOnFinalizedBlock() {
+func (cs *EngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
 	cs.head = finalizedBlock
 
-	*cs.pending = modulemock.PendingBlockBuffer{}
-	cs.pending.On("PruneByView", finalizedBlock.View).Return(nil).Once()
-	cs.pending.On("Size").Return(uint(0)).Once()
-	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
+	*cs.pending = *modulemock.NewPendingBlockBuffer(cs.T())
+	// wait for both expected calls before ending the test
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+	cs.pending.On("PruneByView", finalizedBlock.View).
+		Run(func(_ mock.Arguments) { wg.Done() }).
+		Return(nil).Once()
+	cs.pending.On("Size").
+		Run(func(_ mock.Arguments) { wg.Done() }).
+		Return(uint(0)).Once()
 
-	require.Eventually(cs.T(),
-		func() bool {
-			return cs.pending.AssertCalled(cs.T(), "PruneByView", finalizedBlock.View)
-		}, time.Second, time.Millisecond*20)
+	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
+	unittest.AssertReturnsBefore(cs.T(), wg.Wait, time.Second, "an expected call to block buffer wasn't made")
 }

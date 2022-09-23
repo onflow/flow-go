@@ -7,11 +7,11 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // eventKey generates a unique fingerprint for the tuple of (sender, event, type of event, channel)
-func eventKey(from flow.Identifier, channel network.Channel, event interface{}) (string, error) {
+func eventKey(from flow.Identifier, channel channels.Channel, event interface{}) (string, error) {
 	marshaler := json.NewMarshaler()
 
 	tag, err := marshaler.Marshal([]byte(fmt.Sprintf("testthenetwork %s %T", channel, event)))

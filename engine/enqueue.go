@@ -14,10 +14,17 @@ type Message struct {
 	Payload  interface{}
 }
 
-// MessageStore is the interface to abstract how messages are buffered in memory before
-// being handled by the engine
+// MessageStore is the interface to abstract how messages are buffered in memory
+// while waiting to be processed.
 type MessageStore interface {
+	// Put adds the message to the message store. It returns true if the message
+	// is stored, and false if it is immediately dropped.
+	// Note: depending on the implementation, message stores might drop messages
+	// later according to their internal ejection policy. In other words, a return
+	// value of `true` does _not imply_ that the message is eventually processed.
 	Put(*Message) bool
+	// Get retrieves the next message from the message store. It returns true if
+	// a message is retrieved, and false if the message store is empty.
 	Get() (*Message, bool)
 }
 
@@ -53,8 +60,8 @@ func NewMessageHandler(log zerolog.Logger, notifier Notifier, patterns ...Patter
 // Process iterates over the internal processing patterns and determines if the payload matches.
 // The _first_ matching pattern processes the payload.
 // Returns
-//  * IncompatibleInputTypeError if no matching processor was found
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+//   - IncompatibleInputTypeError if no matching processor was found
+//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) error {
 	msg := &Message{
 		OriginID: originID,

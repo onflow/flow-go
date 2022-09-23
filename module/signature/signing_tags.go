@@ -28,7 +28,7 @@ const cipherSuiteIndex = "CS00-"
 // FLOW-CERTAIN_DOMAIN-V00-CS00-with-cipherSuite
 // where cipherSuite is fixed by the Flow crypto library
 // (only one ciphersuite is provided for BLS signatures by the crypto library
-//	and therefore it's not possible to choose one)
+// and therefore it's not possible to choose one)
 func tag(domain string) string {
 	return protocolPrefix + domain + protocolVersion + cipherSuiteIndex + "with-"
 }

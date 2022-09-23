@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -316,6 +317,28 @@ func (kp KeyPart) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnmarshalJSON unmarshals a JSON value of KeyPart.
+func (kp *KeyPart) UnmarshalJSON(b []byte) error {
+	if kp == nil {
+		return errors.New("UnmarshalJSON on nil KeyPart")
+	}
+	var v struct {
+		Type  uint16
+		Value string
+	}
+	err := json.Unmarshal(b, &v)
+	if err != nil {
+		return err
+	}
+	data, err := hex.DecodeString(v.Value)
+	if err != nil {
+		return err
+	}
+	kp.Type = v.Type
+	kp.Value = data
+	return nil
+}
+
 // Value holds the value part of a ledger key value pair
 type Value []byte
 
@@ -343,6 +366,24 @@ func (v Value) Equals(other Value) bool {
 
 func (v Value) MarshalJSON() ([]byte, error) {
 	return json.Marshal(hex.EncodeToString(v))
+}
+
+// UnmarshalJSON unmarshals a JSON value of Value.
+func (v *Value) UnmarshalJSON(b []byte) error {
+	if v == nil {
+		return errors.New("UnmarshalJSON on nil Value")
+	}
+	var s string
+	err := json.Unmarshal(b, &s)
+	if err != nil {
+		return err
+	}
+	data, err := hex.DecodeString(s)
+	if err != nil {
+		return err
+	}
+	*v = data
+	return nil
 }
 
 // Migration defines how to convert the given slice of input payloads into an slice of output payloads

@@ -10,7 +10,7 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/ledger/partial"
@@ -20,13 +20,23 @@ import (
 
 func TestFunctionalityWithCompleteTrie(t *testing.T) {
 
-	l, err := complete.NewLedger(&fixtures.NoopWAL{}, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	w := &fixtures.NoopWAL{}
+
+	l, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
+
+	compactor := fixtures.NewNoopCompactor(l)
+	<-compactor.Ready()
+
+	defer func() {
+		<-l.Done()
+		<-compactor.Done()
+	}()
 
 	// create empty update
 	state := l.InitialState()
-	keys := utils.RandomUniqueKeys(3, 2, 2, 4)
-	values := utils.RandomValues(3, 1, 32)
+	keys := testutils.RandomUniqueKeys(3, 2, 2, 4)
+	values := testutils.RandomValues(3, 1, 32)
 	update, err := ledger.NewUpdate(state, keys[0:2], values[0:2])
 	require.NoError(t, err)
 

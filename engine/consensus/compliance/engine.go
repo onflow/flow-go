@@ -1,7 +1,6 @@
 package compliance
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -12,16 +11,19 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -31,7 +33,7 @@ import (
 const defaultRangeResponseQueueCapacity = 100
 
 // defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
-const defaultBlockQueueCapacity = 10000
+const defaultBlockQueueCapacity = 10_000
 
 // defaultVoteQueueCapacity maximum capacity of inbound queue for `messages.BlockVote`s
 const defaultVoteQueueCapacity = 1000
@@ -44,42 +46,49 @@ const defaultTimeoutObjectsQueueCapacity = 1000
 // and forwards outbound messages to the networking layer.
 // `compliance.Core` implements the actual compliance logic.
 type Engine struct {
-	unit                       *engine.Unit
-	lm                         *lifecycle.LifecycleManager
-	log                        zerolog.Logger
-	mempool                    module.MempoolMetrics
-	metrics                    module.EngineMetrics
-	me                         module.Local
-	headers                    storage.Headers
-	payloads                   storage.Payloads
-	tracer                     module.Tracer
-	state                      protocol.State
-	prov                       network.Engine
-	core                       *Core
-	pendingBlocks              engine.MessageStore
-	pendingRangeResponses      engine.MessageStore
-	pendingVotes               engine.MessageStore
-	pendingTimeouts            engine.MessageStore
-	messageHandler             *engine.MessageHandler
+	log            zerolog.Logger
+	mempoolMetrics module.MempoolMetrics
+	engineMetrics  module.EngineMetrics
+	me             module.Local
+	headers        storage.Headers
+	payloads       storage.Payloads
+	tracer         module.Tracer
+	state          protocol.State
+	prov           consensus.ProposalProvider
+	core           *Core
+	// queues for inbound messsages
+	pendingBlocks         engine.MessageStore
+	pendingRangeResponses engine.MessageStore
+	// TODO remove pendingVotes and pendingTimeouts - we will pass these directly to the Aggregator
+	pendingVotes    engine.MessageStore
+	pendingTimeouts engine.MessageStore
+	messageHandler  *engine.MessageHandler
+	// tracking finalized view
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
 	con                        network.Conduit
-	stopHotstuff               context.CancelFunc
+
+	cm *component.ComponentManager
+	component.Component
 }
 
+var _ network.MessageProcessor = (*Engine)(nil)
 var _ hotstuff.Communicator = (*Engine)(nil)
+var _ component.Component = (*Engine)(nil)
 
 func NewEngine(
 	log zerolog.Logger,
 	net network.Network,
 	me module.Local,
-	prov network.Engine,
+	prov consensus.ProposalProvider,
 	core *Core,
 ) (*Engine, error) {
+
 	// Inbound FIFO queue for `messages.BlockResponse`s
+	// TODO can be removed along with https://github.com/dapperlabs/flow-go/issues/6254
 	rangeResponseQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultRangeResponseQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockResponseQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceBlockResponseQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for block-sync responses: %w", err)
@@ -91,19 +100,17 @@ func NewEngine(
 	// Inbound FIFO queue for `messages.BlockProposal`s
 	blocksQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound block proposals: %w", err)
 	}
-	pendingBlocks := &engine.FifoMessageStore{
-		FifoQueue: blocksQueue,
-	}
+	pendingBlocks := &engine.FifoMessageStore{FifoQueue: blocksQueue}
 
 	// Inbound FIFO queue for `messages.BlockVote`s
 	votesQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound votes: %w", err)
@@ -127,7 +134,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockResponse)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockResponse)
+					core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockResponse)
 				}
 				return ok
 			},
@@ -137,7 +144,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockProposal)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
+					core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
 				}
 				return ok
 			},
@@ -147,7 +154,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*events.SyncedBlock)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+					core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
 				}
 				return ok
 			},
@@ -168,7 +175,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockVote)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
+					core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
 				}
 				return ok
 			},
@@ -188,12 +195,10 @@ func NewEngine(
 	)
 
 	eng := &Engine{
-		unit:                       engine.NewUnit(),
-		lm:                         lifecycle.NewLifecycleManager(),
 		log:                        log.With().Str("compliance", "engine").Logger(),
 		me:                         me,
-		mempool:                    core.mempool,
-		metrics:                    core.metrics,
+		mempoolMetrics:             core.mempoolMetrics,
+		engineMetrics:              core.engineMetrics,
 		headers:                    core.headers,
 		payloads:                   core.payloads,
 		pendingRangeResponses:      pendingRangeResponses,
@@ -209,10 +214,17 @@ func NewEngine(
 	}
 
 	// register the core with the network layer and store the conduit
-	eng.con, err = net.Register(network.ConsensusCommittee, eng)
+	eng.con, err = net.Register(channels.ConsensusCommittee, eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register core: %w", err)
 	}
+
+	// create the component manager and worker threads
+	eng.cm = component.NewComponentManagerBuilder().
+		AddWorker(eng.processMessagesLoop).
+		AddWorker(eng.finalizationProcessingLoop).
+		Build()
+	eng.Component = eng.cm
 
 	return eng, nil
 }
@@ -224,74 +236,40 @@ func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 	return e
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For consensus engine, this is true once the underlying consensus
-// algorithm has started.
-func (e *Engine) Ready() <-chan struct{} {
+// Start starts the Hotstuff event processMessagesLoop, then the compliance engine worker threads.
+func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	if e.core.hotstuff == nil {
-		panic("must initialize compliance engine with hotstuff engine")
+		ctx.Throw(fmt.Errorf("must initialize compliance engine with hotstuff engine"))
 	}
-	e.lm.OnStart(func() {
-		e.unit.Launch(e.loop)
-		e.unit.Launch(e.finalizationProcessingLoop)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		signalerCtx, hotstuffErrChan := irrecoverable.WithSignaler(ctx)
-		e.stopHotstuff = cancel
+	e.log.Info().Msg("starting hotstuff")
+	e.core.hotstuff.Start(ctx)
+	e.log.Info().Msg("hotstuff started")
 
-		// TODO: this workaround for handling fatal HotStuff errors is required only
-		//  because this engine and epochmgr do not use the Component pattern yet
-		e.unit.Launch(func() {
-			e.handleHotStuffError(hotstuffErrChan)
-		})
+	e.log.Info().Msg("starting compliance engine")
+	e.Component.Start(ctx)
+	e.log.Info().Msg("compliance engine started")
+}
 
-		e.core.hotstuff.Start(signalerCtx)
-		// wait for request handler to startup
-
-		<-e.core.hotstuff.Ready()
-	})
-	return e.lm.Started()
+// Ready returns a ready channel that is closed once the engine has fully started.
+// For the consensus engine, we wait for hotstuff to start.
+func (e *Engine) Ready() <-chan struct{} {
+	// NOTE: this will create long-lived goroutines each time Ready is called
+	// Since Ready is called infrequently, that is OK. If the call frequency changes, change this code.
+	return util.AllReady(e.cm, e.core.hotstuff)
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	e.lm.OnStop(func() {
-		e.log.Info().Msg("shutting down hotstuff eventloop")
-		e.stopHotstuff()
-		<-e.core.hotstuff.Done()
-		e.log.Info().Msg("all components have been shut down")
-		<-e.unit.Done()
-	})
-	return e.lm.Stopped()
-}
-
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.ProcessLocal(event)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := e.Process(channel, originID, event)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.messageHandler.Process(e.me.NodeID(), event)
+	// NOTE: this will create long-lived goroutines each time Done is called
+	// Since Done is called infrequently, that is OK. If the call frequency changes, change this code.
+	return util.AllDone(e.cm, e.core.hotstuff)
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	err := e.messageHandler.Process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
@@ -303,32 +281,32 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 	return nil
 }
 
-// loop implements the processing of inbound messages. Only returns when Engine is terminated.
-func (e *Engine) loop() {
+// processMessagesLoop processes available block, vote, and timeout messages as they are queued.
+func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	doneSignal := ctx.Done()
+	newMessageSignal := e.messageHandler.GetNotifier()
+
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-doneSignal:
 			return
-		case <-e.messageHandler.GetNotifier():
-			err := e.processAvailableMessages()
+		case <-newMessageSignal:
+			err := e.processAvailableMessages() // no errors expected during normal operations
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+				ctx.Throw(err)
 			}
 		}
 	}
 }
 
-// processAvailableMessages processes any available messages from the inbound queues.
+// processAvailableMessages processes any available messages until the message queue is empty.
 // Only returns when all inbound queues are empty (or the engine is terminated).
-// No errors expected during normal operations.
+// No errors are expected during normal operation. All returned exceptions are potential
+// symptoms of internal state corruption and should be fatal.
 func (e *Engine) processAvailableMessages() error {
 	for {
-		select {
-		case <-e.unit.Quit():
-			return nil
-		default:
-		}
-
 		msg, ok := e.pendingRangeResponses.Get()
 		if ok {
 			blockResponse := msg.Payload.(*messages.BlockResponse)
@@ -372,7 +350,7 @@ func (e *Engine) processAvailableMessages() error {
 			continue
 		}
 
-		// when there is no more messages in the queue, back to the loop to wait
+		// when there are no more messages in the queue, back to the processMessagesLoop to wait
 		// for the next incoming message to arrive.
 		return nil
 	}
@@ -395,17 +373,18 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		SigData: sigData,
 	}
 
-	// TODO: this is a hot-fix to mitigate the effects of the following Unicast call blocking occasionally
-	e.unit.Launch(func() {
+	// spawn a goroutine to asynchronously send the vote
+	// we do this so that network operations do not block the HotStuff EventLoop
+	go func() {
 		// send the vote the desired recipient
 		err := e.con.Unicast(vote, recipientID)
 		if err != nil {
-			log.Warn().Err(err).Msg("could not send vote")
+			log.Err(err).Msg("could not send vote")
 			return
 		}
-		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
+		e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
 		log.Info().Msg("block vote transmitted")
-	})
+	}()
 
 	return nil
 }
@@ -426,7 +405,10 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 	log := logContext.Logger()
 
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
-	e.unit.Launch(func() {
+
+	// spawn a goroutine to asynchronously broadcast the timeout object
+	// we do this so that network operations do not block the HotStuff EventLoop
+	go func() {
 		// Retrieve all consensus nodes (excluding myself).
 		// CAUTION: We must include also nodes with weight zero, because otherwise
 		//          TCs might not be constructed at epoch switchover.
@@ -441,7 +423,7 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 			e.log.Fatal().Err(err).Msg("could not get consensus recipients for broadcasting timeout")
 		}
 
-		// create the proposal message for the collection
+		// create the timeout message
 		msg := &messages.TimeoutObject{
 			View:       timeout.View,
 			NewestQC:   timeout.NewestQC,
@@ -454,15 +436,15 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 			return
 		}
 		if err != nil {
-			log.Error().Err(err).Msg("could not broadcast timeout")
+			log.Err(err).Msg("could not broadcast timeout")
 			return
 		}
-		log.Info().Msg("consensus timeout broadcast")
+		log.Info().Msg("consensus timeout was broadcast")
 
 		// TODO(active-pacemaker): update metrics
 		//e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 		//e.core.collectionMetrics.ClusterBlockProposed(block)
-	})
+	}()
 
 	return nil
 }
@@ -509,7 +491,15 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 	log.Debug().Msg("processing proposal broadcast request from hotstuff")
 
-	e.unit.LaunchAfter(delay, func() {
+	// spawn a goroutine to asynchronously broadcast the proposal - we do this
+	// to introduce a pre-proposal delay without blocking the Hotstuff EventLoop thread
+	go func() {
+		select {
+		case <-time.After(delay):
+		case <-e.cm.ShutdownSignal():
+			return
+		}
+
 		// Retrieve all consensus nodes (excluding myself).
 		// CAUTION: We must include also nodes with weight zero, because otherwise
 		//          new consensus nodes for the next epoch are left out.
@@ -524,7 +514,6 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			e.log.Fatal().Err(err).Msg("could not get consensus recipient for broadcasting proposal")
 		}
 
-		// forward proposal to node's local consensus instance
 		e.core.hotstuff.SubmitProposal(header, parent.View) // non-blocking
 
 		// NOTE: some fields are not needed for the message
@@ -541,17 +530,16 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			return
 		}
 		if err != nil {
-			log.Error().Err(err).Msg("could not send proposal message")
+			log.Err(err).Msg("could not send proposal message")
 		}
 
-		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
+		e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
 
-		log.Info().Msg("block proposal broadcasted")
+		log.Info().Msg("block proposal was broadcast")
 
-		// submit the proposal to the provider engine to forward it to other
-		// node roles
-		e.prov.SubmitLocal(proposal)
-	})
+		// submit the proposal to the provider engine to forward it to other node roles
+		e.prov.ProvideProposal(proposal)
+	}()
 
 	return nil
 }
@@ -564,7 +552,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-//  (1) Informs sealing.Core about finalization of respective block.
+// It informs sealing.Core about finalization of respective block.
+//
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
@@ -574,32 +563,16 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
-func (e *Engine) finalizationProcessingLoop() {
+func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
 	finalizationNotifier := e.finalizationEventsNotifier.Channel()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-finalizationNotifier:
 			e.core.ProcessFinalizedView(e.finalizedView.Value())
-		}
-	}
-}
-
-// handleHotStuffError accepts the error channel from the HotStuff component and
-// crashes the node if any error is detected.
-// TODO: this function should be removed in favour of refactoring this engine and
-//  the epochmgr engine to use the Component pattern, so that irrecoverable errors
-//  can be bubbled all the way to the node scaffold
-func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
-	for {
-		select {
-		case <-e.unit.Quit():
-			return
-		case err := <-hotstuffErrs:
-			if err != nil {
-				e.log.Fatal().Err(err).Msg("encountered fatal error in HotStuff")
-			}
 		}
 	}
 }

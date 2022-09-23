@@ -201,6 +201,12 @@ func (c Cache) Size() uint {
 	return uint(c.entities.Size())
 }
 
+// Head returns the head of queue.
+// Boolean return value determines whether there is a head available.
+func (c Cache) Head() (flow.Entity, bool) {
+	return c.entities.Head()
+}
+
 // All returns all entities stored in the backdata.
 func (c Cache) All() map[flow.Identifier]flow.Entity {
 	defer c.logTelemetry()
@@ -284,8 +290,12 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	}
 
 	c.slotCount++
-	entityIndex, ejection := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
-	if ejection {
+	entityIndex, slotAvailable, ejectionHappened := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
+	if !slotAvailable {
+		return false
+	}
+
+	if ejectionHappened {
 		// cache is at its full size and ejection happened to make room for this new entity.
 		c.collector.OnEntityEjectionDueToFullCapacity()
 	}

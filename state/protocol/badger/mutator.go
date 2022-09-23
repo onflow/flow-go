@@ -107,7 +107,7 @@ func NewFullConsensusState(
 func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error {
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
-	defer span.Finish()
+	defer span.End()
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
@@ -135,7 +135,7 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error {
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
-	defer span.Finish()
+	defer span.End()
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
@@ -253,7 +253,7 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckGuarantees)
-	defer span.Finish()
+	defer span.End()
 
 	header := candidate.Header
 	payload := candidate.Payload
@@ -342,7 +342,7 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*flow.Seal, error) {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
-	defer span.Finish()
+	defer span.End()
 
 	lastSeal, err := m.sealValidator.Validate(candidate)
 	if err != nil {
@@ -353,15 +353,16 @@ func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*
 }
 
 // receiptExtend checks the compliance of the receipt payload.
-//   * Receipts should pertain to blocks on the fork
-//   * Receipts should not appear more than once on a fork
-//   * Receipts should pass the ReceiptValidator check
-//   * No seal has been included for the respective block in this particular fork
+//   - Receipts should pertain to blocks on the fork
+//   - Receipts should not appear more than once on a fork
+//   - Receipts should pass the ReceiptValidator check
+//   - No seal has been included for the respective block in this particular fork
+//
 // We require the receipts to be sorted by block height (within a payload).
 func (m *MutableState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckReceipts)
-	defer span.Finish()
+	defer span.End()
 
 	err := m.receiptValidator.ValidatePayload(candidate)
 	if err != nil {
@@ -421,7 +422,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
-	defer span.Finish()
+	defer span.End()
 
 	blockID := candidate.ID()
 	latestSealID := last.ID()
@@ -478,7 +479,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// preliminaries: start tracer and retrieve full block
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorFinalize)
-	defer span.Finish()
+	defer span.End()
 	block, err := m.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve full block that should be finalized: %w", err)
@@ -641,11 +642,11 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // epochFallbackTriggeredByFinalizedBlock checks whether finalizing the input block
 // would trigger epoch emergency fallback mode. In particular, we trigger epoch
 // fallback mode when finalizing a block B when:
-// 1. B is the head of a fork in which epoch fallback was tentatively triggered,
-//    due to incorporating an invalid service event.
-// 2. (a) B is the first finalized block with view greater than or equal to the epoch
-//    commitment deadline for the current epoch AND
-//    (b) the next epoch has not been committed as of B.
+//  1. B is the head of a fork in which epoch fallback was tentatively triggered,
+//     due to incorporating an invalid service event.
+//  2. (a) B is the first finalized block with view greater than or equal to the epoch
+//     commitment deadline for the current epoch AND
+//     (b) the next epoch has not been committed as of B.
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // See protocol.Params for more details on the epoch commitment deadline.
@@ -738,11 +739,12 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 // See handleEpochServiceEvents for details.
 //
 // Convention:
-//           A <-- ... <-- P(Seal_A) <----- B
-//                         ↑                ↑
-//           block sealing service event    first block of new Epoch phase
-//           for epoch-phase transition     (e.g. EpochSetup phase)
-//           (e.g. EpochSetup event)
+//
+//	A <-- ... <-- P(Seal_A) <----- B
+//	              ↑                ↑
+//	block sealing service event    first block of new Epoch phase
+//	for epoch-phase transition     (e.g. EpochSetup phase)
+//	(e.g. EpochSetup event)
 //
 // Per convention, protocol events for epoch phase changes are emitted when
 // the first block of the new phase (eg. EpochSetup phase) is _finalized_.
@@ -804,13 +806,13 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 // final View of the parent's epoch, the block starts a new Epoch.
 //
 // Possible outcomes:
-// 1. Block is in same Epoch as parent (block.View < epoch.FinalView)
-//    -> the parent's EpochStatus.CurrentEpoch also applies for the current block
-// 2. Block enters the next Epoch (block.View ≥ epoch.FinalView)
-//    a) HAPPY PATH: Epoch fallback is not triggered, we enter the next epoch:
-//       -> the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
-//    b) FALLBACK PATH: Epoch fallback is triggered, we continue the current epoch:
-//       -> the parent's EpochStatus.CurrentEpoch also applies for the current block
+//  1. Block is in same Epoch as parent (block.View < epoch.FinalView)
+//     -> the parent's EpochStatus.CurrentEpoch also applies for the current block
+//  2. Block enters the next Epoch (block.View ≥ epoch.FinalView)
+//     a) HAPPY PATH: Epoch fallback is not triggered, we enter the next epoch:
+//     -> the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
+//     b) FALLBACK PATH: Epoch fallback is triggered, we continue the current epoch:
+//     -> the parent's EpochStatus.CurrentEpoch also applies for the current block
 //
 // As the parent was a valid extension of the chain, by induction, the parent
 // satisfies all consistency requirements of the protocol.
@@ -874,10 +876,10 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 // for a block in which a service event was emitted).
 //
 // Return values:
-//  * dbUpdates - If the service events are valid, or there are no service events,
-//    this method returns a slice of Badger operations to apply while storing the block.
-//    This includes an operation to index the epoch status for every block, and
-//    operations to insert service events for blocks that include them.
+//   - dbUpdates - If the service events are valid, or there are no service events,
+//     this method returns a slice of Badger operations to apply while storing the block.
+//     This includes an operation to index the epoch status for every block, and
+//     operations to insert service events for blocks that include them.
 //
 // No errors are expected during normal operation.
 func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdates []func(*transaction.Tx) error, err error) {
@@ -998,7 +1000,6 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 // NOTE: since a parent can have multiple children, `BlockProcessable` event
 // could be triggered multiple times for the same block.
 // NOTE: BlockProcessable should not be blocking, otherwise, it will block the follower
-//
 func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 	header, err := m.headers.ByBlockID(blockID)
 	if err != nil {

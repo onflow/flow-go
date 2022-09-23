@@ -36,10 +36,10 @@ func TestProviderEngine(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 
-	suite.me = new(module.Local)
-	suite.conduit = new(mocknetwork.Conduit)
-	suite.state = new(protocol.State)
-	suite.final = new(protocol.Snapshot)
+	suite.me = module.NewLocal(suite.T())
+	suite.conduit = mocknetwork.NewConduit(suite.T())
+	suite.state = protocol.NewState(suite.T())
+	suite.final = protocol.NewSnapshot(suite.T())
 
 	suite.engine = &Engine{
 		me:      suite.me,
@@ -53,25 +53,17 @@ func (suite *Suite) SetupTest() {
 	localID := suite.identities[0].NodeID
 
 	suite.me.On("NodeID").Return(localID)
-	suite.state.On("Final").Return(suite.final)
+	suite.state.On("AtBlockID", mock.Anything).Return(suite.final).Maybe()
 	suite.final.On("Identities", mock.Anything).Return(
 		func(f flow.IdentityFilter) flow.IdentityList { return suite.identities.Filter(f) },
 		func(flow.IdentityFilter) error { return nil },
-	)
+	).Maybe()
 }
 
-// proposals submitted by remote nodes should not be accepted.
-func (suite *Suite) TestOnBlockProposal_RemoteOrigin() {
-
+// TestBroadcastProposal_Success should broadcast a valid block.
+func (suite *Suite) TestBroadcastProposal_Success() {
 	proposal := unittest.ProposalFixture()
-	// message submitted by remote node
-	err := suite.engine.onBlockProposal(suite.identities[1].NodeID, proposal)
-	suite.Assert().Error(err)
-}
-
-func (suite *Suite) OnBlockProposal_Success() {
-
-	proposal := unittest.ProposalFixture()
+	proposal.Header.ProposerID = suite.me.NodeID()
 
 	params := []interface{}{proposal}
 	for _, identity := range suite.identities {
@@ -84,7 +76,25 @@ func (suite *Suite) OnBlockProposal_Success() {
 
 	suite.conduit.On("Publish", params...).Return(nil).Once()
 
-	err := suite.engine.onBlockProposal(suite.me.NodeID(), proposal)
-	suite.Require().Nil(err)
-	suite.conduit.AssertExpectations(suite.T())
+	err := suite.engine.broadcastProposal(proposal)
+	suite.Assert().NoError(err)
+}
+
+func (suite *Suite) TestBroadcastProposal_Invalid() {
+
+	proposal := unittest.ProposalFixture()
+	proposal.Header.ProposerID = unittest.IdentifierFixture() // set a random proposer
+
+	params := []interface{}{proposal}
+	for _, identity := range suite.identities {
+		// skip consensus nodes
+		if identity.Role == flow.RoleConsensus {
+			continue
+		}
+		params = append(params, identity.NodeID)
+	}
+
+	err := suite.engine.broadcastProposal(proposal)
+	suite.Assert().Error(err)
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", params...)
 }

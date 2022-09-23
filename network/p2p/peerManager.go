@@ -30,10 +30,10 @@ var DefaultPeerUpdateInterval = 10 * time.Minute
 type PeerManager struct {
 	unit               *engine.Unit
 	logger             zerolog.Logger
-	peersProvider      func() (peer.IDSlice, error) // callback to retrieve list of peers to connect to
-	peerRequestQ       chan struct{}                // a channel to queue a peer update request
-	connector          Connector                    // connector to connect or disconnect from peers
-	peerUpdateInterval time.Duration                // interval the peer manager runs on
+	peersProvider      PeersProvider // callback to retrieve list of peers to connect to
+	peerRequestQ       chan struct{} // a channel to queue a peer update request
+	connector          Connector     // connector to connect or disconnect from peers
+	peerUpdateInterval time.Duration // interval the peer manager runs on
 }
 
 // Option represents an option for the peer manager.
@@ -45,23 +45,18 @@ func WithInterval(period time.Duration) Option {
 	}
 }
 
-type PeersProvider func() (peer.IDSlice, error)
+type PeersProvider func() peer.IDSlice
 
 // NewPeerManager creates a new peer manager which calls the peersProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
-func NewPeerManager(logger zerolog.Logger, peersProvider PeersProvider,
-	connector Connector, options ...Option) *PeerManager {
+func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, peersProvider PeersProvider, connector Connector) *PeerManager {
 	pm := &PeerManager{
 		unit:               engine.NewUnit(),
 		logger:             logger,
 		peersProvider:      peersProvider,
 		connector:          connector,
 		peerRequestQ:       make(chan struct{}, 1),
-		peerUpdateInterval: DefaultPeerUpdateInterval,
-	}
-	// apply options
-	for _, o := range options {
-		o(pm)
+		peerUpdateInterval: updateInterval,
 	}
 	return pm
 }
@@ -72,13 +67,13 @@ type PeerManagerFactoryFunc func(host host.Host, peersProvider PeersProvider, lo
 
 // PeerManagerFactory generates a PeerManagerFunc that produces the default PeerManager with the given peer manager
 // options and that uses the LibP2PConnector with the given LibP2P connector options
-func PeerManagerFactory(peerManagerOptions []Option, connectorOptions ...ConnectorOption) PeerManagerFactoryFunc {
+func PeerManagerFactory(connectionPruning bool, updateInterval time.Duration) PeerManagerFactoryFunc {
 	return func(host host.Host, peersProvider PeersProvider, logger zerolog.Logger) (*PeerManager, error) {
-		connector, err := NewLibp2pConnector(host, logger, connectorOptions...)
+		connector, err := NewLibp2pConnector(logger, host, connectionPruning)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2pConnector: %w", err)
 		}
-		return NewPeerManager(logger, peersProvider, connector, peerManagerOptions...), nil
+		return NewPeerManager(logger, updateInterval, peersProvider, connector), nil
 	}
 }
 
@@ -130,11 +125,7 @@ func (pm *PeerManager) RequestPeerUpdate() {
 func (pm *PeerManager) updatePeers() {
 
 	// get all the peer ids to connect to
-	peers, err := pm.peersProvider()
-	if err != nil {
-		pm.logger.Error().Err(err).Msg("failed to update peers")
-		return
-	}
+	peers := pm.peersProvider()
 
 	pm.logger.Trace().
 		Str("peers", fmt.Sprintf("%v", peers)).

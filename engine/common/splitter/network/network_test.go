@@ -9,6 +9,7 @@ import (
 
 	splitternetwork "github.com/onflow/flow-go/engine/common/splitter/network"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -26,16 +27,16 @@ type Suite struct {
 
 	con     *mocknetwork.Conduit
 	net     *splitternetwork.Network
-	engines map[network.Channel]network.MessageProcessor
+	engines map[channels.Channel]network.MessageProcessor
 }
 
 func (suite *Suite) SetupTest() {
 	net := new(mocknetwork.Network)
 	suite.con = new(mocknetwork.Conduit)
-	suite.engines = make(map[network.Channel]network.MessageProcessor)
+	suite.engines = make(map[channels.Channel]network.MessageProcessor)
 
-	net.On("Register", mock.AnythingOfType("network.Channel"), mock.Anything).Run(func(args mock.Arguments) {
-		channel, _ := args.Get(0).(network.Channel)
+	net.On("Register", mock.AnythingOfType("channels.Channel"), mock.Anything).Run(func(args mock.Arguments) {
+		channel, _ := args.Get(0).(channels.Channel)
 		engine, ok := args.Get(1).(network.MessageProcessor)
 		suite.Assert().True(ok)
 		suite.engines[channel] = engine
@@ -55,9 +56,9 @@ func (suite *Suite) TestHappyPath() {
 	id := unittest.IdentifierFixture()
 	event := getEvent()
 
-	chan1 := network.Channel("test-chan-1")
-	chan2 := network.Channel("test-chan-2")
-	chan3 := network.Channel("test-chan-3")
+	chan1 := channels.Channel("test-chan-1")
+	chan2 := channels.Channel("test-chan-2")
+	chan3 := channels.Channel("test-chan-3")
 
 	engine1 := new(mocknetwork.Engine)
 	engine2 := new(mocknetwork.Engine)
