@@ -507,9 +507,12 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 				return
 			}
 			log.Err(err).Msg("could not send proposal message")
+		} else {
+			e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 		}
 
-		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
+		log.Info().Msg("cluster proposal was broadcast")
+
 		block := &cluster.Block{
 			Header:  header,
 			Payload: payload,
