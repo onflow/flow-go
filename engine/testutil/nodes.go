@@ -170,11 +170,12 @@ func GenericNodeWithStateFixture(t testing.TB,
 	net := stub.NewNetwork(t, identity.NodeID, hub)
 
 	parentCtx, cancel := context.WithCancel(context.Background())
-	ctx, _ := irrecoverable.WithSignaler(parentCtx)
+	ctx, errs := irrecoverable.WithSignaler(parentCtx)
 
 	return testmock.GenericNode{
 		Ctx:            ctx,
 		Cancel:         cancel,
+		Errs:           errs,
 		Log:            log,
 		Metrics:        metrics,
 		Tracer:         tracer,

@@ -48,6 +48,7 @@ func NewEpochComponents(
 		// start vote and timeout aggregators, hotstuff will be started by compliance engine
 		voteAggregator.Start(ctx)
 		timeoutAggregator.Start(ctx)
+		prop.Start(ctx)
 		// wait until all components start
 		<-util.AllReady(components.prop, components.sync, components.voteAggregator, components.timeoutAggregator)
 

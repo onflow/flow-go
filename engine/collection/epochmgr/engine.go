@@ -386,7 +386,7 @@ func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, c
 		return nil
 	case <-time.After(e.startupTimeout):
 		cancel() // cancel current context if we didn't start in time
-		return fmt.Errorf("could not stop epoch %d components after %s", counter, e.startupTimeout)
+		return fmt.Errorf("could not start epoch %d components after %s", counter, e.startupTimeout)
 	}
 }
 
