@@ -27,6 +27,9 @@ func NewCorruptMessageProcessor(logger zerolog.Logger, originalProcessor flownet
 	}
 }
 
+// Process implements handling ingress (incoming) messages from the honest Flow network (via network.MessageProcessor interface).
+// If an Attacker is registered on the Corrupt Network, then these ingress messages are passed to the Attacker (by the Corrupt Network).
+// If an Attacker is not registered on the Corrupt Network, then these ingress messages are passed to the original (honest) Message Processor.
 func (m *MessageProcessor) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	// Relay message to the attack orchestrator.
 	lg := m.logger.With().
