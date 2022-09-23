@@ -9,11 +9,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO(patrick): pass in initial snapshot time when we start supporting
+// speculative pre-processing / execution.
 func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
 	return &TransactionProcedure{
-		ID:          tx.ID(),
-		Transaction: tx,
-		TxIndex:     txIndex,
+		ID:                     tx.ID(),
+		Transaction:            tx,
+		InitialSnapshotTxIndex: txIndex,
+		TxIndex:                txIndex,
 	}
 }
 
@@ -22,14 +25,16 @@ type TransactionProcessor interface {
 		Context,
 		*TransactionProcedure,
 		*state.StateHolder,
-		*programs.Programs,
+		*programs.TransactionPrograms,
 	) error
 }
 
 type TransactionProcedure struct {
-	ID              flow.Identifier
-	Transaction     *flow.TransactionBody
-	TxIndex         uint32
+	ID                     flow.Identifier
+	Transaction            *flow.TransactionBody
+	InitialSnapshotTxIndex uint32
+	TxIndex                uint32
+
 	Logs            []string
 	Events          []flow.Event
 	ServiceEvents   []flow.Event
@@ -46,7 +51,7 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
 func (proc *TransactionProcedure) Run(
 	ctx Context,
 	st *state.StateHolder,
-	programs *programs.Programs,
+	programs *programs.TransactionPrograms,
 ) error {
 	for _, p := range ctx.TransactionProcessors {
 		err := p.Process(ctx, proc, st, programs)
@@ -101,4 +106,16 @@ func (proc *TransactionProcedure) ShouldDisableMemoryAndInteractionLimits(
 ) bool {
 	return ctx.DisableMemoryAndInteractionLimits ||
 		proc.Transaction.Payer == ctx.Chain.ServiceAddress()
+}
+
+func (TransactionProcedure) Type() ProcedureType {
+	return TransactionProcedureType
+}
+
+func (proc *TransactionProcedure) InitialSnapshotTime() programs.LogicalTime {
+	return programs.LogicalTime(proc.InitialSnapshotTxIndex)
+}
+
+func (proc *TransactionProcedure) ExecutionTime() programs.LogicalTime {
+	return programs.LogicalTime(proc.TxIndex)
 }

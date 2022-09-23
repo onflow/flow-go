@@ -33,7 +33,7 @@ type ScriptProcessor interface {
 		Context,
 		*ScriptProcedure,
 		*state.StateHolder,
-		*programs.Programs,
+		*programs.TransactionPrograms,
 	) error
 }
 
@@ -75,7 +75,11 @@ func NewScriptWithContextAndArgs(code []byte, reqContext context.Context, args .
 	}
 }
 
-func (proc *ScriptProcedure) Run(ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
+func (proc *ScriptProcedure) Run(
+	ctx Context,
+	sth *state.StateHolder,
+	programs *programs.TransactionPrograms,
+) error {
 	for _, p := range ctx.ScriptProcessors {
 		err := p.Process(ctx, proc, sth, programs)
 		txError, failure := errors.SplitErrorTypes(err)
@@ -118,6 +122,18 @@ func (proc *ScriptProcedure) ShouldDisableMemoryAndInteractionLimits(
 	return ctx.DisableMemoryAndInteractionLimits
 }
 
+func (ScriptProcedure) Type() ProcedureType {
+	return ScriptProcedureType
+}
+
+func (proc *ScriptProcedure) InitialSnapshotTime() programs.LogicalTime {
+	return programs.EndOfBlockExecutionTime
+}
+
+func (proc *ScriptProcedure) ExecutionTime() programs.LogicalTime {
+	return programs.EndOfBlockExecutionTime
+}
+
 type ScriptInvoker struct{}
 
 func NewScriptInvoker() ScriptInvoker {
@@ -128,7 +144,7 @@ func (i ScriptInvoker) Process(
 	ctx Context,
 	proc *ScriptProcedure,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	programs *programs.TransactionPrograms,
 ) error {
 	env := NewScriptEnv(proc.RequestContext, ctx, sth, programs)
 

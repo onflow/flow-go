@@ -314,6 +314,18 @@ func (s *StateHolder) InteractionUsed() uint64 {
 	return s.currentState().InteractionUsed()
 }
 
+func (s *StateHolder) MeterEmittedEvent(byteSize uint64) error {
+	return s.currentState().MeterEmittedEvent(byteSize)
+}
+
+func (s *StateHolder) TotalEmittedEventBytes() uint64 {
+	return s.currentState().TotalEmittedEventBytes()
+}
+
+func (s *StateHolder) TotalEventCounter() uint32 {
+	return s.currentState().TotalEventCounter()
+}
+
 func (s *StateHolder) ViewForTestingOnly() View {
 	return s.currentState().View()
 }

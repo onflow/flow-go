@@ -29,7 +29,7 @@ func (i TransactionInvoker) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	programs *programsCache.Programs,
+	programs *programsCache.TransactionPrograms,
 ) (processErr error) {
 
 	txIDStr := proc.ID.String()
@@ -84,7 +84,7 @@ func (i TransactionInvoker) Process(
 		// based on the contract and frozen account updates we decide how to
 		// clean up the programs for failed transactions we also do the same as
 		// transaction without any deployed contracts
-		programs.Cleanup(modifiedSets)
+		programs.AddInvalidator(modifiedSets)
 
 		err := sth.Commit(nestedTxnId)
 		if err != nil {

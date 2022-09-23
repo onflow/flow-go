@@ -56,7 +56,15 @@ type ViewCommitter interface {
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.Programs) (*execution.ComputationResult, error)
+	ExecuteBlock(
+		context.Context,
+		*entity.ExecutableBlock,
+		state.View,
+		*programs.BlockPrograms,
+	) (
+		*execution.ComputationResult,
+		error,
+	)
 }
 
 type blockComputer struct {
@@ -110,7 +118,7 @@ func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
 	stateView state.View,
-	program *programs.Programs,
+	program *programs.BlockPrograms,
 ) (*execution.ComputationResult, error) {
 
 	span, _, isSampled := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
@@ -134,7 +142,7 @@ func (e *blockComputer) executeBlock(
 	blockSpan otelTrace.Span,
 	block *entity.ExecutableBlock,
 	stateView state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 ) (*execution.ComputationResult, error) {
 
 	// check the start state is set

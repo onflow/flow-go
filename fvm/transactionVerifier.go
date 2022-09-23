@@ -35,7 +35,7 @@ func (v *TransactionVerifier) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	_ *programs.Programs,
+	_ *programs.TransactionPrograms,
 ) error {
 	return v.verifyTransaction(proc, ctx, sth)
 }
