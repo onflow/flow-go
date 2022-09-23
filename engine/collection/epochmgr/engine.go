@@ -1,7 +1,6 @@
 package epochmgr
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -12,8 +11,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/mempool/epochs"
+	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -37,11 +37,11 @@ type Engine struct {
 	log            zerolog.Logger
 	me             module.Local
 	state          protocol.State
-	pools          *epochs.TransactionPools  // epoch-scoped transaction pools
-	factory        EpochComponentsFactory    // consolidates creating epoch for an epoch
-	voter          module.ClusterRootQCVoter // manages process of voting for next epoch's QC
-	heightEvents   events.Heights            // allows subscribing to particular heights
-	startupTimeout time.Duration             // how long we wait for epoch components to start up
+	pools          *epochpool.TransactionPools // epoch-scoped transaction pools
+	factory        EpochComponentsFactory      // consolidates creating epoch for an epoch
+	voter          module.ClusterRootQCVoter   // manages process of voting for next epoch's QC
+	heightEvents   events.Heights              // allows subscribing to particular heights
+	startupTimeout time.Duration               // how long we wait for epoch components to start up
 
 	mu     sync.Mutex                           // protects epochs map
 	epochs map[uint64]*StartableEpochComponents // epoch-scoped components per epoch
@@ -62,7 +62,7 @@ func New(
 	log zerolog.Logger,
 	me module.Local,
 	state protocol.State,
-	pools *epochs.TransactionPools,
+	pools *epochpool.TransactionPools,
 	voter module.ClusterRootQCVoter,
 	factory EpochComponentsFactory,
 	heightEvents events.Heights,
@@ -362,10 +362,14 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 // setup phase, or when the node is restarted during the epoch setup phase. It
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
-func (e *Engine) onEpochSetupPhaseStarted(ctx context.Context, nextEpoch protocol.Epoch) {
+func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nextEpoch protocol.Epoch) {
 	err := e.voter.Vote(ctx, nextEpoch)
 	if err != nil {
-		e.log.Error().Err(err).Msg("failed to submit QC vote for next epoch")
+		if epochs.IsClusterQCNoVoteError(err) {
+			e.log.Warn().Err(err).Msg("unable to submit QC vote for next epoch")
+			return
+		}
+		ctx.Throw(fmt.Errorf("unexpected failure to submit QC vote for next epoch: %w", err))
 	}
 }
 
