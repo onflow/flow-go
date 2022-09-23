@@ -23,8 +23,8 @@ func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
 	// TODO: read the checksum of 17 file parts
 
-	headerPath := filePathHeader(dir, fileName)
-	subtrieChecksums, topTrieChecksum, err := readHeader(headerPath)
+	headerPath := filePathCheckpointHeader(dir, fileName)
+	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read header: %w", err)
 	}
@@ -43,7 +43,7 @@ func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	return tries, nil
 }
 
-func filePathHeader(dir string, fileName string) string {
+func filePathCheckpointHeader(dir string, fileName string) string {
 	return path.Join(dir, fileName)
 }
 
@@ -60,9 +60,61 @@ func filePathTopTries(dir string, fileName string) (string, string) {
 	return path.Join(dir, topTriesFileName), fileName
 }
 
-// TODO: to add
-func readHeader(filePath string) ([]uint32, uint32, error) {
-	return make([]uint32, 16), 0, nil
+// readCheckpointHeader takes a file path and returns subtrieChecksums and topTrieChecksum
+// any error returned are exceptions
+func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
+	closable, err := os.Open(filepath)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not open file %v: %w", filepath, err)
+	}
+	defer func(f *os.File) {
+		f.Close()
+	}(closable)
+
+	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
+	reader := NewCRC32Reader(bufReader)
+
+	version, err := readVersion(reader)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if version != VersionV6 {
+		return nil, 0, fmt.Errorf("wrong version: %v", version)
+	}
+
+	subtrieLevel, err := readSubtrieLevel(reader)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	subtrieCount := subtrieCountByLevel(subtrieLevel)
+	subtrieChecksums := make([]uint32, subtrieCount)
+	for i := 0; i < subtrieCount; i++ {
+		sum, err := readCRC32Sum(reader)
+		if err != nil {
+			return nil, 0, fmt.Errorf("could not read %v-th subtrie checksum from checkpoint header: %w", i, err)
+		}
+		subtrieChecksums[i] = sum
+	}
+
+	topTrieChecksum, err := readCRC32Sum(reader)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not read checkpoint top level trie checksum in chechpoint summary: %w", err)
+	}
+
+	expectedSum, err := readCRC32Sum(reader)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not read checkpoint summary checksum: %w", err)
+	}
+
+	actualSum := reader.Crc32()
+	if actualSum != expectedSum {
+		return nil, 0, fmt.Errorf("invalid checksum checkpoint header, expected %v, actual %v",
+			expectedSum, actualSum)
+	}
+
+	return subtrieChecksums, topTrieChecksum, nil
 }
 
 // func readNodeCountAndTriesCount(f *os.File) (uint64, uint16, error) {
@@ -272,6 +324,42 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	// TODO: validate checksum
 
 	return tries, nil
+}
+
+func readVersion(reader io.Reader) (uint16, error) {
+	bytes := make([]byte, encMagicSize+encVersionSize)
+	_, err := io.ReadFull(reader, bytes)
+	if err != nil {
+		return 0, fmt.Errorf("cannot read version: %w", err)
+	}
+	magic, version, err := decodeVersion(bytes)
+	if err != nil {
+		return 0, err
+	}
+	if magic != MagicBytes {
+		return 0, fmt.Errorf("wrong magic bytes %v", magic)
+	}
+
+	return version, nil
+}
+
+func readSubtrieLevel(reader io.Reader) (uint16, error) {
+	bytes := make([]byte, encSubtrieLevelSize)
+	_, err := io.ReadFull(reader, bytes)
+	if err != nil {
+		return 0, err
+	}
+	return decodeSubtrieLevel(bytes)
+
+}
+
+func readCRC32Sum(reader io.Reader) (uint32, error) {
+	bytes := make([]byte, crc32SumSize)
+	_, err := io.ReadFull(reader, bytes)
+	if err != nil {
+		return 0, err
+	}
+	return decodeCRC32Sum(bytes)
 }
 
 func readNodeCount(f *os.File) (uint64, uint16, error) {

@@ -19,6 +19,10 @@ import (
 const subtrieLevel = 4
 const subtrieCount = 1 << subtrieLevel
 
+func subtrieCountByLevel(level uint16) int {
+	return 1 << subtrieLevel
+}
+
 type NodeEncoder func(node *trie.MTrie, index uint64, scratch []byte) []byte
 
 type resultStoringSubTrie struct {
@@ -74,9 +78,9 @@ func StoreCheckpointV6(
 		return fmt.Errorf("could not store top level tries: %w", err)
 	}
 
-	err = storeCheckpointSummary(subTrieChecksums, topTrieChecksum, outputDir, outputFile, logger)
+	err = storeCheckpointHeader(subTrieChecksums, topTrieChecksum, outputDir, outputFile, logger)
 	if err != nil {
-		return fmt.Errorf("could not store checkpoint summary: %w", err)
+		return fmt.Errorf("could not store checkpoint header: %w", err)
 	}
 
 	logger.Info().Msgf("checkpoint file has been successfully stored at %v/%v", outputDir, outputFile)
@@ -85,18 +89,25 @@ func StoreCheckpointV6(
 }
 
 // 		1. version
+//		2. subtrieLevel
 //		2. checksum of each part file (17 in total)
 // 		3. checksum of the main file itself
-func storeCheckpointSummary(
+func storeCheckpointHeader(
 	subTrieChecksums []uint32,
 	topTrieChecksum uint32,
 	outputDir string,
 	outputFile string,
 	logger *zerolog.Logger,
 ) error {
-	closable, err := createWriterForCheckpointSummary(outputDir, outputFile, logger)
+	// sanity check
+	if len(subTrieChecksums) == subtrieCountByLevel(subtrieLevel) {
+		return fmt.Errorf("expect subtrie level %v to have %v checksums, but got %v",
+			subtrieLevel, subtrieCountByLevel(subtrieLevel), len(subTrieChecksums))
+	}
+
+	closable, err := createWriterForCheckpointHeader(outputDir, outputFile, logger)
 	if err != nil {
-		return fmt.Errorf("could not store checkpoint summary: %w", err)
+		return fmt.Errorf("could not store checkpoint header: %w", err)
 	}
 	defer func() {
 		closeErr := closable.Close()
@@ -106,27 +117,39 @@ func storeCheckpointSummary(
 		}
 	}()
 
-	// write version
-	version := encodeVersion(MagicBytes, VersionV6)
 	writer := NewCRC32Writer(closable)
-	_, err = writer.Write(version)
+
+	// write version
+	_, err = writer.Write(encodeVersion(MagicBytes, VersionV6))
 	if err != nil {
-		return fmt.Errorf("cannot write checksum summary header: %w", err)
+		return fmt.Errorf("cannot write version into checkpoint header: %w", err)
 	}
 
-	// TODO: write checksums
+	// encode subtrieLevel
+	_, err = writer.Write(encodeSubtrieLevel(subtrieLevel))
+	if err != nil {
+		return fmt.Errorf("cannot write subtrie level into checkpoint header: %w", err)
+	}
+
+	//  write checksums
+	for i, subtrieSum := range subTrieChecksums {
+		_, err = writer.Write(encodeCRC32Sum(subtrieSum))
+		if err != nil {
+			return fmt.Errorf("cannot write %v-th subtriechecksum into checkpoint header: %w", i, err)
+		}
+	}
 
 	// write checksum to the end of the file
 	checksum := writer.Crc32()
 	_, err = writer.Write(encodeCRC32Sum(checksum))
 	if err != nil {
-		return fmt.Errorf("cannot write CRC32 checksum to checkpoint summary: %w", err)
+		return fmt.Errorf("cannot write CRC32 checksum to checkpoint header: %w", err)
 	}
 	return nil
 }
 
-func createWriterForCheckpointSummary(outputDir string, outputFile string, logger *zerolog.Logger) (io.WriteCloser, error) {
-	fullPath := filePathHeader(outputDir, outputFile)
+func createWriterForCheckpointHeader(outputDir string, outputFile string, logger *zerolog.Logger) (io.WriteCloser, error) {
+	fullPath := filePathCheckpointHeader(outputDir, outputFile)
 	if utilsio.FileExists(fullPath) {
 		return nil, fmt.Errorf("checkpoint file already exists at %v", fullPath)
 	}
@@ -506,7 +529,7 @@ func encodeCRC32Sum(checksum uint32) []byte {
 
 func decodeCRC32Sum(encoded []byte) (uint32, error) {
 	if len(encoded) != crc32SumSize {
-		return 0, fmt.Errorf("wrong crc32sum, expect %v, got %v", crc32SumSize, len(encoded))
+		return 0, fmt.Errorf("wrong crc32sum size, expect %v, got %v", crc32SumSize, len(encoded))
 	}
 	return binary.BigEndian.Uint32(encoded), nil
 }
@@ -521,9 +544,22 @@ func encodeVersion(magic uint16, version uint16) []byte {
 
 func decodeVersion(encoded []byte) (uint16, uint16, error) {
 	if len(encoded) != encMagicSize+encVersionSize {
-		return 0, 0, fmt.Errorf("wrong version, expect %v, got %v", encMagicSize+encVersionSize, len(encoded))
+		return 0, 0, fmt.Errorf("wrong version size, expect %v, got %v", encMagicSize+encVersionSize, len(encoded))
 	}
 	magicBytes := binary.BigEndian.Uint16(encoded)
 	version := binary.BigEndian.Uint16(encoded[encMagicSize:])
 	return magicBytes, version, nil
+}
+
+func encodeSubtrieLevel(level uint16) []byte {
+	bytes := make([]byte, encSubtrieLevelSize)
+	binary.BigEndian.PutUint16(bytes, level)
+	return bytes
+}
+
+func decodeSubtrieLevel(encoded []byte) (uint16, error) {
+	if len(encoded) != encSubtrieLevelSize {
+		return 0, fmt.Errorf("wrong subtrie level size, expect %v, got %v", encSubtrieLevelSize, len(encoded))
+	}
+	return binary.BigEndian.Uint16(encoded), nil
 }
