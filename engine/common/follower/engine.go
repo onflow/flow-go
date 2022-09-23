@@ -24,6 +24,11 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// Engine follows and maintains the local copy of the protocol state. It is a
+// passive (read-only) version of the compliance engine. The compliance engine
+// is employed by consensus nodes (active consensus participants) where the
+// Follower engine is employed by all other node roles.
+// TODO use ComponentManager, message queues https://github.com/dapperlabs/flow-go/issues/6173
 type Engine struct {
 	unit           *engine.Unit
 	log            zerolog.Logger
@@ -60,6 +65,8 @@ func WithChannel(channel channels.Channel) Option {
 		e.channel = channel
 	}
 }
+
+var _ network.MessageProcessor = (*Engine)(nil)
 
 func New(
 	log zerolog.Logger,
@@ -156,7 +163,8 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event interface{}) error {
+
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})

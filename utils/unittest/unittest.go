@@ -152,6 +152,13 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration, msgAndA
 	}
 }
 
+// ClosedChannel returns a closed channel.
+func ClosedChannel() <-chan struct{} {
+	ch := make(chan struct{})
+	close(ch)
+	return ch
+}
+
 // AssertClosesBefore asserts that the given channel closes before the
 // duration expires.
 func AssertClosesBefore(t assert.TestingT, done <-chan struct{}, duration time.Duration, msgAndArgs ...interface{}) {
