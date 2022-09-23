@@ -49,30 +49,42 @@ func (i TransactionInvoker) Process(
 
 	var modifiedSets programsCache.ModifiedSetsInvalidator
 	defer func() {
+		if sth.NumNestedTransactions() > 1 {
+			if processErr == nil {
+				// This is a fvm internal programming error.  We forgot to
+				// call Commit somewhere in the control flow.  We should halt.
+				processErr = fmt.Errorf(
+					"successfully executed transaction has unexpected " +
+						"nested transactions.")
+				return
+			} else {
+				err := sth.RestartNestedTransaction(nestedTxnId)
+				if err != nil {
+					// This should never happen since merging views should
+					// never fail.
+					processErr = fmt.Errorf(
+						"cannot restart nested transaction on error: %w "+
+							"(original txError: %v)",
+						err,
+						processErr)
+					return
+				}
+
+				ctx.Logger.Warn().Msg(
+					"transaction had unexpected nested transactions, " +
+						"which have been restarted.")
+
+				// Note: proc.Err is set by TransactionProcedure.
+				proc.Logs = make([]string, 0)
+				proc.Events = make([]flow.Event, 0)
+				proc.ServiceEvents = make([]flow.Event, 0)
+			}
+		}
+
 		// based on the contract and frozen account updates we decide how to
 		// clean up the programs for failed transactions we also do the same as
 		// transaction without any deployed contracts
 		programs.Cleanup(modifiedSets)
-
-		if sth.NumNestedTransactions() > 1 {
-			err := sth.RestartNestedTransaction(nestedTxnId)
-			if err != nil {
-				processErr = fmt.Errorf(
-					"cannot restart nested transaction: %w",
-					err,
-				)
-			}
-
-			msg := "transaction has unexpected nested transactions"
-			ctx.Logger.Error().
-				Msg(msg)
-
-			proc.Err = errors.NewFVMInternalErrorf(msg)
-			proc.Logs = make([]string, 0)
-			proc.Events = make([]flow.Event, 0)
-			proc.ServiceEvents = make([]flow.Event, 0)
-
-		}
 
 		err := sth.Commit(nestedTxnId)
 		if err != nil {
