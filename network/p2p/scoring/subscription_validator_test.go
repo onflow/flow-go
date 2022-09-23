@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
@@ -18,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -138,19 +140,21 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 }
 
 func TestLibP2PSubscriptionValidator(t *testing.T) {
+	totalNodes := 3
+
 	ctx := context.Background()
 	sporkId := unittest.IdentifierFixture()
-	dhtPrefix := "subscription-validator-test"
 
 	var idProvider module.IdentityProvider
-	nodes, ids := p2pfixtures.NodesFixture(t, ctx, sporkId, dhtPrefix, 3,
+	nodes, ids := p2pfixtures.NodesFixture(t, ctx, sporkId, t.Name(), totalNodes,
+		p2pfixtures.WithLogger(unittest.Logger()),
 		p2pfixtures.WithPeerScoringEnabled(idProvider),
-		p2pfixtures.WithRole(flow.RoleCollection))
+		p2pfixtures.WithRole(flow.RoleConsensus))
 	idProvider = id.NewFixedIdentityProvider(ids)
 	defer p2pfixtures.StopNodes(t, nodes)
 
 	subs := make([]*pubsub.Subscription, len(nodes))
-	topic := channels.TopicFromChannel(channels.PushGuarantees, sporkId)
+	topic := channels.TopicFromChannel(channels.PublicSyncCommittee, sporkId)
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
 
 	for i, node := range nodes {
@@ -159,6 +163,21 @@ func TestLibP2PSubscriptionValidator(t *testing.T) {
 		subs[i] = sub
 	}
 
+	pInfo0, err := utils.PeerAddressInfo(*ids[0])
+	require.NoError(t, err)
+	for _, node := range nodes[1:] {
+		require.NoError(t, node.AddPeer(ctx, pInfo0))
+	}
+
 	// let the subscriptions propagate
 	time.Sleep(1 * time.Second)
+
+	syncRequestEvent := &messages.SyncRequest{Nonce: 0, Height: 0}
+	syncRequestMsg := p2pfixtures.MustEncodeEvent(t, syncRequestEvent)
+	// publishes a message to the topic.
+	require.NoError(t, nodes[0].Publish(ctx, topic, syncRequestMsg))
+
+	// checks that the message is received by all nodes.
+	ctx1s, _ := context.WithTimeout(ctx, 5*time.Second)
+	p2pfixtures.CheckMsgReceivedByAll(t, ctx1s, syncRequestMsg, subs[1:])
 }
