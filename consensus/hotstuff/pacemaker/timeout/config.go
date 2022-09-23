@@ -81,7 +81,7 @@ func NewConfig(
 		return Config{}, model.NewConfigurationErrorf("minReplicaTimeout must non-negative")
 	}
 	if maxReplicaTimeout < minReplicaTimeout {
-		return Config{}, model.NewConfigurationErrorf("maxReplicaTimeout must be larger than minReplicaTimeout")
+		return Config{}, model.NewConfigurationErrorf("maxReplicaTimeout cannot be smaller than minReplicaTimeout")
 	}
 	if timeoutAdjustmentFactor <= 1 {
 		return Config{}, model.NewConfigurationErrorf("timeoutAdjustmentFactor must be strictly bigger than 1")

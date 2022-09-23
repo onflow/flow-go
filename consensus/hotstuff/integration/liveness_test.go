@@ -29,7 +29,7 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, 6, 0)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, happyPathMaxRoundFailures, 0)
 	require.NoError(t, err)
 
 	// set up five instances that work fully
@@ -97,7 +97,7 @@ func Test2TimeoutOutof4Instances(t *testing.T) {
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
 	timeouts, err := timeout.NewConfig(
-		pmTimeout, pmTimeout, 1.5, 6, 0)
+		pmTimeout, pmTimeout, 1.5, happyPathMaxRoundFailures, 0)
 	require.NoError(t, err)
 
 	// set up two instances that work fully
@@ -164,7 +164,7 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, 6, 0)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, happyPathMaxRoundFailures, 0)
 	require.NoError(t, err)
 
 	// set up instances that work fully
@@ -248,7 +248,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
 	// set block rate delay to be bigger than minimal timeout
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, 6, pmTimeout*2)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, happyPathMaxRoundFailures, pmTimeout*2)
 	require.NoError(t, err)
 
 	// set up 2 instances that fully work (incl. sending TimeoutObjects)

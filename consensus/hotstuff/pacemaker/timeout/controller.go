@@ -7,10 +7,10 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
-// Controller implements a truncated exponential backoff which can be described with next formula:
-// duration = t_min * min(b ^ (r * θ(r-k)), t_max)
-// for practical purpose we will transform this formula into:
-// duration(r) = t_min * b ^ (min(r * θ(r-k)), c), where c = b(t_max / t_min).
+// Controller implements the following truncated exponential backoff:
+//   duration = t_min * min(b ^ ((r-k) * θ(r-k)), t_max)
+// For practical purpose we will transform this formula into:
+//   duration(r) = t_min * b ^ (min((r-k) * θ(r-k)), c), where c = log_b (t_max / t_min).
 // In described formula:
 //
 //	  k - is number of rounds we expect during hot path, after failing this many rounds,
@@ -85,19 +85,23 @@ func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
 
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
-	// piecewise function
-	step := uint64(0)
-	if t.r > t.cfg.HappyPathRounds {
-		step = 1
+	if t.r <= t.cfg.HappyPathRounds {
+		return time.Duration(t.cfg.MinReplicaTimeout * float64(time.Millisecond))
 	}
-
-	exponent := math.Min(float64(t.r*step), t.maxExponent)
-	duration := t.cfg.MinReplicaTimeout * math.Pow(t.cfg.TimeoutAdjustmentFactor, exponent)
+	r := float64(t.r - t.cfg.HappyPathRounds)
+	if r >= t.maxExponent {
+		return time.Duration(t.cfg.MaxReplicaTimeout * float64(time.Millisecond))
+	}
+	// compute timeout duration [in milliseconds]:
+	duration := t.cfg.MinReplicaTimeout * math.Pow(t.cfg.TimeoutAdjustmentFactor, r)
 	return time.Duration(duration * float64(time.Millisecond))
 }
 
 // OnTimeout indicates to the Controller that a view change was triggered by a TC (unhappy path).
 func (t *Controller) OnTimeout() {
+	if float64(t.r) >= t.maxExponent+float64(t.cfg.HappyPathRounds) {
+		return
+	}
 	t.r++
 }
 

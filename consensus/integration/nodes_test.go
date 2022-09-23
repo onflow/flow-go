@@ -575,7 +575,6 @@ func createNode(
 		hotstuffModules,
 		consensus.WithMinTimeout(hotstuffTimeout),
 	)
-
 	require.NoError(t, err)
 
 	comp = comp.WithConsensus(hot)
