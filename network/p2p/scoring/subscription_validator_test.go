@@ -179,5 +179,5 @@ func TestLibP2PSubscriptionValidator(t *testing.T) {
 
 	// checks that the message is received by all nodes.
 	ctx1s, _ := context.WithTimeout(ctx, 5*time.Second)
-	p2pfixtures.CheckMsgReceivedByAll(t, ctx1s, syncRequestMsg, subs[1:])
+	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, syncRequestMsg, subs[1:])
 }

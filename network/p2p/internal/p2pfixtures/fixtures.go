@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"sync"
 	"testing"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -345,26 +345,57 @@ func MustEncodeEvent(t *testing.T, v interface{}) []byte {
 	return data
 }
 
-// CheckMsgReceived checks that the subscription can receive the next message or not
-func CheckMsgReceived(ctx context.Context, t *testing.T, expectedData []byte, sub *pubsub.Subscription, wg *sync.WaitGroup, shouldReceive bool) {
-	if shouldReceive {
-		// assert we can receive the next message
+// SubMustReceiveMessage checks that the subscription have received the expected message.
+func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedData []byte, sub *pubsub.Subscription) {
+	received := make(chan struct{})
+	go func() {
 		msg, err := sub.Next(ctx)
 		require.NoError(t, err)
 		require.Equal(t, expectedData, msg.Data)
-	} else {
-		wg.Add(1)
-		go func() {
-			_, err := sub.Next(ctx)
-			require.ErrorIs(t, err, context.DeadlineExceeded)
-			wg.Done()
-		}()
+		close(received)
+	}()
+	unittest.RequireCloseBefore(t, received, 5*time.Second, "could not receive expected message")
+}
+
+// SubsMustReceiveMessage checks that all subscriptions receive the given message.
+func SubsMustReceiveMessage(t *testing.T, ctx context.Context, msg []byte, subs []*pubsub.Subscription) {
+	for _, sub := range subs {
+		SubMustReceiveMessage(t, ctx, msg, sub)
 	}
 }
 
-// CheckMsgReceivedByAll checks that all subscriptions receive the given message.
-func CheckMsgReceivedByAll(t *testing.T, ctx context.Context, msg []byte, subs []*pubsub.Subscription) {
+func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub *pubsub.Subscription) {
+	timeouted := make(chan struct{})
+	go func() {
+		_, err := sub.Next(ctx)
+		require.Error(t, err)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		close(timeouted)
+	}()
+	unittest.RequireCloseBefore(t, timeouted, 5*time.Second, "should not receive any message")
+}
+
+func SubsMustNeverReceiveMessage(t *testing.T, ctx context.Context, subs []*pubsub.Subscription) {
 	for _, sub := range subs {
-		CheckMsgReceived(ctx, t, msg, sub, nil, true)
+		SubMustNeverReceiveAnyMessage(t, ctx, sub)
 	}
 }
+
+// LetNodesDiscoverEachOther connects all nodes to each other on the pubsub mesh.
+func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, ids flow.IdentityList) {
+	for _, node := range nodes {
+		for i, other := range nodes {
+			if node == other {
+				continue
+			}
+			otherPInfo, err := utils.PeerAddressInfo(*ids[i])
+			require.NoError(t, err)
+			require.NoError(t, node.AddPeer(ctx, otherPInfo))
+		}
+	}
+
+	// wait for all nodes to discover each other
+	time.Sleep(time.Second)
+}
+
+

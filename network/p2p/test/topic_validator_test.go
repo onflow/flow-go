@@ -90,14 +90,10 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	err = sn2.Publish(timedCtx, topic, data1)
 	require.NoError(t, err)
 
-	var wg sync.WaitGroup
-
 	// sn1 should not receive message from sn2 because sn2 is unstaked
 	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	p2pfixtures.CheckMsgReceived(timedCtx, t, nil, sub1, &wg, false)
-
-	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
+	p2pfixtures.SubMustNeverReceiveAnyMessage(t, timedCtx, sub1)
 
 	// ensure the correct error is contained in the logged error
 	require.Contains(t, hook.Logs(), "filtering message from un-allowed peer")
@@ -151,10 +147,10 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	defer cancel()
 
 	// sn1 gets the message
-	p2pfixtures.CheckMsgReceived(timedCtx, t, data1, sub1, nil, true)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub1)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.CheckMsgReceived(timedCtx, t, data1, sub2, nil, true)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub2)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 }
@@ -229,13 +225,13 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	require.NoError(t, err)
 
 	// sn1 gets the message
-	p2pfixtures.CheckMsgReceived(timedCtx, t, data1, sub1, nil, true)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub1)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.CheckMsgReceived(timedCtx, t, data1, sub2, nil, true)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub2)
 
 	// an1 also gets the message
-	p2pfixtures.CheckMsgReceived(timedCtx, t, data1, sub3, nil, true)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub3)
 
 	timedCtx, cancel2s := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel2s()
@@ -248,19 +244,19 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	require.NoError(t, err)
 
 	// an1 receives its own message
-	p2pfixtures.CheckMsgReceived(timedCtx, t, data2, sub3, nil, true)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data2, sub3)
 
 	var wg sync.WaitGroup
 
 	// sn1 does NOT receive the message due to the topic validator
 	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	p2pfixtures.CheckMsgReceived(timedCtx, t, nil, sub1, &wg, false)
+	p2pfixtures.SubMustNeverReceiveAnyMessage(t, timedCtx, sub1)
 
 	// sn2 also does not receive the message via gossip from the sn1 (event after the 1 second hearbeat)
 	timedCtx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	p2pfixtures.CheckMsgReceived(timedCtx, t, nil, sub2, &wg, false)
+	p2pfixtures.SubMustNeverReceiveAnyMessage(t, timedCtx, sub2)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
@@ -329,14 +325,10 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	err = sn2.Publish(timedCtx, topic, data1)
 	require.NoError(t, err)
 
-	var wg sync.WaitGroup
-
 	// sn1 should not receive message from sn2
 	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	p2pfixtures.CheckMsgReceived(timedCtx, t, nil, sub1, &wg, false)
-
-	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
+	p2pfixtures.SubMustNeverReceiveAnyMessage(t, timedCtx, sub1)
 
 	// ensure the correct error is contained in the logged error
 	require.Contains(t, hook.Logs(), message.ErrUnauthorizedMessageOnChannel.Error())
@@ -411,15 +403,14 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	require.NoError(t, err)
 
 	// sn1 gets the message
-	p2pfixtures.CheckMsgReceived(timedCtx, t, data1, sub1, nil, true)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub1)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.CheckMsgReceived(timedCtx, t, data1, sub2, nil, true)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub2)
 
 	// an1 also gets the message
-	p2pfixtures.CheckMsgReceived(timedCtx, t, data1, sub3, nil, true)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub3)
 
-	var wg sync.WaitGroup
 	// "eject" sn2 to ensure messages published by ejected nodes get rejected
 	identity2.Ejected = true
 	header = unittest.BlockHeaderFixture()
@@ -432,9 +423,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	// sn1 should not receive rejected message from ejected sn2
 	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	p2pfixtures.CheckMsgReceived(timedCtx, t, nil, sub1, &wg, false)
-
-	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
+	p2pfixtures.SubMustNeverReceiveAnyMessage(t, timedCtx, sub1)
 
 	// ensure the correct error is contained in the logged error
 	require.Contains(t, hook.Logs(), validator.ErrSenderEjected.Error())
@@ -503,11 +492,11 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	require.NoError(t, err)
 
 	// ln1 gets the message
-	p2pfixtures.CheckMsgReceived(timedCtx, t, data, sub1, nil, true)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, sub1)
 
 	// ln2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.CheckMsgReceived(timedCtx, t, data, sub2, nil, true)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, sub2)
 
 	// ln3 also gets the message
-	p2pfixtures.CheckMsgReceived(timedCtx, t, data, sub3, nil, true)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, sub3)
 }
