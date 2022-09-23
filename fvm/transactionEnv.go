@@ -4,7 +4,6 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -16,7 +15,7 @@ func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
 	sth *state.StateHolder,
-	programs handler.TransactionPrograms,
+	programs environment.TransactionPrograms,
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
@@ -33,7 +32,7 @@ func NewTransactionEnvironment(
 func NewTransactionEnv(
 	ctx Context,
 	sth *state.StateHolder,
-	programs handler.TransactionPrograms,
+	programs environment.TransactionPrograms,
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
@@ -49,11 +48,10 @@ func NewTransactionEnv(
 		environment.NewMeter(sth),
 	)
 
+	ctx.TxIndex = txIndex
+	ctx.TxId = txID
 	env.TransactionInfo = environment.NewTransactionInfo(
-		txIndex,
-		txID,
-		ctx.TransactionFeesEnabled,
-		ctx.LimitAccountStorage,
+		ctx.TransactionInfoParams,
 		env.Tracer,
 		tx.Authorizers,
 		ctx.Chain.ServiceAddress(),
@@ -65,8 +63,7 @@ func NewTransactionEnv(
 		txID,
 		txIndex,
 		tx.Payer,
-		ctx.ServiceEventCollectionEnabled,
-		ctx.EventCollectionByteSizeLimit,
+		ctx.EventEmitterParams,
 	)
 	env.AccountCreator = environment.NewAccountCreator(
 		sth,
@@ -81,19 +78,18 @@ func NewTransactionEnv(
 		ctx.Chain.ServiceAddress(),
 		env.accounts,
 		env.TransactionInfo)
-	env.ContractUpdater = handler.NewContractUpdater(
+	env.ContractUpdater = environment.NewContractUpdater(
 		env.Tracer,
 		env.Meter,
 		env.accounts,
 		env.TransactionInfo,
 		ctx.Chain,
-		ctx.RestrictContractDeployment,
-		ctx.RestrictContractRemoval,
+		ctx.ContractUpdaterParams,
 		env.ProgramLogger,
 		env.SystemContracts,
 		env.Runtime)
 
-	env.AccountKeyUpdater = handler.NewAccountKeyUpdater(
+	env.AccountKeyUpdater = environment.NewAccountKeyUpdater(
 		env.Tracer,
 		env.Meter,
 		env.accounts,

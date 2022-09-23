@@ -6,9 +6,7 @@ import (
 	"math"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -143,42 +141,13 @@ func (vm *VirtualMachine) GetAccountV2(
 			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
 	)
 
-	account, err := vm.getAccount(ctx, stTxn, blockPrograms, address)
+	env := NewScriptEnv(context.Background(), ctx, stTxn, blockPrograms)
+	account, err := env.GetAccount(address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {
 			return nil, fmt.Errorf("cannot get account, this error usually happens if the reference block for this query is not set to a recent block: %w", err)
 		}
 		return nil, fmt.Errorf("cannot get account: %w", err)
 	}
-	return account, nil
-}
-
-func (vm *VirtualMachine) getAccount(
-	ctx Context,
-	sth *state.StateHolder,
-	programs *programs.Programs,
-	address flow.Address,
-) (
-	*flow.Account,
-	error,
-) {
-	accounts := environment.NewAccounts(sth)
-
-	account, err := accounts.Get(address)
-	if err != nil {
-		return nil, err
-	}
-
-	if ctx.ServiceAccountEnabled {
-		env := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
-
-		balance, err := env.GetAccountBalance(common.Address(address))
-		if err != nil {
-			return nil, err
-		}
-
-		account.Balance = balance
-	}
-
 	return account, nil
 }

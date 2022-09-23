@@ -1,4 +1,4 @@
-package handler
+package environment
 
 import (
 	"encoding/hex"
@@ -10,7 +10,6 @@ import (
 	fgcrypto "github.com/onflow/flow-go/crypto"
 	fghash "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/crypto"
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -178,20 +177,20 @@ func (NoAccountKeyUpdater) RevokeAccountKey(
 }
 
 type accountKeyUpdater struct {
-	tracer *environment.Tracer
-	meter  environment.Meter
+	tracer *Tracer
+	meter  Meter
 
-	accounts environment.Accounts
+	accounts Accounts
 	stTxn    *state.StateHolder
-	env      environment.Environment
+	env      Environment
 }
 
 func NewAccountKeyUpdater(
-	tracer *environment.Tracer,
-	meter environment.Meter,
-	accounts environment.Accounts,
+	tracer *Tracer,
+	meter Meter,
+	accounts Accounts,
 	stTxn *state.StateHolder,
-	env environment.Environment,
+	env Environment,
 ) *accountKeyUpdater {
 	return &accountKeyUpdater{
 		tracer:   tracer,
@@ -446,7 +445,7 @@ func (updater *accountKeyUpdater) AddEncodedAccountKey(
 	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
 
 	err := updater.meter.MeterComputation(
-		environment.ComputationKindAddEncodedAccountKey,
+		ComputationKindAddEncodedAccountKey,
 		1)
 	if err != nil {
 		return fmt.Errorf("add encoded account key failed: %w", err)
@@ -480,7 +479,7 @@ func (updater *accountKeyUpdater) RevokeEncodedAccountKey(
 	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
 	err := updater.meter.MeterComputation(
-		environment.ComputationKindRevokeEncodedAccountKey,
+		ComputationKindRevokeEncodedAccountKey,
 		1)
 	if err != nil {
 		return nil, fmt.Errorf("revoke encoded account key failed: %w", err)
@@ -511,7 +510,7 @@ func (updater *accountKeyUpdater) AddAccountKey(
 	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
 
 	err := updater.meter.MeterComputation(
-		environment.ComputationKindAddAccountKey,
+		ComputationKindAddAccountKey,
 		1)
 	if err != nil {
 		return nil, fmt.Errorf("add account key failed: %w", err)
@@ -539,7 +538,7 @@ func (updater *accountKeyUpdater) RevokeAccountKey(
 	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
 	err := updater.meter.MeterComputation(
-		environment.ComputationKindRevokeAccountKey,
+		ComputationKindRevokeAccountKey,
 		1)
 	if err != nil {
 		return nil, fmt.Errorf("revoke account key failed: %w", err)

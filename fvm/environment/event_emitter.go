@@ -12,6 +12,22 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
+const (
+	DefaultEventCollectionByteSizeLimit = 256_000 // 256KB
+)
+
+type EventEmitterParams struct {
+	ServiceEventCollectionEnabled bool
+	EventCollectionByteSizeLimit  uint64
+}
+
+func DefaultEventEmitterParams() EventEmitterParams {
+	return EventEmitterParams{
+		ServiceEventCollectionEnabled: false,
+		EventCollectionByteSizeLimit:  DefaultEventCollectionByteSizeLimit,
+	}
+}
+
 // EventEmitter collect events, separates out service events, and enforces
 // event size limits.
 //
@@ -58,9 +74,8 @@ type eventEmitter struct {
 	txIndex uint32
 	payer   flow.Address
 
-	serviceEventCollectionEnabled bool
-	eventCollectionByteSizeLimit  uint64
-	eventCollection               *EventCollection
+	EventEmitterParams
+	eventCollection *EventCollection
 }
 
 // NewEventEmitter constructs a new eventEmitter
@@ -71,18 +86,16 @@ func NewEventEmitter(
 	txID flow.Identifier,
 	txIndex uint32,
 	payer flow.Address,
-	serviceEventCollectionEnabled bool,
-	eventCollectionByteSizeLimit uint64,
+	params EventEmitterParams,
 ) EventEmitter {
 	emitter := &eventEmitter{
-		tracer:                        tracer,
-		meter:                         meter,
-		chain:                         chain,
-		txID:                          txID,
-		txIndex:                       txIndex,
-		payer:                         payer,
-		serviceEventCollectionEnabled: serviceEventCollectionEnabled,
-		eventCollectionByteSizeLimit:  eventCollectionByteSizeLimit,
+		tracer:             tracer,
+		meter:              meter,
+		chain:              chain,
+		txID:               txID,
+		txIndex:            txIndex,
+		payer:              payer,
+		EventEmitterParams: params,
 	}
 
 	emitter.Reset()
@@ -118,10 +131,10 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	// skip limit if payer is service account
 	if emitter.payer != emitter.chain.ServiceAddress() {
 		totalSize := emitter.eventCollection.TotalByteSize() + payloadSize
-		if totalSize > emitter.eventCollectionByteSizeLimit {
+		if totalSize > emitter.EventCollectionByteSizeLimit {
 			return errors.NewEventLimitExceededError(
 				totalSize,
-				emitter.eventCollectionByteSizeLimit)
+				emitter.EventCollectionByteSizeLimit)
 		}
 	}
 
@@ -133,7 +146,7 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 		Payload:          payload,
 	}
 
-	if emitter.serviceEventCollectionEnabled {
+	if emitter.ServiceEventCollectionEnabled {
 		ok, err := IsServiceEvent(event, emitter.chain.ChainID())
 		if err != nil {
 			return fmt.Errorf("unable to check service event: %w", err)
@@ -207,7 +220,10 @@ func IsServiceEvent(event cadence.Event, chain flow.ChainID) (bool, error) {
 	// retrieve the service event information for this chain
 	events, err := systemcontracts.ServiceEventsForChain(chain)
 	if err != nil {
-		return false, fmt.Errorf("unknown system contracts for chain (%s): %w", chain.String(), err)
+		return false, fmt.Errorf(
+			"unknown system contracts for chain (%s): %w",
+			chain.String(),
+			err)
 	}
 
 	eventType := flow.EventType(event.EventType.ID())

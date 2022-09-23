@@ -16,7 +16,6 @@ import (
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Chain   flow.Chain
 	Blocks  environment.Blocks
 	Metrics environment.MetricsReporter
 	Tracer  module.Tracer
@@ -28,25 +27,19 @@ type Context struct {
 	MaxStateKeySize                   uint64
 	MaxStateValueSize                 uint64
 	MaxStateInteractionSize           uint64
-	EventCollectionByteSizeLimit      uint64
 	BlockHeader                       *flow.Header
 	// NOTE: The ServiceAccountEnabled option is used by the playground
 	// https://github.com/onflow/flow-playground-api/blob/1ad967055f31db8f1ce88e008960e5fc14a9fbd1/compute/computer.go#L76
-	ServiceAccountEnabled bool
-	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
-	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
-	RestrictContractDeployment    bool
-	RestrictContractRemoval       bool
-	LimitAccountStorage           bool
-	TransactionFeesEnabled        bool
-	CadenceLoggingEnabled         bool
-	ServiceEventCollectionEnabled bool
-	ExtensiveTracing              bool
-	TransactionProcessors         []TransactionProcessor
-	ScriptProcessors              []ScriptProcessor
-	Logger                        zerolog.Logger
-	ReusableCadenceRuntimePool    reusableRuntime.ReusableCadenceRuntimePool
-	BlockPrograms                 *programs.Programs
+	ServiceAccountEnabled      bool
+	CadenceLoggingEnabled      bool
+	ExtensiveTracing           bool
+	TransactionProcessors      []TransactionProcessor
+	ScriptProcessors           []ScriptProcessor
+	Logger                     zerolog.Logger
+	ReusableCadenceRuntimePool reusableRuntime.ReusableCadenceRuntimePool
+	BlockPrograms              *programs.Programs
+
+	EnvironmentParams
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -70,14 +63,12 @@ func newContext(ctx Context, opts ...Option) Context {
 const AccountKeyWeightThreshold = 1000
 
 const (
-	DefaultComputationLimit             = 100_000        // 100K
-	DefaultMemoryLimit                  = math.MaxUint64 //
-	DefaultEventCollectionByteSizeLimit = 256_000        // 256KB
+	DefaultComputationLimit = 100_000        // 100K
+	DefaultMemoryLimit      = math.MaxUint64 //
 )
 
 func defaultContext() Context {
 	return Context{
-		Chain:                             flow.Mainnet.Chain(),
 		Blocks:                            nil,
 		Metrics:                           environment.NoopMetricsReporter{},
 		Tracer:                            nil,
@@ -87,13 +78,9 @@ func defaultContext() Context {
 		MaxStateKeySize:                   state.DefaultMaxKeySize,
 		MaxStateValueSize:                 state.DefaultMaxValueSize,
 		MaxStateInteractionSize:           state.DefaultMaxInteractionSize,
-		EventCollectionByteSizeLimit:      DefaultEventCollectionByteSizeLimit,
 		BlockHeader:                       nil,
 		ServiceAccountEnabled:             true,
-		RestrictContractDeployment:        true,
-		RestrictContractRemoval:           true,
 		CadenceLoggingEnabled:             false,
-		ServiceEventCollectionEnabled:     false,
 		ExtensiveTracing:                  false,
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionVerifier(AccountKeyWeightThreshold),
@@ -107,6 +94,7 @@ func defaultContext() Context {
 		ReusableCadenceRuntimePool: reusableRuntime.NewReusableCadenceRuntimePool(
 			0,
 			runtime.Config{}),
+		EnvironmentParams: DefaultEnvironmentParams(),
 	}
 }
 

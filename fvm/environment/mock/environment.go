@@ -375,6 +375,29 @@ func (_m *Environment) GenerateUUID() (uint64, error) {
 	return r0, r1
 }
 
+// GetAccount provides a mock function with given fields: address
+func (_m *Environment) GetAccount(address flow.Address) (*flow.Account, error) {
+	ret := _m.Called(address)
+
+	var r0 *flow.Account
+	if rf, ok := ret.Get(0).(func(flow.Address) *flow.Account); ok {
+		r0 = rf(address)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Account)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetAccountAvailableBalance provides a mock function with given fields: address
 func (_m *Environment) GetAccountAvailableBalance(address common.Address) (uint64, error) {
 	ret := _m.Called(address)
