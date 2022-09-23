@@ -26,7 +26,7 @@ func TestHandleIncomingEvent_AttackerObserve(t *testing.T) {
 	ccf := &mockinsecure.CorruptibleConduitFactory{}
 	ccf.On("RegisterEgressController", mock.Anything).Return(nil)
 
-	corruptibleNetwork, err := NewCorruptNetwork(
+	corruptNetwork, err := NewCorruptNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
 		insecure.DefaultAddress,
@@ -43,7 +43,7 @@ func TestHandleIncomingEvent_AttackerObserve(t *testing.T) {
 	go func() {
 		attackerRegistered.Done()
 
-		err := corruptibleNetwork.ConnectAttacker(&empty.Empty{}, attacker) // blocking call
+		err := corruptNetwork.ConnectAttacker(&empty.Empty{}, attacker) // blocking call
 		require.NoError(t, err)
 	}()
 	unittest.RequireReturnsBefore(t, attackerRegistered.Wait, 1*time.Second, "could not register attacker on time")
@@ -54,7 +54,7 @@ func TestHandleIncomingEvent_AttackerObserve(t *testing.T) {
 	channel := channels.TestNetworkChannel
 
 	go func() {
-		isAttackerRegistered := corruptibleNetwork.HandleIncomingEvent(msg, channel, originId)
+		isAttackerRegistered := corruptNetwork.HandleIncomingEvent(msg, channel, originId)
 		require.True(t, isAttackerRegistered, "attacker should be registered")
 	}()
 	// unique to ingress test - stop
@@ -75,12 +75,13 @@ func TestHandleIncomingEvent_AttackerObserve(t *testing.T) {
 	decodedEvent, err := codec.Decode(receivedMsg.Ingress.Payload)
 	require.NoError(t, err)
 	require.Equal(t, msg, decodedEvent)
+	//mock.AssertExpectationsForObjects(t, ccf)
 }
 
 // TestHandleIncomingEvent_NoAttacker_UnicastOverNetwork checks that incoming unicast events to the corrupted network
 // are routed to the network adapter when no attacker is registered to the network.
 func TestHandleIncomingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, unittest.Logger())
+	corruptNetwork, adapter := corruptNetworkFixture(t, unittest.Logger())
 
 	// unique to ingress test - start
 	originId := unittest.IdentifierFixture()
@@ -89,7 +90,7 @@ func TestHandleIncomingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
 	// unique to ingress test - stop
 
 	// simulate sending message by conduit
-	isAttackerRegistered := corruptibleNetwork.HandleIncomingEvent(msg, channel, originId)
+	isAttackerRegistered := corruptNetwork.HandleIncomingEvent(msg, channel, originId)
 	require.False(t, isAttackerRegistered, "attacker should not be registered")
 
 	// check that correct Adapter method called

@@ -26,9 +26,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// corruptibleNetworkFixture creates a corruptible Network with a mock Adapter.
+// corruptNetworkFixture creates a corruptible Network with a mock Adapter.
 // By default, no attacker is registered on this corruptible network.
-func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
+func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
 	// create corruptible network with no attacker registered
 	codec := unittest.NetworkCodec()
 
@@ -75,9 +75,9 @@ func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID 
 	return corruptibleNetwork, adapter
 }
 
-// withCorruptibleNetwork creates and starts a corruptible network, runs the "run" function of a simulated attacker and then
+// runCorruptNetworkTest creates and starts a corruptible network, runs the "run" function of a simulated attacker and then
 // terminates the network.
-func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
+func runCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
 	run func(
 		flow.Identity, // identity of ccf
 		*Network, // corruptible network
@@ -99,7 +99,7 @@ func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
 		}
 	}()
 
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, logger, corruptedIdentity)
+	corruptibleNetwork, adapter := corruptNetworkFixture(t, logger, corruptedIdentity)
 
 	// start corruptible network
 	corruptibleNetwork.Start(ccfCtx)

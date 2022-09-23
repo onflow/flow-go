@@ -1,6 +1,6 @@
 package corruptible
 
-// This test file covers corruptible network tests that are not ingress or egress specific, including error conditions.
+// This test file covers corrupt network tests that are not ingress or egress specific, including error conditions.
 
 import (
 	"fmt"
@@ -21,24 +21,24 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestEngineClosingChannel evaluates that corruptible network closes the channel whenever the corresponding
+// TestEngineClosingChannel evaluates that corrupt network closes the channel whenever the corresponding
 // engine of that channel attempts on closing it.
 func TestEngineClosingChannel(t *testing.T) {
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, unittest.Logger())
+	corruptNetwork, adapter := corruptNetworkFixture(t, unittest.Logger())
 	channel := channels.TestNetworkChannel
 
 	// on invoking adapter.UnRegisterChannel(channel), it must return a nil, which means
 	// that the channel has been unregistered by the adapter successfully.
 	adapter.On("UnRegisterChannel", channel).Return(nil).Once()
 
-	err := corruptibleNetwork.EngineClosingChannel(channel)
+	err := corruptNetwork.EngineClosingChannel(channel)
 	require.NoError(t, err)
 
 	// adapter's UnRegisterChannel method must be called once.
 	mock.AssertExpectationsForObjects(t, adapter)
 }
 
-// TestProcessAttackerMessage_EmptyEgressIngressMessage checks that corruptible network returns an error
+// TestProcessAttackerMessage_EmptyEgressIngressMessage checks that corrupt network returns an error
 // and exits if both egress and ingress messages are nil.
 func TestProcessAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 	f := func(t *testing.T) {
@@ -50,10 +50,10 @@ func TestProcessAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 func processAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 	logger, _ := unittest.HookedLogger()
 
-	withCorruptibleNetwork(t, logger,
+	runCorruptNetworkTest(t, logger,
 		func(
 			corruptedId flow.Identity, // identity of ccf
-			corruptibleNetwork *Network,
+			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
@@ -79,7 +79,7 @@ func processAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 		})
 }
 
-// TestProcessAttackerMessage_NotEmptyEgressIngressMessage_Exit checks that corruptible network returns an error
+// TestProcessAttackerMessage_NotEmptyEgressIngressMessage_Exit checks that corrupt network returns an error
 // and exits if both egress and ingress messages are NOT nil.
 func TestProcessAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
 	f := func(t *testing.T) {
@@ -91,10 +91,10 @@ func TestProcessAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) 
 func processAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
 	logger, _ := unittest.HookedLogger()
 
-	withCorruptibleNetwork(t, logger,
+	runCorruptNetworkTest(t, logger,
 		func(
 			corruptedId flow.Identity, // identity of ccf
-			corruptibleNetwork *Network,
+			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
