@@ -52,19 +52,19 @@ import (
 func main() {
 
 	var (
-		txLimit                         uint
-		maxCollectionSize               uint
-		maxCollectionByteSize           uint64
-		maxCollectionTotalGas           uint64
-		builderExpiryBuffer             uint
-		builderPayerRateLimit           float64
-		builderUnlimitedPayers          []string
-		hotstuffMinTimeout              time.Duration
-		hotstuffTimeoutAdjustmentFactor float64
-		hotstuffHappyPathRounds         uint64
-		blockRateDelay                  time.Duration
-		startupTimeString               string
-		startupTime                     time.Time
+		txLimit                           uint
+		maxCollectionSize                 uint
+		maxCollectionByteSize             uint64
+		maxCollectionTotalGas             uint64
+		builderExpiryBuffer               uint
+		builderPayerRateLimit             float64
+		builderUnlimitedPayers            []string
+		hotstuffMinTimeout                time.Duration
+		hotstuffTimeoutAdjustmentFactor   float64
+		hotstuffHappyPathMaxRoundFailures uint64
+		blockRateDelay                    time.Duration
+		startupTimeString                 string
+		startupTime                       time.Time
 
 		mainConsensusCommittee  *committees.Consensus
 		followerState           protocol.MutableState
@@ -129,8 +129,7 @@ func main() {
 			"the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor,
 			"adjustment of timeout duration in case of time out event")
-		flags.Uint64Var(&hotstuffHappyPathRounds, "hotstuff-happy-path-max-round-failures",
-			timeout.DefaultConfig.HappyPathRounds,
+		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures,
 			"number of failed rounds before first timeout increase")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
@@ -456,7 +455,7 @@ func main() {
 				consensus.WithBlockRateDelay(blockRateDelay),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
 				consensus.WithTimeoutAdjustmentFactor(hotstuffTimeoutAdjustmentFactor),
-				consensus.WithHappyPathRounds(hotstuffHappyPathRounds),
+				consensus.WithHappyPathMaxRoundFailures(hotstuffHappyPathMaxRoundFailures),
 			}
 
 			if !startupTime.IsZero() {

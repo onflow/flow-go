@@ -85,10 +85,10 @@ func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
 
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
-	if t.r <= t.cfg.HappyPathRounds {
+	if t.r <= t.cfg.HappyPathMaxRoundFailures {
 		return time.Duration(t.cfg.MinReplicaTimeout * float64(time.Millisecond))
 	}
-	r := float64(t.r - t.cfg.HappyPathRounds)
+	r := float64(t.r - t.cfg.HappyPathMaxRoundFailures)
 	if r >= t.maxExponent {
 		return time.Duration(t.cfg.MaxReplicaTimeout * float64(time.Millisecond))
 	}
@@ -99,7 +99,7 @@ func (t *Controller) ReplicaTimeout() time.Duration {
 
 // OnTimeout indicates to the Controller that a view change was triggered by a TC (unhappy path).
 func (t *Controller) OnTimeout() {
-	if float64(t.r) >= t.maxExponent+float64(t.cfg.HappyPathRounds) {
+	if float64(t.r) >= t.maxExponent+float64(t.cfg.HappyPathMaxRoundFailures) {
 		return
 	}
 	t.r++

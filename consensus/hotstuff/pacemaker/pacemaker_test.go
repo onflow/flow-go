@@ -18,10 +18,10 @@ import (
 )
 
 const (
-	minRepTimeout          float64 = 100.0 // Milliseconds
-	maxRepTimeout          float64 = 600.0 // Milliseconds
-	multiplicativeIncrease float64 = 1.5   // multiplicative factor
-	happyPathRounds        uint64  = 6     // number of failed rounds before first timeout increase
+	minRepTimeout             float64 = 100.0 // Milliseconds
+	maxRepTimeout             float64 = 600.0 // Milliseconds
+	multiplicativeIncrease    float64 = 1.5   // multiplicative factor
+	happyPathMaxRoundFailures uint64  = 6     // number of failed rounds before first timeout increase
 )
 
 func expectedTimerInfo(view uint64) interface{} {
@@ -52,7 +52,7 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 		time.Duration(minRepTimeout*1e6),
 		time.Duration(maxRepTimeout*1e6),
 		multiplicativeIncrease,
-		happyPathRounds,
+		happyPathMaxRoundFailures,
 		0)
 	require.NoError(s.T(), err)
 

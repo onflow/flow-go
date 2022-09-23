@@ -19,9 +19,9 @@ type Config struct {
 	// TimeoutAdjustmentFactor: MULTIPLICATIVE factor for increasing timeout when view
 	// change was triggered by a TC (unhappy path) or decreasing the timeout on progress
 	TimeoutAdjustmentFactor float64
-	// HappyPathRounds is the number of rounds without progress where we still consider being
+	// HappyPathMaxRoundFailures is the number of rounds without progress where we still consider being
 	// on hot path of execution. After exceeding this value we will start increasing timeout values.
-	HappyPathRounds uint64
+	HappyPathMaxRoundFailures uint64
 	// BlockRateDelayMS is a delay to broadcast the proposal in order to control block production rate [MILLISECONDS]
 	BlockRateDelayMS float64
 }
@@ -40,14 +40,14 @@ func NewDefaultConfig() Config {
 	maxReplicaTimeout := 1 * time.Minute
 	timeoutAdjustmentFactorFactor := 1.2
 	// after 6 successively failed rounds, the pacemaker leaves the hot path and starts increasing timeouts (recovery mode)
-	happyPathRounds := uint64(6)
+	happyPathMaxRoundFailures := uint64(6)
 	blockRateDelay := 0 * time.Millisecond
 
 	conf, err := NewConfig(
 		minReplicaTimeout+blockRateDelay,
 		maxReplicaTimeout,
 		timeoutAdjustmentFactorFactor,
-		happyPathRounds,
+		happyPathMaxRoundFailures,
 		blockRateDelay,
 	)
 	if err != nil {
@@ -65,7 +65,7 @@ func NewDefaultConfig() Config {
 //     Consistency requirement: must be non-negative and cannot be smaller than minReplicaTimeout
 //   - timeoutAdjustmentFactor: multiplicative factor for adjusting timeout duration
 //     Consistency requirement: must be strictly larger than 1
-//   - happyPathRounds: number of successive failed rounds after which we will start increasing timeouts
+//   - happyPathMaxRoundFailures: number of successive failed rounds after which we will start increasing timeouts
 //   - blockRateDelay: a delay to delay the proposal broadcasting [Milliseconds]
 //     Consistency requirement: must be non-negative
 //
@@ -74,7 +74,7 @@ func NewConfig(
 	minReplicaTimeout time.Duration,
 	maxReplicaTimeout time.Duration,
 	timeoutAdjustmentFactor float64,
-	happyPathRounds uint64,
+	happyPathMaxRoundFailures uint64,
 	blockRateDelay time.Duration,
 ) (Config, error) {
 	if minReplicaTimeout < 0 {
@@ -91,11 +91,11 @@ func NewConfig(
 	}
 
 	tc := Config{
-		MinReplicaTimeout:       float64(minReplicaTimeout.Milliseconds()),
-		MaxReplicaTimeout:       float64(maxReplicaTimeout.Milliseconds()),
-		TimeoutAdjustmentFactor: timeoutAdjustmentFactor,
-		HappyPathRounds:         happyPathRounds,
-		BlockRateDelayMS:        float64(blockRateDelay.Milliseconds()),
+		MinReplicaTimeout:         float64(minReplicaTimeout.Milliseconds()),
+		MaxReplicaTimeout:         float64(maxReplicaTimeout.Milliseconds()),
+		TimeoutAdjustmentFactor:   timeoutAdjustmentFactor,
+		HappyPathMaxRoundFailures: happyPathMaxRoundFailures,
+		BlockRateDelayMS:          float64(blockRateDelay.Milliseconds()),
 	}
 	return tc, nil
 }
