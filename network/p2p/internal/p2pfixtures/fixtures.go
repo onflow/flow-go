@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -342,4 +343,28 @@ func MustEncodeEvent(t *testing.T, v interface{}) []byte {
 	require.NoError(t, err)
 
 	return data
+}
+
+// CheckMsgReceived checks that the subscription can receive the next message or not
+func CheckMsgReceived(ctx context.Context, t *testing.T, expectedData []byte, sub *pubsub.Subscription, wg *sync.WaitGroup, shouldReceive bool) {
+	if shouldReceive {
+		// assert we can receive the next message
+		msg, err := sub.Next(ctx)
+		require.NoError(t, err)
+		require.Equal(t, expectedData, msg.Data)
+	} else {
+		wg.Add(1)
+		go func() {
+			_, err := sub.Next(ctx)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+			wg.Done()
+		}()
+	}
+}
+
+// CheckMsgReceivedByAll checks that all subscriptions receive the given message.
+func CheckMsgReceivedByAll(t *testing.T, ctx context.Context, msg []byte, subs []*pubsub.Subscription) {
+	for _, sub := range subs {
+		CheckMsgReceived(ctx, t, msg, sub, nil, true)
+	}
 }
