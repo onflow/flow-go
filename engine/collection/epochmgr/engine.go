@@ -128,6 +128,9 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	// TODO if we are within the first 600 blocks of an epoch, we should resume the previous epoch's cluster consensus here https://github.com/dapperlabs/flow-go/issues/5659
 }
 
+// checkShouldVoteOnStartup checks whether we should vote, and if so, sends a signal
+// to the worker thread responsible for voting.
+// No errors are expected during normal operation.
 func (e *Engine) checkShouldVoteOnStartup() error {
 	// check the current phase on startup, in case we are in setup phase
 	// and haven't yet voted for the next root QC
@@ -252,6 +255,11 @@ func (e *Engine) handleStopEpochLoop(ctx irrecoverable.SignalerContext, ready co
 	}
 }
 
+// handleEpochErrors checks for irrecoverable errors thrown from any components from
+// some epoch, and handles them. Currently, handling them means simply throwing them
+// to the engine-level signaller context, which should cause the node to crash.
+// In the future, we could restart the failed epoch's components instead.
+// Must be run as a goroutine.
 func (e *Engine) handleEpochErrors(ctx irrecoverable.SignalerContext, errCh <-chan error) {
 	select {
 	case <-ctx.Done():
