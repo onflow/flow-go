@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -28,23 +29,22 @@ import (
 )
 
 type LoadCase struct {
-	tps      int
+	tps      uint
 	duration time.Duration
 }
 
-// This struct is used for uploading data to BigQuery, changes here should
-// remain in sync with tps_results_schema.json
+// This struct is used for uploading data to BigQuery.
 type dataSlice struct {
-	GoVersion    string
-	OsVersion    string
-	GitSha       string
-	StartTime    time.Time
-	EndTime      time.Time
-	InputTps     float64
-	OutputTps    float64
-	BeforeExTxs  int
-	AfterExTxs   int
-	RunStartTime time.Time
+	GoVersion           string    `bigquery:"goVersion"`
+	OsVersion           string    `bigquery:"osVersion"`
+	GitSha              string    `bigquery:"gitSha"`
+	StartTime           time.Time `bigquery:"startTime"`
+	EndTime             time.Time `bigquery:"endTime"`
+	InputTps            float64   `bigquery:"inputTps"`
+	OutputTps           float64   `bigquery:"outputTps"`
+	StartExecutionCount int       `bigquery:"startExecutionCount"`
+	EndExecutionCount   int       `bigquery:"endExecutionCount"`
+	RunStartTime        time.Time `bigquery:"runStartTime"`
 }
 
 // Hardcoded CI values
@@ -70,7 +70,9 @@ func main() {
 	// CI relevant flags
 	tpsFlag := flag.String("tps", "300", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
 	tpsDurationsFlag := flag.String("tps-durations", "10m", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
-	ciFlag := flag.Bool("ci-run", false, "whether or not the run is part of CI")
+	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
+	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
+	bigQueryTableFlag := flag.String("bigquery-table", "tpsslices", "table name for the bigquery uploader")
 	sliceSize := flag.String("slice-size", "2m", "the amount of time that each slice covers")
 	flag.Parse()
 
@@ -114,7 +116,7 @@ func main() {
 		log.Fatal().Err(err).Str("value", *tpsDurationsFlag).
 			Msg("could not parse tps-durations flag")
 	}
-	loadCase := LoadCase{tps: int(tps), duration: tpsDuration}
+	loadCase := LoadCase{tps: uint(tps), duration: tpsDuration}
 
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
@@ -132,11 +134,9 @@ func main() {
 	// prepare load generator
 	log.Info().
 		Str("load_type", loadType).
-		Int("tps", loadCase.tps).
+		Uint("tps", loadCase.tps).
 		Dur("duration", loadCase.duration).
 		Msgf("Running load case...")
-
-	loaderMetrics.SetTPSConfigured(loadCase.tps)
 
 	lg, err := benchmark.New(
 		ctx,
@@ -150,9 +150,8 @@ func main() {
 			FlowTokenAddress:      &flowTokenAddress,
 		},
 		benchmark.LoadParams{
-			TPS:              loadCase.tps,
-			NumberOfAccounts: loadCase.tps * accountMultiplier,
-			LoadType:         loadType,
+			NumberOfAccounts: int(loadCase.tps) * accountMultiplier,
+			LoadType:         benchmark.LoadType(loadType),
 			FeedbackEnabled:  feedbackEnabled,
 		},
 		benchmark.ConstExecParams{
@@ -172,40 +171,58 @@ func main() {
 	}
 
 	// run load
-	lg.Start()
+	err = lg.SetTPS(loadCase.tps)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("unable to set tps")
+	}
+	// TODO(rbtz): pass metrics to the load generator
+	loaderMetrics.SetTPSConfigured(loadCase.tps)
 
 	// prepare data slices
 	sliceDuration, _ := time.ParseDuration(*sliceSize)
-	bufferSize := (loadCase.duration / sliceDuration) * 5
-	dataSlices := make(chan dataSlice, bufferSize)
-	go recordTransactionData(
-		dataSlices,
-		lg,
-		sliceDuration,
-		runStartTime,
-		gitSha,
-		goVersion,
-		osVersion)
+	var dataSlices []dataSlice
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		dataSlices = recordTransactionData(
+			lg,
+			sliceDuration,
+			runStartTime,
+			gitSha,
+			goVersion,
+			osVersion)
+	}()
 
 	select {
 	case <-time.After(loadCase.duration):
-		lg.Stop()
 	case <-ctx.Done(): //TODO: the loader currently doesn't ever cancel the context
-		lg.Stop()
 		// add logging here to express the *why* of lg choose to cancel the context.
 		// when the loader cancels its own context it may also call Stop() on itself
 		// this may become redundant.
 	}
+	lg.Stop()
+	wg.Wait()
 
-	prepareDataForBigQuery(dataSlices, *ciFlag)
+	if len(dataSlices) == 0 {
+		log.Fatal().Msg("no data slices recorded")
+	}
+
+	err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("unable to send data to bigquery")
+	}
 }
 
 func recordTransactionData(
-	slices chan dataSlice,
 	lg *benchmark.ContLoadGenerator,
 	sliceDuration time.Duration,
 	runStartTime time.Time,
-	gitSha, goVersion, osVersion string) {
+	gitSha, goVersion, osVersion string,
+) []dataSlice {
+	var dataSlices []dataSlice
+
 	// get initial values for first slice
 	startTime := time.Now()
 	startExecutedTransactions := lg.GetTxExecuted()
@@ -222,63 +239,45 @@ func recordTransactionData(
 			// calculate this slice
 			inputTps := lg.AvgTpsBetween(startTime, endTime)
 			outputTps := float64(endExecutedTransaction-startExecutedTransactions) / sliceDuration.Seconds()
-			slice := dataSlice{
-				GitSha:       gitSha,
-				GoVersion:    goVersion,
-				OsVersion:    osVersion,
-				StartTime:    startTime,
-				EndTime:      endTime,
-				InputTps:     inputTps,
-				OutputTps:    outputTps,
-				BeforeExTxs:  startExecutedTransactions,
-				AfterExTxs:   endExecutedTransaction,
-				RunStartTime: runStartTime}
+			dataSlices = append(dataSlices,
+				dataSlice{
+					GitSha:              gitSha,
+					GoVersion:           goVersion,
+					OsVersion:           osVersion,
+					StartTime:           startTime,
+					EndTime:             endTime,
+					InputTps:            inputTps,
+					OutputTps:           outputTps,
+					StartExecutionCount: startExecutedTransactions,
+					EndExecutionCount:   endExecutedTransaction,
+					RunStartTime:        runStartTime,
+				})
 
 			// set start values for next slice
 			startExecutedTransactions = endExecutedTransaction
 			startTime = endTime
-
-			slices <- slice
 		case <-lg.Done():
-			close(slices)
-			return
+			return dataSlices
 		}
 	}
 }
 
-func prepareDataForBigQuery(slicesChannel chan dataSlice, ci bool) {
-	slices := make([]dataSlice, 0)
-
-	for slice := range slicesChannel {
-		slices = append(slices, slice)
-	}
-
-	jsonText, err := json.Marshal(slices)
+func sendDataToBigQuery(
+	ctx context.Context,
+	projectName, datasetName, tableName string,
+	slices []dataSlice,
+) error {
+	bqClient, err := bigquery.NewClient(ctx, projectName)
 	if err != nil {
-		println("Error converting slice data to json")
+		return fmt.Errorf("unable to create bigquery client: %w", err)
 	}
+	defer bqClient.Close()
 
-	// if we are uploading to BigQuery then we need a copy of the json file
-	// that is newline delimited json
-	if ci {
-		jsonString := string(jsonText)
-		// remove the surrounding square brackets
-		jsonString = jsonString[1 : len(jsonString)-1]
-		// end of object commas will be replaced with newlines
-		jsonString = strings.ReplaceAll(jsonString, "},", "}\n")
+	dataset := bqClient.Dataset(datasetName)
+	table := dataset.Table(tableName)
 
-		// output tps-bq-results
-		err = os.WriteFile("tps-bq-results.json", []byte(jsonString), 0666)
-		if err != nil {
-			fmt.Println(err)
-		}
+	if err := table.Inserter().Put(ctx, slices); err != nil {
+		return fmt.Errorf("failed to insert data: %w", err)
 	}
-
-	// output human-readable json blob
-	timestamp := time.Now()
-	fileName := fmt.Sprintf("tps-results-%v.json", timestamp)
-	err = os.WriteFile(fileName, jsonText, 0666)
-	if err != nil {
-		fmt.Println(err)
-	}
+	return nil
 }
