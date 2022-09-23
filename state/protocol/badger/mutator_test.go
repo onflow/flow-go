@@ -1499,10 +1499,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			block1.Header.View = epoch1CommitmentDeadline + rand.Uint64()%2
 			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state, false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block1.ID())
 			require.NoError(t, err)
-
-			assertEpochEmergencyFallbackTriggered(t, state, true)
+			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
 
 			// block 2 will be the first block past the first epoch boundary
 			block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -1598,10 +1598,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			err = state.Extend(context.Background(), block4)
 			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state, false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
-
-			assertEpochEmergencyFallbackTriggered(t, state, true)
+			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
 
 			// block 5 will be the first block past the first epoch boundary
 			block5 := unittest.BlockWithParentFixture(block4.Header)
@@ -1693,10 +1693,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			block4 := unittest.BlockWithParentFixture(block3.Header)
 			err = state.Extend(context.Background(), block4)
 			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state, false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
-
-			assertEpochEmergencyFallbackTriggered(t, state, true)
+			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
 
 			// block 5 is the first block past the current epoch boundary
 			block5 := unittest.BlockWithParentFixture(block4.Header)
