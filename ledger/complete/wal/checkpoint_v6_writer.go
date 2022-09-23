@@ -100,7 +100,7 @@ func storeCheckpointHeader(
 	logger *zerolog.Logger,
 ) error {
 	// sanity check
-	if len(subTrieChecksums) == subtrieCountByLevel(subtrieLevel) {
+	if len(subTrieChecksums) != subtrieCountByLevel(subtrieLevel) {
 		return fmt.Errorf("expect subtrie level %v to have %v checksums, but got %v",
 			subtrieLevel, subtrieCountByLevel(subtrieLevel), len(subTrieChecksums))
 	}
@@ -131,12 +131,18 @@ func storeCheckpointHeader(
 		return fmt.Errorf("cannot write subtrie level into checkpoint header: %w", err)
 	}
 
-	//  write checksums
+	//  write subtrie checksums
 	for i, subtrieSum := range subTrieChecksums {
 		_, err = writer.Write(encodeCRC32Sum(subtrieSum))
 		if err != nil {
 			return fmt.Errorf("cannot write %v-th subtriechecksum into checkpoint header: %w", i, err)
 		}
+	}
+
+	// write top level trie checksum
+	_, err = writer.Write(encodeCRC32Sum(topTrieChecksum))
+	if err != nil {
+		return fmt.Errorf("cannot write top level trie checksum into checkpoint header: %w", err)
 	}
 
 	// write checksum to the end of the file

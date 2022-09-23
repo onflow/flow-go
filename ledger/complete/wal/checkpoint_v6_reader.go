@@ -74,6 +74,7 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
 	reader := NewCRC32Reader(bufReader)
 
+	// read the magic bytes and header
 	version, err := readVersion(reader)
 	if err != nil {
 		return nil, 0, err
@@ -83,11 +84,13 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 		return nil, 0, fmt.Errorf("wrong version: %v", version)
 	}
 
+	// read the subtrie level
 	subtrieLevel, err := readSubtrieLevel(reader)
 	if err != nil {
 		return nil, 0, err
 	}
 
+	// read subtrie checksums
 	subtrieCount := subtrieCountByLevel(subtrieLevel)
 	subtrieChecksums := make([]uint32, subtrieCount)
 	for i := 0; i < subtrieCount; i++ {
@@ -98,19 +101,23 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 		subtrieChecksums[i] = sum
 	}
 
+	// read top level trie checksum
 	topTrieChecksum, err := readCRC32Sum(reader)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not read checkpoint top level trie checksum in chechpoint summary: %w", err)
 	}
 
+	// calculate the actual checksum
+	actualSum := reader.Crc32()
+
+	// read the stored checksum, and compare with the actual sum
 	expectedSum, err := readCRC32Sum(reader)
 	if err != nil {
-		return nil, 0, fmt.Errorf("could not read checkpoint summary checksum: %w", err)
+		return nil, 0, fmt.Errorf("could not read checkpoint header checksum: %w", err)
 	}
 
-	actualSum := reader.Crc32()
 	if actualSum != expectedSum {
-		return nil, 0, fmt.Errorf("invalid checksum checkpoint header, expected %v, actual %v",
+		return nil, 0, fmt.Errorf("invalid checksum in checkpoint header, expected %v, actual %v",
 			expectedSum, actualSum)
 	}
 
@@ -284,7 +291,8 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 		return nil, fmt.Errorf("could not seek to 0: %w", err)
 	}
 
-	reader := NewCRC32Reader(bufio.NewReaderSize(file, defaultBufioReadSize))
+	var bufReader io.Reader = bufio.NewReaderSize(file, defaultBufioReadSize)
+	reader := NewCRC32Reader(bufReader)
 
 	// Scratch buffer is used as temporary buffer that reader can read into.
 	// Raw data in scratch buffer should be copied or converted into desired
