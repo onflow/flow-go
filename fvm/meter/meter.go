@@ -191,9 +191,9 @@ var (
 
 		// Tokens
 
-		common.MemoryKindValueToken:  41,
-		common.MemoryKindSyntaxToken: 25,
-		common.MemoryKindSpaceToken:  50,
+		common.MemoryKindErrorToken: 41,
+		common.MemoryKindTypeToken:  25,
+		common.MemoryKindSpaceToken: 50,
 
 		// AST nodes
 
