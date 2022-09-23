@@ -130,7 +130,7 @@ func main() {
 		flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor",
 			timeout.DefaultConfig.TimeoutIncrease,
 			"multiplicative increase of timeout value in case of time out event")
-		flags.Uint64Var(&hotstuffHappyPathRounds, "hotstuff-happy-path-rounds",
+		flags.Uint64Var(&hotstuffHappyPathRounds, "hotstuff-happy-path-max-round-failures",
 			timeout.DefaultConfig.HappyPathRounds,
 			"number of failed rounds before first timeout increase")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,

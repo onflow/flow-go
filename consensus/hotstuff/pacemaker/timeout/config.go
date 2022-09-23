@@ -6,19 +6,19 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
-// Config contains the configuration parameters for Truncated Exponential Backoff.
-// timeout.Controller
-// - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
-//   this results in exponential growing timeout duration on multiple subsequent timeouts
-// - on progress: MULTIPLICATIVE timeout decrease
+// Config contains the configuration parameters for a Truncated Exponential Backoff,
+// as implemented by the `timeout.Controller`
+//  - On timeout: increase timeout by multiplicative factor `TimeoutAdjustmentFactor`. This
+//    results in exponentially growing timeout duration on multiple subsequent timeouts.
+//  - On progress: decrease timeout by multiplicative factor `TimeoutAdjustmentFactor.
 type Config struct {
 	// MinReplicaTimeout is the minimum the timeout can decrease to [MILLISECONDS]
 	MinReplicaTimeout float64
 	// MaxReplicaTimeout is the maximum value the timeout can increase to [MILLISECONDS]
 	MaxReplicaTimeout float64
-	// TimeoutIncrease: MULTIPLICATIVE factor for increasing timeout when view
-	// change was triggered by a TC (unhappy path).
-	TimeoutIncrease float64
+	// TimeoutAdjustmentFactor: MULTIPLICATIVE factor for increasing timeout when view
+	// change was triggered by a TC (unhappy path) or decreasing the timeout on progress
+	TimeoutAdjustmentFactor float64
 	// HappyPathRounds is the number of rounds without progress where we still consider being
 	// on hot path of execution. After exceeding this value we will start increasing timeout values.
 	HappyPathRounds uint64
@@ -32,18 +32,17 @@ var DefaultConfig = NewDefaultConfig()
 // We explicitly provide a method here, which demonstrates in-code how
 // to compute standard values from some basic quantities.
 func NewDefaultConfig() Config {
-	// the lower bound on the replicaTimeout value, this is also the initial timeout with what replicas
+	// minReplicaTimeout is the lower bound on the replica's timeout value, this is also the initial timeout with what replicas
 	// will start their execution.
 	// If HotStuff is running at full speed, 1200ms should be enough. However, we add some buffer.
 	// This value is for instant message delivery.
 	minReplicaTimeout := 3 * time.Second
 	maxReplicaTimeout := 1 * time.Minute
 	timeoutIncreaseFactor := 1.2
-	// we consider that after 6 rounds we are not on hot path anymore, and we need to start increasing timeouts
+	// after 6 successively failed rounds, the pacemaker leaves the hot path and starts increasing timeouts (recovery mode)
 	happyPathRounds := uint64(6)
 	blockRateDelay := 0 * time.Millisecond
 
-	// the following demonstrates the computation of standard values
 	conf, err := NewConfig(
 		minReplicaTimeout+blockRateDelay,
 		maxReplicaTimeout,

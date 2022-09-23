@@ -219,15 +219,31 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 	}
 }
 
-// TestBlockDelayIsHigherThanTimeout tests an edge case where block delay is the same as round duration
-// which results in timing edge cases where some nodes generate timeout objects but don't yet form a TC but then receive
-// a proposal with newer QC.
+// TestBlockDelayIsHigherThanTimeout tests an edge case protocol edge case, where
+//  * The block arrives in time for replicas to vote.
+//  * The next primary does not respond in time with a follow-up proposal,
+//    so nodes start sending TimeoutObjects.
+//  * However, eventually, the next primary successfully constructs a QC and a new
+//    block before a TC leads to the round timing out.
+// This test verifies that nodes still make progress on the happy path (QC constructed),
+// despite already having initiated the timeout.
+// Example scenarios, how this timing edge case could manifest:
+//  * block delay is very close (or larger) than round duration
+//  * delayed message transmission (specifically votes) within network
+//  * overwhelmed / slowed-down primary
+//  * byzantine primary
+// Implementation:
+//  * We have 4 nodes in total where the TimeoutObjects from two of them are always
+//    discarded. Therefore, no TC can be constructed.
+//  * To force nodes to initiated the timeout (i.e. send TimeoutObjects), we set
+//    the `blockRateDelay` to _twice_ the PaceMaker Timeout. Furthermore, we configure
+//    the PaceMaker to only increase timeout duration after 6 successive round failures.
 func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 	numPass := 2
 	numFail := 2
 	finalView := uint64(20)
 
-	// generate the seven hotstuff participants
+	// generate the 4 hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
@@ -235,7 +251,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, 6, pmTimeout*2)
 	require.NoError(t, err)
 
-	// set up five instances that work fully
+	// set up 2 instances that fully work (incl. sending TimeoutObjects)
 	for n := 0; n < numPass; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
@@ -263,7 +279,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 	// connect the communicators of the instances together
 	Connect(instances)
 
-	// start all seven instances and wait for them to wrap up
+	// start all 4 instances and wait for them to wrap up
 	var wg sync.WaitGroup
 	for _, in := range instances {
 		wg.Add(1)

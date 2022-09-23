@@ -18,7 +18,7 @@ import (
 const safeTimeout = 2 * time.Second
 
 // number of failed rounds before first timeout increase
-const safeHappyPathRounds = 6
+const happyPathMaxRoundFailures = 6
 
 func TestSingleInstance(t *testing.T) {
 
