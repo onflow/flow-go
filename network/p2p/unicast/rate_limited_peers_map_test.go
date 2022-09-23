@@ -1,7 +1,6 @@
 package unicast
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -97,7 +96,6 @@ func TestRateLimitedPeersMap_cleanupLoopDone(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	m.close()
 
-	fmt.Println(m.peers)
 	require.False(t, m.exists(peerID1))
 	require.False(t, m.exists(peerID2))
 	require.False(t, m.exists(peerID3))

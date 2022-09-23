@@ -81,11 +81,8 @@ func (r *rateLimitedPeersMap) cleanupLoop() {
 		select {
 		case <-ticker.C:
 			r.cleanup()
-		case _, ok := <-r.done:
-			// clean up and return when channel is closed
-			if !ok {
-				return
-			}
+		case <-r.done:
+			return
 		}
 	}
 }
