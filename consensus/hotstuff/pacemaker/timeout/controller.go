@@ -8,9 +8,13 @@ import (
 )
 
 // Controller implements the following truncated exponential backoff:
-//   duration = t_min * min(b ^ ((r-k) * θ(r-k)), t_max)
+//
+//	duration = t_min * min(b ^ ((r-k) * θ(r-k)), t_max)
+//
 // For practical purpose we will transform this formula into:
-//   duration(r) = t_min * b ^ (min((r-k) * θ(r-k)), c), where c = log_b (t_max / t_min).
+//
+//	duration(r) = t_min * b ^ (min((r-k) * θ(r-k)), c), where c = log_b (t_max / t_min).
+//
 // In described formula:
 //
 //	  k - is number of rounds we expect during hot path, after failing this many rounds,
