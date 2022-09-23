@@ -23,7 +23,7 @@ import (
 	realModule "github.com/onflow/flow-go/module"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
@@ -65,11 +65,11 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.approvals.On("Store", mock.Anything).Return(nil)
 	suite.approvals.On("Index", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	suite.net.On("Register", network.PushApprovals, testifymock.Anything).
+	suite.net.On("Register", channels.PushApprovals, testifymock.Anything).
 		Return(suite.pushCon, nil).
 		Once()
 
-	suite.net.On("Register", network.ProvideApprovalsByChunk, testifymock.Anything).
+	suite.net.On("Register", channels.ProvideApprovalsByChunk, testifymock.Anything).
 		Return(suite.pullCon, nil).
 		Once()
 

@@ -4,6 +4,7 @@ package network
 import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // Engine represents an isolated process running across the peer-to-peer network
@@ -24,7 +25,7 @@ type Engine interface {
 	// for processing in a non-blocking manner. It returns instantly and logs
 	// a potential processing error internally when done.
 	// Deprecated: Only applicable for use by the networking layer, which should use MessageProcessor instead
-	Submit(channel Channel, originID flow.Identifier, event interface{})
+	Submit(channel channels.Channel, originID flow.Identifier, event interface{})
 
 	// ProcessLocal processes an event originating on the local node.
 	// Deprecated: To synchronously process a local message:
@@ -36,7 +37,7 @@ type Engine interface {
 	// in a blocking manner. It returns the potential processing error when
 	// done.
 	// Deprecated: Only applicable for use by the networking layer, which should use MessageProcessor instead
-	Process(channel Channel, originID flow.Identifier, event interface{}) error
+	Process(channel channels.Channel, originID flow.Identifier, event interface{}) error
 }
 
 // MessageProcessor represents a component which receives messages from the
@@ -45,5 +46,5 @@ type Engine interface {
 // (including invalid message types, malformed messages, etc.). Because of this,
 // node-internal messages should NEVER be submitted to a component using Process.
 type MessageProcessor interface {
-	Process(channel Channel, originID flow.Identifier, message interface{}) error
+	Process(channel channels.Channel, originID flow.Identifier, message interface{}) error
 }

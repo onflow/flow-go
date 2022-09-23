@@ -148,17 +148,12 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	hasher := msig.NewBLSHasher(tag)
 	// create and test a threshold signature with the keys computed by dkg
 	sigData := []byte("message to be signed")
-	beaconKeys := make([]crypto.PrivateKey, 0, len(nodes))
 	signatures := []crypto.Signature{}
 	indices := []int{}
 	for i, n := range nodes {
 		// TODO: to replace with safeBeaconKeys
 		beaconKey, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(s.T(), err)
-		// epochLookup := epochs.NewEpochLookup(n.State)
-		// beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, n.safeBeaconKeys)
-		// beaconKey, err := beaconKeyStore.ByView(nextEpochSetup.FirstView)
-		beaconKeys = append(beaconKeys, beaconKey)
 
 		signature, err := beaconKey.Sign(sigData, hasher)
 		require.NoError(s.T(), err)

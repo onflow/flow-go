@@ -1,7 +1,7 @@
 package epochmgr
 
 import (
-	"io/ioutil"
+	"io"
 	"testing"
 	"time"
 
@@ -92,7 +92,7 @@ type Suite struct {
 
 func (suite *Suite) SetupTest() {
 
-	suite.log = zerolog.New(ioutil.Discard)
+	suite.log = zerolog.New(io.Discard)
 	suite.me = new(module.Local)
 	suite.state = new(protocol.State)
 	suite.snap = new(protocol.Snapshot)

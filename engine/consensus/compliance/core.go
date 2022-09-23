@@ -8,9 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
-	"github.com/uber/jaeger-client-go"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -34,10 +33,10 @@ import (
 type Core struct {
 	log               zerolog.Logger // used to log relevant actions with context
 	config            compliance.Config
-	metrics           module.EngineMetrics
-	tracer            module.Tracer
-	mempool           module.MempoolMetrics
+	engineMetrics     module.EngineMetrics
+	mempoolMetrics    module.MempoolMetrics
 	complianceMetrics module.ComplianceMetrics
+	tracer            module.Tracer
 	cleaner           storage.Cleaner
 	headers           storage.Headers
 	payloads          storage.Payloads
@@ -75,9 +74,9 @@ func NewCore(
 	e := &Core{
 		log:               log.With().Str("compliance", "core").Logger(),
 		config:            config,
-		metrics:           collector,
+		engineMetrics:     collector,
 		tracer:            tracer,
-		mempool:           mempool,
+		mempoolMetrics:    mempool,
 		complianceMetrics: complianceMetrics,
 		cleaner:           cleaner,
 		headers:           headers,
@@ -89,32 +88,32 @@ func NewCore(
 		voteAggregator:    voteAggregator,
 		timeoutAggregator: timeoutAggregator,
 	}
-
-	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
+	e.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 
 	return e, nil
 }
 
 // OnBlockProposal handles incoming block proposals.
+// No errors are expected during normal operation. All returned exceptions
+// are potential symptoms of internal state corruption and should be fatal.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
 	var traceID string
 
 	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONCompOnBlockProposal)
 	if isSampled {
-		span.LogFields(log.Uint64("view", proposal.Header.View))
-		span.LogFields(log.String("origin_id", originID.String()))
-
-		// set proposer as a tag so we can filter based on proposer
-		span.SetTag("proposer", proposal.Header.ProposerID.String())
-		if sc, ok := span.Context().(jaeger.SpanContext); ok {
-			traceID = sc.TraceID().String()
-		}
+		span.SetAttributes(
+			attribute.Int64("view", int64(proposal.Header.View)),
+			attribute.String("origin_id", originID.String()),
+			attribute.String("proposer", proposal.Header.ProposerID.String()),
+		)
+		traceID = span.SpanContext().TraceID().String()
 	}
-	defer span.Finish()
+	defer span.End()
 
 	header := proposal.Header
 	log := c.log.With().
+		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
@@ -165,38 +164,21 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 
 	// there are two possibilities if the proposal is neither already pending
 	// processing in the cache, nor has already been processed:
-	// 1) the proposal is unverifiable because parent or ancestor is unknown
-	// => we cache the proposal and request the missing link
+	// 1) the proposal is unverifiable because the parent is unknown
+	// => we cache the proposal
 	// 2) the proposal is connected to finalized state through an unbroken chain
 	// => we verify the proposal and forward it to hotstuff if valid
 
-	// if we can connect the proposal to an ancestor in the cache, it means
-	// there is a missing link; we cache it and request the missing link
-	ancestor, found := c.pending.ByID(header.ParentID)
+	// if the parent is a pending block (disconnected from the incorporated state), we cache this block as well.
+	// we don't have to request its parent block or its ancestor again, because as a
+	// pending block, its parent block must have been requested.
+	// if there was problem requesting its parent or ancestors, the sync engine's forward
+	// syncing with range requests for finalized blocks will request for the blocks.
+	_, found := c.pending.ByID(header.ParentID)
 	if found {
-
 		// add the block to the cache
 		_ = c.pending.Add(originID, proposal)
-		c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
-
-		// go to the first missing ancestor
-		ancestorID := ancestor.Header.ParentID
-		ancestorHeight := ancestor.Header.Height - 1
-		for {
-			ancestor, found := c.pending.ByID(ancestorID)
-			if !found {
-				break
-			}
-			ancestorID = ancestor.Header.ParentID
-			ancestorHeight = ancestor.Header.Height - 1
-		}
-
-		log.Debug().
-			Uint64("ancestor_height", ancestorHeight).
-			Hex("ancestor_id", ancestorID[:]).
-			Msg("requesting missing ancestor for proposal")
-
-		c.sync.RequestBlock(ancestorID, ancestorHeight)
+		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		return nil
 	}
@@ -206,14 +188,11 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// and request the parent
 	_, err = c.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
-
 		_ = c.pending.Add(originID, proposal)
-
-		c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
-
-		log.Debug().Msg("requesting missing parent for proposal")
+		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
+		log.Debug().Msg("requesting missing parent for proposal")
 
 		return nil
 	}
@@ -228,7 +207,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
 	err = c.processBlockAndDescendants(proposal)
-	c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
+	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
@@ -246,24 +225,27 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 // its pending proposals for its children. By induction, any children connected
 // to a valid proposal are validly connected to the finalized state and can be
 // processed as well.
+// No errors are expected during normal operation. All returned exceptions
+// are potential symptoms of internal state corruption and should be fatal.
 func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) error {
 	blockID := proposal.Header.ID()
 
 	// process block itself
 	err := c.processBlockProposal(proposal)
-	// child is outdated by the time we started processing it
-	// => node was probably behind and is catching up. Log as warning
-	if engine.IsOutdatedInputError(err) {
-		c.log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
-		return nil
-	}
-	// the block is invalid; log as error as we desire honest participation
-	// ToDo: potential slashing
-	if engine.IsInvalidInputError(err) {
-		c.log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
-		return nil
-	}
 	if err != nil {
+		if engine.IsOutdatedInputError(err) {
+			// child is outdated by the time we started processing it
+			// => node was probably behind and is catching up. Log as warning
+			c.log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
+			return nil
+		}
+		if engine.IsInvalidInputError(err) {
+			// the block is invalid; log as error as we desire honest participation
+			// ToDo: potential slashing
+			c.log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+			return nil
+		}
+
 		// unexpected error: potentially corrupted internal state => abort processing and escalate error
 		return fmt.Errorf("failed to process block %x: %w", blockID, err)
 	}
@@ -295,22 +277,29 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 
 // processBlockProposal processes the given block proposal. The proposal must connect to
 // the finalized state.
+// Expected errors during normal operations:
+//   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
+//   - engine.InvalidInputError if the block proposal is invalid
 func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	startTime := time.Now()
 	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
 
-	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.ConCompProcessBlockProposal)
-	if isSampled {
-		span.SetTag("proposer", proposal.Header.ProposerID.String())
-	}
-	defer span.Finish()
-
 	header := proposal.Header
+	id := header.ID()
+
+	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), id, trace.ConCompProcessBlockProposal)
+	if isSampled {
+		span.SetAttributes(
+			attribute.String("proposer", header.ProposerID.String()),
+		)
+	}
+	defer span.End()
+
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
-		Hex("block_id", logging.Entity(header)).
+		Hex("block_id", id[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
@@ -325,40 +314,44 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 		Payload: proposal.Payload,
 	}
 	err := c.state.Extend(ctx, block)
-	// if the block proposes an invalid extension of the protocol state, then the block is invalid
-	if state.IsInvalidExtensionError(err) {
-		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
-			header.ID(), header.Height, err)
-	}
-	// protocol state aborted processing of block as it is on an abandoned fork: block is outdated
-	if state.IsOutdatedExtensionError(err) {
-		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
-	}
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
+		if state.IsInvalidExtensionError(err) {
+			// if the block proposes an invalid extension of the protocol state, then the block is invalid
+			return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w", id, header.Height, err)
+		}
+		if state.IsOutdatedExtensionError(err) {
+			// protocol state aborted processing of block as it is on an abandoned fork: block is outdated
+			return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
+		}
+
+		// unexpected error: potentially corrupted internal state => abort processing and escalate error
+		return fmt.Errorf("unexpected exception while extending protocol state with block %x at height %d: %w", id, header.Height, err)
 	}
 
-	// retrieve the parent
+	// Submit the model to hotstuff for processing. Note: HotStuff requires also the view of the parent block for
+	// reconstructing the proposal's QC. Since this information is not included in the header, we first query the parent.
 	parent, err := c.headers.ByBlockID(header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
-
-	// submit the model to hotstuff for processing
 	log.Info().Msg("forwarding block proposal to hotstuff")
+
 	c.hotstuff.SubmitProposal(header, parent.View)
 
 	return nil
 }
 
-// OnBlockVote handles incoming block votes.
+// OnBlockVote forwards incoming block votes to the `hotstuff.VoteAggregator`
+// No errors are expected during normal operation.
 func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
 	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), vote.BlockID, trace.CONCompOnBlockVote)
 	if isSampled {
-		span.LogFields(log.String("origin_id", originID.String()))
+		span.SetAttributes(
+			attribute.String("origin_id", originID.String()),
+		)
 	}
-	defer span.Finish()
+	defer span.End()
 
 	v := &model.Vote{
 		View:     vote.View,
@@ -380,6 +373,8 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 	return nil
 }
 
+// OnTimeoutObject forwards incoming TimeoutObjects to the `hotstuff.TimeoutAggregator`
+// No errors are expected during normal operation.
 func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.TimeoutObject) error {
 	t := &model.TimeoutObject{
 		View:       timeout.View,
@@ -408,5 +403,5 @@ func (c *Core) ProcessFinalizedView(finalizedView uint64) {
 	c.pending.PruneByView(finalizedView)
 
 	// always record the metric
-	c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
+	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 }

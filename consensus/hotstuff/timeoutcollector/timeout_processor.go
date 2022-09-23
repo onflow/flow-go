@@ -53,7 +53,8 @@ var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
 
 // NewTimeoutProcessor creates new instance of TimeoutProcessor
 // Returns the following expected errors for invalid inputs:
-//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+//
 // All other errors should be treated as exceptions.
 func NewTimeoutProcessor(committee hotstuff.Replicas,
 	validator hotstuff.Validator,
@@ -93,10 +94,11 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 // to create a TC or a partial TC we will immediately do so and submit it
 // via callback for further processing.
 // Expected error returns during normal operations:
-// * ErrTimeoutForIncompatibleView - submitted timeout for incompatible view
-// * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
-// * model.DuplicatedSignerError if a timeout from the same signer was previously already added
-//   It does _not necessarily_ imply that the timeout is invalid or the sender is equivocating.
+//   - ErrTimeoutForIncompatibleView - submitted timeout for incompatible view
+//   - model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
+//   - model.DuplicatedSignerError if a timeout from the same signer was previously already added
+//     It does _not necessarily_ imply that the timeout is invalid or the sender is equivocating.
+//
 // All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	if p.view != timeout.View {

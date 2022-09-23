@@ -2,7 +2,7 @@ package insecure
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 const (
@@ -12,24 +12,32 @@ const (
 	ProtocolUnknown   = "unknown-protocol"
 )
 
-// Event represents the data model that is exchanged between the attacker and the attack orchestrator.
-// An event is the protocol-level representation of an outgoing message of a corruptible conduit.
-// The corruptible conduit relays the message to the attacker instead of dispatching it through the Flow network.
+// EgressEvent represents the data model that is exchanged between the attacker and the attack orchestrator.
+// An egress event is the protocol-level representation of an outgoing message of a corrupt conduit (of a corrupt node).
+// The corrupt conduit relays the message to the attacker instead of dispatching it through the Flow network.
 // The attacker decodes the message into an event and relays it to the orchestrator.
-// Each corrupted conduit is uniquely identified by 1) corrupted node ID and 2) channel
-type Event struct {
-	CorruptedNodeId flow.Identifier // identifier of corrupted flow node that this corruptible conduit belongs to
-	Channel         network.Channel // channel of the event on the corrupted conduit
-	Protocol        Protocol        // networking-layer protocol that this event was meant to send on.
-	TargetNum       uint32          // number of randomly chosen targets (used in multicast protocol).
+// Each corrupt conduit is uniquely identified by 1) corrupt node ID and 2) channel
+type EgressEvent struct {
+	CorruptOriginId flow.Identifier  // identifier of corrupt flow node that this corrupt conduit belongs to
+	Channel         channels.Channel // channel of the event on the corrupt conduit
+	Protocol        Protocol         // networking-layer protocol that this event was meant to send on.
+	TargetNum       uint32           // number of randomly chosen targets (used in multicast protocol).
 
-	// set of target identifiers (can be any subset of nodes, either honest or corrupted).
+	// set of target identifiers (can be any subset of nodes, either honest or corrupt).
 	TargetIds flow.IdentifierList
 
-	// the protocol-level event that the corrupted node is relaying to
-	// the attacker. The event is originated by the corrupted node, and is
+	// the protocol-level event that the corrupt node is relaying to
+	// the attacker. The event is originated by the corrupt node, and is
 	// sent to attacker to decide on its content before dispatching it to the
 	// Flow network.
+	FlowProtocolEvent interface{}
+}
+
+// IngressEvent is the incoming event coming to a corrupt node (from an honest or corrupt node)
+type IngressEvent struct {
+	OriginID          flow.Identifier
+	CorruptTargetID   flow.Identifier // corrupt node Id
+	Channel           channels.Channel
 	FlowProtocolEvent interface{}
 }
 

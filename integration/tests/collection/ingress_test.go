@@ -5,12 +5,14 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkclient "github.com/onflow/flow-go-sdk/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/integration/convert"
@@ -48,7 +50,7 @@ func (suite *IngressSuite) TestTransactionIngress_InvalidTransaction() {
 	// pick a collector to test against
 	col1 := suite.Collector(0, 0)
 
-	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure()) //nolint:staticcheck
+	client, err := sdkclient.NewClient(col1.Addr(testnet.ColNodeAPIPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.Nil(t, err)
 
 	t.Run("missing reference block id", logStartFinish(func(t *testing.T) {
@@ -113,7 +115,7 @@ func (suite *IngressSuite) TestTxIngress_SingleCluster() {
 	// pick a collector to test against
 	col1 := suite.Collector(0, 0)
 
-	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure()) //nolint:staticcheck
+	client, err := sdkclient.NewClient(col1.Addr(testnet.ColNodeAPIPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.Nil(t, err)
 
 	tx := suite.NextTransaction()
@@ -171,7 +173,7 @@ func (suite *IngressSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	targetNode := suite.Collector(0, 0)
 
 	// get a client pointing to the cluster member
-	client, err := sdkclient.New(targetNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure()) //nolint:staticcheck
+	client, err := sdkclient.NewClient(targetNode.Addr(testnet.ColNodeAPIPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.Nil(t, err)
 
 	tx := suite.TxForCluster(targetCluster)
@@ -247,7 +249,7 @@ func (suite *IngressSuite) TestTxIngressMultiCluster_OtherCluster() {
 	otherNode := suite.Collector(1, 0)
 
 	// create clients pointing to each other node
-	client, err := sdkclient.New(otherNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure()) //nolint:staticcheck
+	client, err := sdkclient.NewClient(otherNode.Addr(testnet.ColNodeAPIPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.Nil(t, err)
 
 	// create a transaction that will be routed to the target cluster

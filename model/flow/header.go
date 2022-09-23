@@ -1,10 +1,7 @@
 package flow
 
 import (
-	"bytes"
 	"encoding/json"
-	"reflect"
-	"sync"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -79,55 +76,10 @@ func (h Header) Fingerprint() []byte {
 	return fingerprint.Fingerprint(h.Body())
 }
 
-var mutexHeader sync.Mutex
-var previdHeader Identifier
-var prevHeader Header
-
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
 func (h Header) ID() Identifier {
-	// NOTE: this is just a sanity check to make sure that we don't get
-	// different block IDs if someone forgets to use UTC timestamps
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
-
-	mutexHeader.Lock()
-
-	// unlock at the return
-	defer mutexHeader.Unlock()
-
-	// compare these elements individually
-	if prevHeader.ParentVoterIndices != nil &&
-		prevHeader.ParentVoterSigData != nil &&
-		prevHeader.ProposerSigData != nil &&
-		len(h.ParentVoterIndices) == len(prevHeader.ParentVoterIndices) &&
-		len(h.ParentVoterSigData) == len(prevHeader.ParentVoterSigData) &&
-		len(h.ProposerSigData) == len(prevHeader.ProposerSigData) {
-
-		if h.ChainID == prevHeader.ChainID &&
-			h.Timestamp == prevHeader.Timestamp &&
-			h.Height == prevHeader.Height &&
-			h.ParentID == prevHeader.ParentID &&
-			h.View == prevHeader.View &&
-			h.PayloadHash == prevHeader.PayloadHash &&
-			bytes.Equal(h.ProposerSigData, prevHeader.ProposerSigData) &&
-			bytes.Equal(h.ParentVoterIndices, prevHeader.ParentVoterIndices) &&
-			bytes.Equal(h.ParentVoterSigData, prevHeader.ParentVoterSigData) &&
-			h.ProposerID == prevHeader.ProposerID &&
-			reflect.DeepEqual(h.LastViewTC, prevHeader.LastViewTC) {
-
-			// cache hit, return the previous identifier
-			return previdHeader
-		}
-	}
-
-	previdHeader = MakeID(h)
-
-	// store a reference to the Header entity data
-	prevHeader = h
-
-	return previdHeader
+	return MakeID(h)
 }
 
 // Checksum returns the checksum of the header.

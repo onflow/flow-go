@@ -54,9 +54,9 @@ func TestTreeInitialization(t *testing.T) {
 
 // TestEmptyTreeHash verifies that an empty tree returns the expected empty hash.
 // We test with:
-//  * different key sizes
-//  * a newly initialized trie (empty)
-//  * a trie, whose last element was removed
+//   - different key sizes
+//   - a newly initialized trie (empty)
+//   - a trie, whose last element was removed
 func TestEmptyTreeHash(t *testing.T) {
 	for _, keyLength := range []int{1, 32, maxKeyLength} {
 		tree, _ := NewTree(keyLength)

@@ -41,35 +41,35 @@ func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics) *ConnMana
 	return cn
 }
 
-func (c *ConnManager) Notifee() network.Notifiee {
-	return c.n
+func (cm *ConnManager) Notifee() network.Notifiee {
+	return cm.n
 }
 
 // ListenNotifee is called by libp2p when network starts listening on an addr
-func (c *ConnManager) ListenNotifee(n network.Network, m multiaddr.Multiaddr) {
-	c.log.Debug().Str("multiaddress", m.String()).Msg("listen started")
+func (cm *ConnManager) ListenNotifee(n network.Network, m multiaddr.Multiaddr) {
+	cm.log.Debug().Str("multiaddress", m.String()).Msg("listen started")
 }
 
 // called by libp2p when network stops listening on an addr
 // * This is never called back by libp2p currently and may be a bug on their side
-func (c *ConnManager) ListenCloseNotifee(n network.Network, m multiaddr.Multiaddr) {
+func (cm *ConnManager) ListenCloseNotifee(n network.Network, m multiaddr.Multiaddr) {
 	// just log the multiaddress  on which we listen
-	c.log.Debug().Str("multiaddress", m.String()).Msg("listen stopped ")
+	cm.log.Debug().Str("multiaddress", m.String()).Msg("listen stopped ")
 }
 
 // Connected is called by libp2p when a connection opened
-func (c *ConnManager) Connected(n network.Network, con network.Conn) {
-	c.logConnectionUpdate(n, con, "connection established")
-	c.updateConnectionMetric(n)
+func (cm *ConnManager) Connected(n network.Network, con network.Conn) {
+	cm.logConnectionUpdate(n, con, "connection established")
+	cm.updateConnectionMetric(n)
 }
 
 // Disconnected is called by libp2p when a connection closed
-func (c *ConnManager) Disconnected(n network.Network, con network.Conn) {
-	c.logConnectionUpdate(n, con, "connection removed")
-	c.updateConnectionMetric(n)
+func (cm *ConnManager) Disconnected(n network.Network, con network.Conn) {
+	cm.logConnectionUpdate(n, con, "connection removed")
+	cm.updateConnectionMetric(n)
 }
 
-func (c *ConnManager) updateConnectionMetric(n network.Network) {
+func (cm *ConnManager) updateConnectionMetric(n network.Network) {
 	var totalInbound uint = 0
 	var totalOutbound uint = 0
 
@@ -82,12 +82,12 @@ func (c *ConnManager) updateConnectionMetric(n network.Network) {
 		}
 	}
 
-	c.metrics.InboundConnections(totalInbound)
-	c.metrics.OutboundConnections(totalOutbound)
+	cm.metrics.InboundConnections(totalInbound)
+	cm.metrics.OutboundConnections(totalOutbound)
 }
 
-func (c *ConnManager) logConnectionUpdate(n network.Network, con network.Conn, logMsg string) {
-	c.log.Debug().
+func (cm *ConnManager) logConnectionUpdate(n network.Network, con network.Conn, logMsg string) {
+	cm.log.Debug().
 		Str("remote_peer", con.RemotePeer().String()).
 		Str("remote_addrs", con.RemoteMultiaddr().String()).
 		Str("local_peer", con.LocalPeer().String()).

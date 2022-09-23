@@ -34,9 +34,10 @@ type ActivePaceMaker struct {
 var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
 
 // New creates a new ActivePaceMaker instance
-//  * startView is the view for the pacemaker to start with.
-//  * timeoutController controls the timeout trigger.
-//  * notifier provides callbacks for pacemaker events.
+//   - startView is the view for the pacemaker to start with.
+//   - timeoutController controls the timeout trigger.
+//   - notifier provides callbacks for pacemaker events.
+//
 // Expected error conditions:
 // * model.ConfigurationError if initial LivenessData is invalid
 func New(timeoutController *timeout.Controller,
