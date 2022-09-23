@@ -870,6 +870,7 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 // with MarkValid. Because of this, any change to the protocol state introduced
 // by a service event emitted in A would only become visible when querying D or
 // later (D's children).
+// TODO(active-pacemaker) update docs here (remove reference to MarkValid) https://github.com/dapperlabs/flow-go/issues/6254
 //
 // This method will only apply service-event-induced state changes when the
 // input block has the form of block D (ie. has a parent, which contains a seal
