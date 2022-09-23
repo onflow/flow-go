@@ -76,7 +76,7 @@ func (c *BaseClient) GetAccount(ctx context.Context) (*sdk.Account, error) {
 
 	// check if account key index within range of keys
 	if int(c.AccountKeyIndex) >= len(account.Keys) {
-		return nil, fmt.Errorf("given account key index (%d) is bigger than the number of keys for this account (%d>=%d)",
+		return nil, fmt.Errorf("given account key index exceeds the number of keys for this account (%d>=%d)",
 			c.AccountKeyIndex, len(account.Keys))
 	}
 

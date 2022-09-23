@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -75,34 +74,4 @@ func NewStartableEpochComponents(components *EpochComponents, cancel context.Can
 		EpochComponents: components,
 		cancel:          cancel,
 	}
-}
-
-// TODO use or delete below structs
-
-// startNewEpochCmd is an internal command used to notify a worker thread to start
-// the consensus components for a new epoch. It is sent when a new epoch begins.
-type startNewEpochCmd struct {
-	// a block within the new epoch
-	refBlock *flow.Header
-}
-
-// sendVoteCmd is an internal command used to notify a worker thread to send our
-// vote for the next epoch's root cluster QC. It is sent once we enter the
-// EpochSetup phase.
-type sendVoteCmd struct {
-	// a block within the EpochSetup phase where we can submit the vote
-	refBlock *flow.Header
-}
-
-// stopEpochCmd is an internal command used to notify a worker thread to stop the
-// consensus components for a running epoch. It is sent once we pass the cluster
-// switchover period after an epoch boundary. See prepareToStopEpochComponents.
-type stopEpochCmd struct {
-	epochCounter uint64
-}
-
-// checkEpochErrorsCmd is an internal command used to notify a worker thread to
-// begin checking
-type checkEpochErrorsCmd struct {
-	errCh chan error
 }

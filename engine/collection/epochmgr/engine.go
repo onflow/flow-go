@@ -50,7 +50,6 @@ type Engine struct {
 	epochTransitionEvents        chan *flow.Header // sends first block of new epoch
 	epochSetupPhaseStartedEvents chan *flow.Header // sends first block of EpochSetup phase
 	epochStopEvents              chan uint64       // sends counter of epoch to stop
-	epochStartedEvents           chan chan error   // sends signaller context error channel for a new epoch
 
 	cm *component.ComponentManager
 	component.Component
@@ -249,19 +248,6 @@ func (e *Engine) handleStopEpochLoop(ctx irrecoverable.SignalerContext, ready co
 			if err != nil {
 				ctx.Throw(err)
 			}
-		}
-	}
-}
-
-func (e *Engine) handleEpochStartedLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case errCh := <-e.epochStartedEvents:
-			go e.handleEpochErrors(ctx, errCh)
 		}
 	}
 }
