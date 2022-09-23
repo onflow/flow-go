@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/trace"
 )
 
 func Test_IsServiceEvent(t *testing.T) {
@@ -159,7 +158,7 @@ func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, e
 		))
 
 	return environment.NewEventEmitter(
-		environment.NewTracer(trace.NewNoopTracer(), trace.NoopSpan, false),
+		environment.NewTracer(environment.DefaultTracerParams()),
 		environment.NewMeter(stTxn),
 		chain.Chain(),
 		flow.ZeroID,

@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -54,23 +53,23 @@ func TestSystemContractsInvoke(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tracer := environment.NewTracer(nil, nil, false)
+			tracer := environment.NewTracer(environment.DefaultTracerParams())
 			runtime := environment.NewRuntime(
-				reusableRuntime.NewCustomReusableCadenceRuntimePool(
-					0,
-					func() runtime.Runtime {
-						return &testutil.TestInterpreterRuntime{
-							InvokeContractFunc: tc.contractFunction,
-						}
-					}))
+				environment.RuntimeParams{
+					reusableRuntime.NewCustomReusableCadenceRuntimePool(
+						0,
+						func() runtime.Runtime {
+							return &testutil.TestInterpreterRuntime{
+								InvokeContractFunc: tc.contractFunction,
+							}
+						}),
+				})
 			invoker := environment.NewSystemContracts(
 				flow.Mainnet.Chain(),
 				tracer,
 				environment.NewProgramLogger(
 					tracer,
-					zerolog.Logger{},
-					environment.NoopMetricsReporter{},
-					false),
+					environment.DefaultProgramLoggerParams()),
 				runtime)
 			value, err := invoker.Invoke(
 				environment.ContractFunctionSpec{
