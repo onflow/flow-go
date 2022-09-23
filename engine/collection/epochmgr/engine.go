@@ -328,9 +328,6 @@ func (e *Engine) onEpochTransition(ctx irrecoverable.SignalerContext, first *flo
 
 	log.Info().Msg("epoch transition: new epoch components started successfully")
 
-	// set up callback to stop previous epoch
-	e.prepareToStopEpochComponents(counter-1, lastEpochMaxHeight)
-
 	return nil
 }
 
