@@ -16,8 +16,18 @@ type Environment = environment.Environment
 type EnvironmentParams struct {
 	Chain flow.Chain
 
+	// NOTE: The ServiceAccountEnabled option is used by the playground
+	// https://github.com/onflow/flow-playground-api/blob/1ad967055f31db8f1ce88e008960e5fc14a9fbd1/compute/computer.go#L76
+	ServiceAccountEnabled bool
+
+	environment.RuntimeParams
+
+	environment.TracerParams
+	environment.ProgramLoggerParams
+
 	environment.EventEmitterParams
 
+	environment.BlockInfoParams
 	environment.TransactionInfoParams
 
 	environment.ContractUpdaterParams
@@ -26,7 +36,13 @@ type EnvironmentParams struct {
 func DefaultEnvironmentParams() EnvironmentParams {
 	return EnvironmentParams{
 		Chain:                 flow.Mainnet.Chain(),
+		ServiceAccountEnabled: true,
+
+		RuntimeParams:         environment.DefaultRuntimeParams(),
+		TracerParams:          environment.DefaultTracerParams(),
+		ProgramLoggerParams:   environment.DefaultProgramLoggerParams(),
 		EventEmitterParams:    environment.DefaultEventEmitterParams(),
+		BlockInfoParams:       environment.DefaultBlockInfoParams(),
 		TransactionInfoParams: environment.DefaultTransactionInfoParams(),
 		ContractUpdaterParams: environment.DefaultContractUpdaterParams(),
 	}
@@ -78,13 +94,8 @@ func newFacadeEnvironment(
 	meter environment.Meter,
 ) *facadeEnvironment {
 	accounts := environment.NewAccounts(stateTransaction)
-	logger := environment.NewProgramLogger(
-		tracer,
-		ctx.Logger,
-		ctx.Metrics,
-		ctx.CadenceLoggingEnabled,
-	)
-	runtime := environment.NewRuntime(ctx.ReusableCadenceRuntimePool)
+	logger := environment.NewProgramLogger(tracer, ctx.ProgramLoggerParams)
+	runtime := environment.NewRuntime(ctx.RuntimeParams)
 	systemContracts := environment.NewSystemContracts(
 		ctx.Chain,
 		tracer,

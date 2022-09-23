@@ -40,11 +40,12 @@ func NewTransactionEnv(
 	txID := tx.ID()
 	// TODO set the flags on context
 
+	ctx.RootSpan = traceSpan
 	env := newFacadeEnvironment(
 		ctx,
 		sth,
 		programs,
-		environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing),
+		environment.NewTracer(ctx.TracerParams),
 		environment.NewMeter(sth),
 	)
 
@@ -72,7 +73,7 @@ func NewTransactionEnv(
 		ctx.ServiceAccountEnabled,
 		env.Tracer,
 		env.Meter,
-		ctx.Metrics,
+		ctx.MetricsReporter,
 		env.SystemContracts)
 	env.AccountFreezer = environment.NewAccountFreezer(
 		ctx.Chain.ServiceAddress(),
