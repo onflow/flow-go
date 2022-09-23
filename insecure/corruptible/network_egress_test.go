@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestHandleOutgoingEvent_AttackerObserve evaluates that the incoming messages to the corrupt network are routed to the
+// TestHandleOutgoingEvent_AttackerObserve checks that the incoming messages to the corrupt network are routed to the
 // registered attacker if one exists.
 func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	codec := unittest.NetworkCodec()
@@ -41,7 +41,7 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 		ccf)
 	require.NoError(t, err)
 
-	attacker := newMockAttackerObserverClient()
+	attacker := newMockAttacker()
 
 	attackerRegistered := sync.WaitGroup{}
 	attackerRegistered.Add(1)
@@ -78,6 +78,7 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	decodedEvent, err := codec.Decode(receivedMsg.Egress.Payload)
 	require.NoError(t, err)
 	require.Equal(t, msg, decodedEvent)
+	mock.AssertExpectationsForObjects(t, ccf)
 }
 
 // TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork checks that outgoing unicast events to the corrupted network
@@ -371,7 +372,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
-			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
+			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to the corrupt network.
 		) {
 
 			passThroughReceipt := unittest.ExecutionReceiptFixture()

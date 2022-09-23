@@ -36,7 +36,7 @@ func TestHandleIncomingEvent_AttackerObserve(t *testing.T) {
 		ccf)
 	require.NoError(t, err)
 
-	attacker := newMockAttackerObserverClient()
+	attacker := newMockAttacker()
 
 	attackerRegistered := sync.WaitGroup{}
 	attackerRegistered.Add(1)

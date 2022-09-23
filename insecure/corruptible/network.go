@@ -36,6 +36,11 @@ import (
 // Whenever any corrupt conduit receives an event from its engine, it relays the event to this
 // network, which in turn is relayed to the register attack orchestrator.
 // The attack orchestrator can asynchronously dictate to the network to send messages on behalf of the node.
+// Honest message flow:
+// Engine -> Conduit -> Flow Networking Layer -> Deliver to targets
+//
+// Corrupt message flow:
+// Engine -> Corrupt Conduit -> Corrupt Network -> Attack Orchestrator (corrupts or passes through) -> Corrupt Network -> Flow Networking Layer
 type Network struct {
 	*component.ComponentManager
 	logger                zerolog.Logger
@@ -506,7 +511,11 @@ func (n *Network) HandleOutgoingEvent(
 	return nil
 }
 
-// HandleIncomingEvent returns true if an attacker is registered and false otherwise
+// HandleIncomingEvent is called on the incoming messages to a corrupt node(s).
+// Returns true if an attacker is registered and false otherwise.
+// Honest node message flow: Flow Networking Layer -> Honest Engine
+// Corrupt node message flow (with attacker registered):
+// Flow Networking Layer -> Corrupt Network -> Attack Orchestrator (mute or passthrough) -> Corrupt Network -> Honest / Corrupt Engine
 func (n *Network) HandleIncomingEvent(event interface{}, channel channels.Channel, originId flow.Identifier) bool {
 	lg := n.logger.With().
 		Hex("corrupt_id", logging.ID(n.me.NodeID())).

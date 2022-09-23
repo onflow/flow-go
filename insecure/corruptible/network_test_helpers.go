@@ -75,7 +75,7 @@ func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID 
 	return corruptibleNetwork, adapter
 }
 
-// withCorruptibleNetwork creates and starts a corruptible network, runs the "run" function and then
+// withCorruptibleNetwork creates and starts a corruptible network, runs the "run" function of a simulated attacker and then
 // terminates the network.
 func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
 	run func(
