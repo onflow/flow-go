@@ -7,35 +7,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// AccountNotFoundError is returned when account doesn't exist for the given address
-type AccountNotFoundError struct {
-	address flow.Address
-}
-
-// NewAccountNotFoundError constructs a new AccountNotFoundError
-func NewAccountNotFoundError(address flow.Address) AccountNotFoundError {
-	return AccountNotFoundError{
-		address: address,
-	}
-}
-
-func (e AccountNotFoundError) Error() string {
-	return fmt.Sprintf(
-		"%s account not found for address %s",
-		e.Code().String(),
-		e.address.String(),
-	)
-}
-
-// Code returns the error code for this error type
-func (e AccountNotFoundError) Code() ErrorCode {
-	return ErrCodeAccountNotFoundError
+func NewAccountNotFoundError(address flow.Address) *CodedError {
+	return NewCodedError(
+		ErrCodeAccountNotFoundError,
+		"account not found for address %s",
+		address.String())
 }
 
 // IsAccountNotFoundError returns true if error has this type
 func IsAccountNotFoundError(err error) bool {
-	var t AccountNotFoundError
-	return errors.As(err, &t)
+	return HasErrorCode(err, ErrCodeAccountNotFoundError)
 }
 
 // AccountAlreadyExistsError is returned when account creation fails because

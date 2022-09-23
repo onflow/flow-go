@@ -300,6 +300,7 @@ type MeterParameters struct {
 	memoryWeights ExecutionMemoryWeights
 
 	storageInteractionLimit uint64
+	eventEmitByteLimit      uint64
 }
 
 func DefaultParameters() MeterParameters {
@@ -311,6 +312,7 @@ func DefaultParameters() MeterParameters {
 		computationWeights:      DefaultComputationWeights,
 		memoryWeights:           DefaultMemoryWeights,
 		storageInteractionLimit: math.MaxUint64,
+		eventEmitByteLimit:      math.MaxUint64,
 	}
 }
 
@@ -350,6 +352,14 @@ func (params MeterParameters) WithStorageInteractionLimit(
 	return newParams
 }
 
+func (params MeterParameters) WithEventEmitByteLimit(
+	byteLimit uint64,
+) MeterParameters {
+	newParams := params
+	newParams.eventEmitByteLimit = byteLimit
+	return newParams
+}
+
 func (params MeterParameters) ComputationWeights() ExecutionEffortWeights {
 	return params.computationWeights
 }
@@ -383,6 +393,9 @@ type Meter struct {
 	storageUpdateSizeMap     map[StorageInteractionKey]uint64
 	totalStorageBytesRead    uint64
 	totalStorageBytesWritten uint64
+
+	eventCounter           uint32
+	totalEmittedEventBytes uint64
 }
 
 type MeterOptions func(*Meter)
@@ -434,6 +447,9 @@ func (m *Meter) MergeMeter(child *Meter) {
 	}
 	m.totalStorageBytesRead += child.TotalBytesReadFromStorage()
 	m.totalStorageBytesWritten += child.TotalBytesWrittenToStorage()
+
+	m.eventCounter += child.TotalEventCounter()
+	m.totalEmittedEventBytes += child.TotalEmittedEventBytes()
 }
 
 // MeterComputation captures computation usage and returns an error if it goes beyond the limit
@@ -556,4 +572,24 @@ func GetStorageKeyValueSizeForTesting(
 
 func (m *Meter) GetStorageUpdateSizeMapForTesting() MeteredStorageInteractionMap {
 	return m.storageUpdateSizeMap
+}
+
+func (m *Meter) MeterEmittedEvent(byteSize uint64) error {
+	m.totalEmittedEventBytes += uint64(byteSize)
+	m.eventCounter++
+
+	if m.totalEmittedEventBytes > m.eventEmitByteLimit {
+		return errors.NewEventLimitExceededError(
+			m.totalEmittedEventBytes,
+			m.eventEmitByteLimit)
+	}
+	return nil
+}
+
+func (m *Meter) TotalEmittedEventBytes() uint64 {
+	return m.totalEmittedEventBytes
+}
+
+func (m *Meter) TotalEventCounter() uint32 {
+	return m.eventCounter
 }

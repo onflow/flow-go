@@ -34,10 +34,7 @@ func NewScriptEnv(
 		fvmContext,
 		sth,
 		programs,
-		environment.NewTracer(
-			fvmContext.Tracer,
-			nil,
-			fvmContext.ExtensiveTracing),
+		environment.NewTracer(fvmContext.TracerParams),
 		environment.NewCancellableMeter(reqContext, sth),
 	)
 }

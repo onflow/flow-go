@@ -17,11 +17,11 @@ type TransactionProcessor struct {
 }
 
 // Process provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *TransactionProcessor) Process(_a0 fvm.Context, _a1 *fvm.TransactionProcedure, _a2 *state.StateHolder, _a3 *programs.Programs) error {
+func (_m *TransactionProcessor) Process(_a0 fvm.Context, _a1 *fvm.TransactionProcedure, _a2 *state.StateHolder, _a3 *programs.TransactionPrograms) error {
 	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(fvm.Context, *fvm.TransactionProcedure, *state.StateHolder, *programs.Programs) error); ok {
+	if rf, ok := ret.Get(0).(func(fvm.Context, *fvm.TransactionProcedure, *state.StateHolder, *programs.TransactionPrograms) error); ok {
 		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r0 = ret.Error(0)

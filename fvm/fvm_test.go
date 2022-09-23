@@ -64,11 +64,11 @@ func createChainAndVm(chainID flow.ChainID) (flow.Chain, *fvm.VirtualMachine) {
 }
 
 func (vmt vmTest) run(
-	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
+	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
 		chain, vm := createChainAndVm(flow.Testnet)
-		blockPrograms := programs.NewEmptyPrograms()
+		blockPrograms := programs.NewEmptyBlockPrograms()
 
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
@@ -97,7 +97,7 @@ func (vmt vmTest) run(
 // bootstrapWith executes the bootstrap procedure and the custom bootstrap function
 // and returns a prepared bootstrappedVmTest with all the state needed
 func (vmt vmTest) bootstrapWith(
-	bootstrap func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) error,
+	bootstrap func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) error,
 ) (bootstrappedVmTest, error) {
 	chain, vm := createChainAndVm(flow.Testnet)
 
@@ -115,7 +115,7 @@ func (vmt vmTest) bootstrapWith(
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
 
-	programs := programs.NewEmptyPrograms()
+	programs := programs.NewEmptyBlockPrograms()
 
 	bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
@@ -136,15 +136,15 @@ type bootstrappedVmTest struct {
 	chain    flow.Chain
 	ctx      fvm.Context
 	view     state.View
-	programs *programs.Programs
+	programs *programs.BlockPrograms
 }
 
 // run Runs a test from the bootstrapped state, without changing the bootstrapped state
 func (vmt bootstrappedVmTest) run(
-	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
+	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
-		f(t, fvm.NewVM(), vmt.chain, vmt.ctx, vmt.view.NewChild(), vmt.programs.ChildPrograms())
+		f(t, fvm.NewVM(), vmt.chain, vmt.ctx, vmt.view.NewChild(), vmt.programs.NewChildBlockPrograms())
 	}
 }
 
@@ -153,7 +153,7 @@ func TestPrograms(t *testing.T) {
 	t.Run(
 		"transaction execution programs are committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 
 				txCtx := fvm.NewContextFromParent(ctx)
 
@@ -194,7 +194,7 @@ func TestPrograms(t *testing.T) {
 
 	t.Run("script execution programs are not committed",
 		newVMTest().withBootstrapProcedureOptions().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 
 				scriptCtx := fvm.NewContextFromParent(ctx)
 
@@ -485,7 +485,7 @@ func TestWithServiceAccount(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	t.Run("With service account enabled", func(t *testing.T) {
-		blockPrograms := programs.NewEmptyPrograms()
+		blockPrograms := programs.NewEmptyBlockPrograms()
 		ctxB := fvm.NewContextFromParent(
 			ctxA,
 			fvm.WithBlockPrograms(blockPrograms))
@@ -500,7 +500,7 @@ func TestWithServiceAccount(t *testing.T) {
 	})
 
 	t.Run("With service account disabled", func(t *testing.T) {
-		blockPrograms := programs.NewEmptyPrograms()
+		blockPrograms := programs.NewEmptyBlockPrograms()
 		ctxB := fvm.NewContextFromParent(
 			ctxA,
 			fvm.WithServiceAccount(false),
@@ -518,7 +518,7 @@ func TestWithServiceAccount(t *testing.T) {
 
 func TestEventLimits(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
-	blockPrograms := programs.NewEmptyPrograms()
+	blockPrograms := programs.NewEmptyBlockPrograms()
 
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
@@ -607,7 +607,7 @@ func TestEventLimits(t *testing.T) {
 func TestHappyPathTransactionSigning(t *testing.T) {
 
 	newVMTest().run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 			// Create an account private key.
 			privateKey, err := testutil.GenerateAccountPrivateKey()
 			require.NoError(t, err)
@@ -934,8 +934,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		},
 	}
 
-	runTx := func(tc testCase) func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-		return func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+	runTx := func(tc testCase) func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
+		return func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 			// ==== Create an account ====
 			privateKey, txBody := testutil.CreateAccountCreationTransaction(t, chain)
 
@@ -1066,7 +1066,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			},
 		),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
@@ -1110,7 +1110,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).withContextOptions(
 		fvm.WithMemoryLimit(10_000_000_000),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 
 			// Create an account private key.
 			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1154,7 +1154,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).withContextOptions(
 		fvm.WithMemoryLimit(10_000_000_000),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
@@ -1196,7 +1196,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			memoryWeights,
 		),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 			require.NoError(t, err)
 
@@ -1258,7 +1258,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			},
 		),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
@@ -1292,7 +1292,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			},
 		),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
@@ -1327,7 +1327,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			},
 		),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
@@ -1368,7 +1368,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithMemoryLimit(math.MaxUint64),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 			// Use the maximum amount of computation so that the transaction still passes.
 			loops := uint64(997)
 			maxExecutionEffort := uint64(997)
@@ -1550,7 +1550,7 @@ func TestEnforcingComputationLimit(t *testing.T) {
 	for _, test := range tests {
 
 		t.Run(test.name, func(t *testing.T) {
-			blockPrograms := programs.NewEmptyPrograms()
+			blockPrograms := programs.NewEmptyBlockPrograms()
 
 			ctx := fvm.NewContext(
 				fvm.WithChain(chain),
@@ -1612,7 +1612,7 @@ func TestStorageCapacity(t *testing.T) {
 			chain flow.Chain,
 			ctx fvm.Context,
 			view state.View,
-			programs *programs.Programs,
+			programs *programs.BlockPrograms,
 		) {
 			service := chain.ServiceAddress()
 			signer := createAccount(t, vm, chain, ctx, view, programs)
@@ -1692,7 +1692,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 	t.Run("contract additions are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1730,7 +1730,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 	t.Run("contract removals are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1789,7 +1789,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 	t.Run("contract updates are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1851,7 +1851,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 
 	t.Run("Account key additions are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1895,7 +1895,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 
 	t.Run("Account key removals are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1986,7 +1986,7 @@ func TestInteractionLimit(t *testing.T) {
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 	).bootstrapWith(
-		func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) error {
+		func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) error {
 			// ==== Create an account ====
 			var txBody *flow.TransactionBody
 			privateKey, txBody = testutil.CreateAccountCreationTransaction(t, chain)
@@ -2049,7 +2049,7 @@ func TestInteractionLimit(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, vmt.run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				// ==== Transfer funds with lowe interaction limit ====
 				txBody := transferTokensTx(chain).
 					AddAuthorizer(address).

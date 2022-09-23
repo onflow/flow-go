@@ -61,7 +61,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -530,7 +530,7 @@ type FakeBlockComputer struct {
 	computationResult *execution.ComputationResult
 }
 
-func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.Programs) (*execution.ComputationResult, error) {
+func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.BlockPrograms) (*execution.ComputationResult, error) {
 	return f.computationResult, nil
 }
 
@@ -664,9 +664,13 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	)
 	vm := manager.vm.(*fvm.VirtualMachine)
 	view := testutil.RootBootstrappedLedger(vm, ctx)
-	programs := programs.NewEmptyPrograms()
+
+	programs := programs.NewEmptyBlockPrograms()
+	txnPrograms, err := programs.NewTransactionPrograms(0, 0)
+	require.NoError(t, err)
+
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	env := fvm.NewScriptEnv(context.Background(), ctx, stTxn, programs)
+	env := fvm.NewScriptEnv(context.Background(), ctx, stTxn, txnPrograms)
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)

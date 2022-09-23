@@ -624,3 +624,65 @@ func TestStorageLimits(t *testing.T) {
 		require.Equal(t, writeKey2Val, writeSize2)
 	})
 }
+
+func TestEventLimits(t *testing.T) {
+	t.Run("metering event emit - within limit", func(t *testing.T) {
+		meter1 := meter.NewMeter(
+			meter.DefaultParameters(),
+		)
+
+		testSize1, testSize2 := uint64(123), uint64(234)
+
+		err := meter1.MeterEmittedEvent(testSize1)
+		require.NoError(t, err)
+		require.Equal(t, testSize1, meter1.TotalEmittedEventBytes())
+		require.Equal(t, uint32(1), meter1.TotalEventCounter())
+
+		err = meter1.MeterEmittedEvent(testSize2)
+		require.NoError(t, err)
+		require.Equal(t, testSize1+testSize2, meter1.TotalEmittedEventBytes())
+		require.Equal(t, uint32(2), meter1.TotalEventCounter())
+	})
+
+	t.Run("metering event emit - exceeding limit", func(t *testing.T) {
+		testSize1, testSize2 := uint64(123), uint64(234)
+		testEventLimit := testSize1 + testSize2 - 1 // make it fail at 2nd meter
+		meter1 := meter.NewMeter(
+			meter.DefaultParameters().WithEventEmitByteLimit(testEventLimit),
+		)
+
+		err := meter1.MeterEmittedEvent(testSize1)
+		require.NoError(t, err)
+		require.Equal(t, testSize1, meter1.TotalEmittedEventBytes())
+		require.Equal(t, uint32(1), meter1.TotalEventCounter())
+
+		err = meter1.MeterEmittedEvent(testSize2)
+		eventLimitExceededError := errors.NewEventLimitExceededError(
+			testSize1+testSize2,
+			testEventLimit)
+		require.ErrorAs(t, err, &eventLimitExceededError)
+	})
+
+	t.Run("merge event metering", func(t *testing.T) {
+		// meter 1
+		meter1 := meter.NewMeter(
+			meter.DefaultParameters(),
+		)
+		testSize1 := uint64(123)
+		err := meter1.MeterEmittedEvent(testSize1)
+		require.NoError(t, err)
+
+		// meter 2
+		meter2 := meter.NewMeter(
+			meter.DefaultParameters(),
+		)
+		testSize2 := uint64(234)
+		err = meter2.MeterEmittedEvent(testSize2)
+		require.NoError(t, err)
+
+		// merge
+		meter1.MergeMeter(meter2)
+		require.Equal(t, testSize1+testSize2, meter1.TotalEmittedEventBytes())
+		require.Equal(t, uint32(2), meter1.TotalEventCounter())
+	})
+}

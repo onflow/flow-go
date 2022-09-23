@@ -375,6 +375,29 @@ func (_m *Environment) GenerateUUID() (uint64, error) {
 	return r0, r1
 }
 
+// GetAccount provides a mock function with given fields: address
+func (_m *Environment) GetAccount(address flow.Address) (*flow.Account, error) {
+	ret := _m.Called(address)
+
+	var r0 *flow.Account
+	if rf, ok := ret.Get(0).(func(flow.Address) *flow.Account); ok {
+		r0 = rf(address)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Account)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetAccountAvailableBalance provides a mock function with given fields: address
 func (_m *Environment) GetAccountAvailableBalance(address common.Address) (uint64, error) {
 	ret := _m.Called(address)
@@ -778,6 +801,20 @@ func (_m *Environment) MeterComputation(operationType common.ComputationKind, in
 	return r0
 }
 
+// MeterEmittedEvent provides a mock function with given fields: byteSize
+func (_m *Environment) MeterEmittedEvent(byteSize uint64) error {
+	ret := _m.Called(byteSize)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64) error); ok {
+		r0 = rf(byteSize)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // MeterMemory provides a mock function with given fields: usage
 func (_m *Environment) MeterMemory(usage common.MemoryUsage) error {
 	ret := _m.Called(usage)
@@ -994,6 +1031,34 @@ func (_m *Environment) StartSpanFromRoot(name trace.SpanName) oteltrace.Span {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(oteltrace.Span)
 		}
+	}
+
+	return r0
+}
+
+// TotalEmittedEventBytes provides a mock function with given fields:
+func (_m *Environment) TotalEmittedEventBytes() uint64 {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
+// TotalEventCounter provides a mock function with given fields:
+func (_m *Environment) TotalEventCounter() uint32 {
+	ret := _m.Called()
+
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint32)
 	}
 
 	return r0
