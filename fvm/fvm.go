@@ -97,6 +97,9 @@ func (vm *VirtualMachine) RunV2(
 		interactionLimit = math.MaxUint64
 	}
 
+	eventSizeLimit := ctx.EventCollectionByteSizeLimit
+	meterParams = meterParams.WithEventEmitByteLimit(eventSizeLimit)
+
 	stTxn := state.NewStateTransaction(
 		v,
 		state.DefaultParameters().
