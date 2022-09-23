@@ -627,6 +627,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 
 	// emit protocol events after database transaction succeeds
+	// event delivery is not guaranteed, consumer needs to fetch missing events.
 	m.consumer.BlockFinalized(header)
 	for _, emit := range events {
 		emit()
@@ -1053,6 +1054,7 @@ func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 	// skip emitting BlockProcessable for root block, as it is always processable
 	if parent.Height > rootHeight {
 		// emit protocol events after database transaction succeeds
+		// event delivery is not guaranteed, consumer needs to fetch missing events.
 		m.consumer.BlockProcessable(parent)
 	}
 

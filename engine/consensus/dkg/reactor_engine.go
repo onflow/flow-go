@@ -105,9 +105,8 @@ func (e *ReactorEngine) Ready() <-chan struct{} {
 		// If we start up in EpochSetup phase, attempt to start the DKG in case it wasn't started previously
 		if phase == flow.EpochPhaseSetup {
 			e.startDKGForEpoch(currentCounter, first)
-		}
+		} else if phase == flow.EpochPhaseCommitted {
 		// If we start up in EpochCommitted phase, ensure the DKG end state is set correctly.
-		if phase == flow.EpochPhaseCommitted {
 			e.handleEpochCommittedPhaseStarted(currentCounter, first)
 		}
 	})
