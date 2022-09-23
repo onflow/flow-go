@@ -24,8 +24,8 @@ type BandWidthRateLimiterImpl struct {
 // separate goroutine and should be stopped by calling Close.
 func NewBandWidthRateLimiter(limit rate.Limit, burst int, opts ...RateLimiterOpt) *BandWidthRateLimiterImpl {
 	l := &BandWidthRateLimiterImpl{
-		rateLimitedPeers: newRateLimitedPeersMap(rateLimiterTTL, cleanUpTickDuration),
-		limiters:         newLimiterMap(rateLimiterTTL, cleanUpTickDuration),
+		rateLimitedPeers: newRateLimitedPeersMap(rateLimiterTTL, cleanUpTickInterval),
+		limiters:         newLimiterMap(rateLimiterTTL, cleanUpTickInterval),
 		limit:            limit,
 		burst:            burst,
 		now:              time.Now,

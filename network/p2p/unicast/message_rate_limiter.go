@@ -25,8 +25,8 @@ type MessageRateLimiterImpl struct {
 // separate goroutine and should be stopped by calling Close.
 func NewMessageRateLimiter(limit rate.Limit, burst int, opts ...RateLimiterOpt) *MessageRateLimiterImpl {
 	l := &MessageRateLimiterImpl{
-		rateLimitedPeers: newRateLimitedPeersMap(rateLimiterTTL, cleanUpTickDuration),
-		limiters:         newLimiterMap(rateLimiterTTL, cleanUpTickDuration),
+		rateLimitedPeers: newRateLimitedPeersMap(rateLimiterTTL, cleanUpTickInterval),
+		limiters:         newLimiterMap(rateLimiterTTL, cleanUpTickInterval),
 		limit:            limit,
 		burst:            burst,
 		now:              time.Now,

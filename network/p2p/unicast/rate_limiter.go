@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	cleanUpTickDuration = 10 * time.Minute
+	cleanUpTickInterval = 10 * time.Minute
 	rateLimiterTTL      = 10 * time.Minute
 )
 

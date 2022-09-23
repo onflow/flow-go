@@ -77,6 +77,7 @@ func (r *rateLimiterMap) cleanup() {
 // cleanupLoop starts a loop that periodically removes stale peers.
 func (r *rateLimiterMap) cleanupLoop() {
 	ticker := time.NewTicker(r.cleanupInterval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
