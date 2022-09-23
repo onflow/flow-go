@@ -318,8 +318,8 @@ func (suite *Suite) TestRespondToEpochTransition() {
 	expiryCallback()
 
 	suite.Assert().Eventually(func() bool {
-		suite.engine.unit.Lock()
-		defer suite.engine.unit.Unlock()
+		suite.engine.mu.Lock()
+		defer suite.engine.mu.Unlock()
 		return len(suite.engine.epochs) == 1
 	}, time.Second, time.Millisecond)
 

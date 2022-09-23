@@ -27,10 +27,6 @@ const DefaultStartupTimeout = time.Minute
 // case for epochs during which this node is joining or leaving the network.
 var ErrNotAuthorizedForEpoch = fmt.Errorf("we are not an authorized participant for the epoch")
 
-// ErrTimeout is returned when the timeout is exceeded before an epoch's components
-// are successfully started or stopped.
-var ErrTimeout = fmt.Errorf("timeout exceeded")
-
 // Engine is the epoch manager, which coordinates the lifecycle of other modules
 // and processes that are epoch-dependent. The manager is responsible for
 // spinning up engines when a new epoch is about to start and spinning down
@@ -126,6 +122,7 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	}
 	err = e.startEpochComponents(ctx, counter, components)
 	if err != nil {
+		// all failures to start epoch components are critical
 		ctx.Throw(err)
 	}
 
@@ -326,7 +323,7 @@ func (e *Engine) onEpochTransition(ctx irrecoverable.SignalerContext, first *flo
 	// start up components
 	err = e.startEpochComponents(ctx, counter, components)
 	if err != nil {
-		return fmt.Errorf("could not start epoch components: %w", err)
+		return fmt.Errorf("unexpected failure starting epoch components: %w", err)
 	}
 
 	log.Info().Msg("epoch transition: new epoch components started successfully")
@@ -378,9 +375,7 @@ func (e *Engine) onEpochSetupPhaseStarted(ctx context.Context, nextEpoch protoco
 
 // startEpochComponents starts the components for the given epoch and adds them
 // to the engine's internal mapping.
-//
-// Error returns:
-// - ErrTimeout if the timeout is exceeded before the epoch components are done.
+// No errors are expected during normal operation.
 func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, counter uint64, components *EpochComponents) error {
 
 	epochCtx, cancel, errCh := irrecoverable.WithSignallerAndCancel(engineCtx)
@@ -395,16 +390,14 @@ func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, c
 		return nil
 	case <-time.After(e.startupTimeout):
 		cancel() // cancel current context if we didn't start in time
-		return fmt.Errorf("could not stop epoch %d components after %s: %w", counter, e.startupTimeout, ErrTimeout)
+		return fmt.Errorf("could not stop epoch %d components after %s", counter, e.startupTimeout)
 	}
 }
 
 // stopEpochComponents stops the components for the given epoch and removes them
 // from the engine's internal mapping. If no components exit for the given epoch,
 // this is a no-op and a warning is logged.
-//
-// Error returns:
-// - ErrTimeout if the timeout is exceeded before the epoch components are done.
+// No errors are expected during normal operation.
 func (e *Engine) stopEpochComponents(counter uint64) error {
 
 	components, exists := e.getEpochComponents(counter)
@@ -422,7 +415,7 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 		e.pools.ForEpoch(counter).Clear()
 		return nil
 	case <-time.After(e.startupTimeout):
-		return fmt.Errorf("could not stop epoch %d components after %s: %w", counter, e.startupTimeout, ErrTimeout)
+		return fmt.Errorf("could not stop epoch %d components after %s", counter, e.startupTimeout)
 	}
 }
 
