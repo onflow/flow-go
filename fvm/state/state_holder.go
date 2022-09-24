@@ -186,7 +186,7 @@ func (s *StateHolder) CommitParseRestricted(
 ) {
 	currentFrame := s.current()
 	if currentFrame.parseRestriction == nil ||
-		currentFrame.parseRestriction.ID() != location.ID() {
+		*currentFrame.parseRestriction != location {
 
 		// This is due to a programming error.
 		return nil, fmt.Errorf(
