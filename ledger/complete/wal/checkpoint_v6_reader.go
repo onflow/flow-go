@@ -21,7 +21,6 @@ import (
 //	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
 func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
-	// TODO: read the checksum of 17 file parts
 
 	headerPath := filePathCheckpointHeader(dir, fileName)
 	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath)
@@ -34,7 +33,6 @@ func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 		return nil, fmt.Errorf("could not read subtrie from dir: %w", err)
 	}
 
-	// validate the subtrie node checksum
 	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum)
 	if err != nil {
 		return nil, fmt.Errorf("could not read top level nodes or tries: %w", err)
@@ -48,7 +46,7 @@ func filePathCheckpointHeader(dir string, fileName string) string {
 }
 
 func filePathSubTries(dir string, fileName string, index int) (string, string, error) {
-	if index < 0 || index > 15 {
+	if index < 0 || index > (subtrieCount-1) {
 		return "", "", fmt.Errorf("index must be between 1 to 16, but got %v", index)
 	}
 	subTrieFileName := fmt.Sprintf("%v.%v", fileName, index)
@@ -56,7 +54,7 @@ func filePathSubTries(dir string, fileName string, index int) (string, string, e
 }
 
 func filePathTopTries(dir string, fileName string) (string, string) {
-	topTriesFileName := fmt.Sprintf("%v.%v", fileName, 16)
+	topTriesFileName := fmt.Sprintf("%v.%v", fileName, subtrieCount)
 	return path.Join(dir, topTriesFileName), fileName
 }
 
@@ -142,13 +140,12 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 // }
 
 func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32) ([][]*node.Node, error) {
-	// TODO: replace 16 with const
-	if len(subtrieChecksums) != 16 {
-		return nil, fmt.Errorf("expect subtrieChecksums to be %v, but got %v", 16, len(subtrieChecksums))
+	if len(subtrieChecksums) != subtrieCount {
+		return nil, fmt.Errorf("expect subtrieChecksums to be %v, but got %v", subtrieCount, len(subtrieChecksums))
 	}
 
-	resultChs := make([]chan *resultReadSubTrie, 0, 16)
-	for i := 0; i < 16; i++ {
+	resultChs := make([]chan *resultReadSubTrie, 0, subtrieCount)
+	for i := 0; i < subtrieCount; i++ {
 		resultCh := make(chan *resultReadSubTrie)
 		go func(i int) {
 			nodes, err := readCheckpointSubTrie(dir, fileName, i, subtrieChecksums[i])
@@ -180,8 +177,6 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 // 3. node count
 // 4. checksum
 func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint32) ([]*node.Node, error) {
-	// TODO: read and validate checksum
-
 	filepath, _, err := filePathSubTries(dir, fileName, index)
 	if err != nil {
 		return nil, err
@@ -222,7 +217,31 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		nodes[i] = node
 	}
 
-	// TODO: validate checksum again
+	// read footer and discard, since we only care about checksum
+	_, err = io.ReadFull(reader, scratch[:encNodeCountSize])
+	if err != nil {
+		return nil, fmt.Errorf("cannot read footer: %w", err)
+	}
+
+	// calculate the actual checksum
+	actualSum := reader.Crc32()
+
+	// read the stored checksum, and compare with the actual sum
+	expectedSum, err := readCRC32Sum(reader)
+	if err != nil {
+		return nil, fmt.Errorf("could not read subtrie checkpoint checksum: %w", err)
+	}
+
+	if actualSum != expectedSum {
+		return nil, fmt.Errorf("invalid checksum in subtrie checkpoint, expected %v, actual %v",
+			expectedSum, actualSum)
+	}
+
+	// compare the checksum with the checksum stored in checkpoint header file
+	if checksum != actualSum {
+		return nil, fmt.Errorf("invalid checksum in checkpoint header and subtrie header, expected %v, actual %v",
+			checksum, actualSum)
+	}
 
 	return nodes, nil
 }
@@ -259,9 +278,7 @@ func readSubTriesNodeCount(f *os.File) (uint64, error) {
 // 7. trie count
 // 6. checksum
 func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32) ([]*trie.MTrie, error) {
-	// TODO: read header to validate checksums of sub trie nodes
 	// TODO: read subtrie count
-	// TODO: read subtrie checksum
 
 	filepath, _ := filePathTopTries(dir, fileName)
 	file, err := os.Open(filepath)
@@ -329,7 +346,24 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 		tries[i] = trie
 	}
 
-	// TODO: validate checksum
+	// read footer and discard, since we only care about checksum
+	_, err = io.ReadFull(reader, scratch[:encNodeCountSize+encTrieCountSize])
+	if err != nil {
+		return nil, fmt.Errorf("cannot read footer: %w", err)
+	}
+
+	actualSum := reader.Crc32()
+
+	// read the stored checksum, and compare with the actual sum
+	expectedSum, err := readCRC32Sum(reader)
+	if err != nil {
+		return nil, fmt.Errorf("could not read top level trie checksum: %w", err)
+	}
+
+	if actualSum != expectedSum {
+		return nil, fmt.Errorf("invalid checksum in top level trie, expected %v, actual %v",
+			expectedSum, actualSum)
+	}
 
 	return tries, nil
 }
