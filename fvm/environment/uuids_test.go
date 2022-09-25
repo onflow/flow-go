@@ -14,7 +14,7 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 	view := utils.NewSimpleView()
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
 	uuidsA := environment.NewUUIDGenerator(
-		environment.NewTracer(nil, nil, false),
+		environment.NewTracer(environment.DefaultTracerParams()),
 		environment.NewMeter(stTxn),
 		stTxn)
 
@@ -27,7 +27,7 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 
 	// create new UUIDs instance
 	uuidsB := environment.NewUUIDGenerator(
-		environment.NewTracer(nil, nil, false),
+		environment.NewTracer(environment.DefaultTracerParams()),
 		environment.NewMeter(stTxn),
 		stTxn)
 	uuid, err = uuidsB.GetUUID() // should read saved value
@@ -40,7 +40,7 @@ func Test_GenerateUUID(t *testing.T) {
 	view := utils.NewSimpleView()
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
 	genA := environment.NewUUIDGenerator(
-		environment.NewTracer(nil, nil, false),
+		environment.NewTracer(environment.DefaultTracerParams()),
 		environment.NewMeter(stTxn),
 		stTxn)
 
@@ -57,7 +57,7 @@ func Test_GenerateUUID(t *testing.T) {
 
 	// Create new generator instance from same ledger
 	genB := environment.NewUUIDGenerator(
-		environment.NewTracer(nil, nil, false),
+		environment.NewTracer(environment.DefaultTracerParams()),
 		environment.NewMeter(stTxn),
 		stTxn)
 

@@ -229,6 +229,18 @@ func (s *State) TotalMemoryLimit() uint {
 	return uint(s.meter.TotalMemoryLimit())
 }
 
+func (s *State) MeterEmittedEvent(byteSize uint64) error {
+	return s.meter.MeterEmittedEvent(byteSize)
+}
+
+func (s *State) TotalEmittedEventBytes() uint64 {
+	return s.meter.TotalEmittedEventBytes()
+}
+
+func (s *State) TotalEventCounter() uint32 {
+	return s.meter.TotalEventCounter()
+}
+
 // MergeState applies the changes from a the given view to this view.
 func (s *State) MergeState(other *State) error {
 	err := s.view.MergeView(other.view)

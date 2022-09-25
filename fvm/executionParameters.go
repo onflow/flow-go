@@ -19,7 +19,7 @@ import (
 func getEnvironmentMeterParameters(
 	ctx Context,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.TransactionPrograms,
 	params meter.MeterParameters,
 ) (
 	meter.MeterParameters,

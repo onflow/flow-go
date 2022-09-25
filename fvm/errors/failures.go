@@ -5,25 +5,10 @@ import (
 	"fmt"
 )
 
-// UnknownFailure captures an unknown vm fatal error
-type UnknownFailure struct {
-	errorWrapper
-}
-
-// NewUnknownFailure constructs a new UnknownFailure
-func NewUnknownFailure(err error) UnknownFailure {
-	return UnknownFailure{
-		errorWrapper: errorWrapper{err: err},
-	}
-}
-
-func (e UnknownFailure) Error() string {
-	return fmt.Sprintf("%s unknown failure: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e UnknownFailure) FailureCode() FailureCode {
-	return FailureCodeUnknownFailure
+func NewUnknownFailure(err error) *CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeUnknownFailure,
+		fmt.Errorf("unknown failure: %w", err))
 }
 
 // EncodingFailure captures an fatal error sourced from encoding issues
@@ -43,7 +28,7 @@ func (e EncodingFailure) Error() string {
 }
 
 // FailureCode returns the failure code
-func (e EncodingFailure) FailureCode() FailureCode {
+func (e EncodingFailure) FailureCode() ErrorCode {
 	return FailureCodeEncodingFailure
 }
 
@@ -64,7 +49,7 @@ func (e LedgerFailure) Error() string {
 }
 
 // FailureCode returns the failure code
-func (e LedgerFailure) FailureCode() FailureCode {
+func (e LedgerFailure) FailureCode() ErrorCode {
 	return FailureCodeLedgerFailure
 }
 
@@ -91,7 +76,7 @@ func (e StateMergeFailure) Error() string {
 }
 
 // FailureCode returns the failure code
-func (e StateMergeFailure) FailureCode() FailureCode {
+func (e StateMergeFailure) FailureCode() ErrorCode {
 	return FailureCodeStateMergeFailure
 }
 
@@ -112,6 +97,6 @@ func (e BlockFinderFailure) Error() string {
 }
 
 // FailureCode returns the failure code
-func (e BlockFinderFailure) FailureCode() FailureCode {
+func (e BlockFinderFailure) FailureCode() ErrorCode {
 	return FailureCodeBlockFinderFailure
 }

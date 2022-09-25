@@ -458,6 +458,20 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 	}
 }
 
+func (e *Engine) checkAndStopExecution(header *flow.Header, stopHeight uint64, stopCrash bool) {
+	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, header.ParentID)
+	if err != nil {
+		e.log.Error().Err(err).Str("block_id", header.ID().String()).Msg("failed to check if the block has been executed")
+		return
+	}
+
+	if executed {
+		e.stopExecution(stopCrash, stopHeight)
+	} else {
+		e.stopAfterExecuting = header.ParentID
+	}
+}
+
 // BlockFinalized implements part of state.protocol.Consumer interface.
 // Method gets called for every finalized block
 func (e *Engine) BlockFinalized(h *flow.Header) {
@@ -473,17 +487,19 @@ func (e *Engine) BlockFinalized(h *flow.Header) {
 		// However, if the node is not up-to-date, finalization might lead, but we want to crash only after
 		// the execution reached the stop height
 		if h.Height == stopHeight {
-			executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, h.ParentID)
-			if err != nil {
-				e.log.Error().Err(err).Str("block_id", h.ID().String()).Msg("failed to check if the block has been executed")
-				return false
-			}
 
-			if executed {
-				e.stopExecution(stopCrash, stopHeight)
-			} else {
-				e.stopAfterExecuting = h.ParentID
-			}
+			e.checkAndStopExecution(h, stopHeight, stopCrash)
+
+			// there is a race condition in checkAndStopExecution, after setting stopAfterExecuting,
+			// the block might just have been executed, meaning the previous check was stale.
+			// we can avoid this race condition by checking again.
+
+			// Since this check will occur only for blocks at stop height, if stop height is even set at all
+			// it's preferred to other solution such as synchronization between this handler and block
+			// results handling code, which would affect every execution.
+			// See TestStopAtHeightRaceFinalization
+
+			e.checkAndStopExecution(h, stopHeight, stopCrash)
 			return true
 		}
 		return false
