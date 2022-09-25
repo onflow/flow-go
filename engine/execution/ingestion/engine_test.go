@@ -952,7 +952,8 @@ func TestStopAtHeight(t *testing.T) {
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header)
 
 		// stop at block C
-		ctx.stopAtHeight.Set(blockSealed.Height+3, false)
+		_, _, _, err := ctx.stopAtHeight.Set(blockSealed.Height+3, false)
+		require.NoError(t, err)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
 		logBlocks(blocks)
@@ -1057,7 +1058,8 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header)
 
 		// stop at block B, so B-1 (A) will be last executed
-		ctx.stopAtHeight.Set(blocks["B"].Height(), false)
+		_, _, _, err := ctx.stopAtHeight.Set(blocks["B"].Height(), false)
+		require.NoError(t, err)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
 		logBlocks(blocks)

@@ -1,8 +1,9 @@
 package ingestion
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestCannotSetNewValuesAfterStoppingStarted(t *testing.T) {
