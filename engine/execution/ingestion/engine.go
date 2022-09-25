@@ -430,11 +430,16 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 	}
 
 	// skips blocks at or above requested stop height
-	if stopEnabled, stopHeight, _ := e.stopAtHeight.Get(); stopEnabled {
+	stopping := e.stopAtHeight.Try(func(stopHeight uint64, stopCrash bool) bool {
 		if b.Height >= stopHeight {
 			e.log.Warn().Msgf("Skipping execution of %s at height %d because stop has been requested at height %d", b.ID(), b.Height, stopHeight)
-			return
+			return true
 		}
+		return false
+	})
+
+	if stopping {
+		return
 	}
 
 	blockID := b.ID()
@@ -461,33 +466,28 @@ func (e *Engine) BlockFinalized(h *flow.Header) {
 		return
 	}
 
-	stopEnabled, stopHeight, stopCrash := e.stopAtHeight.Get()
+	e.stopAtHeight.Try(func(stopHeight uint64, stopCrash bool) bool {
+		// once finalization reached stop height we can be sure no other fork will be valid at this height,
+		// if this block's parent has been executed, we are safe to stop or crash.
+		// This will happen during normal execution, where blocks are executed before they are finalized
+		// However, if the node is not up-to-date, finalization might lead, but we want to crash only after
+		// the execution reached the stop height
+		if h.Height == stopHeight {
+			executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, h.ParentID)
+			if err != nil {
+				e.log.Error().Err(err).Str("block_id", h.ID().String()).Msg("failed to check if the block has been executed")
+				return false
+			}
 
-	// skip if no stop at height has been requested
-	if !stopEnabled {
-		return
-	}
-
-	// once finalization reached stop height we can be sure no other fork will be valid at this height,
-	// if this block's parent has been executed, we are safe to stop or crash.
-	// This will happen during normal execution, where blocks are executed before they are finalized
-	// However, if the node is not up-to-date, finalization might lead, but we want to crash only after
-	// the execution reached the stop height
-	if h.Height == stopHeight {
-
-		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, h.ParentID)
-		if err != nil {
-			e.log.Error().Err(err).Str("block_id", h.ID().String()).Msg("failed to check if the block has been executed")
-			return
+			if executed {
+				e.stopExecution(stopCrash, stopHeight)
+			} else {
+				e.stopAfterExecuting = h.ParentID
+			}
+			return true
 		}
-
-		if executed {
-			e.stopExecution(stopCrash, stopHeight)
-		} else {
-			e.stopAfterExecuting = h.ParentID
-		}
-
-	}
+		return false
+	})
 }
 
 // Main handling
@@ -713,9 +713,13 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	if e.stopAfterExecuting == executableBlock.ID() {
 		// double check. Even if requested stop height has been changed multiple times,
 		// as long as it matches this block we are safe to terminate
-		if set, height, crash := e.stopAtHeight.Get(); set && height == executableBlock.Height()-1 {
-			e.stopExecution(crash, height)
-		}
+		e.stopAtHeight.Try(func(stopHeight uint64, crash bool) bool {
+			if executableBlock.Height()-1 == stopHeight {
+				e.stopExecution(crash, stopHeight)
+				return true
+			}
+			return false
+		})
 	}
 }
 

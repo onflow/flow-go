@@ -33,7 +33,11 @@ type StopAtHeightReq struct {
 func (s *StopAtHeightCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	sah := req.ValidatorData.(StopAtHeightReq)
 
-	_, oldHeight, oldCrash := s.stopAtHeight.Set(sah.height, sah.crash)
+	_, oldHeight, oldCrash, err := s.stopAtHeight.Set(sah.height, sah.crash)
+
+	if err != nil {
+		return nil, err
+	}
 
 	log.Info().Msgf("admintool: EN will stop at height %d and crash: %t, previous values: %d %t", sah.height, sah.crash, oldHeight, oldCrash)
 
