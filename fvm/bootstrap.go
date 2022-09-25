@@ -22,7 +22,7 @@ import (
 type BootstrapProcedure struct {
 	ctx       Context
 	sth       *state.StateHolder
-	programs  *programs.Programs
+	programs  *programs.TransactionPrograms
 	rootBlock *flow.Header
 
 	// genesis parameters
@@ -241,7 +241,11 @@ func Bootstrap(
 	return bootstrapProcedure
 }
 
-func (b *BootstrapProcedure) Run(ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
+func (b *BootstrapProcedure) Run(
+	ctx Context,
+	sth *state.StateHolder,
+	programs *programs.TransactionPrograms,
+) error {
 	b.ctx = NewContextFromParent(
 		ctx,
 		WithContractDeploymentRestricted(false))
@@ -328,6 +332,18 @@ func (proc *BootstrapProcedure) MemoryLimit(_ Context) uint64 {
 
 func (proc *BootstrapProcedure) ShouldDisableMemoryAndInteractionLimits(_ Context) bool {
 	return true
+}
+
+func (BootstrapProcedure) Type() ProcedureType {
+	return BootstrapProcedureType
+}
+
+func (proc *BootstrapProcedure) InitialSnapshotTime() programs.LogicalTime {
+	return 0
+}
+
+func (proc *BootstrapProcedure) ExecutionTime() programs.LogicalTime {
+	return 0
 }
 
 func (b *BootstrapProcedure) createAccount(publicKeys []flow.AccountPublicKey) flow.Address {
@@ -894,7 +910,7 @@ func (b *BootstrapProcedure) invokeMetaTransaction(
 	parentCtx Context,
 	tx *TransactionProcedure,
 	stTxn *state.StateHolder,
-	programs *programs.Programs,
+	programs *programs.TransactionPrograms,
 ) (
 	errors.Error,
 	error,

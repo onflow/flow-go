@@ -695,7 +695,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
 
-	computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyPrograms())
+	computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyBlockPrograms())
 	require.NoError(t, err)
 
 	prevResultId := unittest.IdentifierFixture()

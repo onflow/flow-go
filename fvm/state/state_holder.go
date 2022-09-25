@@ -186,7 +186,7 @@ func (s *StateHolder) CommitParseRestricted(
 ) {
 	currentFrame := s.current()
 	if currentFrame.parseRestriction == nil ||
-		currentFrame.parseRestriction.ID() != location.ID() {
+		*currentFrame.parseRestriction != location {
 
 		// This is due to a programming error.
 		return nil, fmt.Errorf(
@@ -312,6 +312,18 @@ func (s *StateHolder) TotalMemoryEstimate() uint64 {
 
 func (s *StateHolder) InteractionUsed() uint64 {
 	return s.currentState().InteractionUsed()
+}
+
+func (s *StateHolder) MeterEmittedEvent(byteSize uint64) error {
+	return s.currentState().MeterEmittedEvent(byteSize)
+}
+
+func (s *StateHolder) TotalEmittedEventBytes() uint64 {
+	return s.currentState().TotalEmittedEventBytes()
+}
+
+func (s *StateHolder) TotalEventCounter() uint32 {
+	return s.currentState().TotalEventCounter()
 }
 
 func (s *StateHolder) ViewForTestingOnly() View {
