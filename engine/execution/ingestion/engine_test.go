@@ -1040,6 +1040,105 @@ func TestStopAtHeight(t *testing.T) {
 	})
 }
 
+// TestStopAtHeightRaceFinalization test a possible race condition which happens
+// when block at stop height N is finalized while N-1 is being executed.
+// If execution finishes exactly between finalization checking execution state and
+// setting block ID to crash, it's possible to miss and never actually stop the EN
+func TestStopAtHeightRaceFinalization(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+
+		blockSealed := unittest.BlockHeaderFixture()
+
+		blocks := make(map[string]*entity.ExecutableBlock)
+		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, blockSealed)
+		blocks["A"].StartState = unittest.StateCommitmentPointerFixture()
+
+		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
+		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header)
+
+		// stop at block B, so B-1 (A) will be last executed
+		ctx.stopAtHeight.Set(blocks["B"].Height(), false)
+
+		// log the blocks, so that we can link the block ID in the log with the blocks in tests
+		logBlocks(blocks)
+
+		commits := make(map[flow.Identifier]flow.StateCommitment)
+
+		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].Block.Header.ParentID).Return(
+			*blocks["A"].StartState, nil,
+		)
+
+		// make sure the seal height won't trigger state syncing, so that all blocks
+		// will be executed.
+		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
+		ctx.state.On("Sealed").Return(ctx.snapshot)
+		ctx.snapshot.On("Head").Return(blockSealed, nil)
+		ctx.mockSnapshot(blocks["A"].Block.Header, unittest.IdentityListFixture(1))
+
+		executionWg := sync.WaitGroup{}
+		onPersisted := func(blockID flow.Identifier, commit flow.StateCommitment) {
+			executionWg.Done()
+		}
+
+		ctx.blocks.EXPECT().ByID(blocks["A"].ID()).Return(blocks["A"].Block, nil)
+
+		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].ID()).Return(nil, storageerr.ErrNotFound).Once()
+
+		// second call should come from finalization handler, which should wait for execution to finish before returning.
+		// This way we simulate possible race condition when block execution finishes exactly in the middle of finalization handler
+		// setting stopping blockID
+		finalizationWg := sync.WaitGroup{}
+		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].ID()).Run(func(args mock.Arguments) {
+			executionWg.Wait()
+			finalizationWg.Done()
+		}).Return(nil, storageerr.ErrNotFound).Once()
+
+		// second call from finalization handler, third overall
+		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].ID()).
+			Return(flow.StateCommitment{}, nil).Maybe()
+
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
+
+		assert.False(t, ctx.engine.pauseExecution)
+
+		executionWg.Add(1)
+		ctx.engine.BlockProcessable(blocks["A"].Block.Header)
+		ctx.engine.BlockProcessable(blocks["B"].Block.Header)
+
+		assert.False(t, ctx.engine.pauseExecution)
+
+		finalizationWg.Add(1)
+		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
+
+		finalizationWg.Wait()
+		executionWg.Wait()
+
+		assert.True(t, ctx.engine.pauseExecution)
+
+		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		assert.False(t, more)
+
+		var ok bool
+
+		// make sure B and C were not executed
+
+		_, ok = commits[blocks["A"].ID()]
+		require.True(t, ok)
+		_, ok = commits[blocks["B"].ID()]
+		require.False(t, ok)
+		_, ok = commits[blocks["C"].ID()]
+		require.False(t, ok)
+
+		ctx.computationManager.AssertNotCalled(t, "ComputeBlock", mock.Anything, mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
+			return eb.ID() == blocks["B"].ID()
+		}), mock.Anything)
+
+		ctx.computationManager.AssertNotCalled(t, "ComputeBlock", mock.Anything, mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
+			return eb.ID() == blocks["C"].ID()
+		}), mock.Anything)
+	})
+}
+
 func TestExecutionGenerationResultsAreChained(t *testing.T) {
 
 	execState := new(state.ExecutionState)
