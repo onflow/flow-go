@@ -442,7 +442,15 @@ func (l *Ledger) ExportCheckpointAt(
 		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %v: %w", outputDir, err)
 	}
 
-	err = realWAL.StoreCheckpointV6([]*trie.MTrie{newTrie}, outputDir, "root.checkpoint", &l.logger)
+	// err = realWAL.StoreCheckpointV6([]*trie.MTrie{newTrie}, outputDir, "root.checkpoint", &l.logger)
+	writer, err := realWAL.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
+	}
+	defer func() {
+		writer.Close()
+	}()
+	err = realWAL.StoreCheckpoint(writer, newTrie)
 
 	// Writing the checkpoint takes time to write and copy.
 	// Without relying on an exit code or stdout, we need to know when the copy is complete.
