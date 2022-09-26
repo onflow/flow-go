@@ -7,35 +7,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// AccountNotFoundError is returned when account doesn't exist for the given address
-type AccountNotFoundError struct {
-	address flow.Address
-}
-
-// NewAccountNotFoundError constructs a new AccountNotFoundError
-func NewAccountNotFoundError(address flow.Address) error {
-	return &AccountNotFoundError{
-		address: address,
-	}
-}
-
-func (e AccountNotFoundError) Error() string {
-	return fmt.Sprintf(
-		"%s account not found for address %s",
-		e.Code().String(),
-		e.address.String(),
-	)
-}
-
-// Code returns the error code for this error type
-func (e AccountNotFoundError) Code() ErrorCode {
-	return ErrCodeAccountNotFoundError
+func NewAccountNotFoundError(address flow.Address) *CodedError {
+	return NewCodedError(
+		ErrCodeAccountNotFoundError,
+		"account not found for address %s",
+		address.String())
 }
 
 // IsAccountNotFoundError returns true if error has this type
 func IsAccountNotFoundError(err error) bool {
-	var t *AccountNotFoundError
-	return errors.As(err, &t)
+	return HasErrorCode(err, ErrCodeAccountNotFoundError)
 }
 
 // AccountAlreadyExistsError is returned when account creation fails because
@@ -46,8 +27,8 @@ type AccountAlreadyExistsError struct {
 }
 
 // NewAccountAlreadyExistsError constructs a new AccountAlreadyExistsError
-func NewAccountAlreadyExistsError(address flow.Address) error {
-	return &AccountAlreadyExistsError{address: address}
+func NewAccountAlreadyExistsError(address flow.Address) AccountAlreadyExistsError {
+	return AccountAlreadyExistsError{address: address}
 }
 
 func (e AccountAlreadyExistsError) Error() string {
@@ -70,13 +51,13 @@ type AccountPublicKeyNotFoundError struct {
 }
 
 // NewAccountPublicKeyNotFoundError constructs a new AccountPublicKeyNotFoundError
-func NewAccountPublicKeyNotFoundError(address flow.Address, keyIndex uint64) *AccountPublicKeyNotFoundError {
-	return &AccountPublicKeyNotFoundError{address: address, keyIndex: keyIndex}
+func NewAccountPublicKeyNotFoundError(address flow.Address, keyIndex uint64) AccountPublicKeyNotFoundError {
+	return AccountPublicKeyNotFoundError{address: address, keyIndex: keyIndex}
 }
 
 // IsAccountAccountPublicKeyNotFoundError returns true if error has this type
 func IsAccountAccountPublicKeyNotFoundError(err error) bool {
-	var t *AccountPublicKeyNotFoundError
+	var t AccountPublicKeyNotFoundError
 	return errors.As(err, &t)
 }
 
@@ -100,8 +81,8 @@ type FrozenAccountError struct {
 }
 
 // NewFrozenAccountError constructs a new FrozenAccountError
-func NewFrozenAccountError(address flow.Address) error {
-	return &FrozenAccountError{address: address}
+func NewFrozenAccountError(address flow.Address) FrozenAccountError {
+	return FrozenAccountError{address: address}
 }
 
 // Address returns the address of frozen account
@@ -126,8 +107,8 @@ type AccountPublicKeyLimitError struct {
 }
 
 // NewAccountPublicKeyLimitError constructs a new AccountPublicKeyLimitError
-func NewAccountPublicKeyLimitError(address flow.Address, counts, limit uint64) error {
-	return &AccountPublicKeyLimitError{
+func NewAccountPublicKeyLimitError(address flow.Address, counts, limit uint64) AccountPublicKeyLimitError {
+	return AccountPublicKeyLimitError{
 		address: address,
 		counts:  counts,
 		limit:   limit,

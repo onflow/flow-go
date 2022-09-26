@@ -10,10 +10,9 @@ import (
 	"time"
 
 	badger "github.com/ipfs/go-ds-badger2"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/routing"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -57,6 +56,14 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	relaynet "github.com/onflow/flow-go/network/relay"
 	"github.com/onflow/flow-go/network/slashing"
@@ -68,6 +75,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/grpcutils"
+	"github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node.
@@ -177,7 +185,7 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	LibP2PNode                 *p2p.Node
+	LibP2PNode                 *p2pnode.Node
 	FollowerState              protocol.MutableState
 	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
@@ -598,7 +606,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		Me:                  nodeID,
 		MiddlewareFactory:   func() (network.Middleware, error) { return builder.Middleware, nil },
 		Topology:            topology,
-		SubscriptionManager: p2p.NewChannelSubscriptionManager(middleware),
+		SubscriptionManager: subscription.NewChannelSubscriptionManager(middleware),
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
@@ -629,7 +637,7 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvid
 // The access node can optionally participate in the public network publishing data for the observers downstream.
 func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
-		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
+		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
 			return err
 		}
@@ -647,7 +655,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 			)
 		}
 
-		builder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewPublicNetworkIDTranslator())
+		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
 		return nil
 	})
@@ -966,26 +974,26 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 //   - The passed in private key as the libp2p key
 //   - No connection gater
 //   - Default Flow libp2p pubsub options
-func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
-	return func(ctx context.Context) (*p2p.Node, error) {
-		connManager := p2p.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
+func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
+	return func(ctx context.Context) (*p2pnode.Node, error) {
+		connManager := connection.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
 
-		libp2pNode, err := p2p.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
+		libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
 			SetBasicResolver(builder.Resolver).
 			SetSubscriptionFilter(
-				p2p.NewRoleBasedFilter(
+				subscription.NewRoleBasedFilter(
 					flow.RoleAccess, builder.IdentityProvider,
 				),
 			).
 			SetConnectionManager(connManager).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2p.NewDHT(
+				return dht.NewDHT(
 					ctx,
 					h,
 					unicast.FlowPublicDHTProtocolID(builder.SporkID),
 					builder.Logger,
 					builder.PublicNetworkConfig.Metrics,
-					p2p.AsServer(),
+					dht.AsServer(),
 				)
 			}).
 			SetPubSub(pubsub.NewGossipSub).
@@ -1005,28 +1013,28 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
-	factoryFunc p2p.LibP2PFactoryFunc,
+	factoryFunc p2pbuilder.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) network.Middleware {
 
 	logger := builder.Logger.With().Bool("staked", false).Logger()
 
 	// disable connection pruning for the access node which supports the observer
-	peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningDisabled, builder.PeerUpdateInterval)
+	peerManagerFactory := connection.PeerManagerFactory(connection.ConnectionPruningDisabled, builder.PeerUpdateInterval)
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, builder.Metrics.Network)
 
-	builder.Middleware = p2p.NewMiddleware(
+	builder.Middleware = middleware.NewMiddleware(
 		logger,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
 		builder.Metrics.Bitswap,
 		builder.SporkID,
-		p2p.DefaultUnicastTimeout,
+		middleware.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
 		slashingViolationsConsumer,
-		p2p.WithMessageValidators(validators...),
-		p2p.WithPeerManager(peerManagerFactory),
+		middleware.WithMessageValidators(validators...),
+		middleware.WithPeerManager(peerManagerFactory),
 		// use default identifier provider
 	)
 

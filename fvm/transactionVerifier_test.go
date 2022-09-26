@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -111,7 +110,7 @@ func TestTransactionVerification(t *testing.T) {
 		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
 		require.Error(t, err)
 
-		var envelopeError *errors.InvalidEnvelopeSignatureError
+		var envelopeError errors.InvalidEnvelopeSignatureError
 		require.ErrorAs(t, err, &envelopeError)
 	})
 
@@ -147,7 +146,7 @@ func TestTransactionVerification(t *testing.T) {
 		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
 		require.Error(t, err)
 
-		var payloadError *errors.InvalidPayloadSignatureError
+		var payloadError errors.InvalidPayloadSignatureError
 		require.ErrorAs(t, err, &payloadError)
 	})
 
@@ -181,7 +180,7 @@ func TestTransactionVerification(t *testing.T) {
 		require.Error(t, err)
 
 		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
-		var payloadError *errors.InvalidPayloadSignatureError
+		var payloadError errors.InvalidPayloadSignatureError
 		require.ErrorAs(t, err, &payloadError)
 	})
 
@@ -191,7 +190,6 @@ func TestTransactionVerification(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		nil := programs.NewEmptyPrograms()
 
 		// freeze account
 		err := accounts.SetAccountFrozen(frozenAddress, true)

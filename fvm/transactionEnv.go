@@ -1,22 +1,12 @@
 package fvm
 
 import (
-	"github.com/onflow/cadence/runtime"
-
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-var _ runtime.Interface = &TransactionEnv{}
-
-// TransactionEnv is a read-write environment used for executing flow transactions.
-type TransactionEnv struct {
-	commonEnv
-}
 
 // DEPRECATED.  DO NOT USE
 //
@@ -25,11 +15,11 @@ func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
 	sth *state.StateHolder,
-	programs handler.TransactionPrograms,
+	programs environment.TransactionPrograms,
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
-) *TransactionEnv {
+) environment.Environment {
 	return NewTransactionEnv(
 		ctx,
 		sth,
@@ -42,79 +32,70 @@ func NewTransactionEnvironment(
 func NewTransactionEnv(
 	ctx Context,
 	sth *state.StateHolder,
-	programs handler.TransactionPrograms,
+	programs environment.TransactionPrograms,
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
-) *TransactionEnv {
+) environment.Environment {
 	txID := tx.ID()
 	// TODO set the flags on context
-	tracer := environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
-	meter := environment.NewMeter(sth)
 
-	env := &TransactionEnv{
-		commonEnv: newCommonEnv(
-			ctx,
-			sth,
-			programs,
-			tracer,
-			meter,
-		),
-	}
+	ctx.RootSpan = traceSpan
+	env := newFacadeEnvironment(
+		ctx,
+		sth,
+		programs,
+		environment.NewTracer(ctx.TracerParams),
+		environment.NewMeter(sth),
+	)
 
+	ctx.TxIndex = txIndex
+	ctx.TxId = txID
 	env.TransactionInfo = environment.NewTransactionInfo(
-		txIndex,
-		txID,
-		tracer,
+		ctx.TransactionInfoParams,
+		env.Tracer,
 		tx.Authorizers,
 		ctx.Chain.ServiceAddress(),
 	)
 	env.EventEmitter = environment.NewEventEmitter(
-		tracer,
-		meter,
+		env.Tracer,
+		env.Meter,
 		ctx.Chain,
 		txID,
 		txIndex,
 		tx.Payer,
-		ctx.ServiceEventCollectionEnabled,
-		ctx.EventCollectionByteSizeLimit,
+		ctx.EventEmitterParams,
 	)
 	env.AccountCreator = environment.NewAccountCreator(
 		sth,
 		ctx.Chain,
 		env.accounts,
 		ctx.ServiceAccountEnabled,
-		tracer,
-		meter,
-		ctx.Metrics,
+		env.Tracer,
+		env.Meter,
+		ctx.MetricsReporter,
 		env.SystemContracts)
 	env.AccountFreezer = environment.NewAccountFreezer(
 		ctx.Chain.ServiceAddress(),
 		env.accounts,
 		env.TransactionInfo)
-	env.ContractUpdater = handler.NewContractUpdater(
-		tracer,
-		meter,
+	env.ContractUpdater = environment.NewContractUpdater(
+		env.Tracer,
+		env.Meter,
 		env.accounts,
 		env.TransactionInfo,
 		ctx.Chain,
-		ctx.RestrictContractDeployment,
-		ctx.RestrictContractRemoval,
+		ctx.ContractUpdaterParams,
 		env.ProgramLogger,
 		env.SystemContracts,
 		env.Runtime)
 
-	env.AccountKeyUpdater = handler.NewAccountKeyUpdater(
-		tracer,
-		meter,
+	env.AccountKeyUpdater = environment.NewAccountKeyUpdater(
+		env.Tracer,
+		env.Meter,
 		env.accounts,
 		sth,
 		env)
-
-	env.Runtime.SetEnvironment(env)
-
-	// TODO(patrick): rm this hack
-	env.fullEnv = env
 
 	return env
 }

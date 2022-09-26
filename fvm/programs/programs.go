@@ -9,10 +9,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
-// TODO(patrick): rm
-type ModifiedSets = ModifiedSetsInvalidator
-
-// TODO(patrick): rm
+// TODO(patrick): Remove after emulator is updated.
 type Programs struct {
 	lock sync.RWMutex
 
@@ -77,7 +74,7 @@ func (p *Programs) Set(location common.Location, program *interpreter.Program, s
 	p.currentTxn.Set(location, program, state)
 }
 
-func (p *Programs) Cleanup(modifiedSets ModifiedSets) {
+func (p *Programs) Cleanup(modifiedSets ModifiedSetsInvalidator) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 

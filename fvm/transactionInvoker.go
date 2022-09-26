@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	programsCache "github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -28,7 +29,7 @@ func (i TransactionInvoker) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	programs *programsCache.Programs,
+	programs *programsCache.TransactionPrograms,
 ) (processErr error) {
 
 	txIDStr := proc.ID.String()
@@ -46,32 +47,44 @@ func (i TransactionInvoker) Process(
 		return err
 	}
 
-	var modifiedSets programsCache.ModifiedSets
+	var modifiedSets programsCache.ModifiedSetsInvalidator
 	defer func() {
+		if sth.NumNestedTransactions() > 1 {
+			if processErr == nil {
+				// This is a fvm internal programming error.  We forgot to
+				// call Commit somewhere in the control flow.  We should halt.
+				processErr = fmt.Errorf(
+					"successfully executed transaction has unexpected " +
+						"nested transactions.")
+				return
+			} else {
+				err := sth.RestartNestedTransaction(nestedTxnId)
+				if err != nil {
+					// This should never happen since merging views should
+					// never fail.
+					processErr = fmt.Errorf(
+						"cannot restart nested transaction on error: %w "+
+							"(original txError: %v)",
+						err,
+						processErr)
+					return
+				}
+
+				ctx.Logger.Warn().Msg(
+					"transaction had unexpected nested transactions, " +
+						"which have been restarted.")
+
+				// Note: proc.Err is set by TransactionProcedure.
+				proc.Logs = make([]string, 0)
+				proc.Events = make([]flow.Event, 0)
+				proc.ServiceEvents = make([]flow.Event, 0)
+			}
+		}
+
 		// based on the contract and frozen account updates we decide how to
 		// clean up the programs for failed transactions we also do the same as
 		// transaction without any deployed contracts
-		programs.Cleanup(modifiedSets)
-
-		if sth.NumNestedTransactions() > 1 {
-			err := sth.RestartNestedTransaction(nestedTxnId)
-			if err != nil {
-				processErr = fmt.Errorf(
-					"cannot restart nested transaction: %w",
-					err,
-				)
-			}
-
-			msg := "transaction has unexpected nested transactions"
-			ctx.Logger.Error().
-				Msg(msg)
-
-			proc.Err = errors.NewFVMInternalErrorf(msg)
-			proc.Logs = make([]string, 0)
-			proc.Events = make([]flow.Event, 0)
-			proc.ServiceEvents = make([]flow.Event, 0)
-
-		}
+		programs.AddInvalidator(modifiedSets)
 
 		err := sth.Commit(nestedTxnId)
 		if err != nil {
@@ -122,7 +135,7 @@ func (i TransactionInvoker) Process(
 	// this writes back the contract contents to accounts
 	// if any error occurs we fail the tx
 	// this needs to happen before checking limits, so that contract changes are committed to the state
-	modifiedSets, err = env.Commit()
+	modifiedSets, err = env.FlushPendingUpdates()
 	if err != nil && txError == nil {
 		txError = fmt.Errorf("transaction invocation failed when committing Environment: %w", err)
 	}
@@ -147,7 +160,7 @@ func (i TransactionInvoker) Process(
 			Err(txError).
 			Msg("transaction executed with error")
 
-		modifiedSets = programsCache.ModifiedSets{}
+		modifiedSets = programsCache.ModifiedSetsInvalidator{}
 		env.Reset()
 
 		// drop delta since transaction failed
@@ -187,11 +200,11 @@ func (i TransactionInvoker) Process(
 }
 
 func (i TransactionInvoker) deductTransactionFees(
-	env *TransactionEnv,
+	env environment.Environment,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	computationUsed uint64) (err error) {
-	if !env.ctx.TransactionFeesEnabled {
+	if !env.TransactionFeesEnabled() {
 		return nil
 	}
 

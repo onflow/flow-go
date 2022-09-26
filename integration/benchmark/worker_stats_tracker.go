@@ -33,7 +33,7 @@ func NewWorkerStatsTracker() *WorkerStatsTracker {
 // StartPrinting starts reporting of worker stats
 func (st *WorkerStatsTracker) StartPrinting(interval time.Duration) {
 	printer := NewWorker(0, interval, func(_ int) { fmt.Println(st.Digest()) })
-	st.printer = &printer
+	st.printer = printer
 	st.printer.Start()
 }
 
@@ -57,11 +57,11 @@ func (st *WorkerStatsTracker) GetTxExecuted() int {
 	return st.stats.txsExecuted
 }
 
-func (st *WorkerStatsTracker) AddWorker() {
+func (st *WorkerStatsTracker) AddWorkers(i int) {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	st.stats.workers++
+	st.stats.workers += i
 }
 
 func (st *WorkerStatsTracker) AddTxSent() {

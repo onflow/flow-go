@@ -35,7 +35,7 @@ func (v *TransactionVerifier) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	_ *programs.Programs,
+	_ *programs.TransactionPrograms,
 ) error {
 	return v.verifyTransaction(proc, ctx, sth)
 }
@@ -278,21 +278,15 @@ func (v *TransactionVerifier) checkAccountsAreNotFrozen(
 	tx *flow.TransactionBody,
 	accounts environment.Accounts,
 ) error {
-	for _, authorizer := range tx.Authorizers {
+	authorizers := make([]flow.Address, 0, len(tx.Authorizers)+2)
+	authorizers = append(authorizers, tx.Authorizers...)
+	authorizers = append(authorizers, tx.ProposalKey.Address, tx.Payer)
+
+	for _, authorizer := range authorizers {
 		err := accounts.CheckAccountNotFrozen(authorizer)
 		if err != nil {
 			return fmt.Errorf("checking frozen account failed: %w", err)
 		}
-	}
-
-	err := accounts.CheckAccountNotFrozen(tx.ProposalKey.Address)
-	if err != nil {
-		return fmt.Errorf("checking frozen account failed: %w", err)
-	}
-
-	err = accounts.CheckAccountNotFrozen(tx.Payer)
-	if err != nil {
-		return fmt.Errorf("checking frozen account failed: %w", err)
 	}
 
 	return nil

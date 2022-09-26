@@ -17,6 +17,8 @@ type AccountInfo struct {
 
 	accounts        Accounts
 	systemContracts *SystemContracts
+
+	serviceAccountEnabled bool
 }
 
 func NewAccountInfo(
@@ -24,12 +26,14 @@ func NewAccountInfo(
 	meter Meter,
 	accounts Accounts,
 	systemContracts *SystemContracts,
+	serviceAccountEnabled bool,
 ) *AccountInfo {
 	return &AccountInfo{
-		tracer:          tracer,
-		meter:           meter,
-		accounts:        accounts,
-		systemContracts: systemContracts,
+		tracer:                tracer,
+		meter:                 meter,
+		accounts:              accounts,
+		systemContracts:       systemContracts,
+		serviceAccountEnabled: serviceAccountEnabled,
 	}
 }
 
@@ -126,4 +130,27 @@ func (info *AccountInfo) GetAccountAvailableBalance(
 		return 0, invokeErr
 	}
 	return result.ToGoValue().(uint64), nil
+}
+
+func (info *AccountInfo) GetAccount(
+	address flow.Address,
+) (
+	*flow.Account,
+	error,
+) {
+	account, err := info.accounts.Get(address)
+	if err != nil {
+		return nil, err
+	}
+
+	if info.serviceAccountEnabled {
+		balance, err := info.GetAccountBalance(common.Address(address))
+		if err != nil {
+			return nil, err
+		}
+
+		account.Balance = balance
+	}
+
+	return account, nil
 }

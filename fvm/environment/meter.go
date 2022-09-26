@@ -49,6 +49,10 @@ type Meter interface {
 
 	MeterMemory(usage common.MemoryUsage) error
 	MemoryEstimate() uint64
+
+	MeterEmittedEvent(byteSize uint64) error
+	TotalEmittedEventBytes() uint64
+	TotalEventCounter() uint32
 }
 
 type meterImpl struct {
@@ -84,6 +88,21 @@ func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
 
 func (meter *meterImpl) MemoryEstimate() uint64 {
 	return meter.stTxn.TotalMemoryEstimate()
+}
+
+func (meter *meterImpl) MeterEmittedEvent(byteSize uint64) error {
+	if meter.stTxn.EnforceLimits() {
+		return meter.stTxn.MeterEmittedEvent(byteSize)
+	}
+	return nil
+}
+
+func (meter *meterImpl) TotalEmittedEventBytes() uint64 {
+	return meter.stTxn.TotalEmittedEventBytes()
+}
+
+func (meter *meterImpl) TotalEventCounter() uint32 {
+	return meter.stTxn.TotalEventCounter()
 }
 
 type cancellableMeter struct {
