@@ -48,7 +48,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		}
 
 		address := net.JoinHostPort(host, strconv.Itoa(CorruptibleConduitFactoryPort))
-		ccf := corruptible.NewCorruptibleConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
+		ccf := corruptible.NewCorruptConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
 
 		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupted conduit factory initiated")
 
