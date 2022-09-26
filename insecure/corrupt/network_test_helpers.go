@@ -1,4 +1,4 @@
-package corruptible
+package corrupt
 
 // This file has helper function that are only used for testing.
 

@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/insecure/corruptible"
+	"github.com/onflow/flow-go/insecure/corrupt"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/logging"
 )

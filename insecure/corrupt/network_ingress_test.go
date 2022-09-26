@@ -1,4 +1,4 @@
-package corruptible
+package corrupt
 
 import (
 	"sync"

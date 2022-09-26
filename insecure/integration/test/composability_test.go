@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
-	"github.com/onflow/flow-go/insecure/corruptible"
+	"github.com/onflow/flow-go/insecure/corrupt"
 	"github.com/onflow/flow-go/insecure/orchestrator"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
