@@ -83,6 +83,11 @@ func NewNode(
 }
 
 // Stop terminates the libp2p node.
+// The following benign errors are expected during normal operations from libP2P:
+// 	- node fails to unsubscribe from all topics
+// 	- p2p host fails to close
+// 	- peer store fails to close
+// All errors returned from this function can be considered benign.
 func (n *Node) Stop() (chan struct{}, error) {
 	var result error
 	done := make(chan struct{})
@@ -133,12 +138,18 @@ func (n *Node) Stop() (chan struct{}, error) {
 	return done, nil
 }
 
-// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
+// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it.
+// The following benign errors are expected during normal operations from libP2P:
+// 	- host fails to connect to peer
+// All errors returned from this function can be considered benign.
 func (n *Node) AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
 	return n.host.Connect(ctx, peerInfo)
 }
 
 // RemovePeer closes the connection with the peer.
+// The following benign errors are expected during normal operations from libP2P:
+// 	- host fails to close connection to peer
+// All errors returned from this function can be considered benign.
 func (n *Node) RemovePeer(peerID peer.ID) error {
 	err := n.host.Network().ClosePeer(peerID)
 	if err != nil {
@@ -147,6 +158,7 @@ func (n *Node) RemovePeer(peerID peer.ID) error {
 	return nil
 }
 
+// GetPeersForProtocol returns slice peer IDs for the specified protocol ID.
 func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 	pMap := n.pCache.GetPeers(pid)
 	peers := make(peer.IDSlice, 0, len(pMap))
@@ -157,6 +169,9 @@ func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 }
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
+// The following benign errors are expected during normal operations from libP2P:
+// 	- unicast manager fails to create a stream to the peer
+// All errors returned from this function can be considered benign.
 func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
 	lg := n.logger.With().Str("peer_id", peerID.Pretty()).Logger()
 
@@ -194,14 +209,17 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 }
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.
+// All errors returned from this function can be considered benign.
 func (n *Node) GetIPPort() (string, string, error) {
 	return p2putils.IPPortFromMultiAddress(n.host.Network().ListenAddresses()...)
 }
 
+// RoutingTable returns the node routing table
 func (n *Node) RoutingTable() *kbucket.RoutingTable {
 	return n.routing.(*dht.IpfsDHT).RoutingTable()
 }
 
+// ListPeers returns list of peer IDs for peers subscribed to the topic.
 func (n *Node) ListPeers(topic string) []peer.ID {
 	return n.pubSub.ListPeers(topic)
 }
@@ -209,6 +227,10 @@ func (n *Node) ListPeers(topic string) []peer.ID {
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
+// The following benign errors are expected during normal operations from libP2P:
+// 	- node pubsub fails to register topic validator
+// 	- topic cannot be subscribed to
+// All errors returned from this function can be considered benign.
 func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter p2p.PeerFilter, slashingViolationsConsumer slashing.ViolationsConsumer, validators ...validator.PubSubMessageValidator) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
@@ -254,6 +276,10 @@ func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter p
 }
 
 // UnSubscribe cancels the subscriber and closes the topic.
+// The following benign errors are expected during normal operations from libP2P:
+// 	- node pubsub fails to unregister topic validator
+// 	- topic is not found
+// All errors returned from this function can be considered benign.
 func (n *Node) UnSubscribe(topic channels.Topic) error {
 	n.Lock()
 	defer n.Unlock()
@@ -289,7 +315,11 @@ func (n *Node) UnSubscribe(topic channels.Topic) error {
 	return err
 }
 
-// Publish publishes the given payload on the topic
+// Publish publishes the given payload on the topic.
+// The following benign errors are expected during normal operations from libP2P:
+// 	- topic is not found
+// 	- pubsub fails to publish the data
+// All errors returned from this function can be considered benign.
 func (n *Node) Publish(ctx context.Context, topic channels.Topic, data []byte) error {
 	ps, found := n.topics[topic]
 	if !found {
@@ -307,6 +337,7 @@ func (n *Node) Host() host.Host {
 	return n.host
 }
 
+// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
 func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []unicast.ProtocolName) error {
 	n.uniMgr.WithDefaultHandler(defaultHandler)
 	for _, p := range preferred {
@@ -319,12 +350,13 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 	return nil
 }
 
-// IsConnected returns true is address is a direct peer of this node else false
+// IsConnected returns true is address is a direct peer of this node else false.
 func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
 	isConnected := n.host.Network().Connectedness(peerID) == libp2pnet.Connected
 	return isConnected, nil
 }
 
+// Routing returns node routing object.
 func (n *Node) Routing() routing.Routing {
 	return n.routing
 }
