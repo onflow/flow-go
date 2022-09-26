@@ -1,6 +1,8 @@
 package scoring
 
 import (
+	"time"
+
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
@@ -113,6 +115,9 @@ func (s *ScoreOption) preparePeerScoreThresholds() {
 
 func (s *ScoreOption) preparePeerScoreParams() {
 	s.peerScoreParams = &pubsub.PeerScoreParams{
+		SkipAtomicValidation: true,
+		DecayInterval:        time.Hour,
+		DecayToZero:          0.01,
 		AppSpecificScore: func(pid peer.ID) float64 {
 			if err := s.validator.MustSubscribedToAllowedTopics(pid); err != nil {
 				s.logger.Error().
@@ -121,7 +126,7 @@ func (s *ScoreOption) preparePeerScoreParams() {
 					Msg("invalid subscription detected, penalizing peer")
 				return MaxAppSpecificPenalty
 			}
-			s.logger.Trace().
+			s.logger.Info().
 				Str("peer_id", pid.String()).
 				Msg("subscribed topics for peer validated, rewarding peer")
 			return MaxAppSpecificReward
