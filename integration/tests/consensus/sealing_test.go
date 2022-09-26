@@ -63,11 +63,7 @@ func (ss *SealingSuite) Verification() *client.GhostClient {
 }
 
 func (ss *SealingSuite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "sealing.go").
-		Str("testcase", ss.T().Name()).
-		Logger()
-	ss.log = logger
+	ss.log = unittest.LoggerForTest(ss.Suite.T(), zerolog.InfoLevel)
 	ss.log.Info().Msgf("================> SetupTest")
 
 	// seed random generator

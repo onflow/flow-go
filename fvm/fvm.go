@@ -1,60 +1,163 @@
 package fvm
 
 import (
+	"context"
 	"fmt"
+	"math"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type ProcedureType string
+
+const (
+	BootstrapProcedureType   = ProcedureType("bootstrap")
+	TransactionProcedureType = ProcedureType("transaction")
+	ScriptProcedureType      = ProcedureType("script")
+)
+
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
-	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
+	Run(
+		ctx Context,
+		sth *state.StateHolder,
+		programs *programs.TransactionPrograms,
+	) error
+
 	ComputationLimit(ctx Context) uint64
 	MemoryLimit(ctx Context) uint64
+	ShouldDisableMemoryAndInteractionLimits(ctx Context) bool
+
+	Type() ProcedureType
+
+	// The initial snapshot time is used as part of OCC validation to ensure
+	// there are no read-write conflict amongst transactions.  Note that once
+	// we start supporting parallel preprocessing/execution, a transaction may
+	// operation on mutliple snapshots.
+	//
+	// For scripts, since they can only be executed after the block has been
+	// executed, the initial snapshot time is EndOfBlockExecutionTime.
+	InitialSnapshotTime() programs.LogicalTime
+
+	// For transactions, the execution time is TxIndex.  For scripts, the
+	// execution time is EndOfBlockExecutionTime.
+	ExecutionTime() programs.LogicalTime
 }
 
-func NewInterpreterRuntime(options ...runtime.Option) runtime.Runtime {
-
-	defaultOptions := []runtime.Option{
-		runtime.WithContractUpdateValidationEnabled(true),
-	}
-
-	return runtime.NewInterpreterRuntime(
-		append(defaultOptions, options...)...,
-	)
+func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
+	return runtime.NewInterpreterRuntime(config)
 }
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
-	Runtime runtime.Runtime
+	Runtime runtime.Runtime // DEPRECATED.  DO NOT USE.
 }
 
-// NewVirtualMachine creates a new virtual machine instance with the provided runtime.
+func NewVM() *VirtualMachine {
+	return &VirtualMachine{}
+}
+
+// DEPRECATED.  DO NOT USE.
+//
+// TODO(patrick): remove after emulator is updated.
+//
+// Emulator is a special snowflake which prevents fvm from every changing its
+// APIs (integration test uses a pinned version of the emulator, which in turn
+// uses a pinned non-master version of flow-go).  This method is expose to break
+// the ridiculous circular dependency between the two builds.
 func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 	return &VirtualMachine{
 		Runtime: rt,
 	}
 }
 
+// DEPRECATED.  DO NOT USE.
+//
+// TODO(patrick): remove after emulator is updated
+//
 // Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
-	meterParams, err := getEnvironmentMeterParameters(
-		vm,
+func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, _ *programs.Programs) (err error) {
+	return vm.RunV2(ctx, proc, v)
+}
+
+// TODO(patrick): rename back to Run after emulator is fully updated (this
+// takes at least 3 sporks ...).
+//
+// Run runs a procedure against a ledger in the given context.
+func (vm *VirtualMachine) RunV2(
+	ctx Context,
+	proc Procedure,
+	v state.View,
+) error {
+	blockPrograms := ctx.BlockPrograms
+	if blockPrograms == nil {
+		blockPrograms = programs.NewEmptyBlockProgramsWithTransactionOffset(
+			uint32(proc.ExecutionTime()))
+	}
+
+	var txnPrograms *programs.TransactionPrograms
+	var err error
+	switch proc.Type() {
+	case ScriptProcedureType:
+		txnPrograms, err = blockPrograms.NewSnapshotReadTransactionPrograms(
+			proc.InitialSnapshotTime(),
+			proc.ExecutionTime())
+	case TransactionProcedureType, BootstrapProcedureType:
+		txnPrograms, err = blockPrograms.NewTransactionPrograms(
+			proc.InitialSnapshotTime(),
+			proc.ExecutionTime())
+	default:
+		return fmt.Errorf("invalid proc type: %v", proc.Type())
+	}
+
+	if err != nil {
+		return fmt.Errorf("error creating transaction programs: %w", err)
+	}
+
+	// Note: it is safe to skip committing the parsed programs for non-normal
+	// transactions (i.e., bootstrap and script) since this is only an
+	// optimization.
+	if proc.Type() == TransactionProcedureType {
+		defer func() {
+			commitErr := txnPrograms.Commit()
+			if commitErr != nil {
+				// NOTE: txnPrograms commit error does not impact correctness,
+				// but may slow down execution since some programs may need to
+				// be re-parsed.
+				ctx.Logger.Warn().Err(commitErr).Msg(
+					"failed to commit transaction programs")
+			}
+		}()
+	}
+
+	meterParams := meter.DefaultParameters().
+		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
+		WithMemoryLimit(proc.MemoryLimit(ctx))
+
+	meterParams, err = getEnvironmentMeterParameters(
 		ctx,
 		v,
-		programs,
-		uint(proc.ComputationLimit(ctx)),
-		proc.MemoryLimit(ctx),
+		txnPrograms,
+		meterParams,
 	)
 	if err != nil {
 		return fmt.Errorf("error gettng environment meter parameters: %w", err)
 	}
+
+	interactionLimit := ctx.MaxStateInteractionSize
+	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
+		meterParams = meterParams.WithMemoryLimit(math.MaxUint64)
+		interactionLimit = math.MaxUint64
+	}
+
+	eventSizeLimit := ctx.EventCollectionByteSizeLimit
+	meterParams = meterParams.WithEventEmitByteLimit(eventSizeLimit)
 
 	stTxn := state.NewStateTransaction(
 		v,
@@ -62,19 +165,31 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			WithMeterParameters(meterParams).
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
+			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
-	err = proc.Run(vm, ctx, stTxn, programs)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return proc.Run(ctx, stTxn, txnPrograms)
 }
 
-// GetAccount returns an account by address or an error if none exists.
+// DEPRECATED. DO NOT USE
+//
+// TODO(patrick): remove after emulator is updated
 func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
+	return vm.GetAccountV2(ctx, address, v)
+}
+
+// TODO(patrick): rename back to GetAccount after emulator is fully updated
+// (this takes at least 3 sporks ...).
+//
+// GetAccountV2 returns an account by address or an error if none exists.
+func (vm *VirtualMachine) GetAccountV2(
+	ctx Context,
+	address flow.Address,
+	v state.View,
+) (
+	*flow.Account,
+	error,
+) {
 	stTxn := state.NewStateTransaction(
 		v,
 		state.DefaultParameters().
@@ -83,30 +198,31 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
 	)
 
-	account, err := getAccount(vm, ctx, stTxn, programs, address)
+	blockPrograms := ctx.BlockPrograms
+	if blockPrograms == nil {
+		blockPrograms = programs.NewEmptyBlockPrograms()
+	}
+
+	txnPrograms, err := blockPrograms.NewSnapshotReadTransactionPrograms(
+		programs.EndOfBlockExecutionTime,
+		programs.EndOfBlockExecutionTime)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"error creating transaction programs for GetAccount: %w",
+			err)
+	}
+
+	env := NewScriptEnv(context.Background(), ctx, stTxn, txnPrograms)
+	account, err := env.GetAccount(address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {
-			return nil, fmt.Errorf("cannot get account, this error usually happens if the reference block for this query is not set to a recent block: %w", err)
+			return nil, fmt.Errorf(
+				"cannot get account, this error usually happens if the "+
+					"reference block for this query is not set to a recent "+
+					"block: %w",
+				err)
 		}
 		return nil, fmt.Errorf("cannot get account: %w", err)
 	}
 	return account, nil
-}
-
-// invokeMetaTransaction invokes a meta transaction inside the context of an outer transaction.
-//
-// Errors that occur in a meta transaction are propagated as a single error that can be
-// captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, stTxn *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
-	invoker := NewTransactionInvoker(zerolog.Nop())
-
-	// do not deduct fees or check storage in meta transactions
-	ctx := NewContextFromParent(parentCtx,
-		WithAccountStorageLimit(false),
-		WithTransactionFeesEnabled(false),
-	)
-
-	err := invoker.Process(vm, &ctx, tx, stTxn, programs)
-	txErr, fatalErr := errors.SplitErrorTypes(err)
-	return txErr, fatalErr
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onflow/flow-go/network"
+
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
@@ -17,6 +19,8 @@ type Conduit struct {
 	channel          channels.Channel
 	egressController insecure.EgressController
 }
+
+var _ network.Conduit = &Conduit{}
 
 // Publish sends the incoming events as publish events to the controller of this conduit (i.e., its factory) to handle.
 func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {

@@ -22,6 +22,8 @@ type ConduitFactory struct {
 	egressController insecure.EgressController
 }
 
+var _ insecure.CorruptibleConduitFactory = &ConduitFactory{}
+
 func NewCorruptibleConduitFactory(logger zerolog.Logger, chainId flow.ChainID) *ConduitFactory {
 	if chainId != flow.BftTestnet {
 		panic("illegal chain id for using corruptible conduit factory")

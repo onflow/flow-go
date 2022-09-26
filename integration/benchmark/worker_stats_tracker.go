@@ -8,11 +8,16 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 )
 
+type WorkerStats struct {
+	workers     int
+	txsSent     int
+	txsExecuted int
+}
+
 // WorkerStatsTracker keeps track of worker stats
 type WorkerStatsTracker struct {
 	mux              sync.Mutex
-	workers          int
-	txsSent          int
+	stats            WorkerStats
 	txsSentPerSecond map[int64]int // tracks txs sent at the timestamp in seconds
 
 	printer *Worker
@@ -28,7 +33,7 @@ func NewWorkerStatsTracker() *WorkerStatsTracker {
 // StartPrinting starts reporting of worker stats
 func (st *WorkerStatsTracker) StartPrinting(interval time.Duration) {
 	printer := NewWorker(0, interval, func(_ int) { fmt.Println(st.Digest()) })
-	st.printer = &printer
+	st.printer = printer
 	st.printer.Start()
 }
 
@@ -37,11 +42,26 @@ func (st *WorkerStatsTracker) StopPrinting() {
 	st.printer.Stop()
 }
 
-func (st *WorkerStatsTracker) AddWorker() {
+// TODO(rbtz): move transaction tracking to the follower.
+func (st *WorkerStatsTracker) IncTxExecuted() {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	st.workers++
+	st.stats.txsExecuted++
+}
+
+func (st *WorkerStatsTracker) GetTxExecuted() int {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	return st.stats.txsExecuted
+}
+
+func (st *WorkerStatsTracker) AddWorkers(i int) {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	st.stats.workers += i
 }
 
 func (st *WorkerStatsTracker) AddTxSent() {
@@ -50,8 +70,15 @@ func (st *WorkerStatsTracker) AddTxSent() {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	st.txsSent++
+	st.stats.txsSent++
 	st.txsSentPerSecond[now]++
+}
+
+func (st *WorkerStatsTracker) GetStats() WorkerStats {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	return st.stats
 }
 
 // AvgTPSBetween returns the average transactions per second TPS between the two time points
@@ -77,11 +104,15 @@ func (st *WorkerStatsTracker) Digest() string {
 	t.AppendHeader(table.Row{
 		"workers",
 		"total TXs sent",
+		"total TXs finished",
 		"Avg TPS (last 10s)",
 	})
+
+	stats := st.GetStats()
 	t.AppendRow(table.Row{
-		st.workers,
-		st.txsSent,
+		stats.workers,
+		stats.txsSent,
+		stats.txsExecuted,
 		// use 11 seconds to correct for rounding in buckets
 		st.AvgTPSBetween(time.Now().Add(-11*time.Second), time.Now()),
 	})

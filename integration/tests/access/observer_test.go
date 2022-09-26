@@ -45,9 +45,8 @@ func (suite *ObserverSuite) SetupTest() {
 		"GetLatestBlock":                 {},
 		"GetBlockByID":                   {},
 		"GetBlockByHeight":               {},
-		"GetCollectionByID":              {},
-		"GetNetworkParameters":           {},
 		"GetLatestProtocolStateSnapshot": {},
+		"GetNetworkParameters":           {},
 	}
 
 	nodeConfigs := []testnet.NodeConfig{

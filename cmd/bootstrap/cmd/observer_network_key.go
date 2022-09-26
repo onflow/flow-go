@@ -3,7 +3,7 @@ package cmd
 import (
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -70,7 +70,7 @@ func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
 	hex.Encode(output, keyBytes)
 
 	// write to file
-	err = ioutil.WriteFile(flagOutputFile, output, 0600)
+	err = os.WriteFile(flagOutputFile, output, 0600)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not write file")
 	}

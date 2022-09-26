@@ -2,10 +2,10 @@ package complete
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -132,11 +132,13 @@ func TestCompactor(t *testing.T) {
 				// continue
 			case <-time.After(60 * time.Second):
 				// Log segment and checkpoint files
-				files, err := ioutil.ReadDir(dir)
+				files, err := os.ReadDir(dir)
 				require.NoError(t, err)
 
 				for _, file := range files {
-					fmt.Printf("%s, size %d\n", file.Name(), file.Size())
+					info, err := file.Info()
+					require.NoError(t, err)
+					fmt.Printf("%s, size %d\n", file.Name(), info.Size())
 				}
 
 				assert.FailNow(t, "timed out")
@@ -333,11 +335,13 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 			// continue
 		case <-time.After(60 * time.Second):
 			// Log segment and checkpoint files
-			files, err := ioutil.ReadDir(dir)
+			files, err := os.ReadDir(dir)
 			require.NoError(t, err)
 
 			for _, file := range files {
-				fmt.Printf("%s, size %d\n", file.Name(), file.Size())
+				info, err := file.Info()
+				require.NoError(t, err)
+				fmt.Printf("%s, size %d\n", file.Name(), info.Size())
 			}
 
 			// This assert can be flaky because of speed fluctuations (GitHub CI slowdowns, etc.).
@@ -622,9 +626,14 @@ func TestCompactorConcurrency(t *testing.T) {
 		// Run Compactor in background.
 		<-compactor.Ready()
 
+		var wg sync.WaitGroup
+		wg.Add(numGoroutine)
+
 		// Run 4 goroutines and each goroutine updates size+1 tries.
 		for j := 0; j < numGoroutine; j++ {
 			go func(parentState ledger.State) {
+				defer wg.Done()
+
 				// size+1 is used to ensure that size/2*numGoroutine segments are finalized.
 				for i := 0; i < size+1; i++ {
 					payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
@@ -648,6 +657,9 @@ func TestCompactorConcurrency(t *testing.T) {
 				}
 			}(rootState)
 		}
+
+		// wait for goroutines updating ledger
+		wg.Wait()
 
 		// wait for the bound-checking observer to confirm checkpoints have been made
 		select {

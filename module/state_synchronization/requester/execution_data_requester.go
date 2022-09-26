@@ -254,9 +254,9 @@ func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
 
 // AddOnExecutionDataFetchedConsumer adds a callback to be called when a new ExecutionData is received
 // Callback Implementations must:
-//   * be concurrency safe
-//   * be non-blocking
-//   * handle repetition of the same events (with some processing overhead).
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
 func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_synchronization.ExecutionDataReceivedCallback) {
 	e.consumerMu.Lock()
 	defer e.consumerMu.Unlock()

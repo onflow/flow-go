@@ -136,9 +136,9 @@ func (s *JointFeldmanState) NextTimeout() error {
 // key shares.
 // - the finalized private key which is the current participant's own private key share
 // - the returned erorr is :
-//    - dkgFailureError if the disqualified leaders exceeded the threshold.
-//    - other error if Start() was not called, or NextTimeout() was not called twice
-//    - nil otherwise.
+//   - dkgFailureError if the disqualified leaders exceeded the threshold.
+//   - other error if Start() was not called, or NextTimeout() was not called twice
+//   - nil otherwise.
 func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.jointRunning {
 		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.myIndex)

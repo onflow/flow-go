@@ -192,9 +192,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
-			rt := fvm.NewInterpreterRuntime()
-			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
+			vm := fvm.NewVM()
+			fvmOptions := append(
+				[]fvm.Option{fvm.WithLogger(node.Logger)},
+				node.FvmOptions...,
+			)
+			vmCtx := fvm.NewContext(fvmOptions...)
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 			approvalStorage := badger.NewResultApprovals(node.Metrics.Cache, node.DB)
 			verifierEng, err = verifier.New(

@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -143,7 +142,6 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Testnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -163,7 +161,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		view := testutil.RootBootstrappedLedger(vm, ctx)
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, view, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, view)
 		require.NoError(t, err)
 
 		assert.Nil(t, tx.Err)
@@ -196,7 +194,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.Error(t, tx.Err)
@@ -220,7 +218,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		require.Len(t, tx.Logs, 2)
@@ -246,7 +244,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -264,7 +262,6 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -277,7 +274,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -293,7 +290,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -307,7 +304,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -323,7 +320,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -356,7 +353,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx = fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -370,7 +367,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployCheckerHeavyTransaction(accounts[0], chain)
@@ -386,7 +383,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		var parsingCheckingError *runtime.ParsingCheckingError
@@ -402,7 +399,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
@@ -412,7 +409,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.Error(t, tx.Err)
@@ -423,7 +420,6 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	t.Run("account update with set code fails if not signed by service account if dis-allowed in the state", func(t *testing.T) {
 		ctx := fvm.NewContext(
-			zerolog.Nop(),
 			fvm.WithChain(chain),
 			fvm.WithCadenceLogging(true),
 			fvm.WithContractDeploymentRestricted(false),
@@ -440,7 +436,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
@@ -452,7 +448,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 		assert.Error(t, tx.Err)
 
@@ -473,7 +469,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
@@ -485,7 +481,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 	})
@@ -498,7 +494,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -513,7 +509,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
@@ -526,7 +522,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx = fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 	})
@@ -539,7 +535,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -554,7 +550,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
@@ -567,7 +563,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx = fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 		assert.Error(t, tx.Err)
 
@@ -583,7 +579,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -598,7 +594,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
@@ -614,7 +610,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx = fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 	})
@@ -627,7 +623,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		// setup a new authorizer account
@@ -640,7 +636,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 		authTx := fvm.Transaction(authTxBody, 0)
 
-		err = vm.Run(ctx, authTx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, authTx, ledger)
 		require.NoError(t, err)
 		assert.NoError(t, authTx.Err)
 
@@ -653,7 +649,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		tx := fvm.Transaction(txBody, 0)
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 	})
@@ -666,7 +662,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		// Deployent without voucher fails
@@ -675,7 +671,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 		assert.Error(t, tx.Err)
 		assert.Contains(t, tx.Err.Error(), "deploying contracts requires authorization from specific accounts")
@@ -694,7 +690,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 		authTx := fvm.Transaction(authTxBody, 0)
 
-		err = vm.Run(ctx, authTx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, authTx, ledger)
 		require.NoError(t, err)
 		assert.NoError(t, authTx.Err)
 
@@ -706,7 +702,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 		tx = fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 		assert.NoError(t, tx.Err)
 	})
@@ -720,7 +716,6 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -798,7 +793,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 			tx := fvm.Transaction(txBody, 0)
 
-			err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+			err = vm.RunV2(ctx, tx, ledger)
 			require.NoError(t, err)
 
 			tt.check(t, tx)
@@ -827,7 +822,6 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -879,7 +873,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 			tx := fvm.Transaction(txBody, 0)
 
-			err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+			err = vm.RunV2(ctx, tx, ledger)
 			require.NoError(t, err)
 
 			tt.check(t, tx)
@@ -914,7 +908,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -940,16 +934,16 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
 				assert.Equal(t, (&errors.StorageCapacityExceededError{}).Code(), tx.Err.Code())
 			}))
 	t.Run("Increasing storage capacity works", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -993,9 +987,9 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
 				require.NoError(t, tx.Err)
@@ -1028,7 +1022,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				ctx.MaxStateInteractionSize = 500_000
 
 				// Create an account private key.
@@ -1054,9 +1048,9 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
 				assert.Equal(t, (&errors.LedgerInteractionLimitExceededError{}).Code(), tx.Err.Code())
@@ -1065,9 +1059,9 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction but not failing because of service account", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				ctx.MaxStateInteractionSize = 500_000
-				//ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
+				// ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1092,9 +1086,9 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
 			}))
@@ -1102,13 +1096,13 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction fails but does not panic", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(
 			fvm.WithTransactionProcessors(
-				fvm.NewTransactionInvoker(zerolog.Nop()),
+				fvm.NewTransactionInvoker(),
 			),
 		).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				ctx.MaxStateInteractionSize = 500_000
-				//ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
+				// ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1129,12 +1123,13 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 				require.Error(t, tx.Err)
-				assert.Equal(t, (&errors.LedgerInteractionLimitExceededError{}).Code(), tx.Err.Code())
+
+				assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 			}))
 }
 
@@ -1153,7 +1148,6 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -1169,7 +1163,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+		err := vm.RunV2(ctx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -1187,7 +1181,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+		err := vm.RunV2(ctx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.Error(t, script.Err)
@@ -1206,7 +1200,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+		err := vm.RunV2(ctx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -1224,7 +1218,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		// Deploy the test contract
@@ -1261,7 +1255,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -1281,7 +1275,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err = vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -1295,7 +1289,6 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -1336,7 +1329,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(blockCtx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(blockCtx, tx, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -1381,7 +1374,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Run(blockCtx, script, ledger, programs.NewEmptyPrograms())
+		err := vm.RunV2(blockCtx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -1427,7 +1420,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 		require.NoError(t, err)
 
-		err = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(blockCtx, fvm.Transaction(tx, 0), ledger)
 		require.Error(t, err)
 	})
 
@@ -1440,7 +1433,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
         `)
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-		err := vm.Run(blockCtx, fvm.Script(script), ledger, programs.NewEmptyPrograms())
+		err := vm.RunV2(blockCtx, fvm.Script(script), ledger)
 		require.Error(t, err)
 	})
 }
@@ -1454,7 +1447,6 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
@@ -1463,7 +1455,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-	programs := programs.NewEmptyPrograms()
+	programs := programs.NewEmptyBlockPrograms()
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
 		privateKey, txBody := testutil.CreateAccountCreationTransaction(t, chain)
@@ -1483,9 +1475,9 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		// execute the transaction
-		tx := fvm.Transaction(txBody, 0)
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-		err = vm.Run(ctx, tx, ledger, programs)
+		err = vm.RunV2(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -1524,7 +1516,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	t.Run("get accounts", func(t *testing.T) {
 		for address, expectedKey := range accounts {
 
-			account, err := vm.GetAccount(ctx, address, ledger, programs)
+			account, err := vm.GetAccountV2(ctx, address, ledger)
 			require.NoError(t, err)
 
 			assert.Len(t, account.Keys, 1)
@@ -1539,7 +1531,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		var account *flow.Account
-		account, err = vm.GetAccount(ctx, address, ledger, programs)
+		account, err = vm.GetAccountV2(ctx, address, ledger)
 		assert.True(t, errors.IsAccountNotFoundError(err))
 		assert.Nil(t, account)
 	})
@@ -1554,7 +1546,6 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 	header := &flow.Header{Height: 42}
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithBlockHeader(header),
 		fvm.WithCadenceLogging(true),
@@ -1579,7 +1570,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.RunV2(ctx, tx, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -1599,7 +1590,6 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	chain, vm := createChainAndVm(flow.MonotonicEmulator)
 
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 	)
 
@@ -1614,7 +1604,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	tx := fvm.Transaction(txBody, 0)
 
-	err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+	err = vm.RunV2(ctx, tx, ledger)
 	assert.NoError(t, err)
 
 	assert.NoError(t, tx.Err)
@@ -1650,7 +1640,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)
 
-		err := vm.Run(ctx, script, view, programs.NewEmptyPrograms())
+		err := vm.RunV2(ctx, script, view)
 		require.NoError(t, err)
 		require.NoError(t, script.Err)
 		return script.Value.ToGoValue().(uint64)
@@ -1662,7 +1652,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 			// Create an account private key.
@@ -1686,9 +1676,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
 			require.Equal(t, (&errors.StorageCapacityExceededError{}).Code(), tx.Err.Code())
@@ -1705,7 +1695,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 			// Create an account private key.
@@ -1734,9 +1724,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-			err = vm.Run(ctx, tx, view, programs)
+			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
 			require.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
@@ -1752,7 +1742,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 	).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -1775,12 +1765,12 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
-				require.Equal(t, (&errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
-				require.Equal(t, uint64(0), tx.Err.(*errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
+				require.Equal(t, (errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
+				require.Equal(t, uint64(0), tx.Err.(errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
 			}),
 	)
 
@@ -1790,7 +1780,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -1812,21 +1802,21 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
-				require.IsType(t, &errors.CadenceRuntimeError{}, tx.Err)
+				require.IsType(t, errors.CadenceRuntimeError{}, tx.Err)
 
 				// send it again
-				tx = fvm.Transaction(txBody, 0)
+				tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
-				require.Equal(t, (&errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
-				require.Equal(t, uint64(1), tx.Err.(*errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
+				require.Equal(t, (errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
+				require.Equal(t, uint64(1), tx.Err.(errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
 			}),
 	)
 }

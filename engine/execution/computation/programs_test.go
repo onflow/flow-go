@@ -39,15 +39,14 @@ import (
 )
 
 func TestPrograms_TestContractUpdates(t *testing.T) {
-	rt := fvm.NewInterpreterRuntime()
 	chain := flow.Mainnet.Chain()
-	vm := fvm.NewVirtualMachine(rt)
-	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	vm := fvm.NewVM()
+	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 	require.NoError(t, err)
 
 	// setup transactions
@@ -128,7 +127,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
-	programsCache, err := NewProgramsCache(10)
+	programsCache, err := programs.NewChainPrograms(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
@@ -180,20 +179,20 @@ func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header
 //
 // block structure and operations
 // Block1 (empty block)
-//     -> Block11 (deploy contract v1)
-//         -> Block111  (emit event - version should be 1) and (update contract to v3)
-//             -> Block1111   (emit event - version should be 3)
-//	       -> Block112 (emit event - version should be 1) and (update contract to v4)
-//             -> Block1121  (emit event - version should be 4)
-//     -> Block12 (deploy contract v2)
-//         -> Block121 (emit event - version should be 2)
-//             -> Block1211 (emit event - version should be 2)
+//
+//	    -> Block11 (deploy contract v1)
+//	        -> Block111  (emit event - version should be 1) and (update contract to v3)
+//	            -> Block1111   (emit event - version should be 3)
+//		       -> Block112 (emit event - version should be 1) and (update contract to v4)
+//	            -> Block1121  (emit event - version should be 4)
+//	    -> Block12 (deploy contract v2)
+//	        -> Block121 (emit event - version should be 2)
+//	            -> Block1211 (emit event - version should be 2)
 func TestPrograms_TestBlockForks(t *testing.T) {
 	block := unittest.BlockFixture()
-	rt := fvm.NewInterpreterRuntime()
 	chain := flow.Emulator.Chain()
-	vm := fvm.NewVirtualMachine(rt)
-	execCtx := fvm.NewContext(zerolog.Nop(),
+	vm := fvm.NewVM()
+	execCtx := fvm.NewContext(
 		fvm.WithBlockHeader(block.Header),
 		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: &block}}),
 		fvm.WithChain(chain))
@@ -201,7 +200,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 	require.NoError(t, err)
 
 	account := accounts[0]
@@ -227,7 +226,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
-	programsCache, err := NewProgramsCache(10)
+	programsCache, err := programs.NewChainPrograms(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
@@ -277,8 +276,6 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block11, res = createTestBlockAndRun(t, engine, block1, col11, block11View)
 		// cache should include value for this block
 		require.NotNil(t, programsCache.Get(block11.ID()))
-		// cache should have changes
-		require.True(t, programsCache.Get(block11.ID()).HasChanges())
 		// 1st event should be contract deployed
 		assert.EqualValues(t, "flow.AccountContractAdded", res.Events[0][0].Type)
 	})
@@ -298,8 +295,6 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block111, res = createTestBlockAndRun(t, engine, block11, col111, block111View)
 		// cache should include a program for this block
 		require.NotNil(t, programsCache.Get(block111.ID()))
-		// cache should have changes
-		require.True(t, programsCache.Get(block111.ID()).HasChanges())
 
 		require.Len(t, res.Events, 2)
 

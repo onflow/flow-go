@@ -18,16 +18,16 @@ import (
 
 // Orchestrator encapsulates a stateful implementation of wintermute attack orchestrator logic.
 // The attack logic works as follows:
-// 1. Orchestrator corrupts the result of the first incoming execution receipt from any of the corrupted execution node.
-// 2. Orchestrator sends the corrupted execution result to all corrupted execution nodes.
-// 3. If Orchestrator receives any chunk data pack request for a corrupted chunk from a corrupted verification node, it prompts the verifier to approve that chunk by sending it an attestation
-//    for that corrupted chunk.
-// 4. If Orchestrator receives any chunk data pack response from a corrupted execution node to an honest verification node, it drops the response
-//    if it is for one of the corrupted chunks.
-// 5. If Orchestrator receives a result approval for the original result (i.e., conflicting result with corrupted result),
-//    from a corrupted VN, it drops it, hence no conflicting result with the corrupted result is getting approved by any
-//    corrupted VN.
-// 5. Any other incoming messages to the orchestrator are passed through, i.e., are sent as they are in the original Flow network without any tampering.
+//  1. Orchestrator corrupts the result of the first incoming execution receipt from any of the corrupted execution node.
+//  2. Orchestrator sends the corrupted execution result to all corrupted execution nodes.
+//  3. If Orchestrator receives any chunk data pack request for a corrupted chunk from a corrupted verification node, it prompts the verifier to approve that chunk by sending it an attestation
+//     for that corrupted chunk.
+//  4. If Orchestrator receives any chunk data pack response from a corrupted execution node to an honest verification node, it drops the response
+//     if it is for one of the corrupted chunks.
+//  5. If Orchestrator receives a result approval for the original result (i.e., conflicting result with corrupted result),
+//     from a corrupted VN, it drops it, hence no conflicting result with the corrupted result is getting approved by any
+//     corrupted VN.
+//  5. Any other incoming messages to the orchestrator are passed through, i.e., are sent as they are in the original Flow network without any tampering.
 type Orchestrator struct {
 	attackStateLock   sync.RWMutex // providing mutual exclusion for external reads to attack state.
 	receiptHandleLock sync.Mutex   // ensuring at most one receipt is handled at a time, to avoid corrupting two concurrent receipts.
@@ -38,8 +38,10 @@ type Orchestrator struct {
 	corruptedNodeIds flow.IdentifierList // identifier of corrupted nodes.
 	allNodeIds       flow.IdentityList   // identity of all nodes in the network (including non-corrupted ones)
 
-	network insecure.AttackNetwork
+	network insecure.OrchestratorNetwork
 }
+
+var _ insecure.AttackOrchestrator = &Orchestrator{}
 
 func NewOrchestrator(logger zerolog.Logger, corruptedNodeIds flow.IdentifierList, allIds flow.IdentityList) *Orchestrator {
 	o := &Orchestrator{
@@ -52,17 +54,25 @@ func NewOrchestrator(logger zerolog.Logger, corruptedNodeIds flow.IdentifierList
 	return o
 }
 
-// WithAttackNetwork sets the attack network of the orchestrator.
-func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
+// Register sets the orchestrator network of the orchestrator.
+func (o *Orchestrator) Register(network insecure.OrchestratorNetwork) {
 	o.network = network
 }
 
-// HandleEventFromCorruptedNode implements logic of processing the events received from a corrupted node.
+// HandleEgressEvent implements logic of processing the events received from a corrupted node.
 //
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 // the attack Orchestrator instead of dispatching them directly to the network.
 // The Orchestrator completely determines what the corrupted conduit should send to the network.
-func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent) error {
+func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
+	lg := o.logger.With().
+		Hex("corrupt_origin_id", logging.ID(event.CorruptOriginId)).
+		Str("channel", event.Channel.String()).
+		Str("protocol", event.Protocol.String()).
+		Uint32("target_num", event.TargetNum).
+		Str("target_ids", fmt.Sprintf("%v", event.TargetIds)).
+		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
+
 	switch event.FlowProtocolEvent.(type) {
 
 	case *flow.ExecutionReceipt:
@@ -90,19 +100,36 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent)
 
 	default:
 		// Any other event is just passed through the network as it is.
-		err := o.network.Send(event)
+		err := o.network.SendEgress(event)
 
 		if err != nil {
-			return fmt.Errorf("could not send rpc on channel: %w", err)
+			// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
+			lg.Fatal().Err(err).Msg("egress event not passed through")
+			return fmt.Errorf("could not send rpc egress event on channel: %w", err)
 		}
-		o.logger.Debug().
-			Hex("corrupted_node_id", logging.ID(event.CorruptedNodeId)).
-			Str("channel_id", string(event.Channel)).
-			Str("protocol", event.Protocol.String()).
-			Str("type", fmt.Sprintf("%T", event)).
-			Msg("miscellaneous event has passed through")
+		lg.Debug().Msg("egress event has passed through")
 	}
 
+	return nil
+}
+
+// HandleIngressEvent implements logic of processing the incoming (ingress) events to a corrupt node.
+// Wintermute orchestrator doesn't corrupt ingress events, so it just passes them through.
+func (o *Orchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
+	lg := o.logger.With().
+		Hex("origin_id", logging.ID(event.OriginID)).
+		Str("channel", event.Channel.String()).
+		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
+		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
+
+	err := o.network.SendIngress(event)
+
+	if err != nil {
+		// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
+		lg.Fatal().Err(err).Msg("ingress event not passed through")
+		return fmt.Errorf("could not send rpc ingress event on channel: %w", err)
+	}
+	lg.Debug().Msg("ingress event has passed through")
 	return nil
 }
 
@@ -138,14 +165,14 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 	o.receiptHandleLock.Lock()
 	defer o.receiptHandleLock.Unlock()
 
-	ok := o.corruptedNodeIds.Contains(receiptEvent.CorruptedNodeId)
+	ok := o.corruptedNodeIds.Contains(receiptEvent.CorruptOriginId)
 	if !ok {
 		return fmt.Errorf("sender of the event is not a corrupted node")
 	}
 
-	corruptedIdentity, ok := o.allNodeIds.ByNodeID(receiptEvent.CorruptedNodeId)
+	corruptedIdentity, ok := o.allNodeIds.ByNodeID(receiptEvent.CorruptOriginId)
 	if !ok {
-		return fmt.Errorf("could not find corrupted identity for: %x", receiptEvent.CorruptedNodeId)
+		return fmt.Errorf("could not find corrupted identity for: %x", receiptEvent.CorruptOriginId)
 	}
 
 	if corruptedIdentity.Role != flow.RoleExecution {
@@ -162,7 +189,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 		Hex("executor_id", logging.ID(receipt.ExecutorID)).
 		Hex("result_id", logging.ID(receipt.ExecutionResult.ID())).
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
-		Hex("corrupted_id", logging.ID(receiptEvent.CorruptedNodeId)).
+		Hex("corrupted_id", logging.ID(receiptEvent.CorruptOriginId)).
 		Str("protocol", insecure.ProtocolStr(receiptEvent.Protocol)).
 		Str("channel", string(receiptEvent.Channel)).
 		Uint32("targets_num", receiptEvent.TargetNum).
@@ -178,7 +205,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 			return nil
 		}
 
-		err := o.network.Send(receiptEvent)
+		err := o.network.SendEgress(receiptEvent)
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
 		}
@@ -197,8 +224,8 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 	for _, corruptedExecutionId := range corruptedExecutionIds {
 		// sets executor id of the result as the same corrupted execution node id that
 		// is meant to send this message to the flow network.
-		err := o.network.Send(&insecure.EgressEvent{
-			CorruptedNodeId: corruptedExecutionId,
+		err := o.network.SendEgress(&insecure.EgressEvent{
+			CorruptOriginId: corruptedExecutionId,
 			Channel:         receiptEvent.Channel,
 			Protocol:        receiptEvent.Protocol,
 			TargetNum:       receiptEvent.TargetNum,
@@ -230,14 +257,14 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 // chunk.
 // Otherwise, it is passed through.
 func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent *insecure.EgressEvent) error {
-	ok := o.corruptedNodeIds.Contains(chunkDataPackRequestEvent.CorruptedNodeId)
+	ok := o.corruptedNodeIds.Contains(chunkDataPackRequestEvent.CorruptOriginId)
 	if !ok {
 		return fmt.Errorf("sender of the event is not a corrupted node")
 	}
 
-	corruptedIdentity, ok := o.allNodeIds.ByNodeID(chunkDataPackRequestEvent.CorruptedNodeId)
+	corruptedIdentity, ok := o.allNodeIds.ByNodeID(chunkDataPackRequestEvent.CorruptOriginId)
 	if !ok {
-		return fmt.Errorf("could not find corrupted identity for: %x", chunkDataPackRequestEvent.CorruptedNodeId)
+		return fmt.Errorf("could not find corrupted identity for: %x", chunkDataPackRequestEvent.CorruptOriginId)
 	}
 	if corruptedIdentity.Role != flow.RoleVerification {
 		return fmt.Errorf("wrong sender role for chunk data pack request: %s", corruptedIdentity.Role.String())
@@ -259,13 +286,13 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 	// 2) result corruption happened for a previous chunk and subsequent chunks will not be corrupted (since only the first chunk is corrupted)
 	// Therefore, chunk data request is for an honest result, hence the corrupted verifier can follow
 	// the protocol and send its honest chunk data request.
-	err := o.network.Send(chunkDataPackRequestEvent)
+	err := o.network.SendEgress(chunkDataPackRequestEvent)
 	if err != nil {
 		return fmt.Errorf("could not send chunk data request: %w", err)
 	}
 
 	o.logger.Info().
-		Hex("corrupted_id", logging.ID(chunkDataPackRequestEvent.CorruptedNodeId)).
+		Hex("corrupted_id", logging.ID(chunkDataPackRequestEvent.CorruptOriginId)).
 		Str("protocol", insecure.ProtocolStr(chunkDataPackRequestEvent.Protocol)).
 		Str("channel", string(chunkDataPackRequestEvent.Channel)).
 		Uint32("targets_num", chunkDataPackRequestEvent.TargetNum).
@@ -283,7 +310,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 		// an attack has already been conducted
 		lg := o.logger.With().
 			Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ChunkID)).
-			Hex("sender_id", logging.ID(chunkDataPackReplyEvent.CorruptedNodeId)).
+			Hex("sender_id", logging.ID(chunkDataPackReplyEvent.CorruptOriginId)).
 			Hex("target_id", logging.ID(chunkDataPackReplyEvent.TargetIds[0])).Logger()
 
 		// chunk data pack reply goes over a unicast, hence, we only check first target id.
@@ -307,12 +334,12 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 	}
 
 	// chunk data response is for an honest result (or before an attack has started), hence the corrupted execution node can follow the protocol and send (pass through) its honest response
-	err := o.network.Send(chunkDataPackReplyEvent)
+	err := o.network.SendEgress(chunkDataPackReplyEvent)
 	if err != nil {
 		return fmt.Errorf("could not passed through chunk data reply: %w", err)
 	}
 	o.logger.Debug().
-		Hex("corrupted_id", logging.ID(chunkDataPackReplyEvent.CorruptedNodeId)).
+		Hex("corrupted_id", logging.ID(chunkDataPackReplyEvent.CorruptOriginId)).
 		Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ID())).
 		Msg("chunk data pack response passed through")
 	return nil
@@ -328,7 +355,7 @@ func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.E
 		Hex("result_id", logging.ID(approval.Body.ExecutionResultID)).
 		Uint64("chunk_index", approval.Body.ChunkIndex).
 		Hex("result_id", logging.ID(approval.Body.BlockID)).
-		Hex("sender_id", logging.ID(resultApprovalEvent.CorruptedNodeId)).
+		Hex("sender_id", logging.ID(resultApprovalEvent.CorruptOriginId)).
 		Str("target_ids", fmt.Sprintf("%v", resultApprovalEvent.TargetIds)).Logger()
 
 	if _, _, conducted := o.AttackState(); conducted {
@@ -339,7 +366,7 @@ func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.E
 		}
 	}
 
-	err := o.network.Send(resultApprovalEvent)
+	err := o.network.SendEgress(resultApprovalEvent)
 	if err != nil {
 		return fmt.Errorf("could not passed through result approval event %w", err)
 	}
@@ -368,8 +395,8 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 
 		// sends an attestation on behalf of verification node to all consensus nodes
 		consensusIds := o.allNodeIds.Filter(filter.HasRole(flow.RoleConsensus)).NodeIDs()
-		err = o.network.Send(&insecure.EgressEvent{
-			CorruptedNodeId: chunkDataPackRequestEvent.CorruptedNodeId,
+		err = o.network.SendEgress(&insecure.EgressEvent{
+			CorruptOriginId: chunkDataPackRequestEvent.CorruptOriginId,
 			Channel:         channels.PushApprovals,
 			Protocol:        insecure.Protocol_PUBLISH,
 			TargetNum:       0,
@@ -383,7 +410,7 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 		}
 
 		o.logger.Info().
-			Hex("corrupted_id", logging.ID(chunkDataPackRequestEvent.CorruptedNodeId)).
+			Hex("corrupted_id", logging.ID(chunkDataPackRequestEvent.CorruptOriginId)).
 			Str("protocol", insecure.ProtocolStr(chunkDataPackRequestEvent.Protocol)).
 			Str("channel", string(chunkDataPackRequestEvent.Channel)).
 			Uint32("targets_num", chunkDataPackRequestEvent.TargetNum).

@@ -18,31 +18,26 @@ const (
 	DefaultMaxKeySize         = 16_000      // ~16KB
 	DefaultMaxValueSize       = 256_000_000 // ~256MB
 	DefaultMaxInteractionSize = 20_000_000  // ~20MB
-)
 
-type mapKey struct {
-	owner, key string
-}
+	AccountKeyPrefix = "a."
+	KeyAccountStatus = AccountKeyPrefix + "s"
+	KeyCode          = "code"
+	KeyContractNames = "contract_names"
+)
 
 // State represents the execution state
 // it holds draft of updates and captures
 // all register touches
 type State struct {
 	view             View
-	meter            meter.Meter
+	meter            *meter.Meter
 	updatedAddresses map[flow.Address]struct{}
-	updateSize       map[mapKey]uint64
 	stateLimits
-	ReadCounter       uint64
-	WriteCounter      uint64
-	TotalBytesRead    uint64
-	TotalBytesWritten uint64
 }
 
 type stateLimits struct {
-	maxKeySizeAllowed     uint64
-	maxValueSizeAllowed   uint64
-	maxInteractionAllowed uint64
+	maxKeySizeAllowed   uint64
+	maxValueSizeAllowed uint64
 }
 
 type StateParameters struct {
@@ -55,9 +50,8 @@ func DefaultParameters() StateParameters {
 	return StateParameters{
 		MeterParameters: meter.DefaultParameters(),
 		stateLimits: stateLimits{
-			maxKeySizeAllowed:     DefaultMaxKeySize,
-			maxValueSizeAllowed:   DefaultMaxValueSize,
-			maxInteractionAllowed: DefaultMaxInteractionSize,
+			maxKeySizeAllowed:   DefaultMaxKeySize,
+			maxValueSizeAllowed: DefaultMaxValueSize,
 		},
 	}
 }
@@ -88,7 +82,7 @@ func (params StateParameters) WithMaxValueSizeAllowed(limit uint64) StateParamet
 // WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
 func (params StateParameters) WithMaxInteractionSizeAllowed(limit uint64) StateParameters {
 	newParams := params
-	newParams.maxInteractionAllowed = limit
+	newParams.MeterParameters = newParams.MeterParameters.WithStorageInteractionLimit(limit)
 	return newParams
 }
 
@@ -96,7 +90,7 @@ func (s *State) View() View {
 	return s.view
 }
 
-func (s *State) Meter() meter.Meter {
+func (s *State) Meter() *meter.Meter {
 	return s.meter
 }
 
@@ -109,7 +103,6 @@ func NewState(view View, params StateParameters) *State {
 		view:             view,
 		meter:            m,
 		updatedAddresses: make(map[flow.Address]struct{}),
-		updateSize:       make(map[mapKey]uint64),
 		stateLimits:      params.stateLimits,
 	}
 }
@@ -120,14 +113,13 @@ func (s *State) NewChild() *State {
 		view:             s.view.NewChild(),
 		meter:            s.meter.NewChild(),
 		updatedAddresses: make(map[flow.Address]struct{}),
-		updateSize:       make(map[mapKey]uint64),
 		stateLimits:      s.stateLimits,
 	}
 }
 
 // InteractionUsed returns the amount of ledger interaction (total ledger byte read + total ledger byte written)
 func (s *State) InteractionUsed() uint64 {
-	return s.TotalBytesRead + s.TotalBytesWritten
+	return s.meter.TotalBytesOfStorageInteractions()
 }
 
 // Get returns a register value given owner and key
@@ -148,17 +140,12 @@ func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, e
 		return nil, fmt.Errorf("failed to read key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), getError)
 	}
 
-	// if not part of recent updates count them as read
-	if _, ok := s.updateSize[mapKey{owner, key}]; !ok {
-		s.ReadCounter++
-		s.TotalBytesRead += uint64(len(owner) + len(key) + len(value))
-	}
+	err = s.meter.MeterStorageRead(
+		meter.StorageInteractionKey{Owner: owner, Key: key},
+		value,
+		enforceLimit)
 
-	if enforceLimit {
-		return value, s.checkMaxInteraction()
-	}
-
-	return value, nil
+	return value, err
 }
 
 // Set updates state delta with a register update
@@ -176,26 +163,18 @@ func (s *State) Set(owner, key string, value flow.RegisterValue, enforceLimit bo
 		return fmt.Errorf("failed to update key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), setError)
 	}
 
-	if enforceLimit {
-		if err := s.checkMaxInteraction(); err != nil {
-			return err
-		}
+	err := s.meter.MeterStorageWrite(
+		meter.StorageInteractionKey{Owner: owner, Key: key},
+		value,
+		enforceLimit,
+	)
+	if err != nil {
+		return err
 	}
 
 	if address, isAddress := addressFromOwner(owner); isAddress {
 		s.updatedAddresses[address] = struct{}{}
 	}
-
-	mapKey := mapKey{owner, key}
-	if old, ok := s.updateSize[mapKey]; ok {
-		s.WriteCounter--
-		s.TotalBytesWritten -= old
-	}
-
-	updateSize := uint64(len(owner) + len(key) + len(value))
-	s.WriteCounter++
-	s.TotalBytesWritten += updateSize
-	s.updateSize[mapKey] = updateSize
 
 	return nil
 }
@@ -250,38 +229,32 @@ func (s *State) TotalMemoryLimit() uint {
 	return uint(s.meter.TotalMemoryLimit())
 }
 
+func (s *State) MeterEmittedEvent(byteSize uint64) error {
+	return s.meter.MeterEmittedEvent(byteSize)
+}
+
+func (s *State) TotalEmittedEventBytes() uint64 {
+	return s.meter.TotalEmittedEventBytes()
+}
+
+func (s *State) TotalEventCounter() uint32 {
+	return s.meter.TotalEventCounter()
+}
+
 // MergeState applies the changes from a the given view to this view.
-func (s *State) MergeState(other *State, enforceLimit bool) error {
+func (s *State) MergeState(other *State) error {
 	err := s.view.MergeView(other.view)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)
 	}
 
-	err = s.meter.MergeMeter(other.meter, enforceLimit)
-	if err != nil {
-		return err
-	}
+	s.meter.MergeMeter(other.meter)
 
 	// apply address updates
 	for k, v := range other.updatedAddresses {
 		s.updatedAddresses[k] = v
 	}
 
-	// apply update sizes
-	for k, v := range other.updateSize {
-		s.updateSize[k] = v
-	}
-
-	// update ledger interactions
-	s.ReadCounter += other.ReadCounter
-	s.WriteCounter += other.WriteCounter
-	s.TotalBytesRead += other.TotalBytesRead
-	s.TotalBytesWritten += other.TotalBytesWritten
-
-	// check max interaction as last step
-	if enforceLimit {
-		return s.checkMaxInteraction()
-	}
 	return nil
 }
 
@@ -304,13 +277,6 @@ func (s *State) UpdatedAddresses() []flow.Address {
 	sort.Sort(addresses)
 
 	return addresses
-}
-
-func (s *State) checkMaxInteraction() error {
-	if s.InteractionUsed() > s.maxInteractionAllowed {
-		return errors.NewLedgerInteractionLimitExceededError(s.InteractionUsed(), s.maxInteractionAllowed)
-	}
-	return nil
 }
 
 func (s *State) checkSize(owner, key string, value flow.RegisterValue) error {

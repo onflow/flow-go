@@ -59,11 +59,7 @@ func (s *Suite) SetupTest() {
 	require.Greater(s.T(), s.EpochLen, s.StakingAuctionLen+s.DKGPhaseLen*3)
 
 	s.ctx, s.cancel = context.WithCancel(context.Background())
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", s.T().Name()).
-		Logger()
-	s.log = logger
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	defer func() {
 		s.log.Info().Msg("================> Finish SetupTest")

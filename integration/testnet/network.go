@@ -18,6 +18,7 @@ import (
 	cmd2 "github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/insecure/cmd"
+	"github.com/onflow/flow-go/network/p2p/translator"
 
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
@@ -47,7 +48,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol/badger"
@@ -355,7 +355,7 @@ type ConsensusFollowerConfig struct {
 func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier, opts ...consensus_follower.Option) ConsensusFollowerConfig {
 	pid, err := keyutils.PeerIDFromFlowPublicKey(networkingPrivKey.PublicKey())
 	assert.NoError(t, err)
-	nodeID, err := p2p.NewPublicNetworkIDTranslator().GetFlowID(pid)
+	nodeID, err := translator.NewPublicNetworkIDTranslator().GetFlowID(pid)
 	assert.NoError(t, err)
 	return ConsensusFollowerConfig{
 		NetworkingPrivKey: networkingPrivKey,
@@ -1135,7 +1135,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 	if nodeConf.Corrupted {
 		// corrupted nodes are running with a Corrupted Conduit Factory (CCF), hence need to bind their
-		// CCF port to local host so they can be accessible by the attack network.
+		// CCF port to local host, so they can be accessible by the orchestrator network.
 		hostPort := testingdock.RandomPort(t)
 		nodeContainer.bindPort(hostPort, strconv.Itoa(cmd.CorruptibleConduitFactoryPort))
 		net.CorruptedPortMapping[nodeConf.NodeID] = hostPort

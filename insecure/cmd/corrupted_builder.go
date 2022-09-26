@@ -59,7 +59,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 
 		// initializes corruptible network that acts as a wrapper around the original flow network of the node, hence
 		// allowing a remote attacker to control the ingress and egress traffic of the node.
-		corruptibleNetwork, err := corruptible.NewCorruptibleNetwork(
+		corruptibleNetwork, err := corruptible.NewCorruptNetwork(
 			cnb.Logger,
 			cnb.RootChainID,
 			address,

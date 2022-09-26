@@ -64,8 +64,12 @@ func TestExecutionFlow(t *testing.T) {
 
 	// create execution node
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21, chainID)
-	exeNode.Ready()
-	defer exeNode.Done()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	unittest.RequireReturnsBefore(t, func() {
+		exeNode.Ready(ctx)
+	}, 1*time.Second, "could not start execution node on time")
+	defer exeNode.Done(cancel)
 
 	genesis, err := exeNode.State.AtHeight(0).Head()
 	require.NoError(t, err)
@@ -370,8 +374,12 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	consensusNode := testutil.GenericNodeFromParticipants(t, hub, conID, identities, chainID)
 	defer consensusNode.Done()
 	exe1Node := testutil.ExecutionNode(t, hub, exe1ID, identities, 27, chainID)
-	exe1Node.Ready()
-	defer exe1Node.Done()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	unittest.RequireReturnsBefore(t, func() {
+		exe1Node.Ready(ctx)
+	}, 1*time.Second, "could not start execution node on time")
+	defer exe1Node.Done(cancel)
 
 	genesis, err := exe1Node.State.AtHeight(0).Head()
 	require.NoError(t, err)
@@ -520,8 +528,12 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	identities := unittest.CompleteIdentitySet(colID, conID, exeID, ver1ID, ver2ID)
 
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21, chainID)
-	exeNode.Ready()
-	defer exeNode.Done()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	unittest.RequireReturnsBefore(t, func() {
+		exeNode.Ready(ctx)
+	}, 1*time.Second, "could not start execution node on time")
+	defer exeNode.Done(cancel)
 
 	verification1Node := testutil.GenericNodeFromParticipants(t, hub, ver1ID, identities, chainID)
 	defer verification1Node.Done()
