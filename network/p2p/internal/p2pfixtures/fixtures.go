@@ -111,6 +111,10 @@ func NodeFixture(
 		builder.SetConnectionGater(connGater)
 	}
 
+	if parameters.PeerScoringEnabled {
+		builder.EnableGossipSubPeerScoring(parameters.IdProvider)
+	}
+
 	n, err := builder.Build(ctx)
 	require.NoError(t, err)
 
@@ -397,5 +401,3 @@ func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []*p2pno
 	// wait for all nodes to discover each other
 	time.Sleep(time.Second)
 }
-
-
