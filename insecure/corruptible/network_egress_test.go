@@ -22,9 +22,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestHandleOutgoingEvent_AttackerObserve checks that the incoming messages to the corrupt network are routed to the
-// registered attacker if one exists.
-func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
+// TestHandleOutgoingEvent_AttackerRegistered checks that egress messages (from a corrupt node to the corrupt network) are routed to a registered attacker.
+// The attacker is mocked out in this test.
+func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 	codec := unittest.NetworkCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 	flowNetwork := &mocknetwork.Network{}
