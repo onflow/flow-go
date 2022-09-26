@@ -263,30 +263,31 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		// create conduit factor
 		cf := conduit.NewDefaultConduitFactory()
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
 
-		return fnb.InitFlowNetworkWithConduitFactory(node, cf)
+		myAddr := fnb.NodeConfig.Me.Address()
+		if fnb.BaseConfig.BindAddr != NotSet {
+			myAddr = fnb.BaseConfig.BindAddr
+		}
+		// create libp2p node factor
+		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
+			fnb.Logger,
+			myAddr,
+			fnb.NetworkKey,
+			fnb.SporkID,
+			fnb.IdentityProvider,
+			fnb.Metrics.Network,
+			fnb.Resolver,
+			fnb.BaseConfig.NodeRole,
+		)
+
+		return fnb.InitFlowNetwork(node, cf, libP2PNodeFactory)
 	})
 }
 
-func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory) (network.Network, error) {
-	myAddr := fnb.NodeConfig.Me.Address()
-	if fnb.BaseConfig.BindAddr != NotSet {
-		myAddr = fnb.BaseConfig.BindAddr
-	}
-
-	libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
-		fnb.Logger,
-		myAddr,
-		fnb.NetworkKey,
-		fnb.SporkID,
-		fnb.IdentityProvider,
-		fnb.Metrics.Network,
-		fnb.Resolver,
-		fnb.BaseConfig.NodeRole,
-	)
-
+func (fnb *FlowNodeBuilder) InitFlowNetwork(node *NodeConfig, cf network.ConduitFactory, libP2PNodeFactory p2pbuilder.LibP2PFactoryFunc) (network.Network, error) {
 	var mwOpts []middleware.MiddlewareOption
 	if len(fnb.MsgValidators) > 0 {
 		mwOpts = append(mwOpts, middleware.WithMessageValidators(fnb.MsgValidators...))

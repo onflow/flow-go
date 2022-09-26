@@ -2,6 +2,7 @@ package p2pnode
 
 import (
 	"context"
+
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
