@@ -39,12 +39,11 @@ func NewParticipant(
 	// initialize the default configuration
 	defTimeout := timeout.DefaultConfig
 	cfg := ParticipantConfig{
-		TimeoutInitial:        time.Duration(defTimeout.ReplicaTimeout) * time.Millisecond,
-		TimeoutMinimum:        time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
-		TimeoutMaximum:        time.Duration(defTimeout.MaxReplicaTimeout) * time.Millisecond,
-		TimeoutIncreaseFactor: defTimeout.TimeoutIncrease,
-		TimeoutDecreaseFactor: defTimeout.TimeoutDecrease,
-		BlockRateDelay:        time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
+		TimeoutMinimum:            time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
+		TimeoutMaximum:            time.Duration(defTimeout.MaxReplicaTimeout) * time.Millisecond,
+		TimeoutAdjustmentFactor:   defTimeout.TimeoutAdjustmentFactor,
+		HappyPathMaxRoundFailures: defTimeout.HappyPathMaxRoundFailures,
+		BlockRateDelay:            time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
 	}
 
 	// apply the configuration options
@@ -64,11 +63,10 @@ func NewParticipant(
 
 	// initialize the timeout config
 	timeoutConfig, err := timeout.NewConfig(
-		cfg.TimeoutInitial,
 		cfg.TimeoutMinimum,
 		cfg.TimeoutMaximum,
-		cfg.TimeoutIncreaseFactor,
-		cfg.TimeoutDecreaseFactor,
+		cfg.TimeoutAdjustmentFactor,
+		cfg.HappyPathMaxRoundFailures,
 		cfg.BlockRateDelay,
 	)
 	if err != nil {

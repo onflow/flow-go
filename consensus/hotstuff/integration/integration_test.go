@@ -17,7 +17,8 @@ import (
 // but for slow environment like CI, a longer one is needed.
 const safeTimeout = 2 * time.Second
 
-const safeDecreaseFactor = 0.85
+// number of failed rounds before first timeout increase
+const happyPathMaxRoundFailures = 6
 
 func TestSingleInstance(t *testing.T) {
 
@@ -51,7 +52,7 @@ func TestThreeInstances(t *testing.T) {
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, safeTimeout, 1.5, safeDecreaseFactor, 0)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 1.5, happyPathMaxRoundFailures, 0)
 	require.NoError(t, err)
 
 	// set up three instances that are exactly the same
@@ -115,7 +116,7 @@ func TestSevenInstances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, safeTimeout, 1.5, safeDecreaseFactor, 0)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 1.5, happyPathMaxRoundFailures, 0)
 	require.NoError(t, err)
 
 	// set up five instances that work fully

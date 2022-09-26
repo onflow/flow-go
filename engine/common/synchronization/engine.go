@@ -310,7 +310,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 		}
 		// forward the block to the compliance engine for validation and processing
 		// we use the network.MessageProcessor interface here because the block is un-validated
-		err := e.comp.Process(channels.SyncCommittee, originID, &events.SyncedBlock{
+		err := e.comp.Process(channels.SyncCommittee, e.me.NodeID(), &events.SyncedBlock{
 			OriginID: originID,
 			Block:    block,
 		})
