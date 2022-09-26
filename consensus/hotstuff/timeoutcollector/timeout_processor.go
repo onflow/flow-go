@@ -30,7 +30,7 @@ func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 	if weight < t.minRequiredWeight {
 		return false
 	}
-	return t.done.CAS(false, true)
+	return t.done.CompareAndSwap(false, true)
 }
 
 // TimeoutProcessor implements the hotstuff.TimeoutProcessor interface.
