@@ -50,7 +50,7 @@ type Network struct {
 	flowNetwork           flownet.Network // original flow network of the node.
 	server                *grpc.Server    // touch point of orchestrator network to this factory.
 	gRPCListenAddress     net.Addr
-	conduitFactory        insecure.CorruptibleConduitFactory
+	conduitFactory        insecure.CorruptConduitFactory
 	attackerInboundStream insecure.CorruptibleConduitFactory_ConnectAttackerServer // inbound stream to attack orchestrator
 
 	// We keep the original message processor here so that we can directly send messages to it when
@@ -75,7 +75,7 @@ func NewCorruptNetwork(
 	me module.Local,
 	codec flownet.Codec,
 	flowNetwork flownet.Network,
-	conduitFactory insecure.CorruptibleConduitFactory) (*Network, error) {
+	conduitFactory insecure.CorruptConduitFactory) (*Network, error) {
 	if chainId != flow.BftTestnet {
 		panic("illegal chain id for using corrupt network")
 	}

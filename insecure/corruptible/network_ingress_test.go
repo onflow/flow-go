@@ -25,7 +25,7 @@ func TestHandleIncomingEvent_AttackerRegistered(t *testing.T) {
 	codec := unittest.NetworkCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 	flowNetwork := &mocknetwork.Network{}
-	ccf := &mockinsecure.CorruptibleConduitFactory{}
+	ccf := &mockinsecure.CorruptConduitFactory{}
 	ccf.On("RegisterEgressController", mock.Anything).Return(nil)
 
 	corruptNetwork, err := NewCorruptNetwork(
@@ -78,7 +78,7 @@ func TestHandleIncomingEvent_AttackerRegistered(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, ccf)
 }
 
-// TestHandleIncomingEvent_NoAttacker checks that incoming unicast events to the corrupted network
+// TestHandleIncomingEvent_NoAttacker checks that incoming events to the corrupted network
 // are routed to the network adapter when no attacker is registered to the network.
 func TestHandleIncomingEvent_NoAttacker(t *testing.T) {
 	corruptNetwork, adapter := corruptNetworkFixture(t, unittest.Logger())

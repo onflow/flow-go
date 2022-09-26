@@ -106,7 +106,7 @@ func (m *Message) GetIngress() *IngressMessage {
 }
 
 // EgressMessage represents an outgoing message from a corrupt node to another (honest or corrupt) node.
-// The exchanged message is between the CorruptibleConduitFactory and Attacker services.
+// The exchanged message is between the CorruptConduitFactory and Attacker services.
 type EgressMessage struct {
 	ChannelID string `protobuf:"bytes,1,opt,name=ChannelID,proto3" json:"ChannelID,omitempty"`
 	// CorruptOriginID represents the corrupt node id where the outgoing message is coming from.
@@ -300,7 +300,7 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// CorruptibleConduitFactoryClient is the client API for CorruptibleConduitFactory service.
+// CorruptibleConduitFactoryClient is the client API for CorruptConduitFactory service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type CorruptibleConduitFactoryClient interface {
@@ -317,7 +317,7 @@ func NewCorruptibleConduitFactoryClient(cc *grpc.ClientConn) CorruptibleConduitF
 }
 
 func (c *corruptibleConduitFactoryClient) ConnectAttacker(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (CorruptibleConduitFactory_ConnectAttackerClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_CorruptibleConduitFactory_serviceDesc.Streams[0], "/corruptible.CorruptibleConduitFactory/ConnectAttacker", opts...)
+	stream, err := c.cc.NewStream(ctx, &_CorruptibleConduitFactory_serviceDesc.Streams[0], "/corruptible.CorruptConduitFactory/ConnectAttacker", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +349,7 @@ func (x *corruptibleConduitFactoryConnectAttackerClient) Recv() (*Message, error
 }
 
 func (c *corruptibleConduitFactoryClient) ProcessAttackerMessage(ctx context.Context, opts ...grpc.CallOption) (CorruptibleConduitFactory_ProcessAttackerMessageClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_CorruptibleConduitFactory_serviceDesc.Streams[1], "/corruptible.CorruptibleConduitFactory/ProcessAttackerMessage", opts...)
+	stream, err := c.cc.NewStream(ctx, &_CorruptibleConduitFactory_serviceDesc.Streams[1], "/corruptible.CorruptConduitFactory/ProcessAttackerMessage", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -382,7 +382,7 @@ func (x *corruptibleConduitFactoryProcessAttackerMessageClient) CloseAndRecv() (
 	return m, nil
 }
 
-// CorruptibleConduitFactoryServer is the server API for CorruptibleConduitFactory service.
+// CorruptibleConduitFactoryServer is the server API for CorruptConduitFactory service.
 type CorruptibleConduitFactoryServer interface {
 	ConnectAttacker(*emptypb.Empty, CorruptibleConduitFactory_ConnectAttackerServer) error
 	ProcessAttackerMessage(CorruptibleConduitFactory_ProcessAttackerMessageServer) error
@@ -451,7 +451,7 @@ func (x *corruptibleConduitFactoryProcessAttackerMessageServer) Recv() (*Message
 }
 
 var _CorruptibleConduitFactory_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "corruptible.CorruptibleConduitFactory",
+	ServiceName: "corruptible.CorruptConduitFactory",
 	HandlerType: (*CorruptibleConduitFactoryServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{

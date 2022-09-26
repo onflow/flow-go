@@ -22,7 +22,7 @@ type ConduitFactory struct {
 	egressController insecure.EgressController
 }
 
-var _ insecure.CorruptibleConduitFactory = &ConduitFactory{}
+var _ insecure.CorruptConduitFactory = &ConduitFactory{}
 
 func NewCorruptibleConduitFactory(logger zerolog.Logger, chainId flow.ChainID) *ConduitFactory {
 	if chainId != flow.BftTestnet {

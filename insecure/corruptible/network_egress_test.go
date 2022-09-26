@@ -28,7 +28,7 @@ func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 	codec := unittest.NetworkCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 	flowNetwork := &mocknetwork.Network{}
-	ccf := &mockinsecure.CorruptibleConduitFactory{}
+	ccf := &mockinsecure.CorruptConduitFactory{}
 	ccf.On("RegisterEgressController", mock.Anything).Return(nil)
 
 	corruptNetwork, err := NewCorruptNetwork(
