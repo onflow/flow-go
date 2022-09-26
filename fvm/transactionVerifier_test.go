@@ -110,8 +110,11 @@ func TestTransactionVerification(t *testing.T) {
 		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
 		require.Error(t, err)
 
-		var envelopeError errors.InvalidEnvelopeSignatureError
-		require.ErrorAs(t, err, &envelopeError)
+		require.True(
+			t,
+			errors.HasErrorCode(
+				err,
+				errors.ErrCodeInvalidEnvelopeSignatureError))
 	})
 
 	t.Run("invalid payload signature", func(t *testing.T) {
@@ -146,8 +149,11 @@ func TestTransactionVerification(t *testing.T) {
 		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
 		require.Error(t, err)
 
-		var payloadError errors.InvalidPayloadSignatureError
-		require.ErrorAs(t, err, &payloadError)
+		require.True(
+			t,
+			errors.HasErrorCode(
+				err,
+				errors.ErrCodeInvalidPayloadSignatureError))
 	})
 
 	t.Run("invalid payload and envelope signatures", func(t *testing.T) {
@@ -180,8 +186,11 @@ func TestTransactionVerification(t *testing.T) {
 		require.Error(t, err)
 
 		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
-		var payloadError errors.InvalidPayloadSignatureError
-		require.ErrorAs(t, err, &payloadError)
+		require.True(
+			t,
+			errors.HasErrorCode(
+				err,
+				errors.ErrCodeInvalidPayloadSignatureError))
 	})
 
 	t.Run("frozen account is rejected", func(t *testing.T) {
