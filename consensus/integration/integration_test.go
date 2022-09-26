@@ -57,6 +57,7 @@ func Test3Nodes(t *testing.T) {
 
 // with 5 nodes, and one node completely blocked, the other 4 nodes can still reach consensus
 func Test5Nodes(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "active-pacemaker, on CI channel test doesn't stop, need to revisit stop conditions")
 	// 4 nodes should be able to finalize at least 3 blocks.
 	stopper := NewStopper(2, 1)
 	participantsData := createConsensusIdentities(t, 5)

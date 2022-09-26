@@ -52,21 +52,20 @@ import (
 func main() {
 
 	var (
-		txLimit                       uint
-		maxCollectionSize             uint
-		maxCollectionByteSize         uint64
-		maxCollectionTotalGas         uint64
-		builderExpiryBuffer           uint
-		builderPayerRateLimitDryRun   bool
-		builderPayerRateLimit         float64
-		builderUnlimitedPayers        []string
-		hotstuffTimeout               time.Duration
-		hotstuffMinTimeout            time.Duration
-		hotstuffTimeoutIncreaseFactor float64
-		hotstuffTimeoutDecreaseFactor float64
-		blockRateDelay                time.Duration
-		startupTimeString             string
-		startupTime                   time.Time
+		txLimit                           uint
+		maxCollectionSize                 uint
+		maxCollectionByteSize             uint64
+		maxCollectionTotalGas             uint64
+		builderExpiryBuffer               uint
+		builderPayerRateLimitDryRun       bool
+		builderPayerRateLimit             float64
+		builderUnlimitedPayers            []string
+		hotstuffMinTimeout                time.Duration
+		hotstuffTimeoutAdjustmentFactor   float64
+		hotstuffHappyPathMaxRoundFailures uint64
+		blockRateDelay                    time.Duration
+		startupTimeString                 string
+		startupTime                       time.Time
 
 		mainConsensusCommittee  *committees.Consensus
 		followerState           protocol.MutableState
@@ -129,16 +128,12 @@ func main() {
 			"maximum byte size of the proposed collection")
 		flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", flow.DefaultMaxCollectionTotalGas,
 			"maximum total amount of maxgas of transactions in proposed collections")
-		flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
-			"the initial timeout for the hotstuff pacemaker")
 		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond,
-			"the lower timeout bound for the hotstuff pacemaker")
-		flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor",
-			timeout.DefaultConfig.TimeoutIncrease,
-			"multiplicative increase of timeout value in case of time out event")
-		flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor",
-			timeout.DefaultConfig.TimeoutDecrease,
-			"multiplicative decrease of timeout value in case of progress")
+			"the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
+		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor,
+			"adjustment of timeout duration in case of time out event")
+		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures,
+			"number of failed rounds before first timeout increase")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
 		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
@@ -463,10 +458,9 @@ func main() {
 
 			opts := []consensus.Option{
 				consensus.WithBlockRateDelay(blockRateDelay),
-				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
-				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
+				consensus.WithTimeoutAdjustmentFactor(hotstuffTimeoutAdjustmentFactor),
+				consensus.WithHappyPathMaxRoundFailures(hotstuffHappyPathMaxRoundFailures),
 			}
 
 			if !startupTime.IsZero() {
