@@ -30,7 +30,7 @@ import (
 type Core struct {
 	log               zerolog.Logger // used to log relevant actions with context
 	config            compliance.Config
-	metrics           module.EngineMetrics
+	engineMetrics     module.EngineMetrics
 	mempoolMetrics    module.MempoolMetrics
 	collectionMetrics module.CollectionMetrics
 	headers           storage.Headers
@@ -64,7 +64,7 @@ func NewCore(
 	c := &Core{
 		log:               log.With().Str("cluster_compliance", "core").Logger(),
 		config:            config,
-		metrics:           collector,
+		engineMetrics:     collector,
 		mempoolMetrics:    mempool,
 		collectionMetrics: collectionMetrics,
 		headers:           headers,

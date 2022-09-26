@@ -125,7 +125,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.ClusterBlockProposal)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
+					core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 				}
 				return ok
 			},
@@ -135,7 +135,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*events.SyncedClusterBlock)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
+					core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
 				}
 				return ok
 			},
@@ -156,7 +156,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.ClusterBlockVote)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
+					core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
 				}
 				return ok
 			},
@@ -179,7 +179,7 @@ func NewEngine(
 		unit:                       engine.NewUnit(),
 		lm:                         lifecycle.NewLifecycleManager(),
 		log:                        engineLog,
-		metrics:                    core.metrics,
+		metrics:                    core.engineMetrics,
 		me:                         me,
 		headers:                    core.headers,
 		payloads:                   payloads,
@@ -435,7 +435,7 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 			log.Err(err).Msg("could not broadcast timeout")
 			return
 		}
-		log.Info().Msg("cluster timeout broadcast")
+		log.Info().Msg("cluster timeout was broadcast")
 
 		// TODO(active-pacemaker): update metrics
 		//e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
@@ -513,7 +513,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			return
 		}
 
-		log.Info().Msg("cluster proposal proposed")
+		log.Info().Msg("cluster proposal was broadcast")
 
 		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 		block := &cluster.Block{

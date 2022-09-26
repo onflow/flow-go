@@ -57,6 +57,11 @@ func RandomAddressFixture() flow.Address {
 	return addr
 }
 
+// Uint64InRange returns a uint64 value drawn from the uniform random distribution [min,max].
+func Uint64InRange(min, max uint64) uint64 {
+	return min + uint64(rand.Intn(int(max)+1-int(min)))
+}
+
 func RandomSDKAddressFixture() sdk.Address {
 	addr := RandomAddressFixture()
 	var sdkAddr sdk.Address

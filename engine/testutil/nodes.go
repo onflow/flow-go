@@ -325,7 +325,6 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.PublicDB,
 		node.State,
 		createMetrics,
-		consensus.WithInitialTimeout(time.Second*2),
 	)
 	require.NoError(t, err)
 

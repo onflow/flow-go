@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/chainsync"
+	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -40,7 +41,7 @@ type Engine struct {
 	me      module.Local
 	con     network.Conduit
 	blocks  storage.Blocks
-	comp    network.Engine // compliance layer engine
+	comp    network.MessageProcessor
 
 	pollInterval         time.Duration
 	scanInterval         time.Duration
@@ -62,7 +63,7 @@ func New(
 	net network.Network,
 	me module.Local,
 	blocks storage.Blocks,
-	comp network.Engine,
+	comp network.MessageProcessor,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
 	participantsProvider identifier.IdentifierProvider,
@@ -304,12 +305,19 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 
 	for _, block := range res.Blocks {
 		if !e.core.HandleBlock(block.Header) {
-			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
+			e.log.Debug().Uint64("height", block.Header.Height).Msg("block does not need processing")
 			continue
 		}
+		// forward the block to the compliance engine for validation and processing
+		// we use the network.MessageProcessor interface here because the block is un-validated
+		err := e.comp.Process(channels.SyncCommittee, e.me.NodeID(), &events.SyncedBlock{
+			OriginID: originID,
+			Block:    block,
+		})
+		if err != nil {
+			e.log.Err(err).Msg("received unexpected error from compliance engine")
+		}
 	}
-
-	e.comp.SubmitLocal(res)
 }
 
 // checkLoop will regularly scan for items that need requesting.
