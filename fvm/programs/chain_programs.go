@@ -37,10 +37,10 @@ func NewChainPrograms(chainCacheSize uint) (*ChainPrograms, error) {
 
 func (chain *ChainPrograms) unsafeGet(
 	currentBlockId flow.Identifier,
-) *Programs {
+) *BlockPrograms {
 	currentEntry, ok := chain.lru.Get(currentBlockId)
 	if ok {
-		return currentEntry.(*Programs)
+		return currentEntry.(*BlockPrograms)
 	}
 
 	return nil
@@ -48,7 +48,7 @@ func (chain *ChainPrograms) unsafeGet(
 
 func (chain *ChainPrograms) Get(
 	currentBlockId flow.Identifier,
-) *Programs {
+) *BlockPrograms {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
@@ -58,7 +58,7 @@ func (chain *ChainPrograms) Get(
 func (chain *ChainPrograms) GetOrCreateBlockPrograms(
 	currentBlockId flow.Identifier,
 	parentBlockId flow.Identifier,
-) *Programs {
+) *BlockPrograms {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
@@ -67,12 +67,12 @@ func (chain *ChainPrograms) GetOrCreateBlockPrograms(
 		return currentEntry
 	}
 
-	var current *Programs
+	var current *BlockPrograms
 	parentEntry, ok := chain.lru.Get(parentBlockId)
 	if ok {
-		current = parentEntry.(*Programs).ChildPrograms()
+		current = parentEntry.(*BlockPrograms).NewChildBlockPrograms()
 	} else {
-		current = NewEmptyPrograms()
+		current = NewEmptyBlockPrograms()
 	}
 
 	chain.lru.Add(currentBlockId, current)
@@ -81,11 +81,11 @@ func (chain *ChainPrograms) GetOrCreateBlockPrograms(
 
 func (chain *ChainPrograms) NewBlockProgramsForScript(
 	currentBlockId flow.Identifier,
-) *Programs {
+) *BlockPrograms {
 	block := chain.Get(currentBlockId)
 	if block != nil {
-		return block.ChildPrograms()
+		return block.NewChildBlockPrograms()
 	}
 
-	return NewEmptyPrograms()
+	return NewEmptyBlockPrograms()
 }

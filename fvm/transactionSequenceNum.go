@@ -21,7 +21,7 @@ func (c *TransactionSequenceNumberChecker) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	_ *programs.Programs,
+	_ *programs.TransactionPrograms,
 ) error {
 	return c.checkAndIncrementSequenceNumber(proc, ctx, sth)
 }

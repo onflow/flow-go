@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -191,7 +190,6 @@ func TestTransactionVerification(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		nil := programs.NewEmptyPrograms()
 
 		// freeze account
 		err := accounts.SetAccountFrozen(frozenAddress, true)
