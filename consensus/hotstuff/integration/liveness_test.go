@@ -266,7 +266,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 		instances = append(instances, in)
 	}
 
-	// set up two instances which don't generate timeout objects
+	// set up two instances which don't generate and receive timeout objects
 	for n := healthyReplicas; n < healthyReplicas+replicasNotGeneratingTimeouts; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
@@ -274,6 +274,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
 			WithStopCondition(ViewFinalized(finalView)),
+			WithIncomingTimeoutObjects(BlockAllTimeoutObjects),
 			WithOutgoingTimeoutObjects(BlockAllTimeoutObjects),
 		)
 		instances = append(instances, in)
