@@ -40,7 +40,7 @@ import (
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
-type LibP2PFactoryFunc func(context.Context) (*p2pnode.Node, error)
+type LibP2PFactoryFunc func(context.Context) (p2pnode.LibP2PNode, error)
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
@@ -54,38 +54,8 @@ func DefaultLibP2PNodeFactory(
 	resolver madns.BasicResolver,
 	role string,
 ) LibP2PFactoryFunc {
-
-	return func(ctx context.Context) (*p2pnode.Node, error) {
-		connManager := connection.NewConnManager(log, metrics)
-
-		// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
-		peerFilter := notEjectedPeerFilter(idProvider)
-		connGater := connection.NewConnGater(log,
-			connection.WithOnInterceptPeerDialFilters([]p2p.PeerFilter{peerFilter}),
-			connection.WithOnInterceptSecuredFilters([]p2p.PeerFilter{peerFilter}),
-		)
-
-		builder := NewNodeBuilder(log, address, flowKey, sporkId).
-			SetBasicResolver(resolver).
-			SetConnectionManager(connManager).
-			SetConnectionGater(connGater).
-			SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-				return dht.NewDHT(
-					ctx,
-					host,
-					unicast.FlowDHTProtocolID(sporkId),
-					log,
-					metrics,
-					dht.AsServer(),
-				)
-			}).
-			SetPubSub(pubsub.NewGossipSub)
-
-		if role != "ghost" {
-			r, _ := flow.ParseRole(role)
-			builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
-		}
-
+	return func(ctx context.Context) (p2pnode.LibP2PNode, error) {
+		builder := DefaultNodeBuilder(log, address, flowKey, sporkId, idProvider, metrics, resolver, role)
 		return builder.Build(ctx)
 	}
 }
@@ -97,6 +67,8 @@ func DefaultMessageIDFunction(msg *pb.Message) string {
 	return h.SumHash().Hex()
 }
 
+type CreateNodeFunc func(logger zerolog.Logger, host host.Host, pubSub *pubsub.PubSub, routing routing.Routing, pCache *p2pnode.ProtocolPeerCache, uniMgr *unicast.Manager) p2pnode.LibP2PNode
+
 type NodeBuilder interface {
 	SetBasicResolver(madns.BasicResolver) NodeBuilder
 	SetSubscriptionFilter(pubsub.SubscriptionFilter) NodeBuilder
@@ -105,7 +77,8 @@ type NodeBuilder interface {
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 	SetPubSub(func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)) NodeBuilder
-	Build(context.Context) (*p2pnode.Node, error)
+	SetCreateNode(CreateNodeFunc) NodeBuilder
+	Build(context.Context) (p2pnode.LibP2PNode, error)
 }
 
 type LibP2PNodeBuilder struct {
@@ -120,6 +93,7 @@ type LibP2PNodeBuilder struct {
 	connGater          connmgr.ConnectionGater
 	routingFactory     func(context.Context, host.Host) (routing.Routing, error)
 	pubsubFactory      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
+	createNode         CreateNodeFunc
 }
 
 func NewNodeBuilder(
@@ -133,6 +107,7 @@ func NewNodeBuilder(
 		sporkID:    sporkID,
 		addr:       addr,
 		networkKey: networkKey,
+		createNode: DefaultCreateNodeFunc,
 	}
 }
 
@@ -171,13 +146,22 @@ func (builder *LibP2PNodeBuilder) SetPubSub(f func(context.Context, host.Host, .
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*p2pnode.Node, error) {
+func (builder *LibP2PNodeBuilder) SetCreateNode(f CreateNodeFunc) NodeBuilder {
+	builder.createNode = f
+	return builder
+}
+
+func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (p2pnode.LibP2PNode, error) {
 	if builder.routingFactory == nil {
 		return nil, errors.New("routing factory is not set")
 	}
 
 	if builder.pubsubFactory == nil {
 		return nil, errors.New("pubsub factory is not set")
+	}
+
+	if builder.createNode == nil {
+		return nil, errors.New("create node func is not set")
 	}
 
 	var opts []libp2p.Option
@@ -234,12 +218,60 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*p2pnode.Node, err
 		return nil, err
 	}
 
-	n := p2pnode.NewNode(builder.logger, host, pubSub, rsys, pCache, unicast.NewUnicastManager(
+	unicastManager := unicast.NewUnicastManager(
 		builder.logger,
 		unicast.NewLibP2PStreamFactory(host),
 		builder.sporkID,
-	))
+	)
+	n := builder.createNode(builder.logger, host, pubSub, rsys, pCache, unicastManager)
 	return n, nil
+}
+
+func DefaultNodeBuilder(log zerolog.Logger,
+	address string,
+	flowKey fcrypto.PrivateKey,
+	sporkId flow.Identifier,
+	idProvider id.IdentityProvider,
+	metrics module.NetworkMetrics,
+	resolver madns.BasicResolver,
+	role string,
+) NodeBuilder {
+	connManager := connection.NewConnManager(log, metrics)
+
+	// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
+	peerFilter := notEjectedPeerFilter(idProvider)
+	connGater := connection.NewConnGater(log,
+		connection.WithOnInterceptPeerDialFilters([]p2p.PeerFilter{peerFilter}),
+		connection.WithOnInterceptSecuredFilters([]p2p.PeerFilter{peerFilter}),
+	)
+
+	builder := NewNodeBuilder(log, address, flowKey, sporkId).
+		SetBasicResolver(resolver).
+		SetConnectionManager(connManager).
+		SetConnectionGater(connGater).
+		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+			return dht.NewDHT(
+				ctx,
+				host,
+				unicast.FlowDHTProtocolID(sporkId),
+				log,
+				metrics,
+				dht.AsServer(),
+			)
+		}).
+		SetPubSub(pubsub.NewGossipSub)
+
+	if role != "ghost" {
+		r, _ := flow.ParseRole(role)
+		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
+	}
+
+	return builder
+}
+
+// DefaultCreateNodeFunc returns new libP2P node.
+func DefaultCreateNodeFunc(logger zerolog.Logger, host host.Host, pubSub *pubsub.PubSub, routing routing.Routing, pCache *p2pnode.ProtocolPeerCache, uniMgr *unicast.Manager) p2pnode.LibP2PNode {
+	return p2pnode.NewNode(logger, host, pubSub, routing, pCache, uniMgr)
 }
 
 // DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and

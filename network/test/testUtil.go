@@ -112,8 +112,8 @@ func GenerateIDs(
 	logger zerolog.Logger,
 	n int,
 	opts ...func(*optsConfig),
-) (flow.IdentityList, []*p2pnode.Node, []observable.Observable) {
-	libP2PNodes := make([]*p2pnode.Node, n)
+) (flow.IdentityList, []p2pnode.LibP2PNode, []observable.Observable) {
+	libP2PNodes := make([]p2pnode.LibP2PNode, n)
 	tagObservables := make([]observable.Observable, n)
 
 	o := &optsConfig{peerUpdateInterval: connection.DefaultPeerUpdateInterval}
@@ -154,7 +154,7 @@ func GenerateIDs(
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2pnode.Node, codec network.Codec, consumer slashing.ViolationsConsumer, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []p2pnode.LibP2PNode, codec network.Codec, consumer slashing.ViolationsConsumer, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
@@ -171,7 +171,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		nodeId := identities[i].NodeID
 
 		// libp2p node factory for this instance of middleware
-		factory := func(ctx context.Context) (*p2pnode.Node, error) {
+		factory := func(ctx context.Context) (p2pnode.LibP2PNode, error) {
 			return node, nil
 		}
 
@@ -346,7 +346,7 @@ func generateLibP2PNode(
 	connGating bool,
 	idProvider id.IdentityProvider,
 	opts ...nodeBuilderOption,
-) (*p2pnode.Node, observable.Observable) {
+) (p2pnode.LibP2PNode, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
 

@@ -80,7 +80,7 @@ type Middleware struct {
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
 	// and worker routines.
 	wg                         *sync.WaitGroup
-	libP2PNode                 *p2pnode.Node
+	libP2PNode                 p2pnode.LibP2PNode
 	libP2PNodeFactory          p2pbuilder.LibP2PFactoryFunc
 	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier

@@ -77,7 +77,7 @@ func TestFilterSubscribe(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	testPublish := func(wg *sync.WaitGroup, from *p2pnode.Node, sub *pubsub.Subscription) {
+	testPublish := func(wg *sync.WaitGroup, from p2pnode.LibP2PNode, sub *pubsub.Subscription) {
 		data := []byte("hello")
 
 		err := from.Publish(context.TODO(), badTopic, data)

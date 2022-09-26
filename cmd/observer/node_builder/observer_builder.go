@@ -167,7 +167,7 @@ type ObserverServiceBuilder struct {
 	*ObserverServiceConfig
 
 	// components
-	LibP2PNode              *p2pnode.Node
+	LibP2PNode              p2pnode.LibP2PNode
 	FollowerState           stateprotocol.MutableState
 	SyncCore                *chainsync.Core
 	RpcEng                  *rpc.Engine
@@ -827,7 +827,7 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 // * No connection manager
 // * Default libp2p pubsub options
 func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
-	return func(ctx context.Context) (*p2pnode.Node, error) {
+	return func(ctx context.Context) (p2pnode.LibP2PNode, error) {
 		var pis []peer.AddrInfo
 
 		for _, b := range builder.bootstrapIdentities {
