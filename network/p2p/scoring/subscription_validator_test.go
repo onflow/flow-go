@@ -4,14 +4,14 @@ import (
 	"context"
 	"regexp"
 	"testing"
-	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
+	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/scoring"
-	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -140,17 +139,27 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 }
 
 func TestLibP2PSubscriptionValidator(t *testing.T) {
-	totalNodes := 3
+	totalNodes := 2
 
 	ctx := context.Background()
 	sporkId := unittest.IdentifierFixture()
 
-	var idProvider module.IdentityProvider
+	idProvider := mock.NewIdentityProvider(t)
 	nodes, ids := p2pfixtures.NodesFixture(t, ctx, sporkId, t.Name(), totalNodes,
 		p2pfixtures.WithLogger(unittest.Logger()),
 		p2pfixtures.WithPeerScoringEnabled(idProvider),
 		p2pfixtures.WithRole(flow.RoleConsensus))
-	idProvider = id.NewFixedIdentityProvider(ids)
+
+	provider := id.NewFixedIdentityProvider(ids)
+	idProvider.On("ByPeerID", mocktestify.Anything).Return(
+		func(peerId peer.ID) *flow.Identity {
+			identity, _ := provider.ByPeerID(peerId)
+			return identity
+		}, func(peerId peer.ID) bool {
+			_, ok := provider.ByPeerID(peerId)
+			return ok
+		})
+
 	defer p2pfixtures.StopNodes(t, nodes)
 
 	subs := make([]*pubsub.Subscription, len(nodes))
@@ -163,14 +172,7 @@ func TestLibP2PSubscriptionValidator(t *testing.T) {
 		subs[i] = sub
 	}
 
-	pInfo0, err := utils.PeerAddressInfo(*ids[0])
-	require.NoError(t, err)
-	for _, node := range nodes[1:] {
-		require.NoError(t, node.AddPeer(ctx, pInfo0))
-	}
-
-	// let the subscriptions propagate
-	time.Sleep(1 * time.Second)
+	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
 	syncRequestEvent := &messages.SyncRequest{Nonce: 0, Height: 0}
 	syncRequestMsg := p2pfixtures.MustEncodeEvent(t, syncRequestEvent)
@@ -178,6 +180,19 @@ func TestLibP2PSubscriptionValidator(t *testing.T) {
 	require.NoError(t, nodes[0].Publish(ctx, topic, syncRequestMsg))
 
 	// checks that the message is received by all nodes.
-	ctx1s, _ := context.WithTimeout(ctx, 5*time.Second)
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, syncRequestMsg, subs[1:])
+	p2pfixtures.SubsMustReceiveMessage(t, ctx, syncRequestMsg, subs[1:])
+
+	//_, err := nodes[0].Subscribe("invalid-topic", unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	//require.NoError(t, err)
+	//
+	//time.Sleep(5 * time.Second)
+	//
+	//syncRequestEvent = &messages.SyncRequest{Nonce: 1, Height: 1}
+	//syncRequestMsg = p2pfixtures.MustEncodeEvent(t, syncRequestEvent)
+	//// publishes a message to the topic.
+	//require.NoError(t, nodes[0].Publish(ctx, topic, syncRequestMsg))
+	//
+	//// checks that the message is received by all nodes.
+	//ctx1s, _ = context.WithTimeout(ctx, 5*time.Second)
+	//p2pfixtures.SubsMustReceiveMessage(t, ctx1s, syncRequestMsg, subs[1:])
 }
