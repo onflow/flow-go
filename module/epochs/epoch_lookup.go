@@ -121,33 +121,9 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 		epochFallbackIsTriggered: atomic.NewBool(false),
 	}
 
-<<<<<<< HEAD
-// EpochForView returns the counter of the epoch that the view belongs to.
-// The protocol.State#Epochs object exposes previous, current, and next epochs,
-// which should be all we need. In general, we can't guarantee that a node will
-// have access to epoch data beyond these three, so it is safe to throw an error
-// for a query that doesn't fit within the view bounds of these three epochs
-// (even if the node does happen to have that stored in the underlying storage)
-// -- these queries indicate a bug in the querier.
-func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error) {
-	epochs := l.state.Final().Epochs()
-	previous := epochs.Previous()
-	current := epochs.Current()
-	next := epochs.Next()
-
-	for _, epoch := range []protocol.Epoch{previous, current, next} {
-		counter, err := epoch.Counter()
-		if errors.Is(err, protocol.ErrNoPreviousEpoch) {
-			continue
-		}
-		if err != nil {
-			return 0, err
-		}
-=======
 	lookup.Component = component.NewComponentManagerBuilder().
 		AddWorker(lookup.handleProtocolEvents).
 		Build()
->>>>>>> feature/active-pacemaker
 
 	final := state.Final()
 
@@ -193,38 +169,10 @@ func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error)
 	return lookup, nil
 }
 
-<<<<<<< HEAD
-// EpochForViewWithFallback returns the counter of the epoch that the input
-// view belongs to, with the same rules as EpochForView, except that this
-// function will return the last committed epoch counter in perpetuity in the
-// case that any epoch preparation. For example, if we are in epoch 10, and
-// reach the final view of epoch 10 before epoch 11 has finished being setup,
-// this function will return 10 even after the final view of epoch 10.
-func (l *EpochLookup) EpochForViewWithFallback(view uint64) (uint64, error) {
-
-	epochs := l.state.Final().Epochs()
-	current := epochs.Current()
-	next := epochs.Next()
-
-	// TMP: EMERGENCY EPOCH CHAIN CONTINUATION [EECC]
-	//
-	// If the given view is within the bounds of the next epoch, and the epoch
-	// has not been set up or committed, we pretend that we are still in the
-	// current epoch and return that epoch's counter.
-	//
-	// This is used to determine which Random Beacon key we will use to sign and
-	// verify blocks and votes. The failure case we are avoiding here is if the
-	// DKG for next epoch failed and there is no Random Beacon key for that epoch,
-	// or if the next epoch failed for any other reason. In either case we will
-	// continue using the last valid Random Beacon key until the next spork.
-	//
-	currentFinalView, err := current.FinalView()
-=======
 // cacheEpoch caches the given epoch's view range. Must only be called with committed epochs.
 // No errors are expected during normal operation.
 func (lookup *EpochLookup) cacheEpoch(epoch protocol.Epoch) error {
 	counter, err := epoch.Counter()
->>>>>>> feature/active-pacemaker
 	if err != nil {
 		return err
 	}
