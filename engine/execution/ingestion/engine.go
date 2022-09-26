@@ -730,7 +730,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		// double check. Even if requested stop height has been changed multiple times,
 		// as long as it matches this block we are safe to terminate
 		e.stopAtHeight.Try(func(stopHeight uint64, crash bool) bool {
-			if executableBlock.Height()-1 == stopHeight {
+			if executableBlock.Height() == stopHeight-1 {
 				e.stopExecution(crash, stopHeight)
 				return true
 			}
