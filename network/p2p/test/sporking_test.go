@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -167,10 +168,13 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	// spork topic is derived by suffixing the channel with the root block ID
 	topicBeforeSpork := channels.TopicFromChannel(channels.TestNetworkChannel, previousSporkId)
 
+	logger := unittest.Logger()
+	topicValidator := flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
+
 	// both nodes are initially on the same spork and subscribed to the same topic
-	_, err = node1.Subscribe(topicBeforeSpork, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+	_, err = node1.Subscribe(topicBeforeSpork, topicValidator)
 	require.NoError(t, err)
-	sub2, err := node2.Subscribe(topicBeforeSpork, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+	sub2, err := node2.Subscribe(topicBeforeSpork, topicValidator)
 	require.NoError(t, err)
 
 	// add node 2 as a peer of node 1
@@ -194,7 +198,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	// and keeping node2 subscribed to topic 'topicBeforeSpork'
 	err = node1.UnSubscribe(topicBeforeSpork)
 	require.NoError(t, err)
-	_, err = node1.Subscribe(topicAfterSpork, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+	_, err = node1.Subscribe(topicAfterSpork, topicValidator)
 	require.NoError(t, err)
 
 	// assert that node 1 can no longer send a message to node 2 via PubSub

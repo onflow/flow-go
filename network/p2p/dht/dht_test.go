@@ -12,14 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/network/p2p/dht"
-
-	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
-
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -154,8 +153,11 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	data, err := msg.Marshal()
 	require.NoError(t, err)
 
+	logger := unittest.Logger()
+
 	for _, n := range nodes {
-		s, err := n.Subscribe(topic, codec, unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+		topicValidator := flowpubsub.TopicValidator(logger, codec, unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
+		s, err := n.Subscribe(topic, topicValidator)
 		require.NoError(t, err)
 
 		go func(s *pubsub.Subscription, nodeID peer.ID) {

@@ -2,7 +2,6 @@ package p2pnode
 
 import (
 	"context"
-
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -11,12 +10,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 
-	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	"github.com/onflow/flow-go/network/slashing"
-	"github.com/onflow/flow-go/network/validator"
 )
 
 type LibP2PNode interface {
@@ -37,7 +32,7 @@ type LibP2PNode interface {
 	// ListPeers returns list of peer IDs for peers subscribed to the topic.
 	ListPeers(topic string) []peer.ID
 	// Subscribe subscribes the node to the given topic and returns the subscription
-	Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter p2p.PeerFilter, slashingViolationsConsumer slashing.ViolationsConsumer, validators ...validator.PubSubMessageValidator) (*pubsub.Subscription, error)
+	Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (*pubsub.Subscription, error)
 	// UnSubscribe cancels the subscriber and closes the topic.
 	UnSubscribe(topic channels.Topic) error
 	// Publish publishes the given payload on the topic.
