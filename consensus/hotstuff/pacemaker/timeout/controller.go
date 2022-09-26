@@ -1,6 +1,7 @@
 package timeout
 
 import (
+	"context"
 	"math"
 	"time"
 
@@ -33,7 +34,8 @@ type Controller struct {
 	cfg            Config
 	timer          *time.Timer
 	timerInfo      *model.TimerInfo
-	timeoutChannel <-chan time.Time
+	timeoutChannel chan time.Time
+	stopTicker     context.CancelFunc
 	maxExponent    float64 // max exponent for exponential function, derived from maximum round duration
 	r              uint64  // failed rounds counter, higher value results in longer round duration
 }
@@ -68,23 +70,65 @@ func (t *Controller) TimerInfo() *model.TimerInfo { return t.timerInfo }
 // New channel is created for each timer.
 // in the event the timeout is reached (specified as TimerInfo).
 // returns closed channel if no timer has been started.
-func (t *Controller) Channel() <-chan time.Time { return t.timeoutChannel }
+func (t *Controller) Channel() <-chan time.Time {
+	return t.timeoutChannel
+}
 
 // StartTimeout starts the timeout of the specified type and returns the timer info
 func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
-	if t.timer != nil { // stop old timer
+	// stop old timer and schedule stop of ticker
+	if t.timer != nil {
 		t.timer.Stop()
+		t.stopTicker()
 	}
 	duration := t.ReplicaTimeout()
 
+	// start round duration timer
 	startTime := time.Now().UTC()
 	timer := time.NewTimer(duration)
 	timerInfo := model.TimerInfo{View: view, StartTime: startTime, Duration: duration}
 	t.timer = timer
-	t.timeoutChannel = t.timer.C
+	t.timeoutChannel = make(chan time.Time, 1)
 	t.timerInfo = &timerInfo
 
+	var ctx context.Context
+	ctx, t.stopTicker = context.WithCancel(context.Background())
+
+	// start a ticker to rebroadcast timeout objects on regular basis as long as we are in the same round.
+	go tickAfterTimeout(ctx, t.timeoutChannel, t.timer.C)
+
 	return &timerInfo
+}
+
+// tickAfterTimeout is a utility function which starts ticking after observing timeout from single-shot timer
+// The idea is that after observing single-shot event we create a ticker which will send tick events to `tickSink` channel
+// note that first timeout event is sent as well. We use context to track when to stop.
+// This approach allows to have a concurrent-safe implementation where there is no unsafe state sharing between caller and
+// ticking logic.
+func tickAfterTimeout(ctx context.Context, tickSink chan time.Time, timeout <-chan time.Time) {
+	var tickerChannel <-chan time.Time
+	defer close(tickSink)
+	for {
+		select {
+		case val, ok := <-timeout:
+			// since this channel is single-shot we know this section will be called once
+			if !ok {
+				return
+			}
+			// create a ticker and schedule it to stop when we are done
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+			tickerChannel = ticker.C
+			// don't forget to send value to the sink
+			tickSink <- val
+		case val := <-tickerChannel:
+			// forward ticks to the sink
+			tickSink <- val
+		case <-ctx.Done():
+			// exit when asked
+			return
+		}
+	}
 }
 
 // ReplicaTimeout returns the duration of the current view before we time out
