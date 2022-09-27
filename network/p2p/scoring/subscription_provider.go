@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// SubscriptionProvider provides a list of topics a peer is subscribed to as well as a list of peers subscribed to a topic.
+// SubscriptionProvider provides a list of topics a peer is subscribed to.
 type SubscriptionProvider struct {
 	logger zerolog.Logger
 	tp     p2p.TopicProvider
@@ -20,9 +20,9 @@ type SubscriptionProvider struct {
 	peersByTopicUpdating sync.Map // whether a goroutine is already updating the list of peers for a topic
 
 	// allTopics is a list of all topics in the pubsub network that this node is subscribed to.
-	allTopicsLock   sync.RWMutex
-	allTopics       []string
-	allTopicsUpdate atomic.Bool
+	allTopicsLock   sync.RWMutex // protects allTopics
+	allTopics       []string     // list of all topics in the pubsub network that this node has subscribed to.
+	allTopicsUpdate atomic.Bool  // whether a goroutine is already updating the list of topics.
 }
 
 func NewSubscriptionProvider(logger zerolog.Logger, tp p2p.TopicProvider) *SubscriptionProvider {
@@ -34,6 +34,10 @@ func NewSubscriptionProvider(logger zerolog.Logger, tp p2p.TopicProvider) *Subsc
 }
 
 // GetSubscribedTopics returns all the subscriptions of a peer within the pubsub network.
+// Note that the current peer must be subscribed to the topic for it to the same topics in order
+// to query for other peers, e.g., if current peer has subscribed to topics A and B, and peer1
+// has subscribed to topics A, B, and C, then GetSubscribedTopics(peer1) will return A and B. Since this peer
+// has not subscribed to topic C, it will not be able to query for other peers subscribed to topic C.
 func (s *SubscriptionProvider) GetSubscribedTopics(pid peer.ID) []string {
 	topics := s.getAllTopics()
 	subscriptions := make([]string, 0)
@@ -55,6 +59,7 @@ func (s *SubscriptionProvider) GetSubscribedTopics(pid peer.ID) []string {
 // list.
 func (s *SubscriptionProvider) getAllTopics() []string {
 	go func() {
+		// TODO: refactor this to a component manager worker once we have a startable libp2p node.
 		if updateInProgress := s.allTopicsUpdate.CompareAndSwap(false, true); updateInProgress {
 			// another goroutine is already updating the list of topics
 			return
@@ -87,6 +92,7 @@ func (s *SubscriptionProvider) getAllTopics() []string {
 // subscribed to the topic in the pubsub network due to an inherent limitation of GossipSub.
 func (s *SubscriptionProvider) getPeersByTopic(topic string) []peer.ID {
 	go func() {
+		// TODO: refactor this to a component manager worker once we have a startable libp2p node.
 		if _, updateInProgress := s.peersByTopicUpdating.LoadOrStore(topic, true); updateInProgress {
 			// another goroutine is already updating the list of peers for this topic
 			return
