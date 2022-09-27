@@ -505,7 +505,7 @@ func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_inval
 		nil, "", nil, nil, invalidSignatureAlgo, 0,
 	)
 
-	require.IsType(t, errors.ValueError{}, err)
+	require.True(t, errors.IsValueError(err))
 
 	require.Contains(t, err.Error(), fmt.Sprintf("%d", invalidSignatureAlgo))
 
@@ -532,7 +532,7 @@ func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_inval
 		nil, "", nil, nil, runtime.SignatureAlgorithmECDSA_P256, invalidHashAlgo,
 	)
 
-	require.IsType(t, errors.ValueError{}, err)
+	require.True(t, errors.IsValueError(err))
 
 	require.Contains(t, err.Error(), fmt.Sprintf("%d", invalidHashAlgo))
 
@@ -559,7 +559,7 @@ func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_inval
 		nil, "random_tag", nil, invalidPublicKey, runtime.SignatureAlgorithmECDSA_P256, runtime.HashAlgorithmSHA2_256,
 	)
 
-	require.IsType(t, errors.ValueError{}, err)
+	require.True(t, errors.IsValueError(err))
 	errorString := err.Error()
 
 	require.Contains(t, errorString, fmt.Sprintf("%x", invalidPublicKey))
