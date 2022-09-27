@@ -126,8 +126,8 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	for _, role := range flow.Roles() {
 		peer := p2pfixtures.PeerIdFixture(t)
 		unauthorizedChannels := channels.Channels(). // all channels
-								ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
-								ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
+			ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
+			ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
 		sporkID := unittest.IdentifierFixture()
 		unauthorizedTopics := make([]string, 0, len(unauthorizedChannels))
 		for _, channel := range unauthorizedChannels {
@@ -144,7 +144,23 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 }
 
 // TestSubscriptionValidator_Integration tests that when a peer is subscribed to an invalid topic, it is penalized
-// by the subscription validator of other peers on that channel, and they prevent the peer from sending messages on that channel.
+// by the subscription validator of other peers on that same (invalid) topic,
+// and they prevent the peer from sending messages on that topic.
+// This test is an integration test that tests the subscription validator in the context of the pubsub.
+//
+// Scenario:
+// Part-1:
+// 1. Two verification nodes and one consensus node are created.
+// 2. All nodes subscribe to a legit shared topic (PushBlocks).
+// 3. Consensus node publishes a block on this topic.
+// 4. Test checks that all nodes receive the block.
+//
+// Part-2:
+// 1. Consensus node subscribes to an invalid topic, which it is not supposed to (RequestChunks).
+// 2. Consensus node publishes a block on the PushBlocks topic.
+// 3. Test checks that none of the nodes receive the block.
+// 4. Verification node also publishes a chunk request on the RequestChunks channel.
+// 5. Test checks that consensus node does not receive the chunk request while the other verification node does.
 func TestSubscriptionValidator_Integration(t *testing.T) {
 	ctx := context.Background()
 	sporkId := unittest.IdentifierFixture()
