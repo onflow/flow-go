@@ -2,6 +2,8 @@ package integration
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 	"sync"
 	"testing"
 	"time"
@@ -309,6 +311,79 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 		}
 	}
 	for i := 1; i < healthyReplicas; i++ {
+		assert.Equal(t, ref.forks.FinalizedBlock(), instances[i].forks.FinalizedBlock(), "instance %d should have same finalized block as first instance")
+		assert.Equal(t, finalizedViews, FinalizedViews(instances[i]), "instance %d should have same finalized view as first instance")
+	}
+}
+
+// TestAsyncClusterStartup tests a realistic scenario where nodes are started asynchronously:
+//   - Replicas are started in sequential order
+//   - Each replica skips voting for first block(emulating message omission).
+//   - Each replica skips first timeout object(emulating message omission).
+//   - At this point protocol loses liveness unless a timeout rebroadcast happens from super-majority of replicas.
+//
+// This test verifies that nodes still make progress, despite first TO messages being lost.
+// Implementation:
+//   - We have 4 replicas in total, each of them skips voting for first view to force a timeout
+//   - Block timeouts for whole committee until each replicas generates a timeout.
+//   - After each replica has generated a timeout allow subsequent timeout rebroadcasts to make progress.
+func TestAsyncClusterStartup(t *testing.T) {
+	replicas := 4
+	finalView := uint64(20)
+
+	// generate the seven hotstuff participants
+	participants := unittest.IdentityListFixture(replicas)
+	instances := make([]*Instance, 0, replicas)
+	root := DefaultRoot()
+	// set block rate delay to be bigger than minimal timeout
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, 6, 0)
+	require.NoError(t, err)
+
+	// set up instances that work fully
+	var lock sync.Mutex
+	timeoutObjectGenerated := make(map[flow.Identifier]struct{}, 0)
+	for n := 0; n < replicas; n++ {
+		in := NewInstance(t,
+			WithRoot(root),
+			WithParticipants(participants),
+			WithLocalID(participants[n].NodeID),
+			WithTimeouts(timeouts),
+			WithStopCondition(ViewFinalized(finalView)),
+			WithOutgoingVotes(func(vote *model.Vote) bool {
+				return vote.View == 1
+			}),
+			WithOutgoingTimeoutObjects(func(object *model.TimeoutObject) bool {
+				lock.Lock()
+				defer lock.Unlock()
+				timeoutObjectGenerated[object.SignerID] = struct{}{}
+				// start allowing timeouts when every node has generated one
+				// when nodes will broadcast again, it will go through
+				return len(timeoutObjectGenerated) != replicas
+			}),
+		)
+		instances = append(instances, in)
+	}
+
+	// connect the communicators of the instances together
+	Connect(instances)
+
+	// start each node only after previous one has started
+	var wg sync.WaitGroup
+	for _, in := range instances {
+		wg.Add(1)
+		go func(in *Instance) {
+			err := in.Run()
+			require.True(t, errors.Is(err, errStopCondition))
+			wg.Done()
+		}(in)
+	}
+	wg.Wait()
+
+	// check that all instances have the same finalized block
+	ref := instances[0]
+	assert.Equal(t, finalView, ref.forks.FinalizedBlock().View, "expect instance 0 should made enough progress, but didn't")
+	finalizedViews := FinalizedViews(ref)
+	for i := 1; i < replicas; i++ {
 		assert.Equal(t, ref.forks.FinalizedBlock(), instances[i].forks.FinalizedBlock(), "instance %d should have same finalized block as first instance")
 		assert.Equal(t, finalizedViews, FinalizedViews(instances[i]), "instance %d should have same finalized view as first instance")
 	}
