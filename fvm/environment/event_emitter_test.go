@@ -151,7 +151,7 @@ func Test_EmitEvent_Limit(t *testing.T) {
 
 func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, eventEmitLimit uint64) environment.EventEmitter {
 	view := utils.NewSimpleView()
-	stTxn := state.NewStateTransaction(
+	stTxn := state.NewTransactionState(
 		view,
 		state.DefaultParameters().WithMeterParameters(
 			meter.DefaultParameters().WithEventEmitByteLimit(eventEmitLimit),

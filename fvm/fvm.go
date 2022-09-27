@@ -26,7 +26,7 @@ const (
 type Procedure interface {
 	Run(
 		ctx Context,
-		sth *state.StateHolder,
+		txnState *state.TransactionState,
 		programs *programs.TransactionPrograms,
 	) error
 
@@ -159,7 +159,7 @@ func (vm *VirtualMachine) RunV2(
 	eventSizeLimit := ctx.EventCollectionByteSizeLimit
 	meterParams = meterParams.WithEventEmitByteLimit(eventSizeLimit)
 
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		v,
 		state.DefaultParameters().
 			WithMeterParameters(meterParams).
@@ -168,7 +168,7 @@ func (vm *VirtualMachine) RunV2(
 			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
-	return proc.Run(ctx, stTxn, txnPrograms)
+	return proc.Run(ctx, txnState, txnPrograms)
 }
 
 // DEPRECATED. DO NOT USE
@@ -190,7 +190,7 @@ func (vm *VirtualMachine) GetAccountV2(
 	*flow.Account,
 	error,
 ) {
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		v,
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
@@ -212,7 +212,7 @@ func (vm *VirtualMachine) GetAccountV2(
 			err)
 	}
 
-	env := NewScriptEnv(context.Background(), ctx, stTxn, txnPrograms)
+	env := NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
 	account, err := env.GetAccount(address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {

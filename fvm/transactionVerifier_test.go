@@ -18,8 +18,8 @@ import (
 
 func TestTransactionVerification(t *testing.T) {
 	ledger := utils.NewSimpleView()
-	stTxn := state.NewStateTransaction(ledger, state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	txnState := state.NewTransactionState(ledger, state.DefaultParameters())
+	accounts := environment.NewAccounts(txnState)
 
 	// create 2 accounts
 	address1 := flow.HexToAddress("1234")
@@ -53,7 +53,7 @@ func TestTransactionVerification(t *testing.T) {
 		proc := fvm.Transaction(&tx, 0)
 
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
+		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
 		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), "duplicate signatures are provided for the same key"))
 	})
@@ -73,7 +73,7 @@ func TestTransactionVerification(t *testing.T) {
 		proc := fvm.Transaction(&tx, 0)
 
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
+		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
 		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), "duplicate signatures are provided for the same key"))
 	})
@@ -107,7 +107,7 @@ func TestTransactionVerification(t *testing.T) {
 
 		proc := fvm.Transaction(&tx, 0)
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
+		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
 		require.Error(t, err)
 
 		var envelopeError errors.InvalidEnvelopeSignatureError
@@ -143,7 +143,7 @@ func TestTransactionVerification(t *testing.T) {
 
 		proc := fvm.Transaction(&tx, 0)
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
+		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
 		require.Error(t, err)
 
 		var payloadError errors.InvalidPayloadSignatureError
@@ -176,7 +176,7 @@ func TestTransactionVerification(t *testing.T) {
 
 		proc := fvm.Transaction(&tx, 0)
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
+		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
 		require.Error(t, err)
 
 		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
