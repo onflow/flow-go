@@ -1,4 +1,4 @@
-package handler
+package environment
 
 import (
 	"fmt"
@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/environment"
 	stateMock "github.com/onflow/flow-go/fvm/mock/state"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -57,10 +56,10 @@ func (p testContractUpdaterStubs) UseContractAuditVoucher(
 }
 
 func TestContract_ChildMergeFunctionality(t *testing.T) {
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	accounts := NewAccounts(txnState)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
 	err := accounts.Create(nil, address)
@@ -130,10 +129,10 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 }
 
 func TestContract_AuthorizationFunctionality(t *testing.T) {
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	accounts := NewAccounts(txnState)
 
 	authAdd := flow.HexToAddress("01")
 	rAdd := runtime.Address(authAdd)
@@ -255,10 +254,10 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 
 func TestContract_DeploymentVouchers(t *testing.T) {
 
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	accounts := NewAccounts(txnState)
 
 	addressWithVoucher := flow.HexToAddress("01")
 	addressWithVoucherRuntime := runtime.Address(addressWithVoucher)
@@ -310,10 +309,10 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 
 func TestContract_ContractUpdate(t *testing.T) {
 
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	accounts := NewAccounts(txnState)
 
 	flowAddress := flow.HexToAddress("01")
 	runtimeAddress := runtime.Address(flowAddress)
@@ -408,10 +407,10 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 
 func TestContract_ContractRemoval(t *testing.T) {
 
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		utils.NewSimpleView(),
 		state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	accounts := NewAccounts(txnState)
 
 	flowAddress := flow.HexToAddress("01")
 	runtimeAddress := runtime.Address(flowAddress)

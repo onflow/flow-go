@@ -1,4 +1,4 @@
-package handler_test
+package environment_test
 
 import (
 	"encoding/hex"
@@ -111,12 +111,12 @@ func Test_Programs(t *testing.T) {
 		return nil, nil
 	})
 
-	stTxn := state.NewStateTransaction(mainView, state.DefaultParameters())
+	txnState := state.NewTransactionState(mainView, state.DefaultParameters())
 
 	vm := fvm.NewVM()
-	programs := programsStorage.NewEmptyPrograms()
+	programs := programsStorage.NewEmptyBlockPrograms()
 
-	accounts := environment.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(txnState)
 
 	err := accounts.Create(nil, addressA)
 	require.NoError(t, err)

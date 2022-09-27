@@ -17,8 +17,6 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p/connection"
 
-	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"

@@ -8,6 +8,23 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
+type TransactionInfoParams struct {
+	TxIndex uint32
+	TxId    flow.Identifier
+
+	TransactionFeesEnabled bool
+	LimitAccountStorage    bool
+}
+
+func DefaultTransactionInfoParams() TransactionInfoParams {
+	// NOTE: TxIndex and TxId are populated by NewTransactionEnv rather than by
+	// Context.
+	return TransactionInfoParams{
+		TransactionFeesEnabled: false,
+		LimitAccountStorage:    false,
+	}
+}
+
 // TransactionInfo exposes information associated with the executing
 // transaction.
 //
@@ -30,11 +47,7 @@ type TransactionInfo interface {
 }
 
 type transactionInfo struct {
-	txIndex uint32
-	txId    flow.Identifier
-
-	transactionFeesEnabled bool
-	limitAccountStorage    bool
+	params TransactionInfoParams
 
 	tracer *Tracer
 
@@ -43,10 +56,7 @@ type transactionInfo struct {
 }
 
 func NewTransactionInfo(
-	txIndex uint32,
-	txId flow.Identifier,
-	transactionFeesEnabled bool,
-	limitAccountStorage bool,
+	params TransactionInfoParams,
 	tracer *Tracer,
 	authorizers []flow.Address,
 	serviceAccount flow.Address,
@@ -63,10 +73,7 @@ func NewTransactionInfo(
 	}
 
 	return &transactionInfo{
-		txIndex:                    txIndex,
-		txId:                       txId,
-		transactionFeesEnabled:     transactionFeesEnabled,
-		limitAccountStorage:        limitAccountStorage,
+		params:                     params,
 		tracer:                     tracer,
 		authorizers:                runtimeAddresses,
 		isServiceAccountAuthorizer: isServiceAccountAuthorizer,
@@ -74,19 +81,19 @@ func NewTransactionInfo(
 }
 
 func (info *transactionInfo) TxIndex() uint32 {
-	return info.txIndex
+	return info.params.TxIndex
 }
 
 func (info *transactionInfo) TxID() flow.Identifier {
-	return info.txId
+	return info.params.TxId
 }
 
 func (info *transactionInfo) TransactionFeesEnabled() bool {
-	return info.transactionFeesEnabled
+	return info.params.TransactionFeesEnabled
 }
 
 func (info *transactionInfo) LimitAccountStorage() bool {
-	return info.limitAccountStorage
+	return info.params.LimitAccountStorage
 }
 
 func (info *transactionInfo) SigningAccounts() []runtime.Address {
@@ -98,7 +105,8 @@ func (info *transactionInfo) IsServiceAccountAuthorizer() bool {
 }
 
 func (info *transactionInfo) GetSigningAccounts() ([]runtime.Address, error) {
-	defer info.tracer.StartExtensiveTracingSpanFromRoot(trace.FVMEnvGetSigningAccounts).End()
+	defer info.tracer.StartExtensiveTracingSpanFromRoot(
+		trace.FVMEnvGetSigningAccounts).End()
 
 	return info.authorizers, nil
 }

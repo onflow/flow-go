@@ -29,7 +29,7 @@ type invalidatableProgramEntry struct {
 // represent "real" reads from the canonical source.
 type BlockPrograms struct {
 	lock     sync.RWMutex
-	programs map[common.LocationID]*invalidatableProgramEntry
+	programs map[common.Location]*invalidatableProgramEntry
 
 	latestCommitExecutionTime LogicalTime
 
@@ -47,12 +47,12 @@ type TransactionPrograms struct {
 	// The transaction (or script)'s execution start time (aka TxIndex).
 	executionTime LogicalTime
 
-	readSet  map[common.LocationID]*invalidatableProgramEntry
-	writeSet map[common.LocationID]ProgramEntry
+	readSet  map[common.Location]*invalidatableProgramEntry
+	writeSet map[common.Location]ProgramEntry
 
 	// NOTE: non-address programs are not reusable across transactions, hence
 	// they are kept out of the writeSet and the BlockPrograms database.
-	nonAddressSet map[common.LocationID]ProgramEntry
+	nonAddressSet map[common.Location]ProgramEntry
 
 	// When isSnapshotReadTransaction is true, invalidators must be empty.
 	isSnapshotReadTransaction bool
@@ -61,7 +61,7 @@ type TransactionPrograms struct {
 
 func newEmptyBlockPrograms(latestCommit LogicalTime) *BlockPrograms {
 	return &BlockPrograms{
-		programs:                  map[common.LocationID]*invalidatableProgramEntry{},
+		programs:                  map[common.Location]*invalidatableProgramEntry{},
 		latestCommitExecutionTime: latestCommit,
 		invalidators:              nil,
 	}
@@ -82,7 +82,7 @@ func (block *BlockPrograms) NewChildBlockPrograms() *BlockPrograms {
 	defer block.lock.RUnlock()
 
 	programs := make(
-		map[common.LocationID]*invalidatableProgramEntry,
+		map[common.Location]*invalidatableProgramEntry,
 		len(block.programs))
 
 	for locId, entry := range block.programs {
@@ -110,12 +110,12 @@ func (block *BlockPrograms) LatestCommitExecutionTimeForTestingOnly() LogicalTim
 	return block.latestCommitExecutionTime
 }
 
-func (block *BlockPrograms) EntriesForTestingOnly() map[common.LocationID]*invalidatableProgramEntry {
+func (block *BlockPrograms) EntriesForTestingOnly() map[common.Location]*invalidatableProgramEntry {
 	block.lock.RLock()
 	defer block.lock.RUnlock()
 
 	entries := make(
-		map[common.LocationID]*invalidatableProgramEntry,
+		map[common.Location]*invalidatableProgramEntry,
 		len(block.programs))
 	for locId, entry := range block.programs {
 		entries[locId] = entry
@@ -132,13 +132,13 @@ func (block *BlockPrograms) InvalidatorsForTestingOnly() chainedInvalidators {
 }
 
 func (block *BlockPrograms) GetForTestingOnly(
-	loc common.Location,
+	location common.Location,
 ) (
 	*interpreter.Program,
 	*state.State,
 	bool,
 ) {
-	entry := block.get(loc.ID())
+	entry := block.get(location)
 	if entry != nil {
 		return entry.Program, entry.State, true
 	}
@@ -146,12 +146,12 @@ func (block *BlockPrograms) GetForTestingOnly(
 }
 
 func (block *BlockPrograms) get(
-	locId common.LocationID,
+	location common.Location,
 ) *invalidatableProgramEntry {
 	block.lock.RLock()
 	defer block.lock.RUnlock()
 
-	return block.programs[locId]
+	return block.programs[location]
 }
 
 func (block *BlockPrograms) unsafeValidate(
@@ -290,9 +290,9 @@ func (block *BlockPrograms) newTransactionPrograms(
 		block:                     block,
 		snapshotTime:              snapshotTime,
 		executionTime:             executionTime,
-		readSet:                   map[common.LocationID]*invalidatableProgramEntry{},
-		writeSet:                  map[common.LocationID]ProgramEntry{},
-		nonAddressSet:             map[common.LocationID]ProgramEntry{},
+		readSet:                   map[common.Location]*invalidatableProgramEntry{},
+		writeSet:                  map[common.Location]ProgramEntry{},
+		nonAddressSet:             map[common.Location]ProgramEntry{},
 		isSnapshotReadTransaction: isSnapshotReadTransaction,
 	}, nil
 }
@@ -332,26 +332,25 @@ func (transaction *TransactionPrograms) Get(
 	*state.State,
 	bool,
 ) {
-	locId := location.ID()
 	_, ok := location.(common.AddressLocation)
 	if !ok {
-		nonAddrEntry, ok := transaction.nonAddressSet[locId]
+		nonAddrEntry, ok := transaction.nonAddressSet[location]
 		return nonAddrEntry.Program, nonAddrEntry.State, ok
 	}
 
-	writeEntry, ok := transaction.writeSet[locId]
+	writeEntry, ok := transaction.writeSet[location]
 	if ok {
 		return writeEntry.Program, writeEntry.State, true
 	}
 
-	readEntry := transaction.readSet[locId]
+	readEntry := transaction.readSet[location]
 	if readEntry != nil {
 		return readEntry.Program, readEntry.State, true
 	}
 
-	readEntry = transaction.block.get(locId)
+	readEntry = transaction.block.get(location)
 	if readEntry != nil {
-		transaction.readSet[locId] = readEntry
+		transaction.readSet[location] = readEntry
 		return readEntry.Program, readEntry.State, true
 	}
 
@@ -365,14 +364,14 @@ func (transaction *TransactionPrograms) Set(
 ) {
 	addrLoc, ok := location.(common.AddressLocation)
 	if !ok {
-		transaction.nonAddressSet[location.ID()] = ProgramEntry{
+		transaction.nonAddressSet[location] = ProgramEntry{
 			Program: program,
 			State:   state,
 		}
 		return
 	}
 
-	transaction.writeSet[location.ID()] = ProgramEntry{
+	transaction.writeSet[location] = ProgramEntry{
 		Location: addrLoc,
 		Program:  program,
 		State:    state,

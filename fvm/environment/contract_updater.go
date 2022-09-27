@@ -1,4 +1,4 @@
-package handler
+package environment
 
 import (
 	"bytes"
@@ -10,13 +10,28 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
+
+type ContractUpdaterParams struct {
+	// Depricated: RestrictedDeploymentEnabled is deprecated use
+	// SetIsContractDeploymentRestrictedTransaction instead.
+	// Can be removed after all networks are migrated to
+	// SetIsContractDeploymentRestrictedTransaction
+	RestrictContractDeployment bool
+	RestrictContractRemoval    bool
+}
+
+func DefaultContractUpdaterParams() ContractUpdaterParams {
+	return ContractUpdaterParams{
+		RestrictContractDeployment: true,
+		RestrictContractRemoval:    true,
+	}
+}
 
 type sortableContractUpdates struct {
 	keys    []programs.ContractUpdateKey
@@ -98,13 +113,13 @@ type ContractUpdaterStubs interface {
 }
 
 type contractUpdaterStubsImpl struct {
-	chain                      flow.Chain
-	restrictContractDeployment bool
-	restrictContractRemoval    bool
+	chain flow.Chain
 
-	logger          *environment.ProgramLogger
-	systemContracts *environment.SystemContracts
-	runtime         *environment.Runtime
+	ContractUpdaterParams
+
+	logger          *ProgramLogger
+	systemContracts *SystemContracts
+	runtime         *Runtime
 }
 
 func (impl *contractUpdaterStubsImpl) RestrictedDeploymentEnabled() bool {
@@ -114,7 +129,7 @@ func (impl *contractUpdaterStubsImpl) RestrictedDeploymentEnabled() bool {
 		// fallback to the default value set by the configuration
 		// after the contract deployment bool is set by the state on all
 		// chains, this logic can be simplified
-		return impl.restrictContractDeployment
+		return impl.RestrictContractDeployment
 	}
 	return enabled
 }
@@ -155,7 +170,7 @@ func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
 func (impl *contractUpdaterStubsImpl) RestrictedRemovalEnabled() bool {
 	// TODO read this from the chain similar to the contract deployment
 	// but for now we would honor the fallback context flag
-	return impl.restrictContractRemoval
+	return impl.RestrictContractRemoval
 }
 
 // GetAuthorizedAccounts returns a list of addresses authorized by the service
@@ -206,10 +221,10 @@ func (impl *contractUpdaterStubsImpl) UseContractAuditVoucher(
 }
 
 type contractUpdater struct {
-	tracer          *environment.Tracer
-	meter           environment.Meter
-	accounts        environment.Accounts
-	transactionInfo environment.TransactionInfo
+	tracer          *Tracer
+	meter           Meter
+	accounts        Accounts
+	transactionInfo TransactionInfo
 
 	draftUpdates map[programs.ContractUpdateKey]programs.ContractUpdate
 
@@ -219,7 +234,7 @@ type contractUpdater struct {
 var _ ContractUpdater = &contractUpdater{}
 
 func NewContractUpdaterForTesting(
-	accounts environment.Accounts,
+	accounts Accounts,
 	stubs ContractUpdaterStubs,
 ) *contractUpdater {
 	updater := NewContractUpdater(
@@ -228,8 +243,7 @@ func NewContractUpdaterForTesting(
 		accounts,
 		nil,
 		nil,
-		false,
-		false,
+		DefaultContractUpdaterParams(),
 		nil,
 		nil,
 		nil)
@@ -238,16 +252,15 @@ func NewContractUpdaterForTesting(
 }
 
 func NewContractUpdater(
-	tracer *environment.Tracer,
-	meter environment.Meter,
-	accounts environment.Accounts,
-	transactionInfo environment.TransactionInfo,
+	tracer *Tracer,
+	meter Meter,
+	accounts Accounts,
+	transactionInfo TransactionInfo,
 	chain flow.Chain,
-	restrictContractDeployment bool,
-	restrictContractRemoval bool,
-	logger *environment.ProgramLogger,
-	systemContracts *environment.SystemContracts,
-	runtime *environment.Runtime,
+	params ContractUpdaterParams,
+	logger *ProgramLogger,
+	systemContracts *SystemContracts,
+	runtime *Runtime,
 ) *contractUpdater {
 	updater := &contractUpdater{
 		tracer:          tracer,
@@ -255,12 +268,11 @@ func NewContractUpdater(
 		accounts:        accounts,
 		transactionInfo: transactionInfo,
 		ContractUpdaterStubs: &contractUpdaterStubsImpl{
-			logger:                     logger,
-			chain:                      chain,
-			restrictContractDeployment: restrictContractDeployment,
-			restrictContractRemoval:    restrictContractRemoval,
-			systemContracts:            systemContracts,
-			runtime:                    runtime,
+			logger:                logger,
+			chain:                 chain,
+			ContractUpdaterParams: params,
+			systemContracts:       systemContracts,
+			runtime:               runtime,
 		},
 	}
 
@@ -277,7 +289,7 @@ func (updater *contractUpdater) UpdateAccountContractCode(
 		trace.FVMEnvUpdateAccountContractCode).End()
 
 	err := updater.meter.MeterComputation(
-		environment.ComputationKindUpdateAccountContractCode,
+		ComputationKindUpdateAccountContractCode,
 		1)
 	if err != nil {
 		return fmt.Errorf("update account contract code failed: %w", err)
@@ -308,7 +320,7 @@ func (updater *contractUpdater) RemoveAccountContractCode(
 		trace.FVMEnvRemoveAccountContractCode).End()
 
 	err := updater.meter.MeterComputation(
-		environment.ComputationKindRemoveAccountContractCode,
+		ComputationKindRemoveAccountContractCode,
 		1)
 	if err != nil {
 		return fmt.Errorf("remove account contract code failed: %w", err)

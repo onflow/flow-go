@@ -5,13 +5,48 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // TODO(patrick): rm after emulator is updated
 type Environment = environment.Environment
+
+type EnvironmentParams struct {
+	Chain flow.Chain
+
+	// NOTE: The ServiceAccountEnabled option is used by the playground
+	// https://github.com/onflow/flow-playground-api/blob/1ad967055f31db8f1ce88e008960e5fc14a9fbd1/compute/computer.go#L76
+	ServiceAccountEnabled bool
+
+	environment.RuntimeParams
+
+	environment.TracerParams
+	environment.ProgramLoggerParams
+
+	environment.EventEmitterParams
+
+	environment.BlockInfoParams
+	environment.TransactionInfoParams
+
+	environment.ContractUpdaterParams
+}
+
+func DefaultEnvironmentParams() EnvironmentParams {
+	return EnvironmentParams{
+		Chain:                 flow.Mainnet.Chain(),
+		ServiceAccountEnabled: true,
+
+		RuntimeParams:         environment.DefaultRuntimeParams(),
+		TracerParams:          environment.DefaultTracerParams(),
+		ProgramLoggerParams:   environment.DefaultProgramLoggerParams(),
+		EventEmitterParams:    environment.DefaultEventEmitterParams(),
+		BlockInfoParams:       environment.DefaultBlockInfoParams(),
+		TransactionInfoParams: environment.DefaultTransactionInfoParams(),
+		ContractUpdaterParams: environment.DefaultContractUpdaterParams(),
+	}
+}
 
 var _ environment.Environment = &facadeEnvironment{}
 
@@ -42,30 +77,25 @@ type facadeEnvironment struct {
 	environment.AccountFreezer
 
 	*environment.AccountKeyReader
-	handler.AccountKeyUpdater
+	environment.AccountKeyUpdater
 
 	*environment.ContractReader
-	handler.ContractUpdater
-	*handler.Programs
+	environment.ContractUpdater
+	*environment.Programs
 
 	accounts environment.Accounts
 }
 
 func newFacadeEnvironment(
 	ctx Context,
-	stateTransaction *state.StateHolder,
-	programs handler.TransactionPrograms,
+	txnState *state.TransactionState,
+	programs environment.TransactionPrograms,
 	tracer *environment.Tracer,
 	meter environment.Meter,
 ) *facadeEnvironment {
-	accounts := environment.NewAccounts(stateTransaction)
-	logger := environment.NewProgramLogger(
-		tracer,
-		ctx.Logger,
-		ctx.Metrics,
-		ctx.CadenceLoggingEnabled,
-	)
-	runtime := environment.NewRuntime(ctx.ReusableCadenceRuntimePool)
+	accounts := environment.NewAccounts(txnState)
+	logger := environment.NewProgramLogger(tracer, ctx.ProgramLoggerParams)
+	runtime := environment.NewRuntime(ctx.RuntimeParams)
 	systemContracts := environment.NewSystemContracts(
 		ctx.Chain,
 		tracer,
@@ -98,6 +128,7 @@ func newFacadeEnvironment(
 			meter,
 			accounts,
 			systemContracts,
+			ctx.ServiceAccountEnabled,
 		),
 		TransactionInfo: environment.NoTransactionInfo{},
 
@@ -112,7 +143,7 @@ func newFacadeEnvironment(
 		UUIDGenerator: environment.NewUUIDGenerator(
 			tracer,
 			meter,
-			stateTransaction),
+			txnState),
 
 		AccountCreator: environment.NoAccountCreator{},
 		AccountFreezer: environment.NoAccountFreezer{},
@@ -122,18 +153,18 @@ func newFacadeEnvironment(
 			meter,
 			accounts,
 		),
-		AccountKeyUpdater: handler.NoAccountKeyUpdater{},
+		AccountKeyUpdater: environment.NoAccountKeyUpdater{},
 
 		ContractReader: environment.NewContractReader(
 			tracer,
 			meter,
 			accounts,
 		),
-		ContractUpdater: handler.NoContractUpdater{},
-		Programs: handler.NewPrograms(
+		ContractUpdater: environment.NoContractUpdater{},
+		Programs: environment.NewPrograms(
 			tracer,
 			meter,
-			stateTransaction,
+			txnState,
 			accounts,
 			programs),
 
