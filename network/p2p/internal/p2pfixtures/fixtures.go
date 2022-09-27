@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/utils"
+	"github.com/onflow/flow-go/utils/logging"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -85,16 +86,18 @@ func NodeFixture(
 		unittest.WithAddress(parameters.Address),
 		unittest.WithRole(parameters.Role))
 
+	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
+
 	noopMetrics := metrics.NewNoopCollector()
-	connManager := connection.NewConnManager(parameters.Logger, noopMetrics)
+	connManager := connection.NewConnManager(logger, noopMetrics)
 	resourceManager := test.NewResourceManager(t)
 
-	builder := p2pbuilder.NewNodeBuilder(parameters.Logger, parameters.Address, parameters.Key, sporkID).
+	builder := p2pbuilder.NewNodeBuilder(logger, parameters.Address, parameters.Key, sporkID).
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h,
 				protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
-				parameters.Logger,
+				logger,
 				noopMetrics,
 				parameters.DhtOptions...,
 			)
@@ -105,7 +108,7 @@ func NodeFixture(
 		filters := []p2p.PeerFilter{parameters.PeerFilter}
 		// set parameters.peerFilter as the default peerFilter for both callbacks
 		connGater := connection.NewConnGater(
-			parameters.Logger,
+			logger,
 			connection.WithOnInterceptPeerDialFilters(filters),
 			connection.WithOnInterceptSecuredFilters(filters))
 		builder.SetConnectionGater(connGater)
@@ -358,7 +361,13 @@ func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedData []byt
 		require.Equal(t, expectedData, msg.Data)
 		close(received)
 	}()
-	unittest.RequireCloseBefore(t, received, 5*time.Second, "could not receive expected message")
+
+	select {
+	case <-received:
+		return
+	case <-ctx.Done():
+		require.Fail(t, "timeout on receiving expected pubsub message")
+	}
 }
 
 // SubsMustReceiveMessage checks that all subscriptions receive the given message.
@@ -376,7 +385,11 @@ func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub *pubsu
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		close(timeouted)
 	}()
-	unittest.RequireCloseBefore(t, timeouted, 5*time.Second, "should not receive any message")
+
+	select {
+	case <-timeouted:
+		return
+	}
 }
 
 func SubsMustNeverReceiveMessage(t *testing.T, ctx context.Context, subs []*pubsub.Subscription) {

@@ -230,7 +230,7 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*p2pnode.Node, err
 		return nil, fmt.Errorf("could not create gossipsub: %w", err)
 	}
 	if scoreOpt != nil {
-		scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(pubSub))
+		scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, pubSub))
 	}
 
 	pCache, err := p2pnode.NewProtocolPeerCache(builder.logger, h)
