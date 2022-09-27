@@ -34,3 +34,29 @@ func MakeRange(min, max int) []int {
 	}
 	return a
 }
+
+// AreStringSlicesEqual returns true if the two string slices are equal.
+func AreStringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for _, v := range a {
+		if !StringSliceContainsElement(b, v) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// StringSliceContainsElement returns true if the string slice contains the element.
+func StringSliceContainsElement(a []string, v string) bool {
+	for _, x := range a {
+		if x == v {
+			return true
+		}
+	}
+
+	return false
+}
