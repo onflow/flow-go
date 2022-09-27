@@ -33,7 +33,7 @@ func TestMessagesLost(t *testing.T) {
 
 // TestMessagesLostAcrossNetwork verifies if each receiver lost 10% messages, the network can still reach consensus.
 func TestMessagesLostAcrossNetwork(t *testing.T) {
-	stopper := NewStopper(30, 0)
+	stopper := NewStopper(10, 0)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)

@@ -31,7 +31,8 @@ func stopNodes(t *testing.T, cancel context.CancelFunc, nodes []*Node) {
 	stoppingNodes := make([]<-chan struct{}, 0)
 	cancel()
 	for _, n := range nodes {
-		stoppingNodes = append(stoppingNodes, util.AllDone(n.committee, n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync))
+		stoppingNodes = append(stoppingNodes,
+			util.AllDone(n.committee, n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync))
 	}
 	unittest.RequireCloseBefore(t, util.AllClosed(stoppingNodes...), time.Second, "requiring nodes to stop")
 }
