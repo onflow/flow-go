@@ -40,6 +40,8 @@ func NewSubscriptionProvider(logger zerolog.Logger, tp p2p.TopicProvider) *Subsc
 // has not subscribed to topic C, it will not be able to query for other peers subscribed to topic C.
 func (s *SubscriptionProvider) GetSubscribedTopics(pid peer.ID) []string {
 	topics := s.getAllTopics()
+
+	// finds the topics that this peer is subscribed to.
 	subscriptions := make([]string, 0)
 	for _, topic := range topics {
 		peers := s.getPeersByTopic(topic)
@@ -66,10 +68,7 @@ func (s *SubscriptionProvider) getAllTopics() []string {
 		}
 
 		allTopics := s.tp.GetTopics()
-
-		s.allTopicsLock.Lock()
-		s.allTopics = allTopics
-		s.allTopicsLock.Unlock()
+		s.atomicUpdateAllTopics(allTopics)
 
 		// remove the update flag
 		s.allTopicsUpdate.Store(false)
@@ -112,4 +111,11 @@ func (s *SubscriptionProvider) getPeersByTopic(topic string) []peer.ID {
 		return make([]peer.ID, 0)
 	}
 	return peerId.([]peer.ID)
+}
+
+// atomicUpdateAllTopics updates the list of all topics in the pubsub network that this node has subscribed to.
+func (s *SubscriptionProvider) atomicUpdateAllTopics(allTopics []string) {
+	s.allTopicsLock.Lock()
+	s.allTopics = allTopics
+	s.allTopicsLock.Unlock()
 }
