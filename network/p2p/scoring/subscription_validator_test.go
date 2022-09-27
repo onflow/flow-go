@@ -229,7 +229,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	require.NoError(t, conNode.Publish(ctx, blockTopic, proposalMsg))
 
 	ctx5s, _ := context.WithTimeout(ctx, 5*time.Second)
-	p2pfixtures.SubsMustNeverReceiveMessage(t, ctx5s, []*pubsub.Subscription{ver1SubBlocks, ver2SubBlocks})
+	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []*pubsub.Subscription{ver1SubBlocks, ver2SubBlocks})
 
 	// moreover, a verification node publishing a message to the request chunk topic should not reach consensus node.
 	// however, both verification nodes should receive the message.
@@ -243,5 +243,5 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []*pubsub.Subscription{ver1SubChunks, ver2SubChunks})
 
 	ctx5s, _ = context.WithTimeout(ctx, 5*time.Second)
-	p2pfixtures.SubsMustNeverReceiveMessage(t, ctx5s, []*pubsub.Subscription{conSubChunks})
+	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []*pubsub.Subscription{conSubChunks})
 }

@@ -311,6 +311,7 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 	return libp2pNode
 }
 
+// PeerIdFixture creates a random and unique peer ID (libp2p node ID).
 func PeerIdFixture(t *testing.T) peer.ID {
 	key, err := generateNetworkingKey(unittest.IdentifierFixture())
 	require.NoError(t, err)
@@ -331,6 +332,7 @@ func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 }
 
+// PeerIdsFixture creates random and unique peer IDs (libp2p node IDs).
 func PeerIdsFixture(t *testing.T, n int) []peer.ID {
 	peerIDs := make([]peer.ID, n)
 	for i := 0; i < n; i++ {
@@ -339,6 +341,7 @@ func PeerIdsFixture(t *testing.T, n int) []peer.ID {
 	return peerIDs
 }
 
+// MustEncodeEvent encodes and returns the given event and fails the test if it faces any issue while encoding.
 func MustEncodeEvent(t *testing.T, v interface{}) []byte {
 	bz, err := unittest.NetworkCodec().Encode(v)
 	require.NoError(t, err)
@@ -352,13 +355,13 @@ func MustEncodeEvent(t *testing.T, v interface{}) []byte {
 	return data
 }
 
-// SubMustReceiveMessage checks that the subscription have received the expected message.
-func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedData []byte, sub *pubsub.Subscription) {
+// SubMustReceiveMessage checks that the subscription have received the given message within the given timeout by the context.
+func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, sub *pubsub.Subscription) {
 	received := make(chan struct{})
 	go func() {
 		msg, err := sub.Next(ctx)
 		require.NoError(t, err)
-		require.Equal(t, expectedData, msg.Data)
+		require.Equal(t, expectedMessage, msg.Data)
 		close(received)
 	}()
 
@@ -370,13 +373,14 @@ func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedData []byt
 	}
 }
 
-// SubsMustReceiveMessage checks that all subscriptions receive the given message.
-func SubsMustReceiveMessage(t *testing.T, ctx context.Context, msg []byte, subs []*pubsub.Subscription) {
+// SubsMustReceiveMessage checks that all subscriptions receive the given message within the given timeout by the context.
+func SubsMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, subs []*pubsub.Subscription) {
 	for _, sub := range subs {
-		SubMustReceiveMessage(t, ctx, msg, sub)
+		SubMustReceiveMessage(t, ctx, expectedMessage, sub)
 	}
 }
 
+// SubMustNeverReceiveAnyMessage checks that the subscription never receives any message within the given timeout by the context.
 func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub *pubsub.Subscription) {
 	timeouted := make(chan struct{})
 	go func() {
@@ -392,7 +396,8 @@ func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub *pubsu
 	}
 }
 
-func SubsMustNeverReceiveMessage(t *testing.T, ctx context.Context, subs []*pubsub.Subscription) {
+// SubsMustNeverReceiveAnyMessage checks that all subscriptions never receive any message within the given timeout by the context.
+func SubsMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, subs []*pubsub.Subscription) {
 	for _, sub := range subs {
 		SubMustNeverReceiveAnyMessage(t, ctx, sub)
 	}
