@@ -245,8 +245,15 @@ func NewStateValueSizeLimitError(value flow.RegisterValue, size, limit uint64) S
 }
 
 func (e StateValueSizeLimitError) Error() string {
+	valueStr := ""
+	if len(e.value) > 23 {
+		valueStr = string(e.value[0:10]) + "..." + string(e.value[len(e.value)-10:])
+	} else {
+		valueStr = string(e.value)
+	}
+
 	return fmt.Sprintf("%s value %s has size %d which is higher than storage value size limit %d.",
-		e.Code().String(), string(e.value[0:10])+"..."+string(e.value[len(e.value)-10:]), e.size, e.limit)
+		e.Code().String(), valueStr, e.size, e.limit)
 }
 
 // Code returns the error code for this error
