@@ -537,12 +537,7 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 }
 
 func (n *Network) Topology() flow.IdentityList {
-	fanout := n.topology.Fanout(n.Identities())
-	me := n.Identities().Filter(filter.HasNodeID(n.me.NodeID()))[0]
-	if me.Role == flow.RoleAccess {
-		fanout.Union(n.Identities().Filter(filter.HasRole(flow.RoleExecution)))
-	}
-	return fanout
+	return n.topology.Fanout(n.Identities())
 }
 
 func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
