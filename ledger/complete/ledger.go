@@ -336,6 +336,7 @@ func (l *Ledger) ExportCheckpointAt(
 	postCheckpointReporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
 	outputDir, outputFile string,
+	version int,
 ) (ledger.State, error) {
 
 	l.logger.Info().Msgf(
@@ -362,78 +363,11 @@ func (l *Ledger) ExportCheckpointAt(
 			fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
 	}
 
-	// TODO enable validity check of trie
-	// only check validity of the trie we are interested in
-	// l.logger.Info().Msg("Checking validity of the trie at the given state...")
-	// if !t.IsAValidTrie() {
-	//	 return nil, fmt.Errorf("trie is not valid: %w", err)
-	// }
-	// l.logger.Info().Msg("Trie is valid.")
-
-	// get all payloads
-	payloads := t.AllPayloads()
-	payloadSize := len(payloads)
-
-	// migrate payloads
-	for i, migrate := range migrations {
-		l.logger.Info().Msgf("migration %d is underway", i)
-
-		start := time.Now()
-		payloads, err = migrate(payloads)
-		elapsed := time.Since(start)
-
-		if err != nil {
-			return ledger.State(hash.DummyHash), fmt.Errorf("error applying migration (%d): %w", i, err)
-		}
-
-		newPayloadSize := len(payloads)
-
-		if payloadSize != newPayloadSize {
-			l.logger.Warn().
-				Int("migration_step", i).
-				Int("expected_size", payloadSize).
-				Int("outcome_size", newPayloadSize).
-				Msg("payload counts has changed during migration, make sure this is expected.")
-		}
-		l.logger.Info().Str("timeTaken", elapsed.String()).Msgf("migration %d is done", i)
-
-		payloadSize = newPayloadSize
-	}
-
-	l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
-
-	// get paths
-	paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
-	}
-
-	emptyTrie := trie.NewEmptyMTrie()
-
-	// no need to prune the data since it has already been prunned through migrations
-	applyPruning := false
-	newTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
-	}
+	newTrie := t
 
 	statecommitment := ledger.State(newTrie.RootHash())
 
 	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
-
-	l.logger.Info().Msgf("running pre-checkpoint reporters")
-	// run post migration reporters
-	for i, reporter := range preCheckpointReporters {
-		l.logger.Info().Msgf("running a pre-checkpoint generation reporter: %s, (%v/%v)", reporter.Name(), i, len(preCheckpointReporters))
-		err := runReport(reporter, payloads, statecommitment, l.logger)
-		if err != nil {
-			return ledger.State(hash.DummyHash), err
-		}
-	}
-
-	l.logger.Info().Msgf("finished running pre-checkpoint reporters")
-
-	l.logger.Info().Msg("creating a checkpoint for the new trie")
 
 	l.logger.Info().Msg("storing the checkpoint to the file")
 
@@ -442,13 +376,18 @@ func (l *Ledger) ExportCheckpointAt(
 		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %v: %w", outputDir, err)
 	}
 
-	// err = realWAL.StoreCheckpointV6([]*trie.MTrie{newTrie}, outputDir, "root.checkpoint", &l.logger)
-	writer, err := realWAL.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
+	if version == 6 {
+		err = realWAL.StoreCheckpointV6([]*trie.MTrie{newTrie}, outputDir, "root.checkpoint", &l.logger)
+	} else if version == 5 {
+		writer, err := realWAL.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
+		if err != nil {
+			return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
+		}
+		err = realWAL.StoreCheckpointV5(writer, newTrie)
+		writer.Close()
+	} else {
+		return ledger.State(hash.DummyHash), fmt.Errorf("invalid version:%v", version)
 	}
-	err = realWAL.StoreCheckpointV5(writer, newTrie)
-	writer.Close()
 
 	// Writing the checkpoint takes time to write and copy.
 	// Without relying on an exit code or stdout, we need to know when the copy is complete.
@@ -462,19 +401,6 @@ func (l *Ledger) ExportCheckpointAt(
 	}
 
 	l.logger.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
-
-	l.logger.Info().Msgf("finished running post-checkpoint reporters")
-
-	// running post checkpoint reporters
-	for i, reporter := range postCheckpointReporters {
-		l.logger.Info().Msgf("running a post-checkpoint generation reporter: %s, (%v/%v)", reporter.Name(), i, len(postCheckpointReporters))
-		err := runReport(reporter, payloads, statecommitment, l.logger)
-		if err != nil {
-			return ledger.State(hash.DummyHash), err
-		}
-	}
-
-	l.logger.Info().Msgf("ran all post-checkpoint reporters")
 
 	return statecommitment, nil
 }
