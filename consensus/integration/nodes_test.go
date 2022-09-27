@@ -581,6 +581,9 @@ func createNode(
 		[]*flow.Header{},
 		hotstuffModules,
 		consensus.WithMinTimeout(hotstuffTimeout),
+		func(config *consensus.ParticipantConfig) {
+			config.MaxTimeoutObjectRebroadcastInterval = hotstuffTimeout
+		},
 	)
 	require.NoError(t, err)
 

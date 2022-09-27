@@ -53,7 +53,8 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 		time.Duration(maxRepTimeout*1e6),
 		multiplicativeIncrease,
 		happyPathMaxRoundFailures,
-		0)
+		0,
+		time.Duration(maxRepTimeout*1e6))
 	require.NoError(s.T(), err)
 
 	s.livenessData = &hotstuff.LivenessData{

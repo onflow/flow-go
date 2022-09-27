@@ -94,8 +94,11 @@ func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
 	var ctx context.Context
 	ctx, t.stopTicker = context.WithCancel(context.Background())
 
+	// when round duration is small react with faster timeout rebroadcasts
+	tickInterval := time.Duration(math.Min(float64(duration), t.cfg.MaxTimeoutObjectRebroadcastInterval))
+
 	// start a ticker to rebroadcast timeout objects on regular basis as long as we are in the same round.
-	go tickAfterTimeout(ctx, t.timeoutChannel, t.timer.C)
+	go tickAfterTimeout(ctx, tickInterval, t.timeoutChannel, t.timer.C)
 
 	return &timerInfo
 }
@@ -105,7 +108,7 @@ func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
 // note that first timeout event is sent as well. We use context to track when to stop.
 // This approach allows to have a concurrent-safe implementation where there is no unsafe state sharing between caller and
 // ticking logic.
-func tickAfterTimeout(ctx context.Context, tickSink chan time.Time, timeout <-chan time.Time) {
+func tickAfterTimeout(ctx context.Context, tickInterval time.Duration, tickSink chan time.Time, timeout <-chan time.Time) {
 	var tickerChannel <-chan time.Time
 	defer close(tickSink)
 	for {
@@ -116,7 +119,7 @@ func tickAfterTimeout(ctx context.Context, tickSink chan time.Time, timeout <-ch
 				return
 			}
 			// create a ticker and schedule it to stop when we are done
-			ticker := time.NewTicker(time.Second)
+			ticker := time.NewTicker(tickInterval)
 			defer ticker.Stop()
 			tickerChannel = ticker.C
 			// don't forget to send value to the sink

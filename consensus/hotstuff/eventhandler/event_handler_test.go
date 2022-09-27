@@ -29,6 +29,7 @@ const (
 	maxRepTimeout             float64 = 600.0 // Milliseconds
 	multiplicativeIncrease    float64 = 1.5   // multiplicative factor
 	happyPathMaxRoundFailures uint64  = 6     // number of failed rounds before first timeout increase
+
 )
 
 // TestPaceMaker is a real pacemaker module with logging for view changes
@@ -79,7 +80,8 @@ func initPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData) hots
 		time.Duration(maxRepTimeout*1e6),
 		multiplicativeIncrease,
 		happyPathMaxRoundFailures,
-		0)
+		0,
+		time.Duration(maxRepTimeout*1e6))
 	require.NoError(t, err)
 	persist := &mocks.Persister{}
 	persist.On("PutLivenessData", mock.Anything).Return(nil).Maybe()
