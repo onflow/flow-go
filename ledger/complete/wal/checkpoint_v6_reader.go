@@ -202,7 +202,22 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 	var bufReader io.Reader = bufio.NewReaderSize(f, defaultBufioReadSize)
 	reader := NewCRC32Reader(bufReader)
 
-	scratch := make([]byte, 1024*4)           // must not be less than 1024
+	// read file part index and verify
+	scratch := make([]byte, 1024*4) // must not be less than 1024
+	_, err = io.ReadFull(reader, scratch[:encFilePartIndexSize])
+	if err != nil {
+		return nil, fmt.Errorf("could not read file part index: %w", err)
+	}
+
+	readIndex, err := decodeFileIndex(scratch[:encFilePartIndexSize])
+	if err != nil {
+		return nil, fmt.Errorf("could not decode file part index: %w", err)
+	}
+
+	if index != int(readIndex) {
+		return nil, fmt.Errorf("checkpoint file index (%v) mismatch, index in file name does not match with index in file (%v)", index, readIndex)
+	}
+
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	for i := uint64(1); i <= nodesCount; i++ {
 		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
@@ -265,7 +280,7 @@ func readSubTriesNodeCount(f *os.File) (uint64, error) {
 		return 0, fmt.Errorf("could not read footer: %w", err)
 	}
 
-	return decodeSubtrieFooter(footer)
+	return decodeNodeCount(footer)
 }
 
 // 17th part file contains:
@@ -278,8 +293,6 @@ func readSubTriesNodeCount(f *os.File) (uint64, error) {
 // 7. trie count
 // 6. checksum
 func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32) ([]*trie.MTrie, error) {
-	// TODO: read subtrie count
-
 	filepath, _ := filePathTopTries(dir, fileName)
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -290,8 +303,6 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 		_ = file.Close()
 	}()
 
-	// TODO: read checksum and validate
-
 	topLevelNodesCount, triesCount, err := readNodeCount(file)
 	if err != nil {
 		return nil, fmt.Errorf("could not read node count: %w", err)
@@ -300,9 +311,6 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	topLevelNodes := make([]*node.Node, topLevelNodesCount+1) //+1 for 0 index meaning nil
 	tries := make([]*trie.MTrie, triesCount)
 
-	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
-	// TODO: read subtrie Node count and validate
-
 	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {
 		return nil, fmt.Errorf("could not seek to 0: %w", err)
@@ -310,6 +318,23 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 
 	var bufReader io.Reader = bufio.NewReaderSize(file, defaultBufioReadSize)
 	reader := NewCRC32Reader(bufReader)
+
+	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
+	// read subtrie count
+	buf := make([]byte, encNodeCountSize)
+	_, err = io.ReadFull(reader, buf)
+	if err != nil {
+		return nil, fmt.Errorf("could not read subtrie node count: %w", err)
+	}
+	readSubtrieNodeCount, err := decodeNodeCount(buf)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode node count: %w", err)
+	}
+
+	if int(readSubtrieNodeCount) != totalSubTrieNodeCount {
+		return nil, fmt.Errorf("mismatch subtrie node count, read from disk (%v), but got actual node count (%v)",
+			readSubtrieNodeCount, totalSubTrieNodeCount)
+	}
 
 	// Scratch buffer is used as temporary buffer that reader can read into.
 	// Raw data in scratch buffer should be copied or converted into desired

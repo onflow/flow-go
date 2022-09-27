@@ -58,13 +58,14 @@ const VersionV6 uint16 = 0x06
 const MaxVersion = VersionV5
 
 const (
-	encMagicSize        = 2
-	encVersionSize      = 2
-	headerSize          = encMagicSize + encVersionSize
-	encSubtrieLevelSize = 2
-	encNodeCountSize    = 8
-	encTrieCountSize    = 2
-	crc32SumSize        = 4
+	encMagicSize         = 2
+	encVersionSize       = 2
+	headerSize           = encMagicSize + encVersionSize
+	encSubtrieLevelSize  = 2
+	encNodeCountSize     = 8
+	encTrieCountSize     = 2
+	crc32SumSize         = 4
+	encFilePartIndexSize = 2 // uint16
 )
 
 // defaultBufioReadSize replaces the default bufio buffer size of 4096 bytes.

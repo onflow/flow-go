@@ -195,6 +195,12 @@ func storeTopLevelNodesAndTrieRoots(
 
 	writer := NewCRC32Writer(closable)
 
+	// write subTriesNodeCount
+	_, err = writer.Write(encodeNodeCount(subTriesNodeCount))
+	if err != nil {
+		return 0, fmt.Errorf("could not write subtrie node count: %w", err)
+	}
+
 	topLevelNodeIndices, topLevelNodesCount, err := storeTopLevelNodes(
 		tries,
 		subTrieRootIndices,
@@ -382,6 +388,12 @@ func storeCheckpointSubTrie(
 	// be used to calculate CRC32 checksum
 	writer := NewCRC32Writer(closable)
 
+	// write file part index
+	_, err = writer.Write(encodeFileIndex(uint16(i)))
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("could not write file part index: %w", err)
+	}
+
 	// topLevelNodes contains all unique nodes of given tries
 	// from root to subtrie root and their index
 	// (ordered by node traversal sequence).
@@ -415,7 +427,7 @@ func storeCheckpointSubTrie(
 	totalNodeCount := nodeCounter - 1
 
 	// write total number of node as footer
-	footer := encodeSubtrieFooter(totalNodeCount)
+	footer := encodeNodeCount(totalNodeCount)
 	_, err = writer.Write(footer)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("cannot write checkpoint subtrie footer: %w", err)
@@ -513,13 +525,13 @@ func decodeFooter(footer []byte) (uint64, uint16, error) {
 	return nodesCount, triesCount, nil
 }
 
-func encodeSubtrieFooter(totalNodeCount uint64) []byte {
+func encodeNodeCount(totalNodeCount uint64) []byte {
 	footer := make([]byte, encNodeCountSize)
 	binary.BigEndian.PutUint64(footer, totalNodeCount)
 	return footer
 }
 
-func decodeSubtrieFooter(footer []byte) (uint64, error) {
+func decodeNodeCount(footer []byte) (uint64, error) {
 	if len(footer) != encNodeCountSize {
 		return 0, fmt.Errorf("wrong subtrie footer size, expect %v, got %v", encNodeCountSize, len(footer))
 	}
@@ -566,6 +578,19 @@ func encodeSubtrieLevel(level uint16) []byte {
 func decodeSubtrieLevel(encoded []byte) (uint16, error) {
 	if len(encoded) != encSubtrieLevelSize {
 		return 0, fmt.Errorf("wrong subtrie level size, expect %v, got %v", encSubtrieLevelSize, len(encoded))
+	}
+	return binary.BigEndian.Uint16(encoded), nil
+}
+
+func encodeFileIndex(index uint16) []byte {
+	header := make([]byte, encFilePartIndexSize)
+	binary.BigEndian.PutUint16(header, index)
+	return header
+}
+
+func decodeFileIndex(encoded []byte) (uint16, error) {
+	if len(encoded) != encFilePartIndexSize {
+		return 0, fmt.Errorf("wrong encoded file size, expect %v, got %v", encFilePartIndexSize, len(encoded))
 	}
 	return binary.BigEndian.Uint16(encoded), nil
 }

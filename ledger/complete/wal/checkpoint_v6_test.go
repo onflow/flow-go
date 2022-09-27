@@ -15,6 +15,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+func TestFileIndex(t *testing.T) {
+	index, err := decodeFileIndex(encodeFileIndex(uint16(20)))
+	require.NoError(t, err)
+	require.Equal(t, 20, int(index))
+}
+
 func TestVersion(t *testing.T) {
 	m, v, err := decodeVersion(encodeVersion(MagicBytes, VersionV6))
 	require.NoError(t, err)
@@ -35,9 +41,9 @@ func TestCRC32SumEncoding(t *testing.T) {
 	require.Equal(t, v, s)
 }
 
-func TestSubtrieFooterEncoding(t *testing.T) {
+func TestNodeCountEncoding(t *testing.T) {
 	v := uint64(100)
-	s, err := decodeSubtrieFooter(encodeSubtrieFooter(v))
+	s, err := decodeNodeCount(encodeNodeCount(v))
 	require.NoError(t, err)
 	require.Equal(t, v, s)
 }
@@ -150,7 +156,7 @@ func TestGetNodesByIndex(t *testing.T) {
 	}
 }
 
-func TestWriteAndReadCheckpoint(t *testing.T) {
+func TestWriteAndReadCheckpointV6(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
