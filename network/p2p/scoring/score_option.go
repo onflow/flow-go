@@ -126,7 +126,7 @@ func (s *ScoreOption) preparePeerScoreParams() {
 					Msg("invalid subscription detected, penalizing peer")
 				return MaxAppSpecificPenalty
 			}
-			s.logger.Info().
+			s.logger.Trace().
 				Str("peer_id", pid.String()).
 				Msg("subscribed topics for peer validated, rewarding peer")
 			return MaxAppSpecificReward
