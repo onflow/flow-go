@@ -40,7 +40,9 @@ func NewGCPBucketUploader(ctx context.Context, bucketName string, log zerolog.Lo
 	}, nil
 }
 
-func (u *GCPBucketUploader) Upload(computationResult *execution.ComputationResult) (err error) {
+// Upload uploads the computation result to the configured GCP bucket.
+// All errors returned from this function can be considered benign.
+func (u *GCPBucketUploader) Upload(computationResult *execution.ComputationResult) error {
 	var errs *multierror.Error
 
 	objectName := GCPBlockDataObjectName(computationResult)
@@ -48,25 +50,23 @@ func (u *GCPBucketUploader) Upload(computationResult *execution.ComputationResul
 
 	writer := object.NewWriter(u.ctx)
 
-	defer func() {
-		// flush and close the stream
-		// this occasionally fails with HTTP 50x errors due to flakiness on the network/GCP API
-		closeErr := writer.Close()
-		if closeErr != nil {
-			errs = multierror.Append(errs, fmt.Errorf("error while closing GCP object: %w", closeErr))
-		}
-
-		err = errs.ErrorOrNil()
-	}()
-
 	// serialize and write computation result to upload stream
-	writeErr := WriteComputationResultsTo(computationResult, writer)
-	if writeErr != nil {
-		errs = multierror.Append(errs, fmt.Errorf("error while writing computation result to GCP object: %w", writeErr))
-		return
+	err := WriteComputationResultsTo(computationResult, writer)
+
+	if err != nil {
+		errs = multierror.Append(errs, fmt.Errorf("error while writing computation result to GCP object: %w", err))
+		// fall through because we always want to close the writer
 	}
 
-	return
+	// flush and close the stream
+	err = writer.Close()
+
+	// this occasionally fails with HTTP 5xx errors due to flakiness on the network/GCP API
+	if err != nil {
+		errs = multierror.Append(errs, fmt.Errorf("error while closing GCP object: %w", err))
+	}
+
+	return errs.ErrorOrNil()
 }
 
 func GCPBlockDataObjectName(computationResult *execution.ComputationResult) string {
