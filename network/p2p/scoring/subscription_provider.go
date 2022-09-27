@@ -69,7 +69,7 @@ func (s *SubscriptionProvider) getAllTopics() []string {
 		// remove the update flag
 		s.allTopicsUpdate.Store(false)
 
-		s.logger.Info().Msgf("all topics updated: %v", allTopics)
+		s.logger.Trace().Msgf("all topics updated: %v", allTopics)
 	}()
 
 	s.allTopicsLock.RLock()
@@ -98,7 +98,7 @@ func (s *SubscriptionProvider) getPeersByTopic(topic string) []peer.ID {
 		// remove the update flag
 		s.peersByTopicUpdating.Delete(topic)
 
-		s.logger.Info().Str("topic", topic).Msgf("peers by topic updated: %v", subscribedPeers)
+		s.logger.Trace().Str("topic", topic).Msgf("peers by topic updated: %v", subscribedPeers)
 	}()
 
 	peerId, ok := s.peersByTopic.Load(topic)
