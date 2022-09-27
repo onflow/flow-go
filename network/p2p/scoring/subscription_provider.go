@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
+// SubscriptionProvider provides a list of topics a peer is subscribed to as well as a list of peers subscribed to a topic.
 type SubscriptionProvider struct {
 	logger zerolog.Logger
 	tp     p2p.TopicProvider
