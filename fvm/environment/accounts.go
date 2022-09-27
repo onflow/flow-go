@@ -44,12 +44,12 @@ type Accounts interface {
 var _ Accounts = &StatefulAccounts{}
 
 type StatefulAccounts struct {
-	stateHolder *state.StateHolder
+	txnState *state.TransactionState
 }
 
-func NewAccounts(stateHolder *state.StateHolder) *StatefulAccounts {
+func NewAccounts(txnState *state.TransactionState) *StatefulAccounts {
 	return &StatefulAccounts{
-		stateHolder: stateHolder,
+		txnState: txnState,
 	}
 }
 
@@ -68,7 +68,11 @@ func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.Sto
 	// and won't do ledger getValue for every new slabs (currently happening to compute storage size changes)
 	// this way the getValue would load this value from deltas
 	key := atree.SlabIndexToLedgerKey(index)
-	err = a.stateHolder.Set(string(address.Bytes()), string(key), []byte{}, false)
+	err = a.txnState.Set(
+		string(address.Bytes()),
+		string(key),
+		[]byte{},
+		false)
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("failed to allocate an storage index: %w", err)
 	}
@@ -407,7 +411,10 @@ func (a *StatefulAccounts) setStorageUsed(address flow.Address, used uint64) err
 }
 
 func (a *StatefulAccounts) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {
-	return a.stateHolder.Get(string(address.Bytes()), key, a.stateHolder.EnforceLimits())
+	return a.txnState.Get(
+		string(address.Bytes()),
+		key,
+		a.txnState.EnforceLimits())
 }
 
 // SetValue sets a value in address' storage
@@ -416,7 +423,11 @@ func (a *StatefulAccounts) SetValue(address flow.Address, key string, value flow
 	if err != nil {
 		return fmt.Errorf("failed to update storage used by key %s on account %s: %w", state.PrintableKey(key), address, err)
 	}
-	return a.stateHolder.Set(string(address.Bytes()), key, value, a.stateHolder.EnforceLimits())
+	return a.txnState.Set(
+		string(address.Bytes()),
+		key,
+		value,
+		a.txnState.EnforceLimits())
 
 }
 
@@ -478,7 +489,10 @@ func RegisterSize(address flow.Address, key string, value flow.RegisterValue) in
 // TODO replace with touch
 // TODO handle errors
 func (a *StatefulAccounts) touch(address flow.Address, key string) {
-	_, _ = a.stateHolder.Get(string(address.Bytes()), key, a.stateHolder.EnforceLimits())
+	_, _ = a.txnState.Get(
+		string(address.Bytes()),
+		key,
+		a.txnState.EnforceLimits())
 }
 
 func (a *StatefulAccounts) TouchContract(contractName string, address flow.Address) {

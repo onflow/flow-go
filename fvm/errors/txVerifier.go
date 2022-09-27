@@ -120,6 +120,11 @@ func (e InvalidPayloadSignatureError) Code() ErrorCode {
 	return ErrCodeInvalidPayloadSignatureError
 }
 
+func IsInvalidPayloadSignatureError(err error) bool {
+	var t InvalidPayloadSignatureError
+	return As(err, &t)
+}
+
 // InvalidEnvelopeSignatureError indicates that signature verification for a envelope key in this transaction has failed.
 // this error is the result of failure in any of the following conditions:
 // - provided hashing method is not supported
@@ -156,4 +161,9 @@ func (e InvalidEnvelopeSignatureError) Error() string {
 // Code returns the error code for this error type
 func (e InvalidEnvelopeSignatureError) Code() ErrorCode {
 	return ErrCodeInvalidEnvelopeSignatureError
+}
+
+func IsInvalidEnvelopeSignatureError(err error) bool {
+	var t InvalidEnvelopeSignatureError
+	return As(err, &t)
 }

@@ -34,10 +34,10 @@ func NewTransactionVerifier(keyWeightThreshold int) *TransactionVerifier {
 func (v *TransactionVerifier) Process(
 	ctx Context,
 	proc *TransactionProcedure,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	_ *programs.TransactionPrograms,
 ) error {
-	return v.verifyTransaction(proc, ctx, sth)
+	return v.verifyTransaction(proc, ctx, txnState)
 }
 
 func newInvalidEnvelopeSignatureError(txSig flow.TransactionSignature, err error) error {
@@ -51,7 +51,7 @@ func newInvalidPayloadSignatureError(txSig flow.TransactionSignature, err error)
 func (v *TransactionVerifier) verifyTransaction(
 	proc *TransactionProcedure,
 	ctx Context,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 ) error {
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMVerifyTransaction)
@@ -62,7 +62,7 @@ func (v *TransactionVerifier) verifyTransaction(
 	}
 
 	tx := proc.Transaction
-	accounts := environment.NewAccounts(sth)
+	accounts := environment.NewAccounts(txnState)
 	if tx.Payer == flow.EmptyAddress {
 		err := errors.NewInvalidAddressErrorf(tx.Payer, "payer address is invalid")
 		return fmt.Errorf("transaction verification failed: %w", err)
@@ -82,7 +82,7 @@ func (v *TransactionVerifier) verifyTransaction(
 
 	// check accounts uses the state, but if the limits are too low, this might fail.
 	// we shouldn't fail here if the limits are too low as fee deduction won't happen
-	sth.RunWithAllLimitsDisabled(
+	txnState.RunWithAllLimitsDisabled(
 		func() {
 			err = v.checkAccountsAreNotFrozen(tx, accounts)
 		},
@@ -96,7 +96,7 @@ func (v *TransactionVerifier) verifyTransaction(
 	}
 
 	payloadWeights, proposalKeyVerifiedInPayload, err = v.verifyAccountSignatures(
-		sth,
+		txnState,
 		accounts,
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
@@ -111,7 +111,7 @@ func (v *TransactionVerifier) verifyTransaction(
 	var proposalKeyVerifiedInEnvelope bool
 
 	envelopeWeights, proposalKeyVerifiedInEnvelope, err = v.verifyAccountSignatures(
-		sth,
+		txnState,
 		accounts,
 		tx.EnvelopeSignatures,
 		tx.EnvelopeMessage(),
@@ -154,12 +154,12 @@ func (v *TransactionVerifier) verifyTransaction(
 
 // getPublicKey skips checking limits when getting the public key
 func (v *TransactionVerifier) getPublicKey(
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	accounts environment.Accounts,
 	address flow.Address,
 	keyIndex uint64,
 ) (pub flow.AccountPublicKey, err error) {
-	sth.RunWithAllLimitsDisabled(
+	txnState.RunWithAllLimitsDisabled(
 		func() {
 			pub, err = accounts.GetPublicKey(address, keyIndex)
 		},
@@ -168,7 +168,7 @@ func (v *TransactionVerifier) getPublicKey(
 }
 
 func (v *TransactionVerifier) verifyAccountSignatures(
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	accounts environment.Accounts,
 	signatures []flow.TransactionSignature,
 	message []byte,
@@ -183,7 +183,7 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 
 	for _, txSig := range signatures {
 
-		accountKey, err := v.getPublicKey(sth, accounts, txSig.Address, txSig.KeyIndex)
+		accountKey, err := v.getPublicKey(txnState, accounts, txSig.Address, txSig.KeyIndex)
 		if err != nil {
 			return nil, false, errorBuilder(txSig, err)
 		}
