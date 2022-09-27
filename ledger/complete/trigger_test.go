@@ -11,7 +11,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/common"
 	mocks "github.com/onflow/flow-go/ledger/complete/mock"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -29,8 +29,8 @@ func createNTries(n int) []*trie.MTrie {
 	emptyTrie := trie.NewEmptyMTrie()
 	tries := make([]*trie.MTrie, 0, n)
 	for i := 0; i < n; i++ {
-		path := utils.PathByUint16LeftPadded(uint16(i))
-		t, _, _ := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*utils.LightPayload(1, 2)}, true)
+		path := testutils.PathByUint16LeftPadded(uint16(i))
+		t, _, _ := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*testutils.LightPayload(1, 2)}, true)
 		tries = append(tries, t)
 	}
 	return tries
@@ -46,7 +46,7 @@ func TestTriggerNotifyTrieUpdateWrittenToWAL(t *testing.T) {
 
 	runner := &mocks.CheckpointRunner{}
 	runner.On("RunCheckpoint", mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
-	trigger := NewTrigger(zerolog.Logger{}, activeSegmentNum, checkpointedSegumentNum, uint(checkpointDistance), runner, nil)
+	trigger := NewTrigger(zerolog.Logger{}, activeSegmentNum, checkpointedSegumentNum, uint(checkpointDistance), runner, nil, atomic.NewBool(false))
 
 	// prepare for tries
 	tries := createNTries(10)
@@ -119,7 +119,7 @@ func TestTriggerOnlyOneCheckpointerIsRunning(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 			return nil
 		}).Twice()
-	trigger := NewTrigger(zerolog.Logger{}, activeSegmentNum, checkpointedSegumentNum, uint(checkpointDistance), runner, nil)
+	trigger := NewTrigger(zerolog.Logger{}, activeSegmentNum, checkpointedSegumentNum, uint(checkpointDistance), runner, nil, atomic.NewBool(false))
 
 	// prepare for tries
 	tries := createNTries(10)

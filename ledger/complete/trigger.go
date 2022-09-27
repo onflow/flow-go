@@ -20,13 +20,14 @@ type CheckpointRunner interface {
 // if triggered, it will use the checkpointRunner to create checkpoint.
 // It ensures only one checkpoint is being created at any time.
 type Trigger struct {
-	logger                  zerolog.Logger
-	activeSegmentNum        int                     // the num of the segment that the previous trie update was written to, is used to detect whether trie update is written to a new segment.
-	checkpointedSegumentNum *atomic.Int32           // the highest segment num that has been checkpointed
-	checkpointDistance      uint                    // the total number of segment (write-ahead log) to trigger checkpointing
-	isRunning               *atomic.Bool            // an atomic.Bool for whether checkpointing is currently running.
-	runner                  CheckpointRunner        // for running checkpointing
-	checkpointed            func(checkpointNum int) // to report checkpointing completion
+	logger                               zerolog.Logger
+	activeSegmentNum                     int                     // the num of the segment that the previous trie update was written to, is used to detect whether trie update is written to a new segment.
+	checkpointedSegumentNum              *atomic.Int32           // the highest segment num that has been checkpointed
+	checkpointDistance                   uint                    // the total number of segment (write-ahead log) to trigger checkpointing
+	isRunning                            *atomic.Bool            // an atomic.Bool for whether checkpointing is currently running.
+	runner                               CheckpointRunner        // for running checkpointing
+	checkpointed                         func(checkpointNum int) // to report checkpointing completion
+	triggerCheckpointOnNextSegmentFinish *atomic.Bool            // to trigger checkpoint manually
 }
 
 func NewTrigger(
@@ -36,19 +37,21 @@ func NewTrigger(
 	checkpointDistance uint,
 	runner CheckpointRunner,
 	checkpointed func(checkpointNum int),
+	triggerCheckpointOnNextSegmentFinish *atomic.Bool,
 ) *Trigger {
 	notNil := checkpointed
 	if notNil == nil {
 		notNil = func(int) {} // noop
 	}
 	return &Trigger{
-		logger:                  logger,
-		activeSegmentNum:        activeSegmentNum,
-		checkpointedSegumentNum: atomic.NewInt32(int32(checkpointedSegumentNum)),
-		checkpointDistance:      checkpointDistance,
-		isRunning:               atomic.NewBool(false),
-		runner:                  runner,
-		checkpointed:            notNil,
+		logger:                               logger,
+		activeSegmentNum:                     activeSegmentNum,
+		checkpointedSegumentNum:              atomic.NewInt32(int32(checkpointedSegumentNum)),
+		checkpointDistance:                   checkpointDistance,
+		isRunning:                            atomic.NewBool(false),
+		runner:                               runner,
+		checkpointed:                         notNil,
+		triggerCheckpointOnNextSegmentFinish: triggerCheckpointOnNextSegmentFinish,
 	}
 }
 
@@ -85,11 +88,16 @@ func (t *Trigger) NotifyTrieUpdateWrittenToWAL(ctx context.Context, segmentNum i
 
 	toTrigger := t.hasEnoughSegmentsToTriggerCheckpoint(prevSegmentNum)
 	if !toTrigger {
-		return nil
+		// if the admin tool asks to trigger checkpointing when next segment finish,
+		// then trigger it, otherwise don't
+		shouldTriggerOnSegmentFinish := t.triggerCheckpointOnNextSegmentFinish.CompareAndSwap(true, false)
+		if !shouldTriggerOnSegmentFinish {
+			return nil
+		}
 	}
 
 	// ensure checkpointing only run once at any time
-	if !t.isRunning.CAS(false, true) {
+	if !t.isRunning.CompareAndSwap(false, true) {
 		return nil
 	}
 

@@ -39,15 +39,14 @@ type WALTrieUpdate struct {
 // This will be resolved automaticaly after the forest LRU Cache
 // (code outside checkpointing) is replaced by something like a FIFO queue.
 type Compactor struct {
-	wal                                  realWAL.LedgerWAL
-	logger                               zerolog.Logger
-	trieQueue                            *common.TrieQueue
-	trigger                              *Trigger // determine when to trigger checkpointing
-	lm                                   *lifecycle.LifecycleManager
-	observers                            map[observable.Observer]struct{}
-	stopCh                               chan chan struct{}
-	trieUpdateCh                         <-chan *WALTrieUpdate
-	triggerCheckpointOnNextSegmentFinish *atomic.Bool // to trigger checkpoint manually
+	wal          realWAL.LedgerWAL
+	logger       zerolog.Logger
+	trieQueue    *common.TrieQueue
+	trigger      *Trigger // determine when to trigger checkpointing
+	lm           *lifecycle.LifecycleManager
+	observers    map[observable.Observer]struct{}
+	stopCh       chan chan struct{}
+	trieUpdateCh <-chan *WALTrieUpdate
 }
 
 // NewCompactor creates new Compactor which writes WAL record and triggers
@@ -87,21 +86,20 @@ func NewCompactor(
 
 	// Create trieQueue with initial values from ledger state.
 	trieQueue := common.NewTrieQueueWithValues(checkpointCapacity, tries)
-	trigger, err := createTrigger(logger, w, checkpointsToKeep, checkpointDistance)
+	trigger, err := createTrigger(logger, w, checkpointsToKeep, checkpointDistance, triggerCheckpointOnNextSegmentFinish)
 	if err != nil {
 		return nil, fmt.Errorf("could not create trigger: %w", err)
 	}
 
 	return &Compactor{
-		wal:                                  w,
-		trieQueue:                            trieQueue,
-		trigger:                              trigger,
-		logger:                               logger,
-		stopCh:                               make(chan chan struct{}),
-		trieUpdateCh:                         trieUpdateCh,
-		observers:                            make(map[observable.Observer]struct{}),
-		lm:                                   lifecycle.NewLifecycleManager(),
-		triggerCheckpointOnNextSegmentFinish: triggerCheckpointOnNextSegmentFinish,
+		wal:          w,
+		trieQueue:    trieQueue,
+		trigger:      trigger,
+		logger:       logger,
+		stopCh:       make(chan chan struct{}),
+		trieUpdateCh: trieUpdateCh,
+		observers:    make(map[observable.Observer]struct{}),
+		lm:           lifecycle.NewLifecycleManager(),
 	}, nil
 }
 
@@ -147,7 +145,7 @@ func (c *Compactor) Done() <-chan struct{} {
 	return c.lm.Stopped()
 }
 
-func createTrigger(logger zerolog.Logger, wal realWAL.LedgerWAL, checkpointsToKeep uint, checkpointDistance uint) (*Trigger, error) {
+func createTrigger(logger zerolog.Logger, wal realWAL.LedgerWAL, checkpointsToKeep uint, checkpointDistance uint, triggerCheckpointOnNextSegmentFinish *atomic.Bool) (*Trigger, error) {
 	checkpointer, err := wal.NewCheckpointer()
 	if err != nil {
 		return nil, err
@@ -166,7 +164,7 @@ func createTrigger(logger zerolog.Logger, wal realWAL.LedgerWAL, checkpointsToKe
 	}
 
 	runner := NewRunner(logger, checkpointer, checkpointsToKeep)
-	trigger := NewTrigger(logger, activeSegmentNum, lastCheckpointNum, checkpointDistance, runner, nil)
+	trigger := NewTrigger(logger, activeSegmentNum, lastCheckpointNum, checkpointDistance, runner, nil, triggerCheckpointOnNextSegmentFinish)
 	return trigger, nil
 }
 
