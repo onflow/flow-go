@@ -44,6 +44,7 @@ type Core struct {
 	pending           module.PendingBlockBuffer // pending block cache
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff
+	validator         hotstuff.Validator
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
 }
@@ -61,6 +62,7 @@ func NewCore(
 	state protocol.MutableState,
 	pending module.PendingBlockBuffer,
 	sync module.BlockRequester,
+	validator hotstuff.Validator,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
 	opts ...compliance.Opt,
@@ -85,6 +87,7 @@ func NewCore(
 		pending:           pending,
 		sync:              sync,
 		hotstuff:          nil, // use `WithConsensus`
+		validator:         validator,
 		voteAggregator:    voteAggregator,
 		timeoutAggregator: timeoutAggregator,
 	}
@@ -112,6 +115,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	defer span.End()
 
 	header := proposal.Header
+	blockID := header.ID()
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
@@ -132,14 +136,14 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// 2) blocks already on disk; they were processed and await finalization
 
 	// ignore proposals that are already cached
-	_, cached := c.pending.ByID(header.ID())
+	_, cached := c.pending.ByID(blockID)
 	if cached {
 		log.Debug().Msg("skipping already cached proposal")
 		return nil
 	}
 
 	// ignore proposals that were already processed
-	_, err := c.headers.ByBlockID(header.ID())
+	_, err := c.headers.ByBlockID(blockID)
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
 		return nil
@@ -285,9 +289,9 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
 
 	header := proposal.Header
-	id := header.ID()
+	blockID := header.ID()
 
-	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), id, trace.ConCompProcessBlockProposal)
+	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), blockID, trace.ConCompProcessBlockProposal)
 	if isSampled {
 		span.SetAttributes(
 			attribute.String("proposer", header.ProposerID.String()),
@@ -295,11 +299,39 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	}
 	defer span.End()
 
+	// retrieve the parent block
+	//  - once we reach this point, the parent block must have been validated
+	//    and inserted to the protocol state
+	parent, err := c.headers.ByBlockID(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve proposal parent: %w", err)
+	}
+
+	hotstuffProposal := model.ProposalFromFlow(header, parent.View)
+	err = c.validator.ValidateProposal(hotstuffProposal)
+	if err != nil {
+		if model.IsInvalidBlockError(err) {
+			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// TODO what to do here
+			//  - the parent of this block is valid and inserted (ie. we knew the epoch for it)
+			//  - if we then see this for the child, one of two things must have happened:
+			//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
+			//      -> in this case we can disregard the block
+			//    2. no blocks have been finalized the epoch commitment deadline, and the epoch end (breaking a critical assumption)
+			//      -> in this case, the network has encountered a critical failure
+			//  - we assume in general that Case 2 will not happen, therefore we:
+			//    - can discard the proposal
+			//    - cannot slash the proposer
+		}
+	}
+
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
-		Hex("block_id", id[:]).
+		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
@@ -313,11 +345,11 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
-	err := c.state.Extend(ctx, block)
+	err = c.state.Extend(ctx, block)
 	if err != nil {
 		if state.IsInvalidExtensionError(err) {
 			// if the block proposes an invalid extension of the protocol state, then the block is invalid
-			return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w", id, header.Height, err)
+			return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w", blockID, header.Height, err)
 		}
 		if state.IsOutdatedExtensionError(err) {
 			// protocol state aborted processing of block as it is on an abandoned fork: block is outdated
@@ -325,17 +357,10 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 		}
 
 		// unexpected error: potentially corrupted internal state => abort processing and escalate error
-		return fmt.Errorf("unexpected exception while extending protocol state with block %x at height %d: %w", id, header.Height, err)
+		return fmt.Errorf("unexpected exception while extending protocol state with block %x at height %d: %w", blockID, header.Height, err)
 	}
 
-	// Submit the model to hotstuff for processing. Note: HotStuff requires also the view of the parent block for
-	// reconstructing the proposal's QC. Since this information is not included in the header, we first query the parent.
-	parent, err := c.headers.ByBlockID(header.ParentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve proposal parent: %w", err)
-	}
-	log.Info().Msg("forwarding block proposal to hotstuff")
-
+	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
 	c.hotstuff.SubmitProposal(header, parent.View)
 
 	return nil

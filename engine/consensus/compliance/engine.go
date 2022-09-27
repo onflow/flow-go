@@ -80,7 +80,7 @@ func NewEngine(
 	log zerolog.Logger,
 	net network.Network,
 	me module.Local,
-	prov consensus.ProposalProvider,
+	prov consensus.ProposalProvider, // TODO replace this with pubsub https://github.com/dapperlabs/flow-go/issues/6395
 	core *Core,
 ) (*Engine, error) {
 
@@ -231,6 +231,7 @@ func NewEngine(
 
 // WithConsensus adds the consensus algorithm to the engine. This must be
 // called before the engine can start.
+// TODO replace with pubsub communication https://github.com/dapperlabs/flow-go/issues/6395
 func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 	e.core.hotstuff = hot
 	return e
