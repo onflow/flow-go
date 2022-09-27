@@ -58,9 +58,14 @@ type TransactionFeeDeductionFailedError struct {
 }
 
 // NewTransactionFeeDeductionFailedError constructs a new TransactionFeeDeductionFailedError
-func NewTransactionFeeDeductionFailedError(payer flow.Address, err error) TransactionFeeDeductionFailedError {
+func NewTransactionFeeDeductionFailedError(
+	payer flow.Address,
+	txFees uint64,
+	err error,
+) TransactionFeeDeductionFailedError {
 	return TransactionFeeDeductionFailedError{
-		Payer: payer,
+		Payer:  payer,
+		TxFees: txFees,
 		errorWrapper: errorWrapper{
 			err: err,
 		},
