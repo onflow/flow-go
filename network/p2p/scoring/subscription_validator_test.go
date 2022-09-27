@@ -114,6 +114,8 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 	}
 }
 
+// TestSubscriptionValidator_InvalidSubscription tests that when a peer has subscribed to invalid
+// topics based on its Flow protocol role, the subscription validator returns an error.
 func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	idProvider := mock.NewIdentityProvider(t)
 	sp := mockp2p.NewSubscriptionProvider(t)
@@ -141,7 +143,9 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	}
 }
 
-func TestLibP2PSubscriptionValidator(t *testing.T) {
+// TestSubscriptionValidator_Integration tests that when a peer is subscribed to an invalid topic, it is penalized
+// by the subscription validator of other peers on that channel, and they prevent the peer from sending messages on that channel.
+func TestSubscriptionValidator_Integration(t *testing.T) {
 	ctx := context.Background()
 	sporkId := unittest.IdentifierFixture()
 
