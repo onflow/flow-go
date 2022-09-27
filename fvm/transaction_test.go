@@ -209,11 +209,12 @@ func TestAccountFreezing(t *testing.T) {
 		require.Error(t, proc.Err)
 
 		// find frozen account specific error
-		require.IsType(t, errors.CadenceRuntimeError{}, proc.Err)
-		err = proc.Err.(errors.CadenceRuntimeError).Unwrap()
+		require.True(t, errors.IsCadenceRuntimeError(proc.Err))
 
-		require.IsType(t, runtime.Error{}, err)
-		err = err.(runtime.Error).Err
+		var rtErr runtime.Error
+		require.True(t, errors.As(proc.Err, &rtErr))
+
+		err = rtErr.Err
 
 		require.IsType(t, &runtime.ParsingCheckingError{}, err)
 		err = err.(*runtime.ParsingCheckingError).Err
@@ -353,11 +354,12 @@ func TestAccountFreezing(t *testing.T) {
 		require.Error(t, proc.Err)
 
 		// find frozen account specific error
-		require.IsType(t, errors.CadenceRuntimeError{}, proc.Err)
-		err = proc.Err.(errors.CadenceRuntimeError).Unwrap()
+		require.True(t, errors.IsCadenceRuntimeError(proc.Err))
 
-		require.IsType(t, runtime.Error{}, err)
-		err = err.(runtime.Error).Err
+		var rtErr runtime.Error
+		require.True(t, errors.As(proc.Err, &rtErr))
+
+		err = rtErr.Err
 
 		require.IsType(t, &runtime.ParsingCheckingError{}, err)
 		err = err.(*runtime.ParsingCheckingError).Err
