@@ -71,6 +71,7 @@ func MultiAddressStr(ip, port string) string {
 	return fmt.Sprintf("/dns4/%s/tcp/%s", ip, port)
 }
 
+// AllowedSubscription returns true if the given role is allowed to subscribe to the topic.
 func AllowedSubscription(role flow.Role, topic string) bool {
 	channel, ok := channels.ChannelFromTopic(channels.Topic(topic))
 	if !ok {
