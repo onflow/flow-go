@@ -242,7 +242,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		}
 	}()
 
-	err = StoreCheckpoint(writer, tries...)
+	err = StoreCheckpointV5(writer, tries...)
 
 	c.wal.log.Info().Msgf("created checkpoint %d with %d tries", to, len(tries))
 
@@ -285,7 +285,7 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 	}, nil
 }
 
-// StoreCheckpoint writes the given tries to checkpoint file, and also appends
+// StoreCheckpointV5 writes the given tries to checkpoint file, and also appends
 // a CRC32 file checksum for integrity check.
 // Checkpoint file consists of a flattened forest. Specifically, it consists of:
 //   - a list of encoded nodes, where references to other nodes are by list index.
@@ -300,7 +300,7 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 // as for each node, the children have been previously encountered.
 // TODO: evaluate alternatives to CRC32 since checkpoint file is many GB in size.
 // TODO: add concurrency if the performance gains are enough to offset complexity.
-func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
+func StoreCheckpointV5(writer io.Writer, tries ...*trie.MTrie) error {
 
 	crc32Writer := NewCRC32Writer(writer)
 
