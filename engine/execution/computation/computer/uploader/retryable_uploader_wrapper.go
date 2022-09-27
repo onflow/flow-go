@@ -138,6 +138,8 @@ func (b *BadgerRetryableUploaderWrapper) RetryUpload() error {
 	for _, blockID := range blockIDs {
 		wg.Add(1)
 		go func(blockID flow.Identifier) {
+			defer wg.Done()
+
 			var cr_err error
 			retComputationResult, err := b.reconstructComputationResult(blockID)
 			if err != nil {
@@ -155,8 +157,6 @@ func (b *BadgerRetryableUploaderWrapper) RetryUpload() error {
 			}
 
 			b.metrics.ExecutionComputationResultUploadRetried()
-
-			wg.Done()
 		}(blockID)
 	}
 	wg.Wait()

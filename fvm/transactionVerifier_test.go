@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,8 +18,8 @@ import (
 
 func TestTransactionVerification(t *testing.T) {
 	ledger := utils.NewSimpleView()
-	stTxn := state.NewStateTransaction(ledger, state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	txnState := state.NewTransactionState(ledger, state.DefaultParameters())
+	accounts := environment.NewAccounts(txnState)
 
 	// create 2 accounts
 	address1 := flow.HexToAddress("1234")
@@ -54,7 +53,7 @@ func TestTransactionVerification(t *testing.T) {
 		proc := fvm.Transaction(&tx, 0)
 
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
+		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
 		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), "duplicate signatures are provided for the same key"))
 	})
@@ -74,7 +73,7 @@ func TestTransactionVerification(t *testing.T) {
 		proc := fvm.Transaction(&tx, 0)
 
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
+		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
 		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), "duplicate signatures are provided for the same key"))
 	})
@@ -108,7 +107,7 @@ func TestTransactionVerification(t *testing.T) {
 
 		proc := fvm.Transaction(&tx, 0)
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
+		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
 		require.Error(t, err)
 
 		var envelopeError errors.InvalidEnvelopeSignatureError
@@ -144,7 +143,7 @@ func TestTransactionVerification(t *testing.T) {
 
 		proc := fvm.Transaction(&tx, 0)
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
+		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
 		require.Error(t, err)
 
 		var payloadError errors.InvalidPayloadSignatureError
@@ -177,7 +176,7 @@ func TestTransactionVerification(t *testing.T) {
 
 		proc := fvm.Transaction(&tx, 0)
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, stTxn, nil)
+		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
 		require.Error(t, err)
 
 		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
@@ -191,7 +190,6 @@ func TestTransactionVerification(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		nil := programs.NewEmptyPrograms()
 
 		// freeze account
 		err := accounts.SetAccountFrozen(frozenAddress, true)

@@ -19,6 +19,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -26,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -127,19 +128,19 @@ func (suite *MeshEngineTestSuite) TestTargetedValidators_Publish() {
 // TestMaxMessageSize_Unicast evaluates the messageSizeScenario scenario using
 // the Unicast method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Unicast() {
-	suite.messageSizeScenario(suite.Unicast, p2p.DefaultMaxUnicastMsgSize)
+	suite.messageSizeScenario(suite.Unicast, middleware.DefaultMaxUnicastMsgSize)
 }
 
 // TestMaxMessageSize_Multicast evaluates the messageSizeScenario scenario using
 // the Multicast method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Multicast() {
-	suite.messageSizeScenario(suite.Multicast, p2p.DefaultMaxPubSubMsgSize)
+	suite.messageSizeScenario(suite.Multicast, p2pnode.DefaultMaxPubSubMsgSize)
 }
 
 // TestMaxMessageSize_Publish evaluates the messageSizeScenario scenario using the
 // Publish method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Publish() {
-	suite.messageSizeScenario(suite.Publish, p2p.DefaultMaxPubSubMsgSize)
+	suite.messageSizeScenario(suite.Publish, p2pnode.DefaultMaxPubSubMsgSize)
 }
 
 // TestUnregister_Publish tests that an engine cannot send any message using Publish
