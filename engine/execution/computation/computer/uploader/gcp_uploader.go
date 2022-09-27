@@ -45,14 +45,21 @@ func (u *GCPBucketUploader) Upload(computationResult *execution.ComputationResul
 	object := u.bucket.Object(objectName)
 
 	writer := object.NewWriter(u.ctx)
-	defer func() {
-		err := writer.Close()
-		if err != nil {
-			u.log.Warn().Err(err).Str("object_name", objectName).Msg("error while closing GCP object")
-		}
-	}()
 
-	return WriteComputationResultsTo(computationResult, writer)
+	// serialize and write computation result to upload stream
+	err := WriteComputationResultsTo(computationResult, writer)
+	if err != nil {
+		return fmt.Errorf("failed to write computation result to GCP stream: %w", err)
+	}
+
+	// flush and close the stream
+	// this occasionally fails with HTTP 50x errors due to flakiness on the network/GCP API
+	err = writer.Close()
+	if err != nil {
+		return fmt.Errorf("error while closing GCP object: %w", err)
+	}
+
+	return nil
 }
 
 func GCPBlockDataObjectName(computationResult *execution.ComputationResult) string {
