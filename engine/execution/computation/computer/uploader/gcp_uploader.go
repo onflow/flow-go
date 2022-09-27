@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/storage"
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -39,27 +40,33 @@ func NewGCPBucketUploader(ctx context.Context, bucketName string, log zerolog.Lo
 	}, nil
 }
 
-func (u *GCPBucketUploader) Upload(computationResult *execution.ComputationResult) error {
+func (u *GCPBucketUploader) Upload(computationResult *execution.ComputationResult) (err error) {
+	var errs *multierror.Error
 
 	objectName := GCPBlockDataObjectName(computationResult)
 	object := u.bucket.Object(objectName)
 
 	writer := object.NewWriter(u.ctx)
 
+	defer func() {
+		// flush and close the stream
+		// this occasionally fails with HTTP 50x errors due to flakiness on the network/GCP API
+		closeErr := writer.Close()
+		if closeErr != nil {
+			errs = multierror.Append(errs, fmt.Errorf("error while closing GCP object: %w", closeErr))
+		}
+
+		err = errs.ErrorOrNil()
+	}()
+
 	// serialize and write computation result to upload stream
-	err := WriteComputationResultsTo(computationResult, writer)
-	if err != nil {
-		return fmt.Errorf("failed to write computation result to GCP stream: %w", err)
+	writeErr := WriteComputationResultsTo(computationResult, writer)
+	if writeErr != nil {
+		errs = multierror.Append(errs, fmt.Errorf("error while writing computation result to GCP object: %w", writeErr))
+		return
 	}
 
-	// flush and close the stream
-	// this occasionally fails with HTTP 50x errors due to flakiness on the network/GCP API
-	err = writer.Close()
-	if err != nil {
-		return fmt.Errorf("error while closing GCP object: %w", err)
-	}
-
-	return nil
+	return
 }
 
 func GCPBlockDataObjectName(computationResult *execution.ComputationResult) string {
