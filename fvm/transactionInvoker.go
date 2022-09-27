@@ -222,7 +222,10 @@ func (i TransactionInvoker) deductTransactionFees(
 		computationUsed)
 
 	if err != nil {
-		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, err)
+		return errors.NewTransactionFeeDeductionFailedError(
+			proc.Transaction.Payer,
+			computationUsed,
+			err)
 	}
 	return nil
 }
