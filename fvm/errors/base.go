@@ -135,6 +135,11 @@ func (e ValueError) Code() ErrorCode {
 	return ErrCodeValueError
 }
 
+func IsValueError(err error) bool {
+	var valErr ValueError
+	return As(err, &valErr)
+}
+
 // OperationAuthorizationError indicates not enough authorization
 // to perform an operations like account creation or smart contract deployment.
 type OperationAuthorizationError struct {
