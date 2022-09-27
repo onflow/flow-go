@@ -126,8 +126,8 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	for _, role := range flow.Roles() {
 		peer := p2pfixtures.PeerIdFixture(t)
 		unauthorizedChannels := channels.Channels(). // all channels
-			ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
-			ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
+								ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
+								ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
 		sporkID := unittest.IdentifierFixture()
 		unauthorizedTopics := make([]string, 0, len(unauthorizedChannels))
 		for _, channel := range unauthorizedChannels {
@@ -226,7 +226,8 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	require.NoError(t, conNode.Publish(ctx, blockTopic, proposalMsg))
 
 	// checks that the message is received by all nodes.
-	ctx1s, _ := context.WithTimeout(ctx, 1*time.Second)
+	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel1s()
 	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, []*pubsub.Subscription{conSub, ver1SubBlocks, ver2SubBlocks})
 
 	// now consensus node is doing something very bad!
@@ -244,7 +245,8 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// publishes a message to the topic.
 	require.NoError(t, conNode.Publish(ctx, blockTopic, proposalMsg))
 
-	ctx5s, _ := context.WithTimeout(ctx, 5*time.Second)
+	ctx5s, cancel5s := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel5s()
 	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []*pubsub.Subscription{ver1SubBlocks, ver2SubBlocks})
 
 	// moreover, a verification node publishing a message to the request chunk topic should not reach consensus node.
@@ -255,9 +257,11 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	})
 	require.NoError(t, verNode1.Publish(ctx, channels.TopicFromChannel(channels.RequestChunks, sporkId), chunkDataPackRequestMsg))
 
-	ctx1s, _ = context.WithTimeout(ctx, 1*time.Second)
+	ctx1s, cancel1s = context.WithTimeout(ctx, 1*time.Second)
+	defer cancel1s()
 	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []*pubsub.Subscription{ver1SubChunks, ver2SubChunks})
 
-	ctx5s, _ = context.WithTimeout(ctx, 5*time.Second)
+	ctx5s, cancel5s = context.WithTimeout(ctx, 5*time.Second)
+	defer cancel5s()
 	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []*pubsub.Subscription{conSubChunks})
 }
