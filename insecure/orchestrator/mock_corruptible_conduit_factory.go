@@ -32,10 +32,10 @@ type mockCorruptibleConduitFactory struct {
 	address               net.Addr               // address of gRPC endpoint for this mock ccf
 	attackerRegMsg        chan interface{}       // channel indicating whether attacker has registered.
 	attackerMsg           chan *insecure.Message // channel  keeping the last incoming (insecure) message from an attacker.
-	attackerObserveStream insecure.CorruptibleConduitFactory_ConnectAttackerServer
+	attackerObserveStream insecure.CorruptNetwork_ConnectAttackerServer
 }
 
-var _ insecure.CorruptibleConduitFactoryServer = &mockCorruptibleConduitFactory{}
+var _ insecure.CorruptNetworkServer = &mockCorruptibleConduitFactory{}
 var _ module.ReadyDoneAware = &mockCorruptibleConduitFactory{}
 var _ module.Startable = &mockCorruptibleConduitFactory{}
 
@@ -69,7 +69,7 @@ func (c *mockCorruptibleConduitFactory) ServerAddress() string {
 func (c *mockCorruptibleConduitFactory) start(ctx irrecoverable.SignalerContext, address string) {
 	// starts up gRPC server of orchestrator network at given address.
 	s := grpc.NewServer()
-	insecure.RegisterCorruptibleConduitFactoryServer(s, c)
+	insecure.RegisterCorruptNetworkServer(s, c)
 	ln, err := net.Listen(networkingProtocolTCP, address)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
@@ -95,7 +95,7 @@ func (c *mockCorruptibleConduitFactory) stop() {
 
 // ProcessAttackerMessage is a gRPC end-point of this mock corruptible conduit factory, that accepts messages from orchestrator network, and
 // puts the incoming message in a channel to be read by the test procedure.
-func (c *mockCorruptibleConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
+func (c *mockCorruptibleConduitFactory) ProcessAttackerMessage(stream insecure.CorruptNetwork_ProcessAttackerMessageServer) error {
 	for {
 		select {
 		case <-c.cm.ShutdownSignal():
@@ -115,7 +115,7 @@ func (c *mockCorruptibleConduitFactory) ProcessAttackerMessage(stream insecure.C
 
 // ConnectAttacker is a gRPC end-point of this mock corruptible conduit factory, that accepts attacker registration messages from the orchestrator network.
 // It puts the incoming message into a channel to be read by test procedure.
-func (c *mockCorruptibleConduitFactory) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_ConnectAttackerServer) error {
+func (c *mockCorruptibleConduitFactory) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptNetwork_ConnectAttackerServer) error {
 	select {
 	case <-c.cm.ShutdownSignal():
 		return nil

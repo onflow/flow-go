@@ -34,7 +34,7 @@ import (
 func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 	// We first start ccf and then the orchestrator network, since the order of startup matters, i.e., on startup, the orchestrator network tries
 	// to connect to all ccfs.
-	withCorruptibleNetwork(t, func(t *testing.T, corruptedIdentity flow.Identity, corruptibleNetwork *corruptible.Network, hub *stub.Hub) {
+	withCorruptibleNetwork(t, func(t *testing.T, corruptedIdentity flow.Identity, corruptibleNetwork *corrupt.Network, hub *stub.Hub) {
 		// these are the events which orchestrator will send instead of the original ingress and egress events coming to and from
 		// the corrupted engine, respectively.
 		corruptedEgressEvent := &message.TestMessage{Text: "this is a corrupted egress message"}
@@ -120,7 +120,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 }
 
 // withCorruptibleNetwork creates a real corruptible network, starts it, runs the "run" function, and then stops it.
-func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corruptible.Network, *stub.Hub)) {
+func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corrupt.Network, *stub.Hub)) {
 	codec := unittest.NetworkCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
@@ -136,9 +136,9 @@ func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *c
 		}
 	}()
 	hub := stub.NewNetworkHub()
-	ccf := corruptible.NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
+	ccf := corrupt.NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	flowNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
-	corruptibleNetwork, err := corruptible.NewCorruptNetwork(
+	corruptibleNetwork, err := corrupt.NewCorruptNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
 		insecure.DefaultAddress,
