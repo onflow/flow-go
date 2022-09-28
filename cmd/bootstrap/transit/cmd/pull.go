@@ -3,7 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -103,14 +105,29 @@ func pull(cmd *cobra.Command, args []string) {
 	// move root checkpoint file if node role is execution
 	if role == flow.RoleExecution {
 
-		// root.checkpoint is downloaded to <bootstrap folder>/public-root-information after a pull
-		rootCheckpointSrc := filepath.Join(flagBootDir, model.DirnamePublicBootstrap, model.FilenameWALRootCheckpoint)
-		rootCheckpointDst := filepath.Join(flagBootDir, model.PathRootCheckpoint)
+		// root.checkpoint.* is downloaded to <bootstrap folder>/public-root-information after a pull
+		localPublicRootInfoDir := filepath.Join(flagBootDir, model.DirnamePublicBootstrap)
 
-		log.Info().Str("src", rootCheckpointSrc).Str("destination", rootCheckpointDst).Msgf("moving file")
-		err := moveFile(rootCheckpointSrc, rootCheckpointDst)
+		// move the root.checkpoint, root.checkpoint.1, root.checkpoint.2 etc. files to the bootstrap/execution-state dir
+		err = filepath.WalkDir(localPublicRootInfoDir, func(path string, d fs.DirEntry, err error) error {
+			// if d is file whose name starts with root.checkpoint, then move it
+			if !d.IsDir() && strings.HasPrefix(d.Name(), model.FilenameWALRootCheckpoint) {
+				srcInfo, err := d.Info()
+				if err != nil {
+					return err
+				}
+				rootCheckpointSrc := srcInfo.Name()
+				rootCheckpointDst := filepath.Join(flagBootDir, model.DirnameExecutionState, d.Name())
+				log.Info().Str("src", rootCheckpointSrc).Str("destination", rootCheckpointDst).Msgf("moving file")
+				err = moveFile(d.Name(), rootCheckpointDst)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
 		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to move root.checkpoint")
+			log.Fatal().Err(err).Msg("Failed to move root.checkpoint files")
 		}
 	}
 
