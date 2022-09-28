@@ -72,13 +72,13 @@ func (_m *Procedure) MemoryLimit(ctx fvm.Context) uint64 {
 	return r0
 }
 
-// Run provides a mock function with given fields: ctx, sth, _a2
-func (_m *Procedure) Run(ctx fvm.Context, sth *state.StateHolder, _a2 *programs.TransactionPrograms) error {
-	ret := _m.Called(ctx, sth, _a2)
+// Run provides a mock function with given fields: ctx, txnState, _a2
+func (_m *Procedure) Run(ctx fvm.Context, txnState *state.TransactionState, _a2 *programs.TransactionPrograms) error {
+	ret := _m.Called(ctx, txnState, _a2)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(fvm.Context, *state.StateHolder, *programs.TransactionPrograms) error); ok {
-		r0 = rf(ctx, sth, _a2)
+	if rf, ok := ret.Get(0).(func(fvm.Context, *state.TransactionState, *programs.TransactionPrograms) error); ok {
+		r0 = rf(ctx, txnState, _a2)
 	} else {
 		r0 = ret.Error(0)
 	}

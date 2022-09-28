@@ -88,12 +88,12 @@ type facadeEnvironment struct {
 
 func newFacadeEnvironment(
 	ctx Context,
-	stateTransaction *state.StateHolder,
+	txnState *state.TransactionState,
 	programs environment.TransactionPrograms,
 	tracer *environment.Tracer,
 	meter environment.Meter,
 ) *facadeEnvironment {
-	accounts := environment.NewAccounts(stateTransaction)
+	accounts := environment.NewAccounts(txnState)
 	logger := environment.NewProgramLogger(tracer, ctx.ProgramLoggerParams)
 	runtime := environment.NewRuntime(ctx.RuntimeParams)
 	systemContracts := environment.NewSystemContracts(
@@ -143,7 +143,7 @@ func newFacadeEnvironment(
 		UUIDGenerator: environment.NewUUIDGenerator(
 			tracer,
 			meter,
-			stateTransaction),
+			txnState),
 
 		AccountCreator: environment.NoAccountCreator{},
 		AccountFreezer: environment.NoAccountFreezer{},
@@ -164,7 +164,7 @@ func newFacadeEnvironment(
 		Programs: environment.NewPrograms(
 			tracer,
 			meter,
-			stateTransaction,
+			txnState,
 			accounts,
 			programs),
 
