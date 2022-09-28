@@ -1,8 +1,14 @@
 package wal
 
 import (
+	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"math/rand"
+	"os"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -162,6 +168,78 @@ func TestWriteAndReadCheckpointV6(t *testing.T) {
 		fileName := "checkpoint"
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6(tries, dir, fileName, &logger), "fail to store checkpoint")
+		decoded, err := ReadCheckpointV6(dir, fileName, &logger)
+		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		requireTriesEqual(t, tries, decoded)
+	})
+}
+
+// test running checkpointing twice will produce the same checkpoint file
+func TestCheckpointV6IsDeterminstic(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimpleTrie(t)
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint1", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint2", &logger), "fail to store checkpoint")
+		require.NoError(t, compareFiles(path.Join(dir, "checkpoint1"), path.Join(dir, "checkpoint2")),
+			"found difference in checkpoint files")
+	})
+}
+
+// compareFiles takes two files' full path, and read them bytes by bytes and compare if
+// the two files are identical
+// it returns nil if identical
+// it returns error if there is difference
+func compareFiles(file1, file2 string) error {
+	closable1, err := os.Open(file1)
+	if err != nil {
+		return fmt.Errorf("could not open file 1 %v: %w", closable1, err)
+	}
+	defer func(f *os.File) {
+		f.Close()
+	}(closable1)
+
+	closable2, err := os.Open(file1)
+	if err != nil {
+		return fmt.Errorf("could not open file 2 %v: %w", closable2, err)
+	}
+	defer func(f *os.File) {
+		f.Close()
+	}(closable2)
+
+	reader1 := bufio.NewReaderSize(closable1, defaultBufioReadSize)
+	reader2 := bufio.NewReaderSize(closable2, defaultBufioReadSize)
+
+	buf1 := make([]byte, defaultBufioReadSize)
+	buf2 := make([]byte, defaultBufioReadSize)
+	for {
+		_, err1 := reader1.Read(buf1)
+		_, err2 := reader2.Read(buf2)
+		if errors.Is(err1, io.EOF) && errors.Is(err2, io.EOF) {
+			break
+		}
+
+		if err1 != nil {
+			return err1
+		}
+		if err2 != nil {
+			return err2
+		}
+
+		if !bytes.Equal(buf1, buf2) {
+			return fmt.Errorf("bytes are different: %x, %x", buf1, buf2)
+		}
+	}
+
+	return nil
+}
+
+func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimpleTrie(t)
+		fileName := "checkpoint1"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger), "fail to store checkpoint")
 		decoded, err := ReadCheckpointV6(dir, fileName, &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
