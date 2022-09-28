@@ -49,6 +49,11 @@ func (e CadenceRuntimeError) Code() ErrorCode {
 	return ErrCodeCadenceRunTimeError
 }
 
+func IsCadenceRuntimeError(err error) bool {
+	var t CadenceRuntimeError
+	return As(err, &t)
+}
+
 // An TransactionFeeDeductionFailedError indicates that a there was an error deducting transaction fees from the transaction Payer
 type TransactionFeeDeductionFailedError struct {
 	errorWrapper
@@ -58,9 +63,14 @@ type TransactionFeeDeductionFailedError struct {
 }
 
 // NewTransactionFeeDeductionFailedError constructs a new TransactionFeeDeductionFailedError
-func NewTransactionFeeDeductionFailedError(payer flow.Address, err error) TransactionFeeDeductionFailedError {
+func NewTransactionFeeDeductionFailedError(
+	payer flow.Address,
+	txFees uint64,
+	err error,
+) TransactionFeeDeductionFailedError {
 	return TransactionFeeDeductionFailedError{
-		Payer: payer,
+		Payer:  payer,
+		TxFees: txFees,
 		errorWrapper: errorWrapper{
 			err: err,
 		},
@@ -163,6 +173,11 @@ func (e StorageCapacityExceededError) Code() ErrorCode {
 	return ErrCodeStorageCapacityExceeded
 }
 
+func IsStorageCapacityExceededError(err error) bool {
+	var t StorageCapacityExceededError
+	return As(err, &t)
+}
+
 // EventLimitExceededError indicates that the transaction has produced events with size more than limit.
 type EventLimitExceededError struct {
 	totalByteSize uint64
@@ -235,8 +250,15 @@ func NewStateValueSizeLimitError(value flow.RegisterValue, size, limit uint64) S
 }
 
 func (e StateValueSizeLimitError) Error() string {
+	valueStr := ""
+	if len(e.value) > 23 {
+		valueStr = string(e.value[0:10]) + "..." + string(e.value[len(e.value)-10:])
+	} else {
+		valueStr = string(e.value)
+	}
+
 	return fmt.Sprintf("%s value %s has size %d which is higher than storage value size limit %d.",
-		e.Code().String(), string(e.value[0:10])+"..."+string(e.value[len(e.value)-10:]), e.size, e.limit)
+		e.Code().String(), valueStr, e.size, e.limit)
 }
 
 // Code returns the error code for this error
@@ -267,6 +289,11 @@ func (e LedgerInteractionLimitExceededError) Code() ErrorCode {
 	return ErrCodeLedgerInteractionLimitExceededError
 }
 
+func IsLedgerInteractionLimitExceededError(err error) bool {
+	var t LedgerInteractionLimitExceededError
+	return As(err, &t)
+}
+
 // OperationNotSupportedError is generated when an operation (e.g. getting block info) is
 // not supported in the current environment.
 type OperationNotSupportedError struct {
@@ -287,6 +314,11 @@ func (e OperationNotSupportedError) Error() string {
 // Code returns the error code for this error
 func (e OperationNotSupportedError) Code() ErrorCode {
 	return ErrCodeOperationNotSupportedError
+}
+
+func IsOperationNotSupportedError(err error) bool {
+	var t OperationNotSupportedError
+	return As(err, &t)
 }
 
 // ScriptExecutionCancelledError indicates that Cadence Script execution
