@@ -31,8 +31,8 @@ type Programs struct {
 	tracer *Tracer
 	meter  Meter
 
-	stateTransaction *state.StateHolder
-	accounts         Accounts
+	txnState *state.TransactionState
+	accounts Accounts
 
 	transactionPrograms TransactionPrograms
 }
@@ -41,14 +41,14 @@ type Programs struct {
 func NewPrograms(
 	tracer *Tracer,
 	meter Meter,
-	stateTransaction *state.StateHolder,
+	txnState *state.TransactionState,
 	accounts Accounts,
 	transactionPrograms TransactionPrograms,
 ) *Programs {
 	return &Programs{
 		tracer:              tracer,
 		meter:               meter,
-		stateTransaction:    stateTransaction,
+		txnState:            txnState,
 		accounts:            accounts,
 		transactionPrograms: transactionPrograms,
 	}
@@ -71,7 +71,7 @@ func (programs *Programs) set(
 		return nil
 	}
 
-	state, err := programs.stateTransaction.CommitParseRestricted(address)
+	state, err := programs.txnState.CommitParseRestricted(address)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (programs *Programs) get(
 	program, state, has := programs.transactionPrograms.Get(location)
 	if has {
 		if state != nil {
-			err := programs.stateTransaction.AttachAndCommitParseRestricted(
+			err := programs.txnState.AttachAndCommitParseRestricted(
 				state)
 			if err != nil {
 				panic(fmt.Sprintf(
@@ -110,7 +110,7 @@ func (programs *Programs) get(
 		// Address location program is reusable across transactions.  Create
 		// a nested transaction here in order to capture the states read to
 		// parse the program.
-		_, err := programs.stateTransaction.BeginParseRestrictedNestedTransaction(
+		_, err := programs.txnState.BeginParseRestrictedNestedTransaction(
 			address)
 		if err != nil {
 			panic(err)

@@ -190,7 +190,7 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 func CreateAccounts(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -200,7 +200,7 @@ func CreateAccounts(
 func CreateAccountsWithSimpleAddresses(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {

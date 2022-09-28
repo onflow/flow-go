@@ -5,46 +5,25 @@ import (
 	"fmt"
 )
 
-// UnknownFailure captures an unknown vm fatal error
-type UnknownFailure struct {
-	errorWrapper
+func NewUnknownFailure(err error) *CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeUnknownFailure,
+		err,
+		"unknown failure")
 }
 
-// NewUnknownFailure constructs a new UnknownFailure
-func NewUnknownFailure(err error) UnknownFailure {
-	return UnknownFailure{
-		errorWrapper: errorWrapper{err: err},
-	}
-}
-
-func (e UnknownFailure) Error() string {
-	return fmt.Sprintf("%s unknown failure: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e UnknownFailure) FailureCode() FailureCode {
-	return FailureCodeUnknownFailure
-}
-
-// EncodingFailure captures an fatal error sourced from encoding issues
-type EncodingFailure struct {
-	errorWrapper
-}
-
-// NewEncodingFailuref formats and returns a new EncodingFailure
-func NewEncodingFailuref(msg string, err error) EncodingFailure {
-	return EncodingFailure{
-		errorWrapper: errorWrapper{err: fmt.Errorf(msg, err)},
-	}
-}
-
-func (e EncodingFailure) Error() string {
-	return fmt.Sprintf("%s encoding failed: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e EncodingFailure) FailureCode() FailureCode {
-	return FailureCodeEncodingFailure
+// NewEncodingFailure formats and returns a new CodedFailure which
+// captures an fatal error sourced from encoding issues
+func NewEncodingFailuref(
+	err error,
+	msg string,
+	args ...interface{},
+) *CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeEncodingFailure,
+		err,
+		"encoding failed: "+msg,
+		args...)
 }
 
 // LedgerFailure captures a fatal error cause by ledger failures
@@ -64,7 +43,7 @@ func (e LedgerFailure) Error() string {
 }
 
 // FailureCode returns the failure code
-func (e LedgerFailure) FailureCode() FailureCode {
+func (e LedgerFailure) FailureCode() ErrorCode {
 	return FailureCodeLedgerFailure
 }
 
@@ -91,27 +70,15 @@ func (e StateMergeFailure) Error() string {
 }
 
 // FailureCode returns the failure code
-func (e StateMergeFailure) FailureCode() FailureCode {
+func (e StateMergeFailure) FailureCode() ErrorCode {
 	return FailureCodeStateMergeFailure
 }
 
-// BlockFinderFailure captures a fatal caused by block finder
-type BlockFinderFailure struct {
-	errorWrapper
-}
-
-// NewBlockFinderFailure constructs a new BlockFinderFailure
-func NewBlockFinderFailure(err error) BlockFinderFailure {
-	return BlockFinderFailure{
-		errorWrapper: errorWrapper{err: err},
-	}
-}
-
-func (e BlockFinderFailure) Error() string {
-	return fmt.Sprintf("%s can not retrieve the block: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e BlockFinderFailure) FailureCode() FailureCode {
-	return FailureCodeBlockFinderFailure
+// NewBlockFinderFailure constructs a new CodedFailure which captures a fatal
+// caused by block finder.
+func NewBlockFinderFailure(err error) *CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeBlockFinderFailure,
+		err,
+		"can not retrieve the block")
 }

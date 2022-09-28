@@ -181,7 +181,7 @@ type accountKeyUpdater struct {
 	meter  Meter
 
 	accounts Accounts
-	stTxn    *state.StateHolder
+	txnState *state.TransactionState
 	env      Environment
 }
 
@@ -189,14 +189,14 @@ func NewAccountKeyUpdater(
 	tracer *Tracer,
 	meter Meter,
 	accounts Accounts,
-	stTxn *state.StateHolder,
+	txnState *state.TransactionState,
 	env Environment,
 ) *accountKeyUpdater {
 	return &accountKeyUpdater{
 		tracer:   tracer,
 		meter:    meter,
 		accounts: accounts,
-		stTxn:    stTxn,
+		txnState: txnState,
 		env:      env,
 	}
 }
@@ -459,7 +459,7 @@ func (updater *accountKeyUpdater) AddEncodedAccountKey(
 	// TODO do a call to track the computation usage and memory usage
 	//
 	// don't enforce limit during adding a key
-	updater.stTxn.RunWithAllLimitsDisabled(func() {
+	updater.txnState.RunWithAllLimitsDisabled(func() {
 		err = updater.addEncodedAccountKey(address, publicKey)
 	})
 

@@ -46,6 +46,9 @@ type Environment interface {
 		error,
 	)
 
+	// AccountInfo
+	GetAccount(address flow.Address) (*flow.Account, error)
+
 	AccountFreezer
 
 	// FlushPendingUpdates flushes pending updates from the stateful environment

@@ -55,6 +55,20 @@ func (_m *Meter) MeterComputation(_a0 common.ComputationKind, _a1 uint) error {
 	return r0
 }
 
+// MeterEmittedEvent provides a mock function with given fields: byteSize
+func (_m *Meter) MeterEmittedEvent(byteSize uint64) error {
+	ret := _m.Called(byteSize)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64) error); ok {
+		r0 = rf(byteSize)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // MeterMemory provides a mock function with given fields: usage
 func (_m *Meter) MeterMemory(usage common.MemoryUsage) error {
 	ret := _m.Called(usage)
@@ -64,6 +78,34 @@ func (_m *Meter) MeterMemory(usage common.MemoryUsage) error {
 		r0 = rf(usage)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// TotalEmittedEventBytes provides a mock function with given fields:
+func (_m *Meter) TotalEmittedEventBytes() uint64 {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
+// TotalEventCounter provides a mock function with given fields:
+func (_m *Meter) TotalEventCounter() uint32 {
+	ret := _m.Called()
+
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint32)
 	}
 
 	return r0
