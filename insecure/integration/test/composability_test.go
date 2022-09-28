@@ -22,26 +22,26 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/network"
 )
 
-// TestCorruptibleConduitFrameworkHappyPath implements a round-trip test that checks the composibility of the entire happy path of the corruptible
-// conduit framework. The test runs two engines on two distinct network instances, one with normal conduit,
-// and one with a corruptible conduit factory (ccf).
+// TestCorruptNetworkFrameworkHappyPath implements a round-trip test that checks the composibility of the entire happy path of the corrupt
+// network framework. The test runs two engines on two distinct network instances, one with normal conduit,
+// and one with a corrupt conduit factory (ccf).
 //
-// The engine running on ccf is sending a message to the other engine (running with normal conduit).
-// The message goes through ccf to the orchestrator network and reaches the attack orchestrator.
-// The orchestrator corrupts the message and sends it back to the ccf to be dispatched on the flow network.
-// The test passes if the engine running with normal conduit receives the corrupted message in a timely fashion (and also never gets the
+// The engine running on corrupt network is sending a message to the honest engine.
+// The message goes through the corrupt network to the orchestrator network and reaches the attack orchestrator.
+// The orchestrator corrupts the message and sends it back to the corrupt network to be dispatched on the flow network.
+// The test passes if the honest engine receives the corrupted message in a timely fashion (and also never gets the
 // original messages).
-func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
+func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 	// We first start ccf and then the orchestrator network, since the order of startup matters, i.e., on startup, the orchestrator network tries
 	// to connect to all ccfs.
-	withCorruptibleNetwork(t, func(t *testing.T, corruptedIdentity flow.Identity, corruptibleNetwork *corrupt.Network, hub *stub.Hub) {
+	withCorruptNetwork(t, func(t *testing.T, corruptedIdentity flow.Identity, corruptNetwork *corrupt.Network, hub *stub.Hub) {
 		// these are the events which orchestrator will send instead of the original ingress and egress events coming to and from
 		// the corrupted engine, respectively.
 		corruptedEgressEvent := &message.TestMessage{Text: "this is a corrupted egress message"}
 		corruptedIngressEvent := &message.TestMessage{Text: "this is a corrupted ingress message"}
 
 		// extracting port that ccf gRPC server is running on
-		_, ccfPortStr, err := net.SplitHostPort(corruptibleNetwork.ServerAddress())
+		_, ccfPortStr, err := net.SplitHostPort(corruptNetwork.ServerAddress())
 		require.NoError(t, err)
 
 		withAttackOrchestrator(t, flow.IdentityList{&corruptedIdentity}, map[flow.Identifier]string{corruptedIdentity.NodeID: ccfPortStr},
@@ -55,7 +55,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 			},
 			func(t *testing.T) {
 				require.Eventually(t, func() bool {
-					return corruptibleNetwork.AttackerRegistered() // attacker's registration must be done on corruptible network prior to sending any messages.
+					return corruptNetwork.AttackerRegistered() // attacker's registration must be done on corrupt network prior to sending any messages.
 				}, 2*time.Second, 100*time.Millisecond, "registration of attacker on CCF could not be done one time")
 
 				// egress event is sent from the node running corrupted engine to node running the honest engine.
@@ -66,7 +66,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 				// corrupted node network
 				corruptedEngine := &network.Engine{}
-				corruptedConduit, err := corruptibleNetwork.Register(testChannel, corruptedEngine)
+				corruptedConduit, err := corruptNetwork.Register(testChannel, corruptedEngine)
 				require.NoError(t, err)
 
 				// honest network
@@ -119,8 +119,8 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 }
 
-// withCorruptibleNetwork creates a real corruptible network, starts it, runs the "run" function, and then stops it.
-func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corrupt.Network, *stub.Hub)) {
+// withCorruptNetwork creates a real corrupt network, starts it, runs the "run" function, and then stops it.
+func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corrupt.Network, *stub.Hub)) {
 	codec := unittest.NetworkCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
@@ -138,7 +138,7 @@ func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *c
 	hub := stub.NewNetworkHub()
 	ccf := corrupt.NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	flowNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
-	corruptibleNetwork, err := corrupt.NewCorruptNetwork(
+	corruptNetwork, err := corrupt.NewCorruptNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
 		insecure.DefaultAddress,
@@ -148,24 +148,24 @@ func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *c
 		ccf)
 	require.NoError(t, err)
 
-	// starts corruptible conduit factory
-	corruptibleNetwork.Start(ccfCtx)
+	// starts corrupt conduit factory
+	corruptNetwork.Start(ccfCtx)
 	unittest.RequireCloseBefore(
 		t,
-		corruptibleNetwork.Ready(),
+		corruptNetwork.Ready(),
 		1*time.Second,
-		"could not start corruptible network on time")
+		"could not start corrupt network on time")
 
 	unittest.RequireReturnsBefore(t, func() {
 		// starts the stub network of the corrupted node so that messages sent by its registered engines can be delivered.
 		flowNetwork.StartConDev(100*time.Millisecond, true)
 	}, 100*time.Millisecond, "failed to start corrupted node network")
 
-	run(t, *corruptedIdentity, corruptibleNetwork, hub)
+	run(t, *corruptedIdentity, corruptNetwork, hub)
 
 	// terminates orchestratorNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, corruptibleNetwork.Done(), 1*time.Second, "could not stop corruptible network on time")
+	unittest.RequireCloseBefore(t, corruptNetwork.Done(), 1*time.Second, "could not stop corrupt network on time")
 
 	unittest.RequireReturnsBefore(t, func() {
 		// stops the stub network of corrupted node.
@@ -209,7 +209,7 @@ func withAttackOrchestrator(
 		}
 	}()
 
-	// starts corruptible conduit factory
+	// starts orchestrator network
 	orchestratorNetwork.Start(orchestratorNetworkCtx)
 	unittest.RequireCloseBefore(t, orchestratorNetwork.Ready(), 1*time.Second, "could not start orchestrator network on time")
 	run(t)
