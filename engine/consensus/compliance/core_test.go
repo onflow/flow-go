@@ -2,6 +2,7 @@ package compliance
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -340,8 +341,58 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 //   - should not be added to the state
 //   - we should not attempt to process its children
 func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
-	//cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, cs.head.View)).Return(nil)
 
+	// create a proposal that has two ancestors in the cache
+	originID := cs.participants[1].NodeID
+	ancestor := unittest.BlockWithParentFixture(cs.head)
+	parent := unittest.BlockWithParentFixture(ancestor.Header)
+	block := unittest.BlockWithParentFixture(parent.Header)
+	proposal := unittest.ProposalFromBlock(block)
+
+	// store the data for retrieval
+	cs.headerDB[parent.ID()] = parent.Header
+	cs.headerDB[ancestor.ID()] = ancestor.Header
+
+	cs.Run("invalid block error", func() {
+		// the block fails HotStuff validation
+		*cs.validator = *hotstuff.NewValidator(cs.T())
+		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(model.InvalidBlockError{})
+
+		// it should be processed without error
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
+
+		// we should not extend the state with the header
+		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, block)
+	})
+
+	cs.Run("view for unknown epoch error", func() {
+		// the block fails HotStuff validation
+		*cs.validator = *hotstuff.NewValidator(cs.T())
+		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(model.ErrViewForUnknownEpoch)
+
+		// it should be processed without error
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
+
+		// we should not extend the state with the header
+		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, block)
+	})
+
+	cs.Run("unexpected error", func() {
+		// the block fails HotStuff validation
+		unexpectedErr := errors.New("generic unexpected error")
+		*cs.validator = *hotstuff.NewValidator(cs.T())
+		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(unexpectedErr)
+
+		// the error should be propagated
+		err := cs.core.OnBlockProposal(originID, proposal)
+		fmt.Println(err)
+		require.ErrorIs(cs.T(), err, unexpectedErr)
+
+		// we should not extend the state with the header
+		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, block)
+	})
 }
 
 // TestOnBlockProposal_InvalidExtension tests processing a proposal which passes HotStuff validation,
@@ -379,9 +430,8 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 
 	// we should extend the state with the header
 	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
-
-	// we should not submit the proposal to hotstuff
-	cs.hotstuff.AssertExpectations(cs.T())
+	// we should not pass the block to hotstuff
+	cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
 }
 
 func (cs *CoreSuite) TestProcessBlockAndDescendants() {
