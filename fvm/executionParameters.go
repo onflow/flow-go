@@ -2,7 +2,9 @@ package fvm
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -15,6 +17,53 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
+
+// GetMeterSettingsFromState retrieves meter settings from state.
+// All state reading interactions/spock secretes will be merged to collectionView.
+func GetMeterSettingsFromState(
+	blockCtx Context,
+	collectionView state.View,
+) (_ meter.MeterParameters, retErr error) {
+	var errs *multierror.Error
+
+	// since getEnvironmentMeterParameters() only sets memory limit when state read is successful.
+	// We mark memory limit as 0 as a flag to indicate whether state reading is successful.
+	defaultMeterParams := meter.DefaultParameters().WithMemoryLimit(0)
+
+	// we only need snapshot read txn programs here to read meter settings from state
+	blockPrograms := blockCtx.BlockPrograms
+	if blockPrograms == nil {
+		blockPrograms = programs.NewEmptyBlockPrograms()
+	}
+	txnPrograms, err := blockPrograms.NewSnapshotReadTransactionPrograms(
+		programs.EndOfBlockExecutionTime,
+		programs.EndOfBlockExecutionTime)
+	if err != nil {
+		return defaultMeterParams, fmt.Errorf("error creating script transaction programs: %w", err)
+	}
+
+	// using a child view for state reading and it will be merged into parent view when done
+	childColView := collectionView.NewChild()
+	defer func() {
+		err := collectionView.MergeView(childColView)
+		if err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("failed to merge child view into parent collection view: %w", err))
+			retErr = errs.ErrorOrNil()
+		}
+	}()
+
+	meterParams, err := getEnvironmentMeterParameters(
+		blockCtx,
+		childColView,
+		txnPrograms,
+		defaultMeterParams,
+	)
+	if err != nil {
+		errs = multierror.Append(errs, fmt.Errorf("failed to retrieve meter settings from state: %w", err))
+	}
+
+	return meterParams, errs.ErrorOrNil()
+}
 
 func getEnvironmentMeterParameters(
 	ctx Context,

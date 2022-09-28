@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -19,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/runtime/testutil"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestGetExecutionMemoryWeights(t *testing.T) {
@@ -273,4 +276,22 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 			require.InDeltaMapValues(t, expectedWeights, weights, 0)
 		},
 	)
+}
+
+func Test_GetMeterSettingsFromState(t *testing.T) {
+	ctx := fvm.NewContext()
+	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+		assert.Equal(t, key, "storage")
+		return nil, nil
+	})
+
+	_, err := fvm.GetMeterSettingsFromState(ctx, view)
+	assert.NoError(t, err)
+
+	touchedRegIDs := view.AllRegisters()
+	assert.Equal(t, 1, len(touchedRegIDs))
+	assert.Equal(t, "storage", touchedRegIDs[0].Key)
+
+	// computation weights, memory weights, memory limit
+	assert.Equal(t, uint64(3), view.ReadsCount())
 }
