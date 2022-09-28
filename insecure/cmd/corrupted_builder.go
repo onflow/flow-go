@@ -11,10 +11,10 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// CorruptibleConduitFactoryPort is the port number that gRPC server of the conduit factory of corrupted nodes is listening on.
-const CorruptibleConduitFactoryPort = 4300
+// CorruptNetworkPort is the port number that gRPC server of the conduit factory of corrupted nodes is listening on.
+const CorruptNetworkPort = 4300
 
-// CorruptedNodeBuilder creates a general flow node builder with corruptible conduit factory.
+// CorruptedNodeBuilder creates a general flow node builder with corrupt network.
 type CorruptedNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 }
@@ -47,7 +47,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			return nil, fmt.Errorf("could not extract host address: %w", err)
 		}
 
-		address := net.JoinHostPort(host, strconv.Itoa(CorruptibleConduitFactoryPort))
+		address := net.JoinHostPort(host, strconv.Itoa(CorruptNetworkPort))
 		ccf := corrupt.NewCorruptConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
 
 		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupted conduit factory initiated")

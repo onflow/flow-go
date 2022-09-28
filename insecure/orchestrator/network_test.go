@@ -35,7 +35,7 @@ func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
 	withMockOrchestrator(
 		t,
 		corruptedIds,
-		func(orchestratorNetwork *Network, orchestrator *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
+		func(orchestratorNetwork *Network, orchestrator *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptNetwork) {
 			// mocks orchestrator to receive each event exactly once.
 			orchestratorWG := mockOrchestratorHandlingEgressEvent(t, orchestrator, egressEvents)
 
@@ -94,7 +94,7 @@ func testOrchestratorNetwork(t *testing.T, protocol insecure.Protocol, concurren
 
 	withMockOrchestrator(t,
 		corruptedIds,
-		func(orchestratorNetwork *Network, _ *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
+		func(orchestratorNetwork *Network, _ *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptNetwork) {
 			attackerMsgReceived := &sync.WaitGroup{}
 			attackerMsgReceived.Add(concurrencyDegree)
 
@@ -162,11 +162,11 @@ func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, me
 // Once the orchestrator network, CCFs, and mock orchestrator are all ready, it executes the injected "run" function.
 func withMockOrchestrator(t *testing.T,
 	corruptedIds flow.IdentityList,
-	run func(*Network, *mockinsecure.AttackOrchestrator, []*mockCorruptibleConduitFactory)) {
+	run func(*Network, *mockinsecure.AttackOrchestrator, []*mockCorruptNetwork)) {
 
 	withMockCorruptibleConduitFactories(t,
 		corruptedIds.NodeIDs(),
-		func(signalerContext irrecoverable.SignalerContext, ccfs []*mockCorruptibleConduitFactory, ccfPorts map[flow.Identifier]string) {
+		func(signalerContext irrecoverable.SignalerContext, ccfs []*mockCorruptNetwork, ccfPorts map[flow.Identifier]string) {
 
 			orchestrator := &mockinsecure.AttackOrchestrator{}
 			connector := NewCorruptedConnector(unittest.Logger(), corruptedIds, ccfPorts)
@@ -253,7 +253,7 @@ func mockOrchestratorHandlingEgressEvent(t *testing.T, orchestrator *mockinsecur
 func withMockCorruptibleConduitFactories(
 	t *testing.T,
 	corruptedIds flow.IdentifierList,
-	run func(irrecoverable.SignalerContext, []*mockCorruptibleConduitFactory, map[flow.Identifier]string)) {
+	run func(irrecoverable.SignalerContext, []*mockCorruptNetwork, map[flow.Identifier]string)) {
 
 	count := len(corruptedIds)
 
@@ -269,11 +269,11 @@ func withMockCorruptibleConduitFactories(
 		}
 	}()
 
-	ccfs := make([]*mockCorruptibleConduitFactory, count)
+	ccfs := make([]*mockCorruptNetwork, count)
 	ccfPorts := make(map[flow.Identifier]string)
 	for i := 0; i < count; i++ {
 		// factory
-		ccf := newMockCorruptibleConduitFactory()
+		ccf := newMockCorruptNetwork()
 		ccf.Start(ccfCtx)
 		unittest.RequireCloseBefore(t, ccf.Ready(), 1*time.Second, "could not start corruptible conduit factory on time")
 		ccfs[i] = ccf

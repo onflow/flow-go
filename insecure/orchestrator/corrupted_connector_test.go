@@ -20,7 +20,7 @@ import (
 // TestConnectorHappy_Send checks that a CorruptedConnector can successfully create a connection to a remote Corruptible Conduit Factory (CCF).
 // Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from attacker to CCF.
 func TestConnectorHappyPath_Send(t *testing.T) {
-	withMockCorruptibleConduitFactory(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, ccf *mockCorruptibleConduitFactory) {
+	withMockCorruptibleConduitFactory(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, ccf *mockCorruptNetwork) {
 		// extracting port that ccf gRPC server is running on CCF.
 		_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
 		require.NoError(t, err)
@@ -81,7 +81,7 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 // CCF).
 // Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from CCF to attacker.
 func TestConnectorHappyPath_Receive(t *testing.T) {
-	withMockCorruptibleConduitFactory(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, ccf *mockCorruptibleConduitFactory) {
+	withMockCorruptibleConduitFactory(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, ccf *mockCorruptNetwork) {
 		// extracting port that ccf gRPC server is running on
 		_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
 		require.NoError(t, err)
@@ -133,7 +133,7 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 
 // withMockCorruptibleConduitFactory creates and starts a mock corruptible conduit factory. This mock factory only runs the gRPC server part of an
 // actual corruptible conduit factory, and then executes the run function on it.
-func withMockCorruptibleConduitFactory(t *testing.T, run func(flow.Identity, irrecoverable.SignalerContext, *mockCorruptibleConduitFactory)) {
+func withMockCorruptibleConduitFactory(t *testing.T, run func(flow.Identity, irrecoverable.SignalerContext, *mockCorruptNetwork)) {
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
 	// life-cycle management of corruptible conduit factory.
@@ -148,7 +148,7 @@ func withMockCorruptibleConduitFactory(t *testing.T, run func(flow.Identity, irr
 		}
 	}()
 
-	ccf := newMockCorruptibleConduitFactory()
+	ccf := newMockCorruptNetwork()
 
 	// starts corruptible conduit factory
 	ccf.Start(ccfCtx)
