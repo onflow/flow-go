@@ -1,9 +1,9 @@
 name: Ephemeral-Benchnet2-Teardown
 
 on:
-  pull_request:
-    types:
-      - closed
+  # pull_request:
+  #   types:
+  #     - closed
 
 env:
   GO_VERSION: 1.19

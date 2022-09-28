@@ -2,21 +2,21 @@ name: CI
 
 on:
   push:
-    branches:
-      - 'auto-cadence-upgrade/**'
-      - staging
-      - trying
-      - 'feature/**'
-      - 'v[0-9]+.[0-9]+'
-  pull_request:
-    branches:
-      - master
-      - 'auto-cadence-upgrade/**'
-      - 'feature/**'
-      - 'v[0-9]+.[0-9]+'
-  workflow_run:
-    workflows: ["Ephemeral BN2 Setup for PR"]
-    branches: ['feature/**', master]
+  #   branches:
+  #     - 'auto-cadence-upgrade/**'
+  #     - staging
+  #     - trying
+  #     - 'feature/**'
+  #     - 'v[0-9]+.[0-9]+'
+  # pull_request:
+  #   branches:
+  #     - master
+  #     - 'auto-cadence-upgrade/**'
+  #     - 'feature/**'
+  #     - 'v[0-9]+.[0-9]+'
+  # workflow_run:
+  #   workflows: ["Ephemeral BN2 Setup for PR"]
+  #   branches: ['feature/**', master]
 
 env:
   GO_VERSION: 1.19

@@ -6,9 +6,9 @@ name: BFT Tests
 # this workflow should be disabled in Github when not needed: https://docs.github.com/en/actions/managing-workflow-runs/disabling-and-enabling-a-workflow
 
 on:
-  push:
-    branches:
-      - '**/*bft*'
+  # push:
+  #   branches:
+  #     - '**/*bft*'
 
 env:
   GO_VERSION: 1.19
