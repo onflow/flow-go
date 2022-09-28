@@ -11,6 +11,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
@@ -181,7 +182,9 @@ func TestCheckpointV6IsDeterminstic(t *testing.T) {
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint1", &logger), "fail to store checkpoint")
 		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint2", &logger), "fail to store checkpoint")
-		require.NoError(t, compareFiles(path.Join(dir, "checkpoint1"), path.Join(dir, "checkpoint2")),
+		require.NoError(t, compareFiles(
+			path.Join(dir, "checkpoint1"),
+			path.Join(dir, "checkpoint2")),
 			"found difference in checkpoint files")
 	})
 }
@@ -234,14 +237,55 @@ func compareFiles(file1, file2 string) error {
 	return nil
 }
 
-func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
+func storeCheckpointV5(tries []*trie.MTrie, dir string, fileName string, logger *zerolog.Logger) error {
+	closable, err := createWriterForCheckpointHeader(dir, fileName, logger)
+	if err != nil {
+		return fmt.Errorf("could not store checkpoint header: %w", err)
+	}
+	defer func() {
+		closeErr := closable.Close()
+		// Return close error if there isn't any prior error to return.
+		if err == nil {
+			err = closeErr
+		}
+	}()
+
+	return StoreCheckpointV5(closable, tries...)
+}
+
+func TestWriteAndReadCheckpointV5(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint1"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger), "fail to store checkpoint")
-		decoded, err := ReadCheckpointV6(dir, fileName, &logger)
-		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+
+		require.NoErrorf(t, storeCheckpointV5(tries, dir, fileName, &logger), "fail to store checkpoint")
+		decoded, err := LoadCheckpoint(dir, fileName, &logger)
+		require.NoErrorf(t, err, "fail to load checkpoint")
 		requireTriesEqual(t, tries, decoded)
+	})
+}
+
+// test that converting a v6 back to v5 would produce the same v5 checkpoint as
+// producing directly to v5
+func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimpleTrie(t)
+		logger := unittest.Logger()
+
+		// store tries into v6 then read back, then store into v5
+		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
+		decoded, err := ReadCheckpointV6(dir, "checkpoint-v6", &logger)
+		require.NoErrorf(t, err, "fail to read checkpoint %v/checkpoint-v6", dir)
+		require.NoErrorf(t, storeCheckpointV5(decoded, dir, "checkpoint-v6-v5", &logger), "fail to store checkpoint")
+
+		// store tries directly into v5 checkpoint
+		require.NoErrorf(t, storeCheckpointV5(tries, dir, "checkpoint-v5", &logger), "fail to store checkpoint")
+
+		// compare the two v5 checkpoint files should be identical
+		require.NoError(t, compareFiles(
+			path.Join(dir, "checkpoint-v5"),
+			path.Join(dir, "checkpoint-v6-v5")),
+			"found difference in checkpoint files")
 	})
 }
