@@ -420,15 +420,10 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 	// the block passes HotStuff validation
 	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(nil)
 
-	// make sure we fail to extend the state
-	*cs.state = protocol.MutableState{}
-	cs.state.On("Final").Return(
-		func() protint.Snapshot {
-			return cs.snapshot
-		},
-	)
-
 	cs.Run("invalid block", func() {
+		// make sure we fail to extend the state
+		*cs.state = protocol.MutableState{}
+		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewInvalidExtensionError(""))
 
 		// the expected error should be handled within the Core
@@ -444,6 +439,9 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 	})
 
 	cs.Run("outdated block", func() {
+		// make sure we fail to extend the state
+		*cs.state = protocol.MutableState{}
+		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewOutdatedExtensionError(""))
 
 		// the expected error should be handled within the Core
@@ -458,12 +456,16 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
 	})
 
-	cs.Run("outdated block", func() {
-		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewOutdatedExtensionError(""))
+	cs.Run("unexpected error", func() {
+		// make sure we fail to extend the state
+		*cs.state = protocol.MutableState{}
+		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
+		unexpectedErr := errors.New("unexpected generic error")
+		cs.state.On("Extend", mock.Anything, mock.Anything).Return(unexpectedErr)
 
 		// it should be processed without error
 		err := cs.core.OnBlockProposal(originID, proposal)
-		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
+		require.ErrorIs(cs.T(), err, unexpectedErr)
 
 		// we should extend the state with the header
 		cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
