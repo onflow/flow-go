@@ -33,6 +33,18 @@ type resultStoringSubTrie struct {
 	Err       error
 }
 
+// StoreCheckpointV6SingleThread stores checkpoint file in v6 in a single threaded manner,
+// useful when EN is executing block.
+func StoreCheckpointV6SingleThread(tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
+	return StoreCheckpointV6(tries, outputDir, outputFile, logger, 1)
+}
+
+// StoreCheckpointV6SingleThread stores checkpoint file in v6 in max workers,
+// useful during state extraction
+func StoreCheckpointV6Concurrent(tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
+	return StoreCheckpointV6(tries, outputDir, outputFile, logger, 16)
+}
+
 // StoreCheckpointV6 stores checkpoint file into a main file and 17 file parts.
 // the main file stores:
 // 		1. version
@@ -40,8 +52,9 @@ type resultStoringSubTrie struct {
 // 		3. checksum of the main file itself
 // 	the first 16 files parts contain the trie nodes below the subtrieLevel
 //	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
+// nWorker specifies how many workers to encode subtrie concurrently, valid range [1,16]
 func StoreCheckpointV6(
-	tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
+	tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger, nWorker uint) error {
 	if len(tries) == 0 {
 		logger.Info().Msg("no tries to be checkpointed")
 		return nil
@@ -66,6 +79,7 @@ func StoreCheckpointV6(
 		outputDir,
 		outputFile,
 		logger,
+		nWorker,
 	)
 	if err != nil {
 		return fmt.Errorf("could not store sub trie: %w", err)
@@ -268,6 +282,7 @@ func storeSubTrieConcurrently(
 	outputDir string,
 	outputFile string,
 	logger *zerolog.Logger,
+	nWorker uint,
 ) (
 	map[*node.Node]uint64, // node indices
 	uint64, // node count
