@@ -234,20 +234,31 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) error {
 	blockID := proposal.Header.ID()
 
+	log := c.log.With().
+		Str("block_id", blockID.String()).
+		Uint64("block_height", proposal.Header.Height).
+		Uint64("block_view", proposal.Header.View).
+		Logger()
+
 	// process block itself
 	err := c.processBlockProposal(proposal)
 	if err != nil {
 		if engine.IsOutdatedInputError(err) {
 			// child is outdated by the time we started processing it
 			// => node was probably behind and is catching up. Log as warning
-			c.log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
+			log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
 			return nil
 		}
 		if engine.IsInvalidInputError(err) {
 			// the block is invalid; log as error as we desire honest participation
 			// ToDo: potential slashing
-			c.log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+			log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
 			return nil
+		}
+		if engine.IsUnverifiableInputError(err) {
+			// the block cannot be validated
+			// TODO: potential slashing
+			log.Err(err).Msg("received unverifiable block proposal; this is an indicator of an invalid (slashable) proposal or an epoch failure")
 		}
 
 		// unexpected error: potentially corrupted internal state => abort processing and escalate error
@@ -284,6 +295,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 // Expected errors during normal operations:
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - engine.InvalidInputError if the block proposal is invalid
+//   - engine.UnverifiableInputError if the proposal cannot be validated
 func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	startTime := time.Now()
 	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
@@ -314,17 +326,19 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			// TODO what to do here
+			// We have received a proposal, but we don't know the epoch its view is within.
+			// We know:
 			//  - the parent of this block is valid and inserted (ie. we knew the epoch for it)
 			//  - if we then see this for the child, one of two things must have happened:
 			//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
 			//      -> in this case we can disregard the block
-			//    2. no blocks have been finalized the epoch commitment deadline, and the epoch end (breaking a critical assumption)
+			//    2. no blocks have been finalized the epoch commitment deadline, and the epoch end
+			//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
 			//      -> in this case, the network has encountered a critical failure
-			//  - we assume in general that Case 2 will not happen, therefore we:
-			//    - can discard the proposal
-			//    - cannot slash the proposer
+			//  - we assume in general that Case 2 will not happen, therefore we can discard this proposal
+			return engine.NewUnverifiableInputError("cannot validate proposal with view from unknown epoch: %w", err)
 		}
+		return fmt.Errorf("unexpected error validating proposal: %w", err)
 	}
 
 	log := c.log.With().
