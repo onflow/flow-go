@@ -122,24 +122,35 @@ type codedError struct {
 	errorWrapper
 }
 
-func wrapError(
+func newError(
 	code ErrorCode,
 	rootCause error,
 ) codedError {
-	// TODO(patrick): check if rootCause is a failure, and if so, invert the
-	// error nesting (convert the new code into an additional error).
 	return codedError{
 		code:         code,
 		errorWrapper: errorWrapper{rootCause},
 	}
 }
 
-func newError(
+func wrapCodedError(
+	code ErrorCode,
+	err error,
+	prefixMsgFormat string,
+	formatArguments ...interface{},
+) codedError {
+	if prefixMsgFormat != "" {
+		msg := fmt.Sprintf(prefixMsgFormat, formatArguments...)
+		err = fmt.Errorf("%s: %w", msg, err)
+	}
+	return newError(code, err)
+}
+
+func newCodedError(
 	code ErrorCode,
 	format string,
 	formatArguments ...interface{},
 ) codedError {
-	return wrapError(code, fmt.Errorf(format, formatArguments...))
+	return newError(code, fmt.Errorf(format, formatArguments...))
 }
 
 func (err codedError) Error() string {
@@ -166,7 +177,18 @@ func NewCodedError(
 	arguments ...interface{},
 ) *CodedError {
 	return &CodedError{
-		codedError: newError(code, format, arguments...),
+		codedError: newCodedError(code, format, arguments...),
+	}
+}
+
+func WrapCodedError(
+	code ErrorCode,
+	err error,
+	prefixMsgFormat string,
+	formatArgs ...interface{},
+) *CodedError {
+	return &CodedError{
+		codedError: wrapCodedError(code, err, prefixMsgFormat, formatArgs...),
 	}
 }
 
@@ -178,9 +200,14 @@ type CodedFailure struct {
 	codedError
 }
 
-func WrapCodedFailure(code ErrorCode, err error) *CodedFailure {
+func WrapCodedFailure(
+	code ErrorCode,
+	err error,
+	prefixMsgFormat string,
+	formatArgs ...interface{},
+) *CodedFailure {
 	return &CodedFailure{
-		codedError: wrapError(code, err),
+		codedError: wrapCodedError(code, err, prefixMsgFormat, formatArgs...),
 	}
 }
 
