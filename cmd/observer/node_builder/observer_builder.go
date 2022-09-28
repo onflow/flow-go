@@ -741,7 +741,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 					}
 
 					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
-						builder.Logger.Err(err).Str("peer", pid.Pretty()).Msg("failed to translate to Flow ID")
+						builder.Logger.Err(err).Str("peer", pid.String()).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)
 					}
