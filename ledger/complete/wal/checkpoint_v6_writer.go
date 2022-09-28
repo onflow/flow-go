@@ -53,6 +53,7 @@ func StoreCheckpointV6(
 		Uint64("first_reg_count", first.AllocatedRegCount()).
 		Str("last", last.RootHash().String()).
 		Uint64("last_reg_count", last.AllocatedRegCount()).
+		Int("version", 6).
 		Msgf("storing checkpoint for %v tries to %v", len(tries), outputDir)
 
 	subtrieRoots := createSubTrieRoots(tries)

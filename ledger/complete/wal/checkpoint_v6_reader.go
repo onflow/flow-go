@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/rs/zerolog"
 )
 
 // ReadCheckpointV6 reads checkpoint file from a main file and 17 file parts.
@@ -19,8 +20,10 @@ import (
 // 		3. checksum of the main file itself
 // 	the first 16 files parts contain the trie nodes below the subtrieLevel
 //	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
-func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
+func ReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
+
+	logger.Info().Msgf("reading v6 checkpoint file")
 
 	headerPath := filePathCheckpointHeader(dir, fileName)
 	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath)

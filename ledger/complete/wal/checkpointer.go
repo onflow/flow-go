@@ -624,10 +624,10 @@ func LoadCheckpoint(dir string, filename string, logger *zerolog.Logger) ([]*tri
 		_ = file.Close()
 	}()
 
-	return readCheckpoint(file, dir, filename)
+	return readCheckpoint(file, dir, filename, logger)
 }
 
-func readCheckpoint(f *os.File, dir string, filename string) ([]*trie.MTrie, error) {
+func readCheckpoint(f *os.File, dir string, filename string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 
 	// Read header: magic (2 bytes) + version (2 bytes)
 	header := make([]byte, headerSize)
@@ -656,9 +656,9 @@ func readCheckpoint(f *os.File, dir string, filename string) ([]*trie.MTrie, err
 	case VersionV4:
 		return readCheckpointV4(f)
 	case VersionV5:
-		return readCheckpointV5(f)
+		return readCheckpointV5(f, logger)
 	case VersionV6:
-		return ReadCheckpointV6(dir, filename)
+		return ReadCheckpointV6(dir, filename, logger)
 	default:
 		return nil, fmt.Errorf("unsupported file version %x", version)
 	}
@@ -867,7 +867,8 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 
 // readCheckpointV5 decodes checkpoint file (version 5) and returns a list of tries.
 // Checkpoint file header (magic and version) are verified by the caller.
-func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
+func readCheckpointV5(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+	logger.Info().Msgf("reading v5 checkpoint file")
 
 	// Scratch buffer is used as temporary buffer that reader can read into.
 	// Raw data in scratch buffer should be copied or converted into desired
