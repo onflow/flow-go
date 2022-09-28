@@ -103,11 +103,6 @@ func pull(cmd *cobra.Command, args []string) {
 	// move root checkpoint file if node role is execution
 	if role == flow.RoleExecution {
 
-		// bump up the timeout if it has not been set
-		if !pullCmd.Flags().Lookup("timeout").Changed {
-
-		}
-
 		// root.checkpoint is downloaded to <bootstrap folder>/public-root-information after a pull
 		rootCheckpointSrc := filepath.Join(flagBootDir, model.DirnamePublicBootstrap, model.FilenameWALRootCheckpoint)
 		rootCheckpointDst := filepath.Join(flagBootDir, model.PathRootCheckpoint)
