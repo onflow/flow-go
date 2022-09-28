@@ -10,7 +10,9 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
@@ -812,5 +814,145 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 		ChunkBody: chunkBody,
 		Index:     m.Index,
 		EndState:  endState,
+	}, nil
+}
+
+func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (*entities.BlockExecutionData, error) {
+	chunkExecutionDatas := make([]*entities.ChunkExecutionData, len(data.ChunkExecutionDatas))
+	for i, chunk := range data.ChunkExecutionDatas {
+		chunkMessage, err := ChunkExecutionDataToMessage(chunk)
+		if err != nil {
+			return nil, err
+		}
+		chunkExecutionDatas[i] = chunkMessage
+	}
+	return &entities.BlockExecutionData{
+		BlockId:            IdentifierToMessage(data.BlockID),
+		ChunkExecutionData: chunkExecutionDatas,
+	}, nil
+}
+
+func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (*entities.ChunkExecutionData, error) {
+	collection := &entities.ExecutionDataCollection{
+		Transactions: TransactionsToMessages(data.Collection.Transactions),
+	}
+	events := EventsToMessages(data.Events)
+
+	paths := make([][]byte, len(data.TrieUpdate.Paths))
+	for i, path := range data.TrieUpdate.Paths {
+		paths[i] = []byte(path.String())
+	}
+
+	payloads := make([]*entities.Payload, len(data.TrieUpdate.Payloads))
+	for i, payload := range data.TrieUpdate.Payloads {
+		key, err := payload.Key()
+		if err != nil {
+			return nil, err
+		}
+		keyParts := make([]*entities.KeyPart, len(key.KeyParts))
+		for j, keyPart := range key.KeyParts {
+			keyParts[j] = &entities.KeyPart{
+				Type:  uint32(keyPart.Type),
+				Value: keyPart.Value,
+			}
+		}
+		payloads[i] = &entities.Payload{
+			KeyPart: keyParts,
+			Value:   payload.Value(),
+		}
+	}
+
+	trieUpdate := &entities.TrieUpdate{
+		RootHash: data.TrieUpdate.RootHash[:],
+		Paths:    paths,
+		Payloads: nil,
+	}
+
+	return &entities.ChunkExecutionData{
+		Collection: collection,
+		Events:     events,
+		TrieUpdate: trieUpdate,
+	}, nil
+}
+
+func MessageToBlockExecutionData(m *entities.BlockExecutionData, chain flow.Chain) (execution_data.BlockExecutionData, error) {
+	if m == nil {
+		return execution_data.BlockExecutionData{}, ErrEmptyMessage
+	}
+	chunks := make([]*execution_data.ChunkExecutionData, len(m.ChunkExecutionData))
+	for i, chunk := range m.GetChunkExecutionData() {
+		convertedChunk, err := MessageToChunkExecutionData(chunk, chain)
+		if err != nil {
+			return execution_data.BlockExecutionData{}, err
+		}
+		chunks[i] = &convertedChunk
+	}
+
+	return execution_data.BlockExecutionData{
+		BlockID:             MessageToIdentifier(m.GetBlockId()),
+		ChunkExecutionDatas: chunks,
+	}, nil
+}
+
+func MessageToChunkExecutionData(m *entities.ChunkExecutionData, chain flow.Chain) (execution_data.ChunkExecutionData, error) {
+	collection, err := messageToExecutionDataCollection(m.GetCollection(), chain)
+	if err != nil {
+		return execution_data.ChunkExecutionData{}, err
+	}
+
+	trieUpdate, err := messageToTrieUpdate(m.GetTrieUpdate())
+	if err != nil {
+		return execution_data.ChunkExecutionData{}, err
+	}
+
+	return execution_data.ChunkExecutionData{
+		Collection: collection,
+		Events:     MessagesToEvents(m.GetEvents()),
+		TrieUpdate: trieUpdate,
+	}, nil
+}
+
+func messageToExecutionDataCollection(m *entities.ExecutionDataCollection, chain flow.Chain) (*flow.Collection, error) {
+	messages := m.GetTransactions()
+	transactions := make([]*flow.TransactionBody, len(messages))
+	for i, message := range messages {
+		transaction, err := MessageToTransaction(message, chain)
+		if err != nil {
+			return &flow.Collection{}, err
+		}
+		transactions[i] = &transaction
+	}
+
+	return &flow.Collection{Transactions: transactions}, nil
+}
+
+func messageToTrieUpdate(m *entities.TrieUpdate) (*ledger.TrieUpdate, error) {
+	rootHash, err := ledger.ToRootHash(m.GetRootHash())
+	if err != nil {
+		return &ledger.TrieUpdate{}, err
+	}
+
+	paths := make([]ledger.Path, len(m.GetPaths()))
+	for i, path := range m.GetPaths() {
+		convertedPath, err := ledger.ToPath(path)
+		if err != nil {
+			return &ledger.TrieUpdate{}, err
+		}
+		paths[i] = convertedPath
+	}
+
+	payloads := make([]*ledger.Payload, len(m.Payloads))
+	for i, payload := range m.GetPayloads() {
+		keyParts := make([]ledger.KeyPart, len(payload.GetKeyPart()))
+		for j, keypart := range payload.GetKeyPart() {
+			keyParts[j] = ledger.NewKeyPart(uint16(keypart.GetType()), keypart.GetValue())
+		}
+		payloads[i] = ledger.NewPayload(ledger.NewKey(keyParts), payload.GetValue())
+	}
+
+	return &ledger.TrieUpdate{
+		RootHash: rootHash,
+		Paths:    paths,
+		Payloads: payloads,
 	}, nil
 }

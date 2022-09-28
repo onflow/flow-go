@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -64,6 +65,7 @@ type Backend struct {
 	backendScripts
 	backendTransactions
 	backendEvents
+	backendExecutionData
 	backendBlockHeaders
 	backendBlockDetails
 	backendAccounts
@@ -96,6 +98,7 @@ func New(
 	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
+	reader jobs.ExecutionDataReader,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -143,6 +146,10 @@ func New(
 			connFactory:       connFactory,
 			log:               log,
 			maxHeightRange:    maxHeightRange,
+		},
+		backendExecutionData: backendExecutionData{
+			blocks:   blocks,
+			execData: reader,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,
