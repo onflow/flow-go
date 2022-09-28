@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
-	"github.com/onflow/flow-go/insecure/corrupt"
+	cnet "github.com/onflow/flow-go/insecure/net"
 	"github.com/onflow/flow-go/insecure/orchestrator"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -34,7 +34,7 @@ import (
 func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 	// We first start ccf and then the orchestrator network, since the order of startup matters, i.e., on startup, the orchestrator network tries
 	// to connect to all ccfs.
-	withCorruptNetwork(t, func(t *testing.T, corruptedIdentity flow.Identity, corruptNetwork *corrupt.Network, hub *stub.Hub) {
+	withCorruptNetwork(t, func(t *testing.T, corruptedIdentity flow.Identity, corruptNetwork *cnet.Network, hub *stub.Hub) {
 		// these are the events which orchestrator will send instead of the original ingress and egress events coming to and from
 		// the corrupted engine, respectively.
 		corruptedEgressEvent := &message.TestMessage{Text: "this is a corrupted egress message"}
@@ -120,7 +120,7 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 }
 
 // withCorruptNetwork creates a real corrupt network, starts it, runs the "run" function, and then stops it.
-func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corrupt.Network, *stub.Hub)) {
+func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *cnet.Network, *stub.Hub)) {
 	codec := unittest.NetworkCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
@@ -136,9 +136,9 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corru
 		}
 	}()
 	hub := stub.NewNetworkHub()
-	ccf := corrupt.NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
+	ccf := cnet.NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	flowNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
-	corruptNetwork, err := corrupt.NewCorruptNetwork(
+	corruptNetwork, err := cnet.NewCorruptNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
 		insecure.DefaultAddress,
@@ -148,7 +148,7 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corru
 		ccf)
 	require.NoError(t, err)
 
-	// starts corrupt conduit factory
+	// starts corrupt network
 	corruptNetwork.Start(ccfCtx)
 	unittest.RequireCloseBefore(
 		t,

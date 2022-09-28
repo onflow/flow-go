@@ -1,4 +1,4 @@
-package corrupt
+package net
 
 import (
 	"fmt"

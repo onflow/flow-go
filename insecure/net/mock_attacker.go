@@ -1,4 +1,4 @@
-package corrupt
+package net
 
 import (
 	"github.com/golang/protobuf/ptypes/empty"

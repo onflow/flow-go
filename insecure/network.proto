@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package corrupt;
+package net;
 
 import "google/protobuf/empty.proto";
 
