@@ -644,7 +644,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 
 		builder.IdentityProvider = idCache
 
-		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
+		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
 				filter.And(
 					filter.HasRole(flow.RoleConsensus),
