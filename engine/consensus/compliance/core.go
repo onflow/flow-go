@@ -375,6 +375,7 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	}
 
 	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
+	log.Info().Msg("forwarding block proposal to hotstuff")
 	c.hotstuff.SubmitProposal(header, parent.View)
 
 	return nil
