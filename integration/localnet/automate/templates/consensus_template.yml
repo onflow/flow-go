@@ -1,0 +1,19 @@
+args:
+  - --bootstrapdir=/bootstrap
+  - --datadir=/data/protocol
+  - --secretsdir=/data/secret
+  - --loglevel=DEBUG
+  - --profiler-enabled=false
+  - --profile-uploader-enabled=false
+  - --tracer-enabled=false
+  - --bind=0.0.0.0:3569
+  - --profiler-dir=/profiler
+  - --profiler-interval=2m
+  - --nodeid={{nodeid}}
+  - --block-rate-delay=800ms
+  - --hotstuff-timeout=2s
+  - --hotstuff-min-timeout=2s
+  - --chunk-alpha=1
+  - --emergency-sealing-active=false
+  - --insecure-access-api=false
+  - --access-node-ids=*
