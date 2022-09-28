@@ -2,7 +2,6 @@ package compliance
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -364,6 +363,8 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 
 		// we should not extend the state with the header
 		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, block)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
 	})
 
 	cs.Run("view for unknown epoch error", func() {
@@ -377,6 +378,8 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 
 		// we should not extend the state with the header
 		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, block)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
 	})
 
 	cs.Run("unexpected error", func() {
@@ -387,11 +390,12 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 
 		// the error should be propagated
 		err := cs.core.OnBlockProposal(originID, proposal)
-		fmt.Println(err)
 		require.ErrorIs(cs.T(), err, unexpectedErr)
 
 		// we should not extend the state with the header
 		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, block)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
 	})
 }
 
@@ -432,6 +436,8 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
 	// we should not pass the block to hotstuff
 	cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
+	// we should not attempt to process the children
+	cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
 }
 
 func (cs *CoreSuite) TestProcessBlockAndDescendants() {
