@@ -51,7 +51,7 @@ type Network struct {
 	server                *grpc.Server    // touch point of orchestrator network to this factory.
 	gRPCListenAddress     net.Addr
 	conduitFactory        insecure.CorruptConduitFactory
-	attackerInboundStream insecure.CorruptibleConduitFactory_ConnectAttackerServer // inbound stream to attack orchestrator
+	attackerInboundStream insecure.CorruptNetwork_ConnectAttackerServer // inbound stream to attack orchestrator
 
 	// We keep the original message processor here so that we can directly send messages to it when
 	// attacker dictates to do so.
@@ -66,7 +66,7 @@ type Network struct {
 var _ flownet.Network = &Network{}
 var _ insecure.EgressController = &Network{}
 var _ insecure.IngressController = &Network{}
-var _ insecure.CorruptibleConduitFactoryServer = &Network{}
+var _ insecure.CorruptNetworkServer = &Network{}
 
 func NewCorruptNetwork(
 	logger zerolog.Logger,
@@ -160,7 +160,7 @@ func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvid
 //
 // Messages sent from attack orchestrator to this corrupt network are considered dictated in the sense that they are sent on behalf
 // of this corrupt network instance on the original Flow network to other Flow nodes.
-func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
+func (n *Network) ProcessAttackerMessage(stream insecure.CorruptNetwork_ProcessAttackerMessageServer) error {
 	for {
 		select {
 		case <-n.ComponentManager.ShutdownSignal():
@@ -328,7 +328,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 func (n *Network) start(ctx irrecoverable.SignalerContext, gRPCListenAddress string) {
 	// starts up gRPC server of corrupt network at given address.
 	server := grpc.NewServer()
-	insecure.RegisterCorruptibleConduitFactoryServer(server, n)
+	insecure.RegisterCorruptNetworkServer(server, n)
 	ln, err := net.Listen(networkingProtocolTCP, gRPCListenAddress)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
@@ -435,8 +435,8 @@ func (n *Network) AttackerRegistered() bool {
 	return n.attackerInboundStream != nil
 }
 
-// ConnectAttacker is a blocking Server Streaming gRPC end-point for this corrupt network that lets an attack orchestrator register itself to it,
-// so that the attack orchestrator can control its ingress and egress traffic flow.
+// ConnectAttacker is a blocking Server Streaming gRPC end-point for this corrupt network that registers an attacker to the corrupt network,
+// so that the attacker can control its ingress and egress traffic flow.
 //
 // An attack orchestrator (i.e., client) remote call to this function will return immediately on the attack orchestrator's side. However,
 // here on the server (i.e., corrupt network) side, the call remains blocking through the lifecycle of the server.
@@ -449,7 +449,7 @@ func (n *Network) AttackerRegistered() bool {
 //
 // Registering an attack orchestrator on a networking layer is an exactly-once immutable operation,
 // any second attempt after a successful registration returns an error.
-func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_ConnectAttackerServer) error {
+func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptNetwork_ConnectAttackerServer) error {
 	n.mu.Lock()
 	n.logger.Info().Msg("attack orchestrator registration called arrived")
 	if n.attackerInboundStream != nil {

@@ -82,7 +82,7 @@ func runCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
 		flow.Identity, // identity of ccf
 		*Network, // corruptible network
 		*mocknetwork.Adapter, // mock adapter that corrupted network uses to communicate with authorized flow nodes.
-		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
+		insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 	)) {
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
@@ -116,7 +116,7 @@ func runCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	require.NoError(t, err)
 
-	client := insecure.NewCorruptibleConduitFactoryClient(gRpcClient)
+	client := insecure.NewCorruptNetworkClient(gRpcClient)
 	stream, err := client.ProcessAttackerMessage(context.Background())
 	require.NoError(t, err)
 

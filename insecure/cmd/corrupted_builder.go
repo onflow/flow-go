@@ -48,7 +48,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		}
 
 		address := net.JoinHostPort(host, strconv.Itoa(CorruptibleConduitFactoryPort))
-		ccf := corruptible.NewCorruptConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
+		ccf := corrupt.NewCorruptConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
 
 		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupted conduit factory initiated")
 
@@ -59,7 +59,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 
 		// initializes corruptible network that acts as a wrapper around the original flow network of the node, hence
 		// allowing a remote attacker to control the ingress and egress traffic of the node.
-		corruptibleNetwork, err := corruptible.NewCorruptNetwork(
+		corruptibleNetwork, err := corrupt.NewCorruptNetwork(
 			cnb.Logger,
 			cnb.RootChainID,
 			address,
