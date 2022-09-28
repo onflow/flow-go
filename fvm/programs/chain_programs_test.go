@@ -39,8 +39,12 @@ func TestChainPrograms(t *testing.T) {
 	loc1 := testLocation("0a")
 	prog1 := &interpreter.Program{}
 
-	block1.Set(loc1, prog1, nil)
-	block1.Cleanup(ModifiedSets{}) // aka commit
+	txn, err := block1.NewTransactionPrograms(0, 0)
+	require.NoError(t, err)
+
+	txn.Set(loc1, prog1, nil)
+	err = txn.Commit()
+	require.NoError(t, err)
 
 	foundProg, _, ok := block1.GetForTestingOnly(loc1)
 	require.True(t, ok)
@@ -59,8 +63,12 @@ func TestChainPrograms(t *testing.T) {
 	loc2 := testLocation("0b")
 	prog2 := &interpreter.Program{}
 
-	block2.Set(loc2, prog2, nil)
-	block2.Cleanup(ModifiedSets{}) // aka commit
+	txn, err = block2.NewTransactionPrograms(0, 0)
+	require.NoError(t, err)
+
+	txn.Set(loc2, prog2, nil)
+	err = txn.Commit()
+	require.NoError(t, err)
 
 	foundProg, _, ok = block2.GetForTestingOnly(loc1)
 	require.True(t, ok)
