@@ -369,7 +369,6 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 			// protocol state aborted processing of block as it is on an abandoned fork: block is outdated
 			return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
 		}
-
 		// unexpected error: potentially corrupted internal state => abort processing and escalate error
 		return fmt.Errorf("unexpected exception while extending protocol state with block %x at height %d: %w", blockID, header.Height, err)
 	}

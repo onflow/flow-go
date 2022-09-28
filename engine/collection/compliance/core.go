@@ -268,11 +268,12 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 //   - engine.UnverifiableInputError if the proposal cannot be validated
 func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) error {
 	header := proposal.Header
+	blockID := header.ID()
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
-		Hex("block_id", logging.Entity(header)).
+		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
@@ -317,17 +318,17 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 		Payload: proposal.Payload,
 	}
 	err = c.state.Extend(block)
-	// if the block proposes an invalid extension of the protocol state, then the block is invalid
-	if state.IsInvalidExtensionError(err) {
-		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
-			header.ID(), header.Height, err)
-	}
-	// protocol state aborted processing of block as it is on an abandoned fork: block is outdated
-	if state.IsOutdatedExtensionError(err) {
-		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
-	}
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
+		if state.IsInvalidExtensionError(err) {
+			// if the block proposes an invalid extension of the cluster state, then the block is invalid
+			return engine.NewInvalidInputErrorf("invalid extension of cluster state (block: %x, height: %d): %w", blockID, header.Height, err)
+		}
+		if state.IsOutdatedExtensionError(err) {
+			// cluster state aborted processing of block as it is on an abandoned fork: block is outdated
+			return engine.NewOutdatedInputErrorf("outdated extension of cluster state: %w", err)
+		}
+		// unexpected error: potentially corrupted internal state => abort processing and escalate error
+		return fmt.Errorf("unexpected exception while extending cluster state with block %x at height %d: %w", blockID, header.Height, err)
 	}
 
 	// submit the model to hotstuff for processing
