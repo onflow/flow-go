@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -52,7 +52,6 @@ const (
 	loadType                    = "token-transfer"
 	metricport                  = uint(8080)
 	accessNodeAddress           = "127.0.0.1:3569"
-	pushgateway                 = "127.0.0.1:9091"
 	accountMultiplier           = 100
 	feedbackEnabled             = true
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
@@ -74,6 +73,7 @@ func main() {
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
 	bigQueryTableFlag := flag.String("bigquery-table", "tpsslices", "table name for the bigquery uploader")
 	sliceSize := flag.String("slice-size", "2m", "the amount of time that each slice covers")
+	localDev := flag.Bool("local-dev", false, "whether this script itself is being tested. Turns off submitting data to big query and instead outputs a local results file instead")
 	flag.Parse()
 
 	// Version and Commit Info
@@ -102,9 +102,6 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
-	defer sp.Stop()
 
 	tps, err := strconv.ParseInt(*tpsFlag, 0, 32)
 	if err != nil {
@@ -209,9 +206,13 @@ func main() {
 		log.Fatal().Msg("no data slices recorded")
 	}
 
-	err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to send data to bigquery")
+	if *localDev {
+		outputLocalData(dataSlices)
+	} else {
+		err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("unable to send data to bigquery")
+		}
 	}
 }
 
@@ -280,4 +281,19 @@ func sendDataToBigQuery(
 		return fmt.Errorf("failed to insert data: %w", err)
 	}
 	return nil
+}
+
+func outputLocalData(slices []dataSlice) {
+	jsonText, err := json.MarshalIndent(slices, "", "    ")
+	if err != nil {
+		println("Error converting slice data to json")
+	}
+
+	// output human-readable json blob
+	timestamp := time.Now()
+	fileName := fmt.Sprintf("tps-results-%v.json", timestamp.Format("2006-02-01 15:04"))
+	err = os.WriteFile(fileName, jsonText, 0666)
+	if err != nil {
+		fmt.Println(err)
+	}
 }

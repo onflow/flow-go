@@ -70,6 +70,11 @@ start:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
 
+.PHONY: start-thin
+start-thin:
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
+
 .PHONY: stop
 stop:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml down -v --remove-orphans
@@ -84,11 +89,11 @@ tps-test:
 
 .PHONY: tps-ci-smoke
 tps-ci-smoke:
-	go run --tags relic ../benchmark/cmd/ci -log-level info -tps 10 -tps-durations 2m -slice-size 10s
+	go run --tags relic ../benchmark/cmd/ci -log-level info -tps 10 -tps-durations 2m -slice-size 10s -local-dev
 
 .PHONY: tps-test-ci
 tps-test-ci:
 	make init
-	make start
+	make start-thin
 	go run --tags relic ../benchmark/cmd/ci -tps 1
 	make stop
