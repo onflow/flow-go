@@ -354,8 +354,6 @@ var _ io.Writer = &logExtractor{}
 func BenchmarkRuntimeTransaction(b *testing.B) {
 	rand.Seed(time.Now().UnixNano())
 
-	transactionsPerBlock := 10
-
 	longString := strings.Repeat("0", 1000)
 
 	chain := flow.Testnet.Chain()
@@ -365,7 +363,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		InteractionUsed: map[string]uint64{},
 	}
 
-	benchTransaction := func(b *testing.B, tx string) {
+	benchTransaction := func(b *testing.B, tx string, transactionsPerBlock int) {
 
 		logger := zerolog.New(logE).Level(zerolog.DebugLevel)
 
@@ -453,36 +451,37 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	}
 
 	b.Run("reference tx", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, ""))
+		benchTransaction(b, templateTx(100, ""), 10)
 	})
 	b.Run("convert int to string", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `i.toString()`))
+		benchTransaction(b, templateTx(100, `i.toString()`), 10)
 	})
 	b.Run("convert int to string and concatenate it", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `"x".concat(i.toString())`))
+		benchTransaction(b, templateTx(100, `"x".concat(i.toString())`), 10)
 	})
 	b.Run("get signer address", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `signer.address`))
+		benchTransaction(b, templateTx(100, `signer.address`), 10)
 	})
 	b.Run("get public account", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `getAccount(signer.address)`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address)`), 10)
 	})
 	b.Run("get account and get balance", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `getAccount(signer.address).balance`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).balance`), 10)
 	})
 	b.Run("get account and get available balance", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `getAccount(signer.address).availableBalance`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).availableBalance`), 10)
 	})
 	b.Run("get account and get storage used", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageUsed`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageUsed`), 10)
 	})
 	b.Run("get account and get storage capacity", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageCapacity`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageCapacity`), 10)
 	})
 	b.Run("get signer vault", func(b *testing.B) {
 		benchTransaction(
 			b,
 			templateTx(100, `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`),
+			10,
 		)
 	})
 	b.Run("get signer receiver", func(b *testing.B) {
@@ -491,6 +490,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			templateTx(100, `let receiverRef =  getAccount(signer.address)
 				.getCapability(/public/flowTokenReceiver)
 				.borrow<&{FungibleToken.Receiver}>()!`),
+			10,
 		)
 	})
 	b.Run("transfer tokens", func(b *testing.B) {
@@ -505,6 +505,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 
 				receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
 			`),
+			10,
 		)
 	})
 	b.Run("load and save empty string on signers address", func(b *testing.B) {
@@ -514,6 +515,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 				signer.load<String>(from: /storage/testpath)
 				signer.save("", to: /storage/testpath)
 			`),
+			10,
 		)
 	})
 	b.Run("load and save long string on signers address", func(b *testing.B) {
@@ -523,16 +525,17 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 				signer.load<String>(from: /storage/testpath)
 				signer.save("%s", to: /storage/testpath)
 			`, longString)),
+			10,
 		)
 	})
 	b.Run("create new account", func(b *testing.B) {
-		benchTransaction(b, templateTx(50, `let acct = AuthAccount(payer: signer)`))
+		benchTransaction(b, templateTx(50, `let acct = AuthAccount(payer: signer)`), 10)
 	})
 	b.Run("call empty contract function", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `TestContract.empty()`))
+		benchTransaction(b, templateTx(100, `TestContract.empty()`), 10)
 	})
 	b.Run("emit event", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `TestContract.emit()`))
+		benchTransaction(b, templateTx(100, `TestContract.emit()`), 10)
 	})
 	b.Run("borrow array from storage", func(b *testing.B) {
 		benchTransaction(
@@ -545,6 +548,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 				  i = i +1
 				}
 			`),
+			10,
 		)
 	})
 	b.Run("copy array from storage", func(b *testing.B) {
@@ -558,7 +562,17 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 				  i = i +1
 				}
 			`),
+			10,
 		)
+	})
+	b.Run("empty tx - 10 tx per block/collection", func(b *testing.B) {
+		benchTransaction(b, templateTx(0, ""), 10)
+	})
+	b.Run("empty tx - 500 tx per block/collection", func(b *testing.B) {
+		benchTransaction(b, templateTx(0, ""), 500)
+	})
+	b.Run("empty tx - 1000 tx per block/collection", func(b *testing.B) {
+		benchTransaction(b, templateTx(0, ""), 1000)
 	})
 }
 
