@@ -390,10 +390,10 @@ func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub *pubsu
 		close(timeouted)
 	}()
 
-	select {
-	case <-timeouted:
-		return
-	}
+	// wait for the timeout, we choose the timeout to be long enough to make sure that
+	// on a happy path the timeout never happens, and short enough to make sure that
+	// the test doesn't take too long in case of a failure.
+	unittest.RequireCloseBefore(t, timeouted, 10*time.Second, "timeout did not happen on receiving expected pubsub message")
 }
 
 // SubsMustNeverReceiveAnyMessage checks that all subscriptions never receive any message within the given timeout by the context.
