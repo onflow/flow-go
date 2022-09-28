@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 	"strings"
@@ -55,6 +56,11 @@ const (
 	accountMultiplier           = 100
 	feedbackEnabled             = true
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
+
+	// Auto TPS scaling constants
+	additiveIncrease       = 50
+	multiplicativeDecrease = 0.7
+	adjustInterval         = 20 * time.Second
 )
 
 func main() {
@@ -185,12 +191,20 @@ func main() {
 			osVersion)
 	}()
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := adjustTPS(lg, log, adjustInterval, loadCase.tps, uint(*maxTPSFlag))
+		if err != nil {
+			log.Fatal().Err(err).Msgf("unable to adjust tps")
+		}
+	}()
+
 	select {
 	case <-time.After(loadCase.duration):
-	case <-ctx.Done(): //TODO: the loader currently doesn't ever cancel the context
-		// add logging here to express the *why* of lg choose to cancel the context.
-		// when the loader cancels its own context it may also call Stop() on itself
-		// this may become redundant.
+	case <-ctx.Done():
+		// TODO(rbtz): the loader currently doesn't ever cancel the context.
+		log.Warn().Err(ctx.Err()).Msg("loader context canceled")
 	}
 	lg.Stop()
 	wg.Wait()
@@ -199,6 +213,7 @@ func main() {
 		log.Fatal().Msg("no data slices recorded")
 	}
 
+	log.Info().Msg("Uploading data to BigQuery")
 	err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to send data to bigquery")
@@ -270,4 +285,89 @@ func sendDataToBigQuery(
 		return fmt.Errorf("failed to insert data: %w", err)
 	}
 	return nil
+}
+
+// adjustTPS tries to find the maximum TPS that the network can handle using a simple AIMD algorithm.
+// The algorithm starts with min TPS as a target.  Each time it is able to reach the target TPS, it
+// increases the target by `additiveIncrease`. Each time it fails to reach the target TPS, it decreases
+// the target by `multiplicativeDecrease` factor.
+//
+// To avoid oscillation and speedup conversion we skip the adjustment stage if TPS grew
+// compared to the last round.
+//
+// Target TPS is always bounded by [min, max].
+func adjustTPS(
+	lg *benchmark.ContLoadGenerator,
+	log zerolog.Logger,
+	interval time.Duration,
+	min, max uint,
+) error {
+	targetTPS := min
+	lastTs := time.Now()
+	lastTPS := float64(min)
+	lastTxs := uint(lg.GetTxExecuted())
+	for {
+		select {
+		case <-time.After(interval):
+			currentTxs := uint(lg.GetTxExecuted())
+			currentTPS := float64(currentTxs-lastTxs) / math.Floor(time.Since(lastTs).Seconds())
+
+			// Do not touch target TPS if TPS rate incresed since last check.
+			if currentTPS > float64(lastTPS) {
+				log.Info().
+					Float64("lastTPS", lastTPS).
+					Float64("currentTPS", currentTPS).
+					Msg("skipped adjusting TPS")
+
+				lastTxs = currentTxs
+				lastTPS = currentTPS
+				lastTs = time.Now()
+
+				continue
+			}
+
+			unboundedTPS := uint(math.Ceil(currentTPS))
+
+			// To avoid setting target TPS below current TPS,
+			// we decrease the former one by the multiplicativeDecrease factor.
+			if float64(unboundedTPS) >= float64(targetTPS)*multiplicativeDecrease {
+				unboundedTPS = targetTPS + additiveIncrease
+			} else {
+				unboundedTPS = uint(float64(targetTPS) * multiplicativeDecrease)
+			}
+			boundedTPS := boundTPS(unboundedTPS, min, max)
+
+			log.Info().
+				Uint("lastTargetTPS", targetTPS).
+				Float64("lastTPS", lastTPS).
+				Float64("currentTPS", currentTPS).
+				Uint("unboundedTPS", unboundedTPS).
+				Uint("targetTPS", boundedTPS).
+				Msg("adjusting TPS")
+
+			err := lg.SetTPS(boundedTPS)
+			if err != nil {
+				return fmt.Errorf("unable to set tps: %w", err)
+			}
+
+			targetTPS = boundedTPS
+			// SetTPS is a blocking call, so we need to re-fetch the TxExecuted value.
+			lastTxs = uint(lg.GetTxExecuted())
+			lastTPS = currentTPS
+			lastTs = time.Now()
+		case <-lg.Done():
+			return nil
+		}
+	}
+}
+
+func boundTPS(tps, min, max uint) uint {
+	switch {
+	case tps < min:
+		return min
+	case tps > max:
+		return max
+	default:
+		return tps
+	}
 }

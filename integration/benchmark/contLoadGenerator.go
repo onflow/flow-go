@@ -722,7 +722,8 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 			lg.workerStatsTracker.IncTxExecuted()
 			return
 		case <-time.After(slowTransactionThreshold):
-			log.Warn().
+			// TODO(rbtz): add a counter for slow transactions
+			log.Trace().
 				Hex("txID", transferTx.ID().Bytes()).
 				Dur("duration", time.Since(startTime)).
 				Int("availableAccounts", len(lg.availableAccounts)).
