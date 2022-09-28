@@ -274,7 +274,6 @@ type optsConfig struct {
 	dhtPrefix          string
 	dhtOpts            []dht.Option
 	peerUpdateInterval time.Duration
-	connectionGating   bool
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
