@@ -108,6 +108,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
 		assert.NoError(t, err)
+
+		// empty programs won't touch any state regs, so only the storage regs for meter settings will be read.
+		touchedRegIDs := view.AllRegisters()
+		assert.Equal(t, 1, len(touchedRegIDs))
+		assert.Equal(t, "storage", touchedRegIDs[0].Key)
+		// computation weights, memory weights, memory limit
+		assert.Equal(t, uint64(3), view.ReadsCount())
+
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 		assert.Len(t, result.TrieUpdates, 1+1)    // +1 system chunk
 

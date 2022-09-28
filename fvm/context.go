@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
@@ -30,6 +31,8 @@ type Context struct {
 	BlockPrograms *programs.BlockPrograms
 
 	EnvironmentParams
+
+	meterParameters *meter.MeterParameters
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -307,6 +310,14 @@ func WithReusableCadenceRuntimePool(
 func WithBlockPrograms(programs *programs.BlockPrograms) Option {
 	return func(ctx Context) Context {
 		ctx.BlockPrograms = programs
+		return ctx
+	}
+}
+
+// WithMeterParameters sets the MeterParameters to be used for FVM transaction execution.
+func WithMeterParameters(meterParameters *meter.MeterParameters) Option {
+	return func(ctx Context) Context {
+		ctx.meterParameters = meterParameters
 		return ctx
 	}
 }

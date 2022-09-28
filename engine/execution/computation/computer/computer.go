@@ -358,7 +358,18 @@ func (e *blockComputer) executeCollection(
 		colSpan.End()
 	}()
 
-	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsReporter(e.metrics), fvm.WithTracer(e.tracer))
+	// retrieving meter settings from state
+	meterParams, err := fvm.GetMeterSettingsFromState(blockCtx, collectionView)
+	if err != nil {
+		return txIndex, fmt.Errorf("failed to get meter setting from state: %w", err)
+	}
+
+	txCtx := fvm.NewContextFromParent(blockCtx,
+		fvm.WithMetricsReporter(e.metrics),
+		fvm.WithTracer(e.tracer),
+		fvm.WithMeterParameters(&meterParams),
+	)
+
 	for _, txBody := range collection.Transactions {
 		err := e.executeTransaction(txBody, colSpan, collectionView, txCtx, collectionIndex, txIndex, res, false)
 		txIndex++

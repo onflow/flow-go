@@ -140,14 +140,27 @@ func (vm *VirtualMachine) RunV2(
 		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
 		WithMemoryLimit(proc.MemoryLimit(ctx))
 
-	meterParams, err = getEnvironmentMeterParameters(
-		ctx,
-		v,
-		txnPrograms,
-		meterParams,
-	)
-	if err != nil {
-		return fmt.Errorf("error gettng environment meter parameters: %w", err)
+	if ctx.meterParameters != nil {
+		meterParams = meterParams.WithComputationWeights(ctx.meterParameters.ComputationWeights()).
+			WithMemoryWeights(ctx.meterParameters.MemoryWeights())
+
+		// non-zero memory limit means there's valid memory limit read from state
+		if ctx.meterParameters.TotalMemoryLimit() != 0 {
+			meterParams = meterParams.WithMemoryLimit(ctx.meterParameters.TotalMemoryLimit())
+		}
+	} else {
+		// If no preloaded meter parameters from context, the meter setting will be loaded
+		// as usual. Mostly to be compatible with FVM callers without the setting prefetch
+		// optimization like Flow emulator
+		meterParams, err = getEnvironmentMeterParameters(
+			ctx,
+			v,
+			txnPrograms,
+			meterParams,
+		)
+		if err != nil {
+			return fmt.Errorf("error gettng environment meter parameters: %w", err)
+		}
 	}
 
 	interactionLimit := ctx.MaxStateInteractionSize

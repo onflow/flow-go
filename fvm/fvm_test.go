@@ -1054,6 +1054,14 @@ func TestTransactionFeeDeduction(t *testing.T) {
 	}
 }
 
+func appendMeterSettingFromStateToCtx(ctx fvm.Context, view state.View) (fvm.Context, error) {
+	meterParams, err := fvm.GetMeterSettingsFromState(ctx, view)
+	ctx = fvm.NewContextFromParent(ctx,
+		fvm.WithMeterParameters(&meterParams),
+	)
+	return ctx, err
+}
+
 func TestSettingExecutionWeights(t *testing.T) {
 
 	t.Run("transaction should fail with high weights", newVMTest().withBootstrapProcedureOptions(
@@ -1087,6 +1095,10 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+
+			ctx, err = appendMeterSettingFromStateToCtx(ctx, view)
+			require.NoError(t, err)
+
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
@@ -1136,6 +1148,10 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+
+			ctx, err = appendMeterSettingFromStateToCtx(ctx, view)
+			require.NoError(t, err)
+
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
@@ -1172,6 +1188,10 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+
+			ctx, err = appendMeterSettingFromStateToCtx(ctx, view)
+			require.NoError(t, err)
+
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
@@ -1238,6 +1258,10 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+
+			ctx, err = appendMeterSettingFromStateToCtx(ctx, view)
+			require.NoError(t, err)
+
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			// There are 100 breaks and each break uses 1_000_000 memory
@@ -1274,6 +1298,10 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+
+			ctx, err = appendMeterSettingFromStateToCtx(ctx, view)
+			require.NoError(t, err)
+
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
@@ -1309,6 +1337,10 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+
+			ctx, err = appendMeterSettingFromStateToCtx(ctx, view)
+			require.NoError(t, err)
+
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
@@ -1343,6 +1375,10 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+
+			ctx, err = appendMeterSettingFromStateToCtx(ctx, view)
+			require.NoError(t, err)
+
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
@@ -1384,6 +1420,10 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+
+			ctx, err = appendMeterSettingFromStateToCtx(ctx, view)
+			require.NoError(t, err)
+
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 			require.NoError(t, tx.Err)
