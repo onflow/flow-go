@@ -266,6 +266,15 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	ids = append(ids, id1, id2)
 	values = append(values, value1, value2)
 
+	if !system {
+		// meter setting is now fetched outside of each tx execution
+		address := testChain.Chain().ServiceAddress()
+		id3 := flow.NewRegisterID(string(address.Bytes()), "storage")
+		value3 := []byte{'c'}
+		ids = append(ids, id3)
+		values = append(values, value3)
+	}
+
 	var verifiableChunkData verification.VerifiableChunkData
 
 	metricsCollector := &metrics.NoopCollector{}

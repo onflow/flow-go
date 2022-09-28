@@ -39,11 +39,9 @@ func NewChunkVerifier(vm computer.VirtualMachine, vmCtx fvm.Context, logger zero
 	}
 }
 
-// Verify verifies a given VerifiableChunk corresponding to a non-system chunk.
+// Verify verifies a given VerifiableChunk corresponding to either a system chunk or a non-system chunk.
 // by executing it and checking the final state commitment
 // It returns a Spock Secret as a byte array, verification fault of the chunk, and an error.
-// Note: Verify should only be executed on non-system chunks. It returns an error if it is invoked on
-// system chunks.
 func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, chmodels.ChunkFault, error) {
 	if vc.IsSystemChunk {
 		return nil, nil, fmt.Errorf("wrong method invoked for verifying system chunk")
@@ -183,6 +181,19 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	}
 
 	chunkView := delta.NewView(getRegister)
+
+	if !systemChunk {
+		// non-system chunk now reads meter settings from state outside of txns in FVM.
+		// we mirror that behavior here to make sure SPoCK secrets match.
+		// NOTE: we are assuming one chunk maps to one collection. If this changes,
+		//		 we need to adjust the below behavior accordingly.
+		meterParams, err := fvm.GetMeterSettingsFromState(context, chunkView)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get meter setting from state: %w", err)
+		}
+
+		context = fvm.NewContextFromParent(context, fvm.WithMeterParameters(&meterParams))
+	}
 
 	// executes all transactions in this chunk
 	for i, tx := range transactions {
