@@ -47,6 +47,7 @@ const (
 	ErrCodeInvalidEnvelopeSignatureError ErrorCode = 1009
 
 	// base errors 1050 - 1100
+	// Deprecated: No longer used.
 	ErrCodeFVMInternalError            ErrorCode = 1050
 	ErrCodeValueError                  ErrorCode = 1051
 	ErrCodeInvalidArgumentError        ErrorCode = 1052
