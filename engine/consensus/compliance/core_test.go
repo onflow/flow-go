@@ -26,6 +26,7 @@ import (
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/state"
 	protint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -357,7 +358,7 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 		*cs.validator = *hotstuff.NewValidator(cs.T())
 		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(model.InvalidBlockError{})
 
-		// it should be processed without error
+		// the expected error should be handled within the Core
 		err := cs.core.OnBlockProposal(originID, proposal)
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
@@ -372,7 +373,7 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 		*cs.validator = *hotstuff.NewValidator(cs.T())
 		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(model.ErrViewForUnknownEpoch)
 
-		// it should be processed without error
+		// the expected error should be handled within the Core
 		err := cs.core.OnBlockProposal(originID, proposal)
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
@@ -426,18 +427,51 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 			return cs.snapshot
 		},
 	)
-	cs.state.On("Extend", mock.Anything, mock.Anything).Return(errors.New("dummy error"))
 
-	// it should be processed without error
-	err := cs.core.OnBlockProposal(originID, proposal)
-	require.Error(cs.T(), err, "proposal with invalid extension should fail")
+	cs.Run("invalid block", func() {
+		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewInvalidExtensionError(""))
 
-	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
-	// we should not pass the block to hotstuff
-	cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
-	// we should not attempt to process the children
-	cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+		// the expected error should be handled within the Core
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
+
+		// we should extend the state with the header
+		cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
+		// we should not pass the block to hotstuff
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
+
+	cs.Run("outdated block", func() {
+		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewOutdatedExtensionError(""))
+
+		// the expected error should be handled within the Core
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
+
+		// we should extend the state with the header
+		cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
+		// we should not pass the block to hotstuff
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
+
+	cs.Run("outdated block", func() {
+		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewOutdatedExtensionError(""))
+
+		// it should be processed without error
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
+
+		// we should extend the state with the header
+		cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
+		// we should not pass the block to hotstuff
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
 }
 
 func (cs *CoreSuite) TestProcessBlockAndDescendants() {
