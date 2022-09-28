@@ -120,15 +120,17 @@ func main() {
 
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
-	log.Info().Msgf("Service Address: %v", serviceAccountAddress)
 	fungibleTokenAddress := addressGen.NextAddress()
-	log.Info().Msgf("Fungible Token Address: %v", fungibleTokenAddress)
 	flowTokenAddress := addressGen.NextAddress()
-	log.Info().Msgf("Flow Token Address: %v", flowTokenAddress)
+	log.Info().
+		Stringer("serviceAccountAddress", serviceAccountAddress).
+		Stringer("fungibleTokenAddress", fungibleTokenAddress).
+		Stringer("flowTokenAddress", flowTokenAddress).
+		Msg("addresses")
 
 	flowClient, err := client.NewClient(accessNodeAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
+		log.Fatal().Err(err).Msg("unable to initialize Flow client")
 	}
 
 	// prepare load generator
@@ -136,7 +138,7 @@ func main() {
 		Str("load_type", loadType).
 		Uint("tps", loadCase.tps).
 		Dur("duration", loadCase.duration).
-		Msgf("Running load case...")
+		Msg("Running load case...")
 
 	lg, err := benchmark.New(
 		ctx,
@@ -162,18 +164,18 @@ func main() {
 		},
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to create new cont load generator")
+		log.Fatal().Err(err).Msg("unable to create new cont load generator")
 	}
 
 	err = lg.Init()
 	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to init loader")
+		log.Fatal().Err(err).Msg("unable to init loader")
 	}
 
 	// run load
 	err = lg.SetTPS(loadCase.tps)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to set tps")
+		log.Fatal().Err(err).Msg("unable to set tps")
 	}
 	// TODO(rbtz): pass metrics to the load generator
 	loaderMetrics.SetTPSConfigured(loadCase.tps)
@@ -211,7 +213,7 @@ func main() {
 
 	err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to send data to bigquery")
+		log.Fatal().Err(err).Msg("unable to send data to bigquery")
 	}
 }
 
