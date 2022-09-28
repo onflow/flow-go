@@ -8,36 +8,18 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// InvalidAddressError indicates that a transaction references an invalid flow Address
-// in either the Authorizers or Payer field.
-type InvalidAddressError struct {
-	errorWrapper
-
-	address flow.Address
-}
-
-// Address returns the invalid address
-func (e InvalidAddressError) Address() flow.Address {
-	return e.address
-}
-
-// NewInvalidAddressErrorf constructs a new InvalidAddressError
-func NewInvalidAddressErrorf(address flow.Address, msg string, args ...interface{}) InvalidAddressError {
-	return InvalidAddressError{
-		address: address,
-		errorWrapper: errorWrapper{
-			err: fmt.Errorf(msg, args...),
-		},
-	}
-}
-
-func (e InvalidAddressError) Error() string {
-	return fmt.Sprintf("%s invalid address (%s): %s", e.Code().String(), e.address.String(), e.err.Error())
-}
-
-// Code returns the error code for this error type
-func (e InvalidAddressError) Code() ErrorCode {
-	return ErrCodeInvalidAddressError
+// NewInvalidAddressErrorf constructs a new CodedError which indicates that a
+// transaction references an invalid flow Address in either the Authorizers or
+// Payer field.
+func NewInvalidAddressErrorf(
+	address flow.Address,
+	msg string,
+	args ...interface{},
+) *CodedError {
+	return NewCodedError(
+		ErrCodeInvalidAddressError,
+		"invalid address (%s): "+msg,
+		append([]interface{}{address.String()}, args...)...)
 }
 
 // InvalidArgumentError indicates that a transaction includes invalid arguments.
@@ -66,44 +48,22 @@ func (e InvalidArgumentError) Code() ErrorCode {
 	return ErrCodeInvalidArgumentError
 }
 
-// InvalidLocationError indicates an invalid location is passed
-type InvalidLocationError struct {
-	errorWrapper
-
-	location runtime.Location
-}
-
-// NewInvalidLocationErrorf constructs a new InvalidLocationError
-func NewInvalidLocationErrorf(location runtime.Location, msg string, args ...interface{}) InvalidLocationError {
-	return InvalidLocationError{location: location,
-		errorWrapper: errorWrapper{
-			err: fmt.Errorf(msg, args...),
-		},
-	}
-}
-
-func (e InvalidLocationError) Error() string {
-	errMsg := ""
-	if e.err != nil {
-		errMsg = e.err.Error()
-	}
-
+// NewInvalidLocationErrorf constructs a new CodedError which indicates an
+// invalid location is passed.
+func NewInvalidLocationErrorf(
+	location runtime.Location,
+	msg string,
+	args ...interface{},
+) *CodedError {
 	locationStr := ""
-	if e.location != nil {
-		locationStr = e.location.String()
+	if location != nil {
+		locationStr = location.String()
 	}
 
-	return fmt.Sprintf(
-		"%s location (%s) is not a valid location: %s",
-		e.Code().String(),
-		locationStr,
-		errMsg,
-	)
-}
-
-// Code returns the error code for this error
-func (e InvalidLocationError) Code() ErrorCode {
-	return ErrCodeInvalidLocationError
+	return NewCodedError(
+		ErrCodeInvalidLocationError,
+		"location (%s) is not a valid location: "+msg,
+		append([]interface{}{locationStr}, args...)...)
 }
 
 // ValueError indicates a value is not valid value.
@@ -135,40 +95,23 @@ func (e ValueError) Code() ErrorCode {
 	return ErrCodeValueError
 }
 
-// OperationAuthorizationError indicates not enough authorization
-// to perform an operations like account creation or smart contract deployment.
-type OperationAuthorizationError struct {
-	errorWrapper
-
-	operation string
+func IsValueError(err error) bool {
+	var valErr ValueError
+	return As(err, &valErr)
 }
 
-// NewOperationAuthorizationErrorf constructs a new OperationAuthorizationError
-func NewOperationAuthorizationErrorf(operation string, msg string, args ...interface{}) OperationAuthorizationError {
-	return OperationAuthorizationError{
-		operation: operation,
-		errorWrapper: errorWrapper{
-			err: fmt.Errorf(msg, args...),
-		},
-	}
-}
-
-func (e OperationAuthorizationError) Error() string {
-	errMsg := ""
-	if e.err != nil {
-		errMsg = e.err.Error()
-	}
-	return fmt.Sprintf(
-		"%s (%s) is not authorized: %s",
-		e.Code().String(),
-		e.operation,
-		errMsg,
-	)
-}
-
-// Code returns the error code for this error type
-func (e OperationAuthorizationError) Code() ErrorCode {
-	return ErrCodeOperationAuthorizationError
+// NewOperationAuthorizationErrorf constructs a new CodedError which indicates
+// not enough authorization to perform an operations like account creation or
+// smart contract deployment.
+func NewOperationAuthorizationErrorf(
+	operation string,
+	msg string,
+	args ...interface{},
+) *CodedError {
+	return NewCodedError(
+		ErrCodeOperationAuthorizationError,
+		"(%s) is not authorized: "+msg,
+		append([]interface{}{operation}, args...)...)
 }
 
 // AccountAuthorizationError indicates that an authorization issues
@@ -212,29 +155,4 @@ func (e AccountAuthorizationError) Error() string {
 // Code returns the error code for this error type
 func (e AccountAuthorizationError) Code() ErrorCode {
 	return ErrCodeAccountAuthorizationError
-}
-
-// FVMInternalError indicates that an internal error occurs during tx execution.
-type FVMInternalError struct {
-	errorWrapper
-
-	msg string
-}
-
-// NewFVMInternalErrorf constructs a new FVMInternalError
-func NewFVMInternalErrorf(msg string, args ...interface{}) FVMInternalError {
-	return FVMInternalError{
-		errorWrapper: errorWrapper{
-			err: fmt.Errorf(msg, args...),
-		},
-	}
-}
-
-func (e FVMInternalError) Error() string {
-	return e.msg
-}
-
-// Code returns the error code for this error type
-func (e FVMInternalError) Code() ErrorCode {
-	return ErrCodeFVMInternalError
 }

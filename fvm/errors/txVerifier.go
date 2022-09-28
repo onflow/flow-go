@@ -6,38 +6,20 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// InvalidProposalSignatureError indicates that no valid signature is provided for the proposal key.
-type InvalidProposalSignatureError struct {
-	errorWrapper
-
-	address  flow.Address
-	keyIndex uint64
-}
-
-// NewInvalidProposalSignatureError constructs a new InvalidProposalSignatureError
-func NewInvalidProposalSignatureError(address flow.Address, keyIndex uint64, err error) InvalidProposalSignatureError {
-	return InvalidProposalSignatureError{
-		address:  address,
-		keyIndex: keyIndex,
-		errorWrapper: errorWrapper{
-			err: err,
-		},
-	}
-}
-
-func (e InvalidProposalSignatureError) Error() string {
-	return fmt.Sprintf(
-		"%s invalid proposal key: public key %d on account %s does not have a valid signature: %s",
-		e.Code().String(),
-		e.keyIndex,
-		e.address,
-		e.err.Error(),
-	)
-}
-
-// Code returns the error code for this error type
-func (e InvalidProposalSignatureError) Code() ErrorCode {
-	return ErrCodeInvalidProposalSignatureError
+// NewInvalidProposalSignatureError constructs a new CodedError which indicates
+// that no valid signature is provided for the proposal key.
+func NewInvalidProposalSignatureError(
+	address flow.Address,
+	keyIndex uint64,
+	err error,
+) *CodedError {
+	return WrapCodedError(
+		ErrCodeInvalidProposalSignatureError,
+		err,
+		"invalid proposal key: public key %d on account %s does not have a "+
+			"valid signature",
+		keyIndex,
+		address)
 }
 
 // InvalidProposalSeqNumberError indicates that proposal key sequence number does not match the on-chain value.
@@ -120,40 +102,32 @@ func (e InvalidPayloadSignatureError) Code() ErrorCode {
 	return ErrCodeInvalidPayloadSignatureError
 }
 
-// InvalidEnvelopeSignatureError indicates that signature verification for a envelope key in this transaction has failed.
-// this error is the result of failure in any of the following conditions:
+func IsInvalidPayloadSignatureError(err error) bool {
+	var t InvalidPayloadSignatureError
+	return As(err, &t)
+}
+
+// NewInvalidEnvelopeSignatureError constructs a new CodedError which indicates
+// that signature verification for a envelope key in this transaction has
+// failed. Tthis error is the result of failure in any of the following
+// conditions:
 // - provided hashing method is not supported
 // - signature size or format is invalid
 // - signature verification failed
-type InvalidEnvelopeSignatureError struct {
-	errorWrapper
-
-	address  flow.Address
-	keyIndex uint64
+func NewInvalidEnvelopeSignatureError(
+	address flow.Address,
+	keyIndex uint64,
+	err error,
+) *CodedError {
+	return WrapCodedError(
+		ErrCodeInvalidEnvelopeSignatureError,
+		err,
+		"invalid envelope key: public key %d on account %s does not have a "+
+			"valid signature",
+		keyIndex,
+		address)
 }
 
-// NewInvalidEnvelopeSignatureError constructs a new InvalidEnvelopeSignatureError
-func NewInvalidEnvelopeSignatureError(address flow.Address, keyIndex uint64, err error) InvalidEnvelopeSignatureError {
-	return InvalidEnvelopeSignatureError{
-		address:  address,
-		keyIndex: keyIndex,
-		errorWrapper: errorWrapper{
-			err: err,
-		},
-	}
-}
-
-func (e InvalidEnvelopeSignatureError) Error() string {
-	return fmt.Sprintf(
-		"%s invalid envelope key: public key %d on account %s does not have a valid signature: %s",
-		e.Code().String(),
-		e.keyIndex,
-		e.address,
-		e.err.Error(),
-	)
-}
-
-// Code returns the error code for this error type
-func (e InvalidEnvelopeSignatureError) Code() ErrorCode {
-	return ErrCodeInvalidEnvelopeSignatureError
+func IsInvalidEnvelopeSignatureError(err error) bool {
+	return HasErrorCode(err, ErrCodeInvalidEnvelopeSignatureError)
 }

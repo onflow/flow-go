@@ -8,28 +8,22 @@ import (
 func NewUnknownFailure(err error) *CodedFailure {
 	return WrapCodedFailure(
 		FailureCodeUnknownFailure,
-		fmt.Errorf("unknown failure: %w", err))
+		err,
+		"unknown failure")
 }
 
-// EncodingFailure captures an fatal error sourced from encoding issues
-type EncodingFailure struct {
-	errorWrapper
-}
-
-// NewEncodingFailuref formats and returns a new EncodingFailure
-func NewEncodingFailuref(msg string, err error) EncodingFailure {
-	return EncodingFailure{
-		errorWrapper: errorWrapper{err: fmt.Errorf(msg, err)},
-	}
-}
-
-func (e EncodingFailure) Error() string {
-	return fmt.Sprintf("%s encoding failed: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e EncodingFailure) FailureCode() ErrorCode {
-	return FailureCodeEncodingFailure
+// NewEncodingFailure formats and returns a new CodedFailure which
+// captures an fatal error sourced from encoding issues
+func NewEncodingFailuref(
+	err error,
+	msg string,
+	args ...interface{},
+) *CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeEncodingFailure,
+		err,
+		"encoding failed: "+msg,
+		args...)
 }
 
 // LedgerFailure captures a fatal error cause by ledger failures
@@ -80,23 +74,11 @@ func (e StateMergeFailure) FailureCode() ErrorCode {
 	return FailureCodeStateMergeFailure
 }
 
-// BlockFinderFailure captures a fatal caused by block finder
-type BlockFinderFailure struct {
-	errorWrapper
-}
-
-// NewBlockFinderFailure constructs a new BlockFinderFailure
-func NewBlockFinderFailure(err error) BlockFinderFailure {
-	return BlockFinderFailure{
-		errorWrapper: errorWrapper{err: err},
-	}
-}
-
-func (e BlockFinderFailure) Error() string {
-	return fmt.Sprintf("%s can not retrieve the block: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e BlockFinderFailure) FailureCode() ErrorCode {
-	return FailureCodeBlockFinderFailure
+// NewBlockFinderFailure constructs a new CodedFailure which captures a fatal
+// caused by block finder.
+func NewBlockFinderFailure(err error) *CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeBlockFinderFailure,
+		err,
+		"can not retrieve the block")
 }

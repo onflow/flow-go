@@ -14,7 +14,7 @@ import (
 func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	programs environment.TransactionPrograms,
 	tx *flow.TransactionBody,
 	txIndex uint32,
@@ -22,7 +22,7 @@ func NewTransactionEnvironment(
 ) environment.Environment {
 	return NewTransactionEnv(
 		ctx,
-		sth,
+		txnState,
 		programs,
 		tx,
 		txIndex,
@@ -31,7 +31,7 @@ func NewTransactionEnvironment(
 
 func NewTransactionEnv(
 	ctx Context,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	programs environment.TransactionPrograms,
 	tx *flow.TransactionBody,
 	txIndex uint32,
@@ -43,10 +43,10 @@ func NewTransactionEnv(
 	ctx.RootSpan = traceSpan
 	env := newFacadeEnvironment(
 		ctx,
-		sth,
+		txnState,
 		programs,
 		environment.NewTracer(ctx.TracerParams),
-		environment.NewMeter(sth),
+		environment.NewMeter(txnState),
 	)
 
 	ctx.TxIndex = txIndex
@@ -67,7 +67,7 @@ func NewTransactionEnv(
 		ctx.EventEmitterParams,
 	)
 	env.AccountCreator = environment.NewAccountCreator(
-		sth,
+		txnState,
 		ctx.Chain,
 		env.accounts,
 		ctx.ServiceAccountEnabled,
@@ -94,7 +94,7 @@ func NewTransactionEnv(
 		env.Tracer,
 		env.Meter,
 		env.accounts,
-		sth,
+		txnState,
 		env)
 
 	return env

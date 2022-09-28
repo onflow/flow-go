@@ -14,27 +14,27 @@ func NewScriptEnvironment(
 	reqContext context.Context,
 	fvmContext Context,
 	vm *VirtualMachine,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	programs environment.TransactionPrograms,
 ) environment.Environment {
 	return NewScriptEnv(
 		reqContext,
 		fvmContext,
-		sth,
+		txnState,
 		programs)
 }
 
 func NewScriptEnv(
 	reqContext context.Context,
 	fvmContext Context,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	programs environment.TransactionPrograms,
 ) environment.Environment {
 	return newFacadeEnvironment(
 		fvmContext,
-		sth,
+		txnState,
 		programs,
 		environment.NewTracer(fvmContext.TracerParams),
-		environment.NewCancellableMeter(reqContext, sth),
+		environment.NewCancellableMeter(reqContext, txnState),
 	)
 }
