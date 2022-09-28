@@ -39,9 +39,6 @@ func addPullCmdFlags() {
 func pull(cmd *cobra.Command, args []string) {
 	log.Info().Msg("running pull")
 
-	ctx, cancel := context.WithTimeout(context.Background(), flagTimeout)
-	defer cancel()
-
 	nodeID, err := readNodeID()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read node ID")
@@ -54,6 +51,15 @@ func pull(cmd *cobra.Command, args []string) {
 
 	// create new bucket instance with Flow Bucket name
 	bucket := gcs.NewGoogleBucket(flagBucketName)
+
+	// bump up the timeout for an execution node if it has not been explicitly set since downloading
+	// root.checkpoint takes a long time
+	if role == flow.RoleExecution && !pullCmd.Flags().Lookup("timeout").Changed {
+		flagTimeout = time.Hour
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), flagTimeout)
+	defer cancel()
 
 	// initialize a new client to GCS
 	client, err := bucket.NewClient(ctx)
@@ -96,6 +102,12 @@ func pull(cmd *cobra.Command, args []string) {
 
 	// move root checkpoint file if node role is execution
 	if role == flow.RoleExecution {
+
+		// bump up the timeout if it has not been set
+		if !pullCmd.Flags().Lookup("timeout").Changed {
+
+		}
+
 		// root.checkpoint is downloaded to <bootstrap folder>/public-root-information after a pull
 		rootCheckpointSrc := filepath.Join(flagBootDir, model.DirnamePublicBootstrap, model.FilenameWALRootCheckpoint)
 		rootCheckpointDst := filepath.Join(flagBootDir, model.PathRootCheckpoint)
