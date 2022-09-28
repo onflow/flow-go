@@ -259,8 +259,8 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 			// the block cannot be validated
 			// TODO: potential slashing
 			log.Err(err).Msg("received unverifiable block proposal; this is an indicator of an invalid (slashable) proposal or an epoch failure")
+			return nil
 		}
-
 		// unexpected error: potentially corrupted internal state => abort processing and escalate error
 		return fmt.Errorf("failed to process block %x: %w", blockID, err)
 	}
@@ -284,7 +284,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 		}
 	}
 
-	// drop all of the children that should have been processed now
+	// drop all the children that should have been processed now
 	c.pending.DropForParent(blockID)
 
 	return nil
@@ -374,6 +374,7 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 		return fmt.Errorf("unexpected exception while extending protocol state with block %x at height %d: %w", blockID, header.Height, err)
 	}
 
+	// submit the model to hotstuff for processing
 	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
 	log.Info().Msg("forwarding block proposal to hotstuff")
 	c.hotstuff.SubmitProposal(header, parent.View)
