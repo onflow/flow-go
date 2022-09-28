@@ -363,7 +363,60 @@ func (l *Ledger) ExportCheckpointAt(
 			fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
 	}
 
-	newTrie := t
+	// TODO enable validity check of trie
+	// only check validity of the trie we are interested in
+	// l.logger.Info().Msg("Checking validity of the trie at the given state...")
+	// if !t.IsAValidTrie() {
+	//	 return nil, fmt.Errorf("trie is not valid: %w", err)
+	// }
+	// l.logger.Info().Msg("Trie is valid.")
+
+	// get all payloads
+	payloads := t.AllPayloads()
+	payloadSize := len(payloads)
+
+	// migrate payloads
+	for i, migrate := range migrations {
+		l.logger.Info().Msgf("migration %d is underway", i)
+
+		start := time.Now()
+		payloads, err = migrate(payloads)
+		elapsed := time.Since(start)
+
+		if err != nil {
+			return ledger.State(hash.DummyHash), fmt.Errorf("error applying migration (%d): %w", i, err)
+		}
+
+		newPayloadSize := len(payloads)
+
+		if payloadSize != newPayloadSize {
+			l.logger.Warn().
+				Int("migration_step", i).
+				Int("expected_size", payloadSize).
+				Int("outcome_size", newPayloadSize).
+				Msg("payload counts has changed during migration, make sure this is expected.")
+		}
+		l.logger.Info().Str("timeTaken", elapsed.String()).Msgf("migration %d is done", i)
+
+		payloadSize = newPayloadSize
+	}
+
+	l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
+
+	// get paths
+	paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
+	}
+
+	emptyTrie := trie.NewEmptyMTrie()
+
+	// no need to prune the data since it has already been prunned through migrations
+	applyPruning := false
+	newTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
+	}
 
 	statecommitment := ledger.State(newTrie.RootHash())
 
