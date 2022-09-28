@@ -2,6 +2,7 @@ package wal
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -120,6 +121,11 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 	if actualSum != expectedSum {
 		return nil, 0, fmt.Errorf("invalid checksum in checkpoint header, expected %v, actual %v",
 			expectedSum, actualSum)
+	}
+
+	err = reachedEOF(reader)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	return subtrieChecksums, topTrieChecksum, nil
@@ -273,6 +279,11 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 			checksum, actualSum)
 	}
 
+	err = reachedEOF(reader)
+	if err != nil {
+		return nil, err
+	}
+
 	return nodes, nil
 }
 
@@ -417,6 +428,11 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 			expectedSum, actualSum)
 	}
 
+	err = reachedEOF(reader)
+	if err != nil {
+		return nil, err
+	}
+
 	return tries, nil
 }
 
@@ -519,4 +535,15 @@ func getNodeByIndex(subtrieNodes [][]*node.Node, topLevelNodes []*node.Node, ind
 
 	// +1 because first item is always nil
 	return topLevelNodes[offset+1], nil
+}
+
+// reachedEOF checks if the reader has reached end of file
+// it returns nil if reached EOF
+// any error returned are exception
+func reachedEOF(reader io.Reader) error {
+	_, err := reader.Read(make([]byte, 1))
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return fmt.Errorf("expect to reach EOF, but didn't: %w", err)
 }
