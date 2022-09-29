@@ -144,9 +144,9 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 }
 
 func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityRequest) error {
-	e.log.Debug().
-		Uint64("nonce", req.Nonce).
-		Str("origin_id", originID.String()).
+	log := e.log.With().Uint64("nonce", req.Nonce).Str("origin_id", originID.String()).Logger()
+
+	log.Debug().
 		Strs("entity_ids", flow.IdentifierList(req.EntityIDs).Strings()).
 		Msg("entity request received")
 
@@ -172,20 +172,16 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 	for _, entityID := range req.EntityIDs {
 		// skip requesting duplicate entity IDs
 		if _, ok := seen[entityID]; ok {
-			e.log.Warn().
-				Str("origin_id", originID.String()).
+			log.Warn().
 				Str("entity_id", entityID.String()).
-				Uint64("nonce", req.Nonce).
 				Msg("duplicate entity ID in entity request")
 			continue
 		}
 
 		entity, err := e.retrieve(entityID)
 		if errors.Is(err, storage.ErrNotFound) {
-			e.log.Debug().
-				Str("origin_id", originID.String()).
+			log.Debug().
 				Str("entity_id", entityID.String()).
-				Uint64("nonce", req.Nonce).
 				Msg("entity not found")
 			continue
 		}
@@ -224,7 +220,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 	}
 
 	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityResponse)
-	e.log.Debug().Str("origin_id", originID.String()).Uint64("nonce", req.Nonce).Msg("entity response sent")
+	log.Debug().Msg("entity response sent")
 
 	return nil
 }
