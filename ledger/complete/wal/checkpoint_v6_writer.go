@@ -291,23 +291,30 @@ func storeSubTrieConcurrently(
 ) {
 	logger.Info().Msgf("storing %v subtrie groups with average node count %v for each subtrie", subtrieCount, estimatedSubtrieNodeCount)
 
-	resultChs := make([]chan *resultStoringSubTrie, 0, len(subtrieRoots))
-	for i, subTrieRoot := range subtrieRoots {
-		resultCh := make(chan *resultStoringSubTrie)
-		go func(i int, subTrieRoot []*node.Node) {
-			roots, nodeCount, checksum, err := storeCheckpointSubTrie(
-				i, subTrieRoot, estimatedSubtrieNodeCount, outputDir, outputFile, logger)
-			resultCh <- &resultStoringSubTrie{
-				Index:     i,
-				Roots:     roots,
-				NodeCount: nodeCount,
-				Checksum:  checksum,
-				Err:       err,
-			}
-			close(resultCh)
-		}(i, subTrieRoot)
-		resultChs = append(resultChs, resultCh)
-	}
+	resultChs := make(chan chan *resultStoringSubTrie, nWorker)
+	go func() {
+		for i, subTrieRoot := range subtrieRoots {
+			resultCh := make(chan *resultStoringSubTrie)
+			resultChs <- resultCh
+			// resultsChs only has nWorker number of buffer room,
+			// if resultCh can be pushed to resultChs, then we will work on this channel
+			// otherwise, the push will be blocked until the result is finished
+			go func(i int, subTrieRoot []*node.Node) {
+				roots, nodeCount, checksum, err := storeCheckpointSubTrie(
+					i, subTrieRoot, estimatedSubtrieNodeCount, outputDir, outputFile, logger)
+				resultCh <- &resultStoringSubTrie{
+					Index:     i,
+					Roots:     roots,
+					NodeCount: nodeCount,
+					Checksum:  checksum,
+					Err:       err,
+				}
+				close(resultCh)
+			}(i, subTrieRoot)
+		}
+
+		close(resultChs)
+	}()
 
 	logger.Info().Msgf("subtrie roots have been stored")
 
@@ -315,7 +322,11 @@ func storeSubTrieConcurrently(
 	results[nil] = 0
 	nodeCounter := uint64(0)
 	checksums := make([]uint32, 0, len(results))
-	for _, resultCh := range resultChs {
+	for {
+		resultCh, ok := <-resultChs
+		if !ok {
+			break
+		}
 		result := <-resultCh
 		if result.Err != nil {
 			return nil, 0, nil, fmt.Errorf("fail to store %v-th subtrie, trie: %w", result.Index, result.Err)
