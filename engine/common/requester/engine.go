@@ -409,11 +409,9 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 }
 
 func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.EntityResponse) error {
-	e.log.Debug().
-		Str("origin_id", originID.String()).
-		Uint64("nonce", res.Nonce).
-		Strs("entity_ids", flow.IdentifierList(res.EntityIDs).Strings()).
-		Msg("entity response received")
+	log := e.log.With().Str("origin_id", originID.String()).Uint64("nonce", res.Nonce).Logger()
+
+	log.Debug().Strs("entity_ids", flow.IdentifierList(res.EntityIDs).Strings()).Msg("entity response received")
 
 	if e.cfg.ValidateStaking {
 
@@ -456,6 +454,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		// the entity might already have been returned in another response
 		item, exists := e.items[entityID]
 		if !exists {
+			log.Debug().Hex("entity_id", logging.ID(entityID)).Msg("entity not in items skipping")
 			continue
 		}
 
@@ -470,8 +469,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 			actualEntityID := entity.ID()
 			// validate that we got correct entity, exactly what we were expecting
 			if entityID != actualEntityID {
-				e.log.Error().
-					Hex("origin", logging.ID(originID)).
+				log.Error().
 					Hex("stated_entity_id", logging.ID(entityID)).
 					Hex("provided_entity", logging.ID(actualEntityID)).
 					Msg("provided entity does not match stated ID")
