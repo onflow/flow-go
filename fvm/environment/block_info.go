@@ -11,6 +11,18 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+type BlockInfoParams struct {
+	Blocks      Blocks
+	BlockHeader *flow.Header
+}
+
+func DefaultBlockInfoParams() BlockInfoParams {
+	return BlockInfoParams{
+		Blocks:      nil,
+		BlockHeader: nil,
+	}
+}
+
 type BlockInfo struct {
 	tracer *Tracer
 	meter  Meter

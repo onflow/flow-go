@@ -57,7 +57,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = m.MeterComputation(0, 8)
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
-		require.Equal(t, err.(errors.ComputationLimitExceededError).Error(), errors.NewComputationLimitExceededError(10).Error())
+		require.Equal(t, err.Error(), errors.NewComputationLimitExceededError(10).Error())
 
 		err = m.MeterMemory(0, 2)
 		require.NoError(t, err)
@@ -70,7 +70,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = m.MeterMemory(0, 8)
 		require.Error(t, err)
 		require.True(t, errors.IsMemoryLimitExceededError(err))
-		require.Equal(t, err.(errors.MemoryLimitExceededError).Error(), errors.NewMemoryLimitExceededError(10).Error())
+		require.Equal(t, err.Error(), errors.NewMemoryLimitExceededError(10).Error())
 	})
 
 	t.Run("meter computation and memory with weights", func(t *testing.T) {
@@ -159,7 +159,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = m.MeterComputation(compKind, 0)
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
-		require.Equal(t, err.(errors.ComputationLimitExceededError).Error(), errors.NewComputationLimitExceededError(9).Error())
+		require.Equal(t, err.Error(), errors.NewComputationLimitExceededError(9).Error())
 	})
 
 	t.Run("merge meters - ignore limits", func(t *testing.T) {
@@ -227,7 +227,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = m.MeterMemory(0, 0)
 		require.Error(t, err)
 		require.True(t, errors.IsMemoryLimitExceededError(err))
-		require.Equal(t, err.(errors.MemoryLimitExceededError).Error(), errors.NewMemoryLimitExceededError(math.MaxUint32).Error())
+		require.Equal(t, err.Error(), errors.NewMemoryLimitExceededError(math.MaxUint32).Error())
 	})
 
 	t.Run("add intensity - test limits - computation", func(t *testing.T) {
@@ -622,5 +622,67 @@ func TestStorageLimits(t *testing.T) {
 		writeKey2Val, ok := storageUpdateSizeMap[writeKey2]
 		require.True(t, ok)
 		require.Equal(t, writeKey2Val, writeSize2)
+	})
+}
+
+func TestEventLimits(t *testing.T) {
+	t.Run("metering event emit - within limit", func(t *testing.T) {
+		meter1 := meter.NewMeter(
+			meter.DefaultParameters(),
+		)
+
+		testSize1, testSize2 := uint64(123), uint64(234)
+
+		err := meter1.MeterEmittedEvent(testSize1)
+		require.NoError(t, err)
+		require.Equal(t, testSize1, meter1.TotalEmittedEventBytes())
+		require.Equal(t, uint32(1), meter1.TotalEventCounter())
+
+		err = meter1.MeterEmittedEvent(testSize2)
+		require.NoError(t, err)
+		require.Equal(t, testSize1+testSize2, meter1.TotalEmittedEventBytes())
+		require.Equal(t, uint32(2), meter1.TotalEventCounter())
+	})
+
+	t.Run("metering event emit - exceeding limit", func(t *testing.T) {
+		testSize1, testSize2 := uint64(123), uint64(234)
+		testEventLimit := testSize1 + testSize2 - 1 // make it fail at 2nd meter
+		meter1 := meter.NewMeter(
+			meter.DefaultParameters().WithEventEmitByteLimit(testEventLimit),
+		)
+
+		err := meter1.MeterEmittedEvent(testSize1)
+		require.NoError(t, err)
+		require.Equal(t, testSize1, meter1.TotalEmittedEventBytes())
+		require.Equal(t, uint32(1), meter1.TotalEventCounter())
+
+		err = meter1.MeterEmittedEvent(testSize2)
+		eventLimitExceededError := errors.NewEventLimitExceededError(
+			testSize1+testSize2,
+			testEventLimit)
+		require.ErrorAs(t, err, &eventLimitExceededError)
+	})
+
+	t.Run("merge event metering", func(t *testing.T) {
+		// meter 1
+		meter1 := meter.NewMeter(
+			meter.DefaultParameters(),
+		)
+		testSize1 := uint64(123)
+		err := meter1.MeterEmittedEvent(testSize1)
+		require.NoError(t, err)
+
+		// meter 2
+		meter2 := meter.NewMeter(
+			meter.DefaultParameters(),
+		)
+		testSize2 := uint64(234)
+		err = meter2.MeterEmittedEvent(testSize2)
+		require.NoError(t, err)
+
+		// merge
+		meter1.MergeMeter(meter2)
+		require.Equal(t, testSize1+testSize2, meter1.TotalEmittedEventBytes())
+		require.Equal(t, uint32(2), meter1.TotalEventCounter())
 	})
 }

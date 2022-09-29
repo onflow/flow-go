@@ -14,7 +14,7 @@ import (
 func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	programs environment.TransactionPrograms,
 	tx *flow.TransactionBody,
 	txIndex uint32,
@@ -22,7 +22,7 @@ func NewTransactionEnvironment(
 ) environment.Environment {
 	return NewTransactionEnv(
 		ctx,
-		sth,
+		txnState,
 		programs,
 		tx,
 		txIndex,
@@ -31,7 +31,7 @@ func NewTransactionEnvironment(
 
 func NewTransactionEnv(
 	ctx Context,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	programs environment.TransactionPrograms,
 	tx *flow.TransactionBody,
 	txIndex uint32,
@@ -40,19 +40,19 @@ func NewTransactionEnv(
 	txID := tx.ID()
 	// TODO set the flags on context
 
+	ctx.RootSpan = traceSpan
 	env := newFacadeEnvironment(
 		ctx,
-		sth,
+		txnState,
 		programs,
-		environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing),
-		environment.NewMeter(sth),
+		environment.NewTracer(ctx.TracerParams),
+		environment.NewMeter(txnState),
 	)
 
+	ctx.TxIndex = txIndex
+	ctx.TxId = txID
 	env.TransactionInfo = environment.NewTransactionInfo(
-		txIndex,
-		txID,
-		ctx.TransactionFeesEnabled,
-		ctx.LimitAccountStorage,
+		ctx.TransactionInfoParams,
 		env.Tracer,
 		tx.Authorizers,
 		ctx.Chain.ServiceAddress(),
@@ -64,17 +64,16 @@ func NewTransactionEnv(
 		txID,
 		txIndex,
 		tx.Payer,
-		ctx.ServiceEventCollectionEnabled,
-		ctx.EventCollectionByteSizeLimit,
+		ctx.EventEmitterParams,
 	)
 	env.AccountCreator = environment.NewAccountCreator(
-		sth,
+		txnState,
 		ctx.Chain,
 		env.accounts,
 		ctx.ServiceAccountEnabled,
 		env.Tracer,
 		env.Meter,
-		ctx.Metrics,
+		ctx.MetricsReporter,
 		env.SystemContracts)
 	env.AccountFreezer = environment.NewAccountFreezer(
 		ctx.Chain.ServiceAddress(),
@@ -86,8 +85,7 @@ func NewTransactionEnv(
 		env.accounts,
 		env.TransactionInfo,
 		ctx.Chain,
-		ctx.RestrictContractDeployment,
-		ctx.RestrictContractRemoval,
+		ctx.ContractUpdaterParams,
 		env.ProgramLogger,
 		env.SystemContracts,
 		env.Runtime)
@@ -96,7 +94,7 @@ func NewTransactionEnv(
 		env.Tracer,
 		env.Meter,
 		env.accounts,
-		sth,
+		txnState,
 		env)
 
 	return env
