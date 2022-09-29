@@ -384,7 +384,6 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityRequest)
 	e.log.Debug().
-		Str("sender_node_id", e.me.NodeID().String()).
 		Uint64("nonce", req.Nonce).
 		Strs("entity_ids", flow.IdentifierList(req.EntityIDs).Strings()).
 		Msg("entity request sent")
