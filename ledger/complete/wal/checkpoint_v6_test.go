@@ -89,10 +89,54 @@ func createSimpleTrie(t *testing.T) []*trie.MTrie {
 	return tries
 }
 
+func randPathPayload() (ledger.Path, ledger.Payload) {
+	var path ledger.Path
+	rand.Read(path[:])
+	payload := testutils.RandomPayload(1, 100)
+	return path, *payload
+}
+
+func randNPathPayloads(n int) ([]ledger.Path, []ledger.Payload) {
+	paths := make([]ledger.Path, n)
+	payloads := make([]ledger.Payload, n)
+	for i := 0; i < n; i++ {
+		path, payload := randPathPayload()
+		paths[i] = path
+		payloads[i] = payload
+	}
+	return paths, payloads
+}
+
+func createMultipleRandomTries(t *testing.T) []*trie.MTrie {
+	tries := make([]*trie.MTrie, 0)
+	activeTrie := trie.NewEmptyMTrie()
+
+	// add tries with no shared paths
+	for i := 0; i < 100; i++ {
+		paths, payloads := randNPathPayloads(100)
+		activeTrie, _, err := trie.NewTrieWithUpdatedRegisters(activeTrie, paths, payloads, false)
+		require.NoError(t, err, "update registers")
+		tries = append(tries, activeTrie)
+	}
+
+	// add trie with some shared path
+	sharedPaths, payloads1 := randNPathPayloads(100)
+	activeTrie, _, err := trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads1, false)
+	require.NoError(t, err, "update registers")
+	tries = append(tries, activeTrie)
+
+	_, payloads2 := randNPathPayloads(100)
+	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads2, false)
+	require.NoError(t, err, "update registers")
+	tries = append(tries, activeTrie)
+
+	return tries
+}
+
 func TestEncodeSubTrie(t *testing.T) {
 	file := "checkpoint"
 	logger := unittest.Logger()
-	tries := createSimpleTrie(t)
+	tries := createMultipleRandomTries(t)
 	estimatedSubtrieNodeCount := estimateSubtrieNodeCount(tries)
 	subtrieRoots := createSubTrieRoots(tries)
 
@@ -175,10 +219,22 @@ func TestWriteAndReadCheckpointV6(t *testing.T) {
 	})
 }
 
+func TestWriteAndReadCheckpointV6MultipleTries(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createMultipleRandomTries(t)
+		fileName := "checkpoint-multi-file"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger), "fail to store checkpoint")
+		decoded, err := ReadCheckpointV6(dir, fileName, &logger)
+		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		requireTriesEqual(t, tries, decoded)
+	})
+}
+
 // test running checkpointing twice will produce the same checkpoint file
 func TestCheckpointV6IsDeterminstic(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		tries := createSimpleTrie(t)
+		tries := createMultipleRandomTries(t)
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint1", &logger), "fail to store checkpoint")
 		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint2", &logger), "fail to store checkpoint")
@@ -255,7 +311,7 @@ func storeCheckpointV5(tries []*trie.MTrie, dir string, fileName string, logger 
 
 func TestWriteAndReadCheckpointV5(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		tries := createSimpleTrie(t)
+		tries := createMultipleRandomTries(t)
 		fileName := "checkpoint1"
 		logger := unittest.Logger()
 
@@ -270,7 +326,7 @@ func TestWriteAndReadCheckpointV5(t *testing.T) {
 // producing directly to v5
 func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		tries := createSimpleTrie(t)
+		tries := createMultipleRandomTries(t)
 		logger := unittest.Logger()
 
 		// store tries into v6 then read back, then store into v5
