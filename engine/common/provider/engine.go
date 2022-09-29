@@ -172,7 +172,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 	for _, entityID := range req.EntityIDs {
 		// skip requesting duplicate entity IDs
 		if _, ok := seen[entityID]; ok {
-			e.log.Debug().
+			e.log.Warn().
 				Str("origin_id", originID.String()).
 				Str("entity_id", entityID.String()).
 				Uint64("nonce", req.Nonce).
