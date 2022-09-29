@@ -2,7 +2,6 @@ package compliance
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -226,9 +225,6 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
-
-	fmt.Println(block.Header.View)
-	fmt.Println(cs.head.Header.View)
 
 	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(nil)
 	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Once()
