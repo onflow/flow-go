@@ -833,9 +833,13 @@ func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (*enti
 }
 
 func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (*entities.ChunkExecutionData, error) {
-	collection := &entities.ExecutionDataCollection{
-		Transactions: TransactionsToMessages(data.Collection.Transactions),
+	collection := &entities.ExecutionDataCollection{}
+	if data.Collection != nil {
+		collection = &entities.ExecutionDataCollection{
+			Transactions: TransactionsToMessages(data.Collection.Transactions),
+		}
 	}
+
 	events := EventsToMessages(data.Events)
 
 	paths := make([][]byte, len(data.TrieUpdate.Paths))

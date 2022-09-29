@@ -60,6 +60,7 @@ func (suite *Suite) TestTransactionRetry() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		suite.reader,
 	)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
@@ -140,6 +141,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		suite.reader,
 	)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
