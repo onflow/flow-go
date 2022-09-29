@@ -4,8 +4,8 @@
 /protobuf/services/collection/** @jordanschalm
 
 # Consensus Stream
-/cmd/consensus/** @AlexHentschel @zhangchiqing
-/engine/consensus/** @AlexHentschel @zhangchiqing
+/cmd/consensus/** @AlexHentschel @durkmurder @jordanschalm
+/engine/consensus/** @AlexHentschel @durkmurder @jordanschalm
 
 # Execution Stream
 /cmd/execution/** @m4ksio @ramtinms
