@@ -437,8 +437,8 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				events = storage.NewEvents(node.Metrics.Cache, node.DB)
 				commits = storage.NewCommits(node.Metrics.Cache, node.DB)
 				computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
-				collections = storage.NewCollections(node.DB, transactions)
 				transactions = storage.NewTransactions(node.Metrics.Cache, node.DB)
+				collections = storage.NewCollections(node.DB, transactions)
 				txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, e.exeConf.transactionResultsCacheSize)
 
 				// Setting up RetryableUploader for GCP uploader
@@ -887,12 +887,12 @@ func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, view *de
 // Checkpoint file is required to restore the trie, and has to be placed in the execution
 // state folder.
 // There are two ways to generate a checkpoint file:
-// 1) From a clean state.
-// 		Refer to the code in the testcase: TestGenerateExecutionState
-// 2) From a previous execution state
-// 		This is often used when sporking the network.
-//    Use the execution-state-extract util commandline to generate a checkpoint file from
-// 		a previous checkpoint file
+//  1. From a clean state.
+//     Refer to the code in the testcase: TestGenerateExecutionState
+//  2. From a previous execution state
+//     This is often used when sporking the network.
+//     Use the execution-state-extract util commandline to generate a checkpoint file from
+//     a previous checkpoint file
 func copyBootstrapState(dir, trie string) error {
 	filename := ""
 	firstCheckpointFilename := "00000000"
