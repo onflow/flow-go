@@ -160,7 +160,7 @@ func TestEncodeSubTrie(t *testing.T) {
 				indices, nodeCount, checksum)
 
 			// all the nodes
-			nodes, err := readCheckpointSubTrie(dir, file, index, checksum)
+			nodes, err := readCheckpointSubTrie(dir, file, index, checksum, &logger)
 			require.NoError(t, err)
 
 			for _, root := range roots {
