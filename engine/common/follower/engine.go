@@ -165,20 +165,20 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 	switch v := input.(type) {
 	case *messages.BlockResponse:
-		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockResponse, originID)
-		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockResponse, originID)
+		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockResponse)
+		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockResponse)
 		e.unit.Lock()
 		defer e.unit.Unlock()
 		return e.onBlockResponse(originID, v)
 	case *events.SyncedBlock:
-		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock, originID)
-		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlock, originID)
+		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
+		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlock)
 		e.unit.Lock()
 		defer e.unit.Unlock()
 		return e.onSyncedBlock(originID, v)
 	case *messages.BlockProposal:
-		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal, originID)
-		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal, originID)
+		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
+		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 		e.unit.Lock()
 		defer e.unit.Unlock()
 		return e.onBlockProposal(originID, v, false)

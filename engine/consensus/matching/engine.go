@@ -153,7 +153,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return fmt.Errorf("no matching processor for message of type %T from origin %x: %w", event, originID[:],
 			engine.IncompatibleInputTypeError)
 	}
-	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt, originID)
+	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	e.pendingReceipts.Push(receipt)
 	e.inboundEventsNotifier.Notify()
 	return nil

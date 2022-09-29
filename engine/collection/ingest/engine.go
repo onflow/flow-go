@@ -92,7 +92,7 @@ func New(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*flow.TransactionBody)
 				if ok {
-					engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction, msg.OriginID)
+					engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 				}
 				return ok
 			},
@@ -225,7 +225,7 @@ func (e *Engine) processAvailableMessages(ctx context.Context) error {
 //   - other error for any other unexpected error condition.
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBody) error {
 
-	defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction, originID)
+	defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 
 	txID := tx.ID()
 	log := e.log.With().

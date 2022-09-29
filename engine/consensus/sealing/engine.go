@@ -206,7 +206,7 @@ func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGett
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*flow.ResultApproval)
 				if ok {
-					e.engineMetrics.MessageReceived(metrics.EngineSealing, metrics.MessageResultApproval, msg.OriginID)
+					e.engineMetrics.MessageReceived(metrics.EngineSealing, metrics.MessageResultApproval)
 				}
 				return ok
 			},
@@ -224,7 +224,7 @@ func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGett
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.ApprovalResponse)
 				if ok {
-					e.engineMetrics.MessageReceived(metrics.EngineSealing, metrics.MessageResultApproval, msg.OriginID)
+					e.engineMetrics.MessageReceived(metrics.EngineSealing, metrics.MessageResultApproval)
 				}
 				return ok
 			},
@@ -360,7 +360,7 @@ func (e *Engine) loop() {
 // This will be changed in phase 3.
 func (e *Engine) processIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	err := e.core.ProcessIncorporatedResult(incorporatedResult)
-	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt, flow.ZeroID)
+	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	return err
 }
 
@@ -371,7 +371,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	}
 
 	err := e.core.ProcessApproval(approval)
-	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval, originID)
+	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval)
 	if err != nil {
 		return fmt.Errorf("fatal internal error in sealing core logic")
 	}

@@ -112,7 +112,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockResponse)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockResponse, msg.OriginID)
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockResponse)
 				}
 				return ok
 			},
@@ -122,7 +122,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockProposal)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal, msg.OriginID)
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
 				}
 				return ok
 			},
@@ -132,7 +132,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*events.SyncedBlock)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock, msg.OriginID)
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
 				}
 				return ok
 			},
@@ -153,7 +153,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockVote)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote, msg.OriginID)
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
 				}
 				return ok
 			},

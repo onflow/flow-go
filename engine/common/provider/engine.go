@@ -129,8 +129,8 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, mes
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 
-	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityRequest, originID)
-	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest, originID)
+	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityRequest)
+	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
 
 	e.unit.Lock()
 	defer e.unit.Unlock()
