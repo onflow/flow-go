@@ -23,10 +23,10 @@ type InvalidEnvelopeSignatureError struct{ CodedError }
 //type InvalidProposalSeqNumberError struct{ CodedError }
 
 // DO NOT USE.
-//type InvalidPayloadSignatureError struct{ CodedError }
+type InvalidPayloadSignatureError struct{ CodedError }
 
 // DO NOT USE.
-//type AccountAuthorizationError struct{ CodedError }
+type AccountAuthorizationError struct{ CodedError }
 
 // DO NOT USE.
-//type AccountPublicKeyNotFoundError struct{ CodedError }
+type AccountPublicKeyNotFoundError struct{ CodedError }
