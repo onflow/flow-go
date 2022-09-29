@@ -7,11 +7,6 @@ func NewUnknownFailure(err error) *CodedFailure {
 		"unknown failure")
 }
 
-// EncodingFailure captures an fatal error sourced from encoding issues
-type EncodingFailure struct {
-	errorWrapper
-}
-
 // NewEncodingFailuref formats and returns a new EncodingFailure
 func NewEncodingFailuref(
 	err error,
