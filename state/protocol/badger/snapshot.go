@@ -3,7 +3,6 @@
 package badger
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -16,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/state/protocol/seed"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
@@ -95,11 +93,13 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	return qc, nil
 }
 
-// validChild returns a child of the snapshot head that has been validated
-// by HotStuff. Returns state.NoValidChildBlockError if no valid child exists.
+// validChild returns a child of the snapshot head. Any valid child may be returned.
+// Subsequent calls are not guaranteed to return the same child.
+// Since blocks are fully validated before insertion to the state, all stored child
+// blocks are valid and may be returned.
 //
-// Any valid child may be returned. Subsequent calls are not guaranteed to
-// return the same child.
+// Error returns:
+//   - state.NoValidChildBlockError if no valid child exists.
 func (s *Snapshot) validChild() (*flow.Header, error) {
 
 	var childIDs []flow.Identifier
@@ -108,30 +108,12 @@ func (s *Snapshot) validChild() (*flow.Header, error) {
 		return nil, fmt.Errorf("could not look up children: %w", err)
 	}
 
-	// find the first child that has been validated
-	validChildID := flow.ZeroID
-	for _, childID := range childIDs {
-		var valid bool
-		err = s.state.db.View(operation.RetrieveBlockValidity(childID, &valid))
-		// skip blocks whose validity hasn't been checked yet
-		if errors.Is(err, storage.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to determine validity of child block %v: %w", childID, err)
-		}
-		if valid {
-			validChildID = childID
-			break
-		}
-	}
-
-	if validChildID == flow.ZeroID {
-		return nil, state.NewNoValidChildBlockErrorf("block has no valid children (total children: %d)", len(childIDs))
+	if len(childIDs) == 0 {
+		return nil, state.NewNoValidChildBlockErrorf("block (id=%x) has no children stored in the protocol state", s.blockID)
 	}
 
 	// get the header of the first child
-	child, err := s.state.headers.ByBlockID(validChildID)
+	child, err := s.state.headers.ByBlockID(childIDs[0])
 	return child, err
 }
 
@@ -328,22 +310,6 @@ func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 	return descendants, nil
 }
 
-func (s *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
-	valid, err := s.lookupValidity(s.blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not determine validity of block %v: %w", s.blockID, err)
-	}
-	if !valid {
-		return []flow.Identifier{}, nil
-	}
-
-	descendants, err := s.validDescendants(s.blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to traverse the descendants tree of block %v: %w", s.blockID, err)
-	}
-	return descendants, nil
-}
-
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
 	var children []flow.Identifier
 	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &children))
@@ -351,45 +317,6 @@ func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, e
 		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
 	}
 	return children, nil
-}
-
-func (s *Snapshot) lookupValidity(blockID flow.Identifier) (bool, error) {
-	valid := false
-	err := s.state.db.View(operation.RetrieveBlockValidity(blockID, &valid))
-	if err != nil {
-		// We only store the validity flag for blocks that have been marked valid.
-		// For blocks that haven't been marked valid (yet), the flag is simply absent.
-		if !errors.Is(err, storage.ErrNotFound) {
-			return false, fmt.Errorf("could not retrieve validity of block %v: %w", blockID, err)
-		}
-	}
-	return valid, nil
-}
-
-func (s *Snapshot) validDescendants(blockID flow.Identifier) ([]flow.Identifier, error) {
-	var descendantIDs []flow.Identifier
-
-	children, err := s.lookupChildren(blockID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, descendantID := range children {
-		valid, err := s.lookupValidity(descendantID)
-		if err != nil {
-			return nil, err
-		}
-
-		if valid {
-			descendantIDs = append(descendantIDs, descendantID)
-			additionalIDs, err := s.validDescendants(descendantID)
-			if err != nil {
-				return nil, err
-			}
-			descendantIDs = append(descendantIDs, additionalIDs...)
-		}
-	}
-	return descendantIDs, nil
 }
 
 func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, error) {
