@@ -31,6 +31,8 @@ type Consumer interface {
 	// chain and its source of randomness is available).
 	// Formally, this callback is informationally idempotent. I.e. the consumer
 	// of this callback must handle repeated calls for the same block.
+	// TODO trigger this on block insertion (used to be on MarkValid)
+	//  - don't trigger for root block or below
 	BlockProcessable(block *flow.Header)
 
 	// EpochTransition is called when we transition to a new epoch. This is

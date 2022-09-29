@@ -1901,44 +1901,6 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 	})
 }
 
-func TestMakeValid(t *testing.T) {
-	t.Run("should trigger BlockProcessable with parent block", func(t *testing.T) {
-		consumer := mockprotocol.NewConsumer(t)
-		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		head, err := rootSnapshot.Head()
-		require.NoError(t, err)
-		util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.MutableState) {
-			// create block2 and block3
-			block2 := unittest.BlockWithParentFixture(head)
-			block2.SetPayload(flow.EmptyPayload())
-			err := state.Extend(context.Background(), block2)
-			require.NoError(t, err)
-
-			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(flow.EmptyPayload())
-			err = state.Extend(context.Background(), block3)
-			require.NoError(t, err)
-
-			consumer.On("BlockProcessable", mock.Anything).Return()
-
-			// make valid on block2
-			err = state.MarkValid(block2.ID())
-			require.NoError(t, err)
-
-			// because the parent block is the root block,
-			// BlockProcessable is not triggered on root block.
-			consumer.AssertNotCalled(t, "BlockProcessable")
-
-			err = state.MarkValid(block3.ID())
-			require.NoError(t, err)
-
-			// because the parent is not a root block, BlockProcessable event should be emitted
-			// block3's parent is block2
-			consumer.AssertCalled(t, "BlockProcessable", block2.Header)
-		})
-	})
-}
-
 // If block B is finalized and contains a seal for block A, then A is the last sealed block
 func TestSealed(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)

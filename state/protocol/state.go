@@ -57,11 +57,4 @@ type MutableState interface {
 	// It modifies the persistent immutable protocol state accordingly and
 	// forwards the pointer to the latest finalized state.
 	Finalize(ctx context.Context, blockID flow.Identifier) error
-
-	// MarkValid marks the block header with the given block hash as valid.
-	// At this level, we can only mark one block at a time as valid. This
-	// implies that the parent of the block to be marked as valid
-	// has to be already valid.
-	// It modifies the persistent immutable protocol state accordingly.
-	MarkValid(blockID flow.Identifier) error
 }
