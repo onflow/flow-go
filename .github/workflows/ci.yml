@@ -48,7 +48,7 @@ jobs:
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
         version: v1.49
-        args: -v --build-tags relic
+        args: -v --build-tags relic --timeout 180
         working-directory: ${{ matrix.dir }}
         # https://github.com/golangci/golangci-lint-action/issues/244
         skip-cache: true
