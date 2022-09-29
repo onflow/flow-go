@@ -31,7 +31,7 @@ func init() {
 func addPullCmdFlags() {
 	pullCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
 	pullCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
-	pullCmd.Flags().DurationVar(&flagTimeout, "timeout", time.Second*300, `timeout for pull, default: 5m`)
+	pullCmd.Flags().DurationVar(&flagTimeout, "timeout", time.Second*300, `timeout for pull`)
 
 	_ = pullCmd.MarkFlagRequired("token")
 	_ = pullCmd.MarkFlagRequired("role")
@@ -56,7 +56,7 @@ func pull(cmd *cobra.Command, args []string) {
 
 	// bump up the timeout for an execution node if it has not been explicitly set since downloading
 	// root.checkpoint takes a long time
-	if role == flow.RoleExecution && !pullCmd.Flags().Lookup("timeout").Changed {
+	if role == flow.RoleExecution && !cmd.Flags().Lookup("timeout").Changed {
 		flagTimeout = time.Hour
 	}
 
@@ -109,17 +109,13 @@ func pull(cmd *cobra.Command, args []string) {
 		localPublicRootInfoDir := filepath.Join(flagBootDir, model.DirnamePublicBootstrap)
 
 		// move the root.checkpoint, root.checkpoint.1, root.checkpoint.2 etc. files to the bootstrap/execution-state dir
-		err = filepath.WalkDir(localPublicRootInfoDir, func(path string, d fs.DirEntry, err error) error {
-			// if d is file whose name starts with root.checkpoint, then move it
-			if !d.IsDir() && strings.HasPrefix(d.Name(), model.FilenameWALRootCheckpoint) {
-				srcInfo, err := d.Info()
-				if err != nil {
-					return err
-				}
-				rootCheckpointSrc := srcInfo.Name()
-				rootCheckpointDst := filepath.Join(flagBootDir, model.DirnameExecutionState, d.Name())
-				log.Info().Str("src", rootCheckpointSrc).Str("destination", rootCheckpointDst).Msgf("moving file")
-				err = moveFile(d.Name(), rootCheckpointDst)
+		err = filepath.WalkDir(localPublicRootInfoDir, func(srcPath string, rootCheckpointFile fs.DirEntry, err error) error {
+			// if rootCheckpointFile is a file whose name starts with "root.checkpoint", then move it
+			if !rootCheckpointFile.IsDir() && strings.HasPrefix(rootCheckpointFile.Name(), model.FilenameWALRootCheckpoint) {
+
+				dstPath := filepath.Join(flagBootDir, model.DirnameExecutionState, rootCheckpointFile.Name())
+				log.Info().Str("src", srcPath).Str("destination", dstPath).Msgf("moving file")
+				err = moveFile(srcPath, dstPath)
 				if err != nil {
 					return err
 				}
