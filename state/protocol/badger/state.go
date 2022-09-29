@@ -182,10 +182,6 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			if err != nil {
 				return fmt.Errorf("could not insert root block: %w", err)
 			}
-			err = transaction.WithTx(operation.InsertBlockValidity(blockID, true))(tx)
-			if err != nil {
-				return fmt.Errorf("could not mark root block as valid: %w", err)
-			}
 			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index root block segment (id=%x): %w", blockID, err)
