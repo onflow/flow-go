@@ -45,7 +45,7 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 // QuorumCertificate (QC) returns a valid quorum certificate pointing to the
 // header at this snapshot. With the exception of the root block, a valid child
 // block must be which contains the desired QC. The sentinel error
-// state.NoValidChildBlockError is returned if the the QC is unknown.
+// state.NoChildBlockError is returned if the the QC is unknown.
 //
 // For root block snapshots, returns the root quorum certificate. For all other
 // blocks, generates a quorum certificate from a valid child, if one exists.
@@ -99,7 +99,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 // blocks are valid and may be returned.
 //
 // Error returns:
-//   - state.NoValidChildBlockError if no valid child exists.
+//   - state.NoChildBlockError if no valid child exists.
 func (s *Snapshot) validChild() (*flow.Header, error) {
 
 	var childIDs []flow.Identifier
@@ -109,7 +109,7 @@ func (s *Snapshot) validChild() (*flow.Header, error) {
 	}
 
 	if len(childIDs) == 0 {
-		return nil, state.NewNoValidChildBlockErrorf("block (id=%x) has no children stored in the protocol state", s.blockID)
+		return nil, state.NewNoChildBlockErrorf("block (id=%x) has no children stored in the protocol state", s.blockID)
 	}
 
 	// get the header of the first child
@@ -337,7 +337,7 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 
 // RandomSource returns the seed for the current block snapshot.
 // Expected error returns:
-// * state.NoValidChildBlockError if no valid child is known
+// * state.NoChildBlockError if no valid child is known
 func (s *Snapshot) RandomSource() ([]byte, error) {
 
 	// CASE 1: for the root block, generate the seed from the root qc
