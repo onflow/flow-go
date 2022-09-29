@@ -132,8 +132,9 @@ func (factory *EpochComponentsFactory) Create(
 	}
 	voteAggregator = hotstuffModules.VoteAggregator
 	timeoutAggregator = hotstuffModules.TimeoutAggregator
+	validator := hotstuffModules.Validator
 
-	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads, hotstuffModules.VoteAggregator, hotstuffModules.TimeoutAggregator)
+	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads, hotstuffModules.VoteAggregator, hotstuffModules.TimeoutAggregator, validator)
 	if err != nil {
 		err = fmt.Errorf("could not create proposal engine: %w", err)
 		return
