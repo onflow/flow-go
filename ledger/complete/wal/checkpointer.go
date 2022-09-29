@@ -398,6 +398,9 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 		traversedSubtrieNodes[nil] = 0
 
 		for _, root := range subTrieRoot {
+                        // Empty trie is always added to forest as starting point and 
+                        // empty trie's root is nil. It remains in the forest until evicted
+                        // by trie queue exceeding capacity.
 			if root == nil {
 				continue
 			}
