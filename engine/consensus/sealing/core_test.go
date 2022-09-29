@@ -127,8 +127,10 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectUnverifiabl
 
 // TestOnBlockFinalized_RejectOrphanIncorporatedResults tests that execution results incorporated in orphan blocks
 // are rejected as outdated in next situation
-// A <- B_1
-// 	 <- B_2
+//
+//	A <- B_1
+//		 <- B_2
+//
 // B_1 is finalized rendering B_2 as orphan, submitting IR[ER[A], B_1] is a success, submitting IR[ER[A], B_2] is an outdated incorporated result
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncorporatedResults() {
 	blockB1 := unittest.BlockHeaderWithParentFixture(s.Block)
@@ -244,8 +246,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsBefor
 }
 
 // TestProcessIncorporated_ApprovalsAfterResult tests a scenario when first we have discovered execution result
-//// and after that we started receiving approvals. In this scenario we should be able to create a seal right
-//// after processing last needed approval to meet `RequiredApprovalsForSealConstruction` threshold.
+// and after that we started receiving approvals. In this scenario we should be able to create a seal right
+// after processing last needed approval to meet `RequiredApprovalsForSealConstruction` threshold.
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfterResult() {
 	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
@@ -360,9 +362,11 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 }
 
 // TestOnBlockFinalized_ProcessingOrphanApprovals tests that approvals for orphan forks are rejected as outdated entries without processing
-// A <- B_1 <- C_1{ IER[B_1] }
-//	 <- B_2 <- C_2{ IER[B_2] } <- D_2{ IER[C_2] }
-// 	 <- B_3 <- C_3{ IER[B_3] } <- D_3{ IER[C_3] } <- E_3{ IER[D_3] }
+//
+//	 A <- B_1 <- C_1{ IER[B_1] }
+//		 <- B_2 <- C_2{ IER[B_2] } <- D_2{ IER[C_2] }
+//	 	 <- B_3 <- C_3{ IER[B_3] } <- D_3{ IER[C_3] } <- E_3{ IER[D_3] }
+//
 // B_1 becomes finalized rendering forks starting at B_2 and B_3 as orphans
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanApprovals() {
 	forks := make([][]*flow.Block, 3)
@@ -428,11 +432,12 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 }
 
 // TestOnBlockFinalized_ExtendingUnprocessableFork tests that extending orphan fork results in non processable collectors
-//       - X <- Y <- Z
-//    /
-// <- A <- B <- C <- D <- E
-//		   |
-//       finalized
+//
+//	.       - X <- Y <- Z
+//	.    /
+//	. <- A <- B <- C <- D <- E
+//	.           |
+//	.       finalized
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnprocessableFork() {
 	forks := make([][]*flow.Block, 2)
 
@@ -652,9 +657,11 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 // TestRepopulateAssignmentCollectorTree tests that the
 // collectors tree will contain execution results and assignment collectors will be created.
-// P <- A[ER{P}] <- B[ER{A}] <- C[ER{B}] <- D[ER{C}] <- E[ER{D}]
-//         |     <- F[ER{A}] <- G[ER{B}] <- H[ER{G}]
-//      finalized
+//
+//	P <- A[ER{P}] <- B[ER{A}] <- C[ER{B}] <- D[ER{C}] <- E[ER{D}]
+//	        |     <- F[ER{A}] <- G[ER{B}] <- H[ER{G}]
+//	     finalized
+//
 // collectors tree has to be repopulated with incorporated results from blocks [A, B, C, D, F, G]
 // E, H shouldn't be considered since
 func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree() {
@@ -764,7 +771,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 //
 // In particular, the assignment collector tree population step should ignore
 // unknown block references below the root height.
-//
 func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_RootSealingSegment() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()

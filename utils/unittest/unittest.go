@@ -2,7 +2,6 @@ package unittest
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"math"
 	"os"
 	"os/exec"
@@ -306,7 +305,7 @@ func AssertErrSubstringMatch(t testing.TB, expected, actual error) {
 }
 
 func TempDir(t testing.TB) string {
-	dir, err := ioutil.TempDir("", "flow-testing-temp-")
+	dir, err := os.MkdirTemp("", "flow-testing-temp-")
 	require.NoError(t, err)
 	return dir
 }
@@ -432,6 +431,6 @@ func CrashTestWithExpectedStatus(
 }
 
 // NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware
-func NetworkSlashingViolationsConsumer(logger zerolog.Logger) slashing.ViolationsConsumer {
-	return slashing.NewSlashingViolationsConsumer(logger)
+func NetworkSlashingViolationsConsumer(logger zerolog.Logger, metrics module.NetworkSecurityMetrics) slashing.ViolationsConsumer {
+	return slashing.NewSlashingViolationsConsumer(logger, metrics)
 }

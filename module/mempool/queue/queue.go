@@ -121,8 +121,8 @@ func dequeue(queue *Queue) *Queue {
 // new = Indicates if element was new to the queue, when `stored` was true. It lets
 // distinguish (a) and (b) cases.
 // Adding an element fails with return value `false` for `stored` in the following cases:
-//   * element.ParentID() is _not_ stored in the queue
-//   * element's height is _unequal to_ its parent's height + 1
+//   - element.ParentID() is _not_ stored in the queue
+//   - element's height is _unequal to_ its parent's height + 1
 func (q *Queue) TryAdd(element Blockify) (stored bool, new bool) {
 	if _, found := q.Nodes[element.ID()]; found {
 		// (b) element was already stored in the queue _before_ the call.

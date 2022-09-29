@@ -6,11 +6,22 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	metering "github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
 )
+
+type BlockInfoParams struct {
+	Blocks      Blocks
+	BlockHeader *flow.Header
+}
+
+func DefaultBlockInfoParams() BlockInfoParams {
+	return BlockInfoParams{
+		Blocks:      nil,
+		BlockHeader: nil,
+	}
+}
 
 type BlockInfo struct {
 	tracer *Tracer
@@ -40,7 +51,7 @@ func (info *BlockInfo) GetCurrentBlockHeight() (uint64, error) {
 		trace.FVMEnvGetCurrentBlockHeight).End()
 
 	err := info.meter.MeterComputation(
-		metering.ComputationKindGetCurrentBlockHeight,
+		ComputationKindGetCurrentBlockHeight,
 		1)
 	if err != nil {
 		return 0, fmt.Errorf("get current block height failed: %w", err)
@@ -63,7 +74,7 @@ func (info *BlockInfo) GetBlockAtHeight(
 	defer info.tracer.StartSpanFromRoot(trace.FVMEnvGetBlockAtHeight).End()
 
 	err := info.meter.MeterComputation(
-		metering.ComputationKindGetBlockAtHeight,
+		ComputationKindGetBlockAtHeight,
 		1)
 	if err != nil {
 		return runtime.Block{}, false, fmt.Errorf(

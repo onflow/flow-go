@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -22,11 +20,13 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 
 	flow2 "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	exeState "github.com/onflow/flow-go/engine/execution/state"
@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -135,7 +136,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 // BasicBlockExecutor executes blocks in sequence and applies all changes (not fork aware)
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
-	programCache          *programs.Programs
+	programCache          *programs.BlockPrograms
 	activeView            state.View
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
@@ -144,15 +145,21 @@ type BasicBlockExecutor struct {
 }
 
 func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithChain(chain),
+		fvm.WithLogger(logger),
+		fvm.WithReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
+				computation.ReusableCadenceRuntimePoolSize,
+				runtime.Config{},
+			),
+		),
 	}
-	fvmContext := fvm.NewContext(logger, opts...)
+	fvmContext := fvm.NewContext(opts...)
 
 	collector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -212,7 +219,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 
 	return &BasicBlockExecutor{
 		blockComputer:         blockComputer,
-		programCache:          programs.NewEmptyPrograms(),
+		programCache:          programs.NewEmptyBlockPrograms(),
 		activeStateCommitment: initialCommit,
 		activeView:            view,
 		chain:                 chain,
@@ -226,7 +233,7 @@ func (b *BasicBlockExecutor) Chain(_ testing.TB) flow.Chain {
 }
 
 func (b *BasicBlockExecutor) ResetProgramCache(tb testing.TB) {
-	b.programCache = programs.NewEmptyPrograms()
+	b.programCache = programs.NewEmptyBlockPrograms()
 }
 
 func (b *BasicBlockExecutor) ServiceAccount(_ testing.TB) *TestBenchAccount {
@@ -303,7 +310,7 @@ type logExtractor struct {
 }
 
 type txWeights struct {
-	TXHash                string `json:"txHash"`
+	TXHash                string `json:"tx_id"`
 	LedgerInteractionUsed uint64 `json:"ledgerInteractionUsed"`
 	ComputationUsed       uint   `json:"computationUsed"`
 	MemoryEstimate        uint   `json:"memoryEstimate"`

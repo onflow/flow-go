@@ -50,7 +50,7 @@ func PrefixCheckSum(canonicalList []flow.Identifier, signrIndices []byte) []byte
 // - prefixed checksum of the canonical identifier list
 // - the signerIndices
 // Expected error during normal operations:
-//  * ErrInvalidChecksum if the input is shorter than the expected checksum contained therein
+//   - ErrInvalidChecksum if the input is shorter than the expected checksum contained therein
 func SplitCheckSum(checkSumPrefixedSignerIndices []byte) ([CheckSumLen]byte, []byte, error) {
 	if len(checkSumPrefixedSignerIndices) < CheckSumLen {
 		return [CheckSumLen]byte{}, nil,
@@ -69,11 +69,12 @@ func SplitCheckSum(checkSumPrefixedSignerIndices []byte) ([CheckSumLen]byte, []b
 // and compares it with the checksum of the given identifier list.
 // It returns the signer indices if the checksum matches.
 // Inputs:
-// - canonicalList is the canonical list from decoder's view
-// - checkSumPrefixedSignerIndices is the signer indices created by the encoder,
-//   and prefixed with the checksum of the canonical list from encoder's view.
+//   - canonicalList is the canonical list from decoder's view
+//   - checkSumPrefixedSignerIndices is the signer indices created by the encoder,
+//     and prefixed with the checksum of the canonical list from encoder's view.
+//
 // Expected error during normal operations:
-//  * ErrInvalidChecksum if the input is shorter than the expected checksum contained therein
+//   - ErrInvalidChecksum if the input is shorter than the expected checksum contained therein
 func CompareAndExtract(canonicalList []flow.Identifier, checkSumPrefixedSignerIndices []byte) ([]byte, error) {
 	// the checkSumPrefixedSignerIndices bytes contains two parts:
 	// 1. the checksum of the canonical identifier list from encoder's view

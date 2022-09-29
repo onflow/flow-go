@@ -228,6 +228,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	header := proposal.Header
 
 	log := e.log.With().
+		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).

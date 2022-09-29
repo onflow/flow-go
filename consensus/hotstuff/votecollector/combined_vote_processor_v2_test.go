@@ -129,12 +129,13 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() 
 }
 
 // TestProcess_InvalidSignature tests that CombinedVoteProcessorV2 rejects invalid votes for the following scenarios:
-//  1) vote where `SignerID` is not a valid consensus participant;
+//  1. vote where `SignerID` is not a valid consensus participant;
 //     we test correct handling of votes that only a staking signature as well as votes with staking+beacon signatures
-//  2) vote from a valid consensus participant
+//  2. vote from a valid consensus participant
 //     case 2a: vote contains only a staking signatures that is invalid
 //     case 2b: vote contains _invalid staking sig_, and valid random beacon sig
 //     case 2c: vote contains valid staking sig, but _invalid beacon sig_
+//
 // In all cases, the CombinedVoteProcessor should interpret these failure cases as invalid votes
 // and return an InvalidVoteError.
 func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignature() {
@@ -532,7 +533,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		// expected QC
 		onQCCreated := func(qc *flow.QuorumCertificate) {
 			// QC should be created only once
-			if !qcCreated.CAS(false, true) {
+			if !qcCreated.CompareAndSwap(false, true) {
 				t.Fatalf("QC created more than once")
 			}
 
@@ -697,7 +698,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		// expected QC
 		onQCCreated := func(qc *flow.QuorumCertificate) {
 			// QC should be created only once
-			if !qcCreated.CAS(false, true) {
+			if !qcCreated.CompareAndSwap(false, true) {
 				t.Fatalf("QC created more than once")
 			}
 		}

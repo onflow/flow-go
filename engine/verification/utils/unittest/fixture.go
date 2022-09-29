@@ -5,8 +5,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -254,14 +252,12 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		)
 		require.NoError(t, err)
 
-		rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
-		vm := fvm.NewVirtualMachine(rt)
+		vm := fvm.NewVM()
 
 		blocks := new(fvmMock.Blocks)
 
 		execCtx := fvm.NewContext(
-			log,
+			fvm.WithLogger(log),
 			fvm.WithChain(chain),
 			fvm.WithBlocks(blocks),
 		)
@@ -269,7 +265,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
-		programs := programs.NewEmptyPrograms()
+		programs := programs.NewEmptyBlockPrograms()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := new(mocktracker.Storage)
