@@ -16,3 +16,11 @@ func TestGeneratedDataAccess(t *testing.T) {
 
 	generateValuesYaml(nodeConfig)
 }
+
+func TestReplaceString(t *testing.T) {
+	original := "This contains A_STRING that needs to be replaced"
+	replacement := replaceStrings(original, "A_STRING", "a proper string")
+
+	fmt.Println("Replacement Strings")
+	fmt.Println(replacement)
+}

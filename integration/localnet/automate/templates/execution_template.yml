@@ -1,4 +1,4 @@
-args:
+      args:
         - --bootstrapdir=/bootstrap
         - --datadir=/data/protocol
         - --secretsdir=/data/secret

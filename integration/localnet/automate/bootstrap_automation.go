@@ -8,8 +8,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-
-	"gopkg.in/yaml.v2"
 )
 
 // User struct which contains a name
@@ -30,6 +28,14 @@ var EXECUTION_TEMPLATE string = "templates/execution_template.yml"
 var VERIFICATION_TEMPLATE string = "templates/verification_template.yml"
 var RESOURCES_TEMPLATE string = "templates/resources_template.yml"
 var ENV_TEMPLATE string = "templates/env_template.yml"
+
+var VALUES_HEADER string = "branch: fake-branch\n# Commit must be a string\ncommit: \"123456\"\n\ndefaults: {}\n"
+
+var ACCESS_IMAGE string = "gcr.io/flow-container-registry/access:v0.27.6"
+var COLLECTION_IMAGE string = "gcr.io/flow-container-registry/collection:v0.27.6"
+var CONSENSUS_IMAGE string = "gcr.io/flow-container-registry/consensus:v0.27.6"
+var EXECUTION_IMAGE string = "gcr.io/flow-container-registry/execution:v0.27.6"
+var VERIFICATION_IMAGE string = "gcr.io/flow-container-registry/verification:v0.27.6"
 
 func loadNodeJsonData() map[string]Node {
 	var node_info_path = "../bootstrap/public-root-information/node-infos.pub.json"
@@ -61,20 +67,6 @@ func replaceStrings(template string, target string, replacement string) string {
 	return updated
 }
 
-func yamlReader(path string) map[string]string {
-	output := map[string]string{}
-	yamlFile, err := ioutil.ReadFile("path")
-	if err != nil {
-		log.Printf("yamlFile.Get err   #%v ", err)
-	}
-	err = yaml.Unmarshal(yamlFile, output)
-	if err != nil {
-		log.Fatalf("Unmarshal: %v", err)
-	}
-
-	return output
-}
-
 func textReader(path string) string {
 	file, err := os.ReadFile(path)
 	if err != nil {
@@ -91,7 +83,7 @@ func yamlWriter(file *os.File, content string) {
 	}
 }
 
-func generateValuesYaml(nodeConfig map[string]int) {
+func GenerateValuesYaml(nodeConfig map[string]int) {
 	nodesData := loadNodeJsonData()
 
 	values, err := os.OpenFile("values.yaml", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -101,6 +93,7 @@ func generateValuesYaml(nodeConfig map[string]int) {
 
 	resources := textReader(RESOURCES_TEMPLATE)
 	env := textReader(ENV_TEMPLATE)
+	yamlWriter(values, VALUES_HEADER)
 
 	yamlWriter(values, "access:\n")
 	yamlWriter(values, resources)
@@ -110,11 +103,7 @@ func generateValuesYaml(nodeConfig map[string]int) {
 		name := fmt.Sprint("access", i)
 		nodeId := nodesData[name].NodeID
 
-		replacedData := replaceStrings(access_data, nodeId, "REPLACE_NODE_ID")
-
-		yamlWriter(values, name)
-		yamlWriter(values, env)
-		yamlWriter(values, replacedData)
+		writeNodeData(values, name, env, nodeId, access_data)
 	}
 
 	yamlWriter(values, "collection:\n")
@@ -125,11 +114,7 @@ func generateValuesYaml(nodeConfig map[string]int) {
 		name := fmt.Sprint("collection", i)
 		nodeId := nodesData[name].NodeID
 
-		replacedData := replaceStrings(collection_data, nodeId, "REPLACE_NODE_ID")
-
-		yamlWriter(values, name)
-		yamlWriter(values, env)
-		yamlWriter(values, replacedData)
+		writeNodeData(values, name, env, nodeId, collection_data)
 	}
 
 	yamlWriter(values, "consensus:\n")
@@ -140,11 +125,7 @@ func generateValuesYaml(nodeConfig map[string]int) {
 		name := fmt.Sprint("consensus", i)
 		nodeId := nodesData[name].NodeID
 
-		replacedData := replaceStrings(consensus_data, nodeId, "REPLACE_NODE_ID")
-
-		yamlWriter(values, name)
-		yamlWriter(values, env)
-		yamlWriter(values, replacedData)
+		writeNodeData(values, name, env, nodeId, consensus_data)
 	}
 
 	yamlWriter(values, "execution:\n")
@@ -155,11 +136,7 @@ func generateValuesYaml(nodeConfig map[string]int) {
 		name := fmt.Sprint("execution", i)
 		nodeId := nodesData[name].NodeID
 
-		replacedData := replaceStrings(execution_data, nodeId, "REPLACE_NODE_ID")
-
-		yamlWriter(values, name)
-		yamlWriter(values, env)
-		yamlWriter(values, replacedData)
+		writeNodeData(values, name, env, nodeId, execution_data)
 	}
 
 	yamlWriter(values, "verification:\n")
@@ -170,12 +147,17 @@ func generateValuesYaml(nodeConfig map[string]int) {
 		name := fmt.Sprint("verification", i)
 		nodeId := nodesData[name].NodeID
 
-		replacedData := replaceStrings(verification_data, nodeId, "REPLACE_NODE_ID")
-
-		yamlWriter(values, name)
-		yamlWriter(values, env)
-		yamlWriter(values, replacedData)
+		writeNodeData(values, name, env, nodeId, verification_data)
 	}
 
 	values.Close()
+}
+
+func writeNodeData(file *os.File, name string, env string, nodeId string, data string) {
+	replacedData := replaceStrings(data, "REPLACE_NODE_ID", nodeId)
+	replacedEnv := replaceStrings(env, "REPLACE_NODE_ID", nodeId)
+
+	yamlWriter(file, "  "+name+":\n")
+	yamlWriter(file, replacedEnv)
+	yamlWriter(file, replacedData)
 }

@@ -1,18 +1,18 @@
-args:
-  - --bootstrapdir=/bootstrap
-  - --datadir=/data/protocol
-  - --secretsdir=/data/secret
-  - --loglevel=INFO
-  - --profiler-enabled=false
-  - --profile-uploader-enabled=false
-  - --tracer-enabled=false
-  - --bind=0.0.0.0:3569
-  - --profiler-dir=/profiler
-  - --profiler-interval=2m
-  - --nodeid={{nodeid}}
-  - --block-rate-delay=950ms
-  - --hotstuff-timeout=2.15s
-  - --hotstuff-min-timeout=2.15s
-  - --ingress-addr=0.0.0.0:9000
-  - --insecure-access-api=false
-  - --access-node-ids=*
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --loglevel=INFO
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --bind=0.0.0.0:3569
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=REPLACE_NODE_ID
+        - --block-rate-delay=950ms
+        - --hotstuff-timeout=2.15s
+        - --hotstuff-min-timeout=2.15s
+        - --ingress-addr=0.0.0.0:9000
+        - --insecure-access-api=false
+        - --access-node-ids=*

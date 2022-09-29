@@ -1,13 +1,13 @@
-args:
-  - --bootstrapdir=/bootstrap
-  - --datadir=/data/protocol
-  - --secretsdir=/data/secret
-  - --loglevel=INFO
-  - --bind=0.0.0.0:3569
-  - --profiler-enabled=false
-  - --profile-uploader-enabled=false
-  - --tracer-enabled=false
-  - --profiler-dir=/profiler
-  - --profiler-interval=2m
-  - --nodeid=4c61796e65204c616672616e63650033ac50aba5fd0fac305fe196ffda1e62c9
-  - --chunk-alpha=1
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --loglevel=INFO
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=REPLACE_NODE_ID
+        - --chunk-alpha=1
