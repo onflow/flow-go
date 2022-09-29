@@ -330,8 +330,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		},
 	)
 
-	in.finalizer.On("MakeValid", mock.Anything).Return(nil)
-
 	// initialize error handling and logging
 	var err error
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
