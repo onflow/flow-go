@@ -110,6 +110,10 @@ func pull(cmd *cobra.Command, args []string) {
 
 		// move the root.checkpoint, root.checkpoint.1, root.checkpoint.2 etc. files to the bootstrap/execution-state dir
 		err = filepath.WalkDir(localPublicRootInfoDir, func(srcPath string, rootCheckpointFile fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+
 			// if rootCheckpointFile is a file whose name starts with "root.checkpoint", then move it
 			if !rootCheckpointFile.IsDir() && strings.HasPrefix(rootCheckpointFile.Name(), model.FilenameWALRootCheckpoint) {
 
