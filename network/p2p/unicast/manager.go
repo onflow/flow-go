@@ -19,8 +19,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
-const MaxConnectAttemptSleepDuration = 5
+const (
+	// MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
+	MaxConnectAttemptSleepDuration = 5
+
+	// defaultConnectTimeout is the default timeout for establishing a connection to a peer
+	defaultConnectTimeout = 1 * time.Second
+)
 
 // Manager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
 type Manager struct {
@@ -147,7 +152,10 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 
-		err := m.streamFactory.Connect(ctx, peer.AddrInfo{ID: peerID})
+		connectCtx, cancel := context.WithTimeout(ctx, defaultConnectTimeout)
+		defer cancel()
+
+		err := m.streamFactory.Connect(connectCtx, peer.AddrInfo{ID: peerID})
 		if err != nil {
 
 			// if the connection was rejected due to invalid node id, skip the re-attempt
