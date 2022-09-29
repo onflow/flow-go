@@ -64,13 +64,19 @@ func NewEpochComponents(
 	return components
 }
 
-type StartableEpochComponents struct {
+// RunningEpochComponents contains all consensus-related components for an epoch
+// and the cancel function to stop these components. All components must have been
+// started when the RunningEpochComponents is constructed.
+type RunningEpochComponents struct {
 	*EpochComponents
 	cancel context.CancelFunc // used to stop the epoch components
 }
 
-func NewStartableEpochComponents(components *EpochComponents, cancel context.CancelFunc) *StartableEpochComponents {
-	return &StartableEpochComponents{
+// NewRunningEpochComponents returns a new RunningEpochComponents container for the
+// given epoch components. The components must have already been started using some
+// context, which the provided cancel function cancels (stopping the epoch components).
+func NewRunningEpochComponents(components *EpochComponents, cancel context.CancelFunc) *RunningEpochComponents {
+	return &RunningEpochComponents{
 		EpochComponents: components,
 		cancel:          cancel,
 	}

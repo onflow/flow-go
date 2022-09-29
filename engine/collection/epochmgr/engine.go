@@ -43,8 +43,8 @@ type Engine struct {
 	heightEvents   events.Heights              // allows subscribing to particular heights
 	startupTimeout time.Duration               // how long we wait for epoch components to start up
 
-	mu     sync.Mutex                           // protects epochs map
-	epochs map[uint64]*StartableEpochComponents // epoch-scoped components per epoch
+	mu     sync.Mutex                         // protects epochs map
+	epochs map[uint64]*RunningEpochComponents // epoch-scoped components per epoch
 
 	// internal event notifications
 	epochTransitionEvents        chan *flow.Header // sends first block of new epoch
@@ -75,7 +75,7 @@ func New(
 		voter:                        voter,
 		factory:                      factory,
 		heightEvents:                 heightEvents,
-		epochs:                       make(map[uint64]*StartableEpochComponents),
+		epochs:                       make(map[uint64]*RunningEpochComponents),
 		startupTimeout:               DefaultStartupTimeout,
 		epochTransitionEvents:        make(chan *flow.Header, 1),
 		epochSetupPhaseStartedEvents: make(chan *flow.Header, 1),
@@ -380,7 +380,7 @@ func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, c
 
 	select {
 	case <-components.Ready():
-		e.storeEpochComponents(counter, NewStartableEpochComponents(components, cancel))
+		e.storeEpochComponents(counter, NewRunningEpochComponents(components, cancel))
 		return nil
 	case <-time.After(e.startupTimeout):
 		cancel() // cancel current context if we didn't start in time
@@ -416,7 +416,7 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 // getEpochComponents retrieves the stored (running) epoch components for the given epoch counter.
 // If no epoch with the counter is stored, returns (nil, false).
 // Safe for concurrent use.
-func (e *Engine) getEpochComponents(counter uint64) (*StartableEpochComponents, bool) {
+func (e *Engine) getEpochComponents(counter uint64) (*RunningEpochComponents, bool) {
 	e.mu.Lock()
 	epoch, ok := e.epochs[counter]
 	e.mu.Unlock()
@@ -425,7 +425,7 @@ func (e *Engine) getEpochComponents(counter uint64) (*StartableEpochComponents, 
 
 // storeEpochComponents stores the given epoch components in the engine's mapping.
 // Safe for concurrent use.
-func (e *Engine) storeEpochComponents(counter uint64, components *StartableEpochComponents) {
+func (e *Engine) storeEpochComponents(counter uint64, components *RunningEpochComponents) {
 	e.mu.Lock()
 	e.epochs[counter] = components
 	e.mu.Unlock()
