@@ -1,0 +1,16 @@
+args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --loglevel=INFO
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --bind=0.0.0.0:3569
+        - --nodeid=REPLACE_NODE_ID
+        - --triedir=/trie
+        - --rpc-addr=0.0.0.0:9000
+        - --cadence-tracing=false
+        - --extensive-tracing=false

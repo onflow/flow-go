@@ -7,11 +7,12 @@ import (
 
 func TestGeneratedDataAccess(t *testing.T) {
 	fmt.Printf("Starting tests")
-	loadNodeJsonData()
-}
+	var nodeConfig = make(map[string]int)
+	nodeConfig["access"] = 2
+	nodeConfig["collection"] = 6
+	nodeConfig["consensus"] = 3
+	nodeConfig["execution"] = 2
+	nodeConfig["verification"] = 1
 
-func TestString(t *testing.T) {
-	name := fmt.Sprint("access", 1)
-	fmt.Println("Starting tests")
-	fmt.Println(name)
+	generateValuesYaml(nodeConfig)
 }

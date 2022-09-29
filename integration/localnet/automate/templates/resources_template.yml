@@ -35,3 +35,4 @@ defaults:
       port: 9002
       targetPort: admin
   storage: 1G
+nodes:

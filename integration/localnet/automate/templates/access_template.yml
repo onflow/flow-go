@@ -9,7 +9,7 @@ args:
   - "--profiler-dir=/profiler"
   - "--profiler-interval=2m"
   - "--bind=0.0.0.0:3569"
-  - "--nodeid={{nodeid}}"
+  - "--nodeid=REPLACE_NODE_ID"
   - "--rpc-addr=0.0.0.0:9000"
   - "--secure-rpc-addr=0.0.0.0:9001"
   - "--http-addr=0.0.0.0:8000"
