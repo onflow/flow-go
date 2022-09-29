@@ -208,7 +208,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.state.On("Extend", mock.Anything, child).Return(nil).Once()
 	// we have already received and stored the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
-	suite.headers.On("ByBlockID", block.ID()).Return(block.Header, nil).Once() // TODO ??
+	suite.headers.On("ByBlockID", block.ID()).Return(block.Header, nil).Once()
 	// should submit to follower
 	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once()
 	suite.follower.On("SubmitProposal", child.Header, block.Header.View).Once()
