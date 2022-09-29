@@ -24,6 +24,8 @@ type CorruptedNodeConnection struct {
 	inbound        insecure.CorruptNetwork_ConnectAttackerClient        // from corrupt network to attacker.
 }
 
+var _ insecure.CorruptedNodeConnection = &CorruptedNodeConnection{}
+
 func NewCorruptedNodeConnection(
 	logger zerolog.Logger,
 	inboundHandler func(message *insecure.Message),

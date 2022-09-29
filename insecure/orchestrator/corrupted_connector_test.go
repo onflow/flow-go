@@ -155,7 +155,7 @@ func withMockCorruptNetwork(t *testing.T, run func(flow.Identity, irrecoverable.
 
 	run(*corruptedIdentity, cnCtx, cn)
 
-	// terminates orchestratorNetwork
+	// terminates corrupt network
 	cancel()
 	unittest.RequireCloseBefore(t, cn.Done(), 1*time.Second, "could not stop corrupt network on time")
 }
