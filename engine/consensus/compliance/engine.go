@@ -29,9 +29,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// defaultRangeResponseQueueCapacity maximum capacity of inbound queue for `messages.BlockResponse`s
-const defaultRangeResponseQueueCapacity = 100
-
 // defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
 const defaultBlockQueueCapacity = 10_000
 
