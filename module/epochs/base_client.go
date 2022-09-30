@@ -71,6 +71,7 @@ func (c *BaseClient) GetAccount(ctx context.Context) (*sdk.Account, error) {
 	// get account from access node for given address
 	account, err := c.FlowClient.GetAccount(ctx, c.AccountAddress)
 	if err != nil {
+		// we consider all errors from client network calls to be transient and non-critical
 		return nil, network.NewTransientErrorf("could not get account: %w", err)
 	}
 
@@ -97,6 +98,7 @@ func (c *BaseClient) SendTransaction(ctx context.Context, tx *sdk.Transaction) (
 	// submit transaction to client
 	err := c.FlowClient.SendTransaction(ctx, *tx)
 	if err != nil {
+		// we consider all errors from client network calls to be transient and non-critical
 		return sdk.EmptyID, network.NewTransientErrorf("failed to send transaction: %w", err)
 	}
 
@@ -123,6 +125,7 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 
 		result, err := c.FlowClient.GetTransactionResult(ctx, txID)
 		if err != nil {
+			// we consider all errors from client network calls to be transient and non-critical
 			err = network.NewTransientErrorf("could not get transaction result: %w", err)
 			log.Err(err).Msg("retrying getting transaction result...")
 			return retry.RetryableError(err)
