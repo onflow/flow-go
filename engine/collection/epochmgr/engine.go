@@ -43,8 +43,8 @@ type Engine struct {
 	heightEvents   events.Heights              // allows subscribing to particular heights
 	startupTimeout time.Duration               // how long we wait for epoch components to start up
 
-	mu     sync.Mutex                           // protects epochs map
-	epochs map[uint64]*StartableEpochComponents // epoch-scoped components per epoch
+	mu     sync.RWMutex                       // protects epochs map
+	epochs map[uint64]*RunningEpochComponents // epoch-scoped components per epoch
 
 	// internal event notifications
 	epochTransitionEvents        chan *flow.Header // sends first block of new epoch
@@ -75,7 +75,7 @@ func New(
 		voter:                        voter,
 		factory:                      factory,
 		heightEvents:                 heightEvents,
-		epochs:                       make(map[uint64]*StartableEpochComponents),
+		epochs:                       make(map[uint64]*RunningEpochComponents),
 		startupTimeout:               DefaultStartupTimeout,
 		epochTransitionEvents:        make(chan *flow.Header, 1),
 		epochSetupPhaseStartedEvents: make(chan *flow.Header, 1),
@@ -83,9 +83,7 @@ func New(
 	}
 
 	e.cm = component.NewComponentManagerBuilder().
-		AddWorker(e.handleEpochSetupPhaseStartedLoop).
-		AddWorker(e.handleEpochTransitionLoop).
-		AddWorker(e.handleStopEpochLoop).
+		AddWorker(e.handleEpochEvents).
 		Build()
 	e.Component = e.cm
 
@@ -100,7 +98,7 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	// 2 - check if we should attempt to vote after startup
 	err := e.checkShouldVoteOnStartup()
 	if err != nil {
-		ctx.Throw(err)
+		ctx.Throw(fmt.Errorf("could not vote on startup: %w", err))
 	}
 
 	// 3 - start epoch-scoped components
@@ -108,7 +106,7 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	epoch := e.state.Final().Epochs().Current()
 	counter, err := epoch.Counter()
 	if err != nil {
-		ctx.Throw(err)
+		ctx.Throw(fmt.Errorf("could not get epoch counter: %w", err))
 	}
 	components, err := e.createEpochComponents(epoch)
 	if err != nil {
@@ -117,12 +115,12 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 			e.log.Info().Msg("node is not authorized for current epoch - skipping initializing cluster consensus")
 			return
 		}
-		ctx.Throw(err)
+		ctx.Throw(fmt.Errorf("could not create epoch components: %w", err))
 	}
 	err = e.startEpochComponents(ctx, counter, components)
 	if err != nil {
 		// all failures to start epoch components are critical
-		ctx.Throw(err)
+		ctx.Throw(fmt.Errorf("could not start epoch components: %w", err))
 	}
 
 	// TODO if we are within the first 600 blocks of an epoch, we should resume the previous epoch's cluster consensus here https://github.com/dapperlabs/flow-go/issues/5659
@@ -153,13 +151,13 @@ func (e *Engine) checkShouldVoteOnStartup() error {
 // This is true when the engine-scoped worker threads have started, and all presently
 // running epoch components (max 2) have started.
 func (e *Engine) Ready() <-chan struct{} {
-	e.mu.Lock()
+	e.mu.RLock()
 	components := make([]module.ReadyDoneAware, 0, len(e.epochs)+1)
 	components = append(components, e.cm)
 	for _, epoch := range e.epochs {
 		components = append(components, epoch)
 	}
-	e.mu.Unlock()
+	e.mu.RUnlock()
 
 	return util.AllReady(components...)
 }
@@ -168,13 +166,13 @@ func (e *Engine) Ready() <-chan struct{} {
 // This is true when the engine-scoped worker threads have stopped, and all presently
 // running epoch components (max 2) have stopped.
 func (e *Engine) Done() <-chan struct{} {
-	e.mu.Lock()
+	e.mu.RLock()
 	components := make([]module.ReadyDoneAware, 0, len(e.epochs)+1)
 	components = append(components, e.cm)
 	for _, epoch := range e.epochs {
 		components = append(components, epoch)
 	}
-	e.mu.Unlock()
+	e.mu.RUnlock()
 
 	return util.AllDone(components...)
 }
@@ -205,8 +203,14 @@ func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
 	e.epochSetupPhaseStartedEvents <- first
 }
 
-// handleEpochTransitionLoop handles EpochTransition protocol events.
-func (e *Engine) handleEpochTransitionLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// handleEpochEvents handles events relating to the epoch lifecycle:
+//   - EpochTransition protocol event - we start epoch components for the starting epoch,
+//     and schedule shutdown for the ending epoch
+//   - EpochSetupPhaseStarted protocol event - we submit our node's vote for our cluster's
+//     root block in the next epoch
+//   - epochStopEvents - signalled when a previously scheduled shutdown height is reached.
+//     We shut down components associated with the epoch.
+func (e *Engine) handleEpochEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	for {
@@ -218,34 +222,9 @@ func (e *Engine) handleEpochTransitionLoop(ctx irrecoverable.SignalerContext, re
 			if err != nil {
 				ctx.Throw(err)
 			}
-		}
-	}
-}
-
-// handleEpochSetupPhaseStartedLoop handles EpochSetupPhaseStarted protocol events.
-func (e *Engine) handleEpochSetupPhaseStartedLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
 		case firstBlock := <-e.epochSetupPhaseStartedEvents:
 			nextEpoch := e.state.AtBlockID(firstBlock.ID()).Epochs().Next()
 			e.onEpochSetupPhaseStarted(ctx, nextEpoch)
-		}
-	}
-}
-
-// handleStopEpochLoop handles internal events indicating that a prior epoch's
-// components should be stopped.
-func (e *Engine) handleStopEpochLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
 		case epochCounter := <-e.epochStopEvents:
 			err := e.stopEpochComponents(epochCounter)
 			if err != nil {
@@ -380,7 +359,7 @@ func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, c
 
 	select {
 	case <-components.Ready():
-		e.storeEpochComponents(counter, NewStartableEpochComponents(components, cancel))
+		e.storeEpochComponents(counter, NewRunningEpochComponents(components, cancel))
 		return nil
 	case <-time.After(e.startupTimeout):
 		cancel() // cancel current context if we didn't start in time
@@ -416,16 +395,16 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 // getEpochComponents retrieves the stored (running) epoch components for the given epoch counter.
 // If no epoch with the counter is stored, returns (nil, false).
 // Safe for concurrent use.
-func (e *Engine) getEpochComponents(counter uint64) (*StartableEpochComponents, bool) {
-	e.mu.Lock()
+func (e *Engine) getEpochComponents(counter uint64) (*RunningEpochComponents, bool) {
+	e.mu.RLock()
 	epoch, ok := e.epochs[counter]
-	e.mu.Unlock()
+	e.mu.RUnlock()
 	return epoch, ok
 }
 
 // storeEpochComponents stores the given epoch components in the engine's mapping.
 // Safe for concurrent use.
-func (e *Engine) storeEpochComponents(counter uint64, components *StartableEpochComponents) {
+func (e *Engine) storeEpochComponents(counter uint64, components *RunningEpochComponents) {
 	e.mu.Lock()
 	e.epochs[counter] = components
 	e.mu.Unlock()

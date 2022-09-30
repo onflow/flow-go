@@ -14,7 +14,7 @@ func TestWorkerStatsTracker(t *testing.T) {
 	st.StartPrinting(time.Second)
 	defer st.StopPrinting()
 
-	st.AddWorker()
+	st.AddWorkers(1)
 
 	startTime := time.Now()
 	endTime := startTime.Add(time.Second)

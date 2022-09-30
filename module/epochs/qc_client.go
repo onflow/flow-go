@@ -163,12 +163,13 @@ func (c *QCContractClient) Voted(ctx context.Context) (bool, error) {
 		return false, network.NewTransientErrorf("could not execute voted script: %w", err)
 	}
 
-	if _, ok := ret.(cadence.Bool); !ok {
+	voted, ok := ret.(cadence.Bool)
+	if !ok {
 		return false, fmt.Errorf("unexpected cadence type (%T) returned from Voted script", ret)
 	}
 
 	// check if node has voted
-	if !ret.(cadence.Bool) {
+	if !voted {
 		return false, nil
 	}
 	return true, nil

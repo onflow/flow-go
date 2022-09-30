@@ -29,6 +29,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+func doneChan() <-chan struct{} {
+	c := make(chan struct{})
+	close(c)
+	return c
+}
+
 func TestComplianceCore(t *testing.T) {
 	suite.Run(t, new(CoreSuite))
 }

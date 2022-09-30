@@ -25,7 +25,7 @@ func NewTriggerCheckpointCommand(trigger *atomic.Bool) *TriggerCheckpointCommand
 }
 
 func (s *TriggerCheckpointCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
-	if s.trigger.CAS(false, true) {
+	if s.trigger.CompareAndSwap(false, true) {
 		log.Info().Msgf("admintool: trigger checkpoint as soon as finishing writing the current segment file. you can find log about 'compactor' to check the checkpointing progress")
 	} else {
 		log.Info().Msgf("admintool: checkpoint is already set to be triggered")
