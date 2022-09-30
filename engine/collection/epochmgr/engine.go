@@ -43,7 +43,7 @@ type Engine struct {
 	heightEvents   events.Heights              // allows subscribing to particular heights
 	startupTimeout time.Duration               // how long we wait for epoch components to start up
 
-	mu     sync.Mutex                         // protects epochs map
+	mu     sync.RWMutex                       // protects epochs map
 	epochs map[uint64]*RunningEpochComponents // epoch-scoped components per epoch
 
 	// internal event notifications
@@ -153,13 +153,13 @@ func (e *Engine) checkShouldVoteOnStartup() error {
 // This is true when the engine-scoped worker threads have started, and all presently
 // running epoch components (max 2) have started.
 func (e *Engine) Ready() <-chan struct{} {
-	e.mu.Lock()
+	e.mu.RLock()
 	components := make([]module.ReadyDoneAware, 0, len(e.epochs)+1)
 	components = append(components, e.cm)
 	for _, epoch := range e.epochs {
 		components = append(components, epoch)
 	}
-	e.mu.Unlock()
+	e.mu.RUnlock()
 
 	return util.AllReady(components...)
 }
@@ -168,13 +168,13 @@ func (e *Engine) Ready() <-chan struct{} {
 // This is true when the engine-scoped worker threads have stopped, and all presently
 // running epoch components (max 2) have stopped.
 func (e *Engine) Done() <-chan struct{} {
-	e.mu.Lock()
+	e.mu.RLock()
 	components := make([]module.ReadyDoneAware, 0, len(e.epochs)+1)
 	components = append(components, e.cm)
 	for _, epoch := range e.epochs {
 		components = append(components, epoch)
 	}
-	e.mu.Unlock()
+	e.mu.RUnlock()
 
 	return util.AllDone(components...)
 }
@@ -417,9 +417,9 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 // If no epoch with the counter is stored, returns (nil, false).
 // Safe for concurrent use.
 func (e *Engine) getEpochComponents(counter uint64) (*RunningEpochComponents, bool) {
-	e.mu.Lock()
+	e.mu.RLock()
 	epoch, ok := e.epochs[counter]
-	e.mu.Unlock()
+	e.mu.RUnlock()
 	return epoch, ok
 }
 
