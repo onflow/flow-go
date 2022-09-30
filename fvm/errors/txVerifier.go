@@ -64,47 +64,28 @@ func (e InvalidProposalSeqNumberError) Code() ErrorCode {
 	return ErrCodeInvalidProposalSeqNumberError
 }
 
-// InvalidPayloadSignatureError indicates that signature verification for a key in this transaction has failed.
-// this error is the result of failure in any of the following conditions:
+// NewInvalidPayloadSignatureError constructs a new CodedError which indicates
+// that signature verification for a key in this transaction has failed. This
+// error is the result of failure in any of the following conditions:
 // - provided hashing method is not supported
 // - signature size or format is invalid
 // - signature verification failed
-type InvalidPayloadSignatureError struct {
-	errorWrapper
-
-	address  flow.Address
-	keyIndex uint64
-}
-
-// NewInvalidPayloadSignatureError constructs a new InvalidPayloadSignatureError
-func NewInvalidPayloadSignatureError(address flow.Address, keyIndex uint64, err error) InvalidPayloadSignatureError {
-	return InvalidPayloadSignatureError{
-		address:  address,
-		keyIndex: keyIndex,
-		errorWrapper: errorWrapper{
-			err: err,
-		},
-	}
-}
-
-func (e InvalidPayloadSignatureError) Error() string {
-	return fmt.Sprintf(
-		"%s invalid payload signature: public key %d on account %s does not have a valid signature: %s",
-		e.Code().String(),
-		e.keyIndex,
-		e.address,
-		e.err.Error(),
-	)
-}
-
-// Code returns the error code for this error type
-func (e InvalidPayloadSignatureError) Code() ErrorCode {
-	return ErrCodeInvalidPayloadSignatureError
+func NewInvalidPayloadSignatureError(
+	address flow.Address,
+	keyIndex uint64,
+	err error,
+) *CodedError {
+	return WrapCodedError(
+		ErrCodeInvalidPayloadSignatureError,
+		err,
+		"invalid payload signature: public key %d on account %s does not have"+
+			" a valid signature",
+		keyIndex,
+		address)
 }
 
 func IsInvalidPayloadSignatureError(err error) bool {
-	var t InvalidPayloadSignatureError
-	return As(err, &t)
+	return HasErrorCode(err, ErrCodeInvalidPayloadSignatureError)
 }
 
 // NewInvalidEnvelopeSignatureError constructs a new CodedError which indicates

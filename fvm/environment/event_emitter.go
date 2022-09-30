@@ -83,18 +83,16 @@ func NewEventEmitter(
 	tracer *Tracer,
 	meter Meter,
 	chain flow.Chain,
-	txID flow.Identifier,
-	txIndex uint32,
-	payer flow.Address,
+	txInfo TransactionInfoParams,
 	params EventEmitterParams,
 ) EventEmitter {
 	emitter := &eventEmitter{
 		tracer:             tracer,
 		meter:              meter,
 		chain:              chain,
-		txID:               txID,
-		txIndex:            txIndex,
-		payer:              payer,
+		txID:               txInfo.TxId,
+		txIndex:            txInfo.TxIndex,
+		payer:              txInfo.TxBody.Payer,
 		EventEmitterParams: params,
 	}
 
