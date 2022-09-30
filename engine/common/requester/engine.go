@@ -278,6 +278,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
+	e.log.Debug().Int("num_entities", len(e.items)).Msg("selecting entities")
+
 	// get the current top-level set of valid providers
 	providers, err := e.state.Final().Identities(e.selector)
 	if err != nil {
@@ -346,6 +348,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			item.RetryAfter = e.cfg.RetryMaximum
 		}
 
+		e.log.Debug().Hex("entity", logging.ID(entityID)).Msg("selected entity")
+
 		// if we reached the maximum size for a batch, bail
 		if uint(len(entityIDs)) >= e.cfg.BatchThreshold {
 			break
@@ -362,11 +366,24 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		Nonce:     rand.Uint64(),
 		EntityIDs: entityIDs,
 	}
+
+	requestStart := time.Now()
+	e.log.Debug().
+		Hex("provider", logging.ID(providerID)).
+		Int("num_selected", len(entityIDs)).
+		Msg("sending entity request")
+
 	err = e.con.Unicast(req, providerID)
 	if err != nil {
 		return true, fmt.Errorf("could not send request: %w", err)
 	}
 	e.requests[req.Nonce] = req
+
+	e.log.Debug().
+		Hex("provider", logging.ID(providerID)).
+		Int("num_selected", len(entityIDs)).
+		Dur("duration", time.Since(requestStart)).
+		Msg("entity request sent")
 
 	// NOTE: we forget about requests after the expiry of the shortest retry time
 	// from the entities in the list; this means that we purge requests aggressively.
