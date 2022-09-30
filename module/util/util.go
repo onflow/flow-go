@@ -38,13 +38,13 @@ func AllClosed(channels ...<-chan struct{}) <-chan struct{} {
 	done := make(chan struct{})
 	var wg sync.WaitGroup
 
-	for _, ch := range channels {
-		wg.Add(1)
-		go func(ch <-chan struct{}) {
+	wg.Add(1)
+	go func() {
+		for _, ch := range channels {
 			<-ch
-			wg.Done()
-		}(ch)
-	}
+		}
+		wg.Done()
+	}()
 
 	go func() {
 		wg.Wait()
