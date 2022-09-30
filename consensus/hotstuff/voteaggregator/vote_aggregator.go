@@ -123,19 +123,19 @@ func (va *VoteAggregator) queuedMessagesProcessingLoop(ctx irrecoverable.Signale
 		case <-ctx.Done():
 			return
 		case <-notifier:
-			err := va.processQueuedEvents(ctx)
+			err := va.processQueuedMessages(ctx)
 			if err != nil {
-				ctx.Throw(fmt.Errorf("internal error processing queued vote events: %w", err))
+				ctx.Throw(fmt.Errorf("internal error processing queued messages: %w", err))
 				return
 			}
 		}
 	}
 }
 
-// processQueuedEvents is a function which dispatches previously queued votes on worker thread
-// This function is called whenever we have queued votes ready to be dispatched.
+// processQueuedMessages is a function which dispatches previously queued messages on worker thread
+// This function is called whenever we have queued messages ready to be dispatched.
 // No errors are expected during normal operations.
-func (va *VoteAggregator) processQueuedEvents(ctx context.Context) error {
+func (va *VoteAggregator) processQueuedMessages(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
