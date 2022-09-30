@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -392,7 +393,7 @@ func (vm *vmMock) RunV2(ctx fvm.Context, proc fvm.Procedure, led state.View) err
 	case "failedTx":
 		// add updates to the ledger
 		_ = led.Set("05", "", []byte{'B'})
-		tx.Err = &fvmErrors.CadenceRuntimeError{} // inside the runtime (e.g. div by zero, access account)
+		tx.Err = fvmErrors.NewCadenceRuntimeError(runtime.Error{}) // inside the runtime (e.g. div by zero, access account)
 	case "eventsMismatch":
 		tx.Events = append(eventsList, flow.Event{
 			Type:             "event.Extra",

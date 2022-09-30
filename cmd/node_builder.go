@@ -13,20 +13,20 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go/crypto"
-
-	"github.com/onflow/flow-go/module/compliance"
-
 	"github.com/onflow/flow-go/admin/commands"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -237,8 +237,8 @@ func DefaultBaseConfig() *BaseConfig {
 		secretsdir:                      NotSet,
 		secretsDBEnabled:                true,
 		level:                           "info",
-		PeerUpdateInterval:              p2p.DefaultPeerUpdateInterval,
-		UnicastMessageTimeout:           p2p.DefaultUnicastTimeout,
+		PeerUpdateInterval:              connection.DefaultPeerUpdateInterval,
+		UnicastMessageTimeout:           middleware.DefaultUnicastTimeout,
 		metricsPort:                     8080,
 		profilerEnabled:                 false,
 		uploaderEnabled:                 false,
@@ -255,7 +255,7 @@ func DefaultBaseConfig() *BaseConfig {
 
 		// By default we let networking layer trim connections to all nodes that
 		// are no longer part of protocol state.
-		NetworkConnectionPruning: p2p.ConnectionPruningEnabled,
+		NetworkConnectionPruning: connection.ConnectionPruningEnabled,
 
 		HeroCacheMetricsEnable: false,
 		SyncCoreConfig:         chainsync.DefaultConfig(),
