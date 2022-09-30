@@ -83,9 +83,7 @@ func New(
 	}
 
 	e.cm = component.NewComponentManagerBuilder().
-		AddWorker(e.handleEpochSetupPhaseStartedLoop).
-		AddWorker(e.handleEpochTransitionLoop).
-		AddWorker(e.handleStopEpochLoop).
+		AddWorker(e.handleEpochEvents).
 		Build()
 	e.Component = e.cm
 
@@ -205,8 +203,14 @@ func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
 	e.epochSetupPhaseStartedEvents <- first
 }
 
-// handleEpochTransitionLoop handles EpochTransition protocol events.
-func (e *Engine) handleEpochTransitionLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// handleEpochEvents handles events relating to the epoch lifecycle:
+//   - EpochTransition protocol event - we start epoch components for the starting epoch,
+//     and schedule shutdown for the ending epoch
+//   - EpochSetupPhaseStarted protocol event - we submit our node's vote for our cluster's
+//     root block in the next epoch
+//   - epochStopEvents - signalled when a previously scheduled shutdown height is reached.
+//     We shut down components associated with the epoch.
+func (e *Engine) handleEpochEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	for {
@@ -218,34 +222,9 @@ func (e *Engine) handleEpochTransitionLoop(ctx irrecoverable.SignalerContext, re
 			if err != nil {
 				ctx.Throw(err)
 			}
-		}
-	}
-}
-
-// handleEpochSetupPhaseStartedLoop handles EpochSetupPhaseStarted protocol events.
-func (e *Engine) handleEpochSetupPhaseStartedLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
 		case firstBlock := <-e.epochSetupPhaseStartedEvents:
 			nextEpoch := e.state.AtBlockID(firstBlock.ID()).Epochs().Next()
 			e.onEpochSetupPhaseStarted(ctx, nextEpoch)
-		}
-	}
-}
-
-// handleStopEpochLoop handles internal events indicating that a prior epoch's
-// components should be stopped.
-func (e *Engine) handleStopEpochLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
 		case epochCounter := <-e.epochStopEvents:
 			err := e.stopEpochComponents(epochCounter)
 			if err != nil {
