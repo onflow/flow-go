@@ -20,16 +20,16 @@ func NewTransactionSequenceNumberChecker() *TransactionSequenceNumberChecker {
 func (c *TransactionSequenceNumberChecker) Process(
 	ctx Context,
 	proc *TransactionProcedure,
-	sth *state.StateHolder,
-	_ *programs.Programs,
+	txnState *state.TransactionState,
+	_ *programs.TransactionPrograms,
 ) error {
-	return c.checkAndIncrementSequenceNumber(proc, ctx, sth)
+	return c.checkAndIncrementSequenceNumber(proc, ctx, txnState)
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	proc *TransactionProcedure,
 	ctx Context,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 ) error {
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
@@ -37,22 +37,22 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		defer span.End()
 	}
 
-	nestedTxnId, err := sth.BeginNestedTransaction()
+	nestedTxnId, err := txnState.BeginNestedTransaction()
 	if err != nil {
 		return err
 	}
 
 	defer func() {
 		// Skip checking limits when merging the public key sequence number
-		sth.RunWithAllLimitsDisabled(func() {
-			mergeError := sth.Commit(nestedTxnId)
+		txnState.RunWithAllLimitsDisabled(func() {
+			mergeError := txnState.Commit(nestedTxnId)
 			if mergeError != nil {
 				panic(mergeError)
 			}
 		})
 	}()
 
-	accounts := environment.NewAccounts(sth)
+	accounts := environment.NewAccounts(txnState)
 	proposalKey := proc.Transaction.ProposalKey
 
 	var accountKey flow.AccountPublicKey
@@ -61,7 +61,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 
 	// Skip checking limits when getting the public key
-	sth.RunWithAllLimitsDisabled(func() {
+	txnState.RunWithAllLimitsDisabled(func() {
 		accountKey, err = accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	})
 	if err != nil {
@@ -85,13 +85,15 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	accountKey.SeqNumber++
 
 	// Skip checking limits when setting the public key sequence number
-	sth.RunWithAllLimitsDisabled(func() {
+	txnState.RunWithAllLimitsDisabled(func() {
 		_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	})
 	if err != nil {
 		// NOTE: we need to disable limits during restart or else restart may
 		// fail on merging.
-		sth.RunWithAllLimitsDisabled(func() { _ = sth.RestartNestedTransaction(nestedTxnId) })
+		txnState.RunWithAllLimitsDisabled(func() {
+			_ = txnState.RestartNestedTransaction(nestedTxnId)
+		})
 		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
 

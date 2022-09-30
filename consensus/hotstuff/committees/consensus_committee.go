@@ -364,7 +364,7 @@ func (c *Consensus) onEpochEmergencyFallbackTriggered() error {
 	// the core logic is protected by an atomic bool.
 	// although it is only valid for epoch fallback to be triggered once per spork,
 	// we must account for repeated delivery of protocol events.
-	if !c.isEpochFallbackHandled.CAS(false, true) {
+	if !c.isEpochFallbackHandled.CompareAndSwap(false, true) {
 		return nil
 	}
 
