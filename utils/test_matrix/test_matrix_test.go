@@ -75,19 +75,21 @@ func TestGenerateTestMatrix(t *testing.T) {
 
 	otherPackages := listOtherPackages(getAllFlowPackages(), seenPackages)
 
-	testMatrix := generateTestMatrix(targetPackages, otherPackages)
+	matrix := generateTestMatrix(targetPackages, otherPackages)
 
-	// should be 3 groups in test matrix: abc, ghi, other
-	require.Equal(t, 3, len(testMatrix))
+	// should be 3 groups in test matrix: abc, ghi, others
+	require.Equal(t, 3, len(matrix))
 
-	require.Equal(t, "abc", testMatrix[0].Name)
-	require.Equal(t, "github.com/onflow/flow-go/abc github.com/onflow/flow-go/abc/def github.com/onflow/flow-go/abc/def/ghi",
-		testMatrix[0].Packages)
-
-	require.Equal(t, "ghi", testMatrix[1].Name)
-	require.Equal(t, "github.com/onflow/flow-go/ghi", testMatrix[1].Packages)
-
-	require.Equal(t, "others", testMatrix[2].Name)
-	require.Equal(t, "github.com/onflow/flow-go/def github.com/onflow/flow-go/def/abc github.com/onflow/flow-go/jkl github.com/onflow/flow-go/mno/abc github.com/onflow/flow-go/pqr github.com/onflow/flow-go/stu github.com/onflow/flow-go/vwx github.com/onflow/flow-go/vwx/ghi github.com/onflow/flow-go/yz",
-		testMatrix[2].Packages)
+	require.Contains(t, matrix, testMatrix{
+		Name:     "abc",
+		Packages: "github.com/onflow/flow-go/abc github.com/onflow/flow-go/abc/def github.com/onflow/flow-go/abc/def/ghi"},
+	)
+	require.Contains(t, matrix, testMatrix{
+		Name:     "ghi",
+		Packages: "github.com/onflow/flow-go/ghi"},
+	)
+	require.Contains(t, matrix, testMatrix{
+		Name:     "others",
+		Packages: "github.com/onflow/flow-go/def github.com/onflow/flow-go/def/abc github.com/onflow/flow-go/jkl github.com/onflow/flow-go/mno/abc github.com/onflow/flow-go/pqr github.com/onflow/flow-go/stu github.com/onflow/flow-go/vwx github.com/onflow/flow-go/vwx/ghi github.com/onflow/flow-go/yz"},
+	)
 }
