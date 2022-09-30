@@ -30,7 +30,7 @@ func NewSignaler() (*Signaler, <-chan error) {
 // errors as unhandled.
 func (s *Signaler) Throw(err error) {
 	defer runtime.Goexit()
-	if s.errThrown.CAS(false, true) {
+	if s.errThrown.CompareAndSwap(false, true) {
 		s.errChan <- err
 		close(s.errChan)
 	} else {

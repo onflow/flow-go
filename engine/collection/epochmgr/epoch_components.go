@@ -15,7 +15,7 @@ import (
 type EpochComponents struct {
 	*component.ComponentManager
 	state             cluster.State
-	prop              component.Component
+	comp              component.Component
 	sync              module.ReadyDoneAware
 	hotstuff          module.HotStuff
 	voteAggregator    hotstuff.VoteAggregator
@@ -26,7 +26,7 @@ var _ component.Component = (*EpochComponents)(nil)
 
 func NewEpochComponents(
 	state cluster.State,
-	prop component.Component,
+	comp component.Component,
 	sync module.ReadyDoneAware,
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
@@ -34,7 +34,7 @@ func NewEpochComponents(
 ) *EpochComponents {
 	components := &EpochComponents{
 		state:             state,
-		prop:              prop,
+		comp:              comp,
 		sync:              sync,
 		hotstuff:          hotstuff,
 		voteAggregator:    voteAggregator,
@@ -47,9 +47,9 @@ func NewEpochComponents(
 		// start vote and timeout aggregators, hotstuff will be started by compliance engine
 		voteAggregator.Start(ctx)
 		timeoutAggregator.Start(ctx)
-		prop.Start(ctx)
+		comp.Start(ctx)
 		// wait until all components start
-		<-util.AllReady(components.prop, components.sync, components.voteAggregator, components.timeoutAggregator)
+		<-util.AllReady(components.comp, components.sync, components.voteAggregator, components.timeoutAggregator)
 
 		// signal that startup has finished, and we are ready to go
 		ready()
@@ -57,20 +57,26 @@ func NewEpochComponents(
 		// wait for shutdown to be commenced
 		<-ctx.Done()
 		// wait for compliance engine and event loop to shut down
-		<-util.AllDone(components.prop, components.sync, components.voteAggregator, components.timeoutAggregator)
+		<-util.AllDone(components.comp, components.sync, components.voteAggregator, components.timeoutAggregator)
 	})
 	components.ComponentManager = builder.Build()
 
 	return components
 }
 
-type StartableEpochComponents struct {
+// RunningEpochComponents contains all consensus-related components for an epoch
+// and the cancel function to stop these components. All components must have been
+// started when the RunningEpochComponents is constructed.
+type RunningEpochComponents struct {
 	*EpochComponents
 	cancel context.CancelFunc // used to stop the epoch components
 }
 
-func NewStartableEpochComponents(components *EpochComponents, cancel context.CancelFunc) *StartableEpochComponents {
-	return &StartableEpochComponents{
+// NewRunningEpochComponents returns a new RunningEpochComponents container for the
+// given epoch components. The components must have already been started using some
+// context, which the provided cancel function cancels (stopping the epoch components).
+func NewRunningEpochComponents(components *EpochComponents, cancel context.CancelFunc) *RunningEpochComponents {
+	return &RunningEpochComponents{
 		EpochComponents: components,
 		cancel:          cancel,
 	}

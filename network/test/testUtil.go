@@ -11,18 +11,21 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/host"
-	p2pNetwork "github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	pc "github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	rcmgr "github.com/libp2p/go-libp2p-resource-manager"
+	"github.com/libp2p/go-libp2p/core/host"
+	p2pNetwork "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	pc "github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/core/routing"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -38,6 +41,12 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -51,7 +60,7 @@ type PeerTag struct {
 }
 
 type TagWatchingConnManager struct {
-	*p2p.ConnManager
+	*connection.ConnManager
 	observers map[observable.Observer]struct{}
 	obsLock   sync.RWMutex
 }
@@ -89,7 +98,7 @@ func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 }
 
 func NewTagWatchingConnManager(log zerolog.Logger, idProvider id.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
-	cm := p2p.NewConnManager(log, metrics)
+	cm := connection.NewConnManager(log, metrics)
 	return &TagWatchingConnManager{
 		ConnManager: cm,
 		observers:   make(map[observable.Observer]struct{}),
@@ -103,11 +112,11 @@ func GenerateIDs(
 	logger zerolog.Logger,
 	n int,
 	opts ...func(*optsConfig),
-) (flow.IdentityList, []*p2p.Node, []observable.Observable) {
-	libP2PNodes := make([]*p2p.Node, n)
+) (flow.IdentityList, []*p2pnode.Node, []observable.Observable) {
+	libP2PNodes := make([]*p2pnode.Node, n)
 	tagObservables := make([]observable.Observable, n)
 
-	o := &optsConfig{peerUpdateInterval: p2p.DefaultPeerUpdateInterval}
+	o := &optsConfig{peerUpdateInterval: connection.DefaultPeerUpdateInterval}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -145,12 +154,12 @@ func GenerateIDs(
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, codec network.Codec, consumer slashing.ViolationsConsumer, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2pnode.Node, codec network.Codec, consumer slashing.ViolationsConsumer, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
 
-	o := &optsConfig{peerUpdateInterval: p2p.DefaultPeerUpdateInterval}
+	o := &optsConfig{peerUpdateInterval: connection.DefaultPeerUpdateInterval}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -162,26 +171,26 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		nodeId := identities[i].NodeID
 
 		// libp2p node factory for this instance of middleware
-		factory := func(ctx context.Context) (*p2p.Node, error) {
+		factory := func(ctx context.Context) (*p2pnode.Node, error) {
 			return node, nil
 		}
 
 		idProviders[i] = NewUpdatableIDProvider(identities)
 
-		peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningEnabled, o.peerUpdateInterval)
+		peerManagerFactory := connection.PeerManagerFactory(connection.ConnectionPruningEnabled, o.peerUpdateInterval)
 
 		// creating middleware of nodes
-		mws[i] = p2p.NewMiddleware(logger,
+		mws[i] = middleware.NewMiddleware(logger,
 			factory,
 			nodeId,
 			metrics,
 			metrics,
 			sporkID,
-			p2p.DefaultUnicastTimeout,
-			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
+			middleware.DefaultUnicastTimeout,
+			translator.NewIdentityProviderIDTranslator(idProviders[i]),
 			codec,
 			consumer,
-			p2p.WithPeerManager(peerManagerFactory),
+			middleware.WithPeerManager(peerManagerFactory),
 		)
 	}
 	return mws, idProviders
@@ -314,12 +323,12 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	return engs
 }
 
-type nodeBuilderOption func(p2p.NodeBuilder)
+type nodeBuilderOption func(p2pbuilder.NodeBuilder)
 
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
-	return func(nb p2p.NodeBuilder) {
+	return func(nb p2pbuilder.NodeBuilder) {
 		nb.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2p.NewDHT(c, h,
+			return p2pdht.NewDHT(c, h,
 				pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix),
 				zerolog.Nop(),
 				metrics.NewNoopCollector(),
@@ -337,7 +346,7 @@ func generateLibP2PNode(
 	connGating bool,
 	idProvider id.IdentityProvider,
 	opts ...nodeBuilderOption,
-) (*p2p.Node, observable.Observable) {
+) (*p2pnode.Node, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
 
@@ -346,7 +355,7 @@ func generateLibP2PNode(
 	// Inject some logic to be able to observe connections of this node
 	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
 
-	builder := p2p.NewNodeBuilder(logger, "0.0.0.0:0", key, sporkID).
+	builder := p2pbuilder.NewNodeBuilder(logger, "0.0.0.0:0", key, sporkID).
 		SetConnectionManager(connManager).
 		SetPubSub(pubsub.NewGossipSub).
 		SetResourceManager(NewResourceManager(t))
@@ -382,7 +391,7 @@ func GenerateSubscriptionManagers(t *testing.T, mws []network.Middleware) []netw
 
 	sms := make([]network.SubscriptionManager, len(mws))
 	for i, mw := range mws {
-		sms[i] = p2p.NewChannelSubscriptionManager(mw)
+		sms[i] = subscription.NewChannelSubscriptionManager(mw)
 	}
 	return sms
 }

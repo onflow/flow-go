@@ -106,7 +106,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 		assert.Len(t, result.TrieUpdates, 1+1)    // +1 system chunk
@@ -142,7 +142,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create an empty block
 		block := generateBlock(0, 0, rag)
-		programs := programs.NewEmptyPrograms()
+		programs := programs.NewEmptyBlockPrograms()
 
 		vm.On("RunV2", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
@@ -188,7 +188,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		chain := flow.Localnet.Chain()
 		vm := fvm.NewVM()
-		progs := programs.NewEmptyPrograms()
+		progs := programs.NewEmptyBlockPrograms()
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
 			fvm.WithBlockPrograms(progs),
@@ -274,7 +274,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
-		programs := programs.NewEmptyPrograms()
+		programs := programs.NewEmptyBlockPrograms()
 
 		vm.On("RunV2", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) {
@@ -442,7 +442,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
 		require.NoError(t, err)
 
 		// all events should have been collected
@@ -526,7 +526,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -620,7 +620,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -769,8 +769,8 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return ledger.Get(owner, key)
 	})
-	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	txnState := state.NewTransactionState(view, state.DefaultParameters())
+	accounts := environment.NewAccounts(txnState)
 
 	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
 	// as freeze check should happen before a transaction signature is checked
@@ -800,7 +800,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	_, err = exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+	_, err = exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
 	assert.NoError(t, err)
 
 	registerTouches := view.Interactions().RegisterTouches()
@@ -866,7 +866,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	view := delta.NewView(ledger.Get)
 
-	result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+	result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
 	assert.NoError(t, err)
 	assert.Len(t, result.StateSnapshots, 1) // +1 system chunk
 	assert.Len(t, result.TransactionResults, 1)
