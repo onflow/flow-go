@@ -580,7 +580,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		// expected QC
 		onQCCreated := func(qc *flow.QuorumCertificate) {
 			// QC should be created only once
-			if !qcCreated.CAS(false, true) {
+			if !qcCreated.CompareAndSwap(false, true) {
 				t.Fatalf("QC created more than once")
 			}
 
@@ -833,7 +833,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 		// expected QC
 		onQCCreated := func(qc *flow.QuorumCertificate) {
 			// QC should be created only once
-			if !qcCreated.CAS(false, true) {
+			if !qcCreated.CompareAndSwap(false, true) {
 				t.Fatalf("QC created more than once")
 			}
 		}

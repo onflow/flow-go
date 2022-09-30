@@ -19,13 +19,13 @@ import (
 func getEnvironmentMeterParameters(
 	ctx Context,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.TransactionPrograms,
 	params meter.MeterParameters,
 ) (
 	meter.MeterParameters,
 	error,
 ) {
-	sth := state.NewStateTransaction(
+	sth := state.NewTransactionState(
 		view,
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).

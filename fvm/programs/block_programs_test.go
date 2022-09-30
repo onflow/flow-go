@@ -160,14 +160,14 @@ func TestTxnProgsValidateRejectOutdatedReadSet(t *testing.T) {
 	testTxn, err := block.NewTransactionPrograms(0, 2)
 	require.NoError(t, err)
 
-	loc := common.AddressLocation{
+	location := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
 		Name:    "address",
 	}
 	expectedProg := &interpreter.Program{}
 	expectedState := &state.State{}
 
-	testSetupTxn1.Set(loc, expectedProg, expectedState)
+	testSetupTxn1.Set(location, expectedProg, expectedState)
 
 	testSetupTxn1.AddInvalidator(testInvalidator{})
 
@@ -177,7 +177,7 @@ func TestTxnProgsValidateRejectOutdatedReadSet(t *testing.T) {
 	validateErr := testTxn.Validate()
 	require.NoError(t, validateErr)
 
-	actualProg, actualState, ok := testTxn.Get(loc)
+	actualProg, actualState, ok := testTxn.Get(location)
 	require.True(t, ok)
 	require.Same(t, expectedProg, actualProg)
 	require.Same(t, expectedState, actualState)
@@ -305,12 +305,12 @@ func TestTxnProgsCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
 	testTxn, err := block.NewTransactionPrograms(0, 0)
 	require.NoError(t, err)
 
-	loc := common.AddressLocation{
+	location := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
 		Name:    "address",
 	}
 
-	actualProg, actualState, ok := testTxn.Get(loc)
+	actualProg, actualState, ok := testTxn.Get(location)
 	require.False(t, ok)
 	require.Nil(t, actualProg)
 	require.Nil(t, actualState)
@@ -318,9 +318,9 @@ func TestTxnProgsCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
 	expectedProg := &interpreter.Program{}
 	expectedState := &state.State{}
 
-	testTxn.Set(loc, expectedProg, expectedState)
+	testTxn.Set(location, expectedProg, expectedState)
 
-	actualProg, actualState, ok = testTxn.Get(loc)
+	actualProg, actualState, ok = testTxn.Get(location)
 	require.True(t, ok)
 	require.Same(t, expectedProg, actualProg)
 	require.Same(t, expectedState, actualState)
@@ -342,10 +342,10 @@ func TestTxnProgsCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
 	entries := block.EntriesForTestingOnly()
 	require.Equal(t, 1, len(entries))
 
-	entry, ok := entries[loc.ID()]
+	entry, ok := entries[location]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Equal(t, loc, entry.Location)
+	require.Equal(t, location, entry.Location)
 	require.Same(t, expectedProg, entry.Program)
 	require.Same(t, expectedState, entry.State)
 }
@@ -357,12 +357,12 @@ func TestTxnProgsCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
 	testTxn, err := block.NewTransactionPrograms(0, testTxnTime)
 	require.NoError(t, err)
 
-	loc := common.AddressLocation{
+	location := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
 		Name:    "address",
 	}
 
-	actualProg, actualState, ok := testTxn.Get(loc)
+	actualProg, actualState, ok := testTxn.Get(location)
 	require.False(t, ok)
 	require.Nil(t, actualProg)
 	require.Nil(t, actualState)
@@ -370,9 +370,9 @@ func TestTxnProgsCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
 	expectedProg := &interpreter.Program{}
 	expectedState := &state.State{}
 
-	testTxn.Set(loc, expectedProg, expectedState)
+	testTxn.Set(location, expectedProg, expectedState)
 
-	actualProg, actualState, ok = testTxn.Get(loc)
+	actualProg, actualState, ok = testTxn.Get(location)
 	require.True(t, ok)
 	require.Same(t, expectedProg, actualProg)
 	require.Same(t, expectedState, actualState)
@@ -413,14 +413,14 @@ func TestTxnProgsCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
 	testTxn, err := block.NewTransactionPrograms(10, 12)
 	require.NoError(t, err)
 
-	loc := common.AddressLocation{
+	location := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
 		Name:    "address",
 	}
 	expectedProg := &interpreter.Program{}
 	expectedState := &state.State{}
 
-	testSetupTxn.Set(loc, expectedProg, expectedState)
+	testSetupTxn.Set(location, expectedProg, expectedState)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
@@ -428,13 +428,13 @@ func TestTxnProgsCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
 	entries := block.EntriesForTestingOnly()
 	require.Equal(t, 1, len(entries))
 
-	expectedEntry, ok := entries[loc.ID()]
+	expectedEntry, ok := entries[location]
 	require.True(t, ok)
 
 	otherProg := &interpreter.Program{}
 	otherState := &state.State{}
 
-	testTxn.Set(loc, otherProg, otherState)
+	testTxn.Set(location, otherProg, otherState)
 
 	err = testTxn.Commit()
 	require.NoError(t, err)
@@ -442,12 +442,12 @@ func TestTxnProgsCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
 	entries = block.EntriesForTestingOnly()
 	require.Equal(t, 1, len(entries))
 
-	actualEntry, ok := entries[loc.ID()]
+	actualEntry, ok := entries[location]
 	require.True(t, ok)
 
 	require.Same(t, expectedEntry, actualEntry)
 	require.False(t, actualEntry.isInvalid)
-	require.Equal(t, loc, actualEntry.Location)
+	require.Equal(t, location, actualEntry.Location)
 	require.Same(t, expectedProg, actualEntry.Program)
 	require.Same(t, expectedState, actualEntry.State)
 	require.NotSame(t, otherProg, actualEntry.Program)
@@ -520,14 +520,14 @@ func TestTxnProgsCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 	entries := block.EntriesForTestingOnly()
 	require.Equal(t, 2, len(entries))
 
-	entry, ok := entries[loc1.ID()]
+	entry, ok := entries[loc1]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
 	require.Equal(t, loc1, entry.Location)
 	require.Same(t, expectedProg1, entry.Program)
 	require.Same(t, expectedState1, entry.State)
 
-	entry, ok = entries[loc2.ID()]
+	entry, ok = entries[loc2]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
 	require.Equal(t, loc2, entry.Location)
@@ -634,18 +634,18 @@ func TestTxnProgsCommitNonAddressPrograms(t *testing.T) {
 	testTxn, err := block.NewTransactionPrograms(0, expectedTime)
 	require.NoError(t, err)
 
-	loc := common.IdentifierLocation("non-address")
+	location := common.IdentifierLocation("non-address")
 
-	actualProg, actualState, ok := testTxn.Get(loc)
+	actualProg, actualState, ok := testTxn.Get(location)
 	require.False(t, ok)
 	require.Nil(t, actualProg)
 	require.Nil(t, actualState)
 
 	expectedProg := &interpreter.Program{}
 
-	testTxn.Set(loc, expectedProg, nil)
+	testTxn.Set(location, expectedProg, nil)
 
-	actualProg, actualState, ok = testTxn.Get(loc)
+	actualProg, actualState, ok = testTxn.Get(location)
 	require.True(t, ok)
 	require.Same(t, expectedProg, actualProg)
 	require.Nil(t, actualState)
@@ -818,14 +818,14 @@ func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
 	entries := block.EntriesForTestingOnly()
 	require.Equal(t, 2, len(entries))
 
-	entry, ok := entries[readLoc2.ID()]
+	entry, ok := entries[readLoc2]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
 	require.Equal(t, readLoc2, entry.Location)
 	require.Same(t, readProg2, entry.Program)
 	require.Same(t, readState2, entry.State)
 
-	entry, ok = entries[writeLoc2.ID()]
+	entry, ok = entries[writeLoc2]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
 	require.Equal(t, writeLoc2, entry.Location)
@@ -854,14 +854,14 @@ func TestBlockProgsNewChildBlockPrograms(t *testing.T) {
 	txn, err = parentBlock.NewTransactionPrograms(1, 1)
 	require.NoError(t, err)
 
-	loc := common.AddressLocation{
+	location := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
 		Name:    "address",
 	}
 	prog := &interpreter.Program{}
 	state := &state.State{}
 
-	txn.Set(loc, prog, state)
+	txn.Set(location, prog, state)
 
 	err = txn.Commit()
 	require.NoError(t, err)
@@ -878,10 +878,10 @@ func TestBlockProgsNewChildBlockPrograms(t *testing.T) {
 	parentEntries := parentBlock.EntriesForTestingOnly()
 	require.Equal(t, 1, len(parentEntries))
 
-	parentEntry, ok := parentEntries[loc.ID()]
+	parentEntry, ok := parentEntries[location]
 	require.True(t, ok)
 	require.False(t, parentEntry.isInvalid)
-	require.Equal(t, loc, parentEntry.Location)
+	require.Equal(t, location, parentEntry.Location)
 	require.Same(t, prog, parentEntry.Program)
 	require.Same(t, state, parentEntry.State)
 
@@ -899,10 +899,10 @@ func TestBlockProgsNewChildBlockPrograms(t *testing.T) {
 	childEntries := childBlock.EntriesForTestingOnly()
 	require.Equal(t, 1, len(childEntries))
 
-	childEntry, ok := childEntries[loc.ID()]
+	childEntry, ok := childEntries[location]
 	require.True(t, ok)
 	require.False(t, childEntry.isInvalid)
-	require.Equal(t, loc, childEntry.Location)
+	require.Equal(t, location, childEntry.Location)
 	require.Same(t, prog, childEntry.Program)
 	require.Same(t, state, childEntry.State)
 
