@@ -100,7 +100,7 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	// 2 - check if we should attempt to vote after startup
 	err := e.checkShouldVoteOnStartup()
 	if err != nil {
-		ctx.Throw(err)
+		ctx.Throw(fmt.Errorf("could not vote on startup: %w", err))
 	}
 
 	// 3 - start epoch-scoped components
@@ -108,7 +108,7 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	epoch := e.state.Final().Epochs().Current()
 	counter, err := epoch.Counter()
 	if err != nil {
-		ctx.Throw(err)
+		ctx.Throw(fmt.Errorf("could not get epoch counter: %w", err))
 	}
 	components, err := e.createEpochComponents(epoch)
 	if err != nil {
@@ -117,12 +117,12 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 			e.log.Info().Msg("node is not authorized for current epoch - skipping initializing cluster consensus")
 			return
 		}
-		ctx.Throw(err)
+		ctx.Throw(fmt.Errorf("could not create epoch components: %w", err))
 	}
 	err = e.startEpochComponents(ctx, counter, components)
 	if err != nil {
 		// all failures to start epoch components are critical
-		ctx.Throw(err)
+		ctx.Throw(fmt.Errorf("could not start epoch components: %w", err))
 	}
 
 	// TODO if we are within the first 600 blocks of an epoch, we should resume the previous epoch's cluster consensus here https://github.com/dapperlabs/flow-go/issues/5659
