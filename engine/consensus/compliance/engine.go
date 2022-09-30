@@ -57,8 +57,7 @@ type Engine struct {
 	prov           consensus.ProposalProvider
 	core           *Core
 	// queues for inbound messsages
-	pendingBlocks         engine.MessageStore
-	pendingRangeResponses engine.MessageStore
+	pendingBlocks engine.MessageStore
 	// TODO remove pendingVotes and pendingTimeouts - we will pass these directly to the Aggregator
 	pendingVotes    engine.MessageStore
 	pendingTimeouts engine.MessageStore
@@ -83,19 +82,6 @@ func NewEngine(
 	prov consensus.ProposalProvider,
 	core *Core,
 ) (*Engine, error) {
-
-	// Inbound FIFO queue for `messages.BlockResponse`s
-	// TODO can be removed along with https://github.com/dapperlabs/flow-go/issues/6254
-	rangeResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultRangeResponseQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceBlockResponseQueue, uint(len)) }),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create queue for block-sync responses: %w", err)
-	}
-	pendingRangeResponses := &engine.FifoMessageStore{
-		FifoQueue: rangeResponseQueue,
-	}
 
 	// Inbound FIFO queue for `messages.BlockProposal`s
 	blocksQueue, err := fifoqueue.NewFifoQueue(
@@ -130,16 +116,6 @@ func NewEngine(
 	handler := engine.NewMessageHandler(
 		log.With().Str("compliance", "engine").Logger(),
 		engine.NewNotifier(),
-		engine.Pattern{
-			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.BlockResponse)
-				if ok {
-					core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockResponse)
-				}
-				return ok
-			},
-			Store: pendingRangeResponses,
-		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockProposal)
@@ -201,7 +177,6 @@ func NewEngine(
 		engineMetrics:              core.engineMetrics,
 		headers:                    core.headers,
 		payloads:                   core.payloads,
-		pendingRangeResponses:      pendingRangeResponses,
 		pendingBlocks:              pendingBlocks,
 		pendingVotes:               pendingVotes,
 		pendingTimeouts:            pendingTimeouts,
@@ -307,23 +282,7 @@ func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready co
 // symptoms of internal state corruption and should be fatal.
 func (e *Engine) processAvailableMessages() error {
 	for {
-		msg, ok := e.pendingRangeResponses.Get()
-		if ok {
-			blockResponse := msg.Payload.(*messages.BlockResponse)
-			for _, block := range blockResponse.Blocks {
-				// process each block and indicate it's from a range of blocks
-				err := e.core.OnBlockProposal(msg.OriginID, &messages.BlockProposal{
-					Header:  block.Header,
-					Payload: block.Payload,
-				})
-				if err != nil {
-					return fmt.Errorf("could not process synced block proposal: %w", err)
-				}
-			}
-			continue
-		}
-
-		msg, ok = e.pendingBlocks.Get()
+		msg, ok := e.pendingBlocks.Get()
 		if ok {
 			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal))
 			if err != nil {
