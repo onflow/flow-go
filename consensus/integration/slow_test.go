@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"github.com/onflow/flow-go/utils/unittest"
 	"sync"
 	"testing"
 	"time"
@@ -9,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestMessagesLost verifies if a node lost some messages, it's still able to catch up.

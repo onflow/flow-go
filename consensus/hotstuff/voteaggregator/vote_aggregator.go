@@ -62,7 +62,7 @@ func NewVoteAggregator(
 
 	queuedBlocks, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultBlockQueueCapacity))
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize votes queue")
+		return nil, fmt.Errorf("could not initialize blocks queue")
 	}
 
 	aggregator := &VoteAggregator{
@@ -81,7 +81,7 @@ func NewVoteAggregator(
 	componentBuilder := component.NewComponentManagerBuilder()
 	var wg sync.WaitGroup
 	wg.Add(defaultVoteAggregatorWorkers)
-	for i := 0; i < defaultVoteAggregatorWorkers; i++ { // manager for worker routines that process inbound votes
+	for i := 0; i < defaultVoteAggregatorWorkers; i++ { // manager for worker routines that process inbound messages
 		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			aggregator.queuedMessagesProcessingLoop(ctx)
