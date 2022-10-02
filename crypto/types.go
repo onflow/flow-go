@@ -17,17 +17,17 @@ type SigningAlgorithm int
 const (
 	// Supported signing algorithms
 	UnknownSigningAlgorithm SigningAlgorithm = iota
-	// BLSBLS12381 is BLS on BLS 12-381 curve
-	BLSBLS12381
 	// ECDSAP256 is ECDSA on NIST P-256 curve
 	ECDSAP256
 	// ECDSASecp256k1 is ECDSA on secp256k1 curve
 	ECDSASecp256k1
+	// BLSBLS12381 is BLS on BLS 12-381 curve
+	BLSBLS12381
 )
 
 // String returns the string representation of this signing algorithm.
 func (f SigningAlgorithm) String() string {
-	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_secp256k1"}[f]
+	return [...]string{"UNKNOWN", "ECDSA_P256", "ECDSA_secp256k1", "BLS_BLS12381"}[f]
 }
 
 const (
