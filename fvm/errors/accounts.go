@@ -1,7 +1,6 @@
 package errors
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -31,35 +30,22 @@ func NewAccountAlreadyExistsError(address flow.Address) *CodedError {
 		address)
 }
 
-// AccountPublicKeyNotFoundError is returned when a public key not found for the given address and key index
-type AccountPublicKeyNotFoundError struct {
-	address  flow.Address
-	keyIndex uint64
-}
-
-// NewAccountPublicKeyNotFoundError constructs a new AccountPublicKeyNotFoundError
-func NewAccountPublicKeyNotFoundError(address flow.Address, keyIndex uint64) AccountPublicKeyNotFoundError {
-	return AccountPublicKeyNotFoundError{address: address, keyIndex: keyIndex}
+// NewAccountPublicKeyNotFoundError constructs a new CodedError. It is returned
+// when a public key not found for the given address and key index.
+func NewAccountPublicKeyNotFoundError(
+	address flow.Address,
+	keyIndex uint64,
+) *CodedError {
+	return NewCodedError(
+		ErrCodeAccountPublicKeyNotFoundError,
+		"account public key not found for address %s and key index %d",
+		address,
+		keyIndex)
 }
 
 // IsAccountAccountPublicKeyNotFoundError returns true if error has this type
 func IsAccountAccountPublicKeyNotFoundError(err error) bool {
-	var t AccountPublicKeyNotFoundError
-	return errors.As(err, &t)
-}
-
-func (e AccountPublicKeyNotFoundError) Error() string {
-	return fmt.Sprintf(
-		"%s account public key not found for address %s and key index %d",
-		e.Code().String(),
-		e.address,
-		e.keyIndex,
-	)
-}
-
-// Code returns the error code for this error type
-func (e AccountPublicKeyNotFoundError) Code() ErrorCode {
-	return ErrCodeAccountPublicKeyNotFoundError
+	return HasErrorCode(err, ErrCodeAccountPublicKeyNotFoundError)
 }
 
 // FrozenAccountError is returned when a frozen account signs a transaction

@@ -30,11 +30,9 @@ func NewScriptEnv(
 	txnState *state.TransactionState,
 	programs environment.TransactionPrograms,
 ) environment.Environment {
-	return newFacadeEnvironment(
-		fvmContext,
+	return environment.NewScriptEnvironment(
+		reqContext,
+		fvmContext.EnvironmentParams,
 		txnState,
-		programs,
-		environment.NewTracer(fvmContext.TracerParams),
-		environment.NewCancellableMeter(reqContext, txnState),
-	)
+		programs)
 }

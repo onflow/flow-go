@@ -518,13 +518,13 @@ func getNodesAtLevel(root *node.Node, level uint) []*node.Node {
 }
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
-	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
-	return LoadCheckpoint(filepath, &c.wal.log)
+	filename := NumberToFilename(checkpoint)
+	return LoadCheckpoint(c.dir, filename, &c.wal.log)
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
-	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
-	return LoadCheckpoint(filepath, &c.wal.log)
+	filename := bootstrap.FilenameWALRootCheckpoint
+	return LoadCheckpoint(c.dir, filename, &c.wal.log)
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
@@ -541,7 +541,8 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
-func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func LoadCheckpoint(dir string, filename string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+	filepath := path.Join(dir, filename)
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
