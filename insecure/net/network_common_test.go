@@ -24,18 +24,22 @@ import (
 // TestEngineClosingChannel evaluates that corrupt network closes the channel whenever the corresponding
 // engine of that channel attempts on closing it.
 func TestEngineClosingChannel(t *testing.T) {
-	corruptNetwork, adapter := corruptNetworkFixture(t, unittest.Logger())
-	channel := channels.TestNetworkChannel
+	runCorruptNetworkTest(t, unittest.Logger(),
+		func(
+			corruptedId flow.Identity, // identity of ccf
+			corruptNetwork *Network,
+			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
+			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
+		) {
+			channel := channels.TestNetworkChannel
 
-	// on invoking adapter.UnRegisterChannel(channel), it must return a nil, which means
-	// that the channel has been unregistered by the adapter successfully.
-	adapter.On("UnRegisterChannel", channel).Return(nil).Once()
+			// on invoking adapter.UnRegisterChannel(channel), it must return a nil, which means
+			// that the channel has been unregistered by the adapter successfully.
+			adapter.On("UnRegisterChannel", channel).Return(nil).Once()
 
-	err := corruptNetwork.EngineClosingChannel(channel)
-	require.NoError(t, err)
-
-	// adapter's UnRegisterChannel method must be called once.
-	mock.AssertExpectationsForObjects(t, adapter)
+			err := corruptNetwork.EngineClosingChannel(channel)
+			require.NoError(t, err)
+		})
 }
 
 // TestProcessAttackerMessage_EmptyEgressIngressMessage checks that corrupt network returns an error

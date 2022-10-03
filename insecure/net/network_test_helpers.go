@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/rs/zerolog"
 
 	"google.golang.org/grpc"
@@ -17,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/module/irrecoverable"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
@@ -28,6 +29,8 @@ import (
 
 // corruptNetworkFixture creates a corruptible Network with a mock Adapter.
 // By default, no attacker is registered on this corruptible network.
+// This function is not meant to be used by tests directly because it expects the corrupt network to be properly started and stopped.
+// Otherwise, it will throw mock expectations errors.
 func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
 	// create corruptible network with no attacker registered
 	codec := unittest.NetworkCodec()
@@ -38,7 +41,7 @@ func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*
 		corruptedIdentity = corruptedID[0]
 	}
 
-	flowNetwork := &mocknetwork.Network{}
+	flowNetwork := mocknetwork.NewNetwork(t)
 	flowNetwork.On("Start", mock.Anything).Return()
 
 	// mock flow network will pretend to be ready when required
@@ -56,8 +59,9 @@ func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*
 	})
 	ccf := NewCorruptConduitFactory(logger, flow.BftTestnet)
 
-	// set up adapter, so we can check that it called the expected method
-	adapter := &mocknetwork.Adapter{}
+	// set up adapter, so we can check that it called the expected method.
+	// It will be checked automatically without having to remember to call mock.AssertExpectationsForObjects()
+	adapter := mocknetwork.NewAdapter(t)
 	err := ccf.RegisterAdapter(adapter)
 	require.NoError(t, err)
 

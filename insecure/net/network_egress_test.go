@@ -27,8 +27,8 @@ import (
 func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 	codec := unittest.NetworkCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
-	flowNetwork := &mocknetwork.Network{}
-	ccf := &mockinsecure.CorruptConduitFactory{}
+	flowNetwork := mocknetwork.NewNetwork(t)
+	ccf := mockinsecure.NewCorruptConduitFactory(t)
 	ccf.On("RegisterEgressController", mock.Anything).Return(nil)
 
 	corruptNetwork, err := NewCorruptNetwork(
@@ -84,69 +84,78 @@ func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork checks that outgoing unicast events to the corrupted network
 // are routed to the network adapter when no attacker is registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
-	corruptNetwork, adapter := corruptNetworkFixture(t, unittest.Logger())
+	runCorruptNetworkTest(t, unittest.Logger(),
+		func(
+			corruptedId flow.Identity, // identity of ccf
+			corruptNetwork *Network,
+			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
+			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
+		) {
+			msg := &message.TestMessage{Text: "this is a test msg"}
+			channel := channels.TestNetworkChannel
 
-	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := channels.TestNetworkChannel
+			targetId := unittest.IdentifierFixture()
 
-	targetId := unittest.IdentifierFixture()
+			adapter.On("UnicastOnChannel", channel, msg, targetId).Return(nil).Once()
 
-	adapter.On("UnicastOnChannel", channel, msg, targetId).Return(nil).Once()
-
-	// simulate sending message by conduit
-	err := corruptNetwork.HandleOutgoingEvent(msg, channel, insecure.Protocol_UNICAST, uint32(0), targetId)
-	require.NoError(t, err)
-
-	// check that correct Adapter method called
-	mock.AssertExpectationsForObjects(t, adapter)
+			// simulate sending message by conduit
+			err := corruptNetwork.HandleOutgoingEvent(msg, channel, insecure.Protocol_UNICAST, uint32(0), targetId)
+			require.NoError(t, err)
+		})
 }
 
 // TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork checks that the outgoing publish events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
-	corruptNetwork, adapter := corruptNetworkFixture(t, unittest.Logger())
+	runCorruptNetworkTest(t, unittest.Logger(),
+		func(
+			corruptedId flow.Identity, // identity of ccf
+			corruptNetwork *Network,
+			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
+			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
+		) {
+			msg := &message.TestMessage{Text: "this is a test msg"}
+			channel := channels.TestNetworkChannel
 
-	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := channels.TestNetworkChannel
+			targetIds := unittest.IdentifierListFixture(10)
+			params := []interface{}{channel, msg}
+			for _, id := range targetIds {
+				params = append(params, id)
+			}
 
-	targetIds := unittest.IdentifierListFixture(10)
-	params := []interface{}{channel, msg}
-	for _, id := range targetIds {
-		params = append(params, id)
-	}
+			adapter.On("PublishOnChannel", params...).Return(nil).Once()
 
-	adapter.On("PublishOnChannel", params...).Return(nil).Once()
-
-	// simulate sending message by conduit
-	err := corruptNetwork.HandleOutgoingEvent(msg, channel, insecure.Protocol_PUBLISH, uint32(0), targetIds...)
-	require.NoError(t, err)
-
-	// check that correct Adapter method called
-	mock.AssertExpectationsForObjects(t, adapter)
+			// simulate sending message by conduit
+			err := corruptNetwork.HandleOutgoingEvent(msg, channel, insecure.Protocol_PUBLISH, uint32(0), targetIds...)
+			require.NoError(t, err)
+		})
 }
 
 // TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork checks that the outgoing multicast events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
-	corruptNetwork, adapter := corruptNetworkFixture(t, unittest.Logger())
+	runCorruptNetworkTest(t, unittest.Logger(),
+		func(
+			corruptedId flow.Identity, // identity of ccf
+			corruptNetwork *Network,
+			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
+			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
+		) {
+			msg := &message.TestMessage{Text: "this is a test msg"}
+			channel := channels.TestNetworkChannel
 
-	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := channels.TestNetworkChannel
+			targetIds := unittest.IdentifierListFixture(10)
 
-	targetIds := unittest.IdentifierListFixture(10)
+			params := []interface{}{channel, msg, uint(3)}
+			for _, id := range targetIds {
+				params = append(params, id)
+			}
+			adapter.On("MulticastOnChannel", params...).Return(nil).Once()
 
-	params := []interface{}{channel, msg, uint(3)}
-	for _, id := range targetIds {
-		params = append(params, id)
-	}
-	adapter.On("MulticastOnChannel", params...).Return(nil).Once()
-
-	// simulate sending message by conduit
-	err := corruptNetwork.HandleOutgoingEvent(msg, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
-	require.NoError(t, err)
-
-	// check that correct Adapter method called
-	mock.AssertExpectationsForObjects(t, adapter)
+			// simulate sending message by conduit
+			err := corruptNetwork.HandleOutgoingEvent(msg, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
+			require.NoError(t, err)
+		})
 }
 
 // TestProcessAttackerMessage checks that a corrupted network relays the messages to its underlying flow network.

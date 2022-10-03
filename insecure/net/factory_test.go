@@ -30,7 +30,7 @@ func TestNewConduit_HappyPath(t *testing.T) {
 // TestRegisterAdapter_FailDoubleRegistration checks that CorruptibleConduitFactory can be registered with only one adapter.
 func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
 	ccf := NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
-	adapter := &mocknetwork.Adapter{}
+	adapter := mocknetwork.NewAdapter(t)
 
 	// registering adapter should be successful
 	require.NoError(t, ccf.RegisterAdapter(adapter))
