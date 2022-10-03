@@ -21,7 +21,6 @@ import (
 //	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
 func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
-
 	headerPath := filePathCheckpointHeader(dir, fileName)
 	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath)
 	if err != nil {

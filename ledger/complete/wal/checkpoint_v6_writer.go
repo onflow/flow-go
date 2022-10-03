@@ -43,7 +43,7 @@ type resultStoringSubTrie struct {
 func StoreCheckpointV6(
 	tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
 	if len(tries) == 0 {
-		logger.Info().Msgf("no tries to be checkpointed")
+		logger.Info().Msg("no tries to be checkpointed")
 		return nil
 	}
 
@@ -243,11 +243,15 @@ func createSubTrieRoots(tries []*trie.MTrie) [subtrieCount][]*node.Node {
 	return subtrieRoots
 }
 
+// estimateSubtrieNodeCount takes a list of tries, and estimate the average number of registers
+// in each subtrie.
 func estimateSubtrieNodeCount(tries []*trie.MTrie) int {
 	if len(tries) == 0 {
 		return 0
 	}
-	estimatedTrieNodeCount := 2*int(tries[0].AllocatedRegCount()) - 1
+	// take the last trie and use the allocatedRegCount from there considering its
+	// most likely have more registers than the trie with 0 index.
+	estimatedTrieNodeCount := 2*int(tries[len(tries)-1].AllocatedRegCount()) - 1
 	return estimatedTrieNodeCount / subtrieCount
 }
 

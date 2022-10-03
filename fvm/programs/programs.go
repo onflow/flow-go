@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
-// TODO(patrick): rm
+// TODO(patrick): Remove after emulator is updated.
 type Programs struct {
 	lock sync.RWMutex
 

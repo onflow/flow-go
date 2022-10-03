@@ -10,35 +10,46 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-type Tracer struct {
+type TracerParams struct {
 	module.Tracer
+	ExtensiveTracing bool
 
-	rootSpan         otelTrace.Span
-	extensiveTracing bool
+	RootSpan otelTrace.Span
 }
 
-func NewTracer(
-	tracer module.Tracer,
-	root otelTrace.Span,
-	extensiveTracing bool) *Tracer {
-	return &Tracer{tracer, root, extensiveTracing}
+func DefaultTracerParams() TracerParams {
+	// NOTE: RootSpan is set by NewTransactionEnv rather by Context
+	return TracerParams{
+		Tracer:           nil,
+		ExtensiveTracing: false,
+	}
+}
+
+type Tracer struct {
+	TracerParams
+}
+
+func NewTracer(params TracerParams) *Tracer {
+	return &Tracer{params}
 }
 
 func (tracer *Tracer) isTraceable() bool {
-	return tracer.Tracer != nil && tracer.rootSpan != nil
+	return tracer.Tracer != nil && tracer.RootSpan != nil
 }
 
 func (tracer *Tracer) StartSpanFromRoot(name trace.SpanName) otelTrace.Span {
 	if tracer.isTraceable() {
-		return tracer.Tracer.StartSpanFromParent(tracer.rootSpan, name)
+		return tracer.Tracer.StartSpanFromParent(tracer.RootSpan, name)
 	}
 
 	return trace.NoopSpan
 }
 
-func (tracer *Tracer) StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span {
-	if tracer.isTraceable() && tracer.extensiveTracing {
-		return tracer.Tracer.StartSpanFromParent(tracer.rootSpan, name)
+func (tracer *Tracer) StartExtensiveTracingSpanFromRoot(
+	name trace.SpanName,
+) otelTrace.Span {
+	if tracer.isTraceable() && tracer.ExtensiveTracing {
+		return tracer.Tracer.StartSpanFromParent(tracer.RootSpan, name)
 	}
 
 	return trace.NoopSpan
@@ -52,5 +63,9 @@ func (tracer *Tracer) RecordSpanFromRoot(
 	if !tracer.isTraceable() {
 		return
 	}
-	tracer.Tracer.RecordSpanFromParent(tracer.rootSpan, spanName, duration, attrs)
+	tracer.Tracer.RecordSpanFromParent(
+		tracer.RootSpan,
+		spanName,
+		duration,
+		attrs)
 }

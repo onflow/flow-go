@@ -3,7 +3,6 @@ package fvm
 import (
 	"math"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -16,9 +15,6 @@ import (
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Blocks  environment.Blocks
-	Metrics environment.MetricsReporter
-	Tracer  module.Tracer
 	// DisableMemoryAndInteractionLimits will override memory and interaction
 	// limits and set them to MaxUint64, effectively disabling these limits.
 	DisableMemoryAndInteractionLimits bool
@@ -27,19 +23,13 @@ type Context struct {
 	MaxStateKeySize                   uint64
 	MaxStateValueSize                 uint64
 	MaxStateInteractionSize           uint64
-	BlockHeader                       *flow.Header
-	// NOTE: The ServiceAccountEnabled option is used by the playground
-	// https://github.com/onflow/flow-playground-api/blob/1ad967055f31db8f1ce88e008960e5fc14a9fbd1/compute/computer.go#L76
-	ServiceAccountEnabled      bool
-	CadenceLoggingEnabled      bool
-	ExtensiveTracing           bool
-	TransactionProcessors      []TransactionProcessor
-	ScriptProcessors           []ScriptProcessor
-	Logger                     zerolog.Logger
-	ReusableCadenceRuntimePool reusableRuntime.ReusableCadenceRuntimePool
-	BlockPrograms              *programs.Programs
 
-	EnvironmentParams
+	TransactionProcessors []TransactionProcessor
+	ScriptProcessors      []ScriptProcessor
+
+	BlockPrograms *programs.BlockPrograms
+
+	environment.EnvironmentParams
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -69,19 +59,12 @@ const (
 
 func defaultContext() Context {
 	return Context{
-		Blocks:                            nil,
-		Metrics:                           environment.NoopMetricsReporter{},
-		Tracer:                            nil,
 		DisableMemoryAndInteractionLimits: false,
 		ComputationLimit:                  DefaultComputationLimit,
 		MemoryLimit:                       DefaultMemoryLimit,
 		MaxStateKeySize:                   state.DefaultMaxKeySize,
 		MaxStateValueSize:                 state.DefaultMaxValueSize,
 		MaxStateInteractionSize:           state.DefaultMaxInteractionSize,
-		BlockHeader:                       nil,
-		ServiceAccountEnabled:             true,
-		CadenceLoggingEnabled:             false,
-		ExtensiveTracing:                  false,
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
@@ -90,11 +73,7 @@ func defaultContext() Context {
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvoker(),
 		},
-		Logger: zerolog.Nop(),
-		ReusableCadenceRuntimePool: reusableRuntime.NewReusableCadenceRuntimePool(
-			0,
-			runtime.Config{}),
-		EnvironmentParams: DefaultEnvironmentParams(),
+		EnvironmentParams: environment.DefaultEnvironmentParams(),
 	}
 }
 
@@ -228,7 +207,7 @@ func WithBlocks(blocks environment.Blocks) Option {
 func WithMetricsReporter(mr environment.MetricsReporter) Option {
 	return func(ctx Context) Context {
 		if mr != nil {
-			ctx.Metrics = mr
+			ctx.MetricsReporter = mr
 		}
 		return ctx
 	}
@@ -325,7 +304,7 @@ func WithReusableCadenceRuntimePool(
 
 // WithBlockPrograms sets the programs cache storage to be used by the
 // transaction/script.
-func WithBlockPrograms(programs *programs.Programs) Option {
+func WithBlockPrograms(programs *programs.BlockPrograms) Option {
 	return func(ctx Context) Context {
 		ctx.BlockPrograms = programs
 		return ctx

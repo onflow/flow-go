@@ -163,7 +163,7 @@ func TestKeyListSignature(t *testing.T) {
 					chain flow.Chain,
 					ctx fvm.Context,
 					view state.View,
-					programs *programs.Programs,
+					programs *programs.BlockPrograms,
 				) {
 					privateKey, publicKey := createKey()
 					signableMessage, message := createMessage("foo")
@@ -260,7 +260,7 @@ func TestKeyListSignature(t *testing.T) {
 					chain flow.Chain,
 					ctx fvm.Context,
 					view state.View,
-					programs *programs.Programs,
+					programs *programs.BlockPrograms,
 				) {
 					privateKeyA, publicKeyA := createKey()
 					privateKeyB, publicKeyB := createKey()
@@ -397,7 +397,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
-				programs *programs.Programs,
+				programs *programs.BlockPrograms,
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
@@ -508,7 +508,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
-				programs *programs.Programs,
+				programs *programs.BlockPrograms,
 			) {
 
 				code := []byte(
@@ -632,7 +632,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
-				programs *programs.Programs,
+				programs *programs.BlockPrograms,
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
@@ -756,7 +756,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
-				programs *programs.Programs,
+				programs *programs.BlockPrograms,
 			) {
 
 				message, cadenceMessage := createMessage("random_message")
