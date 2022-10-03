@@ -53,11 +53,10 @@ func StoreCheckpointV6(
 
 	subtrieRoots := createSubTrieRoots(tries)
 
-	estimatedSubtrieNodeCount := estimateSubtrieNodeCount(tries)
-
 	subTrieRootIndices, subTriesNodeCount, subTrieChecksums, err := storeSubTrieConcurrently(
 		subtrieRoots,
-		estimatedSubtrieNodeCount,
+		estimateSubtrieNodeCount(tries),
+		subTrieRootAndTopLevelTrieCount(tries),
 		outputDir,
 		outputFile,
 		logger,
@@ -226,9 +225,20 @@ func estimateSubtrieNodeCount(tries []*trie.MTrie) int {
 	return estimatedTrieNodeCount / subtrieCount
 }
 
+// subTrieRootAndTopLevelTrieCount return the total number of subtrie root nodes
+// and top level trie nodes for given number of tries
+// it is used for preallocating memory for the map that holds all unique nodes in
+// all sub trie roots and top level trie nodoes.
+// the top level trie nodes has nearly same number of nodes as subtrie node count at subtrieLevel
+// that's it needs to * 2.
+func subTrieRootAndTopLevelTrieCount(tries []*trie.MTrie) int {
+	return len(tries) * subtrieCount * 2
+}
+
 func storeSubTrieConcurrently(
 	subtrieRoots [subtrieCount][]*node.Node,
-	estimatedSubtrieNodeCount int,
+	estimatedSubtrieNodeCount int, // useful for preallocating memory for building unique node map when processing sub tries
+	subAndTopNodeCount int, // useful for preallocating memory for the node indices map to be returned
 	outputDir string,
 	outputFile string,
 	logger *zerolog.Logger,
@@ -260,7 +270,7 @@ func storeSubTrieConcurrently(
 
 	logger.Info().Msgf("subtrie roots have been stored")
 
-	results := make(map[*node.Node]uint64, 1<<(subtrieLevel+1))
+	results := make(map[*node.Node]uint64, subAndTopNodeCount)
 	results[nil] = 0
 	nodeCounter := uint64(0)
 	checksums := make([]uint32, 0, len(results))
@@ -361,7 +371,7 @@ func storeCheckpointSubTrie(
 	// from root to subtrie root and their index
 	// (ordered by node traversal sequence).
 	// Index 0 is a special case with nil node.
-	subtrieRootNodes := make(map[*node.Node]uint64, 1<<(subtrieLevel+1))
+	subtrieRootNodes := make(map[*node.Node]uint64, subtrieCount)
 	subtrieRootNodes[nil] = 0
 
 	// nodeCounter is counter for all unique nodes.
