@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/onflow/flow-go/cmd"
-	cnet "github.com/onflow/flow-go/insecure/net"
+	corruptnet "github.com/onflow/flow-go/insecure/net"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -48,7 +48,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		}
 
 		address := net.JoinHostPort(host, strconv.Itoa(CorruptNetworkPort))
-		ccf := cnet.NewCorruptConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
+		ccf := corruptnet.NewCorruptConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
 
 		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupted conduit factory initiated")
 
@@ -59,7 +59,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 
 		// initializes corruptible network that acts as a wrapper around the original flow network of the node, hence
 		// allowing a remote attacker to control the ingress and egress traffic of the node.
-		corruptibleNetwork, err := cnet.NewCorruptNetwork(
+		corruptibleNetwork, err := corruptnet.NewCorruptNetwork(
 			cnb.Logger,
 			cnb.RootChainID,
 			address,
