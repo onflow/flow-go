@@ -81,7 +81,7 @@ func TestHandleIncomingEvent_AttackerRegistered(t *testing.T) {
 // TestHandleIncomingEvent_NoAttacker checks that incoming events to the corrupted network
 // are routed to the network adapter when no attacker is registered to the network.
 func TestHandleIncomingEvent_NoAttacker(t *testing.T) {
-	corruptNetwork, adapter := corruptNetworkFixture(t, unittest.Logger())
+	corruptNetwork, _ := corruptNetworkFixture(t, unittest.Logger())
 
 	originId := unittest.IdentifierFixture()
 	msg := &message.TestMessage{Text: "this is a test msg"}
@@ -90,7 +90,4 @@ func TestHandleIncomingEvent_NoAttacker(t *testing.T) {
 	// simulate sending message by conduit
 	isAttackerRegistered := corruptNetwork.HandleIncomingEvent(msg, channel, originId)
 	require.False(t, isAttackerRegistered, "attacker should not be registered")
-
-	// check that correct Adapter method called
-	mock.AssertExpectationsForObjects(t, adapter)
 }
