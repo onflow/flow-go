@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
+	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -37,13 +38,17 @@ type MessageHub struct {
 	headers                storage.Headers
 	payloads               storage.Payloads
 	con                    network.Conduit
-	compliance             network.MessageProcessor
-	prov                   consensus.ProposalProvider
-	hotstuff               module.HotStuff
 	queuedMessagesNotifier engine.Notifier
 	queuedVotes            *fifoqueue.FifoQueue
 	queuedProposals        *fifoqueue.FifoQueue
 	queuedTimeouts         *fifoqueue.FifoQueue
+
+	// injected dependencies
+	compliance        network.MessageProcessor
+	prov              consensus.ProposalProvider
+	hotstuff          module.HotStuff
+	voteAggregator    hotstuff.VoteAggregator
+	timeoutAggregator hotstuff.TimeoutAggregator
 }
 
 var _ network.MessageProcessor = (*MessageHub)(nil)
@@ -373,6 +378,30 @@ func (h *MessageHub) BroadcastProposalWithDelay(proposal *flow.Header, delay tim
 }
 
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
-	// TODO(active-pacemaker): update MessageHub to actually process events and pass them to VoteAggregator, TimeoutAggregator, ComplianceEngine
-	return h.compliance.Process(channel, originID, message)
+	switch msg := message.(type) {
+	case *events.SyncedBlock:
+		return h.compliance.Process(channel, originID, message)
+	case *messages.BlockProposal:
+		return h.compliance.Process(channel, originID, message)
+	case *messages.BlockVote:
+		v := &model.Vote{
+			View:     msg.View,
+			BlockID:  msg.BlockID,
+			SignerID: originID,
+			SigData:  msg.SigData,
+		}
+		h.voteAggregator.AddVote(v)
+	case *messages.TimeoutObject:
+		t := &model.TimeoutObject{
+			View:       msg.View,
+			NewestQC:   msg.NewestQC,
+			LastViewTC: msg.LastViewTC,
+			SignerID:   originID,
+			SigData:    msg.SigData,
+		}
+		h.timeoutAggregator.AddTimeout(t)
+	default:
+		h.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
+	}
+	return nil
 }
