@@ -39,7 +39,6 @@ type EventHandler struct {
 	blockProducer     hotstuff.BlockProducer
 	forks             hotstuff.Forks
 	persist           hotstuff.Persister
-	communicator      hotstuff.Communicator
 	committee         hotstuff.Replicas
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
@@ -56,7 +55,6 @@ func NewEventHandler(
 	blockProducer hotstuff.BlockProducer,
 	forks hotstuff.Forks,
 	persist hotstuff.Persister,
-	communicator hotstuff.Communicator,
 	committee hotstuff.Replicas,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
@@ -69,7 +67,6 @@ func NewEventHandler(
 		blockProducer:     blockProducer,
 		forks:             forks,
 		persist:           persist,
-		communicator:      communicator,
 		safetyRules:       safetyRules,
 		committee:         committee,
 		voteAggregator:    voteAggregator,
@@ -301,11 +298,8 @@ func (e *EventHandler) broadcastTimeoutObjectIfAuthorized() error {
 	// contribute produced timeout to TC aggregation logic
 	e.timeoutAggregator.AddTimeout(timeout)
 
-	// broadcast timeout to participants
-	err = e.communicator.BroadcastTimeout(timeout)
-	if err != nil {
-		log.Warn().Err(err).Msg("failed to broadcast TimeoutObject")
-	}
+	// raise a notification to broadcast timeout
+	e.notifier.BroadcastTimeout(timeout)
 	log.Debug().Msg("broadcast TimeoutObject done")
 
 	return nil
@@ -451,11 +445,8 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	} else {
 		delay = delay - elapsed
 	}
-	err = e.communicator.BroadcastProposalWithDelay(header, delay)
-	if err != nil {
-		log.Warn().Err(err).Msg("could not forward proposal")
-	}
-
+	// raise a notification to broadcast proposal
+	e.notifier.BroadcastProposalWithDelay(header, delay)
 	return nil
 }
 
@@ -536,10 +527,8 @@ func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLea
 		e.voteAggregator.AddVote(ownVote)
 	} else {
 		log.Debug().Msg("forwarding vote to compliance engine")
-		err = e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
-		if err != nil {
-			log.Warn().Err(err).Msg("could not forward vote")
-		}
+		// raise a notification to send vote
+		e.notifier.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
 	}
 	return nil
 }
