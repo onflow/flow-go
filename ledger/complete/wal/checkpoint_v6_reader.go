@@ -88,8 +88,7 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 		return nil, fmt.Errorf("expect subtrieChecksums to be %v, but got %v", 16, len(subtrieChecksums))
 	}
 
-        numOfSubTries := len(subtrieChecksums)
-	resultChs := make([]chan *resultReadSubTrie, 0, numOfSubTries)
+	resultChs := make([]chan *resultReadSubTrie, 0, len(subtrieChecksums))
 	for i := 0; i < 16; i++ {
 		resultCh := make(chan *resultReadSubTrie)
 		go func(i int) {
@@ -182,7 +181,7 @@ func readSubTriesNodeCount(f *os.File) (uint64, error) {
 		return 0, fmt.Errorf("cannot seek to footer: %w", err)
 	}
 
-	footer := make([]byte, footerSize) 
+	footer := make([]byte, footerSize)
 	_, err = io.ReadFull(f, footer)
 	if err != nil {
 		return 0, fmt.Errorf("could not read footer: %w", err)
