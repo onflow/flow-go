@@ -3,6 +3,7 @@ package hotstuff
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"time"
 )
 
 // FinalizationConsumer consumes outbound notifications produced by the finalization logic.
@@ -49,6 +50,7 @@ type FinalizationConsumer interface {
 //   - handle repetition of the same events (with some processing overhead).
 type Consumer interface {
 	FinalizationConsumer
+	CommunicatorConsumer
 
 	// OnEventProcessed notifications are produced by the EventHandler when it is done processing
 	// and hands control back to the EventLoop to wait for the next event.
@@ -233,4 +235,32 @@ type TimeoutCollectorConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnNewTcDiscovered(certificate *flow.TimeoutCertificate)
+}
+
+// CommunicatorConsumer consumes outbound notifications produced by HotStuff and it's components.
+// Notifications allow the HotStuff core algorithm to communicate with the other actors of the consensus process.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
+type CommunicatorConsumer interface {
+	// SendVote notifies about intent to send a vote for the given parameters to the specified recipient.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier)
+
+	// BroadcastTimeout notifies about intent to broadcast the given timeout object(TO) to all actors of the consensus process.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	BroadcastTimeout(timeout *model.TimeoutObject)
+
+	// BroadcastProposalWithDelay notifies about intent to broadcast the given block proposal to all actors of
+	// the consensus process.
+	// delay is to hold the proposal before broadcasting it. Useful to control the block production rate.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) error
 }
