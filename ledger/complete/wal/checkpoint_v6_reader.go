@@ -51,12 +51,12 @@ func filePathSubTries(dir string, fileName string, index int) (string, string, e
 	if index < 0 || index > 15 {
 		return "", "", fmt.Errorf("index must be between 1 to 16, but got %v", index)
 	}
-	subTrieFileName := fmt.Sprintf("%v.%v", fileName, index)
+	subTrieFileName := fmt.Sprintf("%s.%03d", fileName, index)
 	return path.Join(dir, subTrieFileName), subTrieFileName, nil
 }
 
 func filePathTopTries(dir string, fileName string) (string, string) {
-	topTriesFileName := fmt.Sprintf("%v.%v", fileName, 16)
+	topTriesFileName := fmt.Sprintf("%s.%03d", fileName, 16)
 	return path.Join(dir, topTriesFileName), fileName
 }
 
@@ -88,7 +88,8 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 		return nil, fmt.Errorf("expect subtrieChecksums to be %v, but got %v", 16, len(subtrieChecksums))
 	}
 
-	resultChs := make([]chan *resultReadSubTrie, 0, 16)
+        numOfSubTries := len(subtrieChecksums)
+	resultChs := make([]chan *resultReadSubTrie, 0, numOfSubTries)
 	for i := 0; i < 16; i++ {
 		resultCh := make(chan *resultReadSubTrie)
 		go func(i int) {
@@ -102,7 +103,7 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 		resultChs = append(resultChs, resultCh)
 	}
 
-	nodesGroups := make([][]*node.Node, 0)
+	nodesGroups := make([][]*node.Node, 0, len(resultChs))
 	for i, resultCh := range resultChs {
 		result := <-resultCh
 		if result.Err != nil {
@@ -152,7 +153,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	for i := uint64(1); i <= nodesCount; i++ {
 		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
-			if nodeIndex >= uint64(i) {
+			if nodeIndex >= i {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}
 			return nodes[nodeIndex], nil
@@ -181,7 +182,7 @@ func readSubTriesNodeCount(f *os.File) (uint64, error) {
 		return 0, fmt.Errorf("cannot seek to footer: %w", err)
 	}
 
-	footer := make([]byte, footerSize) // must not be less than 1024
+	footer := make([]byte, footerSize) 
 	_, err = io.ReadFull(f, footer)
 	if err != nil {
 		return 0, fmt.Errorf("could not read footer: %w", err)

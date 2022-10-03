@@ -55,7 +55,7 @@ const VersionV6 uint16 = 0x06
 
 // MaxVersion is the latest checkpoint version we support.
 // Need to update MaxVersion when creating a newer version.
-const MaxVersion = VersionV5
+const MaxVersion = VersionV6
 
 const (
 	encMagicSize     = 2
@@ -491,7 +491,7 @@ func logProgress(msg string, estimatedSubtrieNodeCount int, logger *zerolog.Logg
 		lookup[estimatedSubtrieNodeCount/10*i] = i * 10
 	}
 	return func(nodeCounter uint64) {
-		percentage, ok := reportProgress(int(nodeCounter), lookup)
+		percentage, ok := lookup[(int(nodeCounter)]
 		if ok {
 			logger.Info().Msgf("%s completion percentage: %v percent", msg, percentage)
 		}
