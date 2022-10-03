@@ -118,8 +118,9 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 		return nil, fmt.Errorf("expect subtrieChecksums to be %v, but got %v", 16, len(subtrieChecksums))
 	}
 
-	resultChs := make([]chan *resultReadSubTrie, 0, len(subtrieChecksums))
-	for i := 0; i < 16; i++ {
+	numOfSubTries := len(subtrieChecksums)
+	resultChs := make([]chan *resultReadSubTrie, 0, numOfSubTries)
+	for i := 0; i < numOfSubTries; i++ {
 		resultCh := make(chan *resultReadSubTrie)
 		go func(i int) {
 			nodes, err := readCheckpointSubTrie(dir, fileName, i, subtrieChecksums[i])
