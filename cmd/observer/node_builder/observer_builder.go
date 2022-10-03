@@ -51,6 +51,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
+	edreader "github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	consensus_follower "github.com/onflow/flow-go/module/upstream"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
@@ -166,6 +167,7 @@ type ObserverServiceBuilder struct {
 	Pending                 []*flow.Header
 	FollowerCore            module.HotStuffFollower
 	ExecutionDataDownloader execution_data.Downloader
+	ExecutionDataReader     edreader.ExecutionDataReader
 	ExecutionDataRequester  state_synchronization.ExecutionDataRequester // for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -525,6 +527,21 @@ func (builder *ObserverServiceBuilder) BuildExecutionDataRequester() *ObserverSe
 			return builder.ExecutionDataRequester, nil
 		})
 
+	return builder
+}
+
+func (builder *ObserverServiceBuilder) BuildExecutionDataReader() *ObserverServiceBuilder {
+	builder.Component("execution data reader", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		builder.ExecutionDataReader = edreader.NewExecutionDataReader(
+			builder.ExecutionDataDownloader,
+			builder.Storage.Headers,
+			builder.Storage.Results,
+			builder.Storage.Seals,
+			edrequester.DefaultFetchTimeout,
+			builder.ExecutionDataRequester.GetLastProcessedIndex,
+		)
+		return builder.ExecutionDataRequester, nil
+	})
 	return builder
 }
 
@@ -906,6 +923,7 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 	builder.BuildConsensusFollower()
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionDataRequester()
+		builder.BuildExecutionDataReader()
 	}
 	return builder.FlowNodeBuilder.Build()
 }
@@ -979,6 +997,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.rpcMetricsEnabled,
 			builder.apiRatelimits,
 			builder.apiBurstlimits,
+			builder.ExecutionDataReader,
 		)
 		if err != nil {
 			return nil, err

@@ -126,7 +126,7 @@ type executionDataRequester struct {
 	results storage.ExecutionResults
 	seals   storage.Seals
 
-	executionDataReader *jobs.ExecutionDataReader
+	executionDataReader *jobs.ExecutionDataReaderImpl
 
 	// Notifiers for queue consumers
 	finalizationNotifier engine.Notifier
@@ -262,6 +262,10 @@ func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_sync
 	defer e.consumerMu.Unlock()
 
 	e.consumers = append(e.consumers, fn)
+}
+
+func (e *executionDataRequester) GetLastProcessedIndex() uint64 {
+	return e.blockConsumer.LastProcessedIndex()
 }
 
 // runBlockConsumer runs the blockConsumer component

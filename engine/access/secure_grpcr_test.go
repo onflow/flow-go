@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	exedatareadermock "github.com/onflow/flow-go/module/state_synchronization/requester/jobs/mock"
 	"github.com/onflow/flow-go/network"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -44,6 +45,7 @@ type SecureGRPCTestSuite struct {
 	metrics    *metrics.NoopCollector
 	rpcEng     *rpc.Engine
 	publicKey  crypto.PublicKey
+	reader     *exedatareadermock.ExecutionDataReader
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -68,6 +70,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	suite.transactions = new(storagemock.Transactions)
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
+	suite.reader = new(exedatareadermock.ExecutionDataReader)
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -101,8 +104,8 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	// save the public key to use later in tests later
 	suite.publicKey = networkingKey.PublicKey()
 
-	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil)
+	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
+		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil, suite.reader)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)

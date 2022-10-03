@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
+	exedatareadermock "github.com/onflow/flow-go/module/state_synchronization/requester/jobs/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -51,6 +52,7 @@ type Suite struct {
 	transactions *storage.Transactions
 	receipts     *storage.ExecutionReceipts
 	results      *storage.ExecutionResults
+	reader       *exedatareadermock.ExecutionDataReader
 
 	eng    *Engine
 	cancel context.CancelFunc
@@ -94,6 +96,7 @@ func (suite *Suite) SetupTest() {
 	suite.transactions = new(storage.Transactions)
 	suite.receipts = new(storage.ExecutionReceipts)
 	suite.results = new(storage.ExecutionResults)
+	suite.reader = new(exedatareadermock.ExecutionDataReader)
 	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 	require.NoError(suite.T(), err)
 	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
@@ -102,7 +105,8 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	rpcEngBuilder, err := rpc.NewBuilder(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0, 0, false, false, nil, nil)
+		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0, 0,
+		false, false, nil, nil, suite.reader)
 	require.NoError(suite.T(), err)
 	rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)

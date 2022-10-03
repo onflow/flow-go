@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
+	exedatareadermock "github.com/onflow/flow-go/module/state_synchronization/requester/jobs/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -61,6 +62,7 @@ type Suite struct {
 	chainID              flow.ChainID
 	metrics              *metrics.NoopCollector
 	backend              *backend.Backend
+	reader               *exedatareadermock.ExecutionDataReader
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -103,6 +105,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
+	suite.reader = new(exedatareadermock.ExecutionDataReader)
 }
 
 func (suite *Suite) RunTest(
@@ -132,6 +135,7 @@ func (suite *Suite) RunTest(
 			nil,
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
+			suite.reader,
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
@@ -307,6 +311,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			nil,
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
+			suite.reader,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
@@ -617,12 +622,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 			enNodeIDs.Strings(),
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
+			suite.reader,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
-			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
+			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil, suite.reader)
 		require.NoError(suite.T(), err)
 		rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 		require.NoError(suite.T(), err)
@@ -710,6 +716,7 @@ func (suite *Suite) TestExecuteScript() {
 			flow.IdentifierList(identities.NodeIDs()).Strings(),
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
+			suite.reader,
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
