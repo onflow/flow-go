@@ -23,13 +23,9 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("parsing error in transaction", func(t *testing.T) {
 
-		rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
 		txInvoker := fvm.NewTransactionInvoker()
-
-		vm := fvm.NewVirtualMachine(rt)
 
 		code := `X`
 
@@ -38,7 +34,7 @@ func TestSafetyCheck(t *testing.T) {
 		view := utils.NewSimpleView()
 		context := fvm.NewContext(fvm.WithLogger(log))
 
-		stTxn := state.NewStateTransaction(
+		txnState := state.NewTransactionState(
 			view,
 			state.DefaultParameters().
 				WithMaxKeySizeAllowed(context.MaxStateKeySize).
@@ -46,7 +42,11 @@ func TestSafetyCheck(t *testing.T) {
 				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		)
 
-		err := txInvoker.Process(vm, &context, proc, stTxn, programs.NewEmptyPrograms())
+		blockPrograms := programs.NewEmptyBlockPrograms()
+		txnPrograms, err := blockPrograms.NewTransactionPrograms(0, 0)
+		require.NoError(t, err)
+
+		err = txInvoker.Process(context, proc, txnState, txnPrograms)
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -56,13 +56,9 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("checking error in transaction", func(t *testing.T) {
 
-		rt := fvm.NewInterpreterRuntime(runtime.Config{})
-
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
 		txInvoker := fvm.NewTransactionInvoker()
-
-		vm := fvm.NewVirtualMachine(rt)
 
 		code := `transaction(arg: X) { }`
 
@@ -71,7 +67,7 @@ func TestSafetyCheck(t *testing.T) {
 		view := utils.NewSimpleView()
 		context := fvm.NewContext(fvm.WithLogger(log))
 
-		stTxn := state.NewStateTransaction(
+		txnState := state.NewTransactionState(
 			view,
 			state.DefaultParameters().
 				WithMaxKeySizeAllowed(context.MaxStateKeySize).
@@ -79,7 +75,11 @@ func TestSafetyCheck(t *testing.T) {
 				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		)
 
-		err := txInvoker.Process(vm, &context, proc, stTxn, programs.NewEmptyPrograms())
+		blockPrograms := programs.NewEmptyBlockPrograms()
+		txnPrograms, err := blockPrograms.NewTransactionPrograms(0, 0)
+		require.NoError(t, err)
+
+		err = txInvoker.Process(context, proc, txnState, txnPrograms)
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")

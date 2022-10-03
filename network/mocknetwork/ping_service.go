@@ -8,7 +8,7 @@ import (
 	message "github.com/onflow/flow-go/network/message"
 	mock "github.com/stretchr/testify/mock"
 
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 
 	time "time"
 )

@@ -318,6 +318,12 @@ func RunWithTempDir(t testing.TB, f func(string)) {
 	f(dbDir)
 }
 
+// Useful for debugging purpose
+func RunWithTempDirWithoutRemove(t testing.TB, f func(string)) {
+	dbDir := TempDir(t)
+	f(dbDir)
+}
+
 func badgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB, error)) *badger.DB {
 	opts := badger.
 		DefaultOptions(dir).
@@ -431,6 +437,6 @@ func CrashTestWithExpectedStatus(
 }
 
 // NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware
-func NetworkSlashingViolationsConsumer(logger zerolog.Logger) slashing.ViolationsConsumer {
-	return slashing.NewSlashingViolationsConsumer(logger)
+func NetworkSlashingViolationsConsumer(logger zerolog.Logger, metrics module.NetworkSecurityMetrics) slashing.ViolationsConsumer {
+	return slashing.NewSlashingViolationsConsumer(logger, metrics)
 }

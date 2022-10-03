@@ -26,7 +26,7 @@ func createAccount(
 	chain flow.Chain,
 	ctx fvm.Context,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 ) flow.Address {
 	ctx = fvm.NewContextFromParent(
 		ctx,
@@ -39,7 +39,7 @@ func createAccount(
 
 	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-	err := vm.Run(ctx, tx, view, programs)
+	err := vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
@@ -66,7 +66,7 @@ func addAccountKey(
 	vm *fvm.VirtualMachine,
 	ctx fvm.Context,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 	address flow.Address,
 	apiVersion accountKeyAPIVersion,
 ) flow.AccountPublicKey {
@@ -90,7 +90,7 @@ func addAccountKey(
 
 	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-	err = vm.Run(ctx, tx, view, programs)
+	err = vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
@@ -103,7 +103,7 @@ func addAccountCreator(
 	chain flow.Chain,
 	ctx fvm.Context,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 	account flow.Address,
 ) {
 	script := []byte(
@@ -119,7 +119,7 @@ func addAccountCreator(
 
 	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-	err := vm.Run(ctx, tx, view, programs)
+	err := vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 }
@@ -130,7 +130,7 @@ func removeAccountCreator(
 	chain flow.Chain,
 	ctx fvm.Context,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 	account flow.Address,
 ) {
 	script := []byte(
@@ -147,7 +147,7 @@ func removeAccountCreator(
 
 	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-	err := vm.Run(ctx, tx, view, programs)
+	err := vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 }
@@ -349,7 +349,7 @@ func TestCreateAccount(t *testing.T) {
 
 	t.Run("Single account",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				payer := createAccount(t, vm, chain, ctx, view, programs)
 
 				txBody := flow.NewTransactionBody().
@@ -358,7 +358,7 @@ func TestCreateAccount(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err := vm.Run(ctx, tx, view, programs)
+				err := vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
@@ -370,7 +370,7 @@ func TestCreateAccount(t *testing.T) {
 				require.NoError(t, err)
 				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
-				account, err := vm.GetAccount(ctx, address, view, programs)
+				account, err := vm.GetAccountV2(ctx, address, view)
 				require.NoError(t, err)
 				require.NotNil(t, account)
 			}),
@@ -378,7 +378,7 @@ func TestCreateAccount(t *testing.T) {
 
 	t.Run("Multiple accounts",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				const count = 3
 
 				payer := createAccount(t, vm, chain, ctx, view, programs)
@@ -389,7 +389,7 @@ func TestCreateAccount(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err := vm.Run(ctx, tx, view, programs)
+				err := vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
@@ -405,7 +405,7 @@ func TestCreateAccount(t *testing.T) {
 					require.NoError(t, err)
 					address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
-					account, err := vm.GetAccount(ctx, address, view, programs)
+					account, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					require.NotNil(t, account)
 				}
@@ -424,7 +424,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 		newVMTest().
 			withContextOptions(options...).
 			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				payer := createAccount(t, vm, chain, ctx, view, programs)
 
 				txBody := flow.NewTransactionBody().
@@ -433,7 +433,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err := vm.Run(ctx, tx, view, programs)
+				err := vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
 				assert.Error(t, tx.Err)
@@ -443,14 +443,14 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 	t.Run("Authorized account payer",
 		newVMTest().withContextOptions(options...).
 			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(createAccountTransaction)).
 					AddAuthorizer(chain.ServiceAddress())
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err := vm.Run(ctx, tx, view, programs)
+				err := vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
@@ -460,7 +460,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 	t.Run("Account payer added to allowlist",
 		newVMTest().withContextOptions(options...).
 			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				payer := createAccount(t, vm, chain, ctx, view, programs)
 				addAccountCreator(t, vm, chain, ctx, view, programs, payer)
 
@@ -471,7 +471,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err := vm.Run(ctx, tx, view, programs)
+				err := vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
@@ -481,7 +481,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 	t.Run("Account payer removed from allowlist",
 		newVMTest().withContextOptions(options...).
 			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				payer := createAccount(t, vm, chain, ctx, view, programs)
 				addAccountCreator(t, vm, chain, ctx, view, programs, payer)
 
@@ -491,7 +491,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 				validTx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err := vm.Run(ctx, validTx, view, programs)
+				err := vm.RunV2(ctx, validTx, view)
 				require.NoError(t, err)
 
 				assert.NoError(t, validTx.Err)
@@ -500,7 +500,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 				invalidTx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.Run(ctx, invalidTx, view, programs)
+				err = vm.RunV2(ctx, invalidTx, view)
 				require.NoError(t, err)
 
 				assert.Error(t, invalidTx.Err)
@@ -551,10 +551,10 @@ func TestAddAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Add to empty key list %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Empty(t, before.Keys)
 
@@ -570,12 +570,12 @@ func TestAddAccountKey(t *testing.T) {
 
 					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-					err = vm.Run(ctx, tx, view, programs)
+					err = vm.RunV2(ctx, tx, view)
 					require.NoError(t, err)
 
 					assert.NoError(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 
 					require.Len(t, after.Keys, 1)
@@ -591,12 +591,12 @@ func TestAddAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Add to non-empty key list %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
 					publicKey1 := addAccountKey(t, vm, ctx, view, programs, address, test.apiVersion)
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, 1)
 
@@ -612,12 +612,12 @@ func TestAddAccountKey(t *testing.T) {
 
 					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-					err = vm.Run(ctx, tx, view, programs)
+					err = vm.RunV2(ctx, tx, view)
 					require.NoError(t, err)
 
 					assert.NoError(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 
 					expectedKeys := []flow.AccountPublicKey{
@@ -640,7 +640,7 @@ func TestAddAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Invalid key %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
 					invalidPublicKey := testutil.BytesToCadenceArray([]byte{1, 2, 3})
@@ -654,12 +654,12 @@ func TestAddAccountKey(t *testing.T) {
 
 					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-					err = vm.Run(ctx, tx, view, programs)
+					err = vm.RunV2(ctx, tx, view)
 					require.NoError(t, err)
 
 					assert.Error(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 
 					assert.Empty(t, after.Keys)
@@ -683,10 +683,10 @@ func TestAddAccountKey(t *testing.T) {
 	for _, test := range multipleKeysTests {
 		t.Run(fmt.Sprintf("Multiple keys %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Empty(t, before.Keys)
 
@@ -707,12 +707,12 @@ func TestAddAccountKey(t *testing.T) {
 
 					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-					err = vm.Run(ctx, tx, view, programs)
+					err = vm.RunV2(ctx, tx, view)
 					require.NoError(t, err)
 
 					assert.NoError(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 
 					expectedKeys := []flow.AccountPublicKey{
@@ -739,7 +739,7 @@ func TestAddAccountKey(t *testing.T) {
 
 			t.Run(hashAlgo,
 				newVMTest().withContextOptions(options...).
-					run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+					run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 						address := createAccount(t, vm, chain, ctx, view, programs)
 
 						privateKey, err := unittest.AccountKeyDefaultFixture()
@@ -771,13 +771,13 @@ func TestAddAccountKey(t *testing.T) {
 
 						tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-						err = vm.Run(ctx, tx, view, programs)
+						err = vm.RunV2(ctx, tx, view)
 						require.NoError(t, err)
 
 						require.Error(t, tx.Err)
 						assert.Contains(t, tx.Err.Error(), "hashing algorithm type not supported")
 
-						after, err := vm.GetAccount(ctx, address, view, programs)
+						after, err := vm.GetAccountV2(ctx, address, view)
 						require.NoError(t, err)
 
 						assert.Empty(t, after.Keys)
@@ -818,7 +818,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Non-existent key %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
 					const keyCount = 2
@@ -827,7 +827,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						_ = addAccountKey(t, vm, ctx, view, programs, address, test.apiVersion)
 					}
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
@@ -842,7 +842,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 						tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-						err = vm.Run(ctx, tx, view, programs)
+						err = vm.RunV2(ctx, tx, view)
 						require.NoError(t, err)
 
 						if test.expectError {
@@ -852,7 +852,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						}
 					}
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, after.Keys, keyCount)
 
@@ -864,7 +864,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Existing key %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
 					const keyCount = 2
@@ -874,7 +874,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						_ = addAccountKey(t, vm, ctx, view, programs, address, test.apiVersion)
 					}
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
@@ -888,12 +888,12 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-					err = vm.Run(ctx, tx, view, programs)
+					err = vm.RunV2(ctx, tx, view)
 					require.NoError(t, err)
 
 					assert.NoError(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, after.Keys, keyCount)
 
@@ -907,7 +907,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Key added by a different api version %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
 					const keyCount = 2
@@ -925,7 +925,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						_ = addAccountKey(t, vm, ctx, view, programs, address, apiVersionForAdding)
 					}
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
@@ -939,12 +939,12 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-					err = vm.Run(ctx, tx, view, programs)
+					err = vm.RunV2(ctx, tx, view)
 					require.NoError(t, err)
 
 					assert.NoError(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, after.Keys, keyCount)
 
@@ -973,7 +973,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	for _, test := range multipleKeysTests {
 		t.Run(fmt.Sprintf("Multiple keys %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
 					const keyCount = 2
@@ -982,7 +982,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						_ = addAccountKey(t, vm, ctx, view, programs, address, test.apiVersion)
 					}
 
-					before, err := vm.GetAccount(ctx, address, view, programs)
+					before, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
@@ -999,12 +999,12 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-					err = vm.Run(ctx, tx, view, programs)
+					err = vm.RunV2(ctx, tx, view)
 					require.NoError(t, err)
 
 					assert.NoError(t, tx.Err)
 
-					after, err := vm.GetAccount(ctx, address, view, programs)
+					after, err := vm.GetAccountV2(ctx, address, view)
 					require.NoError(t, err)
 					assert.Len(t, after.Keys, keyCount)
 
@@ -1025,7 +1025,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Run("Non-existent key",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				address := createAccount(t, vm, chain, ctx, view, programs)
 
 				const keyCount = 2
@@ -1034,7 +1034,7 @@ func TestGetAccountKey(t *testing.T) {
 					_ = addAccountKey(t, vm, ctx, view, programs, address, accountKeyAPIVersionV2)
 				}
 
-				before, err := vm.GetAccount(ctx, address, view, programs)
+				before, err := vm.GetAccountV2(ctx, address, view)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -1049,7 +1049,7 @@ func TestGetAccountKey(t *testing.T) {
 
 					tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-					err = vm.Run(ctx, tx, view, programs)
+					err = vm.RunV2(ctx, tx, view)
 					require.NoError(t, err)
 					require.NoError(t, tx.Err)
 
@@ -1061,7 +1061,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Run("Existing key",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				address := createAccount(t, vm, chain, ctx, view, programs)
 
 				const keyCount = 2
@@ -1072,7 +1072,7 @@ func TestGetAccountKey(t *testing.T) {
 					keys[i] = addAccountKey(t, vm, ctx, view, programs, address, accountKeyAPIVersionV2)
 				}
 
-				before, err := vm.GetAccount(ctx, address, view, programs)
+				before, err := vm.GetAccountV2(ctx, address, view)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -1086,7 +1086,7 @@ func TestGetAccountKey(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
 
@@ -1111,7 +1111,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Run("Key added by a different api version",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				address := createAccount(t, vm, chain, ctx, view, programs)
 
 				const keyCount = 2
@@ -1124,7 +1124,7 @@ func TestGetAccountKey(t *testing.T) {
 					keys[i] = addAccountKey(t, vm, ctx, view, programs, address, accountKeyAPIVersionV1)
 				}
 
-				before, err := vm.GetAccount(ctx, address, view, programs)
+				before, err := vm.GetAccountV2(ctx, address, view)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -1138,7 +1138,7 @@ func TestGetAccountKey(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
 
@@ -1163,7 +1163,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Run("Multiple keys",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				address := createAccount(t, vm, chain, ctx, view, programs)
 
 				const keyCount = 2
@@ -1174,7 +1174,7 @@ func TestGetAccountKey(t *testing.T) {
 					keys[i] = addAccountKey(t, vm, ctx, view, programs, address, accountKeyAPIVersionV2)
 				}
 
-				before, err := vm.GetAccount(ctx, address, view, programs)
+				before, err := vm.GetAccountV2(ctx, address, view)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -1191,7 +1191,7 @@ func TestGetAccountKey(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
 
@@ -1231,7 +1231,7 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker()),
 			fvm.WithCadenceLogging(true),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				account := createAccount(t, vm, chain, ctx, view, programs)
 
 				txBody := transferTokensTx(chain).
@@ -1241,7 +1241,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err := vm.Run(ctx, tx, view, programs)
+				err := vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
@@ -1251,7 +1251,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, account.Hex())))
 
-				err = vm.Run(ctx, script, view, programs)
+				err = vm.RunV2(ctx, script, view)
 
 				assert.NoError(t, err)
 
@@ -1267,7 +1267,7 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker()),
 			fvm.WithCadenceLogging(true),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				nonExistentAddress, err := chain.AddressAtIndex(100)
 				require.NoError(t, err)
 
@@ -1278,7 +1278,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, nonExistentAddress)))
 
-				err = vm.Run(ctx, script, view, programs)
+				err = vm.RunV2(ctx, script, view)
 
 				require.NoError(t, err)
 				require.NoError(t, script.Err)
@@ -1291,7 +1291,7 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker()),
 			fvm.WithCadenceLogging(true),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, _ state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, _ state.View, programs *programs.BlockPrograms) {
 				address := chain.ServiceAddress()
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
@@ -1308,7 +1308,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					return nil, nil
 				})
 
-				err := vm.Run(ctx, script, view, programs)
+				err := vm.RunV2(ctx, script, view)
 				require.ErrorContains(t, err, fmt.Sprintf("error getting register %s, %s", address.Hex(), state.KeyAccountStatus))
 			}),
 	)
@@ -1321,7 +1321,7 @@ func TestAccountBalanceFields(t *testing.T) {
 		).withBootstrapProcedureOptions(
 			fvm.WithStorageMBPerFLOW(1000_000_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				account := createAccount(t, vm, chain, ctx, view, programs)
 
 				txBody := transferTokensTx(chain).
@@ -1331,7 +1331,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err := vm.Run(ctx, tx, view, programs)
+				err := vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
@@ -1341,7 +1341,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, account.Hex())))
 
-				err = vm.Run(ctx, script, view, programs)
+				err = vm.RunV2(ctx, script, view)
 
 				assert.NoError(t, err)
 				assert.NoError(t, script.Err)
@@ -1357,7 +1357,7 @@ func TestAccountBalanceFields(t *testing.T) {
 		).withBootstrapProcedureOptions(
 			fvm.WithStorageMBPerFLOW(1_000_000_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				nonExistentAddress, err := chain.AddressAtIndex(100)
 				require.NoError(t, err)
 
@@ -1368,7 +1368,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, nonExistentAddress)))
 
-				err = vm.Run(ctx, script, view, programs)
+				err = vm.RunV2(ctx, script, view)
 
 				require.NoError(t, err)
 				require.Error(t, script.Err)
@@ -1385,7 +1385,7 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithAccountCreationFee(100_000),
 			fvm.WithMinimumStorageReservation(100_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				account := createAccount(t, vm, chain, ctx, view, programs)
 
 				txBody := transferTokensTx(chain).
@@ -1395,7 +1395,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err := vm.Run(ctx, tx, view, programs)
+				err := vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
@@ -1405,7 +1405,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, account.Hex())))
 
-				err = vm.Run(ctx, script, view, programs)
+				err = vm.RunV2(ctx, script, view)
 
 				assert.NoError(t, err)
 				assert.NoError(t, script.Err)
@@ -1427,7 +1427,7 @@ func TestGetStorageCapacity(t *testing.T) {
 			fvm.WithAccountCreationFee(100_000),
 			fvm.WithMinimumStorageReservation(100_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				account := createAccount(t, vm, chain, ctx, view, programs)
 
 				txBody := transferTokensTx(chain).
@@ -1437,7 +1437,7 @@ func TestGetStorageCapacity(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err := vm.Run(ctx, tx, view, programs)
+				err := vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
@@ -1447,7 +1447,7 @@ func TestGetStorageCapacity(t *testing.T) {
 					}
 				`, account)))
 
-				err = vm.Run(ctx, script, view, programs)
+				err = vm.RunV2(ctx, script, view)
 
 				require.NoError(t, err)
 				require.NoError(t, script.Err)
@@ -1465,7 +1465,7 @@ func TestGetStorageCapacity(t *testing.T) {
 			fvm.WithAccountCreationFee(100_000),
 			fvm.WithMinimumStorageReservation(100_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				nonExistentAddress, err := chain.AddressAtIndex(100)
 				require.NoError(t, err)
 
@@ -1476,7 +1476,7 @@ func TestGetStorageCapacity(t *testing.T) {
 					}
 				`, nonExistentAddress)))
 
-				err = vm.Run(ctx, script, view, programs)
+				err = vm.RunV2(ctx, script, view)
 
 				require.NoError(t, err)
 				require.NoError(t, script.Err)
@@ -1493,7 +1493,7 @@ func TestGetStorageCapacity(t *testing.T) {
 			fvm.WithAccountCreationFee(100_000),
 			fvm.WithMinimumStorageReservation(100_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 				address := chain.ServiceAddress()
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
@@ -1510,7 +1510,7 @@ func TestGetStorageCapacity(t *testing.T) {
 					return nil, nil
 				})
 
-				err := vm.Run(ctx, script, newview, programs)
+				err := vm.RunV2(ctx, script, newview)
 				require.ErrorContains(t, err, fmt.Sprintf("error getting register %s, %s", address.Hex(), state.KeyAccountStatus))
 			}),
 	)

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -374,7 +375,10 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 type vmMock struct{}
 
 func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, programs *programs.Programs) error {
+	return vm.RunV2(ctx, proc, led)
+}
 
+func (vm *vmMock) RunV2(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
 	tx, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
 		return fmt.Errorf("invokable is not a transaction")
@@ -389,7 +393,7 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 	case "failedTx":
 		// add updates to the ledger
 		_ = led.Set("05", "", []byte{'B'})
-		tx.Err = &fvmErrors.CadenceRuntimeError{} // inside the runtime (e.g. div by zero, access account)
+		tx.Err = fvmErrors.NewCadenceRuntimeError(runtime.Error{}) // inside the runtime (e.g. div by zero, access account)
 	case "eventsMismatch":
 		tx.Events = append(eventsList, flow.Event{
 			Type:             "event.Extra",
@@ -409,9 +413,21 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 	return nil
 }
 
+func (vmMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View, _ *programs.Programs) (*flow.Account, error) {
+	panic("not expected")
+}
+
+func (vmMock) GetAccountV2(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Account, error) {
+	panic("not expected")
+}
+
 type vmSystemOkMock struct{}
 
 func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, programs *programs.Programs) error {
+	return vm.RunV2(ctx, proc, led)
+}
+
+func (vm *vmSystemOkMock) RunV2(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
 	tx, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
 		return fmt.Errorf("invokable is not a transaction")
@@ -428,9 +444,21 @@ func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vie
 	return nil
 }
 
+func (vmSystemOkMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View, _ *programs.Programs) (*flow.Account, error) {
+	panic("not expected")
+}
+
+func (vmSystemOkMock) GetAccountV2(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Account, error) {
+	panic("not expected")
+}
+
 type vmSystemBadMock struct{}
 
 func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, programs *programs.Programs) error {
+	return vm.RunV2(ctx, proc, led)
+}
+
+func (vm *vmSystemBadMock) RunV2(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
 	tx, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
 		return fmt.Errorf("invokable is not a transaction")
@@ -439,4 +467,12 @@ func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vi
 	tx.ServiceEvents = []flow.Event{epochCommitEvent}
 
 	return nil
+}
+
+func (vmSystemBadMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View, _ *programs.Programs) (*flow.Account, error) {
+	panic("not expected")
+}
+
+func (vmSystemBadMock) GetAccountV2(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Account, error) {
+	panic("not expected")
 }

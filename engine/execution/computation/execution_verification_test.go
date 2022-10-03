@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
@@ -634,8 +632,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	txs [][]*flow.TransactionBody,
 	opts []fvm.Option,
 	bootstrapOpts []fvm.BootstrapProcedureOption) *execution.ComputationResult {
-	rt := fvm.NewInterpreterRuntime(runtime.Config{})
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVM()
 
 	logger := zerolog.Nop()
 
@@ -698,7 +695,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
 
-	computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyPrograms())
+	computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyBlockPrograms())
 	require.NoError(t, err)
 
 	prevResultId := unittest.IdentifierFixture()

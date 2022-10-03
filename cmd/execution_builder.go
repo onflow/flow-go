@@ -21,6 +21,8 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/network/p2p/blob"
+
 	"github.com/onflow/flow-go/module/mempool/queue"
 
 	"github.com/onflow/flow-go/admin/commands"
@@ -42,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -50,7 +53,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
@@ -71,7 +73,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -359,7 +360,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	opts := []network.BlobServiceOption{}
 
 	if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
-		opts = append(opts, p2p.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
+		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
 	}
 
 	bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
@@ -884,12 +885,12 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		node.Logger,
 		exeNode.exeConf.rpcConf,
 		exeNode.ingestionEng,
-		node.Storage.Blocks,
 		node.Storage.Headers,
 		node.State,
 		exeNode.events,
 		exeNode.results,
 		exeNode.txResults,
+		exeNode.commits,
 		node.RootChainID,
 		signature.NewBlockSignerDecoder(exeNode.committee),
 		exeNode.exeConf.apiRatelimits,
@@ -898,7 +899,7 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 }
 
 // getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the view provided.
-func getContractEpochCounter(vm computation.VirtualMachine, vmCtx fvm.Context, view *delta.View) (uint64, error) {
+func getContractEpochCounter(vm computer.VirtualMachine, vmCtx fvm.Context, view *delta.View) (uint64, error) {
 	// Get the address of the FlowEpoch smart contract
 	sc, err := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
 	if err != nil {
@@ -912,11 +913,8 @@ func getContractEpochCounter(vm computation.VirtualMachine, vmCtx fvm.Context, v
 	})
 	script := fvm.Script(scriptCode)
 
-	// Create empty programs cache
-	p := programs.NewEmptyPrograms()
-
 	// execute the script
-	err = vm.Run(vmCtx, script, view, p)
+	err = vm.RunV2(vmCtx, script, view)
 	if err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, internal error while executing script: %w", err)
 	}

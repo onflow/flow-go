@@ -190,7 +190,7 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 func CreateAccounts(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -200,7 +200,7 @@ func CreateAccounts(
 func CreateAccountsWithSimpleAddresses(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -209,6 +209,7 @@ func CreateAccountsWithSimpleAddresses(
 		fvm.WithTransactionProcessors(
 			fvm.NewTransactionInvoker(),
 		),
+		fvm.WithBlockPrograms(programs),
 	)
 
 	var accounts []flow.Address
@@ -231,7 +232,7 @@ func CreateAccountsWithSimpleAddresses(
 
 	serviceAddress := chain.ServiceAddress()
 
-	for i, privateKey := range privateKeys {
+	for _, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
 		encPublicKey := accountKey.PublicKey.Encode()
 		cadPublicKey := BytesToCadenceArray(encPublicKey)
@@ -251,8 +252,8 @@ func CreateAccountsWithSimpleAddresses(
 			AddArgument(encCadPublicKey).
 			AddAuthorizer(serviceAddress)
 
-		tx := fvm.Transaction(txBody, uint32(i))
-		err := vm.Run(ctx, tx, view, programs)
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+		err := vm.RunV2(ctx, tx, view)
 		if err != nil {
 			return nil, err
 		}
@@ -284,7 +285,6 @@ func CreateAccountsWithSimpleAddresses(
 
 func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalOptions ...fvm.BootstrapProcedureOption) state.View {
 	view := fvmUtils.NewSimpleView()
-	programs := programs.NewEmptyPrograms()
 
 	// set 0 clusters to pass n_collectors >= n_clusters check
 	epochConfig := epochs.DefaultEpochConfig()
@@ -302,13 +302,7 @@ func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalO
 		options...,
 	)
 
-	_ = vm.Run(
-		ctx,
-		bootstrap,
-		view,
-		programs,
-	)
-
+	_ = vm.RunV2(ctx, bootstrap, view)
 	return view
 }
 

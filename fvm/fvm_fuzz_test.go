@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -24,15 +25,15 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 	// setup initial state
 	vmt, tctx := bootstrapFuzzStateAndTxContext(f)
 
-	f.Add(uint64(0), uint64(0), uint(0))
-	f.Add(uint64(5), uint64(0), uint(0))
-	f.Fuzz(func(t *testing.T, computationLimit uint64, memoryLimit uint64, transactionType uint) {
+	f.Add(uint64(0), uint64(0), uint64(0), uint(0))
+	f.Add(uint64(5), uint64(0), uint64(0), uint(0))
+	f.Fuzz(func(t *testing.T, computationLimit uint64, memoryLimit uint64, interactionLimit uint64, transactionType uint) {
 		computationLimit %= flow.DefaultMaxTransactionGasLimit
 		transactionType %= uint(len(fuzzTransactionTypes))
 
 		tt := fuzzTransactionTypes[transactionType]
 
-		vmt.run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		vmt.run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
 			// create the transaction
 			txBody := tt.createTxBody(t, tctx)
 			// set the computation limit
@@ -48,11 +49,13 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 			// set the memory limit
 			ctx.MemoryLimit = memoryLimit
+			// set the interaction limit
+			ctx.MaxStateInteractionSize = interactionLimit
 			// run the transaction
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			require.NotPanics(t, func() {
-				err = vm.Run(ctx, tx, view, programs)
+				err = vm.RunV2(ctx, tx, view)
 			}, "Transaction should never result in a panic.")
 			require.NoError(t, err, "Transaction should never result in an error.")
 
@@ -98,9 +101,11 @@ var fuzzTransactionTypes = []transactionType{
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			// if there is an error, it should be computation exceeded
 			if results.tx.Err != nil {
+				require.Len(t, results.tx.Events, 3)
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
+					errors.ErrCodeLedgerInteractionLimitExceededError,
 				}
 				require.Contains(t, codes, results.tx.Err.Code(), results.tx.Err.Error())
 			}
@@ -127,9 +132,11 @@ var fuzzTransactionTypes = []transactionType{
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.tx.Err)
+			require.Len(t, results.tx.Events, 3)
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the failed transfer
+				errors.ErrCodeLedgerInteractionLimitExceededError,
 			}
 			require.Contains(t, codes, results.tx.Err.Code(), results.tx.Err.Error())
 
@@ -144,6 +151,7 @@ var fuzzTransactionTypes = []transactionType{
 		// Should never succeed.
 		// fees should be deducted no matter what.
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
+			// empty transaction
 			txBody := flow.NewTransactionBody().SetScript([]byte("transaction(){prepare(){};execute{panic(\"some panic\")}}"))
 			txBody.SetProposalKey(tctx.address, 0, 0)
 			txBody.SetPayer(tctx.address)
@@ -151,11 +159,40 @@ var fuzzTransactionTypes = []transactionType{
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.tx.Err)
+			require.Len(t, results.tx.Events, 3)
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the panic
+				errors.ErrCodeLedgerInteractionLimitExceededError,
 			}
 			require.Contains(t, codes, results.tx.Err.Code(), results.tx.Err.Error())
+
+			// fees should be deducted no matter the input
+			fees, deducted := getDeductedFees(t, tctx, results)
+			require.True(t, deducted, "Fees should be deducted.")
+			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+		},
+	},
+	{
+		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
+			// create account
+			txBody := flow.NewTransactionBody().SetScript(createAccountScript).
+				AddAuthorizer(tctx.address)
+			txBody.SetProposalKey(tctx.address, 0, 0)
+			txBody.SetPayer(tctx.address)
+			return txBody
+		},
+		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
+			// if there is an error, it should be computation exceeded
+			if results.tx.Err != nil {
+				require.Len(t, results.tx.Events, 3)
+				codes := []errors.ErrorCode{
+					errors.ErrCodeComputationLimitExceededError,
+					errors.ErrCodeCadenceRunTimeError,
+					errors.ErrCodeLedgerInteractionLimitExceededError,
+				}
+				require.Contains(t, codes, results.tx.Err.Code(), results.tx.Err.Error())
+			}
 
 			// fees should be deducted no matter the input
 			fees, deducted := getDeductedFees(t, tctx, results)
@@ -174,7 +211,7 @@ func getDeductedFees(tb testing.TB, tctx transactionTypeContext, results fuzzRes
 	var ok bool
 	var feesDeductedEvent cadence.Event
 	for _, e := range results.tx.Events {
-		if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", fvm.FlowFeesAddress(tctx.chain)) {
+		if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", environment.FlowFeesAddress(tctx.chain)) {
 			data, err := jsoncdc.Decode(nil, e.Payload)
 			require.NoError(tb, err)
 			feesDeductedEvent, ok = data.(cadence.Event)
@@ -206,7 +243,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 	).withContextOptions(
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
-	).bootstrapWith(func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) error {
+	).bootstrapWith(func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) error {
 		// ==== Create an account ====
 		var txBody *flow.TransactionBody
 		privateKey, txBody = testutil.CreateAccountCreationTransaction(tb, chain)
@@ -218,7 +255,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 
 		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-		err = vm.Run(ctx, tx, view, programs)
+		err = vm.RunV2(ctx, tx, view)
 
 		require.NoError(tb, err)
 		accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
@@ -247,7 +284,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 
 		tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-		err = vm.Run(ctx, tx, view, programs)
+		err = vm.RunV2(ctx, tx, view)
 		if err != nil {
 			return err
 		}

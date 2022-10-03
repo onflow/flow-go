@@ -314,13 +314,31 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 		return fmt.Errorf("cannot write checkpoint header: %w", err)
 	}
 
-	// Nodes are serialized in two steps to save memory.
+	// Multiple tries might have shared nodes at higher level, However, we don't want to
+	// seralize duplicated nodes in the checkpoint file. In order to deduplicate, we build
+	// a map from unique nodes while iterating and seralizing the nodes to the checkpoint file.
+	//
+	// The map for deduplication contains all the trie nodes, which uses a lot of memory.
+	// In fact, we don't have to build a map for all nodes, since there are nodes which
+	// are never shared.  Nodes can only be shared if and only if they are
+	// on the same path. In other words, nodes on different path won't be shared.
+	// If we group trie nodes by path, then we have more smaller groups of trie nodes from the same path,
+	// which might have duplication. And then for each group, we could build a smaller map for deduplication.
+	// Processing each group sequentially would allow us reduce operational memory.
+	//
+	// With this idea in mind, the seralization can be done in two steps:
 	// 1. serialize nodes in subtries (tries with root at subtrieLevel).
 	// 2. serialize remaining nodes (from trie root to subtrie root).
-	// Using subtries saves memory because we only need to track unique nodes
-	// of subtries instead of unique nodes of the entire trie.
-	// NOTE: nodes are serialized in order of Descendents-First-Relationship.
-
+	// For instance, if there are 3 top tries, and subtrieLevel is 4, then there will be
+	// 	(2 ^ 4) * 3 = 48 subtrie root nodes at level 4.
+	// Then step 1 will seralize the 48 subtrie root nodes into the checkpoint file, and
+	// then step 2 will seralize the 3 root nodes (level 0) and the interim nodes from level 1 to 3 into
+	//
+	// Step 1:
+	// 1. Find all the subtrie root nodes at subtrieLevel (level 4)
+	// 2. Group the subtrie by path. Since subtries in different group have different path, they won't have
+	//		child nodes shared. Subtries in the same group might have duplication, we will build a map to deduplicate.
+	//
 	// subtrieLevel is number of edges from trie root to subtrie root.
 	// Trie root is at level 0.
 	const subtrieLevel = 4
@@ -328,20 +346,24 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	// subtrieCount is number of subtries at subtrieLevel.
 	const subtrieCount = 1 << subtrieLevel
 
-	// subtrieRoots is an array with subtrieCount elements
-	// in breadth-first order at subtrieLevel.
-	// Each element is a list of all subtrie roots of the same path.
+	// since each trie has `subtrieCount` number of subtries at subtrieLevel,
+	// we create `subtrieCount` number of groups, each group contains all the subtrie root nodes
+
+	// subtrieRoots is an array of groups.
+	// Each group contains the subtrie roots of the same path at subtrieLevel for different tries.
 	// For example, if subtrieLevel is 4, then
-	// - subtrieRoots[0] is a list all subtrie roots at path [0,0,0,0]
-	// - subtrieRoots[1] is a list all subtrie roots at path [0,0,0,1]
+	// - subtrieRoots[0] is a list of all subtrie roots at path [0,0,0,0]
+	// - subtrieRoots[1] is a list of all subtrie roots at path [0,0,0,1]
 	// - subtrieRoots[subtrieCount-1] is a list of all subtrie roots at path [1,1,1,1]
+	// subtrie roots in subtrieRoots[0] have the same path, therefore might have shared child nodes.
 	var subtrieRoots [subtrieCount][]*node.Node
 	for i := 0; i < len(subtrieRoots); i++ {
 		subtrieRoots[i] = make([]*node.Node, len(tries))
 	}
 
-	// Populate subtrieRoots
 	for trieIndex, t := range tries {
+		// subtries is an array with subtrieCount trie nodes
+		// in breadth-first order at subtrieLevel of the trie `t`
 		subtries := getNodesAtLevel(t.RootNode(), subtrieLevel)
 		for subtrieIndex, subtrieRoot := range subtries {
 			subtrieRoots[subtrieIndex][trieIndex] = subtrieRoot
@@ -376,12 +398,19 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 		traversedSubtrieNodes[nil] = 0
 
 		for _, root := range subTrieRoot {
+			// Empty trie is always added to forest as starting point and
+			// empty trie's root is nil. It remains in the forest until evicted
+			// by trie queue exceeding capacity.
 			if root == nil {
 				continue
 			}
+			// Note: nodeCounter is to assign an global index to each node in the order of it being seralized
+			// into the checkpoint file. Therefore, it has to be reused when iterating each subtrie.
+			// storeUniqueNodes will add the unique visited node into traversedSubtrieNodes with key as the node
+			// itself, and value as n-th node being seralized in the checkpoint file.
 			nodeCounter, err = storeUniqueNodes(root, traversedSubtrieNodes, nodeCounter, scratch, crc32Writer)
 			if err != nil {
-				return err
+				return fmt.Errorf("fail to store nodes in step 1 for subtrie root %v: %w", root.Hash(), err)
 			}
 			// Save subtrie root node index in topLevelNodes,
 			// so when traversing top level tries
@@ -391,19 +420,26 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 		}
 	}
 
-	// Serialize remaining nodes.
+	// Step 2:
+	// Now all nodes above and include the subtrieLevel have been seralized. We now
+	// serialize remaining nodes of each trie from root node (level 0) to (subtrieLevel - 1).
 	for _, t := range tries {
 		root := t.RootNode()
 		if root == nil {
 			continue
 		}
+		// if we iterate through the root trie with an empty visited nodes map, then it will iterate through
+		// all nodes at all levels. In order to skip the nodes above subtrieLevel, since they have been seralized in step 1,
+		// we will need to pass in a visited nodes map that contains all the subtrie root nodes, which is the topLevelNodes.
+		// The topLevelNodes was built in step 1, when seralizing each subtrie root nodes.
 		nodeCounter, err = storeUniqueNodes(root, topLevelNodes, nodeCounter, scratch, crc32Writer)
 		if err != nil {
-			return err
+			return fmt.Errorf("fail to store nodes in step 2 for root trie %v: %w", root.Hash(), err)
 		}
 	}
 
-	// Serialize trie root nodes
+	// The root tries are seralized at the end of the checkpoint file, so that it's easy to find what tries are
+	// included.
 	for _, t := range tries {
 		rootNode := t.RootNode()
 
@@ -421,7 +457,8 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 		}
 	}
 
-	// Write footer with nodes count and tries count
+	// all trie nodes have been seralized into the checkpoint file, now
+	// write footer with nodes count and tries count.
 	footer := scratch[:encNodeCountSize+encTrieCountSize]
 	binary.BigEndian.PutUint64(footer, nodeCounter-1) // -1 to account for 0 node meaning nil
 	binary.BigEndian.PutUint16(footer[encNodeCountSize:], uint16(len(tries)))
@@ -518,13 +555,13 @@ func getNodesAtLevel(root *node.Node, level uint) []*node.Node {
 }
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
-	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
-	return LoadCheckpoint(filepath, &c.wal.log)
+	filename := NumberToFilename(checkpoint)
+	return LoadCheckpoint(c.dir, filename, &c.wal.log)
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
-	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
-	return LoadCheckpoint(filepath, &c.wal.log)
+	filename := bootstrap.FilenameWALRootCheckpoint
+	return LoadCheckpoint(c.dir, filename, &c.wal.log)
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
@@ -541,7 +578,8 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
-func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func LoadCheckpoint(dir string, filename string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+	filepath := path.Join(dir, filename)
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)

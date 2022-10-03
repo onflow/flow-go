@@ -5,14 +5,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestErrorHandling(t *testing.T) {
 
 	t.Run("test nonfatal error detection", func(t *testing.T) {
-		e1 := &OperationNotSupportedError{"some operations"}
+		e1 := NewOperationNotSupportedError("some operations")
 		e2 := fmt.Errorf("some other errors: %w", e1)
-		e3 := &InvalidProposalSignatureError{err: e2}
+		e3 := NewInvalidProposalSignatureError(flow.EmptyAddress, 0, e2)
 
 		txErr, vmErr := SplitErrorTypes(e3)
 		require.Nil(t, vmErr)
@@ -20,10 +22,10 @@ func TestErrorHandling(t *testing.T) {
 	})
 
 	t.Run("test fatal error detection", func(t *testing.T) {
-		e1 := &OperationNotSupportedError{"some operations"}
-		e2 := &LedgerFailure{e1}
+		e1 := NewOperationNotSupportedError("some operations")
+		e2 := NewLedgerFailure(e1)
 		e3 := fmt.Errorf("some other errors: %w", e2)
-		e4 := &InvalidProposalSignatureError{err: e3}
+		e4 := NewInvalidProposalSignatureError(flow.EmptyAddress, 0, e3)
 
 		txErr, vmErr := SplitErrorTypes(e4)
 		require.Nil(t, txErr)

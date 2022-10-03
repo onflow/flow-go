@@ -72,7 +72,7 @@ func (s *Stopper) onFinalizedTotal(id flow.Identifier, total uint) {
 func (s *Stopper) stopAll() {
 	// only allow one process to stop all nodes,
 	// and stop them exactly once
-	if !s.stopping.CAS(false, true) {
+	if !s.stopping.CompareAndSwap(false, true) {
 		return
 	}
 
