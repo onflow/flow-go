@@ -325,9 +325,9 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	// a map from unique nodes while iterating and seralizing the nodes to the checkpoint file.
 	//
 	// The map for deduplication contains all the trie nodes, which uses a lot of memory.
-	// In fact, we don't have to build a map for all nodes, since there are certain nodes whose children
-	// will never have shared nodes. Parent nodes could only share child nodes if and only if parent nodes
-	// are on the same path. In other words, parent nodes on different path won't share nodes.
+	// In fact, we don't have to build a map for all nodes, since there are nodes which
+	// are never shared.  Nodes can only be shared if and only if they are
+	// on the same path. In other words, nodes on different path won't be shared.
 	// If we group trie nodes by path, then we have more smaller groups of trie nodes from the same path,
 	// which might have duplication. And then for each group, we could build a smaller map for deduplication.
 	// Processing each group sequentially would allow us reduce operational memory.
@@ -338,8 +338,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	// For instance, if there are 3 top tries, and subtrieLevel is 4, then there will be
 	// 	(2 ^ 4) * 3 = 48 subtrie root nodes at level 4.
 	// Then step 1 will seralize the 48 subtrie root nodes into the checkpoint file, and
-	// then step 2 will seralize the 3 top tries (level 0) and the interim trie nodes from level 1 to 3 into
-	// the checkpoint file.
+	// then step 2 will seralize the 3 root nodes (level 0) and the interim nodes from level 1 to 3 into
 	//
 	// Step 1:
 	// 1. Find all the subtrie root nodes at subtrieLevel (level 4)
@@ -406,6 +405,9 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 
 		logging := logProgress(fmt.Sprintf("storing %v-th sub trie roots", i), estimatedSubtrieNodeCount, &log.Logger)
 		for _, root := range subTrieRoot {
+			// Empty trie is always added to forest as starting point and
+			// empty trie's root is nil. It remains in the forest until evicted
+			// by trie queue exceeding capacity.
 			if root == nil {
 				continue
 			}
@@ -427,7 +429,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 
 	// Step 2:
 	// Now all nodes above and include the subtrieLevel have been seralized. We now
-	// serialize remaining nodes of each trie from the top level (level 1) to (subtrieLevel - 1).
+	// serialize remaining nodes of each trie from root node (level 0) to (subtrieLevel - 1).
 	for _, t := range tries {
 		root := t.RootNode()
 		if root == nil {
@@ -491,19 +493,11 @@ func logProgress(msg string, estimatedSubtrieNodeCount int, logger *zerolog.Logg
 		lookup[estimatedSubtrieNodeCount/10*i] = i * 10
 	}
 	return func(nodeCounter uint64) {
-		percentage, ok := lookup[(int(nodeCounter)]
+		percentage, ok := lookup[int(nodeCounter)]
 		if ok {
 			logger.Info().Msgf("%s completion percentage: %v percent", msg, percentage)
 		}
 	}
-}
-
-func reportProgress(progress int, lookup map[int]int) (int, bool) {
-	percentage, ok := lookup[progress]
-	if ok {
-		return percentage, true
-	}
-	return 0, false
 }
 
 // storeUniqueNodes iterates and serializes unique nodes for trie with given root node.
