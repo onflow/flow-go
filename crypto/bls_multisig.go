@@ -85,7 +85,7 @@ func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 //   - (nil, invalidSignatureError) if a deserialization of at least one signature fails (input is an invalid serialization of a
 //     compressed E1 element following [zcash]
 //     https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-).
-//     The function does not check
+//     G1 membership is not checked.
 //   - (nil, error) if an unexpected error occurs
 //   - (aggregated_signature, nil) otherwise
 func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
@@ -269,7 +269,8 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 //   - (nil, blsAggregateEmptyListError) if input key slice is empty
 //   - (false, error) if an unexpected error occurs
 //   - (validity, nil) otherwise
-func VerifyBLSSignatureOneMessage(pks []PublicKey, s Signature, message []byte, kmac hash.Hasher,
+func VerifyBLSSignatureOneMessage(
+	pks []PublicKey, s Signature, message []byte, kmac hash.Hasher,
 ) (bool, error) {
 	// public key list must be non empty, this is checked internally by AggregateBLSPublicKeys
 	aggPk, err := AggregateBLSPublicKeys(pks)
@@ -301,7 +302,8 @@ func VerifyBLSSignatureOneMessage(pks []PublicKey, s Signature, message []byte, 
 //   - (false, blsAggregateEmptyListError) if input key slice `pks` is empty
 //   - (false, error) if an unexpected error occurs
 //   - (validity, nil) otherwise
-func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature, messages [][]byte, kmac []hash.Hasher,
+func VerifyBLSSignatureManyMessages(
+	pks []PublicKey, s Signature, messages [][]byte, kmac []hash.Hasher,
 ) (bool, error) {
 	// set BLS context
 	blsInstance.reInit()
@@ -325,7 +327,7 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature, messages [][]b
 	// compute the hashes
 	hashes := make([][]byte, 0, len(messages))
 	for i, k := range kmac {
-		if err := assertValidBLSHasher(k); err != nil {
+		if err := checkHasher(k); err != nil {
 			return false, fmt.Errorf("hasher at index %d is invalid: %w ", i, err)
 		}
 		hashes = append(hashes, k.ComputeHash(messages[i]))
@@ -440,7 +442,8 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature, messages [][]b
 //   - ([]false, blsAggregateEmptyListError) if input key slice is empty
 //   - ([]false, error) if an unexpected error occurs
 //   - ([]validity, nil) otherwise
-func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature, message []byte, kmac hash.Hasher,
+func BatchVerifyBLSSignaturesOneMessage(
+	pks []PublicKey, sigs []Signature, message []byte, kmac hash.Hasher,
 ) ([]bool, error) {
 	// set BLS context
 	blsInstance.reInit()
@@ -458,7 +461,7 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature, messa
 	}
 
 	verifBool := make([]bool, len(sigs))
-	if err := assertValidBLSHasher(kmac); err != nil {
+	if err := checkHasher(kmac); err != nil {
 		return verifBool, err
 	}
 
@@ -509,11 +512,11 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature, messa
 	return verifBool, nil
 }
 
-// assertValidBLSHasher asserts that the given `hasher` is not nil and
+// checkHasher asserts that the given `hasher` is not nil and
 // has an output size of `expandMsgOutput`. Otherwise an error is returned:
 //   - nilHasherError if the hasher is nil
 //   - invalidHasherSizeError if the hasher's output size is not `expandMsgOutput` (128 bytes)
-func assertValidBLSHasher(hasher hash.Hasher) error {
+func checkHasher(hasher hash.Hasher) error {
 	if hasher == nil {
 		return nilHasherError
 	}
