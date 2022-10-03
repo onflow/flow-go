@@ -25,7 +25,7 @@ import (
 type ExecutionDataReaderSuite struct {
 	suite.Suite
 
-	reader       *ExecutionDataReader
+	reader       ExecutionDataReader
 	downloader   *exedatamock.Downloader
 	headers      *storagemock.Headers
 	results      *storagemock.ExecutionResults
