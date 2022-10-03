@@ -144,16 +144,6 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 			continue
 		}
 
-		msg, ok = h.queuedTimeouts.Pop()
-		if ok {
-			err := h.processQueuedTimeout(msg.(*model.TimeoutObject))
-			if err != nil {
-				return fmt.Errorf("coult not process queued timeout: %w", err)
-			}
-
-			continue
-		}
-
 		msg, ok = h.queuedVotes.Pop()
 		if ok {
 			packed := msg.(*packedVote)
@@ -166,6 +156,16 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 				Uint64("view", packed.vote.View).
 				Hex("block_id", packed.vote.BlockID[:]).
 				Msg("packed has been processed successfully")
+
+			continue
+		}
+
+		msg, ok = h.queuedTimeouts.Pop()
+		if ok {
+			err := h.processQueuedTimeout(msg.(*model.TimeoutObject))
+			if err != nil {
+				return fmt.Errorf("coult not process queued timeout: %w", err)
+			}
 
 			continue
 		}
@@ -218,7 +218,8 @@ func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("could not broadcast timeout: %w", err)
+		log.Err(err).Msg("could not broadcast timeout")
+		return nil
 	}
 	log.Info().Msg("consensus timeout was broadcast")
 
@@ -238,19 +239,15 @@ func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 
 	log.Info().Msg("processing vote transmission request from hotstuff")
 
-	// spawn a goroutine to asynchronously send the vote
-	// we do this so that network operations do not block the HotStuff EventLoop
-	go func() {
-		// send the vote the desired recipient
-		err := h.con.Unicast(packed.vote, packed.recipientID)
-		if err != nil {
-			log.Err(err).Msg("could not send vote")
-			return
-		}
-		// TODO(active-pacemaker): update metrics
-		//h.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
-		log.Info().Msg("block vote transmitted")
-	}()
+	// send the vote the desired recipient
+	err := h.con.Unicast(packed.vote, packed.recipientID)
+	if err != nil {
+		log.Err(err).Msg("could not send vote")
+		return nil
+	}
+	// TODO(active-pacemaker): update metrics
+	//h.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
+	log.Info().Msg("block vote transmitted")
 
 	return nil
 }
@@ -327,7 +324,8 @@ func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("could not send proposal message: %w", err)
+		log.Err(err).Msg("could not send proposal message")
+		return nil
 	}
 
 	//TODO(active-pacemaker): update metrics
