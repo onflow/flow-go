@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"time"
 )
 
 // NoopConsumer is an implementation of the notifications consumer that
@@ -66,3 +67,9 @@ func (c *NoopConsumer) OnPartialTcCreated(uint64, *flow.QuorumCertificate, *flow
 func (c *NoopConsumer) OnNewQcDiscovered(*flow.QuorumCertificate) {}
 
 func (c *NoopConsumer) OnNewTcDiscovered(*flow.TimeoutCertificate) {}
+
+func (c *NoopConsumer) SendVote(flow.Identifier, uint64, []byte, flow.Identifier) {}
+
+func (c *NoopConsumer) BroadcastTimeout(*model.TimeoutObject) {}
+
+func (c *NoopConsumer) BroadcastProposalWithDelay(*flow.Header, time.Duration) {}

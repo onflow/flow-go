@@ -2,6 +2,7 @@ package notifications
 
 import (
 	"github.com/rs/zerolog"
+	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -213,4 +214,41 @@ func (lc *LogConsumer) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
 		Uint64("newest_qc_view", tc.NewestQC.View).
 		Hex("newest_qc_block_id", tc.NewestQC.BlockID[:]).
 		Msg("new TC discovered")
+}
+
+func (lc *LogConsumer) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+	lc.log.Info().
+		Hex("block_id", blockID[:]).
+		Uint64("block_view", view).
+		Hex("recipient_id", recipientID[:]).
+		Msg("vote transmission request from hotstuff")
+}
+
+func (lc *LogConsumer) BroadcastTimeout(timeout *model.TimeoutObject) {
+	logContext := lc.log.With().
+		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
+		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
+		Uint64("timeout_view", timeout.View)
+
+	if timeout.LastViewTC != nil {
+		logContext.
+			Uint64("last_view_tc_view", timeout.LastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", timeout.LastViewTC.NewestQC.View)
+	}
+	log := logContext.Logger()
+	log.Info().Msg("timeout broadcast request from hotstuff")
+}
+
+func (lc *LogConsumer) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) {
+	lc.log.Info().
+		Str("chain_id", header.ChainID.String()).
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Hex("block_id", logging.Entity(header)).
+		Hex("parent_id", header.ParentID[:]).
+		Hex("payload_hash", header.PayloadHash[:]).
+		Time("timestamp", header.Timestamp).
+		Hex("signers", header.ParentVoterIndices).
+		Dur("delay", delay).
+		Msg("proposal broadcast request from hotstuff")
 }
