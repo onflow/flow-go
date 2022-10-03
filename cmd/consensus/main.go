@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/consensus/message_hub"
 	"os"
 	"path/filepath"
 	"time"
@@ -112,6 +113,7 @@ func main() {
 		receiptRequester             *requester.Engine
 		syncCore                     *chainsync.Core
 		comp                         *compliance.Engine
+		hot                          module.HotStuff
 		conMetrics                   module.ConsensusMetrics
 		mainMetrics                  module.HotstuffMetrics
 		receiptValidator             module.ReceiptValidator
@@ -720,11 +722,10 @@ func main() {
 			}
 
 			// initialize hotstuff consensus algorithm
-			hot, err := consensus.NewParticipant(
+			hot, err = consensus.NewParticipant(
 				node.Logger,
 				mainMetrics,
 				build,
-				comp,
 				finalizedBlock,
 				pending,
 				hotstuffModules,
@@ -736,7 +737,26 @@ func main() {
 
 			comp = comp.WithConsensus(hot)
 			finalizationDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
+
 			return comp, nil
+		}).
+		Component("consensus message hub", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			messageHub, err := message_hub.NewMessageHub(
+				node.Logger,
+				node.Network,
+				node.Me,
+				comp,
+				prov,
+				hot,
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create consensus message hub: %w", err)
+			}
+			hotstuffModules.Notifier.AddConsumer(messageHub)
+			return messageHub, nil
 		}).
 		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)

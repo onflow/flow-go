@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
@@ -32,6 +33,7 @@ type packedVote struct {
 
 type MessageHub struct {
 	*component.ComponentManager
+	notifications.NoopConsumer
 	log                    zerolog.Logger
 	me                     module.Local
 	state                  protocol.State
