@@ -30,7 +30,7 @@ type Context struct {
 
 	BlockPrograms *programs.BlockPrograms
 
-	EnvironmentParams
+	environment.EnvironmentParams
 
 	meterParameters *meter.MeterParameters
 }
@@ -76,7 +76,7 @@ func defaultContext() Context {
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvoker(),
 		},
-		EnvironmentParams: DefaultEnvironmentParams(),
+		EnvironmentParams: environment.DefaultEnvironmentParams(),
 	}
 }
 

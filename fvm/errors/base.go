@@ -1,8 +1,6 @@
 package errors
 
 import (
-	"fmt"
-
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -22,30 +20,17 @@ func NewInvalidAddressErrorf(
 		append([]interface{}{address.String()}, args...)...)
 }
 
-// InvalidArgumentError indicates that a transaction includes invalid arguments.
-// this error is the result of failure in any of the following conditions:
+// NewInvalidArgumentErrorf constructs a new CodedError which indicates that a
+// transaction includes invalid arguments. This error is the result of failure
+// in any of the following conditions:
 // - number of arguments doesn't match the template
+//
 // TODO add more cases like argument size
-type InvalidArgumentError struct {
-	errorWrapper
-}
-
-// NewInvalidArgumentErrorf constructs a new InvalidArgumentError
-func NewInvalidArgumentErrorf(msg string, args ...interface{}) InvalidArgumentError {
-	return InvalidArgumentError{
-		errorWrapper: errorWrapper{
-			err: fmt.Errorf(msg, args...),
-		},
-	}
-}
-
-func (e InvalidArgumentError) Error() string {
-	return fmt.Sprintf("%s transaction arguments are invalid: (%s)", e.Code().String(), e.err.Error())
-}
-
-// Code returns the error code for this error type
-func (e InvalidArgumentError) Code() ErrorCode {
-	return ErrCodeInvalidArgumentError
+func NewInvalidArgumentErrorf(msg string, args ...interface{}) *CodedError {
+	return NewCodedError(
+		ErrCodeInvalidArgumentError,
+		"transaction arguments are invalid: ("+msg+")",
+		args...)
 }
 
 // NewInvalidLocationErrorf constructs a new CodedError which indicates an
@@ -66,38 +51,21 @@ func NewInvalidLocationErrorf(
 		append([]interface{}{locationStr}, args...)...)
 }
 
-// ValueError indicates a value is not valid value.
-type ValueError struct {
-	errorWrapper
-
-	valueStr string
-}
-
-// NewValueErrorf constructs a new ValueError
-func NewValueErrorf(valueStr string, msg string, args ...interface{}) ValueError {
-	return ValueError{valueStr: valueStr,
-		errorWrapper: errorWrapper{
-			err: fmt.Errorf(msg, args...),
-		},
-	}
-}
-
-func (e ValueError) Error() string {
-	errMsg := ""
-	if e.err != nil {
-		errMsg = e.err.Error()
-	}
-	return fmt.Sprintf("%s invalid value (%s): %s", e.Code().String(), e.valueStr, errMsg)
-}
-
-// Code returns the error code for this error type
-func (e ValueError) Code() ErrorCode {
-	return ErrCodeValueError
+// NewValueErrorf constructs a new CodedError which indicates a value is not
+// valid value.
+func NewValueErrorf(
+	valueStr string,
+	msg string,
+	args ...interface{},
+) *CodedError {
+	return NewCodedError(
+		ErrCodeValueError,
+		"invalid value (%s): "+msg,
+		append([]interface{}{valueStr}, args...)...)
 }
 
 func IsValueError(err error) bool {
-	var valErr ValueError
-	return As(err, &valErr)
+	return HasErrorCode(err, ErrCodeValueError)
 }
 
 // NewOperationAuthorizationErrorf constructs a new CodedError which indicates
@@ -114,45 +82,19 @@ func NewOperationAuthorizationErrorf(
 		append([]interface{}{operation}, args...)...)
 }
 
-// AccountAuthorizationError indicates that an authorization issues
-// either a transaction is missing a required signature to
-// authorize access to an account or a transaction doesn't have authorization
-// to performe some operations like account creation.
-type AccountAuthorizationError struct {
-	errorWrapper
-
-	address flow.Address
-}
-
-// NewAccountAuthorizationErrorf constructs a new AccountAuthorizationError
-func NewAccountAuthorizationErrorf(address flow.Address, msg string, args ...interface{}) AccountAuthorizationError {
-	return AccountAuthorizationError{
-		address: address,
-		errorWrapper: errorWrapper{
-			err: fmt.Errorf(msg, args...),
-		},
-	}
-}
-
-// Address returns the address of an account without enough authorization
-func (e AccountAuthorizationError) Address() flow.Address {
-	return e.address
-}
-
-func (e AccountAuthorizationError) Error() string {
-	errMsg := ""
-	if e.err != nil {
-		errMsg = e.err.Error()
-	}
-	return fmt.Sprintf(
-		"%s authorization failed for account %s: %s",
-		e.Code().String(),
-		e.address,
-		errMsg,
-	)
-}
-
-// Code returns the error code for this error type
-func (e AccountAuthorizationError) Code() ErrorCode {
-	return ErrCodeAccountAuthorizationError
+// NewAccountAuthorizationErrorf constructs a new CodedError which indicates
+// that an authorization issue either:
+//   - a transaction is missing a required signature to authorize access to an
+//     account, or
+//   - a transaction doesn't have authorization to performe some operations like
+//     account creation.
+func NewAccountAuthorizationErrorf(
+	address flow.Address,
+	msg string,
+	args ...interface{},
+) *CodedError {
+	return NewCodedError(
+		ErrCodeAccountAuthorizationError,
+		"authorization failed for account %s: "+msg,
+		append([]interface{}{address}, args...)...)
 }
