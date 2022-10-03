@@ -152,7 +152,7 @@ func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvid
 }
 
 // ProcessAttackerMessage is the central place for the corrupt network to process messages from an attacker.
-// The messages coming from an attacker can be destined TO a corrupt node (ingress) or FROM a corrupt node (egress).
+// The messages coming from an attacker can be destined to this corrupt node (on behalf of another node) (ingress message) or to another node (on behalf of this corrupt node) (egress message).
 // This is a Client Streaming gRPC end-point that allows a registered attack orchestrator to dictate messages to this corrupt
 // network.
 // The first call to this Client Streaming gRPC method creates the "stream" from attack orchestrator (i.e., client) to this corrupt network

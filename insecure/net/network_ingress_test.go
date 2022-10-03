@@ -1,4 +1,4 @@
-package net
+package net_test
 
 import (
 	"sync"
@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/insecure/net"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/channels"
@@ -19,15 +20,15 @@ import (
 // TestHandleIncomingEvent_AttackerRegistered checks that a corrupt network sends ingress messages to a registered attacker.
 // The attacker is mocked out in this test.
 func TestHandleIncomingEvent_AttackerRegistered(t *testing.T) {
-	runCorruptNetworkTest(t, unittest.Logger(),
+	net.RunCorruptNetworkTest(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
-			corruptNetwork *Network,
+			corruptNetwork *net.Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
 			codec := unittest.NetworkCodec()
-			attacker := newMockAttacker()
+			attacker := net.NewMockAttacker()
 
 			attackerRegistered := sync.WaitGroup{}
 			attackerRegistered.Add(1)
@@ -52,7 +53,7 @@ func TestHandleIncomingEvent_AttackerRegistered(t *testing.T) {
 			// either a message arrives or a timeout. Reading a message from that channel means attackers Observe has been called.
 			var receivedMsg *insecure.Message
 			unittest.RequireReturnsBefore(t, func() {
-				receivedMsg = <-attacker.incomingBuffer
+				receivedMsg = <-attacker.IncomingBuffer
 			}, 100*time.Millisecond, "mock attack could not receive incoming message on time")
 
 			// checks content of the received message matches what has been sent.
@@ -70,10 +71,10 @@ func TestHandleIncomingEvent_AttackerRegistered(t *testing.T) {
 // TestHandleIncomingEvent_NoAttacker checks that incoming events to the corrupted network
 // are routed to the network adapter when no attacker is registered to the network.
 func TestHandleIncomingEvent_NoAttacker(t *testing.T) {
-	runCorruptNetworkTest(t, unittest.Logger(),
+	net.RunCorruptNetworkTest(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
-			corruptNetwork *Network,
+			corruptNetwork *net.Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {

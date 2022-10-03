@@ -41,7 +41,7 @@ func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 		ccf)
 	require.NoError(t, err)
 
-	attacker := newMockAttacker()
+	attacker := NewMockAttacker()
 
 	attackerRegistered := sync.WaitGroup{}
 	attackerRegistered.Add(1)
@@ -66,7 +66,7 @@ func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 	// either a message arrives or a timeout. Reading a message from that channel means attackers Observe has been called.
 	var receivedMsg *insecure.Message
 	unittest.RequireReturnsBefore(t, func() {
-		receivedMsg = <-attacker.incomingBuffer
+		receivedMsg = <-attacker.IncomingBuffer
 	}, 100*time.Millisecond, "mock attack could not receive incoming message on time")
 
 	// checks content of the received message matches what has been sent.
@@ -84,7 +84,7 @@ func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork checks that outgoing unicast events to the corrupted network
 // are routed to the network adapter when no attacker is registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
-	runCorruptNetworkTest(t, unittest.Logger(),
+	RunCorruptNetworkTest(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
@@ -107,7 +107,7 @@ func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork checks that the outgoing publish events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
-	runCorruptNetworkTest(t, unittest.Logger(),
+	RunCorruptNetworkTest(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
@@ -134,7 +134,7 @@ func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork checks that the outgoing multicast events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
-	runCorruptNetworkTest(t, unittest.Logger(),
+	RunCorruptNetworkTest(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
@@ -160,7 +160,7 @@ func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
 
 // TestProcessAttackerMessage checks that a corrupted network relays the messages to its underlying flow network.
 func TestProcessAttackerMessage_MessageSentOnFlowNetwork(t *testing.T) {
-	runCorruptNetworkTest(t, unittest.Logger(),
+	RunCorruptNetworkTest(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
@@ -200,7 +200,7 @@ func TestProcessAttackerMessage_MessageSentOnFlowNetwork(t *testing.T) {
 // TestProcessAttackerMessage_ResultApproval_Dictated checks that when a corrupt network receives a result approval with an
 // empty signature field, it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
-	runCorruptNetworkTest(t, unittest.Logger(),
+	RunCorruptNetworkTest(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
@@ -272,7 +272,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 // receives a completely filled result approval,
 // it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
-	runCorruptNetworkTest(t, unittest.Logger(),
+	RunCorruptNetworkTest(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
@@ -316,7 +316,7 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 // TestProcessAttackerMessage_ExecutionReceipt_Dictated checks that when a corrupted network receives an execution receipt with
 // empty signature field, it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
-	runCorruptNetworkTest(t, unittest.Logger(),
+	RunCorruptNetworkTest(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
@@ -376,7 +376,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 // TestProcessAttackerMessage_ExecutionReceipt_PassThrough checks that when a corrupted network
 // receives a completely filled execution receipt, it treats it as a pass-through event and passes it as it is on the Flow network.
 func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
-	runCorruptNetworkTest(t, unittest.Logger(),
+	RunCorruptNetworkTest(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,

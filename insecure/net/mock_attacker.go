@@ -13,16 +13,16 @@ import (
 type mockAttacker struct {
 	grpc.ClientStream
 
-	// incomingBuffer imitates the gRPC buffer of the orchestrator network,
+	// IncomingBuffer imitates the gRPC buffer of the orchestrator network,
 	// i.e., when a corrupt network is relaying an ingress/egress message to an attacker for observation,
-	// the message goes to the gRPC buffer (i.e., incomingBuffer).
-	incomingBuffer chan *insecure.Message
+	// the message goes to the gRPC buffer (i.e., IncomingBuffer).
+	IncomingBuffer chan *insecure.Message
 	closed         chan interface{}
 }
 
-func newMockAttacker() *mockAttacker {
+func NewMockAttacker() *mockAttacker {
 	return &mockAttacker{
-		incomingBuffer: make(chan *insecure.Message),
+		IncomingBuffer: make(chan *insecure.Message),
 		closed:         make(chan interface{}),
 	}
 }
@@ -47,7 +47,7 @@ func (m *mockAttacker) SetTrailer(_ metadata.MD) {
 
 // Send puts the incoming message into inbound buffer of the attacker.
 func (m *mockAttacker) Send(in *insecure.Message) error {
-	m.incomingBuffer <- in
+	m.IncomingBuffer <- in
 	return nil
 }
 
