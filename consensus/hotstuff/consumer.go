@@ -262,5 +262,5 @@ type CommunicatorConsumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) error
+	BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration)
 }
