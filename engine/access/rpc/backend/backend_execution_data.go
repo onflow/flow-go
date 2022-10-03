@@ -2,12 +2,13 @@ package backend
 
 import (
 	"context"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
-	"github.com/onflow/flow-go/storage"
+
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
+	"github.com/onflow/flow-go/storage"
 )
 
 type backendExecutionData struct {

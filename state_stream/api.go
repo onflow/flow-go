@@ -2,6 +2,7 @@ package state_stream
 
 import (
 	"context"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
