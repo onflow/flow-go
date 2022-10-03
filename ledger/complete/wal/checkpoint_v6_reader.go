@@ -97,6 +97,7 @@ func readHeader(filePath string) ([]uint32, uint32, error) {
 // it returns os.ErrNotExist if some file is missing
 // it returns err if running into any exception
 func allPartFileExist(dir string, fileName string, totalSubtrieFiles int) error {
+	// check all subtrie part file exist
 	for i := 0; i < totalSubtrieFiles; i++ {
 		filePath, _, err := filePathSubTries(dir, fileName, i)
 		if err != nil {
@@ -109,6 +110,14 @@ func allPartFileExist(dir string, fileName string, totalSubtrieFiles int) error 
 			return fmt.Errorf("fail to check %v-th subtrie file exist: %w", i, err)
 		}
 	}
+
+	// check top level part file exist
+	toplevelPartFile, _ := filePathTopTries(dir, fileName)
+	_, err := os.Stat(toplevelPartFile)
+	if err != nil {
+		return fmt.Errorf("fail to check top level file exist: %w", err)
+	}
+
 	return nil
 }
 
