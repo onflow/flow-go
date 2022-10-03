@@ -105,9 +105,9 @@ func (r *SealingRecord) Generate() (Rec, error) {
 // This information can only be obtained without traversing the forks, if the result
 // is incorporated at a height that was already finalized.
 // Convention for return values:
-//  * nil if result is incorporated at an unfinalized height
-//  * "finalized" if result is incorporated at a finalized block
-//  * "orphaned" if result is incorporated in an orphaned block
+//   - nil if result is incorporated at an unfinalized height
+//   - "finalized" if result is incorporated at a finalized block
+//   - "orphaned" if result is incorporated in an orphaned block
 func (r *SealingRecord) assignmentFinalizationStatus(incorporatingBlock *flow.Header) (*string, error) {
 	if incorporatingBlock.Height > r.finalizedBlock.Height {
 		return nil, nil // result is incorporated at an unfinalized height.

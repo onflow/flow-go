@@ -269,9 +269,9 @@ func withPrefetchValuesFalse(options *badger.IteratorOptions) {
 //
 // The iteration range uses prefix-wise semantics. Specifically, all keys that
 // meet ANY of the following conditions are included in the iteration:
-//   * have a prefix equal to the start key OR
-//   * have a prefix equal to the end key OR
-//   * have a prefix that is lexicographically between start and end
+//   - have a prefix equal to the start key OR
+//   - have a prefix equal to the end key OR
+//   - have a prefix that is lexicographically between start and end
 //
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.

@@ -34,41 +34,54 @@ func (NoopMetricsReporter) RuntimeTransactionInterpreted(time.Duration) {}
 // RuntimeSetNumberOfAccounts is a noop
 func (NoopMetricsReporter) RuntimeSetNumberOfAccounts(count uint64) {}
 
+type ProgramLoggerParams struct {
+	zerolog.Logger
+
+	CadenceLoggingEnabled bool
+
+	MetricsReporter
+}
+
+func DefaultProgramLoggerParams() ProgramLoggerParams {
+	return ProgramLoggerParams{
+		Logger:                zerolog.Nop(),
+		CadenceLoggingEnabled: false,
+		MetricsReporter:       NoopMetricsReporter{},
+	}
+}
+
 type ProgramLogger struct {
 	tracer *Tracer
 
-	logger zerolog.Logger
+	ProgramLoggerParams
 
-	cadenceLoggingEnabled bool
-	logs                  []string
-
-	reporter MetricsReporter
+	logs []string
 }
 
 func NewProgramLogger(
 	tracer *Tracer,
-	logger zerolog.Logger,
-	reporter MetricsReporter,
-	cadenceLoggingEnabled bool,
+	params ProgramLoggerParams,
 ) *ProgramLogger {
 	return &ProgramLogger{
-		tracer:                tracer,
-		logger:                logger,
-		cadenceLoggingEnabled: cadenceLoggingEnabled,
-		logs:                  nil,
-		reporter:              reporter,
+		tracer:              tracer,
+		ProgramLoggerParams: params,
+		logs:                nil,
 	}
 }
 
+func (logger *ProgramLogger) Logger() *zerolog.Logger {
+	return &logger.ProgramLoggerParams.Logger
+}
+
 func (logger *ProgramLogger) ImplementationDebugLog(message string) error {
-	logger.logger.Debug().Msgf("Cadence: %s", message)
+	logger.Logger().Debug().Msgf("Cadence: %s", message)
 	return nil
 }
 
 func (logger *ProgramLogger) ProgramLog(message string) error {
 	defer logger.tracer.StartExtensiveTracingSpanFromRoot(trace.FVMEnvProgramLog).End()
 
-	if logger.cadenceLoggingEnabled {
+	if logger.CadenceLoggingEnabled {
 		logger.logs = append(logger.logs, message)
 	}
 	return nil
@@ -103,7 +116,7 @@ func (logger *ProgramLogger) ProgramParsed(location common.Location, duration ti
 		return
 	}
 	if _, ok := location.(common.TransactionLocation); ok {
-		logger.reporter.RuntimeTransactionParsed(duration)
+		logger.MetricsReporter.RuntimeTransactionParsed(duration)
 	}
 }
 
@@ -116,7 +129,7 @@ func (logger *ProgramLogger) ProgramChecked(location common.Location, duration t
 		return
 	}
 	if _, ok := location.(common.TransactionLocation); ok {
-		logger.reporter.RuntimeTransactionChecked(duration)
+		logger.MetricsReporter.RuntimeTransactionChecked(duration)
 	}
 }
 
@@ -129,7 +142,7 @@ func (logger *ProgramLogger) ProgramInterpreted(location common.Location, durati
 		return
 	}
 	if _, ok := location.(common.TransactionLocation); ok {
-		logger.reporter.RuntimeTransactionInterpreted(duration)
+		logger.MetricsReporter.RuntimeTransactionInterpreted(duration)
 	}
 }
 

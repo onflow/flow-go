@@ -48,7 +48,7 @@ func (cc *LoaderCollector) TransactionSent() {
 	cc.transactionsSent.Inc()
 }
 
-func (cc *LoaderCollector) SetTPSConfigured(tps int) {
+func (cc *LoaderCollector) SetTPSConfigured(tps uint) {
 	cc.tpsConfigured.Set(float64(tps))
 }
 

@@ -26,9 +26,9 @@ var _ hotstuff.BlockSignerDecoder = (*BlockSignerDecoder)(nil)
 
 // DecodeSignerIDs decodes the signer indices from the given block header into full node IDs.
 // Expected Error returns during normal operations:
-//  * state.UnknownBlockError if block has not been ingested yet
-//  * signature.InvalidSignerIndicesError if signer indices included in the header do
-//    not encode a valid subset of the consensus committee
+//   - state.UnknownBlockError if block has not been ingested yet
+//   - signature.InvalidSignerIndicesError if signer indices included in the header do
+//     not encode a valid subset of the consensus committee
 func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error) {
 	// root block does not have signer indices
 	if header.ParentVoterIndices == nil && header.View == 0 {

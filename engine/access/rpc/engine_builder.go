@@ -34,9 +34,11 @@ func (builder *RPCEngineBuilder) Handler() accessproto.AccessAPIServer {
 
 // WithBlockSignerDecoder specifies that signer indices in block headers should be translated
 // to full node IDs with the given decoder.
-// Caution: you can inject either a `BlockSignerDecoder` (via method `WithBlockSignerDecoder`)
-//          or an `AccessAPIServer` (via method `WithNewHandler`); but not both. If both are
-//          specified, the builder will error during the build step.
+// Caution:
+// you can inject either a `BlockSignerDecoder` (via method `WithBlockSignerDecoder`)
+// or an `AccessAPIServer` (via method `WithNewHandler`); but not both. If both are
+// specified, the builder will error during the build step.
+//
 // Returns self-reference for chaining.
 func (builder *RPCEngineBuilder) WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) *RPCEngineBuilder {
 	builder.signerIndicesDecoder = signerIndicesDecoder
@@ -44,9 +46,11 @@ func (builder *RPCEngineBuilder) WithBlockSignerDecoder(signerIndicesDecoder hot
 }
 
 // WithNewHandler specifies that the given `AccessAPIServer` should be used for serving API queries.
-// Caution: you can inject either a `BlockSignerDecoder` (via method `WithBlockSignerDecoder`)
-//          or an `AccessAPIServer` (via method `WithNewHandler`); but not both. If both are
-//          specified, the builder will error during the build step.
+// Caution:
+// you can inject either a `BlockSignerDecoder` (via method `WithBlockSignerDecoder`)
+// or an `AccessAPIServer` (via method `WithNewHandler`); but not both. If both are
+// specified, the builder will error during the build step.
+//
 // Returns self-reference for chaining.
 func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPIServer) *RPCEngineBuilder {
 	builder.handler = handler

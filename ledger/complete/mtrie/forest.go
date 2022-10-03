@@ -19,7 +19,7 @@ import (
 // explicit eviction policy.
 //
 // TODO: Storage Eviction Policy for Forest
-//       For the execution node: we only evict on sealing a result.
+// For the execution node: we only evict on sealing a result.
 type Forest struct {
 	// tries stores all MTries in the forest. It is NOT a CACHE in the conventional sense:
 	// there is no mechanism to load a trie from disk in case of a cache miss. Missing a

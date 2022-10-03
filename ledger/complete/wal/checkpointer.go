@@ -67,7 +67,7 @@ const defaultBufioReadSize = 1024 * 32
 
 // defaultBufioWriteSize replaces the default bufio buffer size of 4096 bytes.
 // defaultBufioWriteSize can be increased to 8KiB, 16KiB, 32KiB, etc. if it
-//  improves performance on typical EN hardware.
+// improves performance on typical EN hardware.
 const defaultBufioWriteSize = 1024 * 32
 
 type Checkpointer struct {
@@ -281,8 +281,9 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 // StoreCheckpoint writes the given tries to checkpoint file, and also appends
 // a CRC32 file checksum for integrity check.
 // Checkpoint file consists of a flattened forest. Specifically, it consists of:
-//   * a list of encoded nodes, where references to other nodes are by list index.
-//   * a list of encoded tries, each referencing their respective root node by index.
+//   - a list of encoded nodes, where references to other nodes are by list index.
+//   - a list of encoded tries, each referencing their respective root node by index.
+//
 // Referencing to other nodes by index 0 is a special case, meaning nil.
 //
 // As an important property, the nodes are listed in an order which satisfies
@@ -554,13 +555,13 @@ func getNodesAtLevel(root *node.Node, level uint) []*node.Node {
 }
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
-	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
-	return LoadCheckpoint(filepath, &c.wal.log)
+	filename := NumberToFilename(checkpoint)
+	return LoadCheckpoint(c.dir, filename, &c.wal.log)
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
-	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
-	return LoadCheckpoint(filepath, &c.wal.log)
+	filename := bootstrap.FilenameWALRootCheckpoint
+	return LoadCheckpoint(c.dir, filename, &c.wal.log)
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
@@ -577,7 +578,8 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
-func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func LoadCheckpoint(dir string, filename string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+	filepath := path.Join(dir, filename)
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
