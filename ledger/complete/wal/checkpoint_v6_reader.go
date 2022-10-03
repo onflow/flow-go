@@ -193,6 +193,18 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		return nil, fmt.Errorf("cannot read sub trie node count: %w", err)
 	}
 
+	// the subtrie checksum from the checkpoint header file must be same
+	// as the checksum included in the subtrie file
+	expectedSum, err := readCRC32Sum(bufio.NewReaderSize(f, defaultBufioReadSize))
+	if err != nil {
+		return nil, fmt.Errorf("cannot read checksum for sub trie file: %w", err)
+	}
+
+	if checksum != expectedSum {
+		return nil, fmt.Errorf("mismatch checksum in subtrie file. checksum from checkpoint header %v does not"+
+			"match with checksum in subtrie file %v", checksum, expectedSum)
+	}
+
 	_, err = f.Seek(0, io.SeekStart)
 	if err != nil {
 		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
@@ -226,7 +238,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 	actualSum := reader.Crc32()
 
 	// read the stored checksum, and compare with the actual sum
-	expectedSum, err := readCRC32Sum(reader)
+	_, err = readCRC32Sum(reader)
 	if err != nil {
 		return nil, fmt.Errorf("could not read subtrie checkpoint checksum: %w", err)
 	}
@@ -302,6 +314,18 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
 	// TODO: read subtrie Node count and validate
 
+	// the subtrie checksum from the checkpoint header file must be same
+	// as the checksum included in the subtrie file
+	expectedSum, err := readCRC32Sum(bufio.NewReaderSize(file, defaultBufioReadSize))
+	if err != nil {
+		return nil, fmt.Errorf("cannot read checksum for sub trie file: %w", err)
+	}
+
+	if topTrieChecksum != expectedSum {
+		return nil, fmt.Errorf("mismatch checksum in top trie file. checksum from checkpoint header %v does not"+
+			"match with checksum in top trie file %v", topTrieChecksum, expectedSum)
+	}
+
 	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {
 		return nil, fmt.Errorf("could not seek to 0: %w", err)
@@ -354,7 +378,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	actualSum := reader.Crc32()
 
 	// read the stored checksum, and compare with the actual sum
-	expectedSum, err := readCRC32Sum(reader)
+	_, err = readCRC32Sum(reader)
 	if err != nil {
 		return nil, fmt.Errorf("could not read top level trie checksum: %w", err)
 	}
