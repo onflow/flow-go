@@ -467,7 +467,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 		return fmt.Errorf("cannot write checkpoint footer: %w", err)
 	}
 
-	// Write CRC32 sum of the footer for validation
+	// Write CRC32 sum
 	crc32buf := scratch[:crc32SumSize]
 	binary.BigEndian.PutUint32(crc32buf, crc32Writer.Crc32())
 
