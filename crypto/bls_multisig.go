@@ -45,8 +45,8 @@ var popKMAC = internalExpandMsgXOFKMAC128(blsPOPCipherSuite)
 // and is not used by any other application.
 //
 // The function returns:
-//  - (nil, notBLSKeyError) if the input key is not of type BLS BLS12-381
-//  - (pop, nil) otherwise
+//   - (nil, notBLSKeyError) if the input key is not of type BLS BLS12-381
+//   - (pop, nil) otherwise
 func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
 	_, ok := sk.(*prKeyBLSBLS12381)
 	if !ok {
@@ -61,8 +61,8 @@ func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
 // The function internally uses the same KMAC hasher used to generate the PoP.
 //
 // The function returns:
-//  - (false, notBLSKeyError) if the input key is not of type BLS BLS12-381
-//  - (validity, nil) otherwise
+//   - (false, notBLSKeyError) if the input key is not of type BLS BLS12-381
+//   - (validity, nil) otherwise
 func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 	_, ok := pk.(*pubKeyBLSBLS12381)
 	if !ok {
@@ -81,20 +81,20 @@ func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 // No G1 subgroup membership check is performed on the input signatures.
 //
 // The function returns:
-//  - (nil, blsEmptyListError) if no signatures are provided (input slice is empty)
-//  - (nil, invalidSignatureError) if a deserialization of at least one signature fails (input is an invalid serialization of a
-// 	  compressed E1 element following [zcash]
-//    https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-).
-//    The function does not check
-//  - (nil, error) if an unexpected error occurs
-//  - (aggregated_signature, nil) otherwise
+//   - (nil, blsAggregateEmptyListError) if no signatures are provided (input slice is empty)
+//   - (nil, invalidSignatureError) if a deserialization of at least one signature fails (input is an invalid serialization of a
+//     compressed E1 element following [zcash]
+//     https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-).
+//     The function does not check
+//   - (nil, error) if an unexpected error occurs
+//   - (aggregated_signature, nil) otherwise
 func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	// set BLS context
 	blsInstance.reInit()
 
 	// check for empty list
 	if len(sigs) == 0 {
-		return nil, blsEmptyListError
+		return nil, blsAggregateEmptyListError
 	}
 
 	// flatten the shares (required by the C layer)
@@ -130,16 +130,16 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 // No check is performed on the input private keys.
 //
 // The function returns:
-//  - (nil, notBLSKeyError) if at least one key is not of type BLS BLS12-381
-//  - (nil, blsEmptyListError) if no keys are provided (input slice is empty)
-//  - (aggregated_key, nil) otherwise
+//   - (nil, notBLSKeyError) if at least one key is not of type BLS BLS12-381
+//   - (nil, blsAggregateEmptyListError) if no keys are provided (input slice is empty)
+//   - (aggregated_key, nil) otherwise
 func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	// set BLS context
 	blsInstance.reInit()
 
 	// check for empty list
 	if len(keys) == 0 {
-		return nil, blsEmptyListError
+		return nil, blsAggregateEmptyListError
 	}
 
 	scalars := make([]scalar, 0, len(keys))
@@ -165,16 +165,16 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 // No check is performed on the input public keys.
 //
 // The function returns:
-//  - (nil, notBLSKeyError) if at least one key is not of type BLS BLS12-381
-//  - (nil, blsEmptyListError) no keys are provided (input slice is empty)
-//  - (aggregated_key, nil) otherwise
+//   - (nil, notBLSKeyError) if at least one key is not of type BLS BLS12-381
+//   - (nil, blsAggregateEmptyListError) no keys are provided (input slice is empty)
+//   - (aggregated_key, nil) otherwise
 func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	// set BLS context
 	blsInstance.reInit()
 
 	// check for empty list
 	if len(keys) == 0 {
-		return nil, blsEmptyListError
+		return nil, blsAggregateEmptyListError
 	}
 
 	points := make([]pointG2, 0, len(keys))
@@ -214,8 +214,8 @@ func NeutralBLSPublicKey() PublicKey {
 // No membership check is performed on the input public keys.
 //
 // The function returns:
-//  - (nil, notBLSKeyError) if at least one input key is not of type BLS BLS12-381
-//  - (remaining_key, nil) otherwise
+//   - (nil, notBLSKeyError) if at least one input key is not of type BLS BLS12-381
+//   - (remaining_key, nil) otherwise
 func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {
 	// set BLS context
 	blsInstance.reInit()
@@ -263,12 +263,12 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 // message and hasher.
 //
 // The function returns:
-//  - (false, nilHasherError) if hasher is nil
-//  - (false, invalidHasherSizeError) if hasher's output size is not 128 bytes
-//  - (false, notBLSKeyError) if at least one key is not of type pubKeyBLSBLS12381
-//  - (nil, blsEmptyListError) if input key slice is empty
-//  - (false, error) if an unexpected error occurs
-//  - (validity, nil) otherwise
+//   - (false, nilHasherError) if hasher is nil
+//   - (false, invalidHasherSizeError) if hasher's output size is not 128 bytes
+//   - (false, notBLSKeyError) if at least one key is not of type pubKeyBLSBLS12381
+//   - (nil, blsAggregateEmptyListError) if input key slice is empty
+//   - (false, error) if an unexpected error occurs
+//   - (validity, nil) otherwise
 func VerifyBLSSignatureOneMessage(pks []PublicKey, s Signature, message []byte, kmac hash.Hasher,
 ) (bool, error) {
 	// public key list must be non empty, this is checked internally by AggregateBLSPublicKeys
@@ -294,13 +294,13 @@ func VerifyBLSSignatureOneMessage(pks []PublicKey, s Signature, message []byte, 
 // Membership check is performed on the input signature.
 //
 // The function returns:
-//  - (false, nilHasherError) if a hasher is nil
-//  - (false, invalidHasherSizeError) if a hasher's output size is not 128 bytes
-//  - (false, notBLSKeyError) if at least one key is not a BLS BLS12-381 key
-//  - (false, invalidInputsError) if size of keys is not matching the size of messages and hashers
-//  - (false, blsEmptyListError) if input key slice `pks` is empty
-//  - (false, error) if an unexpected error occurs
-//  - (validity, nil) otherwise
+//   - (false, nilHasherError) if a hasher is nil
+//   - (false, invalidHasherSizeError) if a hasher's output size is not 128 bytes
+//   - (false, notBLSKeyError) if at least one key is not a BLS BLS12-381 key
+//   - (false, invalidInputsError) if size of keys is not matching the size of messages and hashers
+//   - (false, blsAggregateEmptyListError) if input key slice `pks` is empty
+//   - (false, error) if an unexpected error occurs
+//   - (validity, nil) otherwise
 func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature, messages [][]byte, kmac []hash.Hasher,
 ) (bool, error) {
 	// set BLS context
@@ -312,7 +312,7 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature, messages [][]b
 	}
 	// check the list lengths
 	if len(pks) == 0 {
-		return false, fmt.Errorf("invalid list of public keys: %w", blsEmptyListError)
+		return false, fmt.Errorf("invalid list of public keys: %w", blsAggregateEmptyListError)
 	}
 	if len(pks) != len(messages) || len(kmac) != len(messages) {
 		return false, invalidInputsErrorf(
@@ -433,13 +433,13 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature, messages [][]b
 // An error is returned if the key slice is empty.
 //
 // The function returns:
-//  - ([]false, nilHasherError) if a hasher is nil
-//  - ([]false, invalidHasherSizeError) if a hasher's output size is not 128 bytes
-//  - ([]false, notBLSKeyError) if at least one key is not of type BLS BLS12-381
-//  - ([]false, invalidInputsError) if size of keys is not matching the size of signatures
-//  - ([]false, blsEmptyListError) if input key slice is empty
-//  - ([]false, error) if an unexpected error occurs
-//  - ([]validity, nil) otherwise
+//   - ([]false, nilHasherError) if a hasher is nil
+//   - ([]false, invalidHasherSizeError) if a hasher's output size is not 128 bytes
+//   - ([]false, notBLSKeyError) if at least one key is not of type BLS BLS12-381
+//   - ([]false, invalidInputsError) if size of keys is not matching the size of signatures
+//   - ([]false, blsAggregateEmptyListError) if input key slice is empty
+//   - ([]false, error) if an unexpected error occurs
+//   - ([]validity, nil) otherwise
 func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature, message []byte, kmac hash.Hasher,
 ) ([]bool, error) {
 	// set BLS context
@@ -447,7 +447,7 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature, messa
 
 	// empty list check
 	if len(pks) == 0 {
-		return []bool{}, fmt.Errorf("invalid list of public keys: %w", blsEmptyListError)
+		return []bool{}, fmt.Errorf("invalid list of public keys: %w", blsAggregateEmptyListError)
 	}
 
 	if len(pks) != len(sigs) {
@@ -511,8 +511,8 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature, messa
 
 // assertValidBLSHasher asserts that the given `hasher` is not nil and
 // has an output size of `expandMsgOutput`. Otherwise an error is returned:
-//  - nilHasherError if the hasher is nil
-//  - invalidHasherSizeError if the hasher's output size is not `expandMsgOutput` (128 bytes)
+//   - nilHasherError if the hasher is nil
+//   - invalidHasherSizeError if the hasher's output size is not `expandMsgOutput` (128 bytes)
 func assertValidBLSHasher(hasher hash.Hasher) error {
 	if hasher == nil {
 		return nilHasherError
@@ -523,15 +523,16 @@ func assertValidBLSHasher(hasher hash.Hasher) error {
 	return nil
 }
 
-// blsEmptyListError is returned when a list of BLS objects (e.g. signatures or keys)
+// blsAggregateEmptyListError is returned when a list of BLS objects (e.g. signatures or keys)
 // is empty or nil and thereby represents an invalid input.
-var blsEmptyListError = errors.New("list cannot be empty")
+var blsAggregateEmptyListError = errors.New("list cannot be empty")
 
-// IsBlsEmptyListError checks if err is an `blsEmptyListError`.
-// blsEmptyListError is returned when a list of BLS objects (e.g. signatures or keys)
-// is empty or nil and thereby represents an invalid input.
-func IsBlsEmptyListError(err error) bool {
-	return errors.Is(err, blsEmptyListError)
+// IsBLSAggregateEmptyListError checks if err is an `blsAggregateEmptyListError`.
+// blsAggregateEmptyListError is returned when a BLS aggregation function is called with
+// an empty list which is not allowed in some aggregation cases to avoid signature equivocation
+// issues.
+func IsBLSAggregateEmptyListError(err error) bool {
+	return errors.Is(err, blsAggregateEmptyListError)
 }
 
 // notBLSKeyError is returned when a private or public key
