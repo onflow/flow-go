@@ -114,6 +114,9 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 
 				// wait for both egress and ingress events to be received.
 				unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "honest node could not receive corrupted event on time")
+
+				corruptedEngine.AssertExpectations(t)
+				honestEngine.AssertExpectations(t)
 			})
 	})
 
