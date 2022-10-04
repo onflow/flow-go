@@ -179,7 +179,7 @@ func storeTopLevelNodesAndTrieRoots(
 
 	err = storeRootNodes(tries, topLevelNodeIndices, flattener.EncodeTrie, writer)
 	if err != nil {
-		return 0, fmt.Errorf("could not store top level nodes: %w", err)
+		return 0, fmt.Errorf("could not store trie root nodes: %w", err)
 	}
 
 	err = storeFooter(topLevelNodesCount, uint16(len(tries)), writer)
