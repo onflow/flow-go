@@ -62,6 +62,10 @@ remove-execution-fork
 # generated key
 integration/localnet/observer-network-key
 
+# benchnet2 generated info
+integration/benchnet2/bootstrap
+integration/benchnet2/values.yml
+
 # go workspace
 go.work
 go.work.sum

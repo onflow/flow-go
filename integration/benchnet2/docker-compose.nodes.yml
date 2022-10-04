@@ -1,0 +1,458 @@
+version: "3.7"
+services:
+  access_1:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        COMMIT: e25eb4074d0175f385ae9ec66329f174eb8409db
+        GOARCH: arm64
+        TARGET: ./cmd/access
+        VERSION: localnetbuild
+      target: production
+    image: localnet-access
+    command:
+    - --bootstrapdir=/bootstrap
+    - --datadir=/data/protocol
+    - --secretsdir=/data/secret
+    - --loglevel=DEBUG
+    - --profiler-enabled=false
+    - --tracer-enabled=true
+    - --profiler-dir=/profiler
+    - --profiler-interval=2m
+    - --nodeid=a604a6b3f0bf9a9a578de4b791833869c94d7c3f6752bbb9b9d5467944f7e16a
+    - --rpc-addr=access_1:9000
+    - --secure-rpc-addr=access_1:9001
+    - --http-addr=access_1:8000
+    - --collection-ingress-port=9000
+    - --supports-observer=true
+    - --public-network-address=access_1:1234
+    - --log-tx-time-to-finalized
+    - --log-tx-time-to-executed
+    - --log-tx-time-to-finalized-executed
+    environment:
+    - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317
+    - OTEL_EXPORTER_OTLP_TRACES_INSECURE=true
+    - OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=access,num=001
+    - BINSTAT_ENABLE
+    - BINSTAT_LEN_WHAT
+    - BINSTAT_DMP_NAME
+    - BINSTAT_DMP_PATH
+    volumes:
+    - ./bootstrap:/bootstrap:z
+    - ./profiler/access/a604a6b3f0bf9a9a578de4b791833869c94d7c3f6752bbb9b9d5467944f7e16a:/profiler:z
+    - ./data/access/a604a6b3f0bf9a9a578de4b791833869c94d7c3f6752bbb9b9d5467944f7e16a:/data:z
+    ports:
+    - 1234:1234
+    - 3569:9000
+    - 3570:9001
+    labels:
+      com.dapperlabs.num: "001"
+      com.dapperlabs.role: access
+  access_2:
+    image: localnet-access
+    depends_on:
+    - access_1
+    command:
+    - --bootstrapdir=/bootstrap
+    - --datadir=/data/protocol
+    - --secretsdir=/data/secret
+    - --loglevel=DEBUG
+    - --profiler-enabled=false
+    - --tracer-enabled=true
+    - --profiler-dir=/profiler
+    - --profiler-interval=2m
+    - --nodeid=85c267b843baa9636b86731362134dacfc10330efd7a17fa82a1df6642a704cd
+    - --rpc-addr=access_2:9000
+    - --secure-rpc-addr=access_2:9001
+    - --http-addr=access_2:8000
+    - --collection-ingress-port=9000
+    - --supports-observer=true
+    - --public-network-address=access_2:1234
+    - --log-tx-time-to-finalized
+    - --log-tx-time-to-executed
+    - --log-tx-time-to-finalized-executed
+    environment:
+    - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317
+    - OTEL_EXPORTER_OTLP_TRACES_INSECURE=true
+    - OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=access,num=002
+    - BINSTAT_ENABLE
+    - BINSTAT_LEN_WHAT
+    - BINSTAT_DMP_NAME
+    - BINSTAT_DMP_PATH
+    volumes:
+    - ./bootstrap:/bootstrap:z
+    - ./profiler/access/85c267b843baa9636b86731362134dacfc10330efd7a17fa82a1df6642a704cd:/profiler:z
+    - ./data/access/85c267b843baa9636b86731362134dacfc10330efd7a17fa82a1df6642a704cd:/data:z
+    ports:
+    - 1235:1234
+    - 3571:9000
+    - 3572:9001
+    labels:
+      com.dapperlabs.num: "002"
+      com.dapperlabs.role: access
+  collection_1:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        COMMIT: e25eb4074d0175f385ae9ec66329f174eb8409db
+        GOARCH: arm64
+        TARGET: ./cmd/collection
+        VERSION: localnetbuild
+      target: production
+    image: localnet-collection
+    depends_on:
+    - access_1
+    command:
+    - --bootstrapdir=/bootstrap
+    - --datadir=/data/protocol
+    - --secretsdir=/data/secret
+    - --loglevel=DEBUG
+    - --profiler-enabled=false
+    - --tracer-enabled=true
+    - --profiler-dir=/profiler
+    - --profiler-interval=2m
+    - --nodeid=2dbfb4294dd1af082cdb4483b261b347707860764bf62f62e145840575997b7c
+    - --block-rate-delay=950ms
+    - --hotstuff-timeout=2.15s
+    - --hotstuff-min-timeout=2.15s
+    - --ingress-addr=collection_1:9000
+    - --insecure-access-api=false
+    - --access-node-ids=*
+    environment:
+    - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317
+    - OTEL_EXPORTER_OTLP_TRACES_INSECURE=true
+    - OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=collection,num=001
+    - BINSTAT_ENABLE
+    - BINSTAT_LEN_WHAT
+    - BINSTAT_DMP_NAME
+    - BINSTAT_DMP_PATH
+    volumes:
+    - ./bootstrap:/bootstrap:z
+    - ./profiler/collection/2dbfb4294dd1af082cdb4483b261b347707860764bf62f62e145840575997b7c:/profiler:z
+    - ./data/collection/2dbfb4294dd1af082cdb4483b261b347707860764bf62f62e145840575997b7c:/data:z
+    ports:
+    - 3702:9002
+    labels:
+      com.dapperlabs.num: "001"
+      com.dapperlabs.role: collection
+  collection_2:
+    image: localnet-collection
+    depends_on:
+    - collection_1
+    command:
+    - --bootstrapdir=/bootstrap
+    - --datadir=/data/protocol
+    - --secretsdir=/data/secret
+    - --loglevel=DEBUG
+    - --profiler-enabled=false
+    - --tracer-enabled=true
+    - --profiler-dir=/profiler
+    - --profiler-interval=2m
+    - --nodeid=455e759a45664b51022803c38277ccd45dc8c979b715de71a1747a284fefb151
+    - --block-rate-delay=950ms
+    - --hotstuff-timeout=2.15s
+    - --hotstuff-min-timeout=2.15s
+    - --ingress-addr=collection_2:9000
+    - --insecure-access-api=false
+    - --access-node-ids=*
+    environment:
+    - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317
+    - OTEL_EXPORTER_OTLP_TRACES_INSECURE=true
+    - OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=collection,num=002
+    - BINSTAT_ENABLE
+    - BINSTAT_LEN_WHAT
+    - BINSTAT_DMP_NAME
+    - BINSTAT_DMP_PATH
+    volumes:
+    - ./bootstrap:/bootstrap:z
+    - ./profiler/collection/455e759a45664b51022803c38277ccd45dc8c979b715de71a1747a284fefb151:/profiler:z
+    - ./data/collection/455e759a45664b51022803c38277ccd45dc8c979b715de71a1747a284fefb151:/data:z
+    ports:
+    - 3703:9002
+    labels:
+      com.dapperlabs.num: "002"
+      com.dapperlabs.role: collection
+  collection_3:
+    image: localnet-collection
+    depends_on:
+    - collection_1
+    command:
+    - --bootstrapdir=/bootstrap
+    - --datadir=/data/protocol
+    - --secretsdir=/data/secret
+    - --loglevel=DEBUG
+    - --profiler-enabled=false
+    - --tracer-enabled=true
+    - --profiler-dir=/profiler
+    - --profiler-interval=2m
+    - --nodeid=7363898ad94a3cc720961d592552d996bbbb738f7a1f6085266e550128708d9a
+    - --block-rate-delay=950ms
+    - --hotstuff-timeout=2.15s
+    - --hotstuff-min-timeout=2.15s
+    - --ingress-addr=collection_3:9000
+    - --insecure-access-api=false
+    - --access-node-ids=*
+    environment:
+    - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317
+    - OTEL_EXPORTER_OTLP_TRACES_INSECURE=true
+    - OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=collection,num=003
+    - BINSTAT_ENABLE
+    - BINSTAT_LEN_WHAT
+    - BINSTAT_DMP_NAME
+    - BINSTAT_DMP_PATH
+    volumes:
+    - ./bootstrap:/bootstrap:z
+    - ./profiler/collection/7363898ad94a3cc720961d592552d996bbbb738f7a1f6085266e550128708d9a:/profiler:z
+    - ./data/collection/7363898ad94a3cc720961d592552d996bbbb738f7a1f6085266e550128708d9a:/data:z
+    ports:
+    - 3704:9002
+    labels:
+      com.dapperlabs.num: "003"
+      com.dapperlabs.role: collection
+  consensus_1:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        COMMIT: e25eb4074d0175f385ae9ec66329f174eb8409db
+        GOARCH: arm64
+        TARGET: ./cmd/consensus
+        VERSION: localnetbuild
+      target: production
+    image: localnet-consensus
+    depends_on:
+    - access_1
+    command:
+    - --bootstrapdir=/bootstrap
+    - --datadir=/data/protocol
+    - --secretsdir=/data/secret
+    - --loglevel=DEBUG
+    - --profiler-enabled=false
+    - --tracer-enabled=true
+    - --profiler-dir=/profiler
+    - --profiler-interval=2m
+    - --nodeid=f4e887585f7ae2c5a3c5335d00f23f6580e83b23cd7b20c3ce62173292e13d64
+    - --block-rate-delay=800ms
+    - --hotstuff-timeout=2s
+    - --hotstuff-min-timeout=2s
+    - --chunk-alpha=1
+    - --emergency-sealing-active=false
+    - --insecure-access-api=false
+    - --access-node-ids=*
+    environment:
+    - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317
+    - OTEL_EXPORTER_OTLP_TRACES_INSECURE=true
+    - OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=consensus,num=001
+    - BINSTAT_ENABLE
+    - BINSTAT_LEN_WHAT
+    - BINSTAT_DMP_NAME
+    - BINSTAT_DMP_PATH
+    volumes:
+    - ./bootstrap:/bootstrap:z
+    - ./profiler/consensus/f4e887585f7ae2c5a3c5335d00f23f6580e83b23cd7b20c3ce62173292e13d64:/profiler:z
+    - ./data/consensus/f4e887585f7ae2c5a3c5335d00f23f6580e83b23cd7b20c3ce62173292e13d64:/data:z
+    ports:
+    - 3705:9002
+    labels:
+      com.dapperlabs.num: "001"
+      com.dapperlabs.role: consensus
+  consensus_2:
+    image: localnet-consensus
+    depends_on:
+    - consensus_1
+    command:
+    - --bootstrapdir=/bootstrap
+    - --datadir=/data/protocol
+    - --secretsdir=/data/secret
+    - --loglevel=DEBUG
+    - --profiler-enabled=false
+    - --tracer-enabled=true
+    - --profiler-dir=/profiler
+    - --profiler-interval=2m
+    - --nodeid=8fae9e6a138460021229a8dc9e30a0c1e11ec5565f54352576f10dade4065b73
+    - --block-rate-delay=800ms
+    - --hotstuff-timeout=2s
+    - --hotstuff-min-timeout=2s
+    - --chunk-alpha=1
+    - --emergency-sealing-active=false
+    - --insecure-access-api=false
+    - --access-node-ids=*
+    environment:
+    - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317
+    - OTEL_EXPORTER_OTLP_TRACES_INSECURE=true
+    - OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=consensus,num=002
+    - BINSTAT_ENABLE
+    - BINSTAT_LEN_WHAT
+    - BINSTAT_DMP_NAME
+    - BINSTAT_DMP_PATH
+    volumes:
+    - ./bootstrap:/bootstrap:z
+    - ./profiler/consensus/8fae9e6a138460021229a8dc9e30a0c1e11ec5565f54352576f10dade4065b73:/profiler:z
+    - ./data/consensus/8fae9e6a138460021229a8dc9e30a0c1e11ec5565f54352576f10dade4065b73:/data:z
+    ports:
+    - 3706:9002
+    labels:
+      com.dapperlabs.num: "002"
+      com.dapperlabs.role: consensus
+  consensus_3:
+    image: localnet-consensus
+    depends_on:
+    - consensus_1
+    command:
+    - --bootstrapdir=/bootstrap
+    - --datadir=/data/protocol
+    - --secretsdir=/data/secret
+    - --loglevel=DEBUG
+    - --profiler-enabled=false
+    - --tracer-enabled=true
+    - --profiler-dir=/profiler
+    - --profiler-interval=2m
+    - --nodeid=32051da4b77cb25f382312a5a71fa32121bd87b46d1c2e283996d89651dd2d4a
+    - --block-rate-delay=800ms
+    - --hotstuff-timeout=2s
+    - --hotstuff-min-timeout=2s
+    - --chunk-alpha=1
+    - --emergency-sealing-active=false
+    - --insecure-access-api=false
+    - --access-node-ids=*
+    environment:
+    - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317
+    - OTEL_EXPORTER_OTLP_TRACES_INSECURE=true
+    - OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=consensus,num=003
+    - BINSTAT_ENABLE
+    - BINSTAT_LEN_WHAT
+    - BINSTAT_DMP_NAME
+    - BINSTAT_DMP_PATH
+    volumes:
+    - ./bootstrap:/bootstrap:z
+    - ./profiler/consensus/32051da4b77cb25f382312a5a71fa32121bd87b46d1c2e283996d89651dd2d4a:/profiler:z
+    - ./data/consensus/32051da4b77cb25f382312a5a71fa32121bd87b46d1c2e283996d89651dd2d4a:/data:z
+    ports:
+    - 3707:9002
+    labels:
+      com.dapperlabs.num: "003"
+      com.dapperlabs.role: consensus
+  execution_1:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        COMMIT: e25eb4074d0175f385ae9ec66329f174eb8409db
+        GOARCH: arm64
+        TARGET: ./cmd/execution
+        VERSION: localnetbuild
+      target: production
+    image: localnet-execution
+    command:
+    - --bootstrapdir=/bootstrap
+    - --datadir=/data/protocol
+    - --secretsdir=/data/secret
+    - --loglevel=DEBUG
+    - --profiler-enabled=false
+    - --tracer-enabled=true
+    - --profiler-dir=/profiler
+    - --profiler-interval=2m
+    - --nodeid=5539e2643c8c17cca9e8a577f0b626555ba911475cf130727cb6329cd36d2baf
+    - --triedir=/trie
+    - --rpc-addr=execution_1:9000
+    - --cadence-tracing=false
+    - --extensive-tracing=false
+    environment:
+    - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317
+    - OTEL_EXPORTER_OTLP_TRACES_INSECURE=true
+    - OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=execution,num=001
+    - BINSTAT_ENABLE
+    - BINSTAT_LEN_WHAT
+    - BINSTAT_DMP_NAME
+    - BINSTAT_DMP_PATH
+    volumes:
+    - ./bootstrap:/bootstrap:z
+    - ./profiler/execution/5539e2643c8c17cca9e8a577f0b626555ba911475cf130727cb6329cd36d2baf:/profiler:z
+    - ./data/execution/5539e2643c8c17cca9e8a577f0b626555ba911475cf130727cb6329cd36d2baf:/data:z
+    - ./trie/execution/5539e2643c8c17cca9e8a577f0b626555ba911475cf130727cb6329cd36d2baf:/trie:z
+    ports:
+    - 3600:9000
+    - 3601:9001
+    - 3700:9002
+    labels:
+      com.dapperlabs.num: "001"
+      com.dapperlabs.role: execution
+  execution_2:
+    image: localnet-execution
+    depends_on:
+    - execution_1
+    command:
+    - --bootstrapdir=/bootstrap
+    - --datadir=/data/protocol
+    - --secretsdir=/data/secret
+    - --loglevel=DEBUG
+    - --profiler-enabled=false
+    - --tracer-enabled=true
+    - --profiler-dir=/profiler
+    - --profiler-interval=2m
+    - --nodeid=17fdc3325306eb0a18bafec41d2a4ac980822a4e052ebd14a50a1053e8e71f95
+    - --triedir=/trie
+    - --rpc-addr=execution_2:9000
+    - --cadence-tracing=false
+    - --extensive-tracing=false
+    environment:
+    - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317
+    - OTEL_EXPORTER_OTLP_TRACES_INSECURE=true
+    - OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=execution,num=002
+    - BINSTAT_ENABLE
+    - BINSTAT_LEN_WHAT
+    - BINSTAT_DMP_NAME
+    - BINSTAT_DMP_PATH
+    volumes:
+    - ./bootstrap:/bootstrap:z
+    - ./profiler/execution/17fdc3325306eb0a18bafec41d2a4ac980822a4e052ebd14a50a1053e8e71f95:/profiler:z
+    - ./data/execution/17fdc3325306eb0a18bafec41d2a4ac980822a4e052ebd14a50a1053e8e71f95:/data:z
+    - ./trie/execution/17fdc3325306eb0a18bafec41d2a4ac980822a4e052ebd14a50a1053e8e71f95:/trie:z
+    ports:
+    - 3602:9000
+    - 3603:9001
+    - 3701:9002
+    labels:
+      com.dapperlabs.num: "002"
+      com.dapperlabs.role: execution
+  verification_1:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        COMMIT: e25eb4074d0175f385ae9ec66329f174eb8409db
+        GOARCH: arm64
+        TARGET: ./cmd/verification
+        VERSION: localnetbuild
+      target: production
+    image: localnet-verification
+    command:
+    - --bootstrapdir=/bootstrap
+    - --datadir=/data/protocol
+    - --secretsdir=/data/secret
+    - --loglevel=DEBUG
+    - --profiler-enabled=false
+    - --tracer-enabled=true
+    - --profiler-dir=/profiler
+    - --profiler-interval=2m
+    - --nodeid=d6bcab0e89dedfadb35055bee5b4f3916ff2be03f2c07d87eb6316f1afc3cee4
+    - --chunk-alpha=1
+    environment:
+    - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317
+    - OTEL_EXPORTER_OTLP_TRACES_INSECURE=true
+    - OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=verification,num=001
+    - BINSTAT_ENABLE
+    - BINSTAT_LEN_WHAT
+    - BINSTAT_DMP_NAME
+    - BINSTAT_DMP_PATH
+    volumes:
+    - ./bootstrap:/bootstrap:z
+    - ./profiler/verification/d6bcab0e89dedfadb35055bee5b4f3916ff2be03f2c07d87eb6316f1afc3cee4:/profiler:z
+    - ./data/verification/d6bcab0e89dedfadb35055bee5b4f3916ff2be03f2c07d87eb6316f1afc3cee4:/data:z
+    ports:
+    - 3708:9002
+    labels:
+      com.dapperlabs.num: "001"
+      com.dapperlabs.role: verification
