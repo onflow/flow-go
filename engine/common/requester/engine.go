@@ -368,10 +368,15 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	}
 
 	requestStart := time.Now()
-	e.log.Debug().
-		Hex("provider", logging.ID(providerID)).
-		Int("num_selected", len(entityIDs)).
-		Msg("sending entity request")
+
+	if e.log.Debug().Enabled() {
+		e.log.Debug().
+			Hex("provider", logging.ID(providerID)).
+			Uint64("nonce", req.Nonce).
+			Int("num_selected", len(entityIDs)).
+			Strs("entities", logging.IDs(entityIDs)).
+			Msg("sending entity request")
+	}
 
 	err = e.con.Unicast(req, providerID)
 	if err != nil {
@@ -379,11 +384,14 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	}
 	e.requests[req.Nonce] = req
 
-	e.log.Debug().
-		Hex("provider", logging.ID(providerID)).
-		Int("num_selected", len(entityIDs)).
-		TimeDiff("duration", time.Now(), requestStart).
-		Msg("entity request sent")
+	if e.log.Debug().Enabled() {
+		e.log.Debug().
+			Hex("provider", logging.ID(providerID)).
+			Uint64("nonce", req.Nonce).
+			Strs("entities", logging.IDs(entityIDs)).
+			TimeDiff("duration", time.Now(), requestStart).
+			Msg("entity request sent")
+	}
 
 	// NOTE: we forget about requests after the expiry of the shortest retry time
 	// from the entities in the list; this means that we purge requests aggressively.
@@ -435,6 +443,14 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		if len(providers) == 0 {
 			return engine.NewInvalidInputErrorf("invalid provider origin (%x)", originID)
 		}
+	}
+
+	if e.log.Debug().Enabled() {
+		e.log.Debug().
+			Hex("provider", logging.ID(originID)).
+			Strs("entities", logging.IDs(res.EntityIDs)).
+			Uint64("nonce", res.Nonce).
+			Msg("onEntityResponse entries received")
 	}
 
 	// build a list of needed entities; if not available, process anyway,
