@@ -68,7 +68,7 @@ func (r *ReadResultsCommand) Handler(ctx context.Context, req *admin.CommandRequ
 func (r *ReadResultsCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return commands.ErrValidatorReqDataFormat
+		return admin.ErrValidatorReqDataFormat
 	}
 
 	data := &readResultsRequest{}

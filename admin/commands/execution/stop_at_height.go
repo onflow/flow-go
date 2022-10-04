@@ -2,7 +2,6 @@ package execution
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/rs/zerolog/log"
 
@@ -30,6 +29,9 @@ type StopAtHeightReq struct {
 	crash  bool
 }
 
+// Handler method sets the stop height parameters.
+// Errors only if setting of stop height parameters fails.
+// Returns "ok" if successful.
 func (s *StopAtHeightCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	sah := req.ValidatorData.(StopAtHeightReq)
 
@@ -44,14 +46,23 @@ func (s *StopAtHeightCommand) Handler(ctx context.Context, req *admin.CommandReq
 	return "ok", nil
 }
 
+// Validator checks the inputs for StopAtHeight command.
+// It expects the following fields in the Data field of the req object:
+//   - height in a numeric format
+//   - crash, a boolean
+//
+// Additionally, height must be a positive integer. If a float value is provided, only the integer part is used.
+// The following sentinel errors are expected during normal operations:
+// * `commands.ErrValidatorReqDataFormat` if `req` is not a key-value map
+// * `InvalidAdminParameterError` if any required field is missing or in a wrong format
 func (s *StopAtHeightCommand) Validator(req *admin.CommandRequest) error {
 
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return commands.ErrValidatorReqDataFormat
+		return admin.ErrValidatorReqDataFormat
 	}
 	result, ok := input["height"]
-	errInvalidHeightValue := fmt.Errorf("invalid value for \"height\": expected a positive integer, but got: %v", result)
+	errInvalidHeightValue := admin.NewInvalidAdminParameterError("height", "expected a positive integer", result)
 
 	if !ok {
 		return errInvalidHeightValue
@@ -63,7 +74,7 @@ func (s *StopAtHeightCommand) Validator(req *admin.CommandRequest) error {
 	}
 
 	result, ok = input["crash"]
-	errInvalidCrashValue := fmt.Errorf("invalid value for \"crash\": expected a boolean, but got: %v", result)
+	errInvalidCrashValue := admin.NewInvalidAdminParameterError("crash", "expected a boolean", result)
 	if !ok {
 		return errInvalidCrashValue
 	}

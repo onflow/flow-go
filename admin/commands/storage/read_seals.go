@@ -125,7 +125,7 @@ func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandReques
 func (r *ReadSealsCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return commands.ErrValidatorReqDataFormat
+		return admin.ErrValidatorReqDataFormat
 	}
 
 	data := &readSealsRequest{}

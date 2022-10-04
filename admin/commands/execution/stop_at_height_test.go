@@ -40,7 +40,9 @@ func TestCommandParsing(t *testing.T) {
 		}
 
 		err := cmd.Validator(req)
-		require.Error(t, err)
+
+		invalidAdminParameterError := &admin.InvalidAdminParameterError{}
+		require.ErrorAs(t, err, &invalidAdminParameterError)
 	})
 
 	t.Run("wrong height type", func(t *testing.T) {
@@ -52,7 +54,9 @@ func TestCommandParsing(t *testing.T) {
 		}
 
 		err := cmd.Validator(req)
-		require.Error(t, err)
+
+		invalidAdminParameterError := &admin.InvalidAdminParameterError{}
+		require.ErrorAs(t, err, &invalidAdminParameterError)
 	})
 
 	t.Run("wrong height type", func(t *testing.T) {
@@ -64,7 +68,9 @@ func TestCommandParsing(t *testing.T) {
 		}
 
 		err := cmd.Validator(req)
-		require.Error(t, err)
+
+		invalidAdminParameterError := &admin.InvalidAdminParameterError{}
+		require.ErrorAs(t, err, &invalidAdminParameterError)
 	})
 
 	t.Run("negative", func(t *testing.T) {
@@ -76,7 +82,9 @@ func TestCommandParsing(t *testing.T) {
 		}
 
 		err := cmd.Validator(req)
-		require.Error(t, err)
+
+		invalidAdminParameterError := &admin.InvalidAdminParameterError{}
+		require.ErrorAs(t, err, &invalidAdminParameterError)
 	})
 
 }
@@ -102,5 +110,4 @@ func TestCommandsSetsValues(t *testing.T) {
 	require.True(t, set)
 	require.Equal(t, uint64(37), height)
 	require.Equal(t, true, crash)
-
 }

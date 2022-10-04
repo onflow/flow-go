@@ -7,16 +7,16 @@ import (
 
 type StopAtHeight struct {
 	sync.RWMutex
-	height   uint64
-	crash    bool
-	stopping bool // if stopping process has started, we disallow changes
-	set      bool // whether stop at height has been set at all, it its envisioned most of the time it won't
+	height    uint64
+	crash     bool
+	commenced bool // if stopping process has started. We disallow any changes then.
+	set       bool // whether stop at height has been set at all, it its envisioned most of the time it won't
 }
 
 // NewStopAtHeight creates new empty StopAtHegiht
 func NewStopAtHeight() *StopAtHeight {
 	return &StopAtHeight{
-		stopping: false,
+		commenced: false,
 	}
 }
 
@@ -41,16 +41,21 @@ func (s *StopAtHeight) Try(f func(uint64, bool) bool) bool {
 		return false
 	}
 
-	started := f(s.height, s.crash)
+	commenced := f(s.height, s.crash)
 
-	if started {
-		s.stopping = true
+	if commenced {
+		s.commenced = true
 	}
 
-	return started
+	return commenced
 }
 
-// Set sets new values and return old ones
+// Set sets new values and return old ones:
+//   - set, whether values were previously set
+//   - height
+//   - crash
+//
+// Returns error is the stopping process has already commenced, new values will be rejected.
 func (s *StopAtHeight) Set(height uint64, crash bool) (bool, uint64, bool, error) {
 	s.Lock()
 	defer s.Unlock()
@@ -59,7 +64,7 @@ func (s *StopAtHeight) Set(height uint64, crash bool) (bool, uint64, bool, error
 	oldHeight := s.height
 	oldCrash := s.crash
 
-	if s.stopping {
+	if s.commenced {
 		return oldSet, oldHeight, oldCrash, fmt.Errorf("cannot update stop height, stopping already in progress for height %d with crash=%t", oldHeight, oldCrash)
 	}
 
@@ -68,12 +73,4 @@ func (s *StopAtHeight) Set(height uint64, crash bool) (bool, uint64, bool, error
 	s.crash = crash
 
 	return oldSet, oldHeight, oldCrash, nil
-}
-
-func (s *StopAtHeight) Unset() {
-	s.Lock()
-	defer s.Unlock()
-	s.set = false
-	s.height = 0
-	s.crash = false
 }

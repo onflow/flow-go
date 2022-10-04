@@ -459,9 +459,11 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 }
 
 func (e *Engine) checkAndStopExecution(header *flow.Header, stopHeight uint64, stopCrash bool) {
+
 	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, header.ParentID)
 	if err != nil {
-		e.log.Error().Err(err).Str("block_id", header.ID().String()).Msg("failed to check if the block has been executed")
+		// any error here would indicate unexpected storage error, so we crash the node
+		e.log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("failed to check if the block has been executed")
 		return
 	}
 
@@ -481,11 +483,11 @@ func (e *Engine) BlockFinalized(h *flow.Header) {
 	}
 
 	e.stopAtHeight.Try(func(stopHeight uint64, stopCrash bool) bool {
-		// once finalization reached stop height we can be sure no other fork will be valid at this height,
+		// Once finalization reached stop height we can be sure no other fork will be valid at this height,
 		// if this block's parent has been executed, we are safe to stop or crash.
-		// This will happen during normal execution, where blocks are executed before they are finalized
-		// However, if the node is not up-to-date, finalization might lead, but we want to crash only after
-		// the execution reached the stop height
+		// This will happen during normal execution, where blocks are executed before they are finalized.
+		// However, it is possible that EN block computation progress can fall behind. In this case,
+		// we want to crash only after the execution reached the stop height.
 		if h.Height == stopHeight {
 
 			e.checkAndStopExecution(h, stopHeight, stopCrash)

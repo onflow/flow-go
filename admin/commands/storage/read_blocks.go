@@ -53,7 +53,7 @@ func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandReque
 func (r *ReadBlocksCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return commands.ErrValidatorReqDataFormat
+		return admin.ErrValidatorReqDataFormat
 	}
 
 	block, ok := input["block"]
