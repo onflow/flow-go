@@ -29,7 +29,7 @@ type Context struct {
 
 	BlockPrograms *programs.BlockPrograms
 
-	EnvironmentParams
+	environment.EnvironmentParams
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -73,7 +73,7 @@ func defaultContext() Context {
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvoker(),
 		},
-		EnvironmentParams: DefaultEnvironmentParams(),
+		EnvironmentParams: environment.DefaultEnvironmentParams(),
 	}
 }
 

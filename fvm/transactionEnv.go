@@ -8,6 +8,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO(patrick): rm after emulator is updated
+type Environment = environment.Environment
+
 // DEPRECATED.  DO NOT USE
 //
 // TODO(patrick): rm after updating emulator
@@ -37,65 +40,13 @@ func NewTransactionEnv(
 	txIndex uint32,
 	traceSpan otelTrace.Span,
 ) environment.Environment {
-	txID := tx.ID()
-	// TODO set the flags on context
-
 	ctx.RootSpan = traceSpan
-	env := newFacadeEnvironment(
-		ctx,
-		txnState,
-		programs,
-		environment.NewTracer(ctx.TracerParams),
-		environment.NewMeter(txnState),
-	)
-
 	ctx.TxIndex = txIndex
-	ctx.TxId = txID
-	env.TransactionInfo = environment.NewTransactionInfo(
-		ctx.TransactionInfoParams,
-		env.Tracer,
-		tx.Authorizers,
-		ctx.Chain.ServiceAddress(),
-	)
-	env.EventEmitter = environment.NewEventEmitter(
-		env.Tracer,
-		env.Meter,
-		ctx.Chain,
-		txID,
-		txIndex,
-		tx.Payer,
-		ctx.EventEmitterParams,
-	)
-	env.AccountCreator = environment.NewAccountCreator(
-		txnState,
-		ctx.Chain,
-		env.accounts,
-		ctx.ServiceAccountEnabled,
-		env.Tracer,
-		env.Meter,
-		ctx.MetricsReporter,
-		env.SystemContracts)
-	env.AccountFreezer = environment.NewAccountFreezer(
-		ctx.Chain.ServiceAddress(),
-		env.accounts,
-		env.TransactionInfo)
-	env.ContractUpdater = environment.NewContractUpdater(
-		env.Tracer,
-		env.Meter,
-		env.accounts,
-		env.TransactionInfo,
-		ctx.Chain,
-		ctx.ContractUpdaterParams,
-		env.ProgramLogger,
-		env.SystemContracts,
-		env.Runtime)
+	ctx.TxId = tx.ID()
+	ctx.TxBody = tx
 
-	env.AccountKeyUpdater = environment.NewAccountKeyUpdater(
-		env.Tracer,
-		env.Meter,
-		env.accounts,
+	return environment.NewTransactionEnvironment(
+		ctx.EnvironmentParams,
 		txnState,
-		env)
-
-	return env
+		programs)
 }
