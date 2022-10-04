@@ -43,6 +43,46 @@ func TestSubscriptionValidator_NoSubscribedTopic(t *testing.T) {
 	require.NoError(t, sv.MustSubscribedToAllowedTopics(peer1))
 }
 
+// TestSubscriptionValidator_UnknownIdentity tests that when a peer does not have an authorized identity,
+// the subscription validator returns an error.
+func TestSubscriptionValidator_UnknownIdentity(t *testing.T) {
+	idProvider := mock.NewIdentityProvider(t)
+	sp := mockp2p.NewSubscriptionProvider(t)
+
+	sv := scoring.NewSubscriptionValidator(idProvider)
+	sv.RegisterSubscriptionProvider(sp)
+
+	peer := p2pfixtures.PeerIdFixture(t)
+	idProvider.On("ByPeerID", peer).Return(nil, false)
+	sp.On("GetSubscribedTopics", peer).Return([]string{})
+
+	err := sv.MustSubscribedToAllowedTopics(peer)
+	require.Error(t, err)
+	require.True(t, scoring.IsInvalidPeerIDError(err))
+	require.Contains(t, err.Error(), scoring.PeerIdStatusUnknown)
+}
+
+// TestSubscriptionValidator_EjectedIdentity tests that when a peer has been ejected, the subscription
+// validator returns an error.
+func TestSubscriptionValidator_EjectedIdentity(t *testing.T) {
+	idProvider := mock.NewIdentityProvider(t)
+	sp := mockp2p.NewSubscriptionProvider(t)
+
+	sv := scoring.NewSubscriptionValidator(idProvider)
+	sv.RegisterSubscriptionProvider(sp)
+
+	ejectedIdentity := unittest.IdentityFixture()
+	ejectedIdentity.Ejected = true
+	peer := p2pfixtures.PeerIdFixture(t)
+	idProvider.On("ByPeerID", peer).Return(ejectedIdentity, true)
+	sp.On("GetSubscribedTopics", peer).Return([]string{})
+
+	err := sv.MustSubscribedToAllowedTopics(peer)
+	require.Error(t, err)
+	require.True(t, scoring.IsInvalidPeerIDError(err))
+	require.Contains(t, err.Error(), scoring.PeerIdStatusEjected)
+}
+
 // TestSubscriptionValidator_UnknownChannel tests that when a peer has subscribed to an unknown
 // topic, the subscription validator returns an error.
 func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
@@ -58,7 +98,9 @@ func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 	sp.On("GetSubscribedTopics", peer1).Return([]string{"unknown-topic-1", "unknown-topic-2"})
 
 	// as peer 1 has subscribed to unknown topics, the subscription validator should return an error.
-	require.Error(t, sv.MustSubscribedToAllowedTopics(peer1))
+	err := sv.MustSubscribedToAllowedTopics(peer1)
+	require.Error(t, err)
+	require.True(t, scoring.IsInvalidSubscriptionError(err))
 }
 
 // TestSubscriptionValidator_ValidSubscription tests that when a peer has subscribed to valid

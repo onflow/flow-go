@@ -10,8 +10,8 @@ type InvalidSubscriptionError struct {
 	topic string // the topic that the peer is subscribed to, but not allowed to.
 }
 
-func NewInvalidSubscriptionError(topic string) *InvalidSubscriptionError {
-	return &InvalidSubscriptionError{
+func NewInvalidSubscriptionError(topic string) error {
+	return InvalidSubscriptionError{
 		topic: topic,
 	}
 }
