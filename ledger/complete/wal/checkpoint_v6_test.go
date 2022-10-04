@@ -162,7 +162,7 @@ func TestWriteAndReadCheckpointV6(t *testing.T) {
 		fileName := "checkpoint"
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6(tries, dir, fileName, &logger), "fail to store checkpoint")
-		decoded, err := ReadCheckpointV6(dir, fileName)
+		decoded, err := ReadCheckpointV6(dir, fileName, &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
 	})

@@ -422,6 +422,20 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
 
+	l.logger.Info().Msgf("running pre-checkpoint reporters")
+	// run post migration reporters
+	for i, reporter := range preCheckpointReporters {
+		l.logger.Info().Msgf("running a pre-checkpoint generation reporter: %s, (%v/%v)", reporter.Name(), i, len(preCheckpointReporters))
+		err := runReport(reporter, payloads, statecommitment, l.logger)
+		if err != nil {
+			return ledger.State(hash.DummyHash), err
+		}
+	}
+
+	l.logger.Info().Msgf("finished running pre-checkpoint reporters")
+
+	l.logger.Info().Msg("creating a checkpoint for the new trie")
+
 	l.logger.Info().Msg("storing the checkpoint to the file")
 
 	err = os.MkdirAll(outputDir, os.ModePerm)
@@ -454,6 +468,19 @@ func (l *Ledger) ExportCheckpointAt(
 	}
 
 	l.logger.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
+
+	l.logger.Info().Msgf("finished running post-checkpoint reporters")
+
+	// running post checkpoint reporters
+	for i, reporter := range postCheckpointReporters {
+		l.logger.Info().Msgf("running a post-checkpoint generation reporter: %s, (%v/%v)", reporter.Name(), i, len(postCheckpointReporters))
+		err := runReport(reporter, payloads, statecommitment, l.logger)
+		if err != nil {
+			return ledger.State(hash.DummyHash), err
+		}
+	}
+
+	l.logger.Info().Msgf("ran all post-checkpoint reporters")
 
 	return statecommitment, nil
 }

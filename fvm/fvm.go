@@ -14,17 +14,40 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type ProcedureType string
+
+const (
+	BootstrapProcedureType   = ProcedureType("bootstrap")
+	TransactionProcedureType = ProcedureType("transaction")
+	ScriptProcedureType      = ProcedureType("script")
+)
+
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
 	Run(
 		ctx Context,
-		sth *state.StateHolder,
-		programs *programs.Programs,
+		txnState *state.TransactionState,
+		programs *programs.TransactionPrograms,
 	) error
 
 	ComputationLimit(ctx Context) uint64
 	MemoryLimit(ctx Context) uint64
 	ShouldDisableMemoryAndInteractionLimits(ctx Context) bool
+
+	Type() ProcedureType
+
+	// The initial snapshot time is used as part of OCC validation to ensure
+	// there are no read-write conflict amongst transactions.  Note that once
+	// we start supporting parallel preprocessing/execution, a transaction may
+	// operation on mutliple snapshots.
+	//
+	// For scripts, since they can only be executed after the block has been
+	// executed, the initial snapshot time is EndOfBlockExecutionTime.
+	InitialSnapshotTime() programs.LogicalTime
+
+	// For transactions, the execution time is TxIndex.  For scripts, the
+	// execution time is EndOfBlockExecutionTime.
+	ExecutionTime() programs.LogicalTime
 }
 
 func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
@@ -74,17 +97,53 @@ func (vm *VirtualMachine) RunV2(
 ) error {
 	blockPrograms := ctx.BlockPrograms
 	if blockPrograms == nil {
-		blockPrograms = programs.NewEmptyPrograms()
+		blockPrograms = programs.NewEmptyBlockProgramsWithTransactionOffset(
+			uint32(proc.ExecutionTime()))
+	}
+
+	var txnPrograms *programs.TransactionPrograms
+	var err error
+	switch proc.Type() {
+	case ScriptProcedureType:
+		txnPrograms, err = blockPrograms.NewSnapshotReadTransactionPrograms(
+			proc.InitialSnapshotTime(),
+			proc.ExecutionTime())
+	case TransactionProcedureType, BootstrapProcedureType:
+		txnPrograms, err = blockPrograms.NewTransactionPrograms(
+			proc.InitialSnapshotTime(),
+			proc.ExecutionTime())
+	default:
+		return fmt.Errorf("invalid proc type: %v", proc.Type())
+	}
+
+	if err != nil {
+		return fmt.Errorf("error creating transaction programs: %w", err)
+	}
+
+	// Note: it is safe to skip committing the parsed programs for non-normal
+	// transactions (i.e., bootstrap and script) since this is only an
+	// optimization.
+	if proc.Type() == TransactionProcedureType {
+		defer func() {
+			commitErr := txnPrograms.Commit()
+			if commitErr != nil {
+				// NOTE: txnPrograms commit error does not impact correctness,
+				// but may slow down execution since some programs may need to
+				// be re-parsed.
+				ctx.Logger.Warn().Err(commitErr).Msg(
+					"failed to commit transaction programs")
+			}
+		}()
 	}
 
 	meterParams := meter.DefaultParameters().
 		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
 		WithMemoryLimit(proc.MemoryLimit(ctx))
 
-	meterParams, err := getEnvironmentMeterParameters(
+	meterParams, err = getEnvironmentMeterParameters(
 		ctx,
 		v,
-		blockPrograms,
+		txnPrograms,
 		meterParams,
 	)
 	if err != nil {
@@ -97,7 +156,10 @@ func (vm *VirtualMachine) RunV2(
 		interactionLimit = math.MaxUint64
 	}
 
-	stTxn := state.NewStateTransaction(
+	eventSizeLimit := ctx.EventCollectionByteSizeLimit
+	meterParams = meterParams.WithEventEmitByteLimit(eventSizeLimit)
+
+	txnState := state.NewTransactionState(
 		v,
 		state.DefaultParameters().
 			WithMeterParameters(meterParams).
@@ -106,7 +168,7 @@ func (vm *VirtualMachine) RunV2(
 			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
-	return proc.Run(ctx, stTxn, blockPrograms)
+	return proc.Run(ctx, txnState, txnPrograms)
 }
 
 // DEPRECATED. DO NOT USE
@@ -128,12 +190,7 @@ func (vm *VirtualMachine) GetAccountV2(
 	*flow.Account,
 	error,
 ) {
-	blockPrograms := ctx.BlockPrograms
-	if blockPrograms == nil {
-		blockPrograms = programs.NewEmptyPrograms()
-	}
-
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		v,
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
@@ -141,11 +198,29 @@ func (vm *VirtualMachine) GetAccountV2(
 			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
 	)
 
-	env := NewScriptEnv(context.Background(), ctx, stTxn, blockPrograms)
+	blockPrograms := ctx.BlockPrograms
+	if blockPrograms == nil {
+		blockPrograms = programs.NewEmptyBlockPrograms()
+	}
+
+	txnPrograms, err := blockPrograms.NewSnapshotReadTransactionPrograms(
+		programs.EndOfBlockExecutionTime,
+		programs.EndOfBlockExecutionTime)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"error creating transaction programs for GetAccount: %w",
+			err)
+	}
+
+	env := NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
 	account, err := env.GetAccount(address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {
-			return nil, fmt.Errorf("cannot get account, this error usually happens if the reference block for this query is not set to a recent block: %w", err)
+			return nil, fmt.Errorf(
+				"cannot get account, this error usually happens if the "+
+					"reference block for this query is not set to a recent "+
+					"block: %w",
+				err)
 		}
 		return nil, fmt.Errorf("cannot get account: %w", err)
 	}

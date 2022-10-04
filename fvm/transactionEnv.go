@@ -8,13 +8,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO(patrick): rm after emulator is updated
+type Environment = environment.Environment
+
 // DEPRECATED.  DO NOT USE
 //
 // TODO(patrick): rm after updating emulator
 func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	programs environment.TransactionPrograms,
 	tx *flow.TransactionBody,
 	txIndex uint32,
@@ -22,7 +25,7 @@ func NewTransactionEnvironment(
 ) environment.Environment {
 	return NewTransactionEnv(
 		ctx,
-		sth,
+		txnState,
 		programs,
 		tx,
 		txIndex,
@@ -31,70 +34,19 @@ func NewTransactionEnvironment(
 
 func NewTransactionEnv(
 	ctx Context,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	programs environment.TransactionPrograms,
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
 ) environment.Environment {
-	txID := tx.ID()
-	// TODO set the flags on context
-
-	env := newFacadeEnvironment(
-		ctx,
-		sth,
-		programs,
-		environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing),
-		environment.NewMeter(sth),
-	)
-
+	ctx.RootSpan = traceSpan
 	ctx.TxIndex = txIndex
-	ctx.TxId = txID
-	env.TransactionInfo = environment.NewTransactionInfo(
-		ctx.TransactionInfoParams,
-		env.Tracer,
-		tx.Authorizers,
-		ctx.Chain.ServiceAddress(),
-	)
-	env.EventEmitter = environment.NewEventEmitter(
-		env.Tracer,
-		env.Meter,
-		ctx.Chain,
-		txID,
-		txIndex,
-		tx.Payer,
-		ctx.EventEmitterParams,
-	)
-	env.AccountCreator = environment.NewAccountCreator(
-		sth,
-		ctx.Chain,
-		env.accounts,
-		ctx.ServiceAccountEnabled,
-		env.Tracer,
-		env.Meter,
-		ctx.Metrics,
-		env.SystemContracts)
-	env.AccountFreezer = environment.NewAccountFreezer(
-		ctx.Chain.ServiceAddress(),
-		env.accounts,
-		env.TransactionInfo)
-	env.ContractUpdater = environment.NewContractUpdater(
-		env.Tracer,
-		env.Meter,
-		env.accounts,
-		env.TransactionInfo,
-		ctx.Chain,
-		ctx.ContractUpdaterParams,
-		env.ProgramLogger,
-		env.SystemContracts,
-		env.Runtime)
+	ctx.TxId = tx.ID()
+	ctx.TxBody = tx
 
-	env.AccountKeyUpdater = environment.NewAccountKeyUpdater(
-		env.Tracer,
-		env.Meter,
-		env.accounts,
-		sth,
-		env)
-
-	return env
+	return environment.NewTransactionEnvironment(
+		ctx.EnvironmentParams,
+		txnState,
+		programs)
 }

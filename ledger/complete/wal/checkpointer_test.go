@@ -525,7 +525,7 @@ func randomlyModifyFile(t *testing.T, filename string) {
 
 func Test_StoringLoadingCheckpoints(t *testing.T) {
 
-	unittest.RunWithTempDir(t, func(dir string) {
+	unittest.RunWithTempDirWithoutRemove(t, func(dir string) {
 		// some hash will be literally encoded in output file
 		// so we can find it and modify - to make sure we get a different checksum
 		// but not fail process by, for example, modifying saved data length causing EOF
@@ -546,10 +546,11 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 
 		someHash := updatedTrie.RootNode().LeftChild().Hash() // Hash of left child
 
-		fileName := "temp-checkpoint"
-		file, err := os.CreateTemp(dir, fileName)
+		filePrefix := "temp-checkpoint"
+		file, err := os.CreateTemp(dir, filePrefix)
 		filepath := file.Name()
 		require.NoError(t, err)
+		_, fileName := path.Split(filepath)
 
 		err = realWAL.StoreCheckpointV5(file, updatedTrie)
 		require.NoError(t, err)
