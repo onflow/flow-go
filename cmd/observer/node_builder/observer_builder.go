@@ -661,7 +661,6 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvid
 // each Flow Identity is initialized with the passed address, the networking key
 // and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
 func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, error) {
-
 	if len(addresses) != len(keys) {
 		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
 	}
@@ -723,17 +722,21 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		if err != nil {
 			return err
 		}
+		// The following wrapper allows to black-list byzantine nodes via an admin command:
+		// the wrapper sets the 'Ejected' flag of blacklisted nodes to true
+		wrappedIdCache, err := cache.NewNodeBlacklistWrapper(idCache, node.DB)
+		if err != nil {
+			return err
+		}
 
-		builder.IdentityProvider = idCache
-
-		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
+		builder.IdentityProvider = wrappedIdCache
+		builder.IDTranslator = translator.NewHierarchicalIDTranslator(wrappedIdCache, translator.NewPublicNetworkIDTranslator())
 
 		// use the default identifier provider
 		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
-				var result flow.IdentifierList
-
 				pids := builder.LibP2PNode.GetPeersForProtocol(unicast.FlowProtocolID(builder.SporkID))
+				result := make(flow.IdentifierList, 0, len(pids))
 
 				for _, pid := range pids {
 					// exclude own Identifier
@@ -742,7 +745,8 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 					}
 
 					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
-						builder.Logger.Err(err).Str("peer", pid.Pretty()).Msg("failed to translate to Flow ID")
+						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
+						builder.Logger.Err(err).Str("peer", pid.String()).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)
 					}

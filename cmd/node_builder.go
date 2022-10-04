@@ -13,10 +13,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go/network/p2p/middleware"
-
-	"github.com/onflow/flow-go/network/p2p/connection"
-
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
@@ -29,6 +25,8 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"

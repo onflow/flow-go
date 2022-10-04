@@ -146,7 +146,7 @@ func TestConnGater(t *testing.T) {
 	node1Peers := make(map[peer.ID]struct{})
 	node1, identity1 := p2pfixtures.NodeFixture(t, ctx, sporkID, "test_conn_gater", p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
 		if _, ok := node1Peers[pid]; !ok {
-			return fmt.Errorf("peer id not found: %s", pid.Pretty())
+			return fmt.Errorf("peer id not found: %s", pid.String())
 		}
 		return nil
 	}))
@@ -157,7 +157,7 @@ func TestConnGater(t *testing.T) {
 	node2Peers := make(map[peer.ID]struct{})
 	node2, identity2 := p2pfixtures.NodeFixture(t, ctx, sporkID, "test_conn_gater", p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
 		if _, ok := node2Peers[pid]; !ok {
-			return fmt.Errorf("id not found: %s", pid.Pretty())
+			return fmt.Errorf("id not found: %s", pid.String())
 		}
 		return nil
 	}))

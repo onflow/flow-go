@@ -14,19 +14,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/network/p2p/cache"
-	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
-	"github.com/onflow/flow-go/network/p2p/subscription"
-	"github.com/onflow/flow-go/network/p2p/utils"
-
-	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-
-	"github.com/onflow/flow-go/network/p2p/translator"
-
-	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -35,6 +22,7 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/common/follower"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -56,8 +44,16 @@ import (
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/cache"
+	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
@@ -471,17 +467,21 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 		if err != nil {
 			return err
 		}
+		// The following wrapper allows to black-list byzantine nodes via an admin command:
+		// the wrapper sets the 'Ejected' flag of blacklisted nodes to true
+		wrappedIdCache, err := cache.NewNodeBlacklistWrapper(idCache, node.DB)
+		if err != nil {
+			return err
+		}
 
-		builder.IdentityProvider = idCache
-
-		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
+		builder.IdentityProvider = wrappedIdCache
+		builder.IDTranslator = translator.NewHierarchicalIDTranslator(wrappedIdCache, translator.NewPublicNetworkIDTranslator())
 
 		// use the default identifier provider
 		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
-				var result flow.IdentifierList
-
 				pids := builder.LibP2PNode.GetPeersForProtocol(unicast.FlowProtocolID(builder.SporkID))
+				result := make(flow.IdentifierList, 0, len(pids))
 
 				for _, pid := range pids {
 					// exclude own Identifier
@@ -490,7 +490,8 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 					}
 
 					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
-						builder.Logger.Err(err).Str("peer", pid.Pretty()).Msg("failed to translate to Flow ID")
+						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
+						builder.Logger.Err(err).Str("peer", pid.String()).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)
 					}

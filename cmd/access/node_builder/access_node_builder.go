@@ -20,8 +20,6 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
-	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/admin/commands"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
@@ -32,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -634,17 +633,21 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvid
 	}
 }
 
-// accessNodeBuilder builds a staked access node.
-// The access node can optionally participate in the public network publishing data for the observers downstream.
 func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
 			return err
 		}
+		// The following wrapper allows to black-list byzantine nodes via an admin command:
+		// the wrapper sets the 'Ejected' flag of blacklisted nodes to true
+		wrappedIdCache, err := cache.NewNodeBlacklistWrapper(idCache, node.DB)
+		if err != nil {
+			return err
+		}
 
-		builder.IdentityProvider = idCache
-
+		builder.IdentityProvider = wrappedIdCache
+		builder.IDTranslator = translator.NewHierarchicalIDTranslator(wrappedIdCache, translator.NewPublicNetworkIDTranslator())
 		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
 				filter.And(
@@ -652,12 +655,9 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 					filter.Not(filter.HasNodeID(node.Me.NodeID())),
 					p2p.NotEjectedFilter,
 				),
-				idCache,
+				wrappedIdCache,
 			)
 		}
-
-		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
-
 		return nil
 	})
 }

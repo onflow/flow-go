@@ -21,14 +21,6 @@ import (
 	"github.com/spf13/pflag"
 	"google.golang.org/api/option"
 
-	"github.com/onflow/flow-go/network/p2p/cache"
-	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/ping"
-	"github.com/onflow/flow-go/network/p2p/subscription"
-
-	"github.com/onflow/flow-go/network/p2p/connection"
-
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/admin/commands/common"
@@ -55,8 +47,14 @@ import (
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/ping"
+	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
@@ -744,16 +742,22 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		if err != nil {
 			return err
 		}
+		// The following wrapper allows to black-list byzantine nodes via an admin command:
+		// the wrapper sets the 'Ejected' flag of blacklisted nodes to true
+		wrappedIdCache, err := cache.NewNodeBlacklistWrapper(idCache, node.DB)
+		if err != nil {
+			return err
+		}
 
-		node.IdentityProvider = idCache
-		node.IDTranslator = idCache
+		node.IdentityProvider = wrappedIdCache
+		node.IDTranslator = wrappedIdCache
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
 				p2p.NotEjectedFilter,
 			),
-			idCache,
+			wrappedIdCache,
 		)
 		return nil
 	})

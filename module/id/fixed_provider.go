@@ -27,6 +27,8 @@ type FixedIdentityProvider struct {
 	identities flow.IdentityList
 }
 
+var _ IdentityProvider = (*FixedIdentityProvider)(nil)
+
 func NewFixedIdentityProvider(identities flow.IdentityList) *FixedIdentityProvider {
 	return &FixedIdentityProvider{identities}
 }
