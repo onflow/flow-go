@@ -137,7 +137,7 @@ func (s *ScoreOption) preparePeerScoreParams() {
 		// AppSpecificScore is a function that takes a peer ID and returns an application specific score.
 		// At the current stage, we only use it to penalize and reward the peers based on their subscriptions.
 		AppSpecificScore: func(pid peer.ID) float64 {
-			if err := s.validator.MustSubscribedToAllowedTopics(pid); err != nil {
+			if err := s.validator.CheckSubscribedToAllowedTopics(pid); err != nil {
 				s.logger.Error().
 					Err(err).
 					Str("peer_id", pid.String()).

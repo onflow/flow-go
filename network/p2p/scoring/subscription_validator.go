@@ -23,11 +23,11 @@ func (v *SubscriptionValidator) RegisterSubscriptionProvider(provider p2p.Subscr
 	v.subscriptionProvider = provider
 }
 
-// MustSubscribedToAllowedTopics validates all subscriptions a peer has with respect to all Flow topics.
+// CheckSubscribedToAllowedTopics validates all subscriptions a peer has with respect to all Flow topics.
 // All errors returned by this method are benign:
 // We expect an unauthorized or ejected peer to subscribe to Flow topics (InvalidPeerIDError).
 // We expect a peer to subscribe to a topic that is not allowed for its role (InvalidSubscriptionError).
-func (v *SubscriptionValidator) MustSubscribedToAllowedTopics(pid peer.ID) error {
+func (v *SubscriptionValidator) CheckSubscribedToAllowedTopics(pid peer.ID) error {
 	topics := v.subscriptionProvider.GetSubscribedTopics(pid)
 
 	flowId, ok := v.idProvider.ByPeerID(pid)

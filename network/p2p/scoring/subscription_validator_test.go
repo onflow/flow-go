@@ -40,7 +40,7 @@ func TestSubscriptionValidator_NoSubscribedTopic(t *testing.T) {
 	sp.On("GetSubscribedTopics", peer1).Return([]string{})
 
 	// as peer 1 has not subscribed to any topic, the subscription validator should return no error.
-	require.NoError(t, sv.MustSubscribedToAllowedTopics(peer1))
+	require.NoError(t, sv.CheckSubscribedToAllowedTopics(peer1))
 }
 
 // TestSubscriptionValidator_UnknownIdentity tests that when a peer does not have an authorized identity,
@@ -56,7 +56,7 @@ func TestSubscriptionValidator_UnknownIdentity(t *testing.T) {
 	idProvider.On("ByPeerID", peer).Return(nil, false)
 	sp.On("GetSubscribedTopics", peer).Return([]string{})
 
-	err := sv.MustSubscribedToAllowedTopics(peer)
+	err := sv.CheckSubscribedToAllowedTopics(peer)
 	require.Error(t, err)
 	require.True(t, scoring.IsInvalidPeerIDError(err))
 	require.Contains(t, err.Error(), scoring.PeerIdStatusUnknown)
@@ -77,7 +77,7 @@ func TestSubscriptionValidator_EjectedIdentity(t *testing.T) {
 	idProvider.On("ByPeerID", peer).Return(ejectedIdentity, true)
 	sp.On("GetSubscribedTopics", peer).Return([]string{})
 
-	err := sv.MustSubscribedToAllowedTopics(peer)
+	err := sv.CheckSubscribedToAllowedTopics(peer)
 	require.Error(t, err)
 	require.True(t, scoring.IsInvalidPeerIDError(err))
 	require.Contains(t, err.Error(), scoring.PeerIdStatusEjected)
@@ -98,7 +98,7 @@ func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 	sp.On("GetSubscribedTopics", peer1).Return([]string{"unknown-topic-1", "unknown-topic-2"})
 
 	// as peer 1 has subscribed to unknown topics, the subscription validator should return an error.
-	err := sv.MustSubscribedToAllowedTopics(peer1)
+	err := sv.CheckSubscribedToAllowedTopics(peer1)
 	require.Error(t, err)
 	require.True(t, scoring.IsInvalidSubscriptionError(err))
 }
@@ -127,7 +127,7 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 		for i := range allowedTopics {
 			idProvider.On("ByPeerID", peer).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
 			sp.On("GetSubscribedTopics", peer).Return(allowedTopics[:i+1])
-			require.NoError(t, sv.MustSubscribedToAllowedTopics(peer))
+			require.NoError(t, sv.CheckSubscribedToAllowedTopics(peer))
 		}
 	}
 }
@@ -152,7 +152,7 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 		peer := p2pfixtures.PeerIdFixture(t)
 		idProvider.On("ByPeerID", peer).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
 		sp.On("GetSubscribedTopics", peer).Return(allTopics)
-		require.Error(t, sv.MustSubscribedToAllowedTopics(peer), role)
+		require.Error(t, sv.CheckSubscribedToAllowedTopics(peer), role)
 	}
 }
 
@@ -180,7 +180,7 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 		for i := range unauthorizedTopics {
 			idProvider.On("ByPeerID", peer).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
 			sp.On("GetSubscribedTopics", peer).Return(unauthorizedTopics[:i+1])
-			require.Error(t, sv.MustSubscribedToAllowedTopics(peer))
+			require.Error(t, sv.CheckSubscribedToAllowedTopics(peer))
 		}
 	}
 }
