@@ -86,7 +86,7 @@ func yamlWriter(file *os.File, content string) {
 func GenerateValuesYaml(nodeConfig map[string]int) {
 	nodesData := loadNodeJsonData()
 
-	values, err := os.OpenFile("values.yaml", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	values, err := os.OpenFile("values.yml", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -99,65 +99,66 @@ func GenerateValuesYaml(nodeConfig map[string]int) {
 	yamlWriter(values, resources)
 
 	access_data := textReader(ACCESS_TEMPLATE)
-	for i := 0; i < nodeConfig["access"]; i++ {
+	for i := 1; i <= nodeConfig["access"]; i++ {
 		name := fmt.Sprint("access", i)
 		nodeId := nodesData[name].NodeID
 
-		writeNodeData(values, name, env, nodeId, access_data)
+		writeNodeData(values, name, env, nodeId, ACCESS_IMAGE, access_data)
 	}
 
 	yamlWriter(values, "collection:\n")
 	yamlWriter(values, resources)
 
 	collection_data := textReader(COLLECTION_TEMPLATE)
-	for i := 0; i < nodeConfig["collection"]; i++ {
+	for i := 1; i <= nodeConfig["collection"]; i++ {
 		name := fmt.Sprint("collection", i)
 		nodeId := nodesData[name].NodeID
 
-		writeNodeData(values, name, env, nodeId, collection_data)
+		writeNodeData(values, name, env, nodeId, COLLECTION_IMAGE, collection_data)
 	}
 
 	yamlWriter(values, "consensus:\n")
 	yamlWriter(values, resources)
 
 	consensus_data := textReader(CONSENSUS_TEMPLATE)
-	for i := 0; i < nodeConfig["consensus"]; i++ {
+	for i := 1; i <= nodeConfig["consensus"]; i++ {
 		name := fmt.Sprint("consensus", i)
 		nodeId := nodesData[name].NodeID
 
-		writeNodeData(values, name, env, nodeId, consensus_data)
+		writeNodeData(values, name, env, nodeId, CONSENSUS_IMAGE, consensus_data)
 	}
 
 	yamlWriter(values, "execution:\n")
 	yamlWriter(values, resources)
 
 	execution_data := textReader(EXECUTION_TEMPLATE)
-	for i := 0; i < nodeConfig["execution"]; i++ {
+	for i := 1; i <= nodeConfig["execution"]; i++ {
 		name := fmt.Sprint("execution", i)
 		nodeId := nodesData[name].NodeID
 
-		writeNodeData(values, name, env, nodeId, execution_data)
+		writeNodeData(values, name, env, nodeId, EXECUTION_IMAGE, execution_data)
 	}
 
 	yamlWriter(values, "verification:\n")
 	yamlWriter(values, resources)
 
 	verification_data := textReader(VERIFICATION_TEMPLATE)
-	for i := 0; i < nodeConfig["verification"]; i++ {
+	for i := 1; i <= nodeConfig["verification"]; i++ {
 		name := fmt.Sprint("verification", i)
 		nodeId := nodesData[name].NodeID
 
-		writeNodeData(values, name, env, nodeId, verification_data)
+		writeNodeData(values, name, env, nodeId, VERIFICATION_IMAGE, verification_data)
 	}
 
 	values.Close()
 }
 
-func writeNodeData(file *os.File, name string, env string, nodeId string, data string) {
+func writeNodeData(file *os.File, name string, env string, nodeId string, image string, data string) {
 	replacedData := replaceStrings(data, "REPLACE_NODE_ID", nodeId)
 	replacedEnv := replaceStrings(env, "REPLACE_NODE_ID", nodeId)
+	replacedEnv = replaceStrings(replacedEnv, "REPLACE_IMAGE", image)
 
-	yamlWriter(file, "  "+name+":\n")
-	yamlWriter(file, replacedEnv)
+	yamlWriter(file, "    "+name+":\n")
 	yamlWriter(file, replacedData)
+	yamlWriter(file, replacedEnv)
 }

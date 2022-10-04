@@ -3,6 +3,8 @@ package automate
 import (
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestGeneratedDataAccess(t *testing.T) {
@@ -14,13 +16,21 @@ func TestGeneratedDataAccess(t *testing.T) {
 	nodeConfig["execution"] = 2
 	nodeConfig["verification"] = 1
 
-	generateValuesYaml(nodeConfig)
+	GenerateValuesYaml(nodeConfig)
+	textReader("values.yml")
 }
 
 func TestReplaceString(t *testing.T) {
 	original := "This contains A_STRING that needs to be replaced"
+	expected := "This contains a proper string that needs to be replaced"
 	replacement := replaceStrings(original, "A_STRING", "a proper string")
 
-	fmt.Println("Replacement Strings")
-	fmt.Println(replacement)
+	require.Equal(t, expected, replacement, "Mismatching strings")
+}
+
+func TestLoadString(t *testing.T) {
+	actual := textReader("bootstrap_test.txt")
+	expected := "Test string 123"
+
+	require.Equal(t, expected, actual, "Mismatching strings")
 }
