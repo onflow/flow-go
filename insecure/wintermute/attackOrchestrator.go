@@ -357,23 +357,15 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 			Hex("sender_id", logging.ID(chunkDataPackReplyEvent.CorruptOriginId)).
 			Hex("target_id", logging.ID(chunkDataPackReplyEvent.TargetIds[0])).Logger()
 
-		// chunk data pack reply goes over a unicast, hence, we only check first target id.
-		ok := o.corruptedNodeIds.Contains(chunkDataPackReplyEvent.TargetIds[0])
 		if o.state.containsCorruptedChunkId(cdpRep.ChunkDataPack.ChunkID) {
-			if !ok {
-				// this is a chunk data pack response for a CORRUPTED chunk to an HONEST verification node
-				// we WINTERMUTE it!
-				// The orchestrator doesn't send anything back to the EN to send to the VN,
-				// thereby indirectly causing the EN to wintermute the honest VN.
-				lg.Info().Msg("wintermuted corrupted chunk data response to an honest verification node")
-				return nil
-			} else {
-				// Illegal state! chunk data pack response for a CORRUPTED chunk to a CORRUPTED verification node.
-				// Request must have never been reached to corrupted execution node, and must have been replaced with
-				// an attestation.
-				lg.Fatal().
-					Msg("orchestrator received a chunk data response for corrupted chunk to a corrupted verification node")
-			}
+			// this indicates a bug!
+			// In normal circumstances, a corrupt execution node does not have any idea about the corrupt chunk data packs.
+			// Since it is fully controlled by the Wintermute orchestrator and corruption is dictated by the orchestrator on
+			// the egress traffic without the knowledge of the execution node.
+			// Hence, it should not be able to send a chunk data pack reply for a corrupted chunk
+			// Indeed, with ingress corruption in place, a chunk data pack request for a corrupted chunk should never
+			// reach a corrupt execution node.
+			lg.Fatal().Msg("illegal state: corrupt execution node is sending a chunk data pack reply for a corrupted chunk")
 		}
 	}
 
