@@ -17,7 +17,7 @@ import (
 )
 
 const subtrieLevel = 4
-const subtrieCount = 1 << subtrieLevel
+const subtrieCount = 1 << subtrieLevel // 16
 
 type NodeEncoder func(node *trie.MTrie, index uint64, scratch []byte) []byte
 
@@ -50,6 +50,11 @@ func StoreCheckpointV6(
 		Str("last", last.RootHash().String()).
 		Uint64("last_reg_count", last.AllocatedRegCount()).
 		Msgf("storing checkpoint for %v tries to %v", len(tries), outputDir)
+
+	err := noneCheckpointFileExist(outputDir, outputFile, subtrieCount)
+	if err != nil {
+		return fmt.Errorf("fail to check if checkpoint file already exist: %w", err)
+	}
 
 	subtrieRoots := createSubTrieRoots(tries)
 

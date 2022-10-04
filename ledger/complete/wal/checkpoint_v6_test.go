@@ -184,3 +184,15 @@ func TestAllPartFileExist(t *testing.T) {
 		}
 	})
 }
+
+// verify that can't store the same checkpoint file twice, because a checkpoint already exists
+func TestCannotStoreTwice(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimpleTrie(t)
+		fileName := "checkpoint"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6(tries, dir, fileName, &logger), "fail to store checkpoint")
+		// checkpoint already exist, can't store again
+		require.Error(t, StoreCheckpointV6(tries, dir, fileName, &logger))
+	})
+}

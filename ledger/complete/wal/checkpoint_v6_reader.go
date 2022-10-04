@@ -2,6 +2,7 @@ package wal
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -118,6 +119,49 @@ func allPartFileExist(dir string, fileName string, totalSubtrieFiles int) error 
 		return fmt.Errorf("fail to check top level file exist: %w", err)
 	}
 
+	return nil
+}
+
+var errCheckpointFileExist = errors.New("checkpoint file exists already")
+
+// noneCheckpointFileExist check if none of the checkpoint header file or the part files exist
+// it returns nil if none exists
+// it returns errCheckpointFileExist if a checkpoint file exists already
+// it returns err if running into any other exception
+func noneCheckpointFileExist(dir string, fileName string, totalSubtrieFiles int) error {
+	// ensure header file does not exist
+	headerPath := filePathHeader(dir, fileName)
+	_, err := os.Stat(headerPath)
+	if err == nil {
+		return fmt.Errorf("checkpoint header file already exist: %v", headerPath)
+	}
+
+	if !errors.Is(os.ErrNotExist, err) {
+		return fmt.Errorf("could not check header file exist: %w", err)
+	}
+
+	// ensure part file does not exist
+	for i := 0; i < totalSubtrieFiles; i++ {
+		filePath, _, err := filePathSubTries(dir, fileName, i)
+		if err != nil {
+			return fmt.Errorf("fail to find file path for %v-th subtrie file: %w", i, err)
+		}
+
+		// ensure file exists
+		_, err = os.Stat(filePath)
+		if errors.Is(os.ErrNotExist, err) {
+			continue
+		}
+
+		// file exists
+		if err == nil {
+			return fmt.Errorf("checkpoint %v-th part file: %w", i, errCheckpointFileExist)
+		}
+
+		if err != nil {
+			return fmt.Errorf("fail to check %v-th part file exist: %w", i, err)
+		}
+	}
 	return nil
 }
 
