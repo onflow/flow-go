@@ -29,9 +29,7 @@ const ticksForAssertEventually = 10 * time.Millisecond
 // able to create new streams with peers even without knowing their address info beforehand.
 func TestFindPeerWithDHT(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	count := 10
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
@@ -43,7 +41,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, sporkId, "dht_test", count-2, p2pfixtures.WithDHTOptions(dht.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	getDhtServerAddr := func(i uint) peer.AddrInfo {
@@ -98,9 +96,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_FLAKY, "failing on CI")
 
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	topic := channels.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 5
@@ -131,7 +127,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, sporkId, "dht_test", count-1, p2pfixtures.WithDHTOptions(dht.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// Step 2: Connect all nodes running a DHT client to the node running the DHT server

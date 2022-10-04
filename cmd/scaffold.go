@@ -49,7 +49,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
-	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
@@ -277,7 +276,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Resolver,
 			fnb.BaseConfig.NodeRole,
 			// run peer manager with the specified interval and let it also prune connections
-			connection.PeerManagerFactory(fnb.NetworkConnectionPruning, fnb.PeerUpdateInterval),
+			fnb.NetworkConnectionPruning,
+			fnb.PeerUpdateInterval,
 		)
 
 		libp2pNode, err := libP2PNodeFactory()
@@ -1003,7 +1003,7 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 		}
 
 		if err != nil {
-			return err
+			return fmt.Errorf("could not handle component %s: %w", f.name, err)
 		}
 
 		parent = started
@@ -1014,7 +1014,7 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	for _, f := range asyncComponents {
 		err = fnb.handleComponent(f, util.AllReady(f.dependencies...), func() {})
 		if err != nil {
-			return err
+			return fmt.Errorf("could not handle dependable component %s: %w", f.name, err)
 		}
 	}
 

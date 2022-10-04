@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -52,7 +53,8 @@ func DefaultLibP2PNodeFactory(
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
 	role string,
-	peerManagerFactory p2p.PeerManagerFactoryFunc,
+	connectionPruning bool,
+	updateInterval time.Duration,
 ) LibP2PFactoryFunc {
 
 	return func() (*p2pnode.Node, error) {
@@ -80,7 +82,7 @@ func DefaultLibP2PNodeFactory(
 				)
 			}).
 			SetPubSub(pubsub.NewGossipSub).
-			SetPeerManagerFactory(peerManagerFactory)
+			SetPeerManagerOptions(connectionPruning, updateInterval)
 
 		if role != "ghost" {
 			r, _ := flow.ParseRole(role)
@@ -106,23 +108,24 @@ type NodeBuilder interface {
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 	SetPubSub(func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)) NodeBuilder
-	SetPeerManagerFactory(p2p.PeerManagerFactoryFunc) NodeBuilder
+	SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder
 	Build() (*p2pnode.Node, error)
 }
 
 type LibP2PNodeBuilder struct {
-	sporkID            flow.Identifier
-	addr               string
-	networkKey         fcrypto.PrivateKey
-	logger             zerolog.Logger
-	basicResolver      madns.BasicResolver
-	subscriptionFilter pubsub.SubscriptionFilter
-	resourceManager    network.ResourceManager
-	connManager        connmgr.ConnManager
-	connGater          connmgr.ConnectionGater
-	routingFactory     func(context.Context, host.Host) (routing.Routing, error)
-	pubsubFactory      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
-	peerManagerFactory p2p.PeerManagerFactoryFunc
+	sporkID                   flow.Identifier
+	addr                      string
+	networkKey                fcrypto.PrivateKey
+	logger                    zerolog.Logger
+	basicResolver             madns.BasicResolver
+	subscriptionFilter        pubsub.SubscriptionFilter
+	resourceManager           network.ResourceManager
+	connManager               connmgr.ConnManager
+	connGater                 connmgr.ConnectionGater
+	routingFactory            func(context.Context, host.Host) (routing.Routing, error)
+	pubsubFactory             func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
+	peerManagerEnablePruning  bool
+	peerManagerUpdateInterval time.Duration
 }
 
 func NewNodeBuilder(
@@ -182,8 +185,9 @@ func (builder *LibP2PNodeBuilder) SetPubSub(f func(context.Context, host.Host, .
 }
 
 // SetPeerManagerFactory sets the peer manager factory function.
-func (builder *LibP2PNodeBuilder) SetPeerManagerFactory(fn p2p.PeerManagerFactoryFunc) NodeBuilder {
-	builder.peerManagerFactory = fn
+func (builder *LibP2PNodeBuilder) SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder {
+	builder.peerManagerEnablePruning = connectionPruning
+	builder.peerManagerUpdateInterval = updateInterval
 	return builder
 }
 
@@ -238,7 +242,17 @@ func (builder *LibP2PNodeBuilder) Build() (*p2pnode.Node, error) {
 		builder.sporkID,
 	)
 
-	node := p2pnode.NewNode(builder.logger, host, pCache, unicastManager, builder.peerManagerFactory)
+	var peerManager *connection.PeerManager
+	if builder.peerManagerUpdateInterval > 0 {
+		connector, err := connection.NewLibp2pConnector(builder.logger, host, builder.peerManagerEnablePruning)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
+		}
+
+		peerManager = connection.NewPeerManager(builder.logger, builder.peerManagerUpdateInterval, connector)
+	}
+
+	node := p2pnode.NewNode(builder.logger, host, pCache, unicastManager, peerManager)
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {

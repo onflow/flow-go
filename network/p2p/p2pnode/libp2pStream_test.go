@@ -33,9 +33,7 @@ import (
 func TestStreamClosing(t *testing.T) {
 	count := 10
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	var msgRegex = regexp.MustCompile("^hello[0-9]")
 
@@ -48,7 +46,7 @@ func TestStreamClosing(t *testing.T) {
 		2,
 		p2pfixtures.WithDefaultStreamHandler(handler))
 
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	nodeInfo1, err := utils.PeerAddressInfo(*identities[1])
@@ -146,9 +144,7 @@ func TestCreateStream_WithPreferredGzipUnicast(t *testing.T) {
 func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.ProtocolName, protocolID core.ProtocolID) {
 	count := 2
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	nodes, identities := p2pfixtures.NodesFixture(t,
 		sporkId,
@@ -156,7 +152,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 		count,
 		p2pfixtures.WithPreferredUnicasts(unicasts))
 
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	id2 := identities[1]
@@ -205,9 +201,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 // are of type default plain tcp.
 func TestCreateStream_FallBack(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// Creates two nodes: one with preferred gzip, and other one with default protocol
 	sporkId := unittest.IdentifierFixture()
@@ -218,7 +212,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 	otherNode, otherId := p2pfixtures.NodeFixture(t, sporkId, "test_create_stream_fallback")
 
 	nodes := []*p2pnode.Node{thisNode, otherNode}
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// Assert that there is no outbound stream to the target yet (neither default nor preferred)
@@ -272,15 +266,13 @@ func TestCreateStream_FallBack(t *testing.T) {
 // TestCreateStreamIsConcurrencySafe tests that the CreateStream is concurrency safe
 func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create two nodes
 	nodes, identities := p2pfixtures.NodesFixture(t, unittest.IdentifierFixture(), "test_create_stream_is_concurrency_safe", 2)
 	require.Len(t, identities, 2)
 
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	nodeInfo1, err := utils.PeerAddressInfo(*identities[1])
@@ -319,12 +311,10 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 
 	// setup per node contexts so they can be stopped independently
 	ctx1, cancel1 := context.WithCancel(ctx)
-	signalCtx1, errChan1 := irrecoverable.WithSignaler(ctx1)
-	go unittest.NoIrrecoverableError(ctx1, t, errChan1)
+	signalerCtx1 := irrecoverable.NewMockSignalerContext(t, ctx1)
 
 	ctx2, cancel2 := context.WithCancel(ctx)
-	signalCtx2, errChan2 := irrecoverable.WithSignaler(ctx2)
-	go unittest.NoIrrecoverableError(ctx2, t, errChan2)
+	signalerCtx2 := irrecoverable.NewMockSignalerContext(t, ctx2)
 
 	count := 2
 	// Creates nodes
@@ -336,8 +326,8 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	node1 := nodes[0]
 	node2 := nodes[1]
 
-	p2pfixtures.StartNode(t, signalCtx1, node1, 100*time.Millisecond)
-	p2pfixtures.StartNode(t, signalCtx2, node2, 100*time.Millisecond)
+	p2pfixtures.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
+	p2pfixtures.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
 
 	// stop node 2 immediately
 	p2pfixtures.StopNode(t, node2, cancel2, 100*time.Millisecond)
@@ -395,9 +385,7 @@ func TestUnicastOverStream_WithGzipStreamCompression(t *testing.T) {
 // testUnicastOverStream sends a message from node 1 to node 2 and then from node 2 to node 1 over a unicast stream.
 func testUnicastOverStream(t *testing.T, opts ...p2pfixtures.NodeFixtureParameterOption) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	count := 2
 	ch := make(chan string, count) // we expect two messages during test, one from node1->node2 and vice versa.
@@ -419,7 +407,7 @@ func testUnicastOverStream(t *testing.T, opts ...p2pfixtures.NodeFixtureParamete
 	)
 	require.Len(t, identities, count)
 
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	testUnicastOverStreamRoundTrip(t, ctx, *identities[0], nodes[0], *identities[1], nodes[1], ch)
@@ -429,9 +417,7 @@ func testUnicastOverStream(t *testing.T, opts ...p2pfixtures.NodeFixtureParamete
 // send and receive unicasts. Despite the asymmetry, the nodes must fall back to the libp2p plain stream during negotiation.
 func TestUnicastOverStream_Fallback(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	ch := make(chan string, 2) // we expect two messages during test, one from node1->node2 and vice versa.
 
@@ -463,7 +449,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	)
 
 	nodes := []*p2pnode.Node{node1, node2}
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	testUnicastOverStreamRoundTrip(t, ctx, id1, node1, id2, node2, ch)
@@ -536,9 +522,7 @@ func testUnicastOverStreamRoundTrip(t *testing.T,
 // timeout interval
 func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// creates a regular node
 	nodes, identities := p2pfixtures.NodesFixture(t,
@@ -548,7 +532,7 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	)
 	require.Len(t, identities, 1)
 
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// create a silent node which never replies
@@ -579,9 +563,7 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 // does not block another concurrent call.
 func TestCreateStreamIsConcurrent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create two regular node
 	goodNodes, goodNodeIds := p2pfixtures.NodesFixture(t,
@@ -591,7 +573,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	)
 	require.Len(t, goodNodeIds, 2)
 
-	p2pfixtures.StartNodes(t, signalCtx, goodNodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, goodNodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, goodNodes, cancel, 100*time.Millisecond)
 
 	goodNodeInfo1, err := utils.PeerAddressInfo(*goodNodeIds[1])
@@ -633,9 +615,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 // TestConnectionGating tests node allow listing by peer.ID
 func TestConnectionGating(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkID := unittest.IdentifierFixture()
 
@@ -657,7 +637,7 @@ func TestConnectionGating(t *testing.T) {
 	}))
 
 	nodes := []*p2pnode.Node{node1, node2}
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	node1Info, err := utils.PeerAddressInfo(node1Id)

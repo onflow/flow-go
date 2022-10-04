@@ -56,9 +56,7 @@ func TestMultiAddress(t *testing.T) {
 // TestSingleNodeLifeCycle evaluates correct lifecycle translation from start to stop the node
 func TestSingleNodeLifeCycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	node, _ := p2pfixtures.NodeFixture(
 		t,
@@ -66,7 +64,7 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 		"test_single_node_life_cycle",
 	)
 
-	node.Start(signalCtx)
+	node.Start(signalerCtx)
 	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, node)
 
 	cancel()
@@ -100,13 +98,11 @@ func TestGetPeerInfo(t *testing.T) {
 func TestAddPeers(t *testing.T) {
 	count := 3
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create nodes
 	nodes, identities := p2pfixtures.NodesFixture(t, unittest.IdentifierFixture(), "test_add_peers", count)
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// add the remaining nodes to the first node as its set of peers
@@ -124,16 +120,14 @@ func TestAddPeers(t *testing.T) {
 func TestRemovePeers(t *testing.T) {
 	count := 3
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create nodes
 	nodes, identities := p2pfixtures.NodesFixture(t, unittest.IdentifierFixture(), "test_remove_peers", count)
 	peerInfos, errs := utils.PeerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
 
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// add nodes two and three to the first node as its peers
@@ -153,9 +147,7 @@ func TestRemovePeers(t *testing.T) {
 
 func TestConnGater(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkID := unittest.IdentifierFixture()
 
@@ -167,7 +159,7 @@ func TestConnGater(t *testing.T) {
 		return nil
 	}))
 
-	p2pfixtures.StartNode(t, signalCtx, node1, 100*time.Millisecond)
+	p2pfixtures.StartNode(t, signalerCtx, node1, 100*time.Millisecond)
 	defer p2pfixtures.StopNode(t, node1, cancel, 100*time.Millisecond)
 
 	node1Info, err := utils.PeerAddressInfo(identity1)
@@ -180,7 +172,7 @@ func TestConnGater(t *testing.T) {
 		}
 		return nil
 	}))
-	p2pfixtures.StartNode(t, signalCtx, node2, 100*time.Millisecond)
+	p2pfixtures.StartNode(t, signalerCtx, node2, 100*time.Millisecond)
 	defer p2pfixtures.StopNode(t, node2, cancel, 100*time.Millisecond)
 
 	node2Info, err := utils.PeerAddressInfo(identity2)

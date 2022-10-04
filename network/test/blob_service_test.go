@@ -21,6 +21,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -80,6 +81,8 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
 	ids, nodes, mws, networks, _ := GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		suite.numNodes,
@@ -91,8 +94,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	)
 	suite.networks = networks
 
-	errChan := StartNetworks(ctx, suite.T(), nodes, networks, 100*time.Millisecond)
-	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
+	StartNodesAndNetworks(signalerCtx, suite.T(), nodes, networks, 100*time.Millisecond)
 
 	blobExchangeChannel := channels.Channel("blob-exchange")
 

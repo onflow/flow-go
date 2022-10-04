@@ -23,6 +23,7 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/slashing"
@@ -52,16 +53,15 @@ const (
 type Node struct {
 	component.Component
 	sync.Mutex
-	uniMgr             *unicast.Manager
-	host               host.Host                               // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
-	pubSub             *pubsub.PubSub                          // reference to the libp2p PubSub component
-	logger             zerolog.Logger                          // used to provide logging
-	topics             map[channels.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs               map[channels.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
-	routing            routing.Routing
-	pCache             *ProtocolPeerCache
-	peerManager        p2p.PeerManager
-	peerManagerFactory p2p.PeerManagerFactoryFunc
+	uniMgr      *unicast.Manager
+	host        host.Host                               // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
+	pubSub      *pubsub.PubSub                          // reference to the libp2p PubSub component
+	logger      zerolog.Logger                          // used to provide logging
+	topics      map[channels.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
+	subs        map[channels.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
+	routing     routing.Routing
+	pCache      *ProtocolPeerCache
+	peerManager *connection.PeerManager
 }
 
 // NewNode creates a new libp2p node and sets its parameters.
@@ -70,16 +70,16 @@ func NewNode(
 	host host.Host,
 	pCache *ProtocolPeerCache,
 	uniMgr *unicast.Manager,
-	peerManagerFactory p2p.PeerManagerFactoryFunc,
+	peerManager *connection.PeerManager,
 ) *Node {
 	return &Node{
-		uniMgr:             uniMgr,
-		host:               host,
-		logger:             logger.With().Str("component", "libp2p-node").Logger(),
-		topics:             make(map[channels.Topic]*pubsub.Topic),
-		subs:               make(map[channels.Topic]*pubsub.Subscription),
-		pCache:             pCache,
-		peerManagerFactory: peerManagerFactory,
+		uniMgr:      uniMgr,
+		host:        host,
+		logger:      logger.With().Str("component", "libp2p-node").Logger(),
+		topics:      make(map[channels.Topic]*pubsub.Topic),
+		subs:        make(map[channels.Topic]*pubsub.Subscription),
+		pCache:      pCache,
+		peerManager: peerManager,
 	}
 }
 
@@ -321,21 +321,11 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 }
 
 // WithPeersProvider sets the PeersProvider for the peer manager.
-// If a peer manager factory is set, this method will build the peer manager and initialize it with
-// the provided PeersProvider.
-func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) error {
-	if n.peerManagerFactory == nil {
-		return nil
+// If a peer manager factory is set, this method will set the peer manager's PeersProvider.
+func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) {
+	if n.peerManager != nil {
+		n.peerManager.SetPeersProvider(peersProvider)
 	}
-
-	var err error
-
-	n.peerManager, err = n.peerManagerFactory(n.host, peersProvider, n.logger)
-	if err != nil {
-		return fmt.Errorf("failed to create peer manager: %w", err)
-	}
-
-	return nil
 }
 
 // PeerManagerComponent returns the component interface of the peer manager.
@@ -356,14 +346,27 @@ func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
 	return isConnected, nil
 }
 
+// SetRouting sets the node's routing implementation.
+// SetRouting may be called at most once.
 func (n *Node) SetRouting(r routing.Routing) {
+	if n.routing != nil {
+		n.logger.Fatal().Msg("routing already set")
+	}
+
 	n.routing = r
 }
 
+// Routing returns the node's routing implementation.
 func (n *Node) Routing() routing.Routing {
 	return n.routing
 }
 
+// SetPubSub sets the node's pubsub implementation.
+// SetPubSub may be called at most once.
 func (n *Node) SetPubSub(ps *pubsub.PubSub) {
+	if n.pubSub != nil {
+		n.logger.Fatal().Msg("pubSub already set")
+	}
+
 	n.pubSub = ps
 }

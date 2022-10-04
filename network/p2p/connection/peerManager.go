@@ -6,7 +6,6 @@ import (
 	mrand "math/rand"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/component"
@@ -33,10 +32,9 @@ type PeerManager struct {
 
 // NewPeerManager creates a new peer manager which calls the peersProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
-func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, peersProvider p2p.PeersProvider, connector p2p.Connector) *PeerManager {
+func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, connector p2p.Connector) *PeerManager {
 	pm := &PeerManager{
 		logger:             logger,
-		peersProvider:      peersProvider,
 		connector:          connector,
 		peerRequestQ:       make(chan struct{}, 1),
 		peerUpdateInterval: updateInterval,
@@ -57,18 +55,6 @@ func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, peersPr
 		Build()
 
 	return pm
-}
-
-// PeerManagerFactory generates a PeerManagerFunc that produces the default PeerManager with the given peer manager
-// options and that uses the LibP2PConnector with the given LibP2P connector options
-func PeerManagerFactory(connectionPruning bool, updateInterval time.Duration) p2p.PeerManagerFactoryFunc {
-	return func(host host.Host, peersProvider p2p.PeersProvider, logger zerolog.Logger) (p2p.PeerManager, error) {
-		connector, err := NewLibp2pConnector(logger, host, connectionPruning)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create libp2pConnector: %w", err)
-		}
-		return NewPeerManager(logger, updateInterval, peersProvider, connector), nil
-	}
 }
 
 // updateLoop triggers an update peer request when it has been requested
@@ -127,6 +113,10 @@ func (pm *PeerManager) RequestPeerUpdate() {
 // updatePeers updates the peers by connecting to all the nodes provided by the peersProvider callback and disconnecting from
 // previous nodes that are no longer in the new list of nodes.
 func (pm *PeerManager) updatePeers(ctx context.Context) {
+	if pm.peersProvider == nil {
+		pm.logger.Error().Msg("peers provider not set")
+		return
+	}
 
 	// get all the peer ids to connect to
 	peers := pm.peersProvider()
@@ -142,4 +132,14 @@ func (pm *PeerManager) updatePeers(ctx context.Context) {
 // ForceUpdatePeers initiates an update to the peer connections of this node immediately
 func (pm *PeerManager) ForceUpdatePeers(ctx context.Context) {
 	pm.updatePeers(ctx)
+}
+
+// SetPeersProvider sets the peers provider
+// SetPeersProvider may be called at most once
+func (pm *PeerManager) SetPeersProvider(peersProvider p2p.PeersProvider) {
+	if pm.peersProvider != nil {
+		pm.logger.Fatal().Msg("peers provider already set")
+	}
+
+	pm.peersProvider = peersProvider
 }

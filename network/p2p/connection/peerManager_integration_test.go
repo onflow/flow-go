@@ -30,13 +30,12 @@ func TestPeerManager_Integration(t *testing.T) {
 	count := 5
 	ctx, cancel := context.WithCancel(context.Background())
 
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create nodes
 	nodes, identities := p2pfixtures.NodesFixture(t, unittest.IdentifierFixture(), "test_peer_manager", count)
 
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	thisNode := nodes[0]
@@ -56,7 +55,8 @@ func TestPeerManager_Integration(t *testing.T) {
 	idTranslator, err := translator.NewFixedTableIdentityTranslator(identities)
 	require.NoError(t, err)
 
-	peerManager := connection.NewPeerManager(unittest.Logger(), connection.DefaultPeerUpdateInterval, func() peer.IDSlice {
+	peerManager := connection.NewPeerManager(unittest.Logger(), connection.DefaultPeerUpdateInterval, connector)
+	peerManager.SetPeersProvider(func() peer.IDSlice {
 		// peerManager is furnished with a full topology that connects to all nodes
 		// in the topologyPeers.
 		peers := peer.IDSlice{}
@@ -67,7 +67,7 @@ func TestPeerManager_Integration(t *testing.T) {
 		}
 
 		return peers
-	}, connector)
+	})
 
 	// initially no node should be in peer store of this node.
 	require.Empty(t, thisNode.Host().Network().Peers())

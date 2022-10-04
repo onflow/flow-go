@@ -1004,9 +1004,6 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 	return func() (*p2pnode.Node, error) {
 		connManager := connection.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
 
-		// disable connection pruning for the access node which supports the observer
-		peerManagerFactory := connection.PeerManagerFactory(connection.ConnectionPruningDisabled, builder.PeerUpdateInterval)
-
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
 			SetBasicResolver(builder.Resolver).
 			SetSubscriptionFilter(
@@ -1026,7 +1023,8 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 				)
 			}).
 			SetPubSub(pubsub.NewGossipSub).
-			SetPeerManagerFactory(peerManagerFactory).
+			// disable connection pruning for the access node which supports the observer
+			SetPeerManagerOptions(connection.ConnectionPruningDisabled, builder.PeerUpdateInterval).
 			Build()
 
 		if err != nil {

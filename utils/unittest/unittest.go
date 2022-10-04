@@ -1,7 +1,6 @@
 package unittest
 
 import (
-	"context"
 	"encoding/json"
 	"math"
 	"math/rand"
@@ -436,20 +435,6 @@ func CrashTestWithExpectedStatus(
 	// expect logger.Fatal() message to be pushed to stdout
 	outStr := string(outBytes)
 	require.Contains(t, outStr, expectedErrorMsg)
-}
-
-// NoIrrecoverableError requires that no irrecoverable errors are thrown on the provided error channel.
-func NoIrrecoverableError(ctx context.Context, t *testing.T, errChan <-chan error, msgAndArgs ...interface{}) {
-	select {
-	case <-ctx.Done():
-		return
-	case err := <-errChan:
-		if len(msgAndArgs) == 0 {
-			require.NoError(t, err, "unexpected irrecoverable error")
-		} else {
-			require.NoError(t, err, msgAndArgs...)
-		}
-	}
 }
 
 // GenerateRandomStringWithLen returns a string of random alpha characters of the provided length

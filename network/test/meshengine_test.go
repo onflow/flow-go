@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -67,6 +68,8 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
 	var nodes []*p2pnode.Node
 	suite.ids, nodes, suite.mws, suite.nets, obs = GenerateIDsMiddlewaresNetworks(
 		suite.T(),
@@ -77,8 +80,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		WithIdentityOpts(unittest.WithAllRoles()),
 	)
 
-	errChan := StartNetworks(ctx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
-	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
+	StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)

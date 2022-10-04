@@ -2,7 +2,6 @@ package p2pfixtures
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -109,11 +108,6 @@ func NodeFixture(
 
 	err = n.WithDefaultUnicastProtocol(parameters.HandlerFunc, parameters.Unicasts)
 	require.NoError(t, err)
-
-	require.Eventuallyf(t, func() bool {
-		ip, p, err := n.GetIPPort()
-		return err == nil && ip != "" && p != ""
-	}, 3*time.Second, ticksForAssertEventually, fmt.Sprintf("could not start node %s", identity.NodeID))
 
 	// get the actual IP and port that have been assigned by the subsystem
 	ip, port, err := n.GetIPPort()

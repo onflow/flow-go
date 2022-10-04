@@ -107,16 +107,14 @@ func TestFilterSubscribe(t *testing.T) {
 // to channel that its role shouldn't subscribe to
 func TestCanSubscribe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	identity, privateKey := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 	sporkId := unittest.IdentifierFixture()
 
 	collectionNode := p2pfixtures.CreateNode(t, identity.NodeID, privateKey, sporkId, zerolog.Nop(), p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
 
-	p2pfixtures.StartNode(t, signalCtx, collectionNode, 100*time.Millisecond)
+	p2pfixtures.StartNode(t, signalerCtx, collectionNode, 100*time.Millisecond)
 	defer p2pfixtures.StopNode(t, collectionNode, cancel, 1*time.Second)
 
 	goodTopic := channels.TopicFromChannel(channels.ProvideCollections, sporkId)

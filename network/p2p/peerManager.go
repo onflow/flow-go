@@ -27,4 +27,7 @@ type PeerManager interface {
 
 	// ForceUpdatePeers initiates an update to the peer connections of this node immediately
 	ForceUpdatePeers(context.Context)
+
+	// SetPeersProvider sets the peer managers's peers provider and may be called at most once
+	SetPeersProvider(PeersProvider)
 }

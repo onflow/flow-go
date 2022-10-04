@@ -119,10 +119,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.mwCancel = cancel
 
-	var errChan <-chan error
-	m.mwCtx, errChan = irrecoverable.WithSignaler(ctx)
-
-	go unittest.NoIrrecoverableError(m.mwCtx, m.T(), errChan)
+	m.mwCtx = irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
 	for i, mw := range m.mws {
 		mw.SetOverlay(m.ov[i])

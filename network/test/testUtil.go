@@ -137,7 +137,7 @@ func GenerateIDs(
 		var opts []nodeBuilderOption
 
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
-		opts = append(opts, withPeerManagerFactory(connection.PeerManagerFactory(connection.ConnectionPruningEnabled, o.peerUpdateInterval)))
+		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
 
 		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, o.connectionGating, idProvider, opts...)
 
@@ -296,20 +296,16 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	return engs
 }
 
-// StartNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel
-func StartNetworks(ctx context.Context, t *testing.T, nodes []*p2pnode.Node, nets []network.Network, duration time.Duration) <-chan error {
-	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-
+// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel
+func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []*p2pnode.Node, nets []network.Network, duration time.Duration) {
 	// start up networks (this will implicitly start middlewares)
 	for _, net := range nets {
-		net.Start(signalerCtx)
+		net.Start(ctx)
 		unittest.RequireComponentsReadyBefore(t, duration, net)
 	}
 
 	// start up nodes and peer managers
-	StartNodes(signalerCtx, t, nodes, duration)
-
-	return errChan
+	StartNodes(ctx, t, nodes, duration)
 }
 
 // StartNodes starts the provided nodes and their peer managers using the provided irrecoverable context
@@ -338,9 +334,9 @@ func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 	}
 }
 
-func withPeerManagerFactory(factory p2p.PeerManagerFactoryFunc) nodeBuilderOption {
+func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) nodeBuilderOption {
 	return func(nb p2pbuilder.NodeBuilder) {
-		nb.SetPeerManagerFactory(factory)
+		nb.SetPeerManagerOptions(connectionPruning, updateInterval)
 	}
 }
 

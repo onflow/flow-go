@@ -31,9 +31,7 @@ import (
 // TestTopicValidator_Unstaked tests that the libP2P node topic validator rejects unauthenticated messages on non-public channels (unstaked)
 func TestTopicValidator_Unstaked(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create a hooked logger
 	logger, hook := unittest.HookedLogger()
@@ -44,7 +42,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
 
 	nodes := []*p2pnode.Node{sn1, sn2}
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	channel := channels.ConsensusCommittee
@@ -113,9 +111,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 // TestTopicValidator_PublicChannel tests that the libP2P node topic validator does not reject unauthenticated messages on public channels
 func TestTopicValidator_PublicChannel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkId := unittest.IdentifierFixture()
 	logger := unittest.Logger()
@@ -124,7 +120,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
 
 	nodes := []*p2pnode.Node{sn1, sn2}
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// unauthenticated messages should not be dropped on public channels
@@ -174,9 +170,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 // TestAuthorizedSenderValidator_Unauthorized tests that the authorized sender validator rejects messages from nodes that are not authorized to send the message
 func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create a hooked logger
 	logger, hook := unittest.HookedLogger()
@@ -188,7 +182,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	an1, identity3 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleAccess))
 
 	nodes := []*p2pnode.Node{sn1, sn2, an1}
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	channel := channels.ConsensusCommittee
@@ -288,9 +282,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 // TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages being sent on the wrong channel
 func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create a hooked logger
 	logger, hook := unittest.HookedLogger()
@@ -301,7 +293,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, "consensus_2", p2pfixtures.WithRole(flow.RoleConsensus))
 
 	nodes := []*p2pnode.Node{sn1, sn2}
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// try to publish BlockProposal on invalid SyncCommittee channel
@@ -367,9 +359,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 // TestAuthorizedSenderValidator_Ejected tests that the authorized sender validator rejects messages from nodes that are ejected
 func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create a hooked logger
 	logger, hook := unittest.HookedLogger()
@@ -381,7 +371,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	an1, identity3 := p2pfixtures.NodeFixture(t, sporkId, "access_1", p2pfixtures.WithRole(flow.RoleAccess))
 
 	nodes := []*p2pnode.Node{sn1, sn2, an1}
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	channel := channels.ConsensusCommittee
@@ -470,9 +460,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 // TestAuthorizedSenderValidator_ClusterChannel tests that the authorized sender validator correctly validates messages sent on cluster channels
 func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(ctx, t, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkId := unittest.IdentifierFixture()
 
@@ -481,7 +469,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	ln3, identity3 := p2pfixtures.NodeFixture(t, sporkId, "collection_3", p2pfixtures.WithRole(flow.RoleCollection))
 
 	nodes := []*p2pnode.Node{ln1, ln2, ln3}
-	p2pfixtures.StartNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	channel := channels.SyncCluster(flow.Testnet)

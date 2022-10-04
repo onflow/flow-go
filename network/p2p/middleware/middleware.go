@@ -283,11 +283,7 @@ func (m *Middleware) start(ctx context.Context) error {
 
 	m.UpdateNodeAddresses()
 
-	err = m.libP2PNode.WithPeersProvider(m.topologyPeers)
-
-	if err != nil {
-		return fmt.Errorf("failed to add libp2p node peers provider: %w", err)
-	}
+	m.libP2PNode.WithPeersProvider(m.topologyPeers)
 
 	return nil
 }

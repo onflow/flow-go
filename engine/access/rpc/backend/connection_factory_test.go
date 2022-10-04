@@ -21,6 +21,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestProxyAccessAPI(t *testing.T) {
@@ -439,7 +440,7 @@ func (n *node) start(t *testing.T) {
 		err := n.server.Serve(n.listener)
 		assert.NoError(t, err)
 	}()
-	wg.Wait()
+	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Millisecond, "could not start goroutine on time")
 }
 
 func (n *node) stop(t *testing.T) {

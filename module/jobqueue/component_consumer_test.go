@@ -286,12 +286,9 @@ func (suite *ComponentConsumerSuite) runTest(
 	sendJobs func(),
 ) {
 	ctx, cancel := context.WithCancel(testCtx)
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	// use global context so we listen for errors until the test is finished
-	go unittest.NoIrrecoverableError(testCtx, suite.T(), errChan)
-
-	consumer.Start(signalCtx)
+	consumer.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 100*time.Millisecond, "timeout waiting for the consumer to be ready")
 
 	sendJobs()
