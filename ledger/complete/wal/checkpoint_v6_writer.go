@@ -19,8 +19,6 @@ import (
 const subtrieLevel = 4
 const subtrieCount = 1 << subtrieLevel
 
-type NodeEncoder func(node *trie.MTrie, index uint64, scratch []byte) []byte
-
 type resultStoringSubTrie struct {
 	Index     int
 	Roots     map[*node.Node]uint64 // node index for root nodes
@@ -177,7 +175,7 @@ func storeTopLevelNodesAndTrieRoots(
 
 	logger.Info().Msgf("top level nodes have been stored. top level node count: %v", topLevelNodesCount)
 
-	err = storeRootNodes(tries, topLevelNodeIndices, flattener.EncodeTrie, writer)
+	err = storeTries(tries, topLevelNodeIndices, writer)
 	if err != nil {
 		return 0, fmt.Errorf("could not store trie root nodes: %w", err)
 	}
@@ -439,10 +437,9 @@ func storeTopLevelNodes(
 	return subTrieRootIndices, topLevelNodesCount, nil
 }
 
-func storeRootNodes(
+func storeTries(
 	tries []*trie.MTrie,
 	topLevelNodes map[*node.Node]uint64,
-	encodeNode NodeEncoder,
 	writer io.Writer) error {
 	scratch := make([]byte, 1024*4)
 	for _, t := range tries {
@@ -455,7 +452,7 @@ func storeRootNodes(
 			return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(rootHash[:]))
 		}
 
-		encTrie := encodeNode(t, rootIndex, scratch)
+		encTrie := flattener.EncodeTrie(t, rootIndex, scratch)
 		_, err := writer.Write(encTrie)
 		if err != nil {
 			return fmt.Errorf("cannot serialize trie: %w", err)
