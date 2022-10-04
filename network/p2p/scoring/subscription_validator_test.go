@@ -134,6 +134,11 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 
 // TestSubscriptionValidator_SubscribeToAllTopics tests that regardless of its role when a peer has subscribed to all
 // topics, the subscription validator returns an error.
+//
+// Note: this test is to ensure that the subscription validator is not bypassed by subscribing to all topics.
+// It also based on the assumption that within the list of all topics, there are guaranteed to be some that are not allowed.
+// If this assumption is not true, this test will fail. Hence, the test should be updated accordingly if the assumption
+// is no longer true.
 func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 	idProvider := mock.NewIdentityProvider(t)
 	sp := mockp2p.NewSubscriptionProvider(t)
@@ -168,8 +173,8 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	for _, role := range flow.Roles() {
 		peer := p2pfixtures.PeerIdFixture(t)
 		unauthorizedChannels := channels.Channels(). // all channels
-								ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
-								ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
+			ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
+			ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
 		sporkID := unittest.IdentifierFixture()
 		unauthorizedTopics := make([]string, 0, len(unauthorizedChannels))
 		for _, channel := range unauthorizedChannels {

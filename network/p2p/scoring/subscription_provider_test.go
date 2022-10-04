@@ -32,7 +32,7 @@ func TestSubscriptionProvider_GetSubscribedTopics(t *testing.T) {
 	tp.On("ListPeers", "topic2").Return(append([]peer.ID{peer2, peer3}, p2pfixtures.PeerIdsFixture(t, 10)...))
 	// mock peers 1 and 3 subscribed to topic 3 (along with other random peers)
 	tp.On("ListPeers", "topic3").Return(append([]peer.ID{peer1, peer3}, p2pfixtures.PeerIdsFixture(t, 10)...))
-	
+
 	// As the calls to the TopicProvider are asynchronous, we need to wait for the goroutines to finish.
 	assert.Eventually(t, func() bool {
 		return slices.AreStringSlicesEqual([]string{"topic1", "topic3"}, sp.GetSubscribedTopics(peer1))
