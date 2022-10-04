@@ -338,12 +338,6 @@ func storeCheckpointSubTrie(
 ) (
 	map[*node.Node]uint64, uint64, uint32, error) {
 
-	// traversedSubtrieNodes contains all unique nodes of subtries of the same path and their index.
-	traversedSubtrieNodes := make(map[*node.Node]uint64, estimatedSubtrieNodeCount)
-	// index 0 is nil, it can be used in a node's left child or right child to indicate
-	// a node's left child or right child is nil
-	traversedSubtrieNodes[nil] = 0
-
 	closable, err := createWriterForSubtrie(outputDir, outputFile, logger, i)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("could not create writer for sub trie: %w", err)
@@ -360,7 +354,6 @@ func storeCheckpointSubTrie(
 	// create a CRC32 writer, so that any bytes passed to the writer will
 	// be used to calculate CRC32 checksum
 	writer := NewCRC32Writer(closable)
-
 	// topLevelNodes contains all unique nodes of given tries
 	// from root to subtrie root and their index
 	// (ordered by node traversal sequence).
@@ -372,6 +365,13 @@ func storeCheckpointSubTrie(
 	nodeCounter := uint64(1)
 
 	logging := logProgress(fmt.Sprintf("storing %v-th sub trie roots", i), estimatedSubtrieNodeCount, logger)
+
+	// traversedSubtrieNodes contains all unique nodes of subtries of the same path and their index.
+	traversedSubtrieNodes := make(map[*node.Node]uint64, estimatedSubtrieNodeCount)
+	// index 0 is nil, it can be used in a node's left child or right child to indicate
+	// a node's left child or right child is nil
+	traversedSubtrieNodes[nil] = 0
+
 	scratch := make([]byte, 1024*4)
 	for _, root := range roots {
 		// Note: nodeCounter is to assign an global index to each node in the order of it being seralized
