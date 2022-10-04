@@ -29,6 +29,7 @@ func TestChannelList_ExcludeChannels(t *testing.T) {
 	require.ElementsMatch(t, channels.ChannelList{"a", "c"}, list.ExcludeChannels(channels.ChannelList{"b"}))
 	require.ElementsMatch(t, channels.ChannelList{"b", "c"}, list.ExcludeChannels(channels.ChannelList{"a"}))
 	require.ElementsMatch(t, channels.ChannelList{"a", "b", "c"}, list.ExcludeChannels(channels.ChannelList{"d"}))
+	require.Empty(t, list.ExcludeChannels(channels.ChannelList{"a", "b", "c"}))
 }
 
 // TestChannelList_ExcludePattern tests that the channel list ExcludePattern method returns a new channel list
