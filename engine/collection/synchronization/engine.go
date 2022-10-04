@@ -309,7 +309,8 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 		}
 		// forward the block to the compliance engine for validation and processing
 		// we use the network.MessageProcessor interface here because the block is un-validated
-		err := e.comp.Process(channels.SyncCluster(block.Header.ChainID), originID, synced)
+		// NOTE: although we set originID=me, this message is untrusted
+		err := e.comp.Process(channels.SyncCluster(block.Header.ChainID), e.me.NodeID(), synced)
 		if err != nil {
 			e.log.Err(err).Msg("received unexpected error from compliance engine")
 		}
