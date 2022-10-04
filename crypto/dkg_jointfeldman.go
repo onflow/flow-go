@@ -66,10 +66,11 @@ type JointFeldmanState struct {
 //
 // The function returns:
 // - (nil, InvalidInputsError) if:
-//    - size if not in [DKGMinSize, DKGMaxSize]
-//    - threshold is not in [MinimumThreshold, size-1]
-//    - myIndex is not in [0, size-1]
-//    - dealerIndex is not in [0, size-1]
+//   - size if not in [DKGMinSize, DKGMaxSize]
+//   - threshold is not in [MinimumThreshold, size-1]
+//   - myIndex is not in [0, size-1]
+//   - dealerIndex is not in [0, size-1]
+//
 // - (dkgInstance, nil) otherwise
 func NewJointFeldman(size int, threshold int, myIndex int,
 	processor DKGProcessor) (DKGState, error) {
@@ -107,9 +108,9 @@ func (s *JointFeldmanState) init() {
 // participant is the dealer.
 //
 // The returned error is :
-//    - dkgInvalidStateTransitionError if the DKG instance is already running.
-//    - error if an unexpected exception occurs
-//    - nil otherwise.
+//   - dkgInvalidStateTransitionError if the DKG instance is already running.
+//   - error if an unexpected exception occurs
+//   - nil otherwise.
 func (s *JointFeldmanState) Start(seed []byte) error {
 	if s.jointRunning {
 		return dkgInvalidStateTransitionErrorf("dkg is already running")
@@ -129,9 +130,9 @@ func (s *JointFeldmanState) Start(seed []byte) error {
 // NextTimeout sets the next timeout of the protocol if any timeout applies.
 //
 // The returned error is :
-//    - dkgInvalidStateTransitionError if the DKG instance was not running.
-//    - dkgInvalidStateTransitionError if the DKG instance already called the 2 required timeouts.
-//    - nil otherwise.
+//   - dkgInvalidStateTransitionError if the DKG instance was not running.
+//   - dkgInvalidStateTransitionError if the DKG instance already called the 2 required timeouts.
+//   - nil otherwise.
 func (s *JointFeldmanState) NextTimeout() error {
 	if !s.jointRunning {
 		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
@@ -154,9 +155,9 @@ func (s *JointFeldmanState) NextTimeout() error {
 // - the finalized private key which is the current participant's own private key share
 //
 // The returned error is:
-//    - dkgFailureError if the disqualified dealers exceeded the threshold.
-//    - dkgInvalidStateTransitionError Start() was not called, or NextTimeout() was not called twice
-//    - nil otherwise.
+//   - dkgFailureError if the disqualified dealers exceeded the threshold.
+//   - dkgInvalidStateTransitionError Start() was not called, or NextTimeout() was not called twice
+//   - nil otherwise.
 func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.jointRunning {
 		return nil, nil, nil, dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
@@ -217,9 +218,9 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 // orig is the message origin index
 //
 // The function returns:
-//  - dkgInvalidStateTransitionError if the instance is not running
-//  - invalidInputsError if `orig` is not valid (in [0, size-1])
-//  - nil otherwise
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
 		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
@@ -237,9 +238,9 @@ func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 // orig is the message origin index
 //
 // The function returns:
-//  - dkgInvalidStateTransitionError if the instance is not running
-//  - invalidInputsError if `orig` is not valid (in [0, size-1])
-//  - nil otherwise
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *JointFeldmanState) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
 		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
@@ -264,9 +265,9 @@ func (s *JointFeldmanState) Running() bool {
 // otherwise, the protocol can be broken
 //
 // The function returns:
-//  - dkgInvalidStateTransitionError if the instance is not running
-//  - invalidInputsError if `orig` is not valid (in [0, size-1])
-//  - nil otherwise
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *JointFeldmanState) ForceDisqualify(participant int) error {
 	if !s.jointRunning {
 		return dkgInvalidStateTransitionErrorf("dkg is not running")

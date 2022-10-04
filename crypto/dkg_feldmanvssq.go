@@ -66,12 +66,12 @@ type complaint struct {
 // In order to run the protocol again, a new instance needs to be created
 //
 // The function returns:
-//  - (nil, InvalidInputsError) if:
-//    - size if not in [DKGMinSize, DKGMaxSize]
-//    - threshold is not in [MinimumThreshold, size-1]
-//    - myIndex is not in [0, size-1]
-//    - dealerIndex is not in [0, size-1]
-//  - (dkgInstance, nil) otherwise
+//   - (nil, InvalidInputsError) if:
+//   - size if not in [DKGMinSize, DKGMaxSize]
+//   - threshold is not in [MinimumThreshold, size-1]
+//   - myIndex is not in [0, size-1]
+//   - dealerIndex is not in [0, size-1]
+//   - (dkgInstance, nil) otherwise
 func NewFeldmanVSSQual(size int, threshold int, myIndex int,
 	processor DKGProcessor, dealerIndex int) (DKGState, error) {
 
@@ -142,9 +142,9 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 //  2. all the public key shares corresponding to the participants private key shares.
 //  3. the finalized private key which is the current participant's own private key share
 //  4. Error Returns:
-//    - dkgFailureError if the dealer was disqualified.
-//    - dkgInvalidStateTransition if Start() was not called, or NextTimeout() was not called twice
-//    - nil otherwise.
+//     - dkgFailureError if the dealer was disqualified.
+//     - dkgInvalidStateTransition if Start() was not called, or NextTimeout() was not called twice
+//     - nil otherwise.
 func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
 		return nil, nil, nil, dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
@@ -196,9 +196,9 @@ const (
 // orig is the message origin index
 //
 // The function returns:
-//  - dkgInvalidStateTransitionError if the instance is not running
-//  - invalidInputsError if `orig` is not valid (in [0, size-1])
-//  - nil otherwise
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.running {
 		return dkgInvalidStateTransitionErrorf("dkg is not running")
@@ -252,9 +252,9 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 // orig is the message origin index.
 //
 // The function returns:
-//  - dkgInvalidStateTransitionError if the instance is not running
-//  - invalidInputsError if `orig` is not valid (in [0, size-1])
-//  - nil otherwise
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.running {
 		return dkgInvalidStateTransitionErrorf("dkg is not running")
@@ -290,9 +290,9 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 // otherwise, the protocol can be broken
 //
 // The function returns:
-//  - dkgInvalidStateTransitionError if the instance is not running
-//  - invalidInputsError if `orig` is not valid (in [0, size-1])
-//  - nil otherwise
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *feldmanVSSQualState) ForceDisqualify(participant int) error {
 	if !s.running {
 		return dkgInvalidStateTransitionErrorf("dkg is not running")

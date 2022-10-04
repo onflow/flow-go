@@ -53,10 +53,11 @@ type feldmanVSSstate struct {
 //
 // The function returns:
 // - (nil, InvalidInputsError) if:
-//    - size if not in [DKGMinSize, DKGMaxSize]
-//    - threshold is not in [MinimumThreshold, size-1]
-//    - myIndex is not in [0, size-1]
-//    - dealerIndex is not in [0, size-1]
+//   - size if not in [DKGMinSize, DKGMaxSize]
+//   - threshold is not in [MinimumThreshold, size-1]
+//   - myIndex is not in [0, size-1]
+//   - dealerIndex is not in [0, size-1]
+//
 // - (dkgInstance, nil) otherwise
 func NewFeldmanVSS(size int, threshold int, myIndex int,
 	processor DKGProcessor, dealerIndex int) (DKGState, error) {
@@ -114,9 +115,9 @@ func (s *feldmanVSSstate) Start(seed []byte) error {
 // - the finalized private key which is the current participant's own private key share
 //
 // The returned erorr is :
-//    - dkgInvalidStateTransitionError if the DKG instance was not running.
-//    - dkgFailureError if the private key and vector are inconsistent.
-//    - nil otherwise.
+//   - dkgInvalidStateTransitionError if the DKG instance was not running.
+//   - dkgFailureError if the private key and vector are inconsistent.
+//   - nil otherwise.
 func (s *feldmanVSSstate) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
 		return nil, nil, nil, dkgInvalidStateTransitionErrorf("dkg is not running")
@@ -150,9 +151,9 @@ const (
 // `orig` is the message origin index.
 //
 // The function returns:
-//  - dkgInvalidStateTransitionError if the instance is not running
-//  - invalidInputsError if `orig` is not valid (in [0, size-1])
-//  - nil otherwise
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.running {
 		return dkgInvalidStateTransitionErrorf("dkg is not running")
@@ -190,9 +191,9 @@ func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 // `orig` is the message origin index.
 //
 // The function returns:
-//  - dkgInvalidStateTransitionError if the instance is not running
-//  - invalidInputsError if `orig` is not valid (in [0, size-1])
-//  - nil otherwise
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.running {
 		return dkgInvalidStateTransitionErrorf("dkg is not running")
@@ -225,9 +226,9 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 // otherwise, the protocol can be broken.
 //
 // The function returns:
-//  - dkgInvalidStateTransitionError if the instance is not running
-//  - invalidInputsError if `orig` is not valid (in [0, size-1])
-//  - nil otherwise
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *feldmanVSSstate) ForceDisqualify(participant int) error {
 	if !s.running {
 		return dkgInvalidStateTransitionErrorf("dkg is not running")
