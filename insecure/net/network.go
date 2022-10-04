@@ -515,8 +515,8 @@ func (n *Network) HandleOutgoingEvent(
 
 // HandleIncomingEvent is called on the incoming messages to a corrupt node(s).
 // Returns true if an attacker is registered and false otherwise.
-// Honest node message flow: Flow Networking Layer -> Honest Engine
-// Corrupt node message flow (with attacker registered):
+// Honest node (i.e., not running with a corrupt network) message flow: Flow Networking Layer -> Honest Engine
+// Corrupt node (i.e., running with a corrupt network) message flow (with attacker registered):
 // Flow Networking Layer -> Corrupt Network -> Attack Orchestrator (mute or passthrough) -> Corrupt Network -> Honest / Corrupt Engine
 func (n *Network) HandleIncomingEvent(event interface{}, channel channels.Channel, originId flow.Identifier) bool {
 	lg := n.logger.With().
