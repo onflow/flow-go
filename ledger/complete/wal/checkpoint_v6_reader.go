@@ -237,21 +237,9 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 	// calculate the actual checksum
 	actualSum := reader.Crc32()
 
-	// read the stored checksum, and compare with the actual sum
-	_, err = readCRC32Sum(reader)
-	if err != nil {
-		return nil, fmt.Errorf("could not read subtrie checkpoint checksum: %w", err)
-	}
-
 	if actualSum != expectedSum {
 		return nil, fmt.Errorf("invalid checksum in subtrie checkpoint, expected %v, actual %v",
 			expectedSum, actualSum)
-	}
-
-	// compare the checksum with the checksum stored in checkpoint header file
-	if checksum != actualSum {
-		return nil, fmt.Errorf("invalid checksum in checkpoint header and subtrie header, expected %v, actual %v",
-			checksum, actualSum)
 	}
 
 	return nodes, nil
@@ -376,12 +364,6 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	}
 
 	actualSum := reader.Crc32()
-
-	// read the stored checksum, and compare with the actual sum
-	_, err = readCRC32Sum(reader)
-	if err != nil {
-		return nil, fmt.Errorf("could not read top level trie checksum: %w", err)
-	}
 
 	if actualSum != expectedSum {
 		return nil, fmt.Errorf("invalid checksum in top level trie, expected %v, actual %v",
