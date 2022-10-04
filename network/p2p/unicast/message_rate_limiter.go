@@ -40,7 +40,7 @@ func NewMessageRateLimiter(limit rate.Limit, burst int, opts ...RateLimiterOpt) 
 }
 
 // Allow checks the cached limiter for the peer and returns limiter.Allow().
-// If a limiter is not cached for a one is created.
+// If a limiter is not cached for a peer one is created.
 func (s *MessageRateLimiterImpl) Allow(peerID peer.ID, _ *message.Message) bool {
 	limiter := s.getLimiter(peerID)
 	if !limiter.AllowN(s.now(), 1) {
