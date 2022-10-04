@@ -29,3 +29,14 @@ func TestAreStringSlicesEqual(t *testing.T) {
 	require.False(t, slices.AreStringSlicesEqual(a, c))
 	require.False(t, slices.AreStringSlicesEqual(a, d))
 }
+
+// TestAreStringSlicesEqual_DuplicateElements tests that the AreStringSlicesEqual function works with duplicate elements.
+func TestAreStringSlicesEqual_DuplicateElements(t *testing.T) {
+	a := []string{"a", "a", "a", "a"}
+	b := []string{"a", "c", "d", "b"}
+	require.False(t, slices.AreStringSlicesEqual(a, b))
+
+	a = []string{"a", "c", "d", "a"}
+	b = []string{"c", "a", "a", "d"}
+	require.True(t, slices.AreStringSlicesEqual(a, b))
+}
