@@ -463,6 +463,7 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 
 func (fnb *FlowNodeBuilder) initLogger() {
 	// configure logger with standard level, node ID and UTC timestamp
+	zerolog.TimeFieldFormat = time.RFC3339Nano
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
 	log := fnb.Logger.With().
 		Timestamp().
