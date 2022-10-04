@@ -42,6 +42,20 @@ type resultStoringSubTrie struct {
 //	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
 func StoreCheckpointV6(
 	tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
+	err := storeCheckpointV6(tries, outputDir, outputFile, logger)
+	if err != nil {
+		cleanupErr := cleanupTempFiles(outputDir, outputFile)
+		if cleanupErr != nil {
+			//
+		}
+		return err
+	}
+
+	return nil
+}
+
+func storeCheckpointV6(
+	tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
 	if len(tries) == 0 {
 		logger.Info().Msg("no tries to be checkpointed")
 		return nil
@@ -501,6 +515,19 @@ func storeRootNodes(
 		}
 	}
 
+	return nil
+}
+
+// remove any temporary files when checkpointing encountered error
+// any error returned are exception
+func cleanupTempFiles(outputDir string, outputFile string) error {
+	filesToRemove := filePaths(outputDir, outputFile, subtrieLevel)
+	for _, file := range filesToRemove {
+		err := os.Remove(file)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("could not remove file %v: %w", file, err)
+		}
+	}
 	return nil
 }
 

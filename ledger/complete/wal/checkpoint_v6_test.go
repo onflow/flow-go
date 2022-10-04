@@ -224,7 +224,7 @@ func TestWriteAndReadCheckpointV6MultipleTries(t *testing.T) {
 		tries := createMultipleRandomTries(t)
 		fileName := "checkpoint-multi-file"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6(tries, dir, fileName, &logger), "fail to store checkpoint")
 		decoded, err := ReadCheckpointV6(dir, fileName, &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
@@ -236,8 +236,8 @@ func TestCheckpointV6IsDeterminstic(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createMultipleRandomTries(t)
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint1", &logger), "fail to store checkpoint")
-		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint2", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6(tries, dir, "checkpoint1", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6(tries, dir, "checkpoint2", &logger), "fail to store checkpoint")
 		require.NoError(t, compareFiles(
 			path.Join(dir, "checkpoint1"),
 			path.Join(dir, "checkpoint2")),
@@ -330,7 +330,7 @@ func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
 		logger := unittest.Logger()
 
 		// store tries into v6 then read back, then store into v5
-		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
 		decoded, err := ReadCheckpointV6(dir, "checkpoint-v6", &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/checkpoint-v6", dir)
 		require.NoErrorf(t, storeCheckpointV5(decoded, dir, "checkpoint-v6-v5", &logger), "fail to store checkpoint")
@@ -344,4 +344,8 @@ func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
 			path.Join(dir, "checkpoint-v6-v5")),
 			"found difference in checkpoint files")
 	})
+}
+
+func TestCleanupOnError(t *testing.T) {
+	require.NoError(t, cleanupTempFiles("not-exist", "checkpoint-v6"))
 }
