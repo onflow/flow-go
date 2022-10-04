@@ -55,7 +55,7 @@ func StoreCheckpointV6(
 
 	subTrieRootIndices, subTriesNodeCount, subTrieChecksums, err := storeSubTrieConcurrently(
 		subtrieRoots,
-		estimateSubtrieNodeCount(tries),
+		estimateSubtrieNodeCount(last), // considering the last trie most likely have more registers than others
 		subTrieRootAndTopLevelTrieCount(tries),
 		outputDir,
 		outputFile,
@@ -213,15 +213,9 @@ func createSubTrieRoots(tries []*trie.MTrie) [subtrieCount][]*node.Node {
 	return subtrieRoots
 }
 
-// estimateSubtrieNodeCount takes a list of tries, and estimate the average number of registers
-// in each subtrie.
-func estimateSubtrieNodeCount(tries []*trie.MTrie) int {
-	if len(tries) == 0 {
-		return 0
-	}
-	// take the last trie and use the allocatedRegCount from there considering its
-	// most likely have more registers than the trie with 0 index.
-	estimatedTrieNodeCount := 2*int(tries[len(tries)-1].AllocatedRegCount()) - 1
+// estimateSubtrieNodeCount estimate the average number of registers in each subtrie.
+func estimateSubtrieNodeCount(trie *trie.MTrie) int {
+	estimatedTrieNodeCount := 2*int(trie.AllocatedRegCount()) - 1
 	return estimatedTrieNodeCount / subtrieCount
 }
 
@@ -273,7 +267,7 @@ func storeSubTrieConcurrently(
 	results := make(map[*node.Node]uint64, subAndTopNodeCount)
 	results[nil] = 0
 	nodeCounter := uint64(0)
-	checksums := make([]uint32, 0, len(results))
+	checksums := make([]uint32, 0, len(resultChs))
 	for _, resultCh := range resultChs {
 		result := <-resultCh
 		if result.Err != nil {
@@ -372,7 +366,6 @@ func storeCheckpointSubTrie(
 	// (ordered by node traversal sequence).
 	// Index 0 is a special case with nil node.
 	subtrieRootNodes := make(map[*node.Node]uint64, subtrieCount)
-	subtrieRootNodes[nil] = 0
 
 	// nodeCounter is counter for all unique nodes.
 	// It starts from 1, as 0 marks nil node.
