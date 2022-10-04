@@ -19,6 +19,9 @@ import (
 // 		3. checksum of the main file itself
 // 	the first 16 files parts contain the trie nodes below the subtrieLevel
 //	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
+// it returns (tries, nil) if there was no error
+// it returns (nil, os.ErrNotExist) if a certain file is missing
+// it returns (nil, err) if running into any exception
 func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
 	// TODO: read the checksum of 17 file parts
@@ -27,6 +30,13 @@ func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	subtrieChecksums, topTrieChecksum, err := readHeader(headerPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read header: %w", err)
+	}
+
+	// ensure all checkpoint part file exists, might return os.ErrNotExist error
+	// if a file is missing
+	err = allPartFileExist(dir, fileName, len(subtrieChecksums))
+	if err != nil {
+		return nil, fmt.Errorf("fail to check all checkpoint part file exist: %w", err)
 	}
 
 	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums)
@@ -81,6 +91,26 @@ func readHeader(filePath string) ([]uint32, uint32, error) {
 //
 // 	return decodeFooter(footer)
 // }
+
+// allPartFileExist check if all the part files of the checkpoint file exist
+// it returns nil if all files exist
+// it returns os.ErrNotExist if some file is missing
+// it returns err if running into any exception
+func allPartFileExist(dir string, fileName string, totalSubtrieFiles int) error {
+	for i := 0; i < totalSubtrieFiles; i++ {
+		filePath, _, err := filePathSubTries(dir, fileName, i)
+		if err != nil {
+			return fmt.Errorf("fail to find file path for %v-th subtrie file: %w", i, err)
+		}
+
+		// ensure file exists
+		_, err = os.Stat(filePath)
+		if err != nil {
+			return fmt.Errorf("fail to check %v-th subtrie file exist: %w", i, err)
+		}
+	}
+	return nil
+}
 
 func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32) ([][]*node.Node, error) {
 	// TODO: replace 16 with const
