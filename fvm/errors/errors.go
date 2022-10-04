@@ -2,17 +2,25 @@ package errors
 
 import (
 	stdErrors "errors"
+	"fmt"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/errors"
 )
 
-// Error covers all non-fatal errors happening
-// while validating and executing a transaction or a script.
-type Error interface {
-	// Code returns the code for this error
+// TODO(patrick): remove after emulator is updated.
+type Error = CodedError
+
+// TODO(patrick): combine CodedError and Failure interface.
+// We can also combine codedError and CodedFailure once the interface is
+// unified.
+type CodedError interface {
+	// TODO(patrick): add IsFailure() bool
+
 	Code() ErrorCode
-	// and anything else that is needed to be an error
+
+	Unwrap() error
+
 	error
 }
 
@@ -22,10 +30,10 @@ type Error interface {
 // if any of these errors occurs we should halt the
 // execution.
 type Failure interface {
+	CodedError
+
 	// FailureCode returns the failure code for this error
-	FailureCode() FailureCode
-	// and anything else that is needed to be an error
-	error
+	FailureCode() ErrorCode
 }
 
 type errorWrapper struct {
@@ -96,4 +104,93 @@ func HandleRuntimeError(err error) error {
 
 	// All other errors are non-fatal Cadence errors.
 	return NewCadenceRuntimeError(runErr)
+}
+
+// This returns true if the error or one of its nested errors matches the
+// specified error code.
+func HasErrorCode(err error, code ErrorCode) bool {
+	return Find(err, code) != nil
+}
+
+// This recursively unwraps the error and returns first CodedError that matches
+// the specified error code.
+func Find(err error, code ErrorCode) CodedError {
+	if err == nil {
+		return nil
+	}
+
+	var coded CodedError
+	if !As(err, &coded) {
+		return nil
+	}
+
+	if coded.Code() == code {
+		return coded
+	}
+
+	return Find(coded.Unwrap(), code)
+}
+
+type codedError struct {
+	code ErrorCode
+
+	errorWrapper
+}
+
+func newError(
+	code ErrorCode,
+	rootCause error,
+) codedError {
+	return codedError{
+		code:         code,
+		errorWrapper: errorWrapper{rootCause},
+	}
+}
+
+func WrapCodedError(
+	code ErrorCode,
+	err error,
+	prefixMsgFormat string,
+	formatArguments ...interface{},
+) codedError {
+	if prefixMsgFormat != "" {
+		msg := fmt.Sprintf(prefixMsgFormat, formatArguments...)
+		err = fmt.Errorf("%s: %w", msg, err)
+	}
+	return newError(code, err)
+}
+
+func NewCodedError(
+	code ErrorCode,
+	format string,
+	formatArguments ...interface{},
+) codedError {
+	return newError(code, fmt.Errorf(format, formatArguments...))
+}
+
+func (err codedError) Error() string {
+	return fmt.Sprintf("%v %v", err.code, err.err)
+}
+
+func (err codedError) Code() ErrorCode {
+	return err.code
+}
+
+type CodedFailure struct {
+	codedError
+}
+
+func WrapCodedFailure(
+	code ErrorCode,
+	err error,
+	prefixMsgFormat string,
+	formatArgs ...interface{},
+) *CodedFailure {
+	return &CodedFailure{
+		codedError: WrapCodedError(code, err, prefixMsgFormat, formatArgs...),
+	}
+}
+
+func (err CodedFailure) FailureCode() ErrorCode {
+	return err.code
 }

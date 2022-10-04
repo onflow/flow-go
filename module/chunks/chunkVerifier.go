@@ -14,6 +14,7 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/partial"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -54,7 +55,14 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 		transactions = append(transactions, tx)
 	}
 
-	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack, vc.Result, vc.Header, transactions, vc.EndState)
+	return fcv.verifyTransactions(
+		vc.TransactionOffset,
+		vc.Chunk,
+		vc.ChunkDataPack,
+		vc.Result,
+		vc.Header,
+		transactions,
+		vc.EndState)
 }
 
 // SystemChunkVerify verifies a given VerifiableChunk corresponding to a system chunk.
@@ -80,14 +88,31 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 		fvm.WithBlockHeader(vc.Header),
 	)
 
-	return fcv.verifyTransactionsInContext(systemChunkContext, vc.Chunk, vc.ChunkDataPack, vc.Result, transactions, vc.EndState, true)
+	return fcv.verifyTransactionsInContext(
+		systemChunkContext,
+		vc.TransactionOffset,
+		vc.Chunk,
+		vc.ChunkDataPack,
+		vc.Result,
+		transactions,
+		vc.EndState,
+		true)
 }
 
-func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk *flow.Chunk,
+func (fcv *ChunkVerifier) verifyTransactionsInContext(
+	context fvm.Context,
+	transactionOffset uint32,
+	chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
 	result *flow.ExecutionResult,
 	transactions []*fvm.TransactionProcedure,
-	endState flow.StateCommitment, systemChunk bool) ([]byte, chmodels.ChunkFault, error) {
+	endState flow.StateCommitment,
+	systemChunk bool,
+) (
+	[]byte,
+	chmodels.ChunkFault,
+	error,
+) {
 
 	// TODO check collection hash to match
 	// TODO check datapack hash to match
@@ -111,6 +136,12 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ", err, chIndex, execResID),
 			nil
 	}
+
+	context = fvm.NewContextFromParent(
+		context,
+		fvm.WithBlockPrograms(
+			programs.NewEmptyBlockProgramsWithTransactionOffset(
+				transactionOffset)))
 
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
@@ -271,15 +302,30 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	return chunkView.SpockSecret(), nil, nil
 }
 
-func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
+func (fcv *ChunkVerifier) verifyTransactions(
+	transactionOffset uint32,
+	chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
 	result *flow.ExecutionResult,
 	header *flow.Header,
 	transactions []*fvm.TransactionProcedure,
-	endState flow.StateCommitment) ([]byte, chmodels.ChunkFault, error) {
+	endState flow.StateCommitment,
+) (
+	[]byte,
+	chmodels.ChunkFault,
+	error,
+) {
 
 	// build a block context
 	blockCtx := fvm.NewContextFromParent(fcv.vmCtx, fvm.WithBlockHeader(header))
 
-	return fcv.verifyTransactionsInContext(blockCtx, chunk, chunkDataPack, result, transactions, endState, false)
+	return fcv.verifyTransactionsInContext(
+		blockCtx,
+		transactionOffset,
+		chunk,
+		chunkDataPack,
+		result,
+		transactions,
+		endState,
+		false)
 }

@@ -12,6 +12,22 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
+const (
+	DefaultEventCollectionByteSizeLimit = 256_000 // 256KB
+)
+
+type EventEmitterParams struct {
+	ServiceEventCollectionEnabled bool
+	EventCollectionByteSizeLimit  uint64
+}
+
+func DefaultEventEmitterParams() EventEmitterParams {
+	return EventEmitterParams{
+		ServiceEventCollectionEnabled: false,
+		EventCollectionByteSizeLimit:  DefaultEventCollectionByteSizeLimit,
+	}
+}
+
 // EventEmitter collect events, separates out service events, and enforces
 // event size limits.
 //
@@ -58,9 +74,8 @@ type eventEmitter struct {
 	txIndex uint32
 	payer   flow.Address
 
-	serviceEventCollectionEnabled bool
-	eventCollectionByteSizeLimit  uint64
-	eventCollection               *EventCollection
+	EventEmitterParams
+	eventCollection *EventCollection
 }
 
 // NewEventEmitter constructs a new eventEmitter
@@ -68,21 +83,17 @@ func NewEventEmitter(
 	tracer *Tracer,
 	meter Meter,
 	chain flow.Chain,
-	txID flow.Identifier,
-	txIndex uint32,
-	payer flow.Address,
-	serviceEventCollectionEnabled bool,
-	eventCollectionByteSizeLimit uint64,
+	txInfo TransactionInfoParams,
+	params EventEmitterParams,
 ) EventEmitter {
 	emitter := &eventEmitter{
-		tracer:                        tracer,
-		meter:                         meter,
-		chain:                         chain,
-		txID:                          txID,
-		txIndex:                       txIndex,
-		payer:                         payer,
-		serviceEventCollectionEnabled: serviceEventCollectionEnabled,
-		eventCollectionByteSizeLimit:  eventCollectionByteSizeLimit,
+		tracer:             tracer,
+		meter:              meter,
+		chain:              chain,
+		txID:               txInfo.TxId,
+		txIndex:            txInfo.TxIndex,
+		payer:              txInfo.TxBody.Payer,
+		EventEmitterParams: params,
 	}
 
 	emitter.Reset()
@@ -90,7 +101,9 @@ func NewEventEmitter(
 }
 
 func (emitter *eventEmitter) Reset() {
-	emitter.eventCollection = NewEventCollection()
+	// TODO: for now we are not resetting meter here because we don't check meter
+	//		 metrics after the first metering failure and when limit is disabled.
+	emitter.eventCollection = NewEventCollection(emitter.meter)
 }
 
 func (emitter *eventEmitter) EventCollection() *EventCollection {
@@ -109,43 +122,45 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	payload, err := jsoncdc.Encode(event)
 	if err != nil {
 		return errors.NewEncodingFailuref(
-			"failed to json encode a cadence event: %w",
-			err)
+			err,
+			"failed to json encode a cadence event")
 	}
 
 	payloadSize := uint64(len(payload))
-
-	// skip limit if payer is service account
-	if emitter.payer != emitter.chain.ServiceAddress() {
-		totalSize := emitter.eventCollection.TotalByteSize() + payloadSize
-		if totalSize > emitter.eventCollectionByteSizeLimit {
-			return errors.NewEventLimitExceededError(
-				totalSize,
-				emitter.eventCollectionByteSizeLimit)
-		}
-	}
 
 	flowEvent := flow.Event{
 		Type:             flow.EventType(event.EventType.ID()),
 		TransactionID:    emitter.txID,
 		TransactionIndex: emitter.txIndex,
-		EventIndex:       emitter.eventCollection.eventCounter,
+		EventIndex:       emitter.eventCollection.TotalEventCounter(),
 		Payload:          payload,
 	}
 
-	if emitter.serviceEventCollectionEnabled {
+	// TODO: to set limit to maximum when it is service account and get rid of this flag
+	isServiceAccount := emitter.payer == emitter.chain.ServiceAddress()
+
+	if emitter.ServiceEventCollectionEnabled {
 		ok, err := IsServiceEvent(event, emitter.chain.ChainID())
 		if err != nil {
 			return fmt.Errorf("unable to check service event: %w", err)
 		}
 		if ok {
-			emitter.eventCollection.AppendServiceEvent(flowEvent, payloadSize)
+			eventEmitError := emitter.eventCollection.AppendServiceEvent(flowEvent, payloadSize)
+			// skip limit if payer is service account
+			if !isServiceAccount && eventEmitError != nil {
+				return eventEmitError
+			}
 		}
 		// We don't return and append the service event into event collection
 		// as well.
 	}
 
-	emitter.eventCollection.AppendEvent(flowEvent, payloadSize)
+	eventEmitError := emitter.eventCollection.AppendEvent(flowEvent, payloadSize)
+	// skip limit if payer is service account
+	if !isServiceAccount {
+		return eventEmitError
+	}
+
 	return nil
 }
 
@@ -160,16 +175,14 @@ func (emitter *eventEmitter) ServiceEvents() []flow.Event {
 type EventCollection struct {
 	events        flow.EventsList
 	serviceEvents flow.EventsList
-	totalByteSize uint64
-	eventCounter  uint32
+	meter         Meter
 }
 
-func NewEventCollection() *EventCollection {
+func NewEventCollection(meter Meter) *EventCollection {
 	return &EventCollection{
 		events:        make([]flow.Event, 0, 10),
 		serviceEvents: make([]flow.Event, 0, 10),
-		totalByteSize: uint64(0),
-		eventCounter:  uint32(0),
+		meter:         meter,
 	}
 }
 
@@ -177,10 +190,9 @@ func (collection *EventCollection) Events() []flow.Event {
 	return collection.events
 }
 
-func (collection *EventCollection) AppendEvent(event flow.Event, size uint64) {
+func (collection *EventCollection) AppendEvent(event flow.Event, size uint64) error {
 	collection.events = append(collection.events, event)
-	collection.totalByteSize += size
-	collection.eventCounter++
+	return collection.meter.MeterEmittedEvent(size)
 }
 
 func (collection *EventCollection) ServiceEvents() []flow.Event {
@@ -190,14 +202,17 @@ func (collection *EventCollection) ServiceEvents() []flow.Event {
 func (collection *EventCollection) AppendServiceEvent(
 	event flow.Event,
 	size uint64,
-) {
+) error {
 	collection.serviceEvents = append(collection.serviceEvents, event)
-	collection.totalByteSize += size
-	collection.eventCounter++
+	return collection.meter.MeterEmittedEvent(size)
 }
 
 func (collection *EventCollection) TotalByteSize() uint64 {
-	return collection.totalByteSize
+	return collection.meter.TotalEmittedEventBytes()
+}
+
+func (collection *EventCollection) TotalEventCounter() uint32 {
+	return collection.meter.TotalEventCounter()
 }
 
 // IsServiceEvent determines whether or not an emitted Cadence event is
@@ -207,7 +222,10 @@ func IsServiceEvent(event cadence.Event, chain flow.ChainID) (bool, error) {
 	// retrieve the service event information for this chain
 	events, err := systemcontracts.ServiceEventsForChain(chain)
 	if err != nil {
-		return false, fmt.Errorf("unknown system contracts for chain (%s): %w", chain.String(), err)
+		return false, fmt.Errorf(
+			"unknown system contracts for chain (%s): %w",
+			chain.String(),
+			err)
 	}
 
 	eventType := flow.EventType(event.EventType.ID())

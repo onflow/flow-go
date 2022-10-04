@@ -9,6 +9,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO(patrick): rm once emulator is updated ...
+func NewStateTransaction(
+	startView View,
+	params StateParameters,
+) *TransactionState {
+	return NewTransactionState(startView, params)
+}
+
 type nestedTransactionStackFrame struct {
 	state *State
 
@@ -22,13 +30,9 @@ type nestedTransactionStackFrame struct {
 	parseRestriction *common.AddressLocation
 }
 
-// TODO(patrick): rename to StateTransaction
-// StateHolder provides active states
-// and facilitates common state management operations
-// in order to make services such as accounts not worry about
-// the state it is recommended that such services wraps
-// a state manager instead of a state itself.
-type StateHolder struct {
+// TransactionState provides active transaction states and facilitates common
+// state management operations.
+type TransactionState struct {
 	enforceLimits bool
 
 	// NOTE: The first frame is always the main transaction, and is not
@@ -45,11 +49,14 @@ func (id NestedTransactionId) StateForTestingOnly() *State {
 	return id.state
 }
 
-// NewStateTransaction constructs a new state transaction which manages nested
+// NewTransactionState constructs a new state transaction which manages nested
 // transactions.
-func NewStateTransaction(startView View, params StateParameters) *StateHolder {
+func NewTransactionState(
+	startView View,
+	params StateParameters,
+) *TransactionState {
 	startState := NewState(startView, params)
-	return &StateHolder{
+	return &TransactionState{
 		enforceLimits: true,
 		nestedTransactions: []nestedTransactionStackFrame{
 			nestedTransactionStackFrame{
@@ -60,27 +67,27 @@ func NewStateTransaction(startView View, params StateParameters) *StateHolder {
 	}
 }
 
-func (s *StateHolder) current() nestedTransactionStackFrame {
+func (s *TransactionState) current() nestedTransactionStackFrame {
 	return s.nestedTransactions[s.NumNestedTransactions()]
 }
 
-func (s *StateHolder) currentState() *State {
+func (s *TransactionState) currentState() *State {
 	return s.current().state
 }
 
 // NumNestedTransactions returns the number of uncommitted nested transactions.
 // Note that the main transaction is not considered a nested transaction.
-func (s *StateHolder) NumNestedTransactions() int {
+func (s *TransactionState) NumNestedTransactions() int {
 	return len(s.nestedTransactions) - 1
 }
 
 // IsParseRestricted returns true if the current nested transaction is in
 // parse resticted access mode.
-func (s *StateHolder) IsParseRestricted() bool {
+func (s *TransactionState) IsParseRestricted() bool {
 	return s.current().parseRestriction != nil
 }
 
-func (s *StateHolder) MainTransactionId() NestedTransactionId {
+func (s *TransactionState) MainTransactionId() NestedTransactionId {
 	return NestedTransactionId{
 		state: s.nestedTransactions[0].state,
 	}
@@ -88,14 +95,17 @@ func (s *StateHolder) MainTransactionId() NestedTransactionId {
 
 // IsCurrent returns true if the provide id refers to the current (nested)
 // transaction.
-func (s *StateHolder) IsCurrent(id NestedTransactionId) bool {
+func (s *TransactionState) IsCurrent(id NestedTransactionId) bool {
 	return s.currentState() == id.state
 }
 
 // BeginNestedTransaction creates a unrestricted nested transaction within the
 // current unrestricted (nested) transaction.  This returns error if the current
 // nested transaction is program restricted.
-func (s *StateHolder) BeginNestedTransaction() (NestedTransactionId, error) {
+func (s *TransactionState) BeginNestedTransaction() (
+	NestedTransactionId,
+	error,
+) {
 	if s.IsParseRestricted() {
 		return NestedTransactionId{}, fmt.Errorf(
 			"cannot beinga a unrestricted nested transaction inside a " +
@@ -120,7 +130,7 @@ func (s *StateHolder) BeginNestedTransaction() (NestedTransactionId, error) {
 
 // BeginParseRestrictedNestedTransaction creates a restricted nested
 // transaction within the current (nested) transaction.
-func (s *StateHolder) BeginParseRestrictedNestedTransaction(
+func (s *TransactionState) BeginParseRestrictedNestedTransaction(
 	location common.AddressLocation,
 ) (
 	NestedTransactionId,
@@ -141,7 +151,7 @@ func (s *StateHolder) BeginParseRestrictedNestedTransaction(
 	}, nil
 }
 
-func (s *StateHolder) mergeIntoParent() error {
+func (s *TransactionState) mergeIntoParent() error {
 	if len(s.nestedTransactions) < 2 {
 		return fmt.Errorf("cannot commit the main transaction")
 	}
@@ -156,7 +166,7 @@ func (s *StateHolder) mergeIntoParent() error {
 // Commit commits the changes in the current unrestricted nested transaction
 // to the parent (nested) transaction.  This returns error if the expectedId
 // does not match the current nested transaction.
-func (s *StateHolder) Commit(
+func (s *TransactionState) Commit(
 	expectedId NestedTransactionId,
 ) error {
 	if !s.IsCurrent(expectedId) {
@@ -178,7 +188,7 @@ func (s *StateHolder) Commit(
 // CommitParseRestricted commits the changes in the current restricted nested
 // transaction to the parent (nested) transaction.  This returns error if the
 // specified location does not match the tracked location.
-func (s *StateHolder) CommitParseRestricted(
+func (s *TransactionState) CommitParseRestricted(
 	location common.AddressLocation,
 ) (
 	*State,
@@ -186,7 +196,7 @@ func (s *StateHolder) CommitParseRestricted(
 ) {
 	currentFrame := s.current()
 	if currentFrame.parseRestriction == nil ||
-		currentFrame.parseRestriction.ID() != location.ID() {
+		*currentFrame.parseRestriction != location {
 
 		// This is due to a programming error.
 		return nil, fmt.Errorf(
@@ -206,7 +216,7 @@ func (s *StateHolder) CommitParseRestricted(
 
 // AttachAndCommitParseRestricted commits the changes in the cached nested
 // transaction to the current (nested) transaction.
-func (s *StateHolder) AttachAndCommitParseRestricted(
+func (s *TransactionState) AttachAndCommitParseRestricted(
 	cachedNestedTransaction *State,
 ) error {
 	s.nestedTransactions = append(
@@ -223,7 +233,7 @@ func (s *StateHolder) AttachAndCommitParseRestricted(
 // RestartNestedTransaction merges all changes that belongs to the nested
 // transaction about to be restart (for spock/meter bookkeeping), then
 // wipes its view changes.
-func (s *StateHolder) RestartNestedTransaction(
+func (s *TransactionState) RestartNestedTransaction(
 	id NestedTransactionId,
 ) error {
 
@@ -252,7 +262,7 @@ func (s *StateHolder) RestartNestedTransaction(
 	return nil
 }
 
-func (s *StateHolder) Get(
+func (s *TransactionState) Get(
 	owner string,
 	key string,
 	enforceLimit bool,
@@ -263,7 +273,7 @@ func (s *StateHolder) Get(
 	return s.currentState().Get(owner, key, enforceLimit)
 }
 
-func (s *StateHolder) Set(
+func (s *TransactionState) Set(
 	owner string,
 	key string,
 	value flow.RegisterValue,
@@ -272,64 +282,76 @@ func (s *StateHolder) Set(
 	return s.currentState().Set(owner, key, value, enforceLimit)
 }
 
-func (s *StateHolder) UpdatedAddresses() []flow.Address {
+func (s *TransactionState) UpdatedAddresses() []flow.Address {
 	return s.currentState().UpdatedAddresses()
 }
 
-func (s *StateHolder) MeterComputation(
+func (s *TransactionState) MeterComputation(
 	kind common.ComputationKind,
 	intensity uint,
 ) error {
 	return s.currentState().MeterComputation(kind, intensity)
 }
 
-func (s *StateHolder) MeterMemory(
+func (s *TransactionState) MeterMemory(
 	kind common.MemoryKind,
 	intensity uint,
 ) error {
 	return s.currentState().MeterMemory(kind, intensity)
 }
 
-func (s *StateHolder) ComputationIntensities() meter.MeteredComputationIntensities {
+func (s *TransactionState) ComputationIntensities() meter.MeteredComputationIntensities {
 	return s.currentState().ComputationIntensities()
 }
 
-func (s *StateHolder) TotalComputationLimit() uint {
+func (s *TransactionState) TotalComputationLimit() uint {
 	return s.currentState().TotalComputationLimit()
 }
 
-func (s *StateHolder) TotalComputationUsed() uint {
+func (s *TransactionState) TotalComputationUsed() uint {
 	return s.currentState().TotalComputationUsed()
 }
 
-func (s *StateHolder) MemoryIntensities() meter.MeteredMemoryIntensities {
+func (s *TransactionState) MemoryIntensities() meter.MeteredMemoryIntensities {
 	return s.currentState().MemoryIntensities()
 }
 
-func (s *StateHolder) TotalMemoryEstimate() uint64 {
+func (s *TransactionState) TotalMemoryEstimate() uint64 {
 	return s.currentState().TotalMemoryEstimate()
 }
 
-func (s *StateHolder) InteractionUsed() uint64 {
+func (s *TransactionState) InteractionUsed() uint64 {
 	return s.currentState().InteractionUsed()
 }
 
-func (s *StateHolder) ViewForTestingOnly() View {
+func (s *TransactionState) MeterEmittedEvent(byteSize uint64) error {
+	return s.currentState().MeterEmittedEvent(byteSize)
+}
+
+func (s *TransactionState) TotalEmittedEventBytes() uint64 {
+	return s.currentState().TotalEmittedEventBytes()
+}
+
+func (s *TransactionState) TotalEventCounter() uint32 {
+	return s.currentState().TotalEventCounter()
+}
+
+func (s *TransactionState) ViewForTestingOnly() View {
 	return s.currentState().View()
 }
 
 // EnableAllLimitEnforcements enables all the limits
-func (s *StateHolder) EnableAllLimitEnforcements() {
+func (s *TransactionState) EnableAllLimitEnforcements() {
 	s.enforceLimits = true
 }
 
 // DisableAllLimitEnforcements disables all the limits
-func (s *StateHolder) DisableAllLimitEnforcements() {
+func (s *TransactionState) DisableAllLimitEnforcements() {
 	s.enforceLimits = false
 }
 
 // RunWithAllLimitsDisabled runs f with limits disabled
-func (s *StateHolder) RunWithAllLimitsDisabled(f func()) {
+func (s *TransactionState) RunWithAllLimitsDisabled(f func()) {
 	if f == nil {
 		return
 	}
@@ -341,11 +363,11 @@ func (s *StateHolder) RunWithAllLimitsDisabled(f func()) {
 
 // EnforceComputationLimits returns if the computation limits should be enforced
 // or not.
-func (s *StateHolder) EnforceComputationLimits() bool {
+func (s *TransactionState) EnforceComputationLimits() bool {
 	return s.enforceLimits
 }
 
 // EnforceInteractionLimits returns if the interaction limits should be enforced or not
-func (s *StateHolder) EnforceLimits() bool {
+func (s *TransactionState) EnforceLimits() bool {
 	return s.enforceLimits
 }
