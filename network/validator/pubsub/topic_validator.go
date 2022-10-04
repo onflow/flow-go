@@ -92,6 +92,7 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 				Err(err).
 				Str("peer_id", from.String()).
 				Hex("sender", msg.OriginID).
+				Bool("suspicious", true).
 				Msg("filtering message from un-allowed peer")
 			return pubsub.ValidationReject
 		}
@@ -117,6 +118,7 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 				Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
 				Str("peer_id", from.String()).
 				Hex("sender", msg.OriginID).
+				Bool("suspicious", true).
 				Msg("rejecting message")
 			return pubsub.ValidationReject
 		}

@@ -106,6 +106,7 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 				Str("peer_id", p.Pretty()).
 				Str("local_address", addr.LocalMultiaddr().String()).
 				Str("remote_address", addr.RemoteMultiaddr().String()).
+				Bool("suspicious", true).
 				Msg("rejected inbound connection")
 			return false
 		}
