@@ -52,3 +52,13 @@ func NewBlockFinderFailure(err error) CodedError {
 		err,
 		"can not retrieve the block")
 }
+
+// NewParseRestrictedModeInvalidAccessFailure constructs a CodedError which
+// captures a fatal caused by Cadence accessing an unexpected environment
+// operation while it is parsing programs.
+func NewParseRestrictedModeInvalidAccessFailure(op string) CodedError {
+	return NewCodedError(
+		FailureCodeParseRestrictedModeInvalidAccessFailure,
+		"cannot access %s while cadence is in parse restricted mode",
+		op)
+}

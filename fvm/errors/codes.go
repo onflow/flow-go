@@ -22,7 +22,8 @@ const (
 	FailureCodeStateMergeFailure  ErrorCode = 2003
 	FailureCodeBlockFinderFailure ErrorCode = 2004
 	// Deprecated: No longer used.
-	FailureCodeHasherFailure ErrorCode = 2005
+	FailureCodeHasherFailure                           ErrorCode = 2005
+	FailureCodeParseRestrictedModeInvalidAccessFailure ErrorCode = 2006
 	// Deprecated: No longer used.
 	FailureCodeMetaTransactionFailure ErrorCode = 2100
 )
