@@ -34,10 +34,10 @@ func NewSubscriptionProvider(logger zerolog.Logger, tp p2p.TopicProvider) *Subsc
 }
 
 // GetSubscribedTopics returns all the subscriptions of a peer within the pubsub network.
-// Note that the current peer must be subscribed to the topic for it to the same topics in order
-// to query for other peers, e.g., if current peer has subscribed to topics A and B, and peer1
-// has subscribed to topics A, B, and C, then GetSubscribedTopics(peer1) will return A and B. Since this peer
-// has not subscribed to topic C, it will not be able to query for other peers subscribed to topic C.
+// Note that the current node can only see peer subscriptions to topics that it has also subscribed to
+// e.g., if current node has subscribed to topics A and B, and peer1 has subscribed to topics A, B, and C,
+// then GetSubscribedTopics(peer1) will return A and B. Since this node has not subscribed to topic C,
+// it will not be able to query for other peers subscribed to topic C.
 func (s *SubscriptionProvider) GetSubscribedTopics(pid peer.ID) []string {
 	topics := s.getAllTopics()
 
