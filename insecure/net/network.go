@@ -513,7 +513,7 @@ func (n *Network) HandleOutgoingEvent(
 	return nil
 }
 
-// HandleIncomingEvent is called on the incoming messages to a corrupt node(s).
+// HandleIncomingEvent is called on the incoming messages to this corrupt node.
 // Returns true if an attacker is registered and false otherwise.
 // Honest node (i.e., not running with a corrupt network) message flow: Flow Networking Layer -> Honest Engine
 // Corrupt node (i.e., running with a corrupt network) message flow (with attacker registered):

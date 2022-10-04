@@ -24,7 +24,7 @@ import (
 // TestEngineClosingChannel evaluates that corrupt network closes the channel whenever the corresponding
 // engine of that channel attempts on closing it.
 func TestEngineClosingChannel(t *testing.T) {
-	RunCorruptNetworkTest(t, unittest.Logger(),
+	runCorruptNetworkTest(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
@@ -54,7 +54,7 @@ func TestProcessAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 func processAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 	logger, _ := unittest.HookedLogger()
 
-	RunCorruptNetworkTest(t, logger,
+	runCorruptNetworkTest(t, logger,
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
@@ -95,7 +95,7 @@ func TestProcessAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) 
 func processAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
 	logger, _ := unittest.HookedLogger()
 
-	RunCorruptNetworkTest(t, logger,
+	runCorruptNetworkTest(t, logger,
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,

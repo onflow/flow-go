@@ -79,9 +79,9 @@ func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*
 	return corruptibleNetwork, adapter
 }
 
-// RunCorruptNetworkTest creates and starts a corruptible network, runs the "run" function of a simulated attacker and then
+// runCorruptNetworkTest creates and starts a corruptible network, runs the "run" function of a simulated attacker and then
 // terminates the network.
-func RunCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
+func runCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
 	run func(
 		flow.Identity, // identity of ccf
 		*Network, // corruptible network
