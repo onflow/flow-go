@@ -8,12 +8,19 @@ import (
 	"github.com/onflow/cadence/runtime/errors"
 )
 
-// Error covers all non-fatal errors happening
-// while validating and executing a transaction or a script.
-type Error interface {
-	// Code returns the code for this error
+// TODO(patrick): remove after emulator is updated.
+type Error = CodedError
+
+// TODO(patrick): combine CodedError and Failure interface.
+// We can also combine codedError and CodedFailure once the interface is
+// unified.
+type CodedError interface {
+	// TODO(patrick): add IsFailure() bool
+
 	Code() ErrorCode
-	// and anything else that is needed to be an error
+
+	Unwrap() error
+
 	error
 }
 
@@ -23,10 +30,10 @@ type Error interface {
 // if any of these errors occurs we should halt the
 // execution.
 type Failure interface {
+	CodedError
+
 	// FailureCode returns the failure code for this error
 	FailureCode() ErrorCode
-	// and anything else that is needed to be an error
-	error
 }
 
 type errorWrapper struct {
@@ -99,21 +106,29 @@ func HandleRuntimeError(err error) error {
 	return NewCadenceRuntimeError(runErr)
 }
 
-// TODO(patrick): combine ErrorCodeChecker, Error and Failure interface.
-// We can also combine CodedError and CodedFailure once the interface is
-// unified.
-type ErrorCodeChecker interface {
-	// TODO(patrick): add Code() ErrorCode
-	// TODO(patrick): add IsFailure() bool
-
-	HasErrorCode(code ErrorCode) bool
-
-	error
+// This returns true if the error or one of its nested errors matches the
+// specified error code.
+func HasErrorCode(err error, code ErrorCode) bool {
+	return Find(err, code) != nil
 }
 
-func HasErrorCode(err error, code ErrorCode) bool {
-	var checker ErrorCodeChecker
-	return As(err, &checker) && checker.HasErrorCode(code)
+// This recursively unwraps the error and returns first CodedError that matches
+// the specified error code.
+func Find(err error, code ErrorCode) CodedError {
+	if err == nil {
+		return nil
+	}
+
+	var coded CodedError
+	if !As(err, &coded) {
+		return nil
+	}
+
+	if coded.Code() == code {
+		return coded
+	}
+
+	return Find(coded.Unwrap(), code)
 }
 
 type codedError struct {
@@ -132,7 +147,7 @@ func newError(
 	}
 }
 
-func wrapCodedError(
+func WrapCodedError(
 	code ErrorCode,
 	err error,
 	prefixMsgFormat string,
@@ -145,7 +160,7 @@ func wrapCodedError(
 	return newError(code, err)
 }
 
-func newCodedError(
+func NewCodedError(
 	code ErrorCode,
 	format string,
 	formatArguments ...interface{},
@@ -157,42 +172,7 @@ func (err codedError) Error() string {
 	return fmt.Sprintf("%v %v", err.code, err.err)
 }
 
-// This returns true if the codedError's code is set to the specified code, or
-// if any one of the codeError's errors has the error code.
-func (err codedError) HasErrorCode(code ErrorCode) bool {
-	if err.code == code {
-		return true
-	}
-
-	return HasErrorCode(err.err, code)
-}
-
-type CodedError struct {
-	codedError
-}
-
-func NewCodedError(
-	code ErrorCode,
-	format string,
-	arguments ...interface{},
-) *CodedError {
-	return &CodedError{
-		codedError: newCodedError(code, format, arguments...),
-	}
-}
-
-func WrapCodedError(
-	code ErrorCode,
-	err error,
-	prefixMsgFormat string,
-	formatArgs ...interface{},
-) *CodedError {
-	return &CodedError{
-		codedError: wrapCodedError(code, err, prefixMsgFormat, formatArgs...),
-	}
-}
-
-func (err CodedError) Code() ErrorCode {
+func (err codedError) Code() ErrorCode {
 	return err.code
 }
 
@@ -207,7 +187,7 @@ func WrapCodedFailure(
 	formatArgs ...interface{},
 ) *CodedFailure {
 	return &CodedFailure{
-		codedError: wrapCodedError(code, err, prefixMsgFormat, formatArgs...),
+		codedError: WrapCodedError(code, err, prefixMsgFormat, formatArgs...),
 	}
 }
 
