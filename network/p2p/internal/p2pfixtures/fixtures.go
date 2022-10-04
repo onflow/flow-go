@@ -34,9 +34,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// Workaround for https://github.com/stretchr/testify/pull/808
-const ticksForAssertEventually = 10 * time.Millisecond
-
 // Creating a node fixture with defaultAddress lets libp2p runs it on an
 // allocated port by OS. So after fixture created, its address would be
 // "0.0.0.0:<selected-port-by-os>
