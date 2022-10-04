@@ -21,7 +21,7 @@ import (
 // 	the first 16 files parts contain the trie nodes below the subtrieLevel
 //	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
 // it returns (tries, nil) if there was no error
-// it returns (nil, os.ErrNotExist) if a certain file is missing
+// it returns (nil, os.ErrNotExist) if a certain file is missing, use (os.IsNotExist to check)
 // it returns (nil, err) if running into any exception
 func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
@@ -95,7 +95,7 @@ func readHeader(filePath string) ([]uint32, uint32, error) {
 
 // allPartFileExist check if all the part files of the checkpoint file exist
 // it returns nil if all files exist
-// it returns os.ErrNotExist if some file is missing
+// it returns os.ErrNotExist if some file is missing, use (os.IsNotExist to check)
 // it returns err if running into any exception
 func allPartFileExist(dir string, fileName string, totalSubtrieFiles int) error {
 	// check all subtrie part file exist
@@ -136,7 +136,7 @@ func noneCheckpointFileExist(dir string, fileName string, totalSubtrieFiles int)
 		return fmt.Errorf("checkpoint header file already exist: %v", headerPath)
 	}
 
-	if !errors.Is(os.ErrNotExist, err) {
+	if !os.IsNotExist(err) {
 		return fmt.Errorf("could not check header file exist: %w", err)
 	}
 
@@ -149,7 +149,7 @@ func noneCheckpointFileExist(dir string, fileName string, totalSubtrieFiles int)
 
 		// ensure file exists
 		_, err = os.Stat(filePath)
-		if errors.Is(os.ErrNotExist, err) {
+		if os.IsNotExist(err) {
 			continue
 		}
 

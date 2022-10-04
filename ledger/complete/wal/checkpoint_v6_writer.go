@@ -51,6 +51,8 @@ func StoreCheckpointV6(
 		Uint64("last_reg_count", last.AllocatedRegCount()).
 		Msgf("storing checkpoint for %v tries to %v", len(tries), outputDir)
 
+	// make sure a checkpoint file with same name doesn't exist
+	// part file with same name doesn't exist either
 	err := noneCheckpointFileExist(outputDir, outputFile, subtrieCount)
 	if err != nil {
 		return fmt.Errorf("fail to check if checkpoint file already exist: %w", err)
