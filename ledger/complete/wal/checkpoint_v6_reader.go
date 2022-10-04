@@ -139,10 +139,6 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 // }
 
 func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32) ([][]*node.Node, error) {
-	if len(subtrieChecksums) != subtrieCount {
-		return nil, fmt.Errorf("expect subtrieChecksums to be %v, but got %v", subtrieCount, len(subtrieChecksums))
-	}
-
 	resultChs := make([]chan *resultReadSubTrie, 0, subtrieCount)
 	for i := 0; i < subtrieCount; i++ {
 		resultCh := make(chan *resultReadSubTrie)
