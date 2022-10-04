@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// CorruptNetworkPort is the port number that gRPC server of the conduit factory of corrupted nodes is listening on.
+// CorruptNetworkPort is the port number that gRPC server of the corrupt networking layer of the corrupted nodes is listening on.
 const CorruptNetworkPort = 4300
 
 // CorruptedNodeBuilder creates a general flow node builder with corrupt network.
