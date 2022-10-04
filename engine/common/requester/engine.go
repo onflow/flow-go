@@ -382,7 +382,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	e.log.Debug().
 		Hex("provider", logging.ID(providerID)).
 		Int("num_selected", len(entityIDs)).
-		Dur("duration", time.Since(requestStart)).
+		TimeDiff("duration", time.Now(), requestStart).
 		Msg("entity request sent")
 
 	// NOTE: we forget about requests after the expiry of the shortest retry time
