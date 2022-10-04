@@ -16,6 +16,8 @@ type SubscriptionProvider struct {
 	tp     p2p.TopicProvider
 
 	// allTopics is a list of all topics in the pubsub network
+	// TODO: we should add an expiry time to this cache and clean up the cache periodically
+	// to avoid leakage of stale topics.
 	peersByTopic         sync.Map // map[topic]peers
 	peersByTopicUpdating sync.Map // whether a goroutine is already updating the list of peers for a topic
 
