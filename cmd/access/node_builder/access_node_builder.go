@@ -639,15 +639,15 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		if err != nil {
 			return err
 		}
+		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
+
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper sets the 'Ejected' flag of blacklisted nodes to true
-		wrappedIdCache, err := cache.NewNodeBlacklistWrapper(idCache, node.DB)
+		builder.IdentityProvider, err = cache.NewNodeBlacklistWrapper(idCache, node.DB)
 		if err != nil {
 			return err
 		}
 
-		builder.IdentityProvider = wrappedIdCache
-		builder.IDTranslator = translator.NewHierarchicalIDTranslator(wrappedIdCache, translator.NewPublicNetworkIDTranslator())
 		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
 				filter.And(
@@ -655,7 +655,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 					filter.Not(filter.HasNodeID(node.Me.NodeID())),
 					p2p.NotEjectedFilter,
 				),
-				wrappedIdCache,
+				builder.IdentityProvider,
 			)
 		}
 		return nil

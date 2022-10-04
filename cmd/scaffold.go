@@ -742,22 +742,22 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		if err != nil {
 			return err
 		}
+		node.IDTranslator = idCache
+
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper sets the 'Ejected' flag of blacklisted nodes to true
-		wrappedIdCache, err := cache.NewNodeBlacklistWrapper(idCache, node.DB)
+		node.IdentityProvider, err = cache.NewNodeBlacklistWrapper(idCache, node.DB)
 		if err != nil {
 			return err
 		}
 
-		node.IdentityProvider = wrappedIdCache
-		node.IDTranslator = wrappedIdCache
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
 				p2p.NotEjectedFilter,
 			),
-			wrappedIdCache,
+			node.IdentityProvider,
 		)
 		return nil
 	})

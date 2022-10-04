@@ -149,6 +149,7 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir=state/cluster --case=underscore --output="state/cluster/mock" --outpkg="mock"
 	mockery --name '.*' --dir=module --case=underscore --tags="relic" --output="./module/mock" --outpkg="mock"
 	mockery --name '.*' --dir=module/mempool --case=underscore --output="./module/mempool/mock" --outpkg="mempool"
+	mockery --name '.*' --dir=module/id --case=underscore --output="./module/mock" --outpkg="mock"
 	mockery --name '.*' --dir=module/component --case=underscore --output="./module/component/mock" --outpkg="component"
 	mockery --name '.*' --dir=network --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	mockery --name '.*' --dir=storage --case=underscore --output="./storage/mock" --outpkg="mock"

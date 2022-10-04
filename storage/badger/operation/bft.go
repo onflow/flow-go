@@ -6,14 +6,27 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// UpdateBlockedNodes updates the list of blocked nodes IDs in the data base
+// PurgeBlacklistedNodes removes the set of blacklisted nodes IDs from the data base.
+// If no corresponding entry exists, this function is a no-op.
+// No errors are expected during normal operations.
 // TODO: TEMPORARY manual override for adding node IDs to list of ejected nodes, applies to networking layer only
-func UpdateBlockedNodes(blockedIDs []flow.Identifier) func(*badger.Txn) error {
-	return update(makePrefix(blockedNodeIDs), blockedIDs)
+func PurgeBlacklistedNodes() func(*badger.Txn) error {
+	return remove(makePrefix(blockedNodeIDs))
 }
 
-// RetrieveBlockedNodes reads the list of blocked node IDs from the data base
+// PersistBlacklistedNodes writes the set of blacklisted nodes IDs into the data base.
+// If an entry already exists, it is overwritten; otherwise a new entry is created.
+// No errors are expected during normal operations.
+//
 // TODO: TEMPORARY manual override for adding node IDs to list of ejected nodes, applies to networking layer only
-func RetrieveBlockedNodes(blockedIDs *[]flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(blockedNodeIDs), blockedIDs)
+func PersistBlacklistedNodes(blacklist map[flow.Identifier]struct{}) func(*badger.Txn) error {
+	return upsert(makePrefix(blockedNodeIDs), blacklist)
+}
+
+// RetrieveBlacklistedNodes reads the set of blacklisted node IDs from the data base.
+// Returns `storage.ErrNotFound` error in case no respective data base entry is present.
+//
+// TODO: TEMPORARY manual override for adding node IDs to list of ejected nodes, applies to networking layer only
+func RetrieveBlacklistedNodes(blacklist *map[flow.Identifier]struct{}) func(*badger.Txn) error {
+	return retrieve(makePrefix(blockedNodeIDs), blacklist)
 }
