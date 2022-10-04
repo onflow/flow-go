@@ -82,7 +82,7 @@ func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 		}
 	case *messages.ChunkDataRequest:
 		// orchestrator received chunk data request from corrupted VN after VN assigned a chunk, and VN about to request that chunk to verify it.
-		if err := o.handleChunkDataPackRequestEvent(event); err != nil {
+		if err := o.handleChunkDataPackRequestEgressEvent(event); err != nil {
 			return fmt.Errorf("could not handle chunk data pack request event: %w", err)
 		}
 	case *messages.ChunkDataResponse:
@@ -121,6 +121,15 @@ func (o *Orchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 		Str("channel", event.Channel.String()).
 		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
+
+	// Only ingress event that Wintermute orchestrator cares about is the chunk data pack request.
+	// Hence, it inspects the chunk data pack request further to decide whether to pass it through or not.
+	if request, ok := event.FlowProtocolEvent.(*messages.ChunkDataRequest); ok {
+		if passThrough := o.shouldIngressChunkDataPackRequestPassThrough(event.OriginID, request); !passThrough {
+			lg.Debug().Msg("chunk data pack request is wintermuted")
+			return nil
+		}
+	}
 
 	err := o.network.SendIngress(event)
 
@@ -252,11 +261,12 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 	return nil
 }
 
-// handleChunkDataPackRequestEvent processes a chunk data pack request event as follows:
-// If request is for a corrupted chunk and comes from a corrupted verification node it is replied with an attestation for that
-// chunk.
+// handleChunkDataPackRequestEgressEvent processes a chunk data pack request egress event (from a corrupted execution node).
+// If request is for a corrupted chunk it is replied with an attestation for that chunk.
 // Otherwise, it is passed through.
-func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent *insecure.EgressEvent) error {
+func (o *Orchestrator) handleChunkDataPackRequestEgressEvent(chunkDataPackRequestEvent *insecure.EgressEvent) error {
+	// when a chunk data pack request is an egress event, it means it is sent by a corrupted verification node.
+	// following code ensures that the sender is a corrupted verification node.
 	ok := o.corruptedNodeIds.Contains(chunkDataPackRequestEvent.CorruptOriginId)
 	if !ok {
 		return fmt.Errorf("sender of the event is not a corrupted node")
@@ -297,9 +307,43 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 		Str("channel", string(chunkDataPackRequestEvent.Channel)).
 		Uint32("targets_num", chunkDataPackRequestEvent.TargetNum).
 		Str("target_ids", fmt.Sprintf("%v", chunkDataPackRequestEvent.TargetIds)).
-		Msg("chunk data pack request event passed through")
+		Msg("egress chunk data pack request event passed through")
 
 	return nil
+}
+
+// shouldIngressChunkDataPackRequestPassThrough processes a chunk data pack ingress event (from a verification node to a corrupted execution node).
+// Boolean return value indicates whether the event is to be passed through or not.
+// Ingress chunk data pack requests from a corrupted verification node are always passed through.
+// Ingress chunk data pack requests from an honest verification node are only passed through if they do not belong to corrupted result.
+// Otherwise, they are dropped.
+func (o *Orchestrator) shouldIngressChunkDataPackRequestPassThrough(originId flow.Identifier, request *messages.ChunkDataRequest) bool {
+	lg := o.logger.With().
+		Hex("origin_id", logging.ID(request.ChunkID)).
+		Hex("chunk_id", logging.ID(request.ChunkID)).Logger()
+	// checks whether an attack has already been conducted
+	if o.corruptedNodeIds.Contains(originId) {
+		// ingress chunk data pack requests by corrupted nodes are always passed through.
+		lg.Debug().Msg("ingress chunk data pack request event passed through (corrupted requester)")
+		return true
+	}
+
+	// request is from an honest node
+	// if an attack has already been conducted and the request is for a corrupted chunk,
+	// it is not passed through, i.e., wintermuted!
+	if _, _, conducted := o.AttackState(); conducted {
+		if o.state.containsCorruptedChunkId(request.ChunkID) {
+			// request is for a corrupted chunk by an honest node.
+			// it is not passed through.
+			lg.Debug().Msg("ingress chunk data pack request event wintermuted (honest requester)"))
+			return false
+		}
+	}
+
+	// request is for an honest chunk by an honest node.
+	// it is passed through.
+	lg.Debug().Msg("ingress chunk data pack request event passed through (honest requester)"))
+	return true
 }
 
 // handleChunkDataPackResponseEvent wintermutes the chunk data pack reply if it belongs to a corrupted result, and is meant to
