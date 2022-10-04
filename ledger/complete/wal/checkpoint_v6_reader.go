@@ -133,7 +133,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func(f *os.File) {
-//TODO: we should evict file from Linux page cache here, so it doesn't keep 170+GB in RAM when that can be used instead for caching more frequently read data.
+		//TODO: we should evict file from Linux page cache here, so it doesn't keep 170+GB in RAM when that can be used instead for caching more frequently read data.
 		f.Close()
 	}(f)
 
@@ -167,6 +167,8 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 
 	// TODO: validate checksum again
 
+	// TODO: simplify getNodeByIndex() logic if we reslice nodes here to remove the nil node at index 0.
+	// return nodes[1:], nil
 	return nodes, nil
 }
 
