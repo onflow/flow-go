@@ -27,7 +27,7 @@ func ReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*t
 	logger.Info().Msgf("reading v6 checkpoint file")
 
 	headerPath := filePathCheckpointHeader(dir, fileName)
-	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath)
+	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not read header: %w", err)
 	}
@@ -93,12 +93,17 @@ func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
 
 // readCheckpointHeader takes a file path and returns subtrieChecksums and topTrieChecksum
 // any error returned are exceptions
-func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
+func readCheckpointHeader(filepath string, logger *zerolog.Logger) ([]uint32, uint32, error) {
 	closable, err := os.Open(filepath)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func(f *os.File) {
+		evictErr := evictFileFromLinuxPageCache(f, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict header file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
 		f.Close()
 	}(closable)
 
