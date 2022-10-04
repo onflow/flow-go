@@ -2,6 +2,8 @@ package test
 
 import (
 	"context"
+	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/stretchr/testify/mock"
 	"net"
 	"sync"
 	"testing"
@@ -19,8 +21,9 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/network"
 )
+
+type Channel string
 
 // TestCorruptNetworkFrameworkHappyPath implements a round-trip test that checks the composibility of the entire happy path of the corrupt
 // network framework. The test runs two engines on two distinct network instances, one with normal conduit,
@@ -65,13 +68,13 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 				testChannel := channels.TestNetworkChannel
 
 				// corrupted node network
-				corruptedEngine := &network.Engine{}
+				corruptedEngine := mocknetwork.NewEngine(t)
 				corruptedConduit, err := corruptNetwork.Register(testChannel, corruptedEngine)
 				require.NoError(t, err)
 
 				// honest network
 				honestIdentity := unittest.IdentityFixture()
-				honestEngine := &network.Engine{}
+				honestEngine := mocknetwork.NewEngine(t)
 				honestNodeNetwork := stub.NewNetwork(t, honestIdentity.NodeID, hub)
 				// in this test, the honest node is only the receiver, hence, we discard
 				// the created conduit.
@@ -82,25 +85,20 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 				wg.Add(2) // wait for both egress and ingress events to be received.
 
 				// we expect to receive the corrupted egress event on the honest node.
-				honestEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
-					// implementing the process logic of the honest engine on reception of message from underlying network.
-					require.Equal(t, testChannel, channel)               // event must arrive at the channel set by orchestrator.
-					require.Equal(t, corruptedIdentity.NodeID, originId) // origin id of the message must be the corrupted node.
-					require.Equal(t, corruptedEgressEvent, event)        // content of event must be swapped with corrupted event.
-
+				// event must arrive at the channel set by orchestrator.
+				// origin id of the message must be the corrupted node.
+				// content of event must be swapped with corrupted event.
+				honestEngine.On("Process", testChannel, corruptedIdentity.NodeID, corruptedEgressEvent).Return(nil).Run(func(args mock.Arguments) {
 					wg.Done()
-					return nil
 				})
 
 				// we expect to receive the corrupted ingress event on the corrupted node.
-				corruptedEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
-					// implementing the process logic of the corrupted engine on reception of message from underlying network.
-					require.Equal(t, testChannel, channel)            // event must arrive at the channel set by orchestrator.
-					require.Equal(t, honestIdentity.NodeID, originId) // origin id of the message must be the honest node.
-					require.Equal(t, corruptedIngressEvent, event)    // content of event must be swapped with corrupted event.
-
+				// event must arrive at the channel set by orchestrator.
+				// origin id of the message must be the honest node.
+				// content of event must be swapped with corrupted event.
+				corruptedEngine.On("Process", testChannel, honestIdentity.NodeID, corruptedIngressEvent).Return(nil).Run(func(args mock.Arguments) {
+					// simulate the Process logic of the corrupted engine on reception of message from underlying network.
 					wg.Done()
-					return nil
 				})
 
 				go func() {
@@ -114,9 +112,6 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 
 				// wait for both egress and ingress events to be received.
 				unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "honest node could not receive corrupted event on time")
-
-				corruptedEngine.AssertExpectations(t)
-				honestEngine.AssertExpectations(t)
 			})
 	})
 
