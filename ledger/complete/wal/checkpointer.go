@@ -30,7 +30,10 @@ import (
 
 const checkpointFilenamePrefix = "checkpoint."
 
-const MagicBytes uint16 = 0x2137
+const MagicBytesCheckpointHeader uint16 = 0x2137
+const MagicBytesCheckpointSubtrie uint16 = 0x2136
+const MagicBytesCheckpointToptrie uint16 = 0x2135
+
 const VersionV1 uint16 = 0x01
 
 // Versions was reset while changing trie format, so now bump it to 3 to avoid conflicts
@@ -313,7 +316,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 
 	// Write header: magic (2 bytes) + version (2 bytes)
 	header := scratch[:headerSize]
-	binary.BigEndian.PutUint16(header, MagicBytes)
+	binary.BigEndian.PutUint16(header, MagicBytesCheckpointHeader)
 	binary.BigEndian.PutUint16(header[encMagicSize:], VersionV5)
 
 	_, err := crc32Writer.Write(header)
@@ -645,8 +648,8 @@ func readCheckpoint(f *os.File, dir string, filename string) ([]*trie.MTrie, err
 		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
 	}
 
-	if magicBytes != MagicBytes {
-		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytes)
+	if magicBytes != MagicBytesCheckpointHeader {
+		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytesCheckpointHeader)
 	}
 
 	switch version {
@@ -986,7 +989,7 @@ func ReadLastTrieRootHashFromCheckpoint(f *os.File) (hash.Hash, error) {
 	magic := binary.BigEndian.Uint16(header)
 	version := binary.BigEndian.Uint16(header[encMagicSize:])
 
-	if magic != MagicBytes {
+	if magic != MagicBytesCheckpointHeader {
 		return hash.DummyHash, errors.New("invalid magic bytes in checkpoint")
 	}
 

@@ -68,11 +68,10 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 		f.Close()
 	}(closable)
 
-	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
-	reader := NewCRC32Reader(bufReader)
+	reader := NewCRC32Reader(bufio.NewReaderSize(closable, defaultBufioReadSize))
 
-	// read the magic bytes and header
-	version, err := readVersion(reader)
+	// read the magic bytes and check version
+	version, err := readVersion(MagicBytesCheckpointHeader, reader)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -188,6 +187,16 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		f.Close()
 	}(f)
 
+	// read the magic bytes and check version
+	version, err := readVersion(MagicBytesCheckpointSubtrie, f)
+	if err != nil {
+		return nil, err
+	}
+
+	if version != VersionV6 {
+		return nil, fmt.Errorf("wrong version: %v", version)
+	}
+
 	nodesCount, err := readSubTriesNodeCount(f)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read sub trie node count: %w", err)
@@ -195,23 +204,30 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 
 	// the subtrie checksum from the checkpoint header file must be same
 	// as the checksum included in the subtrie file
-	expectedSum, err := readCRC32Sum(bufio.NewReaderSize(f, defaultBufioReadSize))
+	expectedSum, err := readCRC32Sum(f)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read checksum for sub trie file: %w", err)
 	}
 
 	if checksum != expectedSum {
-		return nil, fmt.Errorf("mismatch checksum in subtrie file. checksum from checkpoint header %v does not"+
-			"match with checksum in subtrie file %v", checksum, expectedSum)
+		return nil, fmt.Errorf("mismatch checksum in subtrie file. checksum from checkpoint header %v does not "+
+			"match with the checksum in subtrie file %v", checksum, expectedSum)
 	}
 
+	// restart from the beginning of the file, make sure CRC32Reader has seen all the bytes
+	// in order to compute the correct checksum
 	_, err = f.Seek(0, io.SeekStart)
 	if err != nil {
 		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
 	}
 
-	var bufReader io.Reader = bufio.NewReaderSize(f, defaultBufioReadSize)
-	reader := NewCRC32Reader(bufReader)
+	reader := NewCRC32Reader(bufio.NewReaderSize(f, defaultBufioReadSize))
+
+	// read version again for calculating checksum
+	_, err = readVersion(MagicBytesCheckpointSubtrie, reader)
+	if err != nil {
+		return nil, fmt.Errorf("could not read version again for subtrie: %w", err)
+	}
 
 	scratch := make([]byte, 1024*4)           // must not be less than 1024
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
@@ -303,6 +319,18 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 
 	// TODO: read checksum and validate
 
+	// read the magic bytes and check version
+	version, err := readVersion(MagicBytesCheckpointToptrie, file)
+	if err != nil {
+		return nil, err
+	}
+
+	if version != VersionV6 {
+		return nil, fmt.Errorf("wrong version: %v", version)
+	}
+
+	// reading and deseralizing the top level nodes,
+	// first read the node count, so that we know how many nodes to read in total.
 	topLevelNodesCount, triesCount, err := readNodeCount(file)
 	if err != nil {
 		return nil, fmt.Errorf("could not read node count: %w", err)
@@ -316,7 +344,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 
 	// the subtrie checksum from the checkpoint header file must be same
 	// as the checksum included in the subtrie file
-	expectedSum, err := readCRC32Sum(bufio.NewReaderSize(file, defaultBufioReadSize))
+	expectedSum, err := readCRC32Sum(file)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read checksum for sub trie file: %w", err)
 	}
@@ -326,13 +354,20 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 			"match with checksum in top trie file %v", topTrieChecksum, expectedSum)
 	}
 
+	// restart from the beginning of the file, make sure CRC32Reader has seen all the bytes
+	// in order to compute the correct checksum
 	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {
 		return nil, fmt.Errorf("could not seek to 0: %w", err)
 	}
 
-	var bufReader io.Reader = bufio.NewReaderSize(file, defaultBufioReadSize)
-	reader := NewCRC32Reader(bufReader)
+	reader := NewCRC32Reader(bufio.NewReaderSize(file, defaultBufioReadSize))
+
+	// read version again for calculating checksum
+	_, err = readVersion(MagicBytesCheckpointToptrie, reader)
+	if err != nil {
+		return nil, fmt.Errorf("could not read version for top trie: %w", err)
+	}
 
 	// Scratch buffer is used as temporary buffer that reader can read into.
 	// Raw data in scratch buffer should be copied or converted into desired
@@ -391,7 +426,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	return tries, nil
 }
 
-func readVersion(reader io.Reader) (uint16, error) {
+func readVersion(magicBytes uint16, reader io.Reader) (uint16, error) {
 	bytes := make([]byte, encMagicSize+encVersionSize)
 	_, err := io.ReadFull(reader, bytes)
 	if err != nil {
@@ -401,7 +436,7 @@ func readVersion(reader io.Reader) (uint16, error) {
 	if err != nil {
 		return 0, err
 	}
-	if magic != MagicBytes {
+	if magic != magicBytes {
 		return 0, fmt.Errorf("wrong magic bytes %v", magic)
 	}
 
