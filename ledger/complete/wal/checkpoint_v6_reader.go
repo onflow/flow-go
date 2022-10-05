@@ -71,13 +71,9 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 	reader := NewCRC32Reader(bufio.NewReaderSize(closable, defaultBufioReadSize))
 
 	// read the magic bytes and check version
-	version, err := readVersion(MagicBytesCheckpointHeader, reader)
+	err = validateFileHeader(MagicBytesCheckpointHeader, VersionV6, reader)
 	if err != nil {
 		return nil, 0, err
-	}
-
-	if version != VersionV6 {
-		return nil, 0, fmt.Errorf("wrong version: %v", version)
 	}
 
 	// read the subtrie level
@@ -187,14 +183,10 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		f.Close()
 	}(f)
 
-	// read the magic bytes and check version
-	version, err := readVersion(MagicBytesCheckpointSubtrie, f)
+	// valite the magic bytes and version
+	err = validateFileHeader(MagicBytesCheckpointSubtrie, VersionV6, f)
 	if err != nil {
 		return nil, err
-	}
-
-	if version != VersionV6 {
-		return nil, fmt.Errorf("wrong version: %v", version)
 	}
 
 	nodesCount, err := readSubTriesNodeCount(f)
@@ -224,7 +216,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 	reader := NewCRC32Reader(bufio.NewReaderSize(f, defaultBufioReadSize))
 
 	// read version again for calculating checksum
-	_, err = readVersion(MagicBytesCheckpointSubtrie, reader)
+	_, _, err = readFileHeader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("could not read version again for subtrie: %w", err)
 	}
@@ -319,14 +311,10 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 
 	// TODO: read checksum and validate
 
-	// read the magic bytes and check version
-	version, err := readVersion(MagicBytesCheckpointToptrie, file)
+	// read and validate magic bytes and version
+	err = validateFileHeader(MagicBytesCheckpointToptrie, VersionV6, file)
 	if err != nil {
 		return nil, err
-	}
-
-	if version != VersionV6 {
-		return nil, fmt.Errorf("wrong version: %v", version)
 	}
 
 	// reading and deseralizing the top level nodes,
@@ -364,7 +352,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	reader := NewCRC32Reader(bufio.NewReaderSize(file, defaultBufioReadSize))
 
 	// read version again for calculating checksum
-	_, err = readVersion(MagicBytesCheckpointToptrie, reader)
+	_, _, err = readFileHeader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("could not read version for top trie: %w", err)
 	}
@@ -426,21 +414,30 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	return tries, nil
 }
 
-func readVersion(magicBytes uint16, reader io.Reader) (uint16, error) {
+func readFileHeader(reader io.Reader) (uint16, uint16, error) {
 	bytes := make([]byte, encMagicSize+encVersionSize)
 	_, err := io.ReadFull(reader, bytes)
 	if err != nil {
-		return 0, fmt.Errorf("cannot read version: %w", err)
+		return 0, 0, fmt.Errorf("cannot read magic ID and version: %w", err)
 	}
-	magic, version, err := decodeVersion(bytes)
+	return decodeVersion(bytes)
+}
+
+func validateFileHeader(expectedMagic uint16, expectedVersion uint16, reader io.Reader) error {
+	magic, version, err := readFileHeader(reader)
 	if err != nil {
-		return 0, err
-	}
-	if magic != magicBytes {
-		return 0, fmt.Errorf("wrong magic bytes %v", magic)
+		return err
 	}
 
-	return version, nil
+	if magic != expectedMagic {
+		return fmt.Errorf("wrong magic bytes, expect %v, bot got: %v", expectedMagic, magic)
+	}
+
+	if version != expectedVersion {
+		return fmt.Errorf("wrong version, expect %v, bot got: %v", expectedVersion, version)
+	}
+
+	return nil
 }
 
 func readSubtrieLevel(reader io.Reader) (uint16, error) {
