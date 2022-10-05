@@ -18,7 +18,7 @@ const (
 	DefaultAppSpecificScoreWeight = 1
 	MaxAppSpecificPenalty         = -100
 	MaxAppSpecificReward          = 100
-	MinAppSpecificReward          = 1
+	MinAppSpecificReward          = -2
 
 	// DefaultGossipThreshold when a peer's score drops below this threshold,
 	// no gossip is emitted towards that peer and gossip from that peer is ignored.
@@ -28,7 +28,7 @@ const (
 	// How we use it:
 	// As current max penalty is -100, we set the threshold to -99 so that all gossips
 	// to and from peers with score -100 are ignored.
-	DefaultGossipThreshold = -99
+	DefaultGossipThreshold = -1
 
 	// DefaultPublishThreshold when a peer's score drops below this threshold,
 	// self-published messages are not propagated towards this peer.
@@ -67,9 +67,9 @@ const (
 	// Validation Constraint: must be non-negative.
 	//
 	// How we use it:
-	// We set it to the MaxAppSpecificReward - 1 so that we only opportunistically graft peers that are not access nodes (i.e., with MinAppSpecificReward),
+	// We set it to the MaxAppSpecificReward + 1 so that we only opportunistically graft peers that are not access nodes (i.e., with MinAppSpecificReward),
 	// or penalized peers (i.e., with MaxAppSpecificPenalty).
-	DefaultOpportunisticGraftThreshold = MaxAppSpecificReward - 1
+	DefaultOpportunisticGraftThreshold = MaxAppSpecificReward + 1
 )
 
 // ScoreOption is a functional option for configuring the peer scoring system.
@@ -169,12 +169,12 @@ func (s *ScoreOption) preparePeerScoreParams() {
 			// checks if peer is an access node, and if so, pushes it to the
 			// edges of the network by giving the minimum reward.
 			if flowId.Role == flow.RoleAccess {
-				lg.Trace().
+				lg.Info().
 					Msg("rewarding access node with minimum reward value")
 				return MinAppSpecificReward
 			}
 
-			s.logger.Trace().
+			s.logger.Info().
 				Msg("rewarding well-behaved non-access node peer with maximum reward value")
 			return MaxAppSpecificReward
 		},
