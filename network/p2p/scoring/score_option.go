@@ -7,7 +7,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -16,6 +18,7 @@ const (
 	DefaultAppSpecificScoreWeight = 1
 	MaxAppSpecificPenalty         = -100
 	MaxAppSpecificReward          = 100
+	MinAppSpecificReward          = 1
 
 	// DefaultGossipThreshold when a peer's score drops below this threshold,
 	// no gossip is emitted towards that peer and gossip from that peer is ignored.
@@ -64,22 +67,25 @@ const (
 	// Validation Constraint: must be non-negative.
 	//
 	// How we use it:
-	// We set it to 0 so that we can opportunistically graft peers when half of the mesh is penalized.
-	DefaultOpportunisticGraftThreshold = 0
+	// We set it to the MaxAppSpecificReward - 1 so that we only opportunistically graft peers that are not access nodes (i.e., with MinAppSpecificReward),
+	// or penalized peers (i.e., with MaxAppSpecificPenalty).
+	DefaultOpportunisticGraftThreshold = MaxAppSpecificReward - 1
 )
 
 // ScoreOption is a functional option for configuring the peer scoring system.
 type ScoreOption struct {
 	logger              zerolog.Logger
 	validator           *SubscriptionValidator
+	idProvider          module.IdentityProvider
 	peerScoreParams     *pubsub.PeerScoreParams
 	peerThresholdParams *pubsub.PeerScoreThresholds
 }
 
 func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider) *ScoreOption {
 	return &ScoreOption{
-		logger:    logger.With().Str("module", "pubsub_score_option").Logger(),
-		validator: NewSubscriptionValidator(idProvider),
+		logger:     logger.With().Str("module", "pubsub_score_option").Logger(),
+		validator:  NewSubscriptionValidator(idProvider),
+		idProvider: idProvider,
 	}
 }
 
@@ -137,19 +143,74 @@ func (s *ScoreOption) preparePeerScoreParams() {
 		// AppSpecificScore is a function that takes a peer ID and returns an application specific score.
 		// At the current stage, we only use it to penalize and reward the peers based on their subscriptions.
 		AppSpecificScore: func(pid peer.ID) float64 {
-			if err := s.validator.CheckSubscribedToAllowedTopics(pid); err != nil {
-				s.logger.Error().
+			lg := s.logger.With().Str("peer_id", pid.String()).Logger()
+
+			// checks if peer has a valid Flow protocol identity.
+			flowId, err := s.hasValidFlowIdentity(pid)
+			if err != nil {
+				lg.Error().
 					Err(err).
-					Str("peer_id", pid.String()).
+					Msg("invalid peer identity, penalizing peer")
+				return MaxAppSpecificPenalty
+			}
+
+			lg = lg.With().
+				Hex("flow_id", logging.ID(flowId.NodeID)).
+				Str("role", flowId.Role.String()).
+				Logger()
+
+			// checks if peer has any subscription violation.
+			if err := s.validator.CheckSubscribedToAllowedTopics(pid); err != nil {
+				lg.Err(err).
 					Msg("invalid subscription detected, penalizing peer")
 				return MaxAppSpecificPenalty
 			}
+
+			// checks if peer is an access node, and if so, pushes it to the
+			// edges of the network by giving the minimum reward.
+			if flowId.Role == flow.RoleAccess {
+				lg.Trace().
+					Msg("rewarding access node with minimum reward value")
+				return MinAppSpecificReward
+			}
+
 			s.logger.Trace().
-				Str("peer_id", pid.String()).
-				Msg("subscribed topics for peer validated, rewarding peer")
+				Msg("rewarding well-behaved non-access node peer with maximum reward value")
 			return MaxAppSpecificReward
 		},
 		// AppSpecificWeight is the weight of the application specific score.
 		AppSpecificWeight: DefaultAppSpecificScoreWeight,
 	}
+}
+
+func (s *ScoreOption) BuildGossipSubScoreOption() pubsub.Option {
+	s.preparePeerScoreParams()
+	s.preparePeerScoreThresholds()
+
+	s.logger.Info().
+		Float64("gossip_threshold", s.peerThresholdParams.GossipThreshold).
+		Float64("publish_threshold", s.peerThresholdParams.PublishThreshold).
+		Float64("graylist_threshold", s.peerThresholdParams.GraylistThreshold).
+		Float64("accept_px_threshold", s.peerThresholdParams.AcceptPXThreshold).
+		Float64("opportunistic_graft_threshold", s.peerThresholdParams.OpportunisticGraftThreshold).
+		Msg("peer score thresholds configured")
+
+	return pubsub.WithPeerScore(
+		s.peerScoreParams,
+		s.peerThresholdParams,
+	)
+}
+
+// hasValidFlowIdentity checks if the peer has a valid Flow identity.
+func (s *ScoreOption) hasValidFlowIdentity(pid peer.ID) (*flow.Identity, error) {
+	flowId, ok := s.idProvider.ByPeerID(pid)
+	if !ok {
+		return nil, NewInvalidPeerIDError(pid, PeerIdStatusUnknown)
+	}
+
+	if flowId.Ejected {
+		return nil, NewInvalidPeerIDError(pid, PeerIdStatusEjected)
+	}
+
+	return flowId, nil
 }
