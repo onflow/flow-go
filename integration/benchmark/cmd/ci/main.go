@@ -177,8 +177,6 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to set tps")
 	}
-	// TODO(rbtz): pass metrics to the load generator
-	loaderMetrics.SetTPSConfigured(loadCase.tps)
 
 	// prepare data slices
 	sliceDuration, _ := time.ParseDuration(*sliceSize)
