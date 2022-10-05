@@ -164,7 +164,7 @@ func (va *VoteAggregator) processQueuedMessages(ctx context.Context) error {
 			vote := msg.(*model.Vote)
 			err := va.processQueuedVote(vote)
 			if err != nil {
-				return fmt.Errorf("could not process pending vote %v: %w", vote.ID(), err)
+				return fmt.Errorf("could not process pending vote %v for block %v: %w", vote.ID(), vote.BlockID, err)
 			}
 
 			va.log.Info().
@@ -172,6 +172,7 @@ func (va *VoteAggregator) processQueuedMessages(ctx context.Context) error {
 				Hex("block_id", vote.BlockID[:]).
 				Str("vote_id", vote.ID().String()).
 				Msg("vote has been processed successfully")
+			continue
 		}
 
 		// when there is no more messages in the queue, back to the loop to wait
@@ -281,6 +282,8 @@ func (va *VoteAggregator) AddBlock(block *model.Proposal) error {
 	// It means that we are probably catching up.
 	if ok := va.queuedBlocks.Push(block); ok {
 		va.queuedMessagesNotifier.Notify()
+	} else {
+		va.log.Debug().Msgf("dropping block %x because queue is full", block.Block.BlockID)
 	}
 
 	return nil

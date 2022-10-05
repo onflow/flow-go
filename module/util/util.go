@@ -43,7 +43,7 @@ func AllClosed(channels ...<-chan struct{}) <-chan struct{} {
 		for _, ch := range channels {
 			<-ch
 		}
-		wg.Done()
+		close(done)
 	}()
 
 	go func() {
