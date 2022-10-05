@@ -25,7 +25,6 @@ func (s IdentifierSet) Includes(id flow.Identifier) bool {
 
 // NodeBlocklistWrapper is a wrapper for an `id.IdentityProvider` instance, where the
 // wrapper overrides the `Ejected` flag to true for all NodeIDs in a `blocklist`.
-// This wrapper implements the external-facing interfaces
 // To avoid modifying the source of the identities, the wrapper created shallow copies
 // of the identities (whenever necessary) and modifies the `Ejected` flag only in
 // the copy.
