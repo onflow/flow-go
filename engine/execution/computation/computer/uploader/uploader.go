@@ -69,6 +69,9 @@ func (a *AsyncUploader) Upload(computationResult *execution.ComputationResult) e
 		a.metrics.ExecutionBlockDataUploadStarted()
 		start := time.Now()
 
+		a.log.Debug().Msgf("computation result of block %s is being uploaded",
+			computationResult.ExecutableBlock.ID().String())
+
 		err := retry.Do(a.unit.Ctx(), backoff, func(ctx context.Context) error {
 			err := a.uploader.Upload(computationResult)
 			if err != nil {
@@ -81,6 +84,9 @@ func (a *AsyncUploader) Upload(computationResult *execution.ComputationResult) e
 			a.log.Error().Err(err).
 				Hex("block_id", logging.Entity(computationResult.ExecutableBlock)).
 				Msg("failed to upload block data")
+		} else {
+			a.log.Debug().Msgf("computation result of block %s was successfully uploaded",
+				computationResult.ExecutableBlock.ID().String())
 		}
 
 		a.metrics.ExecutionBlockDataUploadFinished(time.Since(start))

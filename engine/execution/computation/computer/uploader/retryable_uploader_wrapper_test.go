@@ -228,7 +228,10 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 // AsyncUploader instance and proper mock storage and EDS interfaces.
 func createTestBadgerRetryableUploaderWrapper(asyncUploader *AsyncUploader) *BadgerRetryableUploaderWrapper {
 	mockBlocksStorage := new(storageMock.Blocks)
-	mockBlocksStorage.On("ByID", mock.Anything).Return(nil, nil)
+	mockBlocksStorage.On("ByID", mock.Anything).Return(&flow.Block{
+		Header:  &flow.Header{},
+		Payload: nil,
+	}, nil)
 
 	mockCommitsStorage := new(storageMock.Commits)
 	mockCommitsStorage.On("ByBlockID", mock.Anything).Return(nil, nil)
