@@ -656,8 +656,6 @@ func readCheckpoint(f *os.File, dir string, filename string) ([]*trie.MTrie, err
 		return readCheckpointV4(f)
 	case VersionV5:
 		return readCheckpointV5(f)
-	case VersionV6:
-		return ReadCheckpointV6(dir, filename)
 	default:
 		return nil, fmt.Errorf("unsupported file version %x", version)
 	}

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
@@ -19,13 +20,15 @@ import (
 // 		3. checksum of the main file itself
 // 	the first 16 files parts contain the trie nodes below the subtrieLevel
 //	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
-func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
-	// TODO: read the main file and check the version
-	headerPath := filePathCheckpointHeader(dir, fileName)
-	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath)
+func ReadCheckpointV6(headerFile *os.File) ([]*trie.MTrie, error) {
+	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerFile)
 	if err != nil {
 		return nil, fmt.Errorf("could not read header: %w", err)
 	}
+
+	// the full path of header file
+	headerPath := headerFile.Name()
+	dir, fileName := filepath.Split(headerPath)
 
 	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums)
 	if err != nil {
@@ -38,6 +41,20 @@ func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	}
 
 	return tries, nil
+}
+
+func OpenAndReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
+	filepath := filePathCheckpointHeader(dir, fileName)
+
+	f, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
+	}
+	defer func(f *os.File) {
+		f.Close()
+	}(f)
+
+	return ReadCheckpointV6(f)
 }
 
 func filePathCheckpointHeader(dir string, fileName string) string {
@@ -59,16 +76,13 @@ func filePathTopTries(dir string, fileName string) (string, string) {
 
 // readCheckpointHeader takes a file path and returns subtrieChecksums and topTrieChecksum
 // any error returned are exceptions
-func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
-	closable, err := os.Open(filepath)
+func readCheckpointHeader(file *os.File) ([]uint32, uint32, error) {
+	_, err := file.Seek(0, io.SeekStart)
 	if err != nil {
-		return nil, 0, fmt.Errorf("could not open file %v: %w", filepath, err)
+		return nil, 0, fmt.Errorf("could not seek to start for header file: %w", err)
 	}
-	defer func(f *os.File) {
-		f.Close()
-	}(closable)
 
-	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
+	var bufReader io.Reader = bufio.NewReaderSize(file, defaultBufioReadSize)
 	reader := NewCRC32Reader(bufReader)
 
 	// read the magic bytes and header
