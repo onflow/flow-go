@@ -201,9 +201,6 @@ func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 	// Retrieve all consensus nodes (excluding myself).
 	// CAUTION: We must include also nodes with weight zero, because otherwise
 	//          TCs might not be constructed at epoch switchover.
-	// Note: retrieving the final state requires a time-intensive database read.
-	//       Therefore, we execute this in a separate routine, because
-	//       `BroadcastTimeout` is directly called by the consensus core logic.
 	recipients, err := h.state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(h.me.NodeID())),
