@@ -642,8 +642,8 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
-		// the wrapper overrides the 'Ejected' flag of blacklisted nodes to true
-		builder.IdentityProvider, err = cache.NewNodeBlacklistWrapper(idCache, node.DB)
+		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
+		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
 		if err != nil {
 			return err
 		}

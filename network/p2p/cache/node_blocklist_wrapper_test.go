@@ -18,32 +18,31 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type NodeBlacklistWrapperTestSuite struct {
+type NodeBlocklistWrapperTestSuite struct {
 	suite.Suite
-	DB               *badger.DB
-	provider         *mocks.IdentityProvider
-	blacklistedNodes cache.IdentifierSet
+	DB       *badger.DB
+	provider *mocks.IdentityProvider
 
-	wrapper *cache.NodeBlacklistWrapper
+	wrapper *cache.NodeBlocklistWrapper
 }
 
-func (s *NodeBlacklistWrapperTestSuite) SetupTest() {
+func (s *NodeBlocklistWrapperTestSuite) SetupTest() {
 	s.DB, _ = unittest.TempBadgerDB(s.T())
 	s.provider = new(mocks.IdentityProvider)
 
 	var err error
-	s.wrapper, err = cache.NewNodeBlacklistWrapper(s.provider, s.DB)
+	s.wrapper, err = cache.NewNodeBlocklistWrapper(s.provider, s.DB)
 	require.NoError(s.T(), err)
 }
 
-func TestNodeBlacklistWrapperTestSuite(t *testing.T) {
-	suite.Run(t, new(NodeBlacklistWrapperTestSuite))
+func TestNodeBlocklistWrapperTestSuite(t *testing.T) {
+	suite.Run(t, new(NodeBlocklistWrapperTestSuite))
 }
 
 // TestHonestNode verifies:
-// For nodes _not_ on the blacklist, the `cache.NodeBlacklistWrapper` should forward
+// For nodes _not_ on the blocklist, the `cache.NodeBlocklistWrapper` should forward
 // the identities from the wrapped `IdentityProvider` without modification.
-func (s *NodeBlacklistWrapperTestSuite) TestHonestNode() {
+func (s *NodeBlocklistWrapperTestSuite) TestHonestNode() {
 	s.Run("ByNodeID", func() {
 		identity := unittest.IdentityFixture()
 		s.provider.On("ByNodeID", identity.NodeID).Return(identity, true)
@@ -75,8 +74,8 @@ func (s *NodeBlacklistWrapperTestSuite) TestHonestNode() {
 	})
 }
 
-// TestBlacklistedNode tests proper handling of identities _on_ the blacklist:
-//   - For any identity `i` with `i.NodeID ∈ blacklist`, the returned identity
+// TestBlacklistedNode tests proper handling of identities _on_ the blocklist:
+//   - For any identity `i` with `i.NodeID ∈ blocklist`, the returned identity
 //     should have `i.Ejected` set to `true` (irrespective of the `Ejected`
 //     flag's initial returned by the wrapped `IdentityProvider`).
 //   - The wrapper should _copy_ the identity and _not_ write into the wrapped
@@ -88,16 +87,16 @@ func (s *NodeBlacklistWrapperTestSuite) TestHonestNode() {
 //     While returning (non-nil identity, false) is not a defined return value,
 //     we expect the wrapper to nevertheless handle this case to increase its
 //     generality.
-func (s *NodeBlacklistWrapperTestSuite) TestBlacklistedNode() {
-	blacklist := unittest.IdentityListFixture(11)
-	s.wrapper.Update(blacklist.NodeIDs())
+func (s *NodeBlocklistWrapperTestSuite) TestBlacklistedNode() {
+	blocklist := unittest.IdentityListFixture(11)
+	s.wrapper.Update(blocklist.NodeIDs())
 
 	index := atomic.NewInt32(0)
 	for _, b := range []bool{true, false} {
 		expectedfound := b
 
 		s.Run(fmt.Sprintf("IdentityProvider.ByNodeID returning (<non-nil identity>, %v)", expectedfound), func() {
-			identity := blacklist[index.Inc()]
+			identity := blocklist[index.Inc()]
 			s.provider.On("ByNodeID", identity.NodeID).Return(identity, expectedfound)
 
 			var backupIdentity flow.Identity = *identity   // unmodified backup Identity
@@ -111,7 +110,7 @@ func (s *NodeBlacklistWrapperTestSuite) TestBlacklistedNode() {
 		})
 
 		s.Run(fmt.Sprintf("IdentityProvider.ByPeerID returning (<non-nil identity>, %v)", expectedfound), func() {
-			identity := blacklist[index.Inc()]
+			identity := blocklist[index.Inc()]
 			peerID := (peer.ID)(identity.NodeID.String())
 			s.provider.On("ByPeerID", peerID).Return(identity, expectedfound)
 
@@ -127,9 +126,9 @@ func (s *NodeBlacklistWrapperTestSuite) TestBlacklistedNode() {
 	}
 
 	s.Run("Identities", func() {
-		blacklistLookup := blacklist.Lookup()
+		blocklistLookup := blocklist.Lookup()
 		honestIdentities := unittest.IdentityListFixture(8)
-		combinedIdentities := honestIdentities.Union(blacklist)
+		combinedIdentities := honestIdentities.Union(blocklist)
 		combinedIdentities = combinedIdentities.DeterministicShuffle(1234)
 		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
 
@@ -138,15 +137,15 @@ func (s *NodeBlacklistWrapperTestSuite) TestBlacklistedNode() {
 
 		require.Equal(s.T(), len(combinedIdentities), len(identities))
 		for _, i := range identities {
-			_, isBlacklisted := blacklistLookup[i.NodeID]
-			require.Equal(s.T(), isBlacklisted, i.Ejected)
+			_, isBlocked := blocklistLookup[i.NodeID]
+			require.Equal(s.T(), isBlocked, i.Ejected)
 		}
 	})
 }
 
 // TestUnknownNode verifies that the wrapper forwards nil identities
 // irrespective of the boolean return values.
-func (s *NodeBlacklistWrapperTestSuite) TestUnknownNode() {
+func (s *NodeBlocklistWrapperTestSuite) TestUnknownNode() {
 	for _, b := range []bool{true, false} {
 		s.Run(fmt.Sprintf("IdentityProvider.ByNodeID returning (nil, %v)", b), func() {
 			id := unittest.IdentifierFixture()
