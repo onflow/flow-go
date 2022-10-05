@@ -61,7 +61,7 @@ const (
 	encMagicSize        = 2
 	encVersionSize      = 2
 	headerSize          = encMagicSize + encVersionSize
-	encSubtrieLevelSize = 2
+	encSubtrieCountSize = 2
 	encNodeCountSize    = 8
 	encTrieCountSize    = 2
 	crc32SumSize        = 4

@@ -82,15 +82,13 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 	}
 
 	// read the subtrie level
-	subtrieLevel, err := readSubtrieLevel(reader)
+	subtrieCount, err := readSubtrieCount(reader)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// read subtrie checksums
-	subtrieCount := subtrieCountByLevel(subtrieLevel)
 	subtrieChecksums := make([]uint32, subtrieCount)
-	for i := 0; i < subtrieCount; i++ {
+	for i := uint16(0); i < subtrieCount; i++ {
 		sum, err := readCRC32Sum(reader)
 		if err != nil {
 			return nil, 0, fmt.Errorf("could not read %v-th subtrie checksum from checkpoint header: %w", i, err)
@@ -384,13 +382,13 @@ func readVersion(reader io.Reader) (uint16, error) {
 	return version, nil
 }
 
-func readSubtrieLevel(reader io.Reader) (uint16, error) {
-	bytes := make([]byte, encSubtrieLevelSize)
+func readSubtrieCount(reader io.Reader) (uint16, error) {
+	bytes := make([]byte, encSubtrieCountSize)
 	_, err := io.ReadFull(reader, bytes)
 	if err != nil {
 		return 0, err
 	}
-	return decodeSubtrieLevel(bytes)
+	return decodeSubtrieCount(bytes)
 
 }
 

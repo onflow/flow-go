@@ -22,10 +22,10 @@ func TestVersion(t *testing.T) {
 	require.Equal(t, VersionV6, v)
 }
 
-func TestSubtrieLevel(t *testing.T) {
-	l, err := decodeSubtrieLevel(encodeSubtrieLevel(subtrieLevel))
+func TestSubtrieCount(t *testing.T) {
+	l, err := decodeSubtrieCount(encodeSubtrieCount(subtrieCount))
 	require.NoError(t, err)
-	require.Equal(t, uint16(subtrieLevel), l)
+	require.Equal(t, uint16(subtrieCount), l)
 }
 
 func TestCRC32SumEncoding(t *testing.T) {

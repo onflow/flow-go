@@ -125,8 +125,8 @@ func storeCheckpointHeader(
 		return fmt.Errorf("cannot write version into checkpoint header: %w", err)
 	}
 
-	// encode subtrieLevel
-	_, err = writer.Write(encodeSubtrieLevel(subtrieLevel))
+	// encode subtrieCount
+	_, err = writer.Write(encodeSubtrieCount(subtrieCount))
 	if err != nil {
 		return fmt.Errorf("cannot write subtrie level into checkpoint header: %w", err)
 	}
@@ -571,15 +571,15 @@ func decodeVersion(encoded []byte) (uint16, uint16, error) {
 	return magicBytes, version, nil
 }
 
-func encodeSubtrieLevel(level uint16) []byte {
-	bytes := make([]byte, encSubtrieLevelSize)
+func encodeSubtrieCount(level uint16) []byte {
+	bytes := make([]byte, encSubtrieCountSize)
 	binary.BigEndian.PutUint16(bytes, level)
 	return bytes
 }
 
-func decodeSubtrieLevel(encoded []byte) (uint16, error) {
-	if len(encoded) != encSubtrieLevelSize {
-		return 0, fmt.Errorf("wrong subtrie level size, expect %v, got %v", encSubtrieLevelSize, len(encoded))
+func decodeSubtrieCount(encoded []byte) (uint16, error) {
+	if len(encoded) != encSubtrieCountSize {
+		return 0, fmt.Errorf("wrong subtrie level size, expect %v, got %v", encSubtrieCountSize, len(encoded))
 	}
 	return binary.BigEndian.Uint16(encoded), nil
 }
