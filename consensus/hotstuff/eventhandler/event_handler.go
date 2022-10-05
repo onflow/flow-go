@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool"
 )
 
 // EventHandler is the main handler for individual events that trigger state transition.
@@ -178,12 +177,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 
 	// notify vote aggregator about a new block, so that it can start verifying
 	// votes for it.
-	err = e.voteAggregator.AddBlock(proposal)
-	if err != nil {
-		if !mempool.IsBelowPrunedThresholdError(err) {
-			return fmt.Errorf("could not add block (%v) to vote aggregator: %w", block.BlockID, err)
-		}
-	}
+	e.voteAggregator.AddBlock(proposal)
 
 	// if the block is for the current view, then try voting for this block
 	err = e.processBlockForCurrentView(proposal)

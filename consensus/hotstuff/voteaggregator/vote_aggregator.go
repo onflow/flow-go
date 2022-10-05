@@ -151,11 +151,6 @@ func (va *VoteAggregator) processQueuedMessages(ctx context.Context) error {
 				return fmt.Errorf("could not process pending block %v: %w", block.Block.BlockID, err)
 			}
 
-			va.log.Info().
-				Uint64("view", block.Block.View).
-				Hex("block_id", block.Block.BlockID[:]).
-				Msg("block has been processed successfully")
-
 			continue
 		}
 
@@ -167,11 +162,6 @@ func (va *VoteAggregator) processQueuedMessages(ctx context.Context) error {
 				return fmt.Errorf("could not process pending vote %v for block %v: %w", vote.ID(), vote.BlockID, err)
 			}
 
-			va.log.Info().
-				Uint64("view", vote.View).
-				Hex("block_id", vote.BlockID[:]).
-				Str("vote_id", vote.ID().String()).
-				Msg("vote has been processed successfully")
 			continue
 		}
 
@@ -209,11 +199,18 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 			vote.View, vote.BlockID, err)
 	}
 
+	va.log.Info().
+		Uint64("view", vote.View).
+		Hex("block_id", vote.BlockID[:]).
+		Str("vote_id", vote.ID().String()).
+		Msg("vote has been processed successfully")
+
 	return nil
 }
 
 // processQueuedBlock performs actual processing of queued block proposals, this method is called from multiple
 // concurrent goroutines.
+// No errors are expected during normal operation.
 func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
 	// check if the block is for a view that has already been pruned (and is thus stale)
 	if block.Block.View < va.lowestRetainedView.Value() {
@@ -237,14 +234,26 @@ func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
 
 	err = collector.ProcessBlock(block)
 	if err != nil {
+		if model.IsInvalidBlockError(err) {
+			// We are attempting process a block which is invalid
+			// This should never happen, because any component that feeds blocks into VoteAggregator
+			// needs to make sure that it's submitting for processing ONLY valid blocks.
+			return fmt.Errorf("received invalid block for processing %v at view %d", block.Block.BlockID, block.Block.View)
+		}
 		return fmt.Errorf("could not process block: %v, %w", block.Block.BlockID, err)
 	}
+
+	va.log.Info().
+		Uint64("view", block.Block.View).
+		Hex("block_id", block.Block.BlockID[:]).
+		Msg("block has been processed successfully")
 
 	return nil
 }
 
 // AddVote checks if vote is stale and appends vote into processing queue
 // actual vote processing will be called in other dispatching goroutine.
+// No errors are expected during normal operation.
 func (va *VoteAggregator) AddVote(vote *model.Vote) {
 	// drop stale votes
 	if vote.View < va.lowestRetainedView.Value() {
@@ -269,15 +278,7 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) {
 // AddBlock notifies the VoteAggregator about a known block so that it can start processing
 // pending votes whose block was unknown.
 // It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
-// Expected error returns during normal operations:
-// * model.InvalidBlockError if the proposer's vote for its own block is invalid
-// * mempool.BelowPrunedThresholdError if the block's view has already been pruned
-func (va *VoteAggregator) AddBlock(block *model.Proposal) error {
-	// check if the block is for a view that has already been pruned (and is thus stale)
-	if block.Block.View < va.lowestRetainedView.Value() {
-		return mempool.NewBelowPrunedThresholdErrorf("block proposal for view %d is stale, lowestRetainedView is %d", block.Block.View, va.lowestRetainedView.Value())
-	}
-
+func (va *VoteAggregator) AddBlock(block *model.Proposal) {
 	// It's ok to silently drop blocks in case our processing pipeline is full.
 	// It means that we are probably catching up.
 	if ok := va.queuedBlocks.Push(block); ok {
@@ -285,8 +286,6 @@ func (va *VoteAggregator) AddBlock(block *model.Proposal) error {
 	} else {
 		va.log.Debug().Msgf("dropping block %x because queue is full", block.Block.BlockID)
 	}
-
-	return nil
 }
 
 // InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it

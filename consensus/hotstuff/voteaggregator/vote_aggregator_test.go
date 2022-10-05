@@ -78,3 +78,5 @@ func (s *VoteAggregatorTestSuite) TestOnFinalizedBlock() {
 	s.aggregator.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
+
+func (s *VoteAggregatorTestSuite)
