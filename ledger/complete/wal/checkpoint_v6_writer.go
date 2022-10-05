@@ -46,7 +46,7 @@ func StoreCheckpointV6(
 	if err != nil {
 		cleanupErr := cleanupTempFiles(outputDir, outputFile)
 		if cleanupErr != nil {
-			//
+			return fmt.Errorf("fail to cleanup temp file %s, after running into error: %w", cleanupErr, err)
 		}
 		return err
 	}

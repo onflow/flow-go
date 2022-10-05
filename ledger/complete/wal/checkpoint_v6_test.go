@@ -224,7 +224,7 @@ func TestWriteAndReadCheckpointV6MultipleTries(t *testing.T) {
 		tries := createMultipleRandomTries(t)
 		fileName := "checkpoint-multi-file"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger), "fail to store checkpoint")
 		decoded, err := ReadCheckpointV6(dir, fileName, &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
@@ -236,8 +236,8 @@ func TestCheckpointV6IsDeterminstic(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createMultipleRandomTries(t)
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6(tries, dir, "checkpoint1", &logger), "fail to store checkpoint")
-		require.NoErrorf(t, StoreCheckpointV6(tries, dir, "checkpoint2", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint1", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint2", &logger), "fail to store checkpoint")
 		require.NoError(t, compareFiles(
 			path.Join(dir, "checkpoint1"),
 			path.Join(dir, "checkpoint2")),
@@ -330,7 +330,7 @@ func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
 		logger := unittest.Logger()
 
 		// store tries into v6 then read back, then store into v5
-		require.NoErrorf(t, StoreCheckpointV6(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
 		decoded, err := ReadCheckpointV6(dir, "checkpoint-v6", &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/checkpoint-v6", dir)
 		require.NoErrorf(t, storeCheckpointV5(decoded, dir, "checkpoint-v6-v5", &logger), "fail to store checkpoint")
@@ -346,6 +346,28 @@ func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
 	})
 }
 
-func TestCleanupOnError(t *testing.T) {
-	require.NoError(t, cleanupTempFiles("not-exist", "checkpoint-v6"))
+func TestCleanupOnErrorIfNotExist(t *testing.T) {
+	t.Run("works if temp files not exist", func(t *testing.T) {
+		require.NoError(t, cleanupTempFiles("not-exist", "checkpoint-v6"))
+	})
+
+	// if it can clean up all files after successful storing, then it can
+	// clean up if failed in middle.
+	t.Run("clean up after finish storing files", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(dir string) {
+			tries := createMultipleRandomTries(t)
+			logger := unittest.Logger()
+
+			// store tries into v6 then read back, then store into v5
+			require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
+			require.NoError(t, cleanupTempFiles(dir, "checkpoint-v6"))
+
+			// verify all files are removed
+			files := filePaths(dir, "checkpoint-v6", subtrieLevel)
+			for _, file := range files {
+				_, err := os.Stat(file)
+				require.True(t, os.IsNotExist(err), err)
+			}
+		})
+	})
 }
