@@ -29,12 +29,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func doneChan() <-chan struct{} {
-	c := make(chan struct{})
-	close(c)
-	return c
-}
-
 func TestComplianceCore(t *testing.T) {
 	suite.Run(t, new(CoreSuite))
 }
@@ -271,6 +265,7 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
 	proposal := unittest.ClusterProposalFromBlock(&block)
+	hotstuffProposal := model.ProposalFromFlow(block.Header, parent.Header.View)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
@@ -280,6 +275,8 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 		// the block fails HotStuff validation
 		*cs.validator = *hotstuff.NewValidator(cs.T())
 		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(model.InvalidBlockError{})
+		// we should notify VoteAggregator about the invalid block
+		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
 		err := cs.core.OnBlockProposal(originID, proposal)
@@ -335,6 +332,7 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
 	proposal := unittest.ClusterProposalFromBlock(&block)
+	hotstuffProposal := model.ProposalFromFlow(block.Header, parent.Header.View)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
@@ -346,12 +344,10 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 	cs.Run("invalid block", func() {
 		// make sure we fail to extend the state
 		*cs.state = *clusterstate.NewMutableState(cs.T())
-		cs.state.On("Final").Return(
-			func() clusterint.Snapshot {
-				return cs.snapshot
-			},
-		)
+		cs.state.On("Final").Return(func() clusterint.Snapshot { return cs.snapshot })
 		cs.state.On("Extend", mock.Anything).Return(state.NewInvalidExtensionError(""))
+		// we should notify VoteAggregator about the invalid block
+		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
 		err := cs.core.OnBlockProposal(originID, proposal)

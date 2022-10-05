@@ -348,6 +348,7 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 	parent := unittest.BlockWithParentFixture(ancestor.Header)
 	block := unittest.BlockWithParentFixture(parent.Header)
 	proposal := unittest.ProposalFromBlock(block)
+	hotstuffProposal := model.ProposalFromFlow(block.Header, parent.Header.View)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = parent.Header
@@ -357,6 +358,8 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 		// the block fails HotStuff validation
 		*cs.validator = *hotstuff.NewValidator(cs.T())
 		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(model.InvalidBlockError{})
+		// we should notify VoteAggregator about the invalid block
+		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
 		err := cs.core.OnBlockProposal(originID, proposal)
@@ -412,19 +415,22 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 	parent := unittest.BlockWithParentFixture(ancestor.Header)
 	block := unittest.BlockWithParentFixture(parent.Header)
 	proposal := unittest.ProposalFromBlock(block)
+	hotstuffProposal := model.ProposalFromFlow(block.Header, parent.Header.View)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = parent.Header
 	cs.headerDB[ancestor.ID()] = ancestor.Header
 
 	// the block passes HotStuff validation
-	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(nil)
+	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 
 	cs.Run("invalid block", func() {
 		// make sure we fail to extend the state
 		*cs.state = protocol.MutableState{}
 		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewInvalidExtensionError(""))
+		// we should notify VoteAggregator about the invalid block
+		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
 		err := cs.core.OnBlockProposal(originID, proposal)

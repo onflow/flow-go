@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
@@ -234,14 +235,23 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) error {
 	blockID := proposal.Header.ID()
 
+	// retrieve the parent block
+	//  - once we reach this point, the parent block must have been validated
+	//    and inserted to the protocol state
+	parent, err := c.headers.ByBlockID(proposal.Header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve proposal parent: %w", err)
+	}
+
 	log := c.log.With().
 		Str("block_id", blockID.String()).
 		Uint64("block_height", proposal.Header.Height).
 		Uint64("block_view", proposal.Header.View).
+		Uint64("parent_view", parent.View).
 		Logger()
 
 	// process block itself
-	err := c.processBlockProposal(proposal)
+	err = c.processBlockProposal(proposal, parent)
 	if err != nil {
 		if engine.IsOutdatedInputError(err) {
 			// child is outdated by the time we started processing it
@@ -253,6 +263,16 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 			// the block is invalid; log as error as we desire honest participation
 			// ToDo: potential slashing
 			log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+			// notify the VoteAggregator of an invalid block to enable detecting Byzantine voters
+			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header, parent.View))
+			if err != nil {
+				if mempool.IsBelowPrunedThresholdError(err) {
+					log.Warn().Msg("received invalid block, but is below pruned threshold")
+					return nil
+				} else {
+					return fmt.Errorf("unexpected error notifying vote aggregator about invalid block: %w", err)
+				}
+			}
 			return nil
 		}
 		if engine.IsUnverifiableInputError(err) {
@@ -296,7 +316,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - engine.InvalidInputError if the block proposal is invalid
 //   - engine.UnverifiableInputError if the proposal cannot be validated
-func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
+func (c *Core) processBlockProposal(proposal *messages.BlockProposal, parent *flow.Header) error {
 	startTime := time.Now()
 	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
 
@@ -311,16 +331,8 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	}
 	defer span.End()
 
-	// retrieve the parent block
-	//  - once we reach this point, the parent block must have been validated
-	//    and inserted to the protocol state
-	parent, err := c.headers.ByBlockID(header.ParentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve proposal parent: %w", err)
-	}
-
 	hotstuffProposal := model.ProposalFromFlow(header, parent.View)
-	err = c.validator.ValidateProposal(hotstuffProposal)
+	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
 		if model.IsInvalidBlockError(err) {
 			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
