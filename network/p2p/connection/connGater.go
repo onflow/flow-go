@@ -92,27 +92,26 @@ func (c *ConnGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
 func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr network.ConnMultiaddrs) bool {
 	switch dir {
 	case network.DirInbound:
-		logger := c.log.With().
-			Str("peer_id", p.Pretty()).
+		lg := c.log.With().
+			Str("peer_id", p.String()).
 			Str("remote_address", addr.RemoteMultiaddr().String()).
 			Logger()
 
 		if len(c.onInterceptSecuredFilters) == 0 {
-			logger.Info().Msg("inbound connection established")
-			logger.Debug().Msg("intercept secured has no peer filters set")
+			lg.Info().Msg("inbound connection established")
 			return true
 		}
 
 		if err := c.peerIDPassesAllFilters(p, c.onInterceptSecuredFilters); err != nil {
 			// log the illegal connection attempt from the remote node
-			logger.Error().
+			lg.Error().
 				Err(err).
 				Str("local_address", addr.LocalMultiaddr().String()).
 				Msg("rejected inbound connection")
 			return false
 		}
 
-		logger.Info().Msg("inbound connection established")
+		lg.Info().Msg("inbound connection established")
 		return true
 	default:
 		// outbound connection should have been already blocked before this call
