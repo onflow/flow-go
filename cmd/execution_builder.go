@@ -137,8 +137,8 @@ type ExecutionNode struct {
 	diskWAL                       *wal.DiskWAL
 	blockDataUploaders            []uploader.Uploader
 	executionDataStore            execution_data.ExecutionDataStore
-	toTriggerCheckpoint           *atomic.Bool            // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
-	stopAtHeight                  *ingestion.StopAtHeight // stop the node at given block height
+	toTriggerCheckpoint           *atomic.Bool           // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	stopControl                   *ingestion.StopControl // stop the node at given block height
 	executionDataDatastore        *badger.Datastore
 	executionDataPruner           *pruner.Pruner
 	executionDataBlobstore        blobs.Blobstore
@@ -150,7 +150,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		builder:             builder.FlowNodeBuilder,
 		exeConf:             builder.exeConf,
 		toTriggerCheckpoint: atomic.NewBool(false),
-		stopAtHeight:        ingestion.NewStopAtHeight(),
+		stopControl:         ingestion.NewStopControl(builder.Logger.With().Str("compontent", "stop_control").Logger(), builder.exeConf.pauseExecution),
 	}
 
 	builder.FlowNodeBuilder.
@@ -161,7 +161,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return executionCommands.NewTriggerCheckpointCommand(exeNode.toTriggerCheckpoint)
 		}).
 		AdminCommand("stop-at-height", func(config *NodeConfig) commands.AdminCommand {
-			return executionCommands.NewStopAtHeightCommand(exeNode.stopAtHeight)
+			return executionCommands.NewStopAtHeightCommand(exeNode.stopControl)
 		}).
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand()
@@ -727,10 +727,9 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.exeConf.syncThreshold,
 		exeNode.exeConf.syncFast,
 		exeNode.checkAuthorizedAtBlock,
-		exeNode.exeConf.pauseExecution,
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploaders,
-		exeNode.stopAtHeight,
+		exeNode.stopControl,
 	)
 
 	// TODO: we should solve these mutual dependencies better

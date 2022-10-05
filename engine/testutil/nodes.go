@@ -648,10 +648,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		syncThreshold,
 		false,
 		checkAuthorizedAtBlock,
-		false,
 		nil,
 		nil,
-		ingestion.NewStopAtHeight(),
+		ingestion.NewStopControl(node.Log.With().Str("compontent", "stop_control").Logger(), false),
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)

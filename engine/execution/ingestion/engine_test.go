@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -73,7 +74,7 @@ type testingContext struct {
 	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
 	collectionRequester *module.MockRequester
 	identities          flow.IdentityList
-	stopAtHeight        *StopAtHeight
+	stopControl         *StopControl
 
 	mu *sync.Mutex
 }
@@ -157,7 +158,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
-	stopAtHeight := NewStopAtHeight()
+	stopControl := NewStopControl(zerolog.Nop(), false)
 
 	engine, err = New(
 		log,
@@ -181,10 +182,9 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		10,
 		false,
 		checkAuthorizedAtBlock,
-		false,
 		nil,
 		nil,
-		stopAtHeight,
+		stopControl,
 	)
 	require.NoError(t, err)
 
@@ -204,7 +204,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		identity:            myIdentity,
 		broadcastedReceipts: make(map[flow.Identifier]*flow.ExecutionReceipt),
 		identities:          identityList,
-		stopAtHeight:        stopAtHeight,
+		stopControl:         stopControl,
 
 		mu: &sync.Mutex{},
 	})
@@ -952,7 +952,7 @@ func TestStopAtHeight(t *testing.T) {
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header)
 
 		// stop at block C
-		_, _, _, err := ctx.stopAtHeight.Set(blockSealed.Height+3, false)
+		_, _, _, err := ctx.stopControl.Set(blockSealed.Height+3, false)
 		require.NoError(t, err)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
@@ -989,7 +989,7 @@ func TestStopAtHeight(t *testing.T) {
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], unittest.IdentifierFixture(), true, *blocks["B"].StartState, nil)
 
-		assert.False(t, ctx.engine.pauseExecution)
+		assert.False(t, ctx.stopControl.IsPaused())
 
 		wg.Add(1)
 		ctx.engine.BlockProcessable(blocks["A"].Block.Header)
@@ -1003,14 +1003,14 @@ func TestStopAtHeight(t *testing.T) {
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		// we don't pause until a block has been finalized
-		assert.False(t, ctx.engine.pauseExecution)
+		assert.False(t, ctx.stopControl.IsPaused())
 
 		ctx.engine.BlockFinalized(blocks["A"].Block.Header)
 		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
 
-		assert.False(t, ctx.engine.pauseExecution)
+		assert.False(t, ctx.stopControl.IsPaused())
 		ctx.engine.BlockFinalized(blocks["C"].Block.Header)
-		assert.True(t, ctx.engine.pauseExecution)
+		assert.True(t, ctx.stopControl.IsPaused())
 
 		ctx.engine.BlockFinalized(blocks["D"].Block.Header)
 
@@ -1058,7 +1058,7 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header)
 
 		// stop at block B, so B-1 (A) will be last executed
-		_, _, _, err := ctx.stopAtHeight.Set(blocks["B"].Height(), false)
+		_, _, _, err := ctx.stopControl.Set(blocks["B"].Height(), false)
 		require.NoError(t, err)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
@@ -1101,13 +1101,13 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
 
-		assert.False(t, ctx.engine.pauseExecution)
+		assert.False(t, ctx.stopControl.IsPaused())
 
 		executionWg.Add(1)
 		ctx.engine.BlockProcessable(blocks["A"].Block.Header)
 		ctx.engine.BlockProcessable(blocks["B"].Block.Header)
 
-		assert.False(t, ctx.engine.pauseExecution)
+		assert.False(t, ctx.stopControl.IsPaused())
 
 		finalizationWg.Add(1)
 		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
@@ -1115,7 +1115,7 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		finalizationWg.Wait()
 		executionWg.Wait()
 
-		assert.True(t, ctx.engine.pauseExecution)
+		assert.True(t, ctx.stopControl.IsPaused())
 
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
 		assert.False(t, more)
@@ -1475,10 +1475,9 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		10,
 		false,
 		checkAuthorizedAtBlock,
-		false,
 		nil,
 		nil,
-		NewStopAtHeight(),
+		NewStopControl(zerolog.Nop(), false),
 	)
 
 	require.NoError(t, err)

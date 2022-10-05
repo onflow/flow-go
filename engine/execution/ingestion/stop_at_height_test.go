@@ -3,12 +3,13 @@ package ingestion
 import (
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCannotSetNewValuesAfterStoppingStarted(t *testing.T) {
 
-	sah := NewStopAtHeight()
+	sah := NewStopControl(zerolog.Nop(), false)
 
 	// first update is always successful
 	oldSet, _, _, err := sah.Set(21, false)

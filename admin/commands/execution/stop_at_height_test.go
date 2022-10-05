@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/admin"
@@ -91,7 +92,7 @@ func TestCommandParsing(t *testing.T) {
 
 func TestCommandsSetsValues(t *testing.T) {
 
-	stopAtHeight := ingestion.NewStopAtHeight()
+	stopAtHeight := ingestion.NewStopControl(zerolog.Nop(), false)
 
 	cmd := NewStopAtHeightCommand(stopAtHeight)
 

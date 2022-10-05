@@ -68,11 +68,9 @@ type Engine struct {
 	syncDeltas             mempool.Deltas      // storing the synced state deltas
 	syncFast               bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
-	pauseExecution         bool
 	executionDataPruner    *pruner.Pruner
 	uploaders              []uploader.Uploader
-	stopAtHeight           *StopAtHeight
-	stopAfterExecuting     flow.Identifier
+	stopControl            *StopControl
 }
 
 func New(
@@ -97,10 +95,9 @@ func New(
 	syncThreshold int,
 	syncFast bool,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
-	pauseExecution bool,
 	pruner *pruner.Pruner,
 	uploaders []uploader.Uploader,
-	stopAtHeight *StopAtHeight,
+	stopControl *StopControl,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -132,11 +129,9 @@ func New(
 		syncDeltas:             syncDeltas,
 		syncFast:               syncFast,
 		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
-		pauseExecution:         pauseExecution,
 		executionDataPruner:    pruner,
 		uploaders:              uploaders,
-		stopAtHeight:           stopAtHeight,
-		stopAfterExecuting:     flow.ZeroID,
+		stopControl:            stopControl,
 	}
 
 	// move to state syncing engine
@@ -153,7 +148,7 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	if !e.pauseExecution {
+	if !e.stopControl.IsPaused() {
 		if computation.GetUploaderEnabled() {
 			if err := e.retryUpload(); err != nil {
 				e.log.Warn().Msg("failed to re-upload all ComputationResults")
@@ -423,22 +418,8 @@ func (e *Engine) reloadBlock(
 // Note: BlockProcessable might be called multiple times for the same block.
 func (e *Engine) BlockProcessable(b *flow.Header) {
 
-	// when the flag is on, no block will be executed. Useful for EN to serve
-	// execution state queries
-	if e.pauseExecution {
-		return
-	}
-
-	// skips blocks at or above requested stop height
-	stopping := e.stopAtHeight.Try(func(stopHeight uint64, stopCrash bool) bool {
-		if b.Height >= stopHeight {
-			e.log.Warn().Msgf("Skipping execution of %s at height %d because stop has been requested at height %d", b.ID(), b.Height, stopHeight)
-			return true
-		}
-		return false
-	})
-
-	if stopping {
+	// skip if stopControl tells to skip
+	if e.stopControl.BlockProcessable(b) {
 		return
 	}
 
@@ -458,54 +439,10 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 	}
 }
 
-func (e *Engine) checkAndStopExecution(header *flow.Header, stopHeight uint64, stopCrash bool) {
-
-	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, header.ParentID)
-	if err != nil {
-		// any error here would indicate unexpected storage error, so we crash the node
-		e.log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("failed to check if the block has been executed")
-		return
-	}
-
-	if executed {
-		e.stopExecution(stopCrash, stopHeight)
-	} else {
-		e.stopAfterExecuting = header.ParentID
-	}
-}
-
 // BlockFinalized implements part of state.protocol.Consumer interface.
 // Method gets called for every finalized block
 func (e *Engine) BlockFinalized(h *flow.Header) {
-
-	if e.pauseExecution {
-		return
-	}
-
-	e.stopAtHeight.Try(func(stopHeight uint64, stopCrash bool) bool {
-		// Once finalization reached stop height we can be sure no other fork will be valid at this height,
-		// if this block's parent has been executed, we are safe to stop or crash.
-		// This will happen during normal execution, where blocks are executed before they are finalized.
-		// However, it is possible that EN block computation progress can fall behind. In this case,
-		// we want to crash only after the execution reached the stop height.
-		if h.Height == stopHeight {
-
-			e.checkAndStopExecution(h, stopHeight, stopCrash)
-
-			// there is a race condition in checkAndStopExecution, after setting stopAfterExecuting,
-			// the block might just have been executed, meaning the previous check was stale.
-			// we can avoid this race condition by checking again.
-
-			// Since this check will occur only for blocks at stop height, if stop height is even set at all
-			// it's preferred to other solution such as synchronization between this handler and block
-			// results handling code, which would affect every execution.
-			// See TestStopAtHeightRaceFinalization
-
-			e.checkAndStopExecution(h, stopHeight, stopCrash)
-			return true
-		}
-		return false
-	})
+	e.stopControl.BlockFinalized(e.unit.Ctx(), e.execState, h)
 }
 
 // Main handling
@@ -728,17 +665,9 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
 	}
 
-	if e.stopAfterExecuting == executableBlock.ID() {
-		// double check. Even if requested stop height has been changed multiple times,
-		// as long as it matches this block we are safe to terminate
-		e.stopAtHeight.Try(func(stopHeight uint64, crash bool) bool {
-			if executableBlock.Height() == stopHeight-1 {
-				e.stopExecution(crash, stopHeight)
-				return true
-			}
-			return false
-		})
-	}
+	e.unit.Ctx()
+
+	e.stopControl.BlockExecuted(executableBlock.Block.Header)
 }
 
 // we've executed the block, now we need to check:
@@ -1344,15 +1273,6 @@ func (e *Engine) retryUpload() (err error) {
 		}
 	}
 	return err
-}
-
-func (e *Engine) stopExecution(crash bool, height uint64) {
-	if crash {
-		e.log.Fatal().Msgf("Crashing as finalization reached requested stop height %d", height)
-	} else {
-		e.pauseExecution = true
-		e.log.Warn().Msgf("Pausing execution as finalization reached requested stop height %d", height)
-	}
 }
 
 func GenerateExecutionReceipt(

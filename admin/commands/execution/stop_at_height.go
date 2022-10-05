@@ -15,10 +15,10 @@ var _ commands.AdminCommand = (*StopAtHeightCommand)(nil)
 // StopAtHeightCommand will send a signal to engine to stop/crash EN
 // at given height
 type StopAtHeightCommand struct {
-	stopAtHeight *ingestion.StopAtHeight
+	stopAtHeight *ingestion.StopControl
 }
 
-func NewStopAtHeightCommand(sah *ingestion.StopAtHeight) *StopAtHeightCommand {
+func NewStopAtHeightCommand(sah *ingestion.StopControl) *StopAtHeightCommand {
 	return &StopAtHeightCommand{
 		stopAtHeight: sah,
 	}
