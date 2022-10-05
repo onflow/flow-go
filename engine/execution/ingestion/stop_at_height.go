@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
 )
 
 type StopControl struct {
