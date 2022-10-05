@@ -343,7 +343,7 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 
 	cs.Run("invalid block", func() {
 		// make sure we fail to extend the state
-		*cs.state = *clusterstate.NewMutableState(cs.T())
+		*cs.state = clusterstate.MutableState{}
 		cs.state.On("Final").Return(func() clusterint.Snapshot { return cs.snapshot })
 		cs.state.On("Extend", mock.Anything).Return(state.NewInvalidExtensionError(""))
 		// we should notify VoteAggregator about the invalid block
@@ -354,7 +354,7 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should extend the state with the header
-		cs.state.AssertCalled(cs.T(), "Extend", block)
+		cs.state.AssertCalled(cs.T(), "Extend", &block)
 		// we should not pass the block to hotstuff
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
 		// we should not attempt to process the children
@@ -372,7 +372,7 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should extend the state with the header
-		cs.state.AssertExpectations(cs.T())
+		cs.state.AssertCalled(cs.T(), "Extend", &block)
 		// we should not pass the block to hotstuff
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
 		// we should not attempt to process the children
@@ -391,7 +391,7 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 		require.ErrorIs(cs.T(), err, unexpectedErr)
 
 		// we should extend the state with the header
-		cs.state.AssertCalled(cs.T(), "Extend", block)
+		cs.state.AssertCalled(cs.T(), "Extend", &block)
 		// we should not pass the block to hotstuff
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
 		// we should not attempt to process the children
