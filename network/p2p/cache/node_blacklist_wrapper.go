@@ -14,8 +14,14 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
-// IdentifierSet represents a set of node IDs. If a node appears in set, it is blacklisted.
+// IdentifierSet represents a set of blacklisted node IDs.
 type IdentifierSet map[flow.Identifier]struct{}
+
+// Includes returns true iff id ∈ s
+func (s IdentifierSet) Includes(id flow.Identifier) bool {
+	_, found := s[id]
+	return found
+}
 
 // NodeBlacklistWrapper is a wrapper for an `id.IdentityProvider` instance, where the
 // wrapper overrides the `Ejected` flag to true for all NodeIDs in a `blacklist`.
@@ -23,12 +29,16 @@ type IdentifierSet map[flow.Identifier]struct{}
 // To avoid modifying the source of the identities, the wrapper created shallow copies
 // of the identities (whenever necessary) and modifies the `Ejected` flag only in
 // the copy.
+// The `NodeBlacklistWrapper` internally represents the `blacklist` as a map, to enable
+// performant lookup. However, the exported API works with `flow.IdentifierList` for
+// blacklist, as this is a broadly supported data structure which lends itself better
+// to config or command-line inputs.
 type NodeBlacklistWrapper struct {
 	m  sync.RWMutex
 	db *badger.DB
 
 	identityProvider id.IdentityProvider
-	blacklist        IdentifierSet
+	blacklist        IdentifierSet // `IdentifierSet` is a map, hence efficient O(1) lookup
 }
 
 var _ id.IdentityProvider = (*NodeBlacklistWrapper)(nil)
@@ -48,12 +58,14 @@ func NewNodeBlacklistWrapper(identityProvider id.IdentityProvider, db *badger.DB
 	}, nil
 }
 
-// Update sets the wrapper's internal set of blacklisted nodes to `blacklist`.
-// This implementation is _eventually consistent_, where changes are written to the data base
-// first and then the in-memory set of blacklisted nodes is updated. This strongly benefits
-// performance and modularity.
+// Update sets the wrapper's internal set of blacklisted nodes to `blacklist`. Empty list and `nil`
+// (equivalent to empty list) are accepted inputs. To avoid legacy entries in the data base, this
+// function purges the entire data base entry if `blacklist` is empty.
+// This implementation is _eventually consistent_, where changes are written to the data base first
+// and then (non-atomically!) the in-memory set of blacklisted nodes is updated. This strongly
+// benefits performance and modularity. No errors are expected during normal operations.
 func (w *NodeBlacklistWrapper) Update(blacklist flow.IdentifierList) error {
-	b := blacklist.Lookup() // convert slice to map
+	b := blacklist.Lookup() // convert slice to
 	err := persistBlacklist(b, w.db)
 	if err != nil {
 		return fmt.Errorf("failed to persist set of blacklisted nodes to the data base: %w", err)
@@ -63,6 +75,12 @@ func (w *NodeBlacklistWrapper) Update(blacklist flow.IdentifierList) error {
 	w.blacklist = b
 	w.m.Unlock()
 	return nil
+}
+
+// ClearBlacklist purges the set of blacklisted node IDs. Convenience function
+// equivalent to w.Update(nil). No errors are expected during normal operations.
+func (w *NodeBlacklistWrapper) ClearBlacklist() error {
+	return w.Update(nil)
 }
 
 // GetBlacklist returns the set of blacklisted node IDs.
@@ -79,20 +97,21 @@ func (w *NodeBlacklistWrapper) GetBlacklist() flow.IdentifierList {
 
 // Identities returns the full identities of _all_ nodes currently known to the
 // protocol that pass the provided filter. Caution, this includes ejected nodes.
-// Please check the `Ejected` flag in the identities (or provide a filter for
-// removing ejected nodes).
+// Please check the `Ejected` flag in the returned identities (or provide a
+// filter for removing ejected nodes).
 func (w *NodeBlacklistWrapper) Identities(filter flow.IdentityFilter) flow.IdentityList {
 	identities := w.identityProvider.Identities(filter)
 	if len(identities) == 0 {
 		return identities
 	}
 
+	// Iterate over all returned identities and set ejected flag to true. We
+	// copy both the return slice and identities of blacklisted nodes to avoid
+	// any possibility of accidentally modifying the wrapped IdentityProvider
 	idtx := make(flow.IdentityList, 0, len(identities))
-
 	w.m.RLock()
-	defer w.m.RUnlock()
 	for _, identity := range identities {
-		if _, isBlacklisted := w.blacklist[identity.NodeID]; isBlacklisted {
+		if w.blacklist.Includes(identity.NodeID) {
 			var i flow.Identity = *identity // shallow copy is sufficient, because `Ejected` flag is in top-level struct
 			i.Ejected = true
 			idtx = append(idtx, &i)
@@ -100,6 +119,7 @@ func (w *NodeBlacklistWrapper) Identities(filter flow.IdentityFilter) flow.Ident
 			idtx = append(idtx, identity)
 		}
 	}
+	w.m.RUnlock()
 	return idtx
 }
 
@@ -123,16 +143,16 @@ func (w *NodeBlacklistWrapper) applyBlacklist(identity *flow.Identity) *flow.Ide
 		return identity
 	}
 
-	// We only enter the following code when: identity ≠ nil  _and_  identity.Ejected = false.
 	w.m.RLock()
-	defer w.m.RUnlock()
-
-	if _, isBlacklisted := w.blacklist[identity.NodeID]; !isBlacklisted {
-		return identity // node not blacklisted, hence no change of Identity necessary
+	isBlacklisted := w.blacklist.Includes(identity.NodeID)
+	w.m.RUnlock()
+	if !isBlacklisted {
+		return identity
 	}
 
-	// For blacklisted nodes, we want to return their flow.Identity with the `Ejected` flag
-	// set to true. Hence, we copy the identity, and override `Ejected`.
+	// For blacklisted nodes, we want to return their `Identity` with the `Ejected` flag
+	// set to true. Caution: we need to copy the `Identity` before we override `Ejected`, as we
+	// would otherwise potentially change the wrapped IdentityProvider.
 	var i flow.Identity = *identity // shallow copy is sufficient, because `Ejected` flag is in top-level struct
 	i.Ejected = true
 	return &i
@@ -149,8 +169,9 @@ func (w *NodeBlacklistWrapper) ByPeerID(p peer.ID) (*flow.Identity, bool) {
 	return w.applyBlacklist(identity), b
 }
 
-// persistBlacklist writes the given blacklist to the data base.
-// No errors are expected during normal operations.
+// persistBlacklist writes the given blacklist to the data base. To avoid legacy
+// entries in the data base, we pure the entire data base entry if `blacklist` is
+// empty. No errors are expected during normal operations.
 func persistBlacklist(blacklist IdentifierSet, db *badger.DB) error {
 	if len(blacklist) == 0 {
 		return db.Update(operation.PurgeBlacklistedNodes())
