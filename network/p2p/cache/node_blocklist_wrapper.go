@@ -88,7 +88,7 @@ func (w *NodeBlocklistWrapper) GetBlocklist() flow.IdentifierList {
 	defer w.m.RUnlock()
 
 	identifiers := make(flow.IdentifierList, 0, len(w.blocklist))
-	for i, _ := range w.blocklist {
+	for i := range w.blocklist {
 		identifiers = append(identifiers, i)
 	}
 	return identifiers

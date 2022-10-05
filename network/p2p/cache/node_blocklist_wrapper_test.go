@@ -89,7 +89,8 @@ func (s *NodeBlocklistWrapperTestSuite) TestHonestNode() {
 //     generality.
 func (s *NodeBlocklistWrapperTestSuite) TestBlacklistedNode() {
 	blocklist := unittest.IdentityListFixture(11)
-	s.wrapper.Update(blocklist.NodeIDs())
+	err := s.wrapper.Update(blocklist.NodeIDs())
+	require.NoError(s.T(), err)
 
 	index := atomic.NewInt32(0)
 	for _, b := range []bool{true, false} {
