@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"context"
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -53,5 +54,5 @@ type EventHandler interface {
 
 	// Start starts the event handler.
 	// No errors are expected during normal operation.
-	Start() error
+	Start(ctx context.Context) error
 }

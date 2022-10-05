@@ -75,7 +75,7 @@ func (t *Controller) Channel() <-chan time.Time {
 }
 
 // StartTimeout starts the timeout of the specified type and returns the timer info
-func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
+func (t *Controller) StartTimeout(ctx context.Context, view uint64) *model.TimerInfo {
 	// stop old timer and schedule stop of ticker
 	if t.timer != nil {
 		t.timer.Stop()
@@ -91,14 +91,14 @@ func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
 	t.timeoutChannel = make(chan time.Time, 1)
 	t.timerInfo = &timerInfo
 
-	var ctx context.Context
-	ctx, t.stopTicker = context.WithCancel(context.Background())
+	var childContext context.Context
+	childContext, t.stopTicker = context.WithCancel(ctx)
 
 	// when round duration is small react with faster timeout rebroadcasts
 	tickInterval := time.Duration(math.Min(float64(duration), t.cfg.MaxTimeoutObjectRebroadcastInterval))
 
 	// start a ticker to rebroadcast timeout objects on regular basis as long as we are in the same round.
-	go tickAfterTimeout(ctx, tickInterval, t.timeoutChannel, t.timer.C)
+	go tickAfterTimeout(childContext, tickInterval, t.timeoutChannel, t.timer.C)
 
 	return &timerInfo
 }

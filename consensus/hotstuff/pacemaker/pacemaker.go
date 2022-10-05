@@ -1,6 +1,7 @@
 package pacemaker
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ import (
 // * never produce a vote for any proposal with view ≤ `v`, after the timeout
 // * produce and broadcast a timeout object, which can form a part of the TC for the timed out view
 type ActivePaceMaker struct {
+	ctx            context.Context
 	timeoutControl *timeout.Controller
 	notifier       hotstuff.Consumer
 	persist        hotstuff.Persister
@@ -141,7 +143,7 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 
 	p.notifier.OnQcTriggeredViewChange(qc, newView)
 
-	timerInfo := p.timeoutControl.StartTimeout(newView)
+	timerInfo := p.timeoutControl.StartTimeout(p.ctx, newView)
 	p.notifier.OnStartingTimeout(timerInfo)
 
 	return &model.NewViewEvent{
@@ -180,7 +182,7 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 
 	p.notifier.OnTcTriggeredViewChange(tc, newView)
 
-	timerInfo := p.timeoutControl.StartTimeout(newView)
+	timerInfo := p.timeoutControl.StartTimeout(p.ctx, newView)
 	p.notifier.OnStartingTimeout(timerInfo)
 
 	return &model.NewViewEvent{
@@ -203,9 +205,10 @@ func (p *ActivePaceMaker) LastViewTC() *flow.TimeoutCertificate {
 
 // Start starts the pacemaker by starting the initial timer for the current view.
 // Start should only be called once - subsequent calls are a no-op.
-func (p *ActivePaceMaker) Start() {
+func (p *ActivePaceMaker) Start(ctx context.Context) {
 	p.started.Do(func() {
-		timerInfo := p.timeoutControl.StartTimeout(p.CurView())
+		p.ctx = ctx
+		timerInfo := p.timeoutControl.StartTimeout(ctx, p.CurView())
 		p.notifier.OnStartingTimeout(timerInfo)
 	})
 }

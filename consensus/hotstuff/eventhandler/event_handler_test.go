@@ -1,6 +1,7 @@
 package eventhandler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -72,7 +73,7 @@ func (p *TestPaceMaker) LastViewTC() *flow.TimeoutCertificate {
 }
 
 // using a real pacemaker for testing event handler
-func initPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData) hotstuff.PaceMaker {
+func initPaceMaker(t require.TestingT, ctx context.Context, livenessData *hotstuff.LivenessData) hotstuff.PaceMaker {
 	notifier := &mocks.Consumer{}
 	tc, err := timeout.NewConfig(
 		time.Duration(minRepTimeout*1e6),
@@ -90,7 +91,7 @@ func initPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData) hots
 	notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything).Return()
 	notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return()
 	notifier.On("OnReachedTimeout", mock.Anything).Return()
-	pm.Start()
+	pm.Start(ctx)
 	return pm
 }
 
@@ -271,6 +272,8 @@ type EventHandlerSuite struct {
 	qc             *flow.QuorumCertificate
 	tc             *flow.TimeoutCertificate
 	newview        *model.NewViewEvent
+	ctx            context.Context
+	stop           context.CancelFunc
 }
 
 func (es *EventHandlerSuite) SetupTest() {
@@ -284,8 +287,10 @@ func (es *EventHandlerSuite) SetupTest() {
 		NewestQC:    newestQC,
 	}
 
+	es.ctx, es.stop = context.WithCancel(context.Background())
+
 	es.committee = NewCommittee(es.T())
-	es.paceMaker = initPaceMaker(es.T(), livenessData)
+	es.paceMaker = initPaceMaker(es.T(), es.ctx, livenessData)
 	es.forks = NewForks(es.T(), finalized)
 	es.persist = mocks.NewPersister(es.T())
 	es.persist.On("PutStarted", mock.Anything).Return(nil).Maybe()
@@ -911,7 +916,7 @@ func (es *EventHandlerSuite) TestStart_PendingBlocksRecovery() {
 
 	es.forks.On("NewestView").Return(es.endView).Once()
 
-	err := es.eventhandler.Start()
+	err := es.eventhandler.Start(es.ctx)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 }
@@ -938,7 +943,7 @@ func (es *EventHandlerSuite) TestStart_ProposeOnce() {
 	es.forks.On("NewestView").Return(es.endView).Once()
 
 	// Start triggers proposing logic, make sure that we don't propose again.
-	err = es.eventhandler.Start()
+	err = es.eventhandler.Start(es.ctx)
 	require.NoError(es.T(), err)
 
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")

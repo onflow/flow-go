@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"context"
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -74,7 +75,7 @@ type PaceMaker interface {
 	TimeoutChannel() <-chan time.Time
 
 	// Start starts the PaceMaker (i.e. the timeout for the configured starting value for view).
-	Start()
+	Start(ctx context.Context)
 
 	// BlockRateDelay
 	BlockRateDelay() time.Duration

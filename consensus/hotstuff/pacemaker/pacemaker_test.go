@@ -1,6 +1,7 @@
 package pacemaker
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -42,6 +43,7 @@ type ActivePaceMakerTestSuite struct {
 	notifier     *mocks.Consumer
 	persist      *mocks.Persister
 	paceMaker    *ActivePaceMaker
+	stop         context.CancelFunc
 }
 
 func (s *ActivePaceMakerTestSuite) SetupTest() {
@@ -70,7 +72,13 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(s.livenessData.CurrentView)).Return().Once()
 
-	s.paceMaker.Start()
+	var ctx context.Context
+	ctx, s.stop = context.WithCancel(context.Background())
+	s.paceMaker.Start(ctx)
+}
+
+func (s *ActivePaceMakerTestSuite) TearDownTest() {
+	s.stop()
 }
 
 func QC(view uint64) *flow.QuorumCertificate {
