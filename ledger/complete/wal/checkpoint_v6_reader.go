@@ -197,9 +197,9 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 
 	// TODO: validate checksum again
 
-	// TODO: simplify getNodeByIndex() logic if we reslice nodes here to remove the nil node at index 0.
-	// return nodes[1:], nil
-	return nodes, nil
+	// since nodes[0] is always `nil`, returning a slice without nodes[0] could simplify the
+	// implementation of getNodeByIndex
+	return nodes[1:], nil
 }
 
 type resultReadSubTrie struct {
@@ -282,7 +282,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}
 
-			return getNodeByIndex(subtrieNodes, topLevelNodes, nodeIndex)
+			return getNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, nodeIndex)
 		})
 		if err != nil {
 			return nil, fmt.Errorf("cannot read node at index %d: %w", i, err)
@@ -294,7 +294,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	// read the trie root nodes
 	for i := uint16(0); i < triesCount; i++ {
 		trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
-			return getNodeByIndex(subtrieNodes, topLevelNodes, nodeIndex)
+			return getNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, nodeIndex)
 		})
 
 		if err != nil {
@@ -326,37 +326,43 @@ func readNodeCount(f *os.File) (uint64, uint16, error) {
 	return decodeFooter(footer)
 }
 
-func computeTotalSubTrieNodeCount(groups [][]*node.Node) int {
+func computeTotalSubTrieNodeCount(groups [][]*node.Node) uint64 {
 	total := 0
 	for _, group := range groups {
-		total += (len(group) - 1) // the first item in group is <nil>
+		total += len(group)
 	}
-	return total
+	return uint64(total)
 }
 
-// each group in subtrieNodes and topLevelNodes start with `nil`
-func getNodeByIndex(subtrieNodes [][]*node.Node, topLevelNodes []*node.Node, index uint64) (*node.Node, error) {
+// get a node by node index.
+// Note: node index start from 1.
+// subtries contains subtrie node groups. subtries[i][0] is NOT nil.
+// topLevelNodes contains top level nodes. topLevelNodes[0] is nil.
+// any error returned are exceptions
+func getNodeByIndex(subtrieNodes [][]*node.Node, totalSubTrieNodeCount uint64, topLevelNodes []*node.Node, index uint64) (*node.Node, error) {
 	if index == 0 {
-		// item at index 0 is nil
+		// item at index 0 is for nil
 		return nil, nil
 	}
-	offset := index - 1 // index.> 0, won't underflow
-	for _, subtries := range subtrieNodes {
-		if len(subtries) < 1 {
-			return nil, fmt.Errorf("subtries should have at least 1 item")
-		}
-		if subtries[0] != nil {
-			return nil, fmt.Errorf("subtrie[0] %v isn't nil", subtries[0])
-		}
 
-		if offset < uint64(len(subtries)-1) {
-			// +1 because first item is always nil
-			return subtries[offset+1], nil
-		}
-		offset -= uint64(len(subtries) - 1)
+	if index > totalSubTrieNodeCount {
+		return getTopNodeByIndex(totalSubTrieNodeCount, topLevelNodes, index)
 	}
 
-	// TODO: move this check outside
+	offset := index - 1 // index > 0, won't underflow
+	for _, subtries := range subtrieNodes {
+		if int(offset) < len(subtries) {
+			return subtries[offset], nil
+		}
+
+		offset -= uint64(len(subtries))
+	}
+
+	return nil, fmt.Errorf("could not find node by index %v, totalSubTrieNodeCount %v", index, totalSubTrieNodeCount)
+}
+
+func getTopNodeByIndex(totalSubTrieNodeCount uint64, topLevelNodes []*node.Node, index uint64) (*node.Node, error) {
+	// sanity checks: topLevelNodes[0] should be `nil`
 	if len(topLevelNodes) < 1 {
 		return nil, fmt.Errorf("top trie should have at least 1 item")
 	}
@@ -365,10 +371,12 @@ func getNodeByIndex(subtrieNodes [][]*node.Node, topLevelNodes []*node.Node, ind
 		return nil, fmt.Errorf("top trie [0] %v isn't nil", topLevelNodes[0])
 	}
 
-	if offset >= uint64(len(topLevelNodes)-1) {
-		return nil, fmt.Errorf("can not find node by index: %v in subtrieNodes %v, topLevelNodes %v", index, subtrieNodes, topLevelNodes)
+	nodePos := index - totalSubTrieNodeCount
+
+	if nodePos >= uint64(len(topLevelNodes)) {
+		return nil, fmt.Errorf("can not find node by index %v, nodePos >= len(topLevelNodes) => (%v > %v)",
+			index, nodePos, len(topLevelNodes))
 	}
 
-	// +1 because first item is always nil
-	return topLevelNodes[offset+1], nil
+	return topLevelNodes[nodePos], nil
 }
