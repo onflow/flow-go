@@ -212,17 +212,11 @@ func storeTopLevelNodesAndTrieRoots(
 		return 0, fmt.Errorf("could not store top level nodes: %w", err)
 	}
 
-	err = storeFooter(topLevelNodesCount, uint16(len(tries)), writer)
+	checksum, err := storeTopLevelTrieFooter(topLevelNodesCount, uint16(len(tries)), writer)
 	if err != nil {
 		return 0, fmt.Errorf("could not store footer: %w", err)
 	}
 
-	// write checksum to the end of the file
-	checksum := writer.Crc32()
-	_, err = writer.Write(encodeCRC32Sum(checksum))
-	if err != nil {
-		return 0, fmt.Errorf("cannot write CRC32 checksum to top level part file: %w", err)
-	}
 	return checksum, nil
 }
 
@@ -419,20 +413,12 @@ func storeCheckpointSubTrie(
 	totalNodeCount := nodeCounter - 1
 
 	// write total number of node as footer
-	footer := encodeSubtrieFooter(totalNodeCount)
-	_, err = writer.Write(footer)
+	checksum, err := storeSubtrieFooter(totalNodeCount, writer)
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("cannot write checkpoint subtrie footer: %w", err)
+		return nil, 0, 0, fmt.Errorf("could not store subtrie footer %w", err)
 	}
 
-	// write checksum to the end of the file
-	crc32Sum := writer.Crc32()
-	_, err = writer.Write(encodeCRC32Sum(crc32Sum))
-	if err != nil {
-		return nil, 0, 0, fmt.Errorf("cannot write CRC32 checksum %v", err)
-	}
-
-	return subtrieRootNodes, totalNodeCount, crc32Sum, nil
+	return subtrieRootNodes, totalNodeCount, checksum, nil
 }
 
 func storeTopLevelNodes(
@@ -491,13 +477,37 @@ func storeRootNodes(
 	return nil
 }
 
-func storeFooter(topLevelNodesCount uint64, rootTrieCount uint16, writer io.Writer) error {
+func storeTopLevelTrieFooter(topLevelNodesCount uint64, rootTrieCount uint16, writer *Crc32Writer) (uint32, error) {
 	footer := encodeFooter(topLevelNodesCount, rootTrieCount)
 	_, err := writer.Write(footer)
 	if err != nil {
-		return fmt.Errorf("cannot write checkpoint footer: %w", err)
+		return 0, fmt.Errorf("cannot write checkpoint footer: %w", err)
 	}
-	return nil
+
+	// write checksum to the end of the file
+	checksum := writer.Crc32()
+	_, err = writer.Write(encodeCRC32Sum(checksum))
+	if err != nil {
+		return 0, fmt.Errorf("cannot write CRC32 checksum to top level part file: %w", err)
+	}
+
+	return checksum, nil
+}
+
+func storeSubtrieFooter(nodeCount uint64, writer *Crc32Writer) (uint32, error) {
+	footer := encodeSubtrieFooter(nodeCount)
+	_, err := writer.Write(footer)
+	if err != nil {
+		return 0, fmt.Errorf("cannot write checkpoint subtrie footer: %w", err)
+	}
+
+	// write checksum to the end of the file
+	crc32Sum := writer.Crc32()
+	_, err = writer.Write(encodeCRC32Sum(crc32Sum))
+	if err != nil {
+		return 0, fmt.Errorf("cannot write CRC32 checksum %v", err)
+	}
+	return crc32Sum, nil
 }
 
 func encodeFooter(topLevelNodesCount uint64, rootTrieCount uint16) []byte {

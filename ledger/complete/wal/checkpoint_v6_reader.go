@@ -184,16 +184,9 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		f.Close()
 	}(f)
 
-	nodesCount, err := readSubTriesNodeCount(f)
+	nodesCount, expectedSum, err := readSubTriesFooter(f)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read sub trie node count: %w", err)
-	}
-
-	// the subtrie checksum from the checkpoint header file must be same
-	// as the checksum included in the subtrie file
-	expectedSum, err := readCRC32Sum(bufio.NewReaderSize(f, defaultBufioReadSize))
-	if err != nil {
-		return nil, fmt.Errorf("cannot read checksum for sub trie file: %w", err)
 	}
 
 	if checksum != expectedSum {
@@ -246,21 +239,33 @@ type resultReadSubTrie struct {
 	Err   error
 }
 
-func readSubTriesNodeCount(f *os.File) (uint64, error) {
+func readSubTriesFooter(f *os.File) (uint64, uint32, error) {
 	const footerSize = encNodeCountSize // footer doesn't include crc32 sum
 	const footerOffset = footerSize + crc32SumSize
 	_, err := f.Seek(-footerOffset, io.SeekEnd)
 	if err != nil {
-		return 0, fmt.Errorf("cannot seek to footer: %w", err)
+		return 0, 0, fmt.Errorf("cannot seek to footer: %w", err)
 	}
 
 	footer := make([]byte, footerSize) // must not be less than 1024
 	_, err = io.ReadFull(f, footer)
 	if err != nil {
-		return 0, fmt.Errorf("could not read footer: %w", err)
+		return 0, 0, fmt.Errorf("could not read footer: %w", err)
 	}
 
-	return decodeSubtrieFooter(footer)
+	nodeCount, err := decodeSubtrieFooter(footer)
+	if err != nil {
+		return 0, 0, fmt.Errorf("could not decode subtrie node count: %w", err)
+	}
+
+	// the subtrie checksum from the checkpoint header file must be same
+	// as the checksum included in the subtrie file
+	expectedSum, err := readCRC32Sum(f)
+	if err != nil {
+		return 0, 0, fmt.Errorf("cannot read checksum for sub trie file: %w", err)
+	}
+
+	return nodeCount, expectedSum, nil
 }
 
 // 17th part file contains:
@@ -287,22 +292,9 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 
 	// TODO: read checksum and validate
 
-	topLevelNodesCount, triesCount, err := readNodeCount(file)
+	topLevelNodesCount, triesCount, expectedSum, err := readTopTriesFooter(file)
 	if err != nil {
-		return nil, fmt.Errorf("could not read node count: %w", err)
-	}
-
-	topLevelNodes := make([]*node.Node, topLevelNodesCount+1) //+1 for 0 index meaning nil
-	tries := make([]*trie.MTrie, triesCount)
-
-	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
-	// TODO: read subtrie Node count and validate
-
-	// the subtrie checksum from the checkpoint header file must be same
-	// as the checksum included in the subtrie file
-	expectedSum, err := readCRC32Sum(bufio.NewReaderSize(file, defaultBufioReadSize))
-	if err != nil {
-		return nil, fmt.Errorf("cannot read checksum for sub trie file: %w", err)
+		return nil, fmt.Errorf("could not read top tries footer: %w", err)
 	}
 
 	if topTrieChecksum != expectedSum {
@@ -314,6 +306,12 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	if err != nil {
 		return nil, fmt.Errorf("could not seek to 0: %w", err)
 	}
+
+	topLevelNodes := make([]*node.Node, topLevelNodesCount+1) //+1 for 0 index meaning nil
+	tries := make([]*trie.MTrie, triesCount)
+
+	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
+	// TODO: read subtrie Node count and validate
 
 	var bufReader io.Reader = bufio.NewReaderSize(file, defaultBufioReadSize)
 	reader := NewCRC32Reader(bufReader)
@@ -405,22 +403,31 @@ func readCRC32Sum(reader io.Reader) (uint32, error) {
 	return decodeCRC32Sum(bytes)
 }
 
-func readNodeCount(f *os.File) (uint64, uint16, error) {
+func readTopTriesFooter(f *os.File) (uint64, uint16, uint32, error) {
 	// footer offset: nodes count (8 bytes) + tries count (2 bytes) + CRC32 sum (4 bytes)
 	const footerOffset = encNodeCountSize + encTrieCountSize + crc32SumSize
 	const footerSize = encNodeCountSize + encTrieCountSize // footer doesn't include crc32 sum
 	// Seek to footer
 	_, err := f.Seek(-footerOffset, io.SeekEnd)
 	if err != nil {
-		return 0, 0, fmt.Errorf("cannot seek to footer: %w", err)
+		return 0, 0, 0, fmt.Errorf("cannot seek to footer: %w", err)
 	}
 	footer := make([]byte, footerSize)
 	_, err = io.ReadFull(f, footer)
 	if err != nil {
-		return 0, 0, fmt.Errorf("cannot read footer: %w", err)
+		return 0, 0, 0, fmt.Errorf("cannot read footer: %w", err)
 	}
 
-	return decodeFooter(footer)
+	nodeCount, trieCount, err := decodeFooter(footer)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("could not decode top trie footer: %w", err)
+	}
+
+	checksum, err := readCRC32Sum(bufio.NewReaderSize(f, defaultBufioReadSize))
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("cannot read checksum for top trie file: %w", err)
+	}
+	return nodeCount, trieCount, checksum, nil
 }
 
 func computeTotalSubTrieNodeCount(groups [][]*node.Node) int {
