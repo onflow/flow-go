@@ -69,6 +69,7 @@ type GenericNode struct {
 	// context and cancel function used to start/stop components
 	Ctx    irrecoverable.SignalerContext
 	Cancel context.CancelFunc
+	Errs   <-chan error
 
 	Log            zerolog.Logger
 	Metrics        *metrics.NoopCollector
@@ -131,8 +132,13 @@ type CollectionNode struct {
 	EpochManagerEngine *epochmgr.Engine
 }
 
-func (n CollectionNode) Ready() <-chan struct{} {
+func (n CollectionNode) Start(t *testing.T) {
+	go unittest.FailOnIrrecoverableError(t, n.Ctx.Done(), n.Errs)
 	n.IngestionEngine.Start(n.Ctx)
+	n.EpochManagerEngine.Start(n.Ctx)
+}
+
+func (n CollectionNode) Ready() <-chan struct{} {
 	return util.AllReady(
 		n.PusherEngine,
 		n.ProviderEngine,
