@@ -418,6 +418,7 @@ func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, e
 }
 
 func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := s.blocks.ByID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot retrieve block: %w", err)

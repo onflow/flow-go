@@ -205,6 +205,7 @@ func (b *backendTransactions) GetTransactionsByBlockID(
 ) ([]*flow.TransactionBody, error) {
 	var transactions []*flow.TransactionBody
 
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
 		return nil, convertStorageError(err)
@@ -301,6 +302,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
 ) ([]*access.TransactionResult, error) {
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
 		return nil, convertStorageError(err)
