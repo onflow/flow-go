@@ -83,9 +83,9 @@ func NewVoteAggregator(
 	wg.Add(defaultVoteAggregatorWorkers)
 	for i := 0; i < defaultVoteAggregatorWorkers; i++ { // manager for worker routines that process inbound messages
 		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			defer wg.Done()
 			ready()
 			aggregator.queuedMessagesProcessingLoop(ctx)
-			wg.Done()
 		})
 	}
 	componentBuilder.AddWorker(func(_ irrecoverable.SignalerContext, ready component.ReadyFunc) {
