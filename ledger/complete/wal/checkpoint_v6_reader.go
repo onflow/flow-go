@@ -106,6 +106,8 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 	actualSum := reader.Crc32()
 
 	// read the stored checksum, and compare with the actual sum
+	// the same Crc32 reader is being used for simplicity, but the updated checksum
+	// won't be used.
 	expectedSum, err := readCRC32Sum(reader)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not read checkpoint header checksum: %w", err)
