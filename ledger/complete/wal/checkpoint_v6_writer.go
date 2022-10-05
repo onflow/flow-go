@@ -20,7 +20,7 @@ const subtrieLevel = 4
 const subtrieCount = 1 << subtrieLevel
 
 func subtrieCountByLevel(level uint16) int {
-	return 1 << subtrieLevel
+	return 1 << level
 }
 
 type NodeEncoder func(node *trie.MTrie, index uint64, scratch []byte) []byte
