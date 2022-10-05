@@ -581,6 +581,22 @@ func (_m *Environment) GetCurrentBlockHeight() (uint64, error) {
 	return r0, r1
 }
 
+// GetInterpreter provides a mock function with given fields:
+func (_m *Environment) GetInterpreter() *interpreter.Interpreter {
+	ret := _m.Called()
+
+	var r0 *interpreter.Interpreter
+	if rf, ok := ret.Get(0).(func() *interpreter.Interpreter); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*interpreter.Interpreter)
+		}
+	}
+
+	return r0
+}
+
 // GetProgram provides a mock function with given fields: _a0
 func (_m *Environment) GetProgram(_a0 common.Location) (*interpreter.Program, error) {
 	ret := _m.Called(_a0)
@@ -974,6 +990,11 @@ func (_m *Environment) SetAccountFrozen(address common.Address, frozen bool) err
 	}
 
 	return r0
+}
+
+// SetInterpreter provides a mock function with given fields: _a0
+func (_m *Environment) SetInterpreter(_a0 *interpreter.Interpreter) {
+	_m.Called(_a0)
 }
 
 // SetProgram provides a mock function with given fields: _a0, _a1
