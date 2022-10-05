@@ -1243,8 +1243,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			// There are 100 breaks and each break uses 1_000_000 memory
 			require.Greater(t, tx.MemoryEstimate, uint64(100_000_000))
 
-			var memoryLimitExceededError errors.MemoryLimitExceededError
-			assert.ErrorAs(t, tx.Err, &memoryLimitExceededError)
+			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
 		},
 	))
 
@@ -1720,10 +1719,9 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				err = vm.RunV2(scriptCtx, script, view)
 				require.NoError(t, err)
 				require.Error(t, script.Err)
-				require.IsType(t, errors.CadenceRuntimeError{}, script.Err)
+				require.True(t, errors.IsCadenceRuntimeError(script.Err))
 				// modifications to contracts are not supported in scripts
-				unsupportedOperationError := errors.OperationNotSupportedError{}
-				require.ErrorAs(t, script.Err, &unsupportedOperationError)
+				require.True(t, errors.IsOperationNotSupportedError(script.Err))
 			},
 		),
 	)
@@ -1779,10 +1777,9 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				err = vm.RunV2(subCtx, script, view)
 				require.NoError(t, err)
 				require.Error(t, script.Err)
-				require.IsType(t, errors.CadenceRuntimeError{}, script.Err)
+				require.True(t, errors.IsCadenceRuntimeError(script.Err))
 				// modifications to contracts are not supported in scripts
-				unsupportedOperationError := errors.OperationNotSupportedError{}
-				require.ErrorAs(t, script.Err, &unsupportedOperationError)
+				require.True(t, errors.IsOperationNotSupportedError(script.Err))
 			},
 		),
 	)
@@ -1837,10 +1834,9 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				err = vm.RunV2(subCtx, script, view)
 				require.NoError(t, err)
 				require.Error(t, script.Err)
-				require.IsType(t, errors.CadenceRuntimeError{}, script.Err)
+				require.True(t, errors.IsCadenceRuntimeError(script.Err))
 				// modifications to contracts are not supported in scripts
-				unsupportedOperationError := errors.OperationNotSupportedError{}
-				require.ErrorAs(t, script.Err, &unsupportedOperationError)
+				require.True(t, errors.IsOperationNotSupportedError(script.Err))
 			},
 		),
 	)
@@ -1885,10 +1881,9 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				err = vm.RunV2(scriptCtx, script, view)
 				require.NoError(t, err)
 				require.Error(t, script.Err)
-				require.IsType(t, errors.CadenceRuntimeError{}, script.Err)
+				require.True(t, errors.IsCadenceRuntimeError(script.Err))
 				// modifications to public keys are not supported in scripts
-				unsupportedOperationError := errors.OperationNotSupportedError{}
-				require.ErrorAs(t, script.Err, &unsupportedOperationError)
+				require.True(t, errors.IsOperationNotSupportedError(script.Err))
 			},
 		),
 	)
@@ -1921,10 +1916,9 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				err = vm.RunV2(scriptCtx, script, view)
 				require.NoError(t, err)
 				require.Error(t, script.Err)
-				require.IsType(t, errors.CadenceRuntimeError{}, script.Err)
+				require.True(t, errors.IsCadenceRuntimeError(script.Err))
 				// modifications to public keys are not supported in scripts
-				unsupportedOperationError := errors.OperationNotSupportedError{}
-				require.ErrorAs(t, script.Err, &unsupportedOperationError)
+				require.True(t, errors.IsOperationNotSupportedError(script.Err))
 			},
 		),
 	)

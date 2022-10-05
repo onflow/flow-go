@@ -83,18 +83,16 @@ func NewEventEmitter(
 	tracer *Tracer,
 	meter Meter,
 	chain flow.Chain,
-	txID flow.Identifier,
-	txIndex uint32,
-	payer flow.Address,
+	txInfo TransactionInfoParams,
 	params EventEmitterParams,
 ) EventEmitter {
 	emitter := &eventEmitter{
 		tracer:             tracer,
 		meter:              meter,
 		chain:              chain,
-		txID:               txID,
-		txIndex:            txIndex,
-		payer:              payer,
+		txID:               txInfo.TxId,
+		txIndex:            txInfo.TxIndex,
+		payer:              txInfo.TxBody.Payer,
 		EventEmitterParams: params,
 	}
 
@@ -124,8 +122,8 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	payload, err := jsoncdc.Encode(event)
 	if err != nil {
 		return errors.NewEncodingFailuref(
-			"failed to json encode a cadence event: %w",
-			err)
+			err,
+			"failed to json encode a cadence event")
 	}
 
 	payloadSize := uint64(len(payload))

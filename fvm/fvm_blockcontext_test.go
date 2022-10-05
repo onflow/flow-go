@@ -415,7 +415,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.Error(t, tx.Err)
 
 		assert.Contains(t, tx.Err.Error(), "deploying contracts requires authorization from specific accounts")
-		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
+		assert.True(t, errors.IsCadenceRuntimeError(tx.Err))
 	})
 
 	t.Run("account update with set code fails if not signed by service account if dis-allowed in the state", func(t *testing.T) {
@@ -453,7 +453,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.Error(t, tx.Err)
 
 		assert.Contains(t, tx.Err.Error(), "deploying contracts requires authorization from specific accounts")
-		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
+		assert.True(t, errors.IsCadenceRuntimeError(tx.Err))
 	})
 
 	t.Run("account update with set succeeds if not signed by service account if allowed in the state", func(t *testing.T) {
@@ -568,7 +568,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.Error(t, tx.Err)
 
 		assert.Contains(t, tx.Err.Error(), "removing contracts requires authorization from specific accounts")
-		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
+		assert.True(t, errors.IsCadenceRuntimeError(tx.Err))
 	})
 
 	t.Run("account update with code removal succeeds if signed by service account", func(t *testing.T) {
@@ -675,7 +675,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 		assert.Error(t, tx.Err)
 		assert.Contains(t, tx.Err.Error(), "deploying contracts requires authorization from specific accounts")
-		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
+		assert.True(t, errors.IsCadenceRuntimeError(tx.Err))
 
 		// Generate an audit voucher
 		authTxBody, err := AuditContractForDeploymentTransaction(
@@ -939,7 +939,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
-				assert.Equal(t, (&errors.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+				assert.True(t, errors.IsStorageCapacityExceededError(tx.Err))
 			}))
 	t.Run("Increasing storage capacity works", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
@@ -1053,7 +1053,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
-				assert.Equal(t, (&errors.LedgerInteractionLimitExceededError{}).Code(), tx.Err.Code())
+				assert.True(t, errors.IsLedgerInteractionLimitExceededError(tx.Err))
 			}))
 
 	t.Run("Using to much interaction but not failing because of service account", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
@@ -1129,7 +1129,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				require.NoError(t, err)
 				require.Error(t, tx.Err)
 
-				assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
+				assert.True(t, errors.IsCadenceRuntimeError(tx.Err))
 			}))
 }
 
@@ -1681,7 +1681,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
-			require.Equal(t, (&errors.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+			require.True(t, errors.IsStorageCapacityExceededError(tx.Err))
 
 			balanceAfter := getBalance(vm, chain, ctx, view, accounts[0])
 
@@ -1729,7 +1729,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = vm.RunV2(ctx, tx, view)
 			require.NoError(t, err)
 
-			require.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
+			require.True(t, errors.IsCadenceRuntimeError(tx.Err))
 
 			balanceAfter := getBalance(vm, chain, ctx, view, accounts[0])
 
@@ -1769,8 +1769,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
-				require.Equal(t, (errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
-				require.Equal(t, uint64(0), tx.Err.(errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
+				castedErr, ok := tx.Err.(errors.InvalidProposalSeqNumberError)
+				require.True(t, ok)
+				require.Equal(t, uint64(0), castedErr.CurrentSeqNumber())
 			}),
 	)
 
@@ -1807,7 +1808,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
-				require.IsType(t, errors.CadenceRuntimeError{}, tx.Err)
+				require.True(t, errors.IsCadenceRuntimeError(tx.Err))
 
 				// send it again
 				tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
@@ -1815,8 +1816,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
-				require.Equal(t, (errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
-				require.Equal(t, uint64(1), tx.Err.(errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
+				castedErr, ok := tx.Err.(errors.InvalidProposalSeqNumberError)
+				require.True(t, ok)
+				require.Equal(t, uint64(1), castedErr.CurrentSeqNumber())
 			}),
 	)
 }

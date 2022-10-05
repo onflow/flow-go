@@ -769,8 +769,8 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return ledger.Get(owner, key)
 	})
-	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	accounts := environment.NewAccounts(stTxn)
+	txnState := state.NewTransactionState(view, state.DefaultParameters())
+	accounts := environment.NewAccounts(txnState)
 
 	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
 	// as freeze check should happen before a transaction signature is checked
