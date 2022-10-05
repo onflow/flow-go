@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
@@ -27,8 +27,8 @@ func TestGetNodesAtLevel(t *testing.T) {
 	})
 
 	t.Run("leaf node", func(t *testing.T) {
-		path := utils.PathByUint8(1)
-		payload := utils.LightPayload8('A', 'a')
+		path := testutils.PathByUint8(1)
+		payload := testutils.LightPayload8('A', 'a')
 		hashValue := hash.Hash([32]byte{1, 1, 1})
 		leafNode := node.NewNode(255, nil, nil, path, payload, hashValue)
 
@@ -48,12 +48,12 @@ func TestGetNodesAtLevel(t *testing.T) {
 		emptyTrie := trie.NewEmptyMTrie()
 
 		// key: 0000...
-		p1 := utils.PathByUint8(0)
-		v1 := utils.LightPayload8('A', 'a')
+		p1 := testutils.PathByUint8(0)
+		v1 := testutils.LightPayload8('A', 'a')
 
 		// key: 0100....
-		p2 := utils.PathByUint8(64)
-		v2 := utils.LightPayload8('B', 'b')
+		p2 := testutils.PathByUint8(64)
+		v2 := testutils.LightPayload8('B', 'b')
 
 		paths := []ledger.Path{p1, p2}
 		payloads := []ledger.Payload{*v1, *v2}
@@ -93,12 +93,12 @@ func TestGetNodesAtLevel(t *testing.T) {
 		emptyTrie := trie.NewEmptyMTrie()
 
 		// key: 1000...
-		p3 := utils.PathByUint8(128)
-		v3 := utils.LightPayload8('C', 'c')
+		p3 := testutils.PathByUint8(128)
+		v3 := testutils.LightPayload8('C', 'c')
 
 		// key: 1100....
-		p4 := utils.PathByUint8(192)
-		v4 := utils.LightPayload8('D', 'd')
+		p4 := testutils.PathByUint8(192)
+		v4 := testutils.LightPayload8('D', 'd')
 
 		paths := []ledger.Path{p3, p4}
 		payloads := []ledger.Payload{*v3, *v4}
@@ -139,20 +139,20 @@ func TestGetNodesAtLevel(t *testing.T) {
 		emptyTrie := trie.NewEmptyMTrie()
 
 		// key: 0000...
-		p1 := utils.PathByUint8(0)
-		v1 := utils.LightPayload8('A', 'a')
+		p1 := testutils.PathByUint8(0)
+		v1 := testutils.LightPayload8('A', 'a')
 
 		// key: 0100....
-		p2 := utils.PathByUint8(64)
-		v2 := utils.LightPayload8('B', 'b')
+		p2 := testutils.PathByUint8(64)
+		v2 := testutils.LightPayload8('B', 'b')
 
 		// key: 1000...
-		p3 := utils.PathByUint8(128)
-		v3 := utils.LightPayload8('C', 'c')
+		p3 := testutils.PathByUint8(128)
+		v3 := testutils.LightPayload8('C', 'c')
 
 		// key: 1100....
-		p4 := utils.PathByUint8(192)
-		v4 := utils.LightPayload8('D', 'd')
+		p4 := testutils.PathByUint8(192)
+		v4 := testutils.LightPayload8('D', 'd')
 
 		paths := []ledger.Path{p1, p2, p3, p4}
 		payloads := []ledger.Payload{*v1, *v2, *v3, *v4}
@@ -194,20 +194,20 @@ func TestGetNodesAtLevel(t *testing.T) {
 		emptyTrie := trie.NewEmptyMTrie()
 
 		// key: 0000 0000
-		p1 := utils.PathByUint8(0)
-		v1 := utils.LightPayload8('A', 'a')
+		p1 := testutils.PathByUint8(0)
+		v1 := testutils.LightPayload8('A', 'a')
 
 		// key: 0000 0001
-		p2 := utils.PathByUint8(1)
-		v2 := utils.LightPayload8('B', 'b')
+		p2 := testutils.PathByUint8(1)
+		v2 := testutils.LightPayload8('B', 'b')
 
 		// key: 1111 1110
-		p3 := utils.PathByUint8(254)
-		v3 := utils.LightPayload8('C', 'c')
+		p3 := testutils.PathByUint8(254)
+		v3 := testutils.LightPayload8('C', 'c')
 
 		// key: 1111 1111
-		p4 := utils.PathByUint8(255)
-		v4 := utils.LightPayload8('D', 'd')
+		p4 := testutils.PathByUint8(255)
+		v4 := testutils.LightPayload8('D', 'd')
 
 		paths := []ledger.Path{p1, p2, p3, p4}
 		payloads := []ledger.Payload{*v1, *v2, *v3, *v4}
