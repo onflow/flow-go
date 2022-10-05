@@ -253,7 +253,6 @@ func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
 
 // AddVote checks if vote is stale and appends vote into processing queue
 // actual vote processing will be called in other dispatching goroutine.
-// No errors are expected during normal operation.
 func (va *VoteAggregator) AddVote(vote *model.Vote) {
 	// drop stale votes
 	if vote.View < va.lowestRetainedView.Value() {
