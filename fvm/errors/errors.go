@@ -11,37 +11,12 @@ import (
 // TODO(patrick): remove after emulator is updated.
 type Error = CodedError
 
-// TODO(patrick): combine CodedError and Failure interface.
-// We can also combine codedError and CodedFailure once the interface is
-// unified.
 type CodedError interface {
-	// TODO(patrick): add IsFailure() bool
-
 	Code() ErrorCode
 
 	Unwrap() error
 
 	error
-}
-
-// Failure captures fatal unexpected virtual machine errors,
-// we capture this type of error instead of panicking
-// to collect all necessary data before crashing
-// if any of these errors occurs we should halt the
-// execution.
-type Failure interface {
-	CodedError
-
-	// FailureCode returns the failure code for this error
-	FailureCode() ErrorCode
-}
-
-type errorWrapper struct {
-	err error
-}
-
-func (e errorWrapper) Unwrap() error {
-	return e.err
 }
 
 // Is is a utility function to call std error lib `Is` function for instance equality checks.
@@ -57,23 +32,63 @@ func As(err error, target interface{}) bool {
 	return stdErrors.As(err, target)
 }
 
+// findImportantCodedError recursively unwraps the error to search for important
+// coded error:
+//  1. If err is nil, this returns (nil, false),
+//  2. If err has no error code, this returns (nil, true),
+//  3. If err has a failure error code, this returns
+//     (<the shallowest failure coded error>, false),
+//  4. If err has a non-failure error code, this returns
+//     (<the shallowest non-failure coded error>, false)
+//
+// TODO(patrick): for case 4, return the deepest (aka root cause) error code
+// instead.
+func findImportantCodedError(err error) (CodedError, bool) {
+	if err == nil {
+		return nil, false
+	}
+
+	var coded CodedError
+	if !As(err, &coded) {
+		return nil, true
+	}
+
+	if coded.Code().IsFailure() {
+		return coded, false
+	}
+
+	shallowest := coded
+	for {
+		if !As(coded.Unwrap(), &coded) {
+			return shallowest, false
+		}
+
+		if coded.Code().IsFailure() {
+			return coded, false
+		}
+	}
+}
+
 // SplitErrorTypes splits the error into fatal (failures) and non-fatal errors
-func SplitErrorTypes(inp error) (err Error, failure Failure) {
-	// failures should get the priority
-	// this method will check all the levels for these failures
-	if As(inp, &failure) {
-		return nil, failure
+func SplitErrorTypes(inp error) (err CodedError, failure CodedError) {
+	if inp == nil {
+		return nil, nil
 	}
-	// then we should try to match known non-fatal errors
-	if As(inp, &err) {
-		return err, nil
-	}
-	// anything else that is left is an unknown failure
-	// (except the ones green listed for now to be considered as txErrors)
-	if inp != nil {
+
+	coded, isUnknown := findImportantCodedError(inp)
+	if isUnknown {
 		return nil, NewUnknownFailure(inp)
 	}
-	return nil, nil
+
+	// TODO(patrick): Right now, we're dropping a bunch of error details since
+	// we're returning coded instead of inp.  Wrap inp with coded.Code() and
+	// return that instead.
+
+	if coded.Code().IsFailure() {
+		return nil, coded
+	}
+
+	return coded, nil
 }
 
 // HandleRuntimeError handles runtime errors and separates
@@ -134,7 +149,7 @@ func Find(err error, code ErrorCode) CodedError {
 type codedError struct {
 	code ErrorCode
 
-	errorWrapper
+	err error
 }
 
 func newError(
@@ -142,8 +157,8 @@ func newError(
 	rootCause error,
 ) codedError {
 	return codedError{
-		code:         code,
-		errorWrapper: errorWrapper{rootCause},
+		code: code,
+		err:  rootCause,
 	}
 }
 
@@ -168,29 +183,14 @@ func NewCodedError(
 	return newError(code, fmt.Errorf(format, formatArguments...))
 }
 
+func (err codedError) Unwrap() error {
+	return err.err
+}
+
 func (err codedError) Error() string {
 	return fmt.Sprintf("%v %v", err.code, err.err)
 }
 
 func (err codedError) Code() ErrorCode {
-	return err.code
-}
-
-type CodedFailure struct {
-	codedError
-}
-
-func WrapCodedFailure(
-	code ErrorCode,
-	err error,
-	prefixMsgFormat string,
-	formatArgs ...interface{},
-) *CodedFailure {
-	return &CodedFailure{
-		codedError: WrapCodedError(code, err, prefixMsgFormat, formatArgs...),
-	}
-}
-
-func (err CodedFailure) FailureCode() ErrorCode {
 	return err.code
 }
