@@ -89,7 +89,7 @@ type NodeBuilder interface {
 	// IMPORTANT: Dependable components are started in parallel with no guaranteed run order, so all
 	// dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
 	// MUST be idempotent.
-	DependableComponent(name string, f ReadyDoneFactory, dependencies []module.ReadyDoneAware) NodeBuilder
+	DependableComponent(name string, f ReadyDoneFactory, dependencies *DependencyList) NodeBuilder
 
 	// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
 	// interface, and calls the provided error handler when an irrecoverable error is encountered.
@@ -213,7 +213,7 @@ type NodeConfig struct {
 	NetworkKey        crypto.PrivateKey
 
 	// list of dependencies for network peer manager startup
-	PeerManagerDependencies []module.ReadyDoneAware
+	PeerManagerDependencies *DependencyList
 	// ReadyDoneAware implementation of the network middleware for DependableComponents
 	middlewareDependable *module.ProxiedReadyDoneAware
 
@@ -281,4 +281,15 @@ func DefaultBaseConfig() *BaseConfig {
 		CodecFactory:           codecFactory,
 		ComplianceConfig:       compliance.DefaultConfig(),
 	}
+}
+
+// DependencyList is a slice of ReadyDoneAware implementations that are used by DependableComponent
+// to define the list of depenencies that must be ready before starting the component.
+type DependencyList struct {
+	components []module.ReadyDoneAware
+}
+
+// Add adds a new ReadyDoneAware implementation to the list of dependencies.
+func (d *DependencyList) Add(component module.ReadyDoneAware) {
+	d.components = append(d.components, component)
 }

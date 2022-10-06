@@ -618,13 +618,13 @@ func testDependableComponentWaitForDependencies(t *testing.T) {
 		c := newMockComponent(logger, name1)
 		component1Dependable.Init(c)
 		return c, nil
-	}, []module.ReadyDoneAware{component3Dependable})
+	}, &DependencyList{[]module.ReadyDoneAware{component3Dependable}})
 
 	name2 := "component 2"
 	nb.DependableComponent(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name2)
 		return newMockComponent(logger, name2), nil
-	}, []module.ReadyDoneAware{component1Dependable})
+	}, &DependencyList{[]module.ReadyDoneAware{component1Dependable}})
 
 	name3 := "component 3"
 	nb.Component(name3, func(node *NodeConfig) (module.ReadyDoneAware, error) {

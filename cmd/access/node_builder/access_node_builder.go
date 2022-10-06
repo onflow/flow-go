@@ -439,7 +439,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		}).
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
 			bsDependable = module.NewProxiedReadyDoneAware()
-			builder.PeerManagerDependencies = append(builder.PeerManagerDependencies, bsDependable)
+			builder.PeerManagerDependencies.Add(bsDependable)
 			return nil
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -987,7 +987,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 			node.Logger.Info().Msgf("network will run on address: %s", builder.PublicNetworkConfig.BindAddress)
 			return net, nil
 		}).
-		Component("peer manager", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("public peer manager", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			return libp2pNode.PeerManagerComponent(), nil
 		})
 }

@@ -539,7 +539,7 @@ func (exeNode *ExecutionNode) LoadExecutionDataDatastore(
 
 func (exeNode *ExecutionNode) LoadBlobservicePeerManagerDependencies(node *NodeConfig) error {
 	exeNode.blobserviceDependable = module.NewProxiedReadyDoneAware()
-	exeNode.builder.PeerManagerDependencies = append(exeNode.builder.PeerManagerDependencies, exeNode.blobserviceDependable)
+	exeNode.builder.PeerManagerDependencies.Add(exeNode.blobserviceDependable)
 	return nil
 }
 

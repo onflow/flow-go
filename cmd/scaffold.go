@@ -97,7 +97,7 @@ type namedComponentFunc struct {
 	name string
 
 	errorHandler component.OnError
-	dependencies []module.ReadyDoneAware
+	dependencies *DependencyList
 }
 
 // FlowNodeBuilder is the default builder struct used for all flow nodes
@@ -298,7 +298,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 	fnb.Module("middleware dependency", func(node *NodeConfig) error {
 		fnb.middlewareDependable = module.NewProxiedReadyDoneAware()
-		fnb.PeerManagerDependencies = append(fnb.PeerManagerDependencies, fnb.middlewareDependable)
+		fnb.PeerManagerDependencies.Add(fnb.middlewareDependable)
 		return nil
 	})
 
@@ -990,7 +990,7 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	// Run all components
 	for _, f := range fnb.components {
 		// Components with explicit dependencies are not started serially
-		if len(f.dependencies) > 0 {
+		if f.dependencies != nil && len(f.dependencies.components) > 0 {
 			asyncComponents = append(asyncComponents, f)
 			continue
 		}
@@ -1013,7 +1013,8 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	// Components with explicit dependencies are run asynchronously, which means dependencies in
 	// the dependency list must be initialized outside of the component factory.
 	for _, f := range asyncComponents {
-		err = fnb.handleComponent(f, util.AllReady(f.dependencies...), func() {})
+		fnb.Logger.Debug().Str("component", f.name).Int("dependencies", len(f.dependencies.components)).Msg("handling component asynchronously")
+		err = fnb.handleComponent(f, util.AllReady(f.dependencies.components...), func() {})
 		if err != nil {
 			return fmt.Errorf("could not handle dependable component %s: %w", f.name, err)
 		}
@@ -1211,7 +1212,7 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuild
 // IMPORTANT: Dependable components are started in parallel with no guaranteed run order, so all
 // dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
 // MUST be idempotent.
-func (fnb *FlowNodeBuilder) DependableComponent(name string, f ReadyDoneFactory, dependencies []module.ReadyDoneAware) NodeBuilder {
+func (fnb *FlowNodeBuilder) DependableComponent(name string, f ReadyDoneFactory, dependencies *DependencyList) NodeBuilder {
 	fnb.components = append(fnb.components, namedComponentFunc{
 		fn:           f,
 		name:         name,
@@ -1360,8 +1361,9 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 
 	builder := &FlowNodeBuilder{
 		NodeConfig: &NodeConfig{
-			BaseConfig: *config,
-			Logger:     zerolog.New(os.Stderr),
+			BaseConfig:              *config,
+			Logger:                  zerolog.New(os.Stderr),
+			PeerManagerDependencies: &DependencyList{},
 		},
 		flags:                    pflag.CommandLine,
 		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
