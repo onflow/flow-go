@@ -75,7 +75,7 @@ func TestEncodeSubTrie(t *testing.T) {
 	file := "checkpoint"
 	logger := unittest.Logger()
 	tries := createSimpleTrie(t)
-	estimatedSubtrieNodeCount := estimateSubtrieNodeCount(tries)
+	estimatedSubtrieNodeCount := estimateSubtrieNodeCount(tries[0])
 	subtrieRoots := createSubTrieRoots(tries)
 
 	for index, roots := range subtrieRoots {

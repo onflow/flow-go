@@ -171,8 +171,9 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 		return nil, fmt.Errorf("expect subtrieChecksums to be %v, but got %v", 16, len(subtrieChecksums))
 	}
 
-	resultChs := make([]chan *resultReadSubTrie, 0, len(subtrieChecksums))
-	for i := 0; i < 16; i++ {
+	numOfSubTries := len(subtrieChecksums)
+	resultChs := make([]chan *resultReadSubTrie, 0, numOfSubTries)
+	for i := 0; i < numOfSubTries; i++ {
 		resultCh := make(chan *resultReadSubTrie)
 		go func(i int) {
 			nodes, err := readCheckpointSubTrie(dir, fileName, i, subtrieChecksums[i])
@@ -215,6 +216,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func(f *os.File) {
+		//TODO: we should evict file from Linux page cache here, so it doesn't keep 170+GB in RAM when that can be used instead for caching more frequently read data.
 		f.Close()
 	}(f)
 
@@ -248,6 +250,8 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 
 	// TODO: validate checksum again
 
+	// TODO: simplify getNodeByIndex() logic if we reslice nodes here to remove the nil node at index 0.
+	// return nodes[1:], nil
 	return nodes, nil
 }
 
