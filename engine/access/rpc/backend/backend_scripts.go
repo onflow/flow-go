@@ -2,7 +2,7 @@ package backend
 
 import (
 	"context"
-	"crypto/md5" //
+	"crypto/md5" //nolint:gosec
 	"time"
 
 	"github.com/hashicorp/go-multierror"
