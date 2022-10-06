@@ -13,7 +13,6 @@ import (
 
 	badger "github.com/ipfs/go-ds-badger2"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -176,7 +175,7 @@ type ObserverServiceBuilder struct {
 	ExecutionDataRequester  state_synchronization.ExecutionDataRequester // for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
-	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
+	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
 	FollowerEng *followereng.Engine
@@ -637,7 +636,7 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 	return net, nil
 }
 
-func publicNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
+func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
 	return []network.MessageValidator{
 		// filter out messages sent by this node itself
 		validator.ValidateNotSender(selfID),
@@ -724,7 +723,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
 		// use the default identifier provider
-		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
+		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
 				var result flow.IdentifierList
 
@@ -737,7 +736,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 					}
 
 					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
-						builder.Logger.Err(err).Str("peer", pid.Pretty()).Msg("failed to translate to Flow ID")
+						builder.Logger.Err(err).Str("peer", pid.String()).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)
 					}
@@ -848,7 +847,6 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 					dht.BootstrapPeers(pis...),
 				)
 			}).
-			SetPubSub(p2ppubsub.NewGossipSub).
 			Build()
 
 		if err != nil {

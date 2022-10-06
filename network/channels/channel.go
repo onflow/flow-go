@@ -1,6 +1,7 @@
 package channels
 
 import (
+	"regexp"
 	"sort"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -42,7 +43,7 @@ func (cl ChannelList) ID() flow.Identifier {
 	return flow.MakeID(cl)
 }
 
-// Contains retuns true if the ChannelList contains the given channel.
+// Contains returns true if the ChannelList contains the given channel.
 func (cl ChannelList) Contains(channel Channel) bool {
 	for _, c := range cl {
 		if c == channel {
@@ -50,4 +51,35 @@ func (cl ChannelList) Contains(channel Channel) bool {
 		}
 	}
 	return false
+}
+
+// ExcludeChannels returns list of channels that are in the ChannelList but not in the other list.
+func (cl ChannelList) ExcludeChannels(other ChannelList) ChannelList {
+	var result ChannelList
+	for _, c := range cl {
+		if !other.Contains(c) {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+// ExcludePattern returns a new ChannelList excluding the Channels that satisfy the given predicate.
+func (cl ChannelList) ExcludePattern(regexp *regexp.Regexp) ChannelList {
+	var result ChannelList
+	for _, c := range cl {
+		if regexp.MatchString(c.String()) {
+			continue
+		}
+		result = append(result, c)
+	}
+	return result
+}
+
+func (cl ChannelList) String() []string {
+	var result []string
+	for _, c := range cl {
+		result = append(result, c.String())
+	}
+	return result
 }

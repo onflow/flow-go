@@ -11,6 +11,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
@@ -23,14 +24,18 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/test"
+	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -62,6 +67,7 @@ func NodeFixture(
 		Key:         NetworkingKeyFixtures(t),
 		Address:     defaultAddress,
 		Logger:      unittest.Logger().Level(zerolog.ErrorLevel),
+		Role:        flow.RoleCollection,
 	}
 
 	for _, opt := range opts {
@@ -73,17 +79,18 @@ func NodeFixture(
 		unittest.WithAddress(parameters.Address),
 		unittest.WithRole(parameters.Role))
 
+	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
+
 	noopMetrics := metrics.NewNoopCollector()
-	connManager := connection.NewConnManager(parameters.Logger, noopMetrics)
+	connManager := connection.NewConnManager(logger, noopMetrics)
 	resourceManager := test.NewResourceManager(t)
 
-	builder := p2pbuilder.NewNodeBuilder(parameters.Logger, parameters.Address, parameters.Key, sporkID).
+	builder := p2pbuilder.NewNodeBuilder(logger, parameters.Address, parameters.Key, sporkID).
 		SetConnectionManager(connManager).
-		SetPubSub(pubsub.NewGossipSub).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h,
 				protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
-				parameters.Logger,
+				logger,
 				noopMetrics,
 				parameters.DhtOptions...,
 			)
@@ -94,10 +101,14 @@ func NodeFixture(
 		filters := []p2p.PeerFilter{parameters.PeerFilter}
 		// set parameters.peerFilter as the default peerFilter for both callbacks
 		connGater := connection.NewConnGater(
-			parameters.Logger,
+			logger,
 			connection.WithOnInterceptPeerDialFilters(filters),
 			connection.WithOnInterceptSecuredFilters(filters))
 		builder.SetConnectionGater(connGater)
+	}
+
+	if parameters.PeerScoringEnabled {
+		builder.EnableGossipSubPeerScoring(parameters.IdProvider)
 	}
 
 	n, err := builder.Build()
@@ -114,17 +125,26 @@ func NodeFixture(
 }
 
 type NodeFixtureParameters struct {
-	HandlerFunc network.StreamHandler
-	Unicasts    []unicast.ProtocolName
-	Key         crypto.PrivateKey
-	Address     string
-	DhtOptions  []dht.Option
-	PeerFilter  p2p.PeerFilter
-	Role        flow.Role
-	Logger      zerolog.Logger
+	HandlerFunc        network.StreamHandler
+	Unicasts           []unicast.ProtocolName
+	Key                crypto.PrivateKey
+	Address            string
+	DhtOptions         []dht.Option
+	PeerFilter         p2p.PeerFilter
+	Role               flow.Role
+	Logger             zerolog.Logger
+	PeerScoringEnabled bool
+	IdProvider         module.IdentityProvider
 }
 
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
+
+func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.PeerScoringEnabled = true
+		p.IdProvider = idProvider
+	}
+}
 
 func WithDefaultStreamHandler(handler network.StreamHandler) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
@@ -279,7 +299,6 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
-		SetPubSub(pubsub.NewGossipSub).
 		SetResourceManager(test.NewResourceManager(t))
 
 	for _, opt := range opts {
@@ -290,4 +309,113 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 	require.NoError(t, err)
 
 	return libp2pNode
+}
+
+// PeerIdFixture creates a random and unique peer ID (libp2p node ID).
+func PeerIdFixture(t *testing.T) peer.ID {
+	key, err := generateNetworkingKey(unittest.IdentifierFixture())
+	require.NoError(t, err)
+
+	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(key.PublicKey())
+	require.NoError(t, err)
+
+	peerID, err := peer.IDFromPublicKey(pubKey)
+	require.NoError(t, err)
+
+	return peerID
+}
+
+// generateNetworkingKey generates a Flow ECDSA key using the given seed
+func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
+	copy(seed, s[:])
+	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
+}
+
+// PeerIdsFixture creates random and unique peer IDs (libp2p node IDs).
+func PeerIdsFixture(t *testing.T, n int) []peer.ID {
+	peerIDs := make([]peer.ID, n)
+	for i := 0; i < n; i++ {
+		peerIDs[i] = PeerIdFixture(t)
+	}
+	return peerIDs
+}
+
+// MustEncodeEvent encodes and returns the given event and fails the test if it faces any issue while encoding.
+func MustEncodeEvent(t *testing.T, v interface{}) []byte {
+	bz, err := unittest.NetworkCodec().Encode(v)
+	require.NoError(t, err)
+
+	msg := message.Message{
+		Payload: bz,
+	}
+	data, err := msg.Marshal()
+	require.NoError(t, err)
+
+	return data
+}
+
+// SubMustReceiveMessage checks that the subscription have received the given message within the given timeout by the context.
+func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, sub *pubsub.Subscription) {
+	received := make(chan struct{})
+	go func() {
+		msg, err := sub.Next(ctx)
+		require.NoError(t, err)
+		require.Equal(t, expectedMessage, msg.Data)
+		close(received)
+	}()
+
+	select {
+	case <-received:
+		return
+	case <-ctx.Done():
+		require.Fail(t, "timeout on receiving expected pubsub message")
+	}
+}
+
+// SubsMustReceiveMessage checks that all subscriptions receive the given message within the given timeout by the context.
+func SubsMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, subs []*pubsub.Subscription) {
+	for _, sub := range subs {
+		SubMustReceiveMessage(t, ctx, expectedMessage, sub)
+	}
+}
+
+// SubMustNeverReceiveAnyMessage checks that the subscription never receives any message within the given timeout by the context.
+func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub *pubsub.Subscription) {
+	timeouted := make(chan struct{})
+	go func() {
+		_, err := sub.Next(ctx)
+		require.Error(t, err)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		close(timeouted)
+	}()
+
+	// wait for the timeout, we choose the timeout to be long enough to make sure that
+	// on a happy path the timeout never happens, and short enough to make sure that
+	// the test doesn't take too long in case of a failure.
+	unittest.RequireCloseBefore(t, timeouted, 10*time.Second, "timeout did not happen on receiving expected pubsub message")
+}
+
+// SubsMustNeverReceiveAnyMessage checks that all subscriptions never receive any message within the given timeout by the context.
+func SubsMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, subs []*pubsub.Subscription) {
+	for _, sub := range subs {
+		SubMustNeverReceiveAnyMessage(t, ctx, sub)
+	}
+}
+
+// LetNodesDiscoverEachOther connects all nodes to each other on the pubsub mesh.
+func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, ids flow.IdentityList) {
+	for _, node := range nodes {
+		for i, other := range nodes {
+			if node == other {
+				continue
+			}
+			otherPInfo, err := utils.PeerAddressInfo(*ids[i])
+			require.NoError(t, err)
+			require.NoError(t, node.AddPeer(ctx, otherPInfo))
+		}
+	}
+
+	// wait for all nodes to discover each other
+	time.Sleep(time.Second)
 }

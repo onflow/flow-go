@@ -77,20 +77,8 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 	}
 }
 
-// DEPRECATED.  DO NOT USE.
-//
-// TODO(patrick): remove after emulator is updated
-//
 // Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, _ *programs.Programs) (err error) {
-	return vm.RunV2(ctx, proc, v)
-}
-
-// TODO(patrick): rename back to Run after emulator is fully updated (this
-// takes at least 3 sporks ...).
-//
-// Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) RunV2(
+func (vm *VirtualMachine) Run(
 	ctx Context,
 	proc Procedure,
 	v state.View,
@@ -171,18 +159,8 @@ func (vm *VirtualMachine) RunV2(
 	return proc.Run(ctx, txnState, txnPrograms)
 }
 
-// DEPRECATED. DO NOT USE
-//
-// TODO(patrick): remove after emulator is updated
-func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
-	return vm.GetAccountV2(ctx, address, v)
-}
-
-// TODO(patrick): rename back to GetAccount after emulator is fully updated
-// (this takes at least 3 sporks ...).
-//
-// GetAccountV2 returns an account by address or an error if none exists.
-func (vm *VirtualMachine) GetAccountV2(
+// GetAccount returns an account by address or an error if none exists.
+func (vm *VirtualMachine) GetAccount(
 	ctx Context,
 	address flow.Address,
 	v state.View,

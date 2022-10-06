@@ -12,7 +12,6 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	p2pNetwork "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -94,7 +93,7 @@ func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 	return res
 }
 
-func NewTagWatchingConnManager(log zerolog.Logger, idProvider id.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
+func NewTagWatchingConnManager(log zerolog.Logger, idProvider module.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
 	cm := connection.NewConnManager(log, metrics)
 	return &TagWatchingConnManager{
 		ConnManager: cm,
@@ -139,7 +138,7 @@ func GenerateIDs(
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
 		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
 
-		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, o.connectionGating, idProvider, opts...)
+		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, idProvider, opts...)
 
 		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
@@ -248,7 +247,6 @@ type optsConfig struct {
 	dhtPrefix          string
 	dhtOpts            []dht.Option
 	peerUpdateInterval time.Duration
-	connectionGating   bool
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
@@ -344,10 +342,8 @@ func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration
 func generateLibP2PNode(
 	t *testing.T,
 	logger zerolog.Logger,
-	id flow.Identity,
 	key crypto.PrivateKey,
-	connGating bool,
-	idProvider id.IdentityProvider,
+	idProvider module.IdentityProvider,
 	opts ...nodeBuilderOption,
 ) (*p2pnode.Node, observable.Observable) {
 
@@ -358,7 +354,6 @@ func generateLibP2PNode(
 
 	builder := p2pbuilder.NewNodeBuilder(logger, "0.0.0.0:0", key, sporkID).
 		SetConnectionManager(connManager).
-		SetPubSub(pubsub.NewGossipSub).
 		SetResourceManager(NewResourceManager(t))
 
 	for _, opt := range opts {

@@ -58,10 +58,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx := fvm.NewContext()
 
 		vm := new(computermock.VirtualMachine)
-		vm.On("RunV2", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Run(func(args mock.Arguments) {
-				//ctx := args[0].(fvm.Context)
+				// ctx := args[0].(fvm.Context)
 				tx := args[1].(*fvm.TransactionProcedure)
 
 				tx.Events = generateEvents(1, tx.TxIndex)
@@ -144,7 +144,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(0, 0, rag)
 		programs := programs.NewEmptyBlockPrograms()
 
-		vm.On("RunV2", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Once() // just system chunk
 
@@ -204,7 +204,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		}
 		bootstrapOpts := append(baseBootstrapOpts, bootstrapOptions...)
-		err := vm.RunV2(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
+		err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
 		require.NoError(t, err)
 
 		comm := new(computermock.ViewCommitter)
@@ -269,14 +269,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		transactionsPerCollection := 2
 		eventsPerTransaction := 2
 		eventsPerCollection := eventsPerTransaction * transactionsPerCollection
-		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
-		//totalEventCount := eventsPerTransaction * totalTransactionCount
+		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 // +1 for system chunk
+		// totalEventCount := eventsPerTransaction * totalTransactionCount
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 		programs := programs.NewEmptyBlockPrograms()
 
-		vm.On("RunV2", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) {
 				tx := args[1].(*fvm.TransactionProcedure)
 
@@ -335,7 +335,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				expectedResults = append(expectedResults, txResult)
 			}
 		}
-		assert.ElementsMatch(t, expectedResults, result.TransactionResults[0:len(result.TransactionResults)-1]) //strip system chunk
+		assert.ElementsMatch(t, expectedResults, result.TransactionResults[0:len(result.TransactionResults)-1]) // strip system chunk
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 
@@ -346,7 +346,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx := fvm.NewContext(
 			fvm.WithServiceEventCollectionEnabled(),
 			fvm.WithTransactionProcessors(
-				//we don't need to check signatures or sequence numbers
+				// we don't need to check signatures or sequence numbers
 				fvm.NewTransactionInvoker(),
 			),
 		)
@@ -354,7 +354,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		collectionCount := 2
 		transactionsPerCollection := 2
 
-		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
+		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 // +1 for system chunk
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
@@ -386,7 +386,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		//events to emit for each iteration/transaction
+		// events to emit for each iteration/transaction
 		events := make([][]cadence.Event, totalTransactionCount)
 		events[0] = nil
 		events[1] = []cadence.Event{serviceEventA, ordinaryEvent}

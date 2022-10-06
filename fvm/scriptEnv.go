@@ -7,23 +7,6 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
-// DEPRECATED.  DO NOT USE
-//
-// TODO(patrick): rm after emulator is updated.
-func NewScriptEnvironment(
-	reqContext context.Context,
-	fvmContext Context,
-	vm *VirtualMachine,
-	txnState *state.TransactionState,
-	programs environment.TransactionPrograms,
-) environment.Environment {
-	return NewScriptEnv(
-		reqContext,
-		fvmContext,
-		txnState,
-		programs)
-}
-
 func NewScriptEnv(
 	reqContext context.Context,
 	fvmContext Context,
