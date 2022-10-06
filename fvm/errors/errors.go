@@ -8,9 +8,6 @@ import (
 	"github.com/onflow/cadence/runtime/errors"
 )
 
-// TODO(patrick): remove after emulator is updated.
-type Error = CodedError
-
 type CodedError interface {
 	Code() ErrorCode
 
