@@ -20,6 +20,8 @@ import (
 )
 
 func TestAccessNodeScore_Integration(t *testing.T) {
+	t.Skipf("skipping test until we have a better way to test the score")
+
 	ctx := context.Background()
 	sporkId := unittest.IdentifierFixture()
 

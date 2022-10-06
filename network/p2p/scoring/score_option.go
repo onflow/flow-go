@@ -146,7 +146,7 @@ func (s *ScoreOption) preparePeerScoreParams() {
 			lg := s.logger.With().Str("peer_id", pid.String()).Logger()
 
 			// checks if peer has a valid Flow protocol identity.
-			flowId, err := s.hasValidFlowIdentity(pid)
+			flowId, err := HasValidFlowIdentity(s.idProvider, pid)
 			if err != nil {
 				lg.Error().
 					Err(err).
@@ -199,18 +199,4 @@ func (s *ScoreOption) BuildGossipSubScoreOption() pubsub.Option {
 		s.peerScoreParams,
 		s.peerThresholdParams,
 	)
-}
-
-// hasValidFlowIdentity checks if the peer has a valid Flow identity.
-func (s *ScoreOption) hasValidFlowIdentity(pid peer.ID) (*flow.Identity, error) {
-	flowId, ok := s.idProvider.ByPeerID(pid)
-	if !ok {
-		return nil, NewInvalidPeerIDError(pid, PeerIdStatusUnknown)
-	}
-
-	if flowId.Ejected {
-		return nil, NewInvalidPeerIDError(pid, PeerIdStatusEjected)
-	}
-
-	return flowId, nil
 }
