@@ -144,6 +144,37 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 	})
 }
 
+func TestAccounts_IterateKeys(t *testing.T) {
+	t.Run("non-existent key count", func(t *testing.T) {
+		address := flow.HexToAddress("01")
+
+		for _, ledgerValue := range [][]byte{{}, nil} {
+			view := utils.NewSimpleView()
+			err := view.Set(
+				string(address.Bytes()),
+				"public_key_iterate",
+				ledgerValue,
+			)
+			require.NoError(t, err)
+
+			txnState := state.NewTransactionState(view, state.DefaultParameters())
+			accounts := environment.NewAccounts(txnState)
+
+			err = accounts.Create(nil, address)
+			require.NoError(t, err)
+
+			keys := make([]flow.AccountPublicKey, 0)
+
+			err = accounts.IterateKeys(address, func(key flow.AccountPublicKey) bool {
+				keys = append(keys, key)
+				return true
+			})
+			require.NoError(t, err)
+			require.Empty(t, keys)
+		}
+	})
+}
+
 // Some old account could be created without key count register
 // we recreate it in a test
 func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
