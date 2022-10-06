@@ -148,8 +148,6 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Msg("unable to set tps")
 		}
-		// TODO(rbtz): pass metrics to the load generator
-		loaderMetrics.SetTPSConfigured(c.tps)
 
 		// if the duration is 0, we run this case forever
 		waitC := make(<-chan time.Time)

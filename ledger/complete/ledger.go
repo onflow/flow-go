@@ -444,7 +444,7 @@ func (l *Ledger) ExportCheckpointAt(
 	}
 
 	if version == 6 {
-		err = realWAL.StoreCheckpointV6([]*trie.MTrie{newTrie}, outputDir, "root.checkpoint", &l.logger)
+		err = realWAL.StoreCheckpointV6Concurrent([]*trie.MTrie{newTrie}, outputDir, outputFile, &l.logger)
 	} else if version == 5 {
 		writer, err := realWAL.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
 		if err != nil {

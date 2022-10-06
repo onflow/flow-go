@@ -100,8 +100,8 @@ func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zer
 	}
 
 	// handle cadence errors
-	var cadenceError *fvmErrors.CadenceRuntimeError
-	if fvmErrors.As(err, &cadenceError) {
+	cadenceError := fvmErrors.Find(err, fvmErrors.ErrCodeCadenceRunTimeError)
+	if cadenceError != nil {
 		msg := fmt.Sprintf("Cadence error: %s", cadenceError.Error())
 		h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
 		return

@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -22,12 +23,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestFileIndex(t *testing.T) {
-	index, err := decodeFileIndex(encodeFileIndex(uint16(20)))
-	require.NoError(t, err)
-	require.Equal(t, 20, int(index))
-}
-
 func TestVersion(t *testing.T) {
 	m, v, err := decodeVersion(encodeVersion(MagicBytes, VersionV6))
 	require.NoError(t, err)
@@ -35,10 +30,10 @@ func TestVersion(t *testing.T) {
 	require.Equal(t, VersionV6, v)
 }
 
-func TestSubtrieLevel(t *testing.T) {
-	l, err := decodeSubtrieLevel(encodeSubtrieLevel(subtrieLevel))
+func TestSubtrieCount(t *testing.T) {
+	l, err := decodeSubtrieCount(encodeSubtrieCount(subtrieCount))
 	require.NoError(t, err)
-	require.Equal(t, uint16(subtrieLevel), l)
+	require.Equal(t, uint16(subtrieCount), l)
 }
 
 func TestCRC32SumEncoding(t *testing.T) {
@@ -48,9 +43,9 @@ func TestCRC32SumEncoding(t *testing.T) {
 	require.Equal(t, v, s)
 }
 
-func TestNodeCountEncoding(t *testing.T) {
+func TestSubtrieFooterEncoding(t *testing.T) {
 	v := uint64(100)
-	s, err := decodeNodeCount(encodeNodeCount(v))
+	s, err := decodeSubtrieFooter(encodeSubtrieFooter(v))
 	require.NoError(t, err)
 	require.Equal(t, v, s)
 }
@@ -137,7 +132,7 @@ func TestEncodeSubTrie(t *testing.T) {
 	file := "checkpoint"
 	logger := unittest.Logger()
 	tries := createMultipleRandomTries(t)
-	estimatedSubtrieNodeCount := estimateSubtrieNodeCount(tries)
+	estimatedSubtrieNodeCount := estimateSubtrieNodeCount(tries[0])
 	subtrieRoots := createSubTrieRoots(tries)
 
 	for index, roots := range subtrieRoots {
@@ -147,8 +142,8 @@ func TestEncodeSubTrie(t *testing.T) {
 			require.NoError(t, err)
 
 			if len(indices) > 1 {
-				require.Len(t, indices, len(roots)+1, // +1 means the default (nil: 0) is included
-					"indices %v should include all roots %v", indices, roots)
+				require.Len(t, indices, len(roots),
+					fmt.Sprintf("indices %v should include all roots %v", indices[nil], roots[0]))
 			}
 			// each root should be included in the indices
 			for _, root := range roots {
@@ -160,7 +155,7 @@ func TestEncodeSubTrie(t *testing.T) {
 				indices, nodeCount, checksum)
 
 			// all the nodes
-			nodes, err := readCheckpointSubTrie(dir, file, index, checksum)
+			nodes, err := readCheckpointSubTrie(dir, file, index, checksum, &logger)
 			require.NoError(t, err)
 
 			for _, root := range roots {
@@ -212,7 +207,7 @@ func TestWriteAndReadCheckpointV6(t *testing.T) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger), "fail to store checkpoint")
 		decoded, err := ReadCheckpointV6(dir, fileName, &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
@@ -316,7 +311,7 @@ func TestWriteAndReadCheckpointV5(t *testing.T) {
 		logger := unittest.Logger()
 
 		require.NoErrorf(t, storeCheckpointV5(tries, dir, fileName, &logger), "fail to store checkpoint")
-		decoded, err := LoadCheckpoint(dir, fileName, &logger)
+		decoded, err := LoadCheckpoint(filepath.Join(dir, fileName), &logger)
 		require.NoErrorf(t, err, "fail to load checkpoint")
 		requireTriesEqual(t, tries, decoded)
 	})

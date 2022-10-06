@@ -8,7 +8,6 @@ package crypto
 import "C"
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -51,6 +50,15 @@ type feldmanVSSstate struct {
 //
 // An instance is run by a single participant and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
+//
+// The function returns:
+// - (nil, InvalidInputsError) if:
+//   - size if not in [DKGMinSize, DKGMaxSize]
+//   - threshold is not in [MinimumThreshold, size-1]
+//   - myIndex is not in [0, size-1]
+//   - dealerIndex is not in [0, size-1]
+//
+// - (dkgInstance, nil) otherwise
 func NewFeldmanVSS(size int, threshold int, myIndex int,
 	processor DKGProcessor, dealerIndex int) (DKGState, error) {
 
@@ -77,13 +85,18 @@ func (s *feldmanVSSstate) init() {
 	C.bn_new_wrapper((*C.bn_st)(&s.x))
 }
 
-// Start starts running the protocol in the current participant
-// If the current participant is the , then the seed is used
-// to generate the secret polynomial (including the group private key)
-// if the current participant is not the , the seed is ignored.
+// Start triggers the protocol start for the current participant.
+// If the current participant is the dealer, then the seed is used
+// to generate the secret polynomial (including the group private key).
+// If the current participant is not the dealer, the seed is ignored.
+//
+// The function returns:
+// - dkgInvalidStateTransitionError if the DKG instance is already running.
+// - error if an unexpected exception occurs
+// - nil otherwise
 func (s *feldmanVSSstate) Start(seed []byte) error {
 	if s.running {
-		return errors.New("dkg is already running")
+		return dkgInvalidStateTransitionErrorf("dkg is already running")
 	}
 
 	s.running = true
@@ -94,19 +107,20 @@ func (s *feldmanVSSstate) Start(seed []byte) error {
 	return nil
 }
 
-// End ends the protocol in the current node.
+// End finalizes the protocol in the current node.
 // It returns the finalized public data and participants private key share.
 // - the group public key corresponding to the group secret key
 // - all the public key shares corresponding to the participants private
 // key shares.
 // - the finalized private key which is the current participant's own private key share
-// - the returned erorr is :
+//
+// The returned erorr is :
+//   - dkgInvalidStateTransitionError if the DKG instance was not running.
 //   - dkgFailureError if the private key and vector are inconsistent.
-//   - other error if Start() was not called.
 //   - nil otherwise.
 func (s *feldmanVSSstate) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
-		return nil, nil, nil, errors.New("dkg is not running")
+		return nil, nil, nil, dkgInvalidStateTransitionErrorf("dkg is not running")
 	}
 	s.running = false
 	if !s.validKey {
@@ -134,11 +148,15 @@ const (
 )
 
 // HandleBroadcastMsg processes a new broadcasted message received by the current participant.
+// `orig` is the message origin index.
 //
-// orig is the message origin index.
+// The function returns:
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.running {
-		return errors.New("dkg is not running")
+		return dkgInvalidStateTransitionErrorf("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
 		return invalidInputsErrorf(
@@ -170,11 +188,15 @@ func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 }
 
 // HandlePrivateMsg processes a new private message received by the current participant.
+// `orig` is the message origin index.
 //
-// orig is the message origin index.
+// The function returns:
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.running {
-		return errors.New("dkg is not running")
+		return dkgInvalidStateTransitionErrorf("dkg is not running")
 	}
 
 	if orig >= s.Size() || orig < 0 {
@@ -201,10 +223,15 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 // ForceDisqualify forces a participant to get disqualified
 // for a reason outside of the DKG protocol
 // The caller should make sure all honest participants call this function,
-// otherwise, the protocol can be broken
+// otherwise, the protocol can be broken.
+//
+// The function returns:
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *feldmanVSSstate) ForceDisqualify(participant int) error {
 	if !s.running {
-		return errors.New("dkg is not running")
+		return dkgInvalidStateTransitionErrorf("dkg is not running")
 	}
 	if participant >= s.Size() || participant < 0 {
 		return invalidInputsErrorf(

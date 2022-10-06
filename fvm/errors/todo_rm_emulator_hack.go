@@ -20,9 +20,6 @@ type InvalidAddressError struct{ CodedError }
 type InvalidEnvelopeSignatureError struct{ CodedError }
 
 // DO NOT USE.
-//type InvalidProposalSeqNumberError struct{ CodedError }
-
-// DO NOT USE.
 type InvalidPayloadSignatureError struct{ CodedError }
 
 // DO NOT USE.
