@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -203,7 +204,7 @@ func main() {
 			uint(*maxTPSFlag),
 			uint(maxInflight/2),
 		)
-		if err != nil {
+		if err != nil && !errors.Is(err, context.Canceled) {
 			log.Fatal().Err(err).Msgf("unable to adjust tps")
 		}
 	}()
@@ -214,7 +215,10 @@ func main() {
 		// TODO(rbtz): the loader currently doesn't ever cancel the context.
 		log.Warn().Err(ctx.Err()).Msg("loader context canceled")
 	}
+
+	log.Info().Msg("Stopping load generator")
 	lg.Stop()
+	log.Info().Msg("Waiting for workers to finish")
 	wg.Wait()
 
 	if len(dataSlices) == 0 {
