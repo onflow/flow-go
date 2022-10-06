@@ -315,7 +315,7 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 			//    2. no blocks have been finalized the epoch commitment deadline, and the epoch end
 			//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
 			//      -> in this case, the network has encountered a critical failure
-			//  - we assume in general that Case 2 will not happen, therefore we can discard this proposal
+			//  - we assume in general that Case 2 will not happen, however we cannot prove Case 1, therefore we can discard this proposal
 			return engine.NewUnverifiableInputError("cannot validate proposal with view from unknown epoch: %w", err)
 		}
 		return fmt.Errorf("unexpected error validating proposal: %w", err)
