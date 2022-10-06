@@ -53,7 +53,7 @@ const (
 	metricport                  = uint(8080)
 	accessNodeAddress           = "127.0.0.1:3569"
 	pushgateway                 = "127.0.0.1:9091"
-	accountMultiplier           = 100
+	accountMultiplier           = 50
 	feedbackEnabled             = true
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
 
