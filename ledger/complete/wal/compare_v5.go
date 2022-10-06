@@ -11,12 +11,12 @@ import (
 )
 
 func CompareV5(f1 *os.File, f2 *os.File) error {
-	nodeCount1, trieCount1, err := readNodeCount(f1)
+	nodeCount1, trieCount1, checksum1, err := readTopTriesFooter(f1)
 	if err != nil {
 		return fmt.Errorf("could not read node count for file 1:%w", err)
 	}
 
-	nodeCount2, trieCount2, err := readNodeCount(f2)
+	nodeCount2, trieCount2, checksum2, err := readTopTriesFooter(f2)
 	if err != nil {
 		return fmt.Errorf("could not read node count for file 2:%w", err)
 	}
@@ -27,6 +27,10 @@ func CompareV5(f1 *os.File, f2 *os.File) error {
 
 	if trieCount1 != trieCount2 {
 		return fmt.Errorf("trie count different %v != %v", trieCount1, trieCount2)
+	}
+
+	if checksum1 != checksum2 {
+		return fmt.Errorf("checksum different %v != %v", checksum1, checksum2)
 	}
 
 	_, err = f1.Seek(0, io.SeekStart)

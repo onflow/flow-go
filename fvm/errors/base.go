@@ -13,7 +13,7 @@ func NewInvalidAddressErrorf(
 	address flow.Address,
 	msg string,
 	args ...interface{},
-) *CodedError {
+) CodedError {
 	return NewCodedError(
 		ErrCodeInvalidAddressError,
 		"invalid address (%s): "+msg,
@@ -26,7 +26,7 @@ func NewInvalidAddressErrorf(
 // - number of arguments doesn't match the template
 //
 // TODO add more cases like argument size
-func NewInvalidArgumentErrorf(msg string, args ...interface{}) *CodedError {
+func NewInvalidArgumentErrorf(msg string, args ...interface{}) CodedError {
 	return NewCodedError(
 		ErrCodeInvalidArgumentError,
 		"transaction arguments are invalid: ("+msg+")",
@@ -39,7 +39,7 @@ func NewInvalidLocationErrorf(
 	location runtime.Location,
 	msg string,
 	args ...interface{},
-) *CodedError {
+) CodedError {
 	locationStr := ""
 	if location != nil {
 		locationStr = location.String()
@@ -57,7 +57,7 @@ func NewValueErrorf(
 	valueStr string,
 	msg string,
 	args ...interface{},
-) *CodedError {
+) CodedError {
 	return NewCodedError(
 		ErrCodeValueError,
 		"invalid value (%s): "+msg,
@@ -75,7 +75,7 @@ func NewOperationAuthorizationErrorf(
 	operation string,
 	msg string,
 	args ...interface{},
-) *CodedError {
+) CodedError {
 	return NewCodedError(
 		ErrCodeOperationAuthorizationError,
 		"(%s) is not authorized: "+msg,
@@ -92,7 +92,7 @@ func NewAccountAuthorizationErrorf(
 	address flow.Address,
 	msg string,
 	args ...interface{},
-) *CodedError {
+) CodedError {
 	return NewCodedError(
 		ErrCodeAccountAuthorizationError,
 		"authorization failed for account %s: "+msg,
