@@ -285,6 +285,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.IdentityProvider,
 		fnb.Metrics.Network,
 		fnb.Resolver,
+		fnb.PeerScoringEnabled,
 		fnb.BaseConfig.NodeRole,
 	)
 
