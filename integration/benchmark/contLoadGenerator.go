@@ -346,11 +346,11 @@ func (lg *ContLoadGenerator) Stop() {
 
 	defer lg.log.Debug().Msg("stopped generator")
 
+	lg.log.Debug().Msg("stopping follower")
+	lg.follower.Stop()
 	lg.log.Debug().Msg("stopping workers")
 	_ = lg.unsafeSetTPS(0)
 	lg.workerStatsTracker.StopPrinting()
-	lg.log.Debug().Msg("stopping follower")
-	lg.follower.Stop()
 	close(lg.stoppedChannel)
 }
 
