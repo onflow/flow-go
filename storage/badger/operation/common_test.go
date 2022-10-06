@@ -4,7 +4,6 @@ package operation
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -87,7 +86,7 @@ func TestInsertDuplicate(t *testing.T) {
 		// persist again
 		err = db.Update(insert(key, e2))
 		require.Error(t, err)
-		require.Equal(t, err, storage.ErrAlreadyExists)
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 
 		// ensure old value did not update
 		var act []byte
@@ -110,7 +109,7 @@ func TestInsertEncodingError(t *testing.T) {
 
 		err := db.Update(insert(key, UnencodeableEntity(e)))
 
-		require.True(t, errors.Is(err, errCantEncode))
+		require.ErrorIs(t, err, errCantEncode)
 	})
 }
 
@@ -148,7 +147,7 @@ func TestUpdateMissing(t *testing.T) {
 		key := []byte{0x01, 0x02, 0x03}
 
 		err := db.Update(update(key, e))
-		require.Equal(t, storage.ErrNotFound, err)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// ensure nothing was written
 		_ = db.View(func(tx *badger.Txn) error {
@@ -172,7 +171,7 @@ func TestUpdateEncodingError(t *testing.T) {
 		})
 
 		err := db.Update(update(key, UnencodeableEntity(e)))
-		require.True(t, errors.Is(err, errCantEncode))
+		require.ErrorIs(t, err, errCantEncode)
 
 		// ensure value did not change
 		var act []byte
@@ -253,7 +252,7 @@ func TestRetrieveMissing(t *testing.T) {
 
 		var act Entity
 		err := db.View(retrieve(key, &act))
-		require.Equal(t, storage.ErrNotFound, err)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -271,7 +270,7 @@ func TestRetrieveUnencodeable(t *testing.T) {
 
 		var act *UnencodeableEntity
 		err := db.View(retrieve(key, &act))
-		require.True(t, errors.Is(err, errCantDecode))
+		require.ErrorIs(t, err, errCantDecode)
 	})
 }
 
@@ -397,8 +396,7 @@ func TestRemove(t *testing.T) {
 				assert.NoError(t, err)
 
 				_, err = txn.Get(key)
-				assert.Error(t, err)
-				assert.IsType(t, badger.ErrKeyNotFound, err)
+				assert.ErrorIs(t, err, badger.ErrKeyNotFound)
 
 				return nil
 			})
@@ -408,6 +406,7 @@ func TestRemove(t *testing.T) {
 			nonexistantKey := append(key, 0x01)
 			_ = db.Update(func(txn *badger.Txn) error {
 				err := remove(nonexistantKey)(txn)
+				assert.ErrorIs(t, err, storage.ErrNotFound)
 				assert.Error(t, err)
 				return nil
 			})

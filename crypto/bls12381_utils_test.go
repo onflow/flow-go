@@ -36,12 +36,12 @@ func TestPRGseeding(t *testing.T) {
 	// 1st scalar (wrapped in a private key)
 	err = seedRelic(seed)
 	require.Nil(t, err)
-	var sk1 PrKeyBLSBLS12381
+	var sk1 prKeyBLSBLS12381
 	randZr(&sk1.scalar)
 	// 2nd scalar (wrapped in a private key)
 	err = seedRelic(seed)
 	require.Nil(t, err)
-	var sk2 PrKeyBLSBLS12381
+	var sk2 prKeyBLSBLS12381
 	randZr(&sk2.scalar)
 	// compare the 2 scalars (by comparing the private keys)
 	assert.True(t, sk1.Equals(&sk2), "private keys should be equal")

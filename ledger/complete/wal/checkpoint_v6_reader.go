@@ -19,12 +19,22 @@ import (
 // 		3. checksum of the main file itself
 // 	the first 16 files parts contain the trie nodes below the subtrieLevel
 //	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
+// it returns (tries, nil) if there was no error
+// it returns (nil, os.ErrNotExist) if a certain file is missing
+// it returns (nil, err) if running into any exception
 func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
 	headerPath := filePathCheckpointHeader(dir, fileName)
 	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read header: %w", err)
+	}
+
+	// ensure all checkpoint part file exists, might return os.ErrNotExist error
+	// if a file is missing
+	err = allPartFileExist(dir, fileName, len(subtrieChecksums))
+	if err != nil {
+		return nil, fmt.Errorf("fail to check all checkpoint part file exist: %w", err)
 	}
 
 	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums)
@@ -48,12 +58,12 @@ func filePathSubTries(dir string, fileName string, index int) (string, string, e
 	if index < 0 || index > (subtrieCount-1) {
 		return "", "", fmt.Errorf("index must be between 1 to 16, but got %v", index)
 	}
-	subTrieFileName := fmt.Sprintf("%v.%v", fileName, index)
+	subTrieFileName := fmt.Sprintf("%s.%03d", fileName, index)
 	return path.Join(dir, subTrieFileName), subTrieFileName, nil
 }
 
 func filePathTopTries(dir string, fileName string) (string, string) {
-	topTriesFileName := fmt.Sprintf("%v.%v", fileName, subtrieCount)
+	topTriesFileName := fmt.Sprintf("%v.%03d", fileName, subtrieCount)
 	return path.Join(dir, topTriesFileName), fileName
 }
 
@@ -138,9 +148,30 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 // 	return decodeFooter(footer)
 // }
 
+// allPartFileExist check if all the part files of the checkpoint file exist
+// it returns nil if all files exist
+// it returns os.ErrNotExist if some file is missing
+// it returns err if running into any exception
+func allPartFileExist(dir string, fileName string, totalSubtrieFiles int) error {
+	for i := 0; i < totalSubtrieFiles; i++ {
+		filePath, _, err := filePathSubTries(dir, fileName, i)
+		if err != nil {
+			return fmt.Errorf("fail to find file path for %v-th subtrie file: %w", i, err)
+		}
+
+		// ensure file exists
+		_, err = os.Stat(filePath)
+		if err != nil {
+			return fmt.Errorf("fail to check %v-th subtrie file exist: %w", i, err)
+		}
+	}
+	return nil
+}
+
 func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32) ([][]*node.Node, error) {
-	resultChs := make([]chan *resultReadSubTrie, 0, subtrieCount)
-	for i := 0; i < subtrieCount; i++ {
+	numOfSubTries := len(subtrieChecksums)
+	resultChs := make([]chan *resultReadSubTrie, 0, numOfSubTries)
+	for i := 0; i < numOfSubTries; i++ {
 		resultCh := make(chan *resultReadSubTrie)
 		go func(i int) {
 			nodes, err := readCheckpointSubTrie(dir, fileName, i, subtrieChecksums[i])
@@ -153,7 +184,7 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 		resultChs = append(resultChs, resultCh)
 	}
 
-	nodesGroups := make([][]*node.Node, 0)
+	nodesGroups := make([][]*node.Node, 0, len(resultChs))
 	for i, resultCh := range resultChs {
 		result := <-resultCh
 		if result.Err != nil {
@@ -181,6 +212,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func(f *os.File) {
+		//TODO: we should evict file from Linux page cache here, so it doesn't keep 170+GB in RAM when that can be used instead for caching more frequently read data.
 		f.Close()
 	}(f)
 
@@ -206,7 +238,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	for i := uint64(1); i <= nodesCount; i++ {
 		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
-			if nodeIndex >= uint64(i) {
+			if nodeIndex >= i {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}
 			return nodes[nodeIndex], nil
@@ -231,6 +263,8 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 			expectedSum, actualSum)
 	}
 
+	// TODO: simplify getNodeByIndex() logic if we reslice nodes here to remove the nil node at index 0.
+	// return nodes[1:], nil
 	return nodes, nil
 }
 
@@ -247,7 +281,7 @@ func readSubTriesFooter(f *os.File) (uint64, uint32, error) {
 		return 0, 0, fmt.Errorf("cannot seek to footer: %w", err)
 	}
 
-	footer := make([]byte, footerSize) // must not be less than 1024
+	footer := make([]byte, footerSize)
 	_, err = io.ReadFull(f, footer)
 	if err != nil {
 		return 0, 0, fmt.Errorf("could not read footer: %w", err)
