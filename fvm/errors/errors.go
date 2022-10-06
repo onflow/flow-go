@@ -66,6 +66,17 @@ func findImportantCodedError(err error) (CodedError, bool) {
 	}
 }
 
+// IsFailure returns true if the error is un-coded, or if the error contains
+// a failure code.
+func IsFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	coded, isUnknown := findImportantCodedError(err)
+	return isUnknown || coded.Code().IsFailure()
+}
+
 // SplitErrorTypes splits the error into fatal (failures) and non-fatal errors
 func SplitErrorTypes(inp error) (err CodedError, failure CodedError) {
 	if inp == nil {

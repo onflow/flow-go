@@ -33,19 +33,8 @@ const (
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
-	// DEPRECATED. DO NOT USE
-	//
-	// TODO(patrick): remove after emulator is updated.
-	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
-
-	RunV2(fvm.Context, fvm.Procedure, state.View) error
-
-	// DEPRECATED. DO NOT USE
-	//
-	// TODO(patrick): remove after emulator is updated.
-	GetAccount(fvm.Context, flow.Address, state.View, *programs.Programs) (*flow.Account, error)
-
-	GetAccountV2(fvm.Context, flow.Address, state.View) (*flow.Account, error)
+	Run(fvm.Context, fvm.Procedure, state.View) error
+	GetAccount(fvm.Context, flow.Address, state.View) (*flow.Account, error)
 }
 
 // ViewCommitter commits views's deltas to the ledger and collects the proofs
@@ -433,7 +422,7 @@ func (e *blockComputer) executeTransaction(
 			Bool("system_chunk", isSystemChunk).
 			Logger()),
 	)
-	err := e.vm.RunV2(childCtx, tx, txView)
+	err := e.vm.Run(childCtx, tx, txView)
 	if err != nil {
 		return fmt.Errorf("failed to execute transaction %v for block %v at height %v: %w",
 			txID.String(),

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	badger "github.com/ipfs/go-ds-badger2"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
@@ -211,7 +210,7 @@ type FlowAccessNodeBuilder struct {
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
 	// Hence, a factory function that needs to be called just before creating the sync engine
-	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
+	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
 	IngestEng   *ingestion.Engine
@@ -619,7 +618,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	return net, nil
 }
 
-func publicNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
+func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
 	return []network.MessageValidator{
 		// filter out messages sent by this node itself
 		validator.ValidateNotSender(selfID),
@@ -645,7 +644,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 
 		builder.IdentityProvider = idCache
 
-		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
+		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
 				filter.And(
 					filter.HasRole(flow.RoleConsensus),
@@ -997,7 +996,6 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 					dht.AsServer(),
 				)
 			}).
-			SetPubSub(pubsub.NewGossipSub).
 			Build(ctx)
 
 		if err != nil {

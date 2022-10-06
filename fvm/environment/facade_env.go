@@ -26,7 +26,7 @@ type facadeEnvironment struct {
 	*CryptoLibrary
 
 	*BlockInfo
-	*AccountInfo
+	AccountInfo
 	TransactionInfo
 
 	*ValueStore
@@ -218,10 +218,28 @@ func newTransactionFacadeEnvironment(
 }
 
 func (env *facadeEnvironment) addParseRestrictedChecks() {
+	// NOTE: Cadence can access Programs, ContractReader and Meter while it is
+	// parsing programs; all other access are unexpected and are potentially
+	// program cache invalidation bugs.
+
 	env.AccountCreator = NewParseRestrictedAccountCreator(
 		env.txnState,
 		env.AccountCreator)
-
+	env.AccountFreezer = NewParseRestrictedAccountFreezer(
+		env.txnState,
+		env.AccountFreezer)
+	env.AccountInfo = NewParseRestrictedAccountInfo(
+		env.txnState,
+		env.AccountInfo)
+	env.AccountKeyUpdater = NewParseRestrictedAccountKeyUpdater(
+		env.txnState,
+		env.AccountKeyUpdater)
+	env.ContractUpdater = NewParseRestrictedContractUpdater(
+		env.txnState,
+		env.ContractUpdater)
+	env.TransactionInfo = NewParseRestrictedTransactionInfo(
+		env.txnState,
+		env.TransactionInfo)
 	// TODO(patrick): check other API
 }
 

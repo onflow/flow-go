@@ -10,6 +10,7 @@ import (
 )
 
 func TestErrorHandling(t *testing.T) {
+	require.False(t, IsFailure(nil))
 
 	t.Run("test nonfatal error detection", func(t *testing.T) {
 		e1 := NewOperationNotSupportedError("some operations")
@@ -20,6 +21,8 @@ func TestErrorHandling(t *testing.T) {
 		txErr, vmErr := SplitErrorTypes(e4)
 		require.Nil(t, vmErr)
 		require.Equal(t, e3, txErr)
+
+		require.False(t, IsFailure(e4))
 	})
 
 	t.Run("test fatal error detection", func(t *testing.T) {
@@ -33,6 +36,8 @@ func TestErrorHandling(t *testing.T) {
 		txErr, vmErr := SplitErrorTypes(e6)
 		require.Nil(t, txErr)
 		require.Equal(t, e3, vmErr)
+
+		require.True(t, IsFailure(e6))
 	})
 
 	t.Run("unknown error", func(t *testing.T) {
@@ -40,5 +45,7 @@ func TestErrorHandling(t *testing.T) {
 		txErr, vmErr := SplitErrorTypes(e1)
 		require.Nil(t, txErr)
 		require.NotNil(t, vmErr)
+
+		require.True(t, IsFailure(e1))
 	})
 }
