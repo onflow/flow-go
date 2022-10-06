@@ -36,6 +36,13 @@ func TestSubtrieFooterEncoding(t *testing.T) {
 	require.Equal(t, v, s)
 }
 
+func TestSubtrieNodeCountEncoding(t *testing.T) {
+	v := uint64(10000)
+	s, err := decodeSubtrieNodeCount(encodeSubtrieNodeCount(v))
+	require.NoError(t, err)
+	require.Equal(t, v, s)
+}
+
 func TestFooterEncoding(t *testing.T) {
 	n1, r1 := uint64(40), uint16(500)
 	n2, r2, err := decodeFooter(encodeFooter(n1, r1))

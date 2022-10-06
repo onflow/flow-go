@@ -134,7 +134,7 @@ func createWriterForCheckpointSummary(outputDir string, outputFile string, logge
 // 17th part file contains:
 // 1. checkpoint version TODO
 // 2. checkpoint file part index TODO
-// 3. subtrieNodeCount TODO
+// 3. subtrieNodeCount
 // 4. top level nodes
 // 5. trie roots
 // 6. node count
@@ -162,6 +162,12 @@ func storeTopLevelNodesAndTrieRoots(
 	}()
 
 	writer := NewCRC32Writer(closable)
+
+	// write subTriesNodeCount
+	_, err = writer.Write(encodeSubtrieNodeCount(subTriesNodeCount))
+	if err != nil {
+		return 0, fmt.Errorf("could not write subtrie node count: %w", err)
+	}
 
 	topLevelNodeIndices, topLevelNodesCount, err := storeTopLevelNodes(
 		tries,
@@ -486,6 +492,19 @@ func decodeFooter(footer []byte) (uint64, uint16, error) {
 	nodesCount := binary.BigEndian.Uint64(footer)
 	triesCount := binary.BigEndian.Uint16(footer[encNodeCountSize:])
 	return nodesCount, triesCount, nil
+}
+
+func encodeSubtrieNodeCount(nodeCount uint64) []byte {
+	footer := make([]byte, encNodeCountSize)
+	binary.BigEndian.PutUint64(footer, nodeCount)
+	return footer
+}
+
+func decodeSubtrieNodeCount(encoded []byte) (uint64, error) {
+	if len(encoded) != encNodeCountSize {
+		return 0, fmt.Errorf("wrong subtrie node count size, expect %v, got %v", encNodeCountSize, len(encoded))
+	}
+	return binary.BigEndian.Uint64(encoded), nil
 }
 
 func encodeSubtrieFooter(totalNodeCount uint64) []byte {
