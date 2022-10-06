@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -45,6 +46,55 @@ type TransactionInfo interface {
 	// Cadence's runtime API.  Note that the script variant will return
 	// OperationNotSupportedError.
 	GetSigningAccounts() ([]runtime.Address, error)
+}
+
+type ParseRestrictedTransactionInfo struct {
+	txnState *state.TransactionState
+	impl     TransactionInfo
+}
+
+func NewParseRestrictedTransactionInfo(
+	txnState *state.TransactionState,
+	impl TransactionInfo,
+) TransactionInfo {
+	return ParseRestrictedTransactionInfo{
+		txnState: txnState,
+		impl:     impl,
+	}
+}
+
+func (info ParseRestrictedTransactionInfo) TxIndex() uint32 {
+	return info.impl.TxIndex()
+}
+
+func (info ParseRestrictedTransactionInfo) TxID() flow.Identifier {
+	return info.impl.TxID()
+}
+
+func (info ParseRestrictedTransactionInfo) TransactionFeesEnabled() bool {
+	return info.impl.TransactionFeesEnabled()
+}
+
+func (info ParseRestrictedTransactionInfo) LimitAccountStorage() bool {
+	return info.impl.LimitAccountStorage()
+}
+
+func (info ParseRestrictedTransactionInfo) SigningAccounts() []runtime.Address {
+	return info.impl.SigningAccounts()
+}
+
+func (info ParseRestrictedTransactionInfo) IsServiceAccountAuthorizer() bool {
+	return info.impl.IsServiceAccountAuthorizer()
+}
+
+func (info ParseRestrictedTransactionInfo) GetSigningAccounts() (
+	[]runtime.Address,
+	error,
+) {
+	return parseRestrict1Ret(
+		info.txnState,
+		"GetSigningAccounts",
+		info.impl.GetSigningAccounts)
 }
 
 type transactionInfo struct {

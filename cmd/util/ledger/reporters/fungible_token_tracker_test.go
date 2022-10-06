@@ -46,7 +46,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
 
-	err := vm.RunV2(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view)
+	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view)
 	require.NoError(t, err)
 
 	// deploy wrapper resource
@@ -82,7 +82,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	tx := fvm.Transaction(txBody, blockPrograms.NextTxIndexForTestingOnly())
-	err = vm.RunV2(ctx, tx, view)
+	err = vm.Run(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
@@ -108,7 +108,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	tx = fvm.Transaction(txBody, blockPrograms.NextTxIndexForTestingOnly())
-	err = vm.RunV2(ctx, tx, view)
+	err = vm.Run(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 

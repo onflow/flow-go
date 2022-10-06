@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -65,17 +66,73 @@ func (lists *sortableContractUpdates) Less(i, j int) bool {
 // Note that scripts cannot modify smart contracts, but must expose the API in
 // compliance with the runtime environment interface.
 type ContractUpdater interface {
+	// Cadence's runtime API.  Note that the script variant will return
+	// OperationNotSupportedError.
 	UpdateAccountContractCode(
 		address runtime.Address,
 		name string,
 		code []byte,
 	) error
 
+	// Cadence's runtime API.  Note that the script variant will return
+	// OperationNotSupportedError.
 	RemoveAccountContractCode(address runtime.Address, name string) error
 
 	Commit() ([]programs.ContractUpdateKey, error)
 
 	Reset()
+}
+
+type ParseRestrictedContractUpdater struct {
+	txnState *state.TransactionState
+	impl     ContractUpdater
+}
+
+func NewParseRestrictedContractUpdater(
+	txnState *state.TransactionState,
+	impl ContractUpdater,
+) ParseRestrictedContractUpdater {
+	return ParseRestrictedContractUpdater{
+		txnState: txnState,
+		impl:     impl,
+	}
+}
+
+func (updater ParseRestrictedContractUpdater) UpdateAccountContractCode(
+	address runtime.Address,
+	name string,
+	code []byte,
+) error {
+	return parseRestrict3Arg(
+		updater.txnState,
+		"UpdateAccountContractCode",
+		updater.impl.UpdateAccountContractCode,
+		address,
+		name,
+		code)
+}
+
+func (updater ParseRestrictedContractUpdater) RemoveAccountContractCode(
+	address runtime.Address,
+	name string,
+) error {
+	return parseRestrict2Arg(
+		updater.txnState,
+		"RemoveAccountContractCode",
+		updater.impl.RemoveAccountContractCode,
+		address,
+		name)
+}
+
+func (updater ParseRestrictedContractUpdater) Commit() (
+	[]programs.ContractUpdateKey,
+	error,
+) {
+	return updater.impl.Commit()
+}
+
+func (updater ParseRestrictedContractUpdater) Reset() {
+	updater.impl.Reset()
 }
 
 type NoContractUpdater struct{}
