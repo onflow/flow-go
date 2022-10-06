@@ -92,9 +92,9 @@ func TestCommandParsing(t *testing.T) {
 
 func TestCommandsSetsValues(t *testing.T) {
 
-	stopAtHeight := ingestion.NewStopControl(zerolog.Nop(), false)
+	stopControl := ingestion.NewStopControl(zerolog.Nop(), false)
 
-	cmd := NewStopAtHeightCommand(stopAtHeight)
+	cmd := NewStopAtHeightCommand(stopControl)
 
 	req := &admin.CommandRequest{
 		ValidatorData: StopAtHeightReq{
@@ -106,7 +106,7 @@ func TestCommandsSetsValues(t *testing.T) {
 	_, err := cmd.Handler(context.TODO(), req)
 	require.NoError(t, err)
 
-	set, height, crash := stopAtHeight.Get()
+	set, height, crash := stopControl.GetStopHeight()
 
 	require.True(t, set)
 	require.Equal(t, uint64(37), height)

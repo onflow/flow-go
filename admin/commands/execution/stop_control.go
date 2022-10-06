@@ -15,12 +15,13 @@ var _ commands.AdminCommand = (*StopAtHeightCommand)(nil)
 // StopAtHeightCommand will send a signal to engine to stop/crash EN
 // at given height
 type StopAtHeightCommand struct {
-	stopAtHeight *ingestion.StopControl
+	stopControl *ingestion.StopControl
 }
 
+// NewStopAtHeightCommand creates a new StopAtHeightCommand object
 func NewStopAtHeightCommand(sah *ingestion.StopControl) *StopAtHeightCommand {
 	return &StopAtHeightCommand{
-		stopAtHeight: sah,
+		stopControl: sah,
 	}
 }
 
@@ -35,7 +36,7 @@ type StopAtHeightReq struct {
 func (s *StopAtHeightCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	sah := req.ValidatorData.(StopAtHeightReq)
 
-	_, oldHeight, oldCrash, err := s.stopAtHeight.Set(sah.height, sah.crash)
+	_, oldHeight, oldCrash, err := s.stopControl.SetStopHeight(sah.height, sah.crash)
 
 	if err != nil {
 		return nil, err

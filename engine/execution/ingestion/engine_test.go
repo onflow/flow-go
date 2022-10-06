@@ -952,7 +952,7 @@ func TestStopAtHeight(t *testing.T) {
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header)
 
 		// stop at block C
-		_, _, _, err := ctx.stopControl.Set(blockSealed.Height+3, false)
+		_, _, _, err := ctx.stopControl.SetStopHeight(blockSealed.Height+3, false)
 		require.NoError(t, err)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
@@ -1058,7 +1058,7 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header)
 
 		// stop at block B, so B-1 (A) will be last executed
-		_, _, _, err := ctx.stopControl.Set(blocks["B"].Height(), false)
+		_, _, _, err := ctx.stopControl.SetStopHeight(blocks["B"].Height(), false)
 		require.NoError(t, err)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
@@ -1115,15 +1115,14 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		finalizationWg.Wait()
 		executionWg.Wait()
 
-		assert.True(t, ctx.stopControl.IsPaused())
-
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
 		assert.False(t, more)
+
+		assert.True(t, ctx.stopControl.IsPaused())
 
 		var ok bool
 
 		// make sure B and C were not executed
-
 		_, ok = commits[blocks["A"].ID()]
 		require.True(t, ok)
 		_, ok = commits[blocks["B"].ID()]

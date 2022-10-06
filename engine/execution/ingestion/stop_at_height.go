@@ -11,6 +11,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// StopControl is a specialized component used by ingestion.Engine to encapsulate
+// control of pausing/stopping blocks execution.
 type StopControl struct {
 	sync.RWMutex
 	height             uint64
@@ -31,49 +33,20 @@ func NewStopControl(log zerolog.Logger, paused bool) *StopControl {
 	}
 }
 
-// Get returns
-// boolean indicating if value is set - for easier comparisons, since its envisions most of the time this struct will be empty
-// height and crash values
-func (s *StopControl) Get() (bool, uint64, bool) {
-	s.RLock()
-	defer s.RUnlock()
-	return s.set, s.height, s.crash
-}
-
+// IsPaused returns true is block execution has been paused
 func (s *StopControl) IsPaused() bool {
 	s.RLock()
 	defer s.RUnlock()
 	return s.paused
 }
 
-// Try runs function f with current values of height and crash if the values are set
-// f should return true if it started a process of stopping, so no further changes will
-// be accepted.
-// Try returns whatever f returned, or false if f has not been called
-func (s *StopControl) Try(f func(uint64, bool) bool) bool {
-	s.Lock()
-	defer s.Unlock()
-
-	if !s.set {
-		return false
-	}
-
-	commenced := f(s.height, s.crash)
-
-	if commenced {
-		s.commenced = true
-	}
-
-	return commenced
-}
-
-// Set sets new values and return old ones:
+// SetStopHeight sets new stop height and crash mode, and return old values:
 //   - set, whether values were previously set
 //   - height
 //   - crash
 //
 // Returns error is the stopping process has already commenced, new values will be rejected.
-func (s *StopControl) Set(height uint64, crash bool) (bool, uint64, bool, error) {
+func (s *StopControl) SetStopHeight(height uint64, crash bool) (bool, uint64, bool, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -93,10 +66,23 @@ func (s *StopControl) Set(height uint64, crash bool) (bool, uint64, bool, error)
 	return oldSet, oldHeight, oldCrash, nil
 }
 
-func (s *StopControl) BlockProcessable(b *flow.Header) bool {
-
+// GetStopHeight returns:
+//   - set, whether values are set
+//   - height
+//   - crash
+func (s *StopControl) GetStopHeight() (bool, uint64, bool) {
 	s.RLock()
 	defer s.RUnlock()
+
+	return s.set, s.height, s.crash
+}
+
+// BlockProcessable should be called when new block is processable.
+// It returns boolean indicating if processing should skip this block.
+func (s *StopControl) BlockProcessable(b *flow.Header) bool {
+
+	s.Lock()
+	defer s.Unlock()
 
 	if !s.set {
 		return false
@@ -109,12 +95,14 @@ func (s *StopControl) BlockProcessable(b *flow.Header) bool {
 	// skips blocks at or above requested stop height
 	if b.Height >= s.height {
 		s.log.Warn().Msgf("Skipping execution of %s at height %d because stop has been requested at height %d", b.ID(), b.Height, s.height)
+		s.commenced = true
 		return true
 	}
 
 	return false
 }
 
+// BlockFinalized should be called when a block is marked as finalized
 func (s *StopControl) BlockFinalized(ctx context.Context, execState state.ReadOnlyExecutionState, h *flow.Header) {
 
 	s.Lock()
@@ -142,12 +130,14 @@ func (s *StopControl) BlockFinalized(ctx context.Context, execState state.ReadOn
 			s.stopExecution()
 		} else {
 			s.stopAfterExecuting = h.ParentID
+			s.set = true
 		}
 
 	}
 
 }
 
+// BlockExecuted should be called after a block has finished execution
 func (s *StopControl) BlockExecuted(h *flow.Header) {
 	s.Lock()
 	defer s.Unlock()
@@ -171,6 +161,7 @@ func (s *StopControl) stopExecution() {
 		s.log.Fatal().Msgf("Crashing as finalization reached requested stop height %d", s.height)
 	} else {
 		s.paused = true
+		s.commenced = true
 		s.log.Warn().Msgf("Pausing execution as finalization reached requested stop height %d", s.height)
 	}
 }
