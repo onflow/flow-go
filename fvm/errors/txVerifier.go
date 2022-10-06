@@ -1,8 +1,6 @@
 package errors
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -12,7 +10,7 @@ func NewInvalidProposalSignatureError(
 	address flow.Address,
 	keyIndex uint64,
 	err error,
-) *CodedError {
+) CodedError {
 	return WrapCodedError(
 		ErrCodeInvalidProposalSignatureError,
 		err,
@@ -24,18 +22,31 @@ func NewInvalidProposalSignatureError(
 
 // InvalidProposalSeqNumberError indicates that proposal key sequence number does not match the on-chain value.
 type InvalidProposalSeqNumberError struct {
-	address           flow.Address
-	keyIndex          uint64
 	currentSeqNumber  uint64
 	providedSeqNumber uint64
+
+	CodedError
 }
 
 // NewInvalidProposalSeqNumberError constructs a new InvalidProposalSeqNumberError
-func NewInvalidProposalSeqNumberError(address flow.Address, keyIndex uint64, currentSeqNumber uint64, providedSeqNumber uint64) InvalidProposalSeqNumberError {
-	return InvalidProposalSeqNumberError{address: address,
-		keyIndex:          keyIndex,
+func NewInvalidProposalSeqNumberError(
+	address flow.Address,
+	keyIndex uint64,
+	currentSeqNumber uint64,
+	providedSeqNumber uint64,
+) CodedError {
+	return InvalidProposalSeqNumberError{
 		currentSeqNumber:  currentSeqNumber,
-		providedSeqNumber: providedSeqNumber}
+		providedSeqNumber: providedSeqNumber,
+		CodedError: NewCodedError(
+			ErrCodeInvalidProposalSeqNumberError,
+			"invalid proposal key: public key %d on account %s has sequence "+
+				"number %d, but given %d",
+			keyIndex,
+			address.String(),
+			currentSeqNumber,
+			providedSeqNumber),
+	}
 }
 
 // CurrentSeqNumber returns the current sequence number
@@ -48,22 +59,6 @@ func (e InvalidProposalSeqNumberError) ProvidedSeqNumber() uint64 {
 	return e.providedSeqNumber
 }
 
-func (e InvalidProposalSeqNumberError) Error() string {
-	return fmt.Sprintf(
-		"%s invalid proposal key: public key %d on account %s has sequence number %d, but given %d",
-		e.Code().String(),
-		e.keyIndex,
-		e.address.String(),
-		e.currentSeqNumber,
-		e.providedSeqNumber,
-	)
-}
-
-// Code returns the error code for this error type
-func (e InvalidProposalSeqNumberError) Code() ErrorCode {
-	return ErrCodeInvalidProposalSeqNumberError
-}
-
 // NewInvalidPayloadSignatureError constructs a new CodedError which indicates
 // that signature verification for a key in this transaction has failed. This
 // error is the result of failure in any of the following conditions:
@@ -74,7 +69,7 @@ func NewInvalidPayloadSignatureError(
 	address flow.Address,
 	keyIndex uint64,
 	err error,
-) *CodedError {
+) CodedError {
 	return WrapCodedError(
 		ErrCodeInvalidPayloadSignatureError,
 		err,
@@ -99,7 +94,7 @@ func NewInvalidEnvelopeSignatureError(
 	address flow.Address,
 	keyIndex uint64,
 	err error,
-) *CodedError {
+) CodedError {
 	return WrapCodedError(
 		ErrCodeInvalidEnvelopeSignatureError,
 		err,

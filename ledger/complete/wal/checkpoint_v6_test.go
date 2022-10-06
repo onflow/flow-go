@@ -15,12 +15,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestFileIndex(t *testing.T) {
-	index, err := decodeFileIndex(encodeFileIndex(uint16(20)))
-	require.NoError(t, err)
-	require.Equal(t, 20, int(index))
-}
-
 func TestVersion(t *testing.T) {
 	m, v, err := decodeVersion(encodeVersion(MagicBytes, VersionV6))
 	require.NoError(t, err)
@@ -28,10 +22,10 @@ func TestVersion(t *testing.T) {
 	require.Equal(t, VersionV6, v)
 }
 
-func TestSubtrieLevel(t *testing.T) {
-	l, err := decodeSubtrieLevel(encodeSubtrieLevel(subtrieLevel))
+func TestSubtrieCount(t *testing.T) {
+	l, err := decodeSubtrieCount(encodeSubtrieCount(subtrieCount))
 	require.NoError(t, err)
-	require.Equal(t, uint16(subtrieLevel), l)
+	require.Equal(t, uint16(subtrieCount), l)
 }
 
 func TestCRC32SumEncoding(t *testing.T) {
@@ -41,9 +35,9 @@ func TestCRC32SumEncoding(t *testing.T) {
 	require.Equal(t, v, s)
 }
 
-func TestNodeCountEncoding(t *testing.T) {
+func TestSubtrieFooterEncoding(t *testing.T) {
 	v := uint64(100)
-	s, err := decodeNodeCount(encodeNodeCount(v))
+	s, err := decodeSubtrieFooter(encodeSubtrieFooter(v))
 	require.NoError(t, err)
 	require.Equal(t, v, s)
 }
@@ -86,7 +80,7 @@ func TestEncodeSubTrie(t *testing.T) {
 	file := "checkpoint"
 	logger := unittest.Logger()
 	tries := createSimpleTrie(t)
-	estimatedSubtrieNodeCount := estimateSubtrieNodeCount(tries)
+	estimatedSubtrieNodeCount := estimateSubtrieNodeCount(tries[0])
 	subtrieRoots := createSubTrieRoots(tries)
 
 	for index, roots := range subtrieRoots {
