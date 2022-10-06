@@ -51,7 +51,7 @@ func (b *Bootstrapper) BootstrapLedger(
 		opts...,
 	)
 
-	err := vm.RunV2(ctx, bootstrap, view)
+	err := vm.Run(ctx, bootstrap, view)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}

@@ -244,7 +244,7 @@ func (e *Manager) ExecuteScript(
 			}
 		}()
 
-		return e.vm.RunV2(blockCtx, script, view)
+		return e.vm.Run(blockCtx, script, view)
 	}()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
@@ -337,7 +337,7 @@ func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, vie
 		fvm.WithBlockPrograms(
 			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
 
-	account, err := e.vm.GetAccountV2(blockCtx, address, view)
+	account, err := e.vm.GetAccount(blockCtx, address, view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account (%s) at block (%s): %w", address.String(), blockHeader.ID(), err)
 	}
