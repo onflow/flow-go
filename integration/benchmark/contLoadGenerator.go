@@ -347,6 +347,10 @@ func (lg *ContLoadGenerator) Done() <-chan struct{} {
 	return lg.stoppedChannel
 }
 
+func (lg *ContLoadGenerator) GetTxSent() int {
+	return lg.workerStatsTracker.GetTxSent()
+}
+
 func (lg *ContLoadGenerator) GetTxExecuted() int {
 	return lg.workerStatsTracker.GetTxExecuted()
 }
