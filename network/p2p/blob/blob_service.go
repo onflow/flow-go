@@ -218,6 +218,8 @@ type rateLimitedBlockStore struct {
 	metrics module.RateLimitedBlockstoreMetrics
 }
 
+var rateLimitedError = errors.New("rate limited")
+
 func newRateLimitedBlockStore(bs blockstore.Blockstore, r float64, b int) *rateLimitedBlockStore {
 	return &rateLimitedBlockStore{
 		Blockstore: bs,
@@ -232,9 +234,9 @@ func (r *rateLimitedBlockStore) Get(ctx context.Context, c cid.Cid) (blocks.Bloc
 		return nil, err
 	}
 
-	err = r.limiter.WaitN(ctx, size)
-	if err != nil {
-		return nil, err
+	allowed = r.limiter.AllowN(time.Now(), size)
+	if !allowed {
+		return nil, rateLimitedError
 	}
 
 	r.metrics.BytesRead(size)
