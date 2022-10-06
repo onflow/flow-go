@@ -187,7 +187,9 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 		for i := range unauthorizedTopics {
 			idProvider.On("ByPeerID", peerId).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
 			sp.On("GetSubscribedTopics", peerId).Return(unauthorizedTopics[:i+1])
-			require.Error(t, sv.CheckSubscribedToAllowedTopics(peerId))
+			err := sv.CheckSubscribedToAllowedTopics(peerId)
+			require.Error(t, err, role)
+			require.True(t, scoring.IsInvalidSubscriptionError(err), role)
 		}
 	}
 }
