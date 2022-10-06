@@ -525,7 +525,7 @@ func randomlyModifyFile(t *testing.T, filename string) {
 
 func Test_StoringLoadingCheckpoints(t *testing.T) {
 
-	unittest.RunWithTempDirWithoutRemove(t, func(dir string) {
+	unittest.RunWithTempDir(t, func(dir string) {
 		// some hash will be literally encoded in output file
 		// so we can find it and modify - to make sure we get a different checksum
 		// but not fail process by, for example, modifying saved data length causing EOF

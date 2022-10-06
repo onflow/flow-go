@@ -1769,8 +1769,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
-				require.Equal(t, (errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
-				require.Equal(t, uint64(0), tx.Err.(errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
+				castedErr, ok := tx.Err.(errors.InvalidProposalSeqNumberError)
+				require.True(t, ok)
+				require.Equal(t, uint64(0), castedErr.CurrentSeqNumber())
 			}),
 	)
 
@@ -1815,8 +1816,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = vm.RunV2(ctx, tx, view)
 				require.NoError(t, err)
 
-				require.Equal(t, (errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
-				require.Equal(t, uint64(1), tx.Err.(errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
+				castedErr, ok := tx.Err.(errors.InvalidProposalSeqNumberError)
+				require.True(t, ok)
+				require.Equal(t, uint64(1), castedErr.CurrentSeqNumber())
 			}),
 	)
 }
