@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -68,12 +67,13 @@ func main() {
 	payerKeyCountInConstExecTx := flag.Uint("const-exec-payer-key-count", 2, "num of payer keys for each constant exec transaction to generate")
 
 	// CI relevant flags
-	tpsFlag := flag.String("tps", "300", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
-	tpsDurationsFlag := flag.String("tps-durations", "10m", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
+	initialTPSFlag := flag.Int("initial-tps", 10, "starting transactions per second")
+	maxTPSFlag := flag.Int("max-tps", *initialTPSFlag, "maximum transactions per second allowed")
+	durationFlag := flag.Duration("duration", 10*time.Minute, "test duration")
 	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
 	bigQueryTableFlag := flag.String("bigquery-table", "tpsslices", "table name for the bigquery uploader")
-	sliceSize := flag.String("slice-size", "2m", "the amount of time that each slice covers")
+	sliceSize := flag.Duration("slice-size", 2*time.Minute, "the amount of time that each slice covers")
 	flag.Parse()
 
 	// Version and Commit Info
@@ -106,17 +106,7 @@ func main() {
 	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
 	defer sp.Stop()
 
-	tps, err := strconv.ParseInt(*tpsFlag, 0, 32)
-	if err != nil {
-		log.Fatal().Err(err).Str("value", *tpsFlag).
-			Msg("could not parse tps flag")
-	}
-	tpsDuration, err := time.ParseDuration(*tpsDurationsFlag)
-	if err != nil {
-		log.Fatal().Err(err).Str("value", *tpsDurationsFlag).
-			Msg("could not parse tps-durations flag")
-	}
-	loadCase := LoadCase{tps: uint(tps), duration: tpsDuration}
+	loadCase := LoadCase{tps: uint(*initialTPSFlag), duration: *durationFlag}
 
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
@@ -137,6 +127,7 @@ func main() {
 	log.Info().
 		Str("load_type", loadType).
 		Uint("tps", loadCase.tps).
+		Int("maxTPS", *maxTPSFlag).
 		Dur("duration", loadCase.duration).
 		Msg("Running load case...")
 
@@ -152,7 +143,7 @@ func main() {
 			FlowTokenAddress:      &flowTokenAddress,
 		},
 		benchmark.LoadParams{
-			NumberOfAccounts: int(loadCase.tps) * accountMultiplier,
+			NumberOfAccounts: *maxTPSFlag * accountMultiplier,
 			LoadType:         benchmark.LoadType(loadType),
 			FeedbackEnabled:  feedbackEnabled,
 		},
@@ -177,11 +168,8 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to set tps")
 	}
-	// TODO(rbtz): pass metrics to the load generator
-	loaderMetrics.SetTPSConfigured(loadCase.tps)
 
 	// prepare data slices
-	sliceDuration, _ := time.ParseDuration(*sliceSize)
 	var dataSlices []dataSlice
 
 	wg := sync.WaitGroup{}
@@ -190,7 +178,7 @@ func main() {
 		defer wg.Done()
 		dataSlices = recordTransactionData(
 			lg,
-			sliceDuration,
+			*sliceSize,
 			runStartTime,
 			gitSha,
 			goVersion,
