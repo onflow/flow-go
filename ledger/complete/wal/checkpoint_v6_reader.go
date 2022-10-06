@@ -56,7 +56,7 @@ func filePathCheckpointHeader(dir string, fileName string) string {
 
 func filePathSubTries(dir string, fileName string, index int) (string, string, error) {
 	if index < 0 || index > (subtrieCount-1) {
-		return "", "", fmt.Errorf("index must be between 1 to 16, but got %v", index)
+		return "", "", fmt.Errorf("index must be between 0 to %v, but got %v", subtrieCount-1, index)
 	}
 	subTrieFileName := fmt.Sprintf("%s.%03d", fileName, index)
 	return path.Join(dir, subTrieFileName), subTrieFileName, nil
