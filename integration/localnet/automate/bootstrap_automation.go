@@ -21,13 +21,14 @@ type Node struct {
 	StakingPubKey string `json:"StakingPubKey"`
 }
 
-var ACCESS_TEMPLATE string = "templates/access_template.yml"
-var COLLECTION_TEMPLATE string = "templates/collection_template.yml"
-var CONSENSUS_TEMPLATE string = "templates/consensus_template.yml"
-var EXECUTION_TEMPLATE string = "templates/execution_template.yml"
-var VERIFICATION_TEMPLATE string = "templates/verification_template.yml"
-var RESOURCES_TEMPLATE string = "templates/resources_template.yml"
-var ENV_TEMPLATE string = "templates/env_template.yml"
+var ACCESS_TEMPLATE string = "access_template.yml"
+var COLLECTION_TEMPLATE string = "collection_template.yml"
+var CONSENSUS_TEMPLATE string = "consensus_template.yml"
+var EXECUTION_TEMPLATE string = "execution_template.yml"
+var VERIFICATION_TEMPLATE string = "verification_template.yml"
+var RESOURCES_TEMPLATE string = "resources_template.yml"
+var ENV_TEMPLATE string = "nv_template.yml"
+var TEMPLATE_PATH string = "templates/"
 
 var VALUES_HEADER string = "branch: fake-branch\n# Commit must be a string\ncommit: \"123456\"\n\ndefaults: {}\n"
 
@@ -83,13 +84,23 @@ func yamlWriter(file *os.File, content string) {
 	}
 }
 
-func GenerateValuesYaml(nodeConfig map[string]int) {
-	nodesData := loadNodeJsonData()
-
-	values, err := os.OpenFile("values.yml", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+func createFile(filename string) *os.File {
+	file, err := os.OpenFile("values.yml", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	return file
+}
+
+func GenerateValuesYaml(nodeConfig map[string]int) {
+	generateValuesYaml(nodeConfig, "templates")
+}
+
+func generateValuesYaml(nodeConfig map[string]int, path string) {
+	nodesData := loadNodeJsonData()
+
+	values := createFile("values.yml")
 
 	resources := textReader(RESOURCES_TEMPLATE)
 	env := textReader(ENV_TEMPLATE)

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGeneratedDataAccess(t *testing.T) {
+func TestGenerateValues(t *testing.T) {
 	fmt.Printf("Starting tests")
 	var nodeConfig = make(map[string]int)
 	nodeConfig["access"] = 2
@@ -17,6 +17,19 @@ func TestGeneratedDataAccess(t *testing.T) {
 	nodeConfig["verification"] = 1
 
 	GenerateValuesYaml(nodeConfig)
+	textReader("values.yml")
+}
+
+func TestGenerateTestTemplates(t *testing.T) {
+	fmt.Printf("Starting tests")
+	var nodeConfig = make(map[string]int)
+	nodeConfig["access"] = 2
+	nodeConfig["collection"] = 6
+	nodeConfig["consensus"] = 3
+	nodeConfig["execution"] = 2
+	nodeConfig["verification"] = 1
+
+	generateValuesYaml(nodeConfig, "templates/test_templates/")
 	textReader("values.yml")
 }
 

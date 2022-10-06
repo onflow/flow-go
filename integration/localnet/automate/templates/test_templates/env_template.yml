@@ -1,0 +1,3 @@
+      env_template:
+      image: REPLACE_IMAGE
+      nodeId: REPLACE_NODE_ID
