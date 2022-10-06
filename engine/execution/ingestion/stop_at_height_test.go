@@ -3,9 +3,10 @@ package ingestion
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestCannotSetNewValuesAfterStoppingStarted(t *testing.T) {
