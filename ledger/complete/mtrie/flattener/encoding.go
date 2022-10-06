@@ -172,20 +172,85 @@ func EncodeNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scratch []
 // so any extra capacity will not be utilized.
 // If len(scratch) < 1024, then a new buffer will be allocated and used.
 func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*node.Node, error) {
-	isLeaf, height, lchildIndex, rchildIndex, path, payload, nodeHash, err :=
-		DecodeNodeData(reader, scratch)
 
-	if err != nil {
-		return nil, fmt.Errorf("could not decode node: %w", err)
+	// minBufSize should be large enough for interim node and leaf node with small payload.
+	// minBufSize is a failsafe and is only used when len(scratch) is much smaller
+	// than expected.  len(scratch) is 4096 by default, so minBufSize isn't likely to be used.
+	const minBufSize = 1024
+
+	if len(scratch) < minBufSize {
+		scratch = make([]byte, minBufSize)
 	}
 
-	// Read leaf node
-	if isLeaf {
-		n := node.NewNode(int(height), nil, nil, path, payload, nodeHash)
-		return n, nil
+	// fixLengthSize is the size of shared data of leaf node and interim node
+	const fixLengthSize = encNodeTypeSize + encHeightSize + encHashSize
+
+	_, err := io.ReadFull(reader, scratch[:fixLengthSize])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read fixed-length part of serialized node: %w", err)
+	}
+
+	pos := 0
+
+	// Decode node type (1 byte)
+	nType := scratch[pos]
+	pos += encNodeTypeSize
+
+	if nType != byte(leafNodeType) && nType != byte(interimNodeType) {
+		return nil, fmt.Errorf("failed to decode node type %d", nType)
+	}
+
+	// Decode height (2 bytes)
+	height := binary.BigEndian.Uint16(scratch[pos:])
+	pos += encHeightSize
+
+	// Decode and create hash.Hash (32 bytes)
+	nodeHash, err := hash.ToHash(scratch[pos : pos+encHashSize])
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode hash of serialized node: %w", err)
+	}
+
+	if nType == byte(leafNodeType) {
+
+		// Read path (32 bytes)
+		encPath := scratch[:encPathSize]
+		_, err := io.ReadFull(reader, encPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read path of serialized node: %w", err)
+		}
+
+		// Decode and create ledger.Path.
+		path, err := ledger.ToPath(encPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode path of serialized node: %w", err)
+		}
+
+		// Read encoded payload data and create ledger.Payload.
+		payload, err := readPayloadFromReader(reader, scratch)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read and decode payload of serialized node: %w", err)
+		}
+
+		node := node.NewNode(int(height), nil, nil, path, payload, nodeHash)
+		return node, nil
 	}
 
 	// Read interim node
+
+	// Read left and right child index (16 bytes)
+	_, err = io.ReadFull(reader, scratch[:encNodeIndexSize*2])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read child index of serialized node: %w", err)
+	}
+
+	pos = 0
+
+	// Decode left child index (8 bytes)
+	lchildIndex := binary.BigEndian.Uint64(scratch[pos:])
+	pos += encNodeIndexSize
+
+	// Decode right child index (8 bytes)
+	rchildIndex := binary.BigEndian.Uint64(scratch[pos:])
 
 	// Get left child node by node index
 	lchild, err := getNode(lchildIndex)
