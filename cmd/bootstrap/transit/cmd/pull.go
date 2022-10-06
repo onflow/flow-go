@@ -108,7 +108,7 @@ func pull(cmd *cobra.Command, args []string) {
 		// root.checkpoint* is downloaded to <bootstrap folder>/public-root-information after a pull
 		localPublicRootInfoDir := filepath.Join(flagBootDir, model.DirnamePublicBootstrap)
 
-		// move the root.checkpoint, root.checkpoint.1, root.checkpoint.2 etc. files to the bootstrap/execution-state dir
+		// move the root.checkpoint, root.checkpoint.0, root.checkpoint.1 etc. files to the bootstrap/execution-state dir
 		err = filepath.WalkDir(localPublicRootInfoDir, func(srcPath string, rootCheckpointFile fs.DirEntry, err error) error {
 			if err != nil {
 				return err
