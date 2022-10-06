@@ -3,7 +3,6 @@ package flattener
 import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
 // NodeIterator is an iterator over the nodes in a trie.
@@ -76,13 +75,13 @@ type NodeIterator struct {
 // as for each node, the children have been previously encountered.
 // NodeIterator created by NewNodeIterator is safe for concurrent use
 // because visitedNodes is always nil in this case.
-func NewNodeIterator(mTrie *trie.MTrie) *NodeIterator {
+func NewNodeIterator(n *node.Node) *NodeIterator {
 	// for a Trie with height H (measured by number of edges), the longest possible path contains H+1 vertices
 	stackSize := ledger.NodeMaxHeight + 1
 	i := &NodeIterator{
 		stack: make([]*node.Node, 0, stackSize),
 	}
-	i.unprocessedRoot = mTrie.RootNode()
+	i.unprocessedRoot = n
 	return i
 }
 
@@ -98,7 +97,7 @@ func NewNodeIterator(mTrie *trie.MTrie) *NodeIterator {
 // When re-building the Trie from the sequence of nodes, one can build the trie on the fly,
 // as for each node, the children have been previously encountered.
 // WARNING: visitedNodes is not safe for concurrent use.
-func NewUniqueNodeIterator(mTrie *trie.MTrie, visitedNodes map[*node.Node]uint64) *NodeIterator {
+func NewUniqueNodeIterator(n *node.Node, visitedNodes map[*node.Node]uint64) *NodeIterator {
 	// For a Trie with height H (measured by number of edges), the longest possible path
 	// contains H+1 vertices.
 	stackSize := ledger.NodeMaxHeight + 1
@@ -106,7 +105,7 @@ func NewUniqueNodeIterator(mTrie *trie.MTrie, visitedNodes map[*node.Node]uint64
 		stack:        make([]*node.Node, 0, stackSize),
 		visitedNodes: visitedNodes,
 	}
-	i.unprocessedRoot = mTrie.RootNode()
+	i.unprocessedRoot = n
 	return i
 }
 
@@ -115,7 +114,7 @@ func (i *NodeIterator) Next() bool {
 		// initial call to Next() for a non-empty trie
 		i.dig(i.unprocessedRoot)
 		i.unprocessedRoot = nil
-		return true
+		return len(i.stack) > 0
 	}
 
 	// the current head of the stack, `n`, has been recalled
