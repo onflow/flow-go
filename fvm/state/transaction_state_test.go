@@ -3,8 +3,9 @@ package state_test
 import (
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"

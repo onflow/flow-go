@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/proof"

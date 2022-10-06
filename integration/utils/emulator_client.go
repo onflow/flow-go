@@ -9,6 +9,7 @@ import (
 	emulator "github.com/onflow/flow-emulator"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 

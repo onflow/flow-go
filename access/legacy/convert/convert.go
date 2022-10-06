@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	accessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/crypto"

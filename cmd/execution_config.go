@@ -8,12 +8,11 @@ import (
 
 	"github.com/spf13/pflag"
 
-	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
-	"github.com/onflow/flow-go/module/mempool"
-
 	"github.com/onflow/flow-go/engine/execution/computation"
+	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/module/mempool"
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 

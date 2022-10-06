@@ -7,16 +7,11 @@ import (
 	gohash "hash"
 	"io"
 
-	sdk "github.com/onflow/flow-go-sdk"
-
-	"github.com/onflow/flow-go/model/encodable"
-
 	"golang.org/x/crypto/hkdf"
-
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )
 

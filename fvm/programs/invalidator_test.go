@@ -3,8 +3,9 @@ package programs
 import (
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/cadence/runtime/common"
 )
 
 type testInvalidator struct {

@@ -6,15 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc/connectivity"
-
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/protocol"

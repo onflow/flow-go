@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onflow/flow-go/utils/unittest"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func Test_GetByID_Parse(t *testing.T) {

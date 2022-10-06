@@ -2,16 +2,16 @@ package backend
 
 import (
 	"context"
-	"crypto/md5" //nolint:gosec
+	"crypto/md5" //
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-
 	"github.com/hashicorp/go-multierror"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"

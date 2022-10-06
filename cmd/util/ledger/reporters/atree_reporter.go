@@ -7,13 +7,13 @@ import (
 	goRuntime "runtime"
 	"sync"
 
+	"github.com/rs/zerolog"
+	"github.com/schollz/progressbar/v3"
+
 	"github.com/onflow/atree"
 
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
-
-	"github.com/rs/zerolog"
-	"github.com/schollz/progressbar/v3"
 )
 
 // AtreeReporter iterates payloads and generates payload and atree stats.

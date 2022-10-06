@@ -3,15 +3,16 @@ package migrations_test
 import (
 	"testing"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/environment"
 	state2 "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
-
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStorageUsedUpdateMigrationMigration(t *testing.T) {

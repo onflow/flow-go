@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/module"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,6 +14,7 @@ import (
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/dkg"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/stub"

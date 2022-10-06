@@ -3,9 +3,8 @@ package environment
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/stdlib"
-
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"

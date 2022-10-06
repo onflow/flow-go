@@ -2,7 +2,6 @@ package blueprints
 
 import (
 	_ "embed"
-
 	"encoding/hex"
 
 	"github.com/onflow/cadence"

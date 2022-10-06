@@ -8,12 +8,11 @@ import (
 	"net"
 	"sync"
 
-	"github.com/onflow/flow-go/module"
-
 	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )

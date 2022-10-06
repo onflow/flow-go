@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/fxamacker/cbor/v2"
+
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/crypto"

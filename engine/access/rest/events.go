@@ -3,10 +3,9 @@ package rest
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
-
-	"github.com/onflow/flow-go/access"
 )
 
 const blockQueryParam = "block_ids"

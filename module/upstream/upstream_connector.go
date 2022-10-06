@@ -9,11 +9,10 @@ import (
 	"github.com/sethvargo/go-retry"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
-	"github.com/onflow/flow-go/network/p2p/utils"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
 // upstreamConnector tries to connect the unstaked AN with atleast one of the configured bootstrap access nodes

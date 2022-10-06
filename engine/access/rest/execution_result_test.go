@@ -7,10 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	mocks "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	mocks "github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/util"

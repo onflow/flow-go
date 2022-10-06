@@ -5,13 +5,12 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/logging"
-
-	"github.com/sethvargo/go-retry"
 )
 
 type Uploader interface {

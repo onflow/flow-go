@@ -4,11 +4,10 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
-
 	"github.com/stretchr/testify/assert"
 
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

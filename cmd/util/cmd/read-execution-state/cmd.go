@@ -10,7 +10,6 @@ import (
 	list_accounts "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-accounts"
 	list_tries "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-tries"
 	list_wals "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-wals"
-
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"

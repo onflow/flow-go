@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"

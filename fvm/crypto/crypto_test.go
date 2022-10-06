@@ -7,9 +7,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/cadence/runtime"
 
 	gocrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"

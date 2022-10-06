@@ -3,8 +3,9 @@ package runtime
 import (
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/cadence/runtime"
 )
 
 func TestReusableCadanceRuntimePoolUnbuffered(t *testing.T) {

@@ -1,8 +1,9 @@
 package debug
 
 import (
-	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"

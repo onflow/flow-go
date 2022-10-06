@@ -3,9 +3,10 @@ package environment
 import (
 	"time"
 
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/module/trace"
 )

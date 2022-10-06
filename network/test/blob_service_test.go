@@ -15,16 +15,14 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/network/p2p/dht"
-
-	"github.com/onflow/flow-go/utils/unittest"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // conditionalTopology is a topology that behaves like the underlying topology when the condition is true,

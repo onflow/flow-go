@@ -1,11 +1,10 @@
 package rest
 
 import (
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/model/flow"
-
-	"github.com/onflow/flow-go/access"
 )
 
 // ExecuteScript handler sends the script from the request to be executed.

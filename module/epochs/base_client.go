@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sethvargo/go-retry"
-
 	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"

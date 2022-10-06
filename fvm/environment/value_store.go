@@ -4,8 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/onflow/atree"
 	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"

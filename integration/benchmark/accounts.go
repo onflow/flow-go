@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
-
 	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go-sdk/crypto"
 )

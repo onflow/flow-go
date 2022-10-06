@@ -6,21 +6,19 @@ import (
 	"testing"
 	"time"
 
-	mockery "github.com/stretchr/testify/mock"
-
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/codec"
-	"github.com/onflow/flow-go/network/message"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/codec"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"

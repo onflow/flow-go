@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
+
+	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/grpcutils"

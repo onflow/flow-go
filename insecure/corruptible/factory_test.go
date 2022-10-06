@@ -4,12 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/onflow/flow-go/network/channels"
-
 	"github.com/stretchr/testify/require"
 
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )

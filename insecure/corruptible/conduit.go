@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/flow-go/network"
-
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 )
 

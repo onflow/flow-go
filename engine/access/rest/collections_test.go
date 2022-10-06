@@ -7,15 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	mocks "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/model/flow"
-
-	"github.com/stretchr/testify/assert"
-	mocks "github.com/stretchr/testify/mock"
-
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

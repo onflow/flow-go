@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onflow/flow-go/engine/access/rest/util"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/engine/access/rest/util"
 )
 
 func TestGetScript_InvalidParse(t *testing.T) {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 )
 

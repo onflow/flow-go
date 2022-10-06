@@ -2,7 +2,6 @@ package badger_test
 
 import (
 	"errors"
-
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -10,9 +9,8 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/unittest"
-
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestPayloadStoreRetrieve(t *testing.T) {

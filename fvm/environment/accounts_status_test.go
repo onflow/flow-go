@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/onflow/atree"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/environment"
 )

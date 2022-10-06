@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 
 	"github.com/rs/zerolog/log"
-
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"

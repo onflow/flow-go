@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/onflow/flow-go/tools/test_monitor/common"
-
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/tools/test_monitor/common"
 )
 
 func TestGenerateLevel3Summary(t *testing.T) {

@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestSelectFilter(t *testing.T) {

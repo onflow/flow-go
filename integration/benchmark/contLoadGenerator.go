@@ -5,19 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-
 	"time"
 
-	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/cadence"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 type LoadType string

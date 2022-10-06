@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"

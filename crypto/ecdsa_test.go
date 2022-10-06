@@ -4,12 +4,11 @@
 package crypto
 
 import (
-	"encoding/hex"
-	"testing"
-
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/hex"
 	"math/big"
+	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/stretchr/testify/assert"

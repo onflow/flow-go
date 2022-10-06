@@ -7,23 +7,18 @@ import (
 
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"gotest.tools/assert"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	executionDataMock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
-
-	"github.com/onflow/flow-go/utils/unittest"
-
-	"github.com/stretchr/testify/mock"
-
 	storageMock "github.com/onflow/flow-go/storage/mock"
-
-	"gotest.tools/assert"
-
-	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func Test_Upload_invoke(t *testing.T) {

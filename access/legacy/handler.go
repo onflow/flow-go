@@ -3,10 +3,11 @@ package handler
 import (
 	"context"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
+	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/legacy/convert"

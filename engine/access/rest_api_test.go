@@ -11,12 +11,13 @@ import (
 	"time"
 
 	"github.com/antihax/optional"
-	restclient "github.com/onflow/flow/openapi/go-client-generated"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	restclient "github.com/onflow/flow/openapi/go-client-generated"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"

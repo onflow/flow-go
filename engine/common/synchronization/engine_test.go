@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/network/p2p/cache"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/events"
@@ -27,6 +25,7 @@ import (
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/cache"
 	protocolint "github.com/onflow/flow-go/state/protocol"
 	protocolEvents "github.com/onflow/flow-go/state/protocol/events"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"

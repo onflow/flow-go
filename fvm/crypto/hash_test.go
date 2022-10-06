@@ -1,12 +1,11 @@
 package crypto_test
 
 import (
+	"crypto/sha256"
+	"crypto/sha512"
 	"math/rand"
 	"testing"
 	"time"
-
-	"crypto/sha256"
-	"crypto/sha512"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

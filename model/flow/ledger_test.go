@@ -3,7 +3,6 @@ package flow
 import (
 	"encoding/hex"
 	"fmt"
-
 	"testing"
 )
 

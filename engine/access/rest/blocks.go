@@ -5,15 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/onflow/flow-go/engine/access/rest/models"
-	"github.com/onflow/flow-go/engine/access/rest/request"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/model/flow"
-
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // GetBlocksByIDs gets blocks by provided ID or list of IDs.
