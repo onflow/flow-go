@@ -844,6 +844,9 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
 	lg.Info().Hex("sender", originID[:]).Msg("handle collection")
+	defer func(startTime time.Time) {
+		lg.Info().TimeDiff("duration", time.Now(), startTime).Msg("collection handled")
+	}(time.Now())
 
 	// TODO: bail if have seen this collection before.
 	err := e.collections.Store(collection)

@@ -282,8 +282,8 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 		exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
 		exeNode.commits = storage.NewCommits(node.Metrics.Cache, node.DB)
 		exeNode.computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
-		exeNode.collections = storage.NewCollections(node.DB, exeNode.transactions)
 		exeNode.transactions = storage.NewTransactions(node.Metrics.Cache, node.DB)
+		exeNode.collections = storage.NewCollections(node.DB, exeNode.transactions)
 		exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
 
 		// Setting up RetryableUploader for GCP uploader

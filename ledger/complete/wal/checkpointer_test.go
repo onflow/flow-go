@@ -525,7 +525,7 @@ func randomlyModifyFile(t *testing.T, filename string) {
 
 func Test_StoringLoadingCheckpoints(t *testing.T) {
 
-	unittest.RunWithTempDirWithoutRemove(t, func(dir string) {
+	unittest.RunWithTempDir(t, func(dir string) {
 		// some hash will be literally encoded in output file
 		// so we can find it and modify - to make sure we get a different checksum
 		// but not fail process by, for example, modifying saved data length causing EOF
@@ -546,11 +546,9 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 
 		someHash := updatedTrie.RootNode().LeftChild().Hash() // Hash of left child
 
-		filePrefix := "temp-checkpoint"
-		file, err := os.CreateTemp(dir, filePrefix)
+		file, err := os.CreateTemp(dir, "temp-checkpoint")
 		filepath := file.Name()
 		require.NoError(t, err)
-		_, fileName := path.Split(filepath)
 
 		err = realWAL.StoreCheckpoint(file, updatedTrie)
 		require.NoError(t, err)
@@ -559,7 +557,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 
 		t.Run("works without data modification", func(t *testing.T) {
 			logger := zerolog.Nop()
-			tries, err := realWAL.LoadCheckpoint(dir, fileName, &logger)
+			tries, err := realWAL.LoadCheckpoint(filepath, &logger)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(tries))
 			require.Equal(t, updatedTrie, tries[0])
@@ -577,7 +575,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 			require.NoError(t, err)
 
 			logger := zerolog.Nop()
-			tries, err := realWAL.LoadCheckpoint(dir, fileName, &logger)
+			tries, err := realWAL.LoadCheckpoint(filepath, &logger)
 			require.Error(t, err)
 			require.Nil(t, tries)
 			require.Contains(t, err.Error(), "checksum")
