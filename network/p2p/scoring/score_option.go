@@ -18,7 +18,7 @@ const (
 	DefaultAppSpecificScoreWeight = 1
 	MaxAppSpecificPenalty         = -100
 	MaxAppSpecificReward          = 100
-	MinAppSpecificReward          = -2
+	MinAppSpecificReward          = -1
 
 	// DefaultGossipThreshold when a peer's score drops below this threshold,
 	// no gossip is emitted towards that peer and gossip from that peer is ignored.
@@ -28,7 +28,7 @@ const (
 	// How we use it:
 	// As current max penalty is -100, we set the threshold to -99 so that all gossips
 	// to and from peers with score -100 are ignored.
-	DefaultGossipThreshold = -1
+	DefaultGossipThreshold = -99
 
 	// DefaultPublishThreshold when a peer's score drops below this threshold,
 	// self-published messages are not propagated towards this peer.
@@ -84,7 +84,7 @@ type ScoreOption struct {
 func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider) *ScoreOption {
 	return &ScoreOption{
 		logger:     logger.With().Str("module", "pubsub_score_option").Logger(),
-		validator:  NewSubscriptionValidator(idProvider),
+		validator:  NewSubscriptionValidator(),
 		idProvider: idProvider,
 	}
 }
@@ -160,7 +160,7 @@ func (s *ScoreOption) preparePeerScoreParams() {
 				Logger()
 
 			// checks if peer has any subscription violation.
-			if err := s.validator.CheckSubscribedToAllowedTopics(pid); err != nil {
+			if err := s.validator.CheckSubscribedToAllowedTopics(pid, flowId.Role); err != nil {
 				lg.Err(err).
 					Msg("invalid subscription detected, penalizing peer")
 				return MaxAppSpecificPenalty
