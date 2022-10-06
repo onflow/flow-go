@@ -14,6 +14,29 @@ import (
 
 // revive:enable
 
+// SigningAlgorithm is an identifier for a signing algorithm
+// (and parameters if applicable)
+type SigningAlgorithm int
+
+const (
+	// Supported signing algorithms
+	UnknownSigningAlgorithm SigningAlgorithm = iota
+	// BLSBLS12381 is BLS on BLS 12-381 curve
+	BLSBLS12381
+	// ECDSAP256 is ECDSA on NIST P-256 curve
+	ECDSAP256
+	// ECDSASecp256k1 is ECDSA on secp256k1 curve
+	ECDSASecp256k1
+)
+
+// String returns the string representation of this signing algorithm.
+func (f SigningAlgorithm) String() string {
+	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_secp256k1"}[f]
+}
+
+// Signature is a generic type, regardless of the signature scheme
+type Signature []byte
+
 // Signer interface
 type signer interface {
 	// generatePrivateKey generates a private key
@@ -83,6 +106,13 @@ func SignatureFormatCheck(algo SigningAlgorithm, s Signature) (bool, error) {
 //
 // It is recommended to use a secure crypto RNG to generate the seed.
 // The seed must have enough entropy and should be sampled uniformly at random.
+//
+// The function returns:
+//   - (false, invalidInputsErrors) if the signing algorithm is not supported or
+//
+// if the seed length is not valid (too short or too long)
+//   - (false, error) if an unexpected error occurs
+//   - (sk, nil) otherwise
 func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
@@ -92,6 +122,16 @@ func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) 
 }
 
 // DecodePrivateKey decodes an array of bytes into a private key of the given algorithm
+//
+// The function returns:
+//   - (nil, invalidInputsErrors) if the signing algorithm is not supported
+//   - (nil, invalidInputsErrors) if the input does not serialize a valid private key:
+//   - ECDSA: bytes(x) where bytes() is the big-endian encoding padded to the curve order.
+//   - BLS: bytes(x) where bytes() is the big-endian encoding padded to the order of BLS12-381.
+//     for all algorithms supported, input is big-endian encoding
+//     of a the private scalar less than the curve order and left-padded to 32 bytes
+//   - (nil, error) if an unexpected error occurs
+//   - (sk, nil) otherwise
 func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
@@ -101,6 +141,14 @@ func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 }
 
 // DecodePublicKey decodes an array of bytes into a public key of the given algorithm
+//
+// The function returns:
+//   - (nil, invalidInputsErrors) if the signing algorithm is not supported
+//   - (nil, invalidInputsErrors) if the input does not serialize a valid public key:
+//   - ECDSA: bytes(x)||bytes(y) where bytes() is the big-endian encoding padded to the field size.
+//   - BLS: compressed serialization of a G2 point following https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-
+//   - (nil, error) if an unexpected error occurs
+//   - (sk, nil) otherwise
 func DecodePublicKey(algo SigningAlgorithm, data []byte) (PublicKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
@@ -110,6 +158,14 @@ func DecodePublicKey(algo SigningAlgorithm, data []byte) (PublicKey, error) {
 }
 
 // DecodePublicKeyCompressed decodes an array of bytes given in a compressed representation into a public key of the given algorithm
+// Only ECDSA is supported (BLS uses the compressed serialzation by default).
+//
+// The function returns:
+//   - (nil, invalidInputsErrors) if the signing algorithm is not supported (is not ECDSA)
+//   - (nil, invalidInputsErrors) if the input does not serialize a valid public key:
+//   - ECDSA: sign_byte||bytes(x) according to X9.62 section 4.3.6.
+//   - (nil, error) if an unexpected error occurs
+//   - (sk, nil) otherwise
 func DecodePublicKeyCompressed(algo SigningAlgorithm, data []byte) (PublicKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
@@ -164,7 +220,7 @@ type PublicKey interface {
 	Verify(Signature, []byte, hash.Hasher) (bool, error)
 	// Encode returns a bytes representation of the public key.
 	Encode() []byte
-	// Encode returns a compressed byte representation of the public key.
+	// EncodeCompressed returns a compressed byte representation of the public key.
 	// The compressed serialization concept is generic to elliptic curves,
 	// but we refer to individual curve parameters for details of the compressed format
 	EncodeCompressed() []byte

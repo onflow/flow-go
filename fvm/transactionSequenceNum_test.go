@@ -60,7 +60,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
 		err = seqChecker.Process(fvm.Context{}, proc, txnState, nil)
 		require.Error(t, err)
-		require.Equal(t, err.(errors.Error).Code(), errors.ErrCodeInvalidProposalSeqNumberError)
+		require.True(t, errors.HasErrorCode(err, errors.ErrCodeInvalidProposalSeqNumberError))
 
 		// get fetch the sequence number and check it to be  unchanged
 		key, err := accounts.GetPublicKey(address, 0)

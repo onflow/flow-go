@@ -25,6 +25,20 @@ import (
 // Private keys are scalar in Zr, where r is the group order of G1/G2.
 // Public keys are in G2.
 
+const (
+	// DKG and Threshold Signatures
+
+	// MinimumThreshold is the minimum value of the threshold parameter in all threshold-based protocols.
+	MinimumThreshold = 1
+	// DKGMinSize is the minimum size of a group participating in a DKG protocol
+	DKGMinSize int = MinimumThreshold + 1
+	// DKGMaxSize is the maximum size of a group participating in a DKG protocol
+	DKGMaxSize int = 254
+	// SeedMinLenDKG is the minumum seed length required to participate in a DKG protocol
+	SeedMinLenDKG = securityBits / 8
+	SeedMaxLenDKG = maxRelicPrgSeed
+)
+
 type DKGState interface {
 	// Size returns the size of the DKG group n
 	Size() int
@@ -77,6 +91,31 @@ func dkgFailureErrorf(msg string, args ...interface{}) error {
 // detects a failure in the protocol and is not able to compute output keys.
 func IsDKGFailureError(err error) bool {
 	var target *dkgFailureError
+	return errors.As(err, &target)
+}
+
+type dkgInvalidStateTransitionError struct {
+	error
+}
+
+func (e dkgInvalidStateTransitionError) Unwrap() error {
+	return e.error
+}
+
+// dkgInvalidStateTransitionErrorf constructs a new dkgInvalidStateTransitionError
+func dkgInvalidStateTransitionErrorf(msg string, args ...interface{}) error {
+	return &dkgInvalidStateTransitionError{
+		error: fmt.Errorf(msg, args...),
+	}
+}
+
+// IsDkgInvalidStateTransitionError checks if the input error is of a dkgInvalidStateTransition type.
+// invalidStateTransition is returned when a caller
+// triggers an invalid state transition in the local DKG instance.
+// Such a failure can only happen if the API is misued by not respecting
+// the state machine conditions.
+func IsDKGInvalidStateTransitionError(err error) bool {
+	var target *dkgInvalidStateTransitionError
 	return errors.As(err, &target)
 }
 

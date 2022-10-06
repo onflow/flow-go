@@ -261,12 +261,12 @@ func TestHashing(t *testing.T) {
 		Algo    runtime.HashAlgorithm
 		WithTag bool
 		Tag     string
-		Check   func(t *testing.T, result string, scriptErr errors.Error, executionErr error)
+		Check   func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error)
 	}{
 		{
 			Algo:    runtime.HashAlgorithmSHA2_256,
 			WithTag: false,
-			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+			Check: func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
 				require.Equal(t, "68fb87dfba69b956f4ba98b748a75a604f99b38a4f2740290037957f7e830da8", result)
@@ -275,7 +275,7 @@ func TestHashing(t *testing.T) {
 		{
 			Algo:    runtime.HashAlgorithmSHA2_384,
 			WithTag: false,
-			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+			Check: func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
 				require.Equal(t, "a9b3e62ab9b2a33020e015f245b82e063afd1398211326408bc8fc31c2c15859594b0aee263fbb02f6d8b5065ad49df2", result)
@@ -284,7 +284,7 @@ func TestHashing(t *testing.T) {
 		{
 			Algo:    runtime.HashAlgorithmSHA3_256,
 			WithTag: false,
-			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+			Check: func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
 				require.Equal(t, "38effea5ab9082a2cb0dc9adfafaf88523e8f3ce74bfbeac85ffc719cc2c4677", result)
@@ -293,7 +293,7 @@ func TestHashing(t *testing.T) {
 		{
 			Algo:    runtime.HashAlgorithmSHA3_384,
 			WithTag: false,
-			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+			Check: func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
 				require.Equal(t, "f41e8de9af0c1f46fc56d5a776f1bd500530879a85f3b904821810295927e13a54f3e936dddb84669021052eb12966c3", result)
@@ -302,7 +302,7 @@ func TestHashing(t *testing.T) {
 		{
 			Algo:    runtime.HashAlgorithmKECCAK_256,
 			WithTag: false,
-			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+			Check: func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
 				require.Equal(t, "1d5ced4738dd4e0bb4628dad7a7b59b8e339a75ece97a4ad004773a49ed7b5bc", result)
@@ -312,7 +312,7 @@ func TestHashing(t *testing.T) {
 			Algo:    runtime.HashAlgorithmKECCAK_256,
 			WithTag: true,
 			Tag:     "some_tag",
-			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+			Check: func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
 				require.Equal(t, "8454ec77f76b229a473770c91e3ea6e7e852416d747805215d15d53bdc56ce5f", result)
@@ -322,7 +322,7 @@ func TestHashing(t *testing.T) {
 			Algo:    runtime.HashAlgorithmSHA2_256,
 			WithTag: true,
 			Tag:     "some_tag",
-			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+			Check: func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
 				require.Equal(t, "4e07609b9a856a5e10703d1dba73be34d9ca0f4e780859d66983f41d746ec8b2", result)
@@ -332,7 +332,7 @@ func TestHashing(t *testing.T) {
 			Algo:    runtime.HashAlgorithmSHA2_384,
 			WithTag: true,
 			Tag:     "some_tag",
-			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+			Check: func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
 				require.Equal(t, "f9bd89e15f341a225656944dc8b3c405e66a0f97838ad44c9803164c911e677aea7ad4e24486fba3f803d83ed1ccfce5", result)
@@ -342,7 +342,7 @@ func TestHashing(t *testing.T) {
 			Algo:    runtime.HashAlgorithmSHA3_256,
 			WithTag: true,
 			Tag:     "some_tag",
-			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+			Check: func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
 				require.Equal(t, "f59e2ccc9d7f008a96948a31573670d9976a4a161601ab1cd1d2da019779a0f6", result)
@@ -352,7 +352,7 @@ func TestHashing(t *testing.T) {
 			Algo:    runtime.HashAlgorithmSHA3_384,
 			WithTag: true,
 			Tag:     "some_tag",
-			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+			Check: func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
 				require.Equal(t, "e7875eafdb53327faeace8478d1650c6547d04fb4fb42f34509ad64bde0267bea7e1b3af8fda3ef9d9c9327dd4e97a96", result)
@@ -361,7 +361,7 @@ func TestHashing(t *testing.T) {
 		{
 			Algo:    runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
 			WithTag: false,
-			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+			Check: func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
 				require.Equal(t, "44dc46111abacfe2bb4a04cea4805aad03f84e4849f138cc3ed431478472b185548628e96d0c963b21ebaf17132d73fc13031eb82d5f4cbe3b6047ff54d20e8d663904373d73348b97ce18305ebc56114cb7e7394e486684007f78aa59abc5d0a8f6bae6bd186db32528af80857cd12112ce6960be29c96074df9c4aaed5b0e6", result)
@@ -371,7 +371,7 @@ func TestHashing(t *testing.T) {
 			Algo:    runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
 			WithTag: true,
 			Tag:     "some_tag",
-			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+			Check: func(t *testing.T, result string, scriptErr errors.CodedError, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
 				require.Equal(t, "de7d9aa24274fa12c98cce5c09eea0634108ead2e91828b9a9a450e878088393e3e63eb4b19834f579ce215b00a9915919b67a71dab1112560319e6e1e5e9ad0fb670e8a09d586508c84547cee7ddbe8c9362c996846154865eb271bdc4523dbcdbdae5a77391fb54374f37534c8bb2281589cb2e3d62742596cdad7e4f9f35c", result)
