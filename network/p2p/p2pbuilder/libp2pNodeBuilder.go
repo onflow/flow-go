@@ -21,22 +21,20 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
-	"github.com/onflow/flow-go/network/p2p/subscription"
-	"github.com/onflow/flow-go/network/p2p/utils"
-
-	"github.com/onflow/flow-go/network/p2p/dht"
-
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
@@ -49,9 +47,10 @@ func DefaultLibP2PNodeFactory(
 	address string,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
-	idProvider id.IdentityProvider,
+	idProvider module.IdentityProvider,
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
+	peerScoringEnabled bool,
 	role string,
 ) LibP2PFactoryFunc {
 
@@ -78,8 +77,11 @@ func DefaultLibP2PNodeFactory(
 					metrics,
 					dht.AsServer(),
 				)
-			}).
-			SetPubSub(pubsub.NewGossipSub)
+			})
+
+		if peerScoringEnabled {
+			builder.EnableGossipSubPeerScoring(idProvider)
+		}
 
 		if role != "ghost" {
 			r, _ := flow.ParseRole(role)
@@ -104,22 +106,23 @@ type NodeBuilder interface {
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
-	SetPubSub(func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)) NodeBuilder
+	EnableGossipSubPeerScoring(module.IdentityProvider) NodeBuilder
 	Build(context.Context) (*p2pnode.Node, error)
 }
 
 type LibP2PNodeBuilder struct {
-	sporkID            flow.Identifier
-	addr               string
-	networkKey         fcrypto.PrivateKey
-	logger             zerolog.Logger
-	basicResolver      madns.BasicResolver
-	subscriptionFilter pubsub.SubscriptionFilter
-	resourceManager    network.ResourceManager
-	connManager        connmgr.ConnManager
-	connGater          connmgr.ConnectionGater
-	routingFactory     func(context.Context, host.Host) (routing.Routing, error)
-	pubsubFactory      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
+	sporkID              flow.Identifier
+	addr                 string
+	networkKey           fcrypto.PrivateKey
+	logger               zerolog.Logger
+	basicResolver        madns.BasicResolver
+	subscriptionFilter   pubsub.SubscriptionFilter
+	resourceManager      network.ResourceManager
+	connManager          connmgr.ConnManager
+	connGater            connmgr.ConnectionGater
+	idProvider           module.IdentityProvider
+	gossipSubPeerScoring bool // whether to enable gossipsub peer scoring
+	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
 }
 
 func NewNodeBuilder(
@@ -166,18 +169,15 @@ func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetPubSub(f func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)) NodeBuilder {
-	builder.pubsubFactory = f
+func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.IdentityProvider) NodeBuilder {
+	builder.gossipSubPeerScoring = true
+	builder.idProvider = provider
 	return builder
 }
 
 func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*p2pnode.Node, error) {
 	if builder.routingFactory == nil {
 		return nil, errors.New("routing factory is not set")
-	}
-
-	if builder.pubsubFactory == nil {
-		return nil, errors.New("pubsub factory is not set")
 	}
 
 	var opts []libp2p.Option
@@ -204,12 +204,12 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*p2pnode.Node, err
 		opts = append(opts, libp2p.ConnectionGater(builder.connGater))
 	}
 
-	host, err := DefaultLibP2PHost(ctx, builder.addr, builder.networkKey, opts...)
+	h, err := DefaultLibP2PHost(ctx, builder.addr, builder.networkKey, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	rsys, err := builder.routingFactory(ctx, host)
+	rsys, err := builder.routingFactory(ctx, h)
 	if err != nil {
 		return nil, err
 	}
@@ -224,19 +224,28 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*p2pnode.Node, err
 		psOpts = append(psOpts, pubsub.WithSubscriptionFilter(builder.subscriptionFilter))
 	}
 
-	pubSub, err := builder.pubsubFactory(ctx, host, psOpts...)
+	var scoreOpt *scoring.ScoreOption
+	if builder.gossipSubPeerScoring {
+		scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider)
+		psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
+	}
+
+	pubSub, err := pubsub.NewGossipSub(ctx, h, psOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("could not create gossipsub: %w", err)
+	}
+	if scoreOpt != nil {
+		scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, pubSub))
+	}
+
+	pCache, err := p2pnode.NewProtocolPeerCache(builder.logger, h)
 	if err != nil {
 		return nil, err
 	}
 
-	pCache, err := p2pnode.NewProtocolPeerCache(builder.logger, host)
-	if err != nil {
-		return nil, err
-	}
-
-	n := p2pnode.NewNode(builder.logger, host, pubSub, rsys, pCache, unicast.NewUnicastManager(
+	n := p2pnode.NewNode(builder.logger, h, pubSub, rsys, pCache, unicast.NewUnicastManager(
 		builder.logger,
-		unicast.NewLibP2PStreamFactory(host),
+		unicast.NewLibP2PStreamFactory(h),
 		builder.sporkID,
 	))
 	return n, nil
