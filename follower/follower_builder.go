@@ -578,7 +578,7 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			pis = append(pis, pi)
 		}
 
-		b := p2pbuilder.NewNodeBuilder(builder.Logger, builder.BaseConfig.BindAddr, networkKey, builder.SporkID).
+		node, err := p2pbuilder.NewNodeBuilder(builder.Logger, builder.BaseConfig.BindAddr, networkKey, builder.SporkID).
 			SetSubscriptionFilter(
 				subscription.NewRoleBasedFilter(
 					subscription.UnstakedRole, builder.IdentityProvider,
@@ -591,12 +591,7 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 					p2pdht.AsClient(),
 					dht.BootstrapPeers(pis...),
 				)
-			})
-		if builder.PeerScoringEnabled {
-			b.EnableGossipSubPeerScoring(builder.IdentityProvider)
-		}
-
-		node, err := b.Build(ctx)
+			}).Build(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("could not build libp2p node: %w", err)
 		}
