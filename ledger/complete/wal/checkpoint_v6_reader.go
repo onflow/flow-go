@@ -311,7 +311,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 
 	topLevelNodesCount, triesCount, expectedSum, err := readTopTriesFooter(file)
 	if err != nil {
-		return nil, fmt.Errorf("could not read node count: %w", err)
+		return nil, fmt.Errorf("could not read top tries footer: %w", err)
 	}
 
 	if topTrieChecksum != expectedSum {
@@ -407,7 +407,6 @@ func readSubtrieCount(reader io.Reader) (uint16, error) {
 		return 0, err
 	}
 	return decodeSubtrieCount(bytes)
-
 }
 
 func readCRC32Sum(reader io.Reader) (uint32, error) {

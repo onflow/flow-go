@@ -578,13 +578,13 @@ func getNodesAtLevel(root *node.Node, level uint) []*node.Node {
 }
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
-	filename := NumberToFilename(checkpoint)
-	return LoadCheckpoint(c.dir, filename, &c.wal.log)
+	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
+	return LoadCheckpoint(filepath, &c.wal.log)
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
-	filename := bootstrap.FilenameWALRootCheckpoint
-	return LoadCheckpoint(c.dir, filename, &c.wal.log)
+	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
+	return LoadCheckpoint(filepath, &c.wal.log)
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
@@ -601,8 +601,7 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
-func LoadCheckpoint(dir string, filename string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
-	filepath := path.Join(dir, filename)
+func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
@@ -617,10 +616,10 @@ func LoadCheckpoint(dir string, filename string, logger *zerolog.Logger) ([]*tri
 		_ = file.Close()
 	}()
 
-	return readCheckpoint(file, dir, filename, logger)
+	return readCheckpoint(file, logger)
 }
 
-func readCheckpoint(f *os.File, dir string, filename string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func readCheckpoint(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 
 	// Read header: magic (2 bytes) + version (2 bytes)
 	header := make([]byte, headerSize)
@@ -650,8 +649,6 @@ func readCheckpoint(f *os.File, dir string, filename string, logger *zerolog.Log
 		return readCheckpointV4(f)
 	case VersionV5:
 		return readCheckpointV5(f, logger)
-	case VersionV6:
-		return ReadCheckpointV6(dir, filename, logger)
 	default:
 		return nil, fmt.Errorf("unsupported file version %x", version)
 	}

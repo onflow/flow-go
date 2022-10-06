@@ -172,7 +172,6 @@ func EncodeNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scratch []
 // so any extra capacity will not be utilized.
 // If len(scratch) < 1024, then a new buffer will be allocated and used.
 func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*node.Node, error) {
-
 	isLeaf, height, lchildIndex, rchildIndex, path, payload, nodeHash, err :=
 		DecodeNodeData(reader, scratch)
 
@@ -182,8 +181,8 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 
 	// Read leaf node
 	if isLeaf {
-		node := node.NewNode(int(height), nil, nil, path, payload, nodeHash)
-		return node, nil
+		n := node.NewNode(int(height), nil, nil, path, payload, nodeHash)
+		return n, nil
 	}
 
 	// Read interim node
