@@ -2,7 +2,6 @@ package checkpoint_list_tries
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -30,8 +29,7 @@ func init() {
 func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("loading checkpoint %v", flagCheckpoint)
-	dir, file := filepath.Split(flagCheckpoint)
-	tries, err := wal.LoadCheckpoint(dir, file, &log.Logger)
+	tries, err := wal.LoadCheckpoint(flagCheckpoint, &log.Logger)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while loading checkpoint")
 	}
