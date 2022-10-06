@@ -105,7 +105,7 @@ func pull(cmd *cobra.Command, args []string) {
 	// move root checkpoint file if node role is execution
 	if role == flow.RoleExecution {
 
-		// root.checkpoint.* is downloaded to <bootstrap folder>/public-root-information after a pull
+		// root.checkpoint* is downloaded to <bootstrap folder>/public-root-information after a pull
 		localPublicRootInfoDir := filepath.Join(flagBootDir, model.DirnamePublicBootstrap)
 
 		// move the root.checkpoint, root.checkpoint.1, root.checkpoint.2 etc. files to the bootstrap/execution-state dir
