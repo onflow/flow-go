@@ -50,6 +50,7 @@ func DefaultLibP2PNodeFactory(
 	idProvider module.IdentityProvider,
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
+	peerScoringEnabled bool,
 	role string,
 ) LibP2PFactoryFunc {
 
@@ -77,6 +78,10 @@ func DefaultLibP2PNodeFactory(
 					dht.AsServer(),
 				)
 			})
+
+		if peerScoringEnabled {
+			builder.EnableGossipSubPeerScoring(idProvider)
+		}
 
 		if role != "ghost" {
 			r, _ := flow.ParseRole(role)

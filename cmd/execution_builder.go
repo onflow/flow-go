@@ -277,8 +277,8 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 		exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
 		exeNode.commits = storage.NewCommits(node.Metrics.Cache, node.DB)
 		exeNode.computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
-		exeNode.collections = storage.NewCollections(node.DB, exeNode.transactions)
 		exeNode.transactions = storage.NewTransactions(node.Metrics.Cache, node.DB)
+		exeNode.collections = storage.NewCollections(node.DB, exeNode.transactions)
 		exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
 
 		// Setting up RetryableUploader for GCP uploader
@@ -914,7 +914,7 @@ func getContractEpochCounter(vm computer.VirtualMachine, vmCtx fvm.Context, view
 	script := fvm.Script(scriptCode)
 
 	// execute the script
-	err = vm.RunV2(vmCtx, script, view)
+	err = vm.Run(vmCtx, script, view)
 	if err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, internal error while executing script: %w", err)
 	}

@@ -154,10 +154,12 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 	}
 
 	for _, role := range flow.Roles() {
-		peer := p2pfixtures.PeerIdFixture(t)
-		idProvider.On("ByPeerID", peer).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
-		sp.On("GetSubscribedTopics", peer).Return(allTopics)
-		require.Error(t, sv.CheckSubscribedToAllowedTopics(peer), role)
+		peerId := p2pfixtures.PeerIdFixture(t)
+		idProvider.On("ByPeerID", peerId).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
+		sp.On("GetSubscribedTopics", peerId).Return(allTopics)
+		err := sv.CheckSubscribedToAllowedTopics(peerId)
+		require.Error(t, err, role)
+		require.True(t, scoring.IsInvalidSubscriptionError(err), role)
 	}
 }
 
@@ -171,10 +173,10 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	sv.RegisterSubscriptionProvider(sp)
 
 	for _, role := range flow.Roles() {
-		peer := p2pfixtures.PeerIdFixture(t)
+		peerId := p2pfixtures.PeerIdFixture(t)
 		unauthorizedChannels := channels.Channels(). // all channels
-			ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
-			ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
+								ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
+								ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
 		sporkID := unittest.IdentifierFixture()
 		unauthorizedTopics := make([]string, 0, len(unauthorizedChannels))
 		for _, channel := range unauthorizedChannels {
@@ -183,9 +185,11 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 
 		// peer should NOT pass subscription validator as it has subscribed to any subset of its unauthorized topics.
 		for i := range unauthorizedTopics {
-			idProvider.On("ByPeerID", peer).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
-			sp.On("GetSubscribedTopics", peer).Return(unauthorizedTopics[:i+1])
-			require.Error(t, sv.CheckSubscribedToAllowedTopics(peer))
+			idProvider.On("ByPeerID", peerId).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
+			sp.On("GetSubscribedTopics", peerId).Return(unauthorizedTopics[:i+1])
+			err := sv.CheckSubscribedToAllowedTopics(peerId)
+			require.Error(t, err, role)
+			require.True(t, scoring.IsInvalidSubscriptionError(err), role)
 		}
 	}
 }

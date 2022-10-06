@@ -26,7 +26,7 @@ type facadeEnvironment struct {
 	*CryptoLibrary
 
 	*BlockInfo
-	*AccountInfo
+	AccountInfo
 	TransactionInfo
 
 	*ValueStore
@@ -46,6 +46,7 @@ type facadeEnvironment struct {
 	*Programs
 
 	accounts Accounts
+	txnState *state.TransactionState
 }
 
 func newFacadeEnvironment(
@@ -131,6 +132,7 @@ func newFacadeEnvironment(
 			programs),
 
 		accounts: accounts,
+		txnState: txnState,
 	}
 
 	env.Runtime.SetEnvironment(env)
@@ -144,18 +146,22 @@ func newScriptFacadeEnvironment(
 	txnState *state.TransactionState,
 	programs TransactionPrograms,
 ) *facadeEnvironment {
-	return newFacadeEnvironment(
+	env := newFacadeEnvironment(
 		params,
 		txnState,
 		programs,
 		NewCancellableMeter(ctx, txnState))
+
+	env.addParseRestrictedChecks()
+
+	return env
 }
 
 func newTransactionFacadeEnvironment(
 	params EnvironmentParams,
 	txnState *state.TransactionState,
 	programs TransactionPrograms,
-) Environment {
+) *facadeEnvironment {
 	env := newFacadeEnvironment(
 		params,
 		txnState,
@@ -206,7 +212,35 @@ func newTransactionFacadeEnvironment(
 		txnState,
 		env)
 
+	env.addParseRestrictedChecks()
+
 	return env
+}
+
+func (env *facadeEnvironment) addParseRestrictedChecks() {
+	// NOTE: Cadence can access Programs, ContractReader and Meter while it is
+	// parsing programs; all other access are unexpected and are potentially
+	// program cache invalidation bugs.
+
+	env.AccountCreator = NewParseRestrictedAccountCreator(
+		env.txnState,
+		env.AccountCreator)
+	env.AccountFreezer = NewParseRestrictedAccountFreezer(
+		env.txnState,
+		env.AccountFreezer)
+	env.AccountInfo = NewParseRestrictedAccountInfo(
+		env.txnState,
+		env.AccountInfo)
+	env.AccountKeyUpdater = NewParseRestrictedAccountKeyUpdater(
+		env.txnState,
+		env.AccountKeyUpdater)
+	env.ContractUpdater = NewParseRestrictedContractUpdater(
+		env.txnState,
+		env.ContractUpdater)
+	env.TransactionInfo = NewParseRestrictedTransactionInfo(
+		env.txnState,
+		env.TransactionInfo)
+	// TODO(patrick): check other API
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (

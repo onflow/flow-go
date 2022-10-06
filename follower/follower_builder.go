@@ -591,11 +591,9 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 					p2pdht.AsClient(),
 					dht.BootstrapPeers(pis...),
 				)
-			}).
-			Build(ctx)
-
+			}).Build(ctx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not build libp2p node: %w", err)
 		}
 
 		builder.LibP2PNode = node

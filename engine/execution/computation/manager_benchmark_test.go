@@ -88,7 +88,7 @@ func mustFundAccounts(
 		tx := fvm.Transaction(
 			transferTx,
 			blockPrograms.NextTxIndexForTestingOnly())
-		err = vm.RunV2(execCtx, tx, ledger)
+		err = vm.Run(execCtx, tx, ledger)
 		require.NoError(b, err)
 		require.NoError(b, tx.Err)
 	}
