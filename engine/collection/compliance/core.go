@@ -228,8 +228,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 			// => node was probably behind and is catching up. Log as warning
 			log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
 			return nil
-		}
-		if engine.IsInvalidInputError(err) {
+		} else if engine.IsInvalidInputError(err) {
 			// the block is invalid; log as error as we desire honest participation
 			// ToDo: potential slashing
 			log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
@@ -244,8 +243,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 				}
 			}
 			return nil
-		}
-		if engine.IsUnverifiableInputError(err) {
+		} else if engine.IsUnverifiableInputError(err) {
 			// the block cannot be validated
 			// TODO: potential slashing
 			log.Err(err).Msg("received unverifiable block proposal; this is an indicator of an invalid (slashable) proposal or an epoch failure")
@@ -307,8 +305,7 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 	if err != nil {
 		if model.IsInvalidBlockError(err) {
 			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
-		}
-		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+		} else if errors.Is(err, model.ErrViewForUnknownEpoch) {
 			// We have received a proposal, but we don't know the epoch its view is within.
 			// We know:
 			//  - the parent of this block is valid and inserted (ie. we knew the epoch for it)
@@ -333,9 +330,9 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 	if err != nil {
 		if state.IsInvalidExtensionError(err) {
 			// if the block proposes an invalid extension of the cluster state, then the block is invalid
+			// TODO: we should slash the block proposer
 			return engine.NewInvalidInputErrorf("invalid extension of cluster state (block: %x, height: %d): %w", blockID, header.Height, err)
-		}
-		if state.IsOutdatedExtensionError(err) {
+		} else if state.IsOutdatedExtensionError(err) {
 			// cluster state aborted processing of block as it is on an abandoned fork: block is outdated
 			return engine.NewOutdatedInputErrorf("outdated extension of cluster state: %w", err)
 		}
