@@ -362,15 +362,6 @@ func getNodeByIndex(subtrieNodes [][]*node.Node, totalSubTrieNodeCount uint64, t
 }
 
 func getTopNodeByIndex(totalSubTrieNodeCount uint64, topLevelNodes []*node.Node, index uint64) (*node.Node, error) {
-	// sanity checks: topLevelNodes[0] should be `nil`
-	if len(topLevelNodes) < 1 {
-		return nil, fmt.Errorf("top trie should have at least 1 item")
-	}
-
-	if topLevelNodes[0] != nil {
-		return nil, fmt.Errorf("top trie [0] %v isn't nil", topLevelNodes[0])
-	}
-
 	nodePos := index - totalSubTrieNodeCount
 
 	if nodePos >= uint64(len(topLevelNodes)) {
