@@ -220,11 +220,18 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 			// => node was probably behind and is catching up. Log as warning
 			log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
 			return nil
-		} else if engine.IsInvalidInputError(err) {
-			// the block is invalid; log as error as we desire honest participation
-			// ToDo: potential slashing
-			log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
-			// notify the VoteAggregator of an invalid block to enable detecting Byzantine voters
+		} else if engine.IsInvalidInputError(err) || engine.IsUnverifiableInputError(err) {
+			// log a message for either input case
+			if engine.IsInvalidInputError(err) {
+				// the block is invalid; log as error as we desire honest participation
+				log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+			}
+			if engine.IsUnverifiableInputError(err) {
+				// the block cannot be validated
+				log.Err(err).Msg("received unverifiable block proposal; this is an indicator of an invalid (slashable) proposal or an epoch failure")
+			}
+
+			// in both cases, notify VoteAggregator
 			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header, parent.View))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
@@ -234,11 +241,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 					return fmt.Errorf("unexpected error notifying vote aggregator about invalid block: %w", err)
 				}
 			}
-			return nil
-		} else if engine.IsUnverifiableInputError(err) {
-			// the block cannot be validated
-			// TODO: potential slashing
-			log.Err(err).Msg("received unverifiable block proposal; this is an indicator of an invalid (slashable) proposal or an epoch failure")
+
 			return nil
 		}
 		// unexpected error: potentially corrupted internal state => abort processing and escalate error
