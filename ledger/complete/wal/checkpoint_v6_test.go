@@ -340,6 +340,32 @@ func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
 	})
 }
 
+func TestCleanupOnErrorIfNotExist(t *testing.T) {
+	t.Run("works if temp files not exist", func(t *testing.T) {
+		require.NoError(t, cleanupTempFiles("not-exist", "checkpoint-v6"))
+	})
+
+	// if it can clean up all files after successful storing, then it can
+	// clean up if failed in middle.
+	t.Run("clean up after finish storing files", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(dir string) {
+			tries := createMultipleRandomTries(t)
+			logger := unittest.Logger()
+
+			// store tries into v6 then read back, then store into v5
+			require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
+			require.NoError(t, cleanupTempFiles(dir, "checkpoint-v6"))
+
+			// verify all files are removed
+			files := filePaths(dir, "checkpoint-v6", subtrieLevel)
+			for _, file := range files {
+				_, err := os.Stat(file)
+				require.True(t, os.IsNotExist(err), err)
+			}
+		})
+	})
+}
+
 // verify that if a part file is missing then os.ErrNotExist should return
 func TestAllPartFileExist(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
