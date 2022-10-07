@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/consensus/message_hub"
 	"os"
 	"sort"
 	"testing"
@@ -145,6 +146,7 @@ type Node struct {
 	committee         *committees.Consensus
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
+	messageHub        *message_hub.MessageHub
 	state             *bprotocol.MutableState
 	headers           *storage.Headers
 	net               *Network
@@ -544,7 +546,7 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	comp, err := compliance.NewEngine(log, net, me, prov, compCore)
+	comp, err := compliance.NewEngine(log, me, prov, compCore)
 	require.NoError(t, err)
 
 	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
@@ -576,7 +578,6 @@ func createNode(
 		log,
 		metricsCollector,
 		build,
-		comp,
 		rootHeader,
 		[]*flow.Header{},
 		hotstuffModules,
@@ -586,6 +587,23 @@ func createNode(
 
 	comp = comp.WithConsensus(hot)
 
+	messageHub, err := message_hub.NewMessageHub(
+		log,
+		net,
+		me,
+		comp,
+		prov,
+		hot,
+		voteAggregator,
+		timeoutAggregator,
+		state,
+		headersDB,
+		payloadsDB,
+	)
+	require.NoError(t, err)
+
+	notifier.AddConsumer(messageHub)
+
 	node.compliance = comp
 	node.sync = sync
 	node.state = fullState
@@ -593,6 +611,7 @@ func createNode(
 	node.committee = committee
 	node.voteAggregator = hotstuffModules.VoteAggregator
 	node.timeoutAggregator = hotstuffModules.TimeoutAggregator
+	node.messageHub = messageHub
 	node.headers = headersDB
 	node.net = net
 	node.log = log
