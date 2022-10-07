@@ -1,17 +1,15 @@
 package integration
 
 import (
-	"fmt"
-	"time"
-
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"testing"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func Connect(instances []*Instance) {
+func Connect(t *testing.T, instances []*Instance) {
 
 	// first, create a map of all instances and a queue for each
 	lookup := make(map[flow.Identifier]*Instance)
@@ -23,16 +21,18 @@ func Connect(instances []*Instance) {
 	for _, sender := range instances {
 		sender := sender // avoid capturing loop variable in closure
 
-		*sender.communicator = mocks.Communicator{}
-		sender.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(
-			func(header *flow.Header, delay time.Duration) error {
+		*sender.notifier = MockedCommunicatorConsumer{}
+		sender.notifier.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Run(
+			func(args mock.Arguments) {
+				header, ok := args[0].(*flow.Header)
+				require.True(t, ok)
 
 				// sender should always have the parent
 				sender.updatingBlocks.RLock()
 				parent, exists := sender.headers[header.ParentID]
 				sender.updatingBlocks.RUnlock()
 				if !exists {
-					return fmt.Errorf("parent for proposal not found (sender: %x, parent: %x)", sender.localID, header.ParentID)
+					t.Fatalf("parent for proposal not found (sender: %x, parent: %x)", sender.localID, header.ParentID)
 				}
 
 				// fill in the header chain ID and height
@@ -47,7 +47,7 @@ func Connect(instances []*Instance) {
 
 				// check if we should block the outgoing proposal
 				if sender.blockPropOut(proposal) {
-					return nil
+					return
 				}
 
 				// iterate through potential receivers
@@ -65,45 +65,50 @@ func Connect(instances []*Instance) {
 
 					receiver.ProcessBlock(proposal)
 				}
-
-				return nil
 			},
 		)
-		sender.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
-			func(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
-
+		sender.notifier.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
+			func(args mock.Arguments) {
+				blockID, ok := args[0].(flow.Identifier)
+				require.True(t, ok)
+				view, ok := args[1].(uint64)
+				require.True(t, ok)
+				sigData, ok := args[2].([]byte)
+				require.True(t, ok)
+				recipientID, ok := args[3].(flow.Identifier)
+				require.True(t, ok)
 				// convert into vote
 				vote := model.VoteFromFlow(sender.localID, blockID, view, sigData)
 
 				// should never send to self
 				if recipientID == sender.localID {
-					return fmt.Errorf("can't send to self (sender: %x)", sender.localID)
+					t.Fatalf("can't send to self (sender: %x)", sender.localID)
 				}
 
 				// check if we should block the outgoing vote
 				if sender.blockVoteOut(vote) {
-					return nil
+					return
 				}
 
 				// get the receiver
 				receiver, exists := lookup[recipientID]
 				if !exists {
-					return fmt.Errorf("recipient doesn't exist (sender: %x, receiver: %x)", sender.localID, recipientID)
+					t.Fatalf("recipient doesn't exist (sender: %x, receiver: %x)", sender.localID, recipientID)
 				}
 
 				// check if e should block the incoming vote
 				if receiver.blockVoteIn(vote) {
-					return nil
+					return
 				}
 
 				// submit the vote to the receiving event loop (non-blocking)
 				receiver.queue <- vote
-
-				return nil
 			},
 		)
-		sender.communicator.On("BroadcastTimeout", mock.Anything).Return(
-			func(timeoutObject *model.TimeoutObject) error {
+		sender.notifier.On("BroadcastTimeout", mock.Anything).Run(
+			func(args mock.Arguments) {
+				timeoutObject, ok := args[0].(*model.TimeoutObject)
+				require.True(t, ok)
 				// iterate through potential receivers
 				for _, receiver := range instances {
 
@@ -124,7 +129,6 @@ func Connect(instances []*Instance) {
 
 					receiver.queue <- timeoutObject
 				}
-				return nil
 			})
 	}
 }

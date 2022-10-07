@@ -59,7 +59,7 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 	}
 
 	// connect the communicators of the instances together
-	Connect(instances)
+	Connect(t, instances)
 
 	// start all seven instances and wait for them to wrap up
 	var wg sync.WaitGroup
@@ -128,7 +128,7 @@ func Test2TimeoutOutof4Instances(t *testing.T) {
 	}
 
 	// connect the communicators of the instances together
-	Connect(instances)
+	Connect(t, instances)
 
 	// start the instances and wait for them to finish
 	var wg sync.WaitGroup
@@ -196,7 +196,7 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 	}
 
 	// connect the communicators of the instances together
-	Connect(instances)
+	Connect(t, instances)
 
 	// start all seven instances and wait for them to wrap up
 	var wg sync.WaitGroup
@@ -281,7 +281,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 	}
 
 	// connect the communicators of the instances together
-	Connect(instances)
+	Connect(t, instances)
 
 	// start all 4 instances and wait for them to wrap up
 	var wg sync.WaitGroup
