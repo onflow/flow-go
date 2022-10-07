@@ -1,6 +1,8 @@
 package factories
 
 import (
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/engine/collection/message_hub"
 	"github.com/onflow/flow-go/module"
@@ -8,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
 )
 
 type MessageHubFactory struct {

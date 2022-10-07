@@ -3,7 +3,6 @@ package integration_test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/consensus/message_hub"
 	"os"
 	"sort"
 	"testing"
@@ -32,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
+	"github.com/onflow/flow-go/engine/consensus/message_hub"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"

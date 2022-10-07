@@ -3,6 +3,7 @@ package compliance
 import (
 	"context"
 	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
