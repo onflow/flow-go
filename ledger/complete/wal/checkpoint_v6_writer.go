@@ -138,7 +138,7 @@ func storeCheckpointHeader(
 	writer := NewCRC32Writer(closable)
 
 	// write version
-	_, err = writer.Write(encodeVersion(MagicBytes, VersionV6))
+	_, err = writer.Write(encodeVersion(MagicBytesCheckpointHeader, VersionV6))
 	if err != nil {
 		return fmt.Errorf("cannot write version into checkpoint header: %w", err)
 	}
@@ -212,6 +212,12 @@ func storeTopLevelNodesAndTrieRoots(
 	}()
 
 	writer := NewCRC32Writer(closable)
+
+	// write version
+	_, err = writer.Write(encodeVersion(MagicBytesCheckpointToptrie, VersionV6))
+	if err != nil {
+		return 0, fmt.Errorf("cannot write version into checkpoint header: %w", err)
+	}
 
 	topLevelNodeIndices, topLevelNodesCount, err := storeTopLevelNodes(
 		tries,
@@ -378,7 +384,7 @@ func createClosableWriter(dir string, logger *zerolog.Logger, fileName string, f
 }
 
 // subtrie file contains:
-// 1. checkpoint version // TODO
+// 1. checkpoint version
 // 2. nodes
 // 3. node count
 // 4. checksum
@@ -408,6 +414,12 @@ func storeCheckpointSubTrie(
 	// create a CRC32 writer, so that any bytes passed to the writer will
 	// be used to calculate CRC32 checksum
 	writer := NewCRC32Writer(closable)
+
+	// write version
+	_, err = writer.Write(encodeVersion(MagicBytesCheckpointSubtrie, VersionV6))
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("cannot write version into checkpoint subtrie file: %w", err)
+	}
 
 	// topLevelNodes contains all unique nodes of given tries
 	// from root to subtrie root and their index

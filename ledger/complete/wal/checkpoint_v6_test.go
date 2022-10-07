@@ -24,9 +24,9 @@ import (
 )
 
 func TestVersion(t *testing.T) {
-	m, v, err := decodeVersion(encodeVersion(MagicBytes, VersionV6))
+	m, v, err := decodeVersion(encodeVersion(MagicBytesCheckpointHeader, VersionV6))
 	require.NoError(t, err)
-	require.Equal(t, MagicBytes, m)
+	require.Equal(t, MagicBytesCheckpointHeader, m)
 	require.Equal(t, VersionV6, v)
 }
 
@@ -195,7 +195,6 @@ func TestGetNodesByIndex(t *testing.T) {
 	topLevelNodes := []*node.Node{nil, ns[3]}
 
 	for i := uint64(1); i <= 4; i++ {
-		fmt.Println(i)
 		node, err := getNodeByIndex(subtrieNodes, topLevelNodes, i)
 		require.NoError(t, err, "cannot get node by index", i)
 		require.Equal(t, ns[i-1], node, "got wrong node by index", i)
