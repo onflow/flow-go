@@ -25,10 +25,8 @@ import (
 // it returns (nil, err) if running into any exception
 func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
-	// TODO: read the checksum of 17 file parts
-
-	headerPath := filePathHeader(dir, fileName)
-	subtrieChecksums, topTrieChecksum, err := readHeader(headerPath)
+	headerPath := filePathCheckpointHeader(dir, fileName)
+	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read header: %w", err)
 	}
@@ -45,7 +43,6 @@ func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 		return nil, fmt.Errorf("could not read subtrie from dir: %w", err)
 	}
 
-	// validate the subtrie node checksum
 	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum)
 	if err != nil {
 		return nil, fmt.Errorf("could not read top level nodes or tries: %w", err)
@@ -54,26 +51,85 @@ func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	return tries, nil
 }
 
-func filePathHeader(dir string, fileName string) string {
+func filePathCheckpointHeader(dir string, fileName string) string {
 	return path.Join(dir, fileName)
 }
 
 func filePathSubTries(dir string, fileName string, index int) (string, string, error) {
-	if index < 0 || index > 15 {
-		return "", "", fmt.Errorf("index must be between 1 to 16, but got %v", index)
+	if index < 0 || index > (subtrieCount-1) {
+		return "", "", fmt.Errorf("index must be between 0 to %v, but got %v", subtrieCount-1, index)
 	}
 	subTrieFileName := fmt.Sprintf("%s.%03d", fileName, index)
 	return path.Join(dir, subTrieFileName), subTrieFileName, nil
 }
 
 func filePathTopTries(dir string, fileName string) (string, string) {
-	topTriesFileName := fmt.Sprintf("%s.%03d", fileName, 16)
+	topTriesFileName := fmt.Sprintf("%v.%03d", fileName, subtrieCount)
 	return path.Join(dir, topTriesFileName), fileName
 }
 
-// TODO: to add
-func readHeader(filePath string) ([]uint32, uint32, error) {
-	return make([]uint32, 16), 0, nil
+// readCheckpointHeader takes a file path and returns subtrieChecksums and topTrieChecksum
+// any error returned are exceptions
+func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
+	closable, err := os.Open(filepath)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not open file %v: %w", filepath, err)
+	}
+	defer func(f *os.File) {
+		f.Close()
+	}(closable)
+
+	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
+	reader := NewCRC32Reader(bufReader)
+
+	// read the magic bytes and header
+	version, err := readVersion(reader)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if version != VersionV6 {
+		return nil, 0, fmt.Errorf("wrong version: %v", version)
+	}
+
+	// read the subtrie level
+	subtrieCount, err := readSubtrieCount(reader)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	subtrieChecksums := make([]uint32, subtrieCount)
+	for i := uint16(0); i < subtrieCount; i++ {
+		sum, err := readCRC32Sum(reader)
+		if err != nil {
+			return nil, 0, fmt.Errorf("could not read %v-th subtrie checksum from checkpoint header: %w", i, err)
+		}
+		subtrieChecksums[i] = sum
+	}
+
+	// read top level trie checksum
+	topTrieChecksum, err := readCRC32Sum(reader)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not read checkpoint top level trie checksum in chechpoint summary: %w", err)
+	}
+
+	// calculate the actual checksum
+	actualSum := reader.Crc32()
+
+	// read the stored checksum, and compare with the actual sum
+	// the same Crc32 reader is being used for simplicity, but the updated checksum
+	// won't be used.
+	expectedSum, err := readCRC32Sum(reader)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not read checkpoint header checksum: %w", err)
+	}
+
+	if actualSum != expectedSum {
+		return nil, 0, fmt.Errorf("invalid checksum in checkpoint header, expected %v, actual %v",
+			expectedSum, actualSum)
+	}
+
+	return subtrieChecksums, topTrieChecksum, nil
 }
 
 // func readNodeCountAndTriesCount(f *os.File) (uint64, uint16, error) {
@@ -114,11 +170,6 @@ func allPartFileExist(dir string, fileName string, totalSubtrieFiles int) error 
 }
 
 func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32) ([][]*node.Node, error) {
-	// TODO: replace 16 with const
-	if len(subtrieChecksums) != 16 {
-		return nil, fmt.Errorf("expect subtrieChecksums to be %v, but got %v", 16, len(subtrieChecksums))
-	}
-
 	numOfSubTries := len(subtrieChecksums)
 	resultChs := make([]chan *resultReadSubTrie, 0, numOfSubTries)
 	for i := 0; i < numOfSubTries; i++ {
@@ -153,8 +204,6 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 // 3. node count
 // 4. checksum
 func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint32) ([]*node.Node, error) {
-	// TODO: read and validate checksum
-
 	filepath, _, err := filePathSubTries(dir, fileName, index)
 	if err != nil {
 		return nil, err
@@ -168,9 +217,14 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		f.Close()
 	}(f)
 
-	nodesCount, err := readSubTriesNodeCount(f)
+	nodesCount, expectedSum, err := readSubTriesFooter(f)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read sub trie node count: %w", err)
+	}
+
+	if checksum != expectedSum {
+		return nil, fmt.Errorf("mismatch checksum in subtrie file. checksum from checkpoint header %v does not"+
+			"match with checksum in subtrie file %v", checksum, expectedSum)
 	}
 
 	_, err = f.Seek(0, io.SeekStart)
@@ -196,7 +250,19 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		nodes[i] = node
 	}
 
-	// TODO: validate checksum again
+	// read footer and discard, since we only care about checksum
+	_, err = io.ReadFull(reader, scratch[:encNodeCountSize])
+	if err != nil {
+		return nil, fmt.Errorf("cannot read footer: %w", err)
+	}
+
+	// calculate the actual checksum
+	actualSum := reader.Crc32()
+
+	if actualSum != expectedSum {
+		return nil, fmt.Errorf("invalid checksum in subtrie checkpoint, expected %v, actual %v",
+			expectedSum, actualSum)
+	}
 
 	// TODO: simplify getNodeByIndex() logic if we reslice nodes here to remove the nil node at index 0.
 	// return nodes[1:], nil
@@ -208,21 +274,33 @@ type resultReadSubTrie struct {
 	Err   error
 }
 
-func readSubTriesNodeCount(f *os.File) (uint64, error) {
+func readSubTriesFooter(f *os.File) (uint64, uint32, error) {
 	const footerSize = encNodeCountSize // footer doesn't include crc32 sum
 	const footerOffset = footerSize + crc32SumSize
 	_, err := f.Seek(-footerOffset, io.SeekEnd)
 	if err != nil {
-		return 0, fmt.Errorf("cannot seek to footer: %w", err)
+		return 0, 0, fmt.Errorf("cannot seek to footer: %w", err)
 	}
 
 	footer := make([]byte, footerSize)
 	_, err = io.ReadFull(f, footer)
 	if err != nil {
-		return 0, fmt.Errorf("could not read footer: %w", err)
+		return 0, 0, fmt.Errorf("could not read footer: %w", err)
 	}
 
-	return decodeSubtrieFooter(footer)
+	nodeCount, err := decodeSubtrieFooter(footer)
+	if err != nil {
+		return 0, 0, fmt.Errorf("could not decode subtrie node count: %w", err)
+	}
+
+	// the subtrie checksum from the checkpoint header file must be same
+	// as the checksum included in the subtrie file
+	expectedSum, err := readCRC32Sum(f)
+	if err != nil {
+		return 0, 0, fmt.Errorf("cannot read checksum for sub trie file: %w", err)
+	}
+
+	return nodeCount, expectedSum, nil
 }
 
 // 17th part file contains:
@@ -235,9 +313,7 @@ func readSubTriesNodeCount(f *os.File) (uint64, error) {
 // 7. trie count
 // 6. checksum
 func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32) ([]*trie.MTrie, error) {
-	// TODO: read header to validate checksums of sub trie nodes
 	// TODO: read subtrie count
-	// TODO: read subtrie checksum
 
 	filepath, _ := filePathTopTries(dir, fileName)
 	file, err := os.Open(filepath)
@@ -251,9 +327,19 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 
 	// TODO: read checksum and validate
 
-	topLevelNodesCount, triesCount, err := readNodeCount(file)
+	topLevelNodesCount, triesCount, expectedSum, err := readTopTriesFooter(file)
 	if err != nil {
-		return nil, fmt.Errorf("could not read node count: %w", err)
+		return nil, fmt.Errorf("could not read top tries footer: %w", err)
+	}
+
+	if topTrieChecksum != expectedSum {
+		return nil, fmt.Errorf("mismatch checksum in top trie file. checksum from checkpoint header %v does not"+
+			"match with checksum in top trie file %v", topTrieChecksum, expectedSum)
+	}
+
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, fmt.Errorf("could not seek to 0: %w", err)
 	}
 
 	topLevelNodes := make([]*node.Node, topLevelNodesCount+1) //+1 for 0 index meaning nil
@@ -262,12 +348,8 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
 	// TODO: read subtrie Node count and validate
 
-	_, err = file.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, fmt.Errorf("could not seek to 0: %w", err)
-	}
-
-	reader := NewCRC32Reader(bufio.NewReaderSize(file, defaultBufioReadSize))
+	var bufReader io.Reader = bufio.NewReaderSize(file, defaultBufioReadSize)
+	reader := NewCRC32Reader(bufReader)
 
 	// Scratch buffer is used as temporary buffer that reader can read into.
 	// Raw data in scratch buffer should be copied or converted into desired
@@ -304,27 +386,83 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 		tries[i] = trie
 	}
 
-	// TODO: validate checksum
+	// read footer and discard, since we only care about checksum
+	_, err = io.ReadFull(reader, scratch[:encNodeCountSize+encTrieCountSize])
+	if err != nil {
+		return nil, fmt.Errorf("cannot read footer: %w", err)
+	}
+
+	actualSum := reader.Crc32()
+
+	if actualSum != expectedSum {
+		return nil, fmt.Errorf("invalid checksum in top level trie, expected %v, actual %v",
+			expectedSum, actualSum)
+	}
 
 	return tries, nil
 }
 
-func readNodeCount(f *os.File) (uint64, uint16, error) {
+func readVersion(reader io.Reader) (uint16, error) {
+	bytes := make([]byte, encMagicSize+encVersionSize)
+	_, err := io.ReadFull(reader, bytes)
+	if err != nil {
+		return 0, fmt.Errorf("cannot read version: %w", err)
+	}
+	magic, version, err := decodeVersion(bytes)
+	if err != nil {
+		return 0, err
+	}
+	if magic != MagicBytes {
+		return 0, fmt.Errorf("wrong magic bytes %v", magic)
+	}
+
+	return version, nil
+}
+
+func readSubtrieCount(reader io.Reader) (uint16, error) {
+	bytes := make([]byte, encSubtrieCountSize)
+	_, err := io.ReadFull(reader, bytes)
+	if err != nil {
+		return 0, err
+	}
+	return decodeSubtrieCount(bytes)
+
+}
+
+func readCRC32Sum(reader io.Reader) (uint32, error) {
+	bytes := make([]byte, crc32SumSize)
+	_, err := io.ReadFull(reader, bytes)
+	if err != nil {
+		return 0, err
+	}
+	return decodeCRC32Sum(bytes)
+}
+
+func readTopTriesFooter(f *os.File) (uint64, uint16, uint32, error) {
 	// footer offset: nodes count (8 bytes) + tries count (2 bytes) + CRC32 sum (4 bytes)
 	const footerOffset = encNodeCountSize + encTrieCountSize + crc32SumSize
 	const footerSize = encNodeCountSize + encTrieCountSize // footer doesn't include crc32 sum
 	// Seek to footer
 	_, err := f.Seek(-footerOffset, io.SeekEnd)
 	if err != nil {
-		return 0, 0, fmt.Errorf("cannot seek to footer: %w", err)
+		return 0, 0, 0, fmt.Errorf("cannot seek to footer: %w", err)
 	}
 	footer := make([]byte, footerSize)
 	_, err = io.ReadFull(f, footer)
 	if err != nil {
-		return 0, 0, fmt.Errorf("cannot read footer: %w", err)
+		return 0, 0, 0, fmt.Errorf("cannot read footer: %w", err)
 	}
 
-	return decodeFooter(footer)
+	nodeCount, trieCount, err := decodeFooter(footer)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("could not decode top trie footer: %w", err)
+	}
+
+	checksum, err := readCRC32Sum(bufio.NewReaderSize(f, defaultBufioReadSize))
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("cannot read checksum for top trie file: %w", err)
+	}
+	return nodeCount, trieCount, checksum, nil
 }
 
 func computeTotalSubTrieNodeCount(groups [][]*node.Node) int {

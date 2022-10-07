@@ -22,6 +22,12 @@ func TestVersion(t *testing.T) {
 	require.Equal(t, VersionV6, v)
 }
 
+func TestSubtrieCount(t *testing.T) {
+	l, err := decodeSubtrieCount(encodeSubtrieCount(subtrieCount))
+	require.NoError(t, err)
+	require.Equal(t, uint16(subtrieCount), l)
+}
+
 func TestCRC32SumEncoding(t *testing.T) {
 	v := uint32(3)
 	s, err := decodeCRC32Sum(encodeCRC32Sum(v))

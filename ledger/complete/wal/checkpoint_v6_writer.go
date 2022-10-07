@@ -19,6 +19,10 @@ import (
 const subtrieLevel = 4
 const subtrieCount = 1 << subtrieLevel
 
+func subtrieCountByLevel(level uint16) int {
+	return 1 << level
+}
+
 type resultStoringSubTrie struct {
 	Index     int
 	Roots     map[*node.Node]uint64 // node index for root nodes
@@ -71,9 +75,9 @@ func StoreCheckpointV6(
 		return fmt.Errorf("could not store top level tries: %w", err)
 	}
 
-	err = storeCheckpointSummary(subTrieChecksums, topTrieChecksum, outputDir, outputFile, logger)
+	err = storeCheckpointHeader(subTrieChecksums, topTrieChecksum, outputDir, outputFile, logger)
 	if err != nil {
-		return fmt.Errorf("could not store checkpoint summary: %w", err)
+		return fmt.Errorf("could not store checkpoint header: %w", err)
 	}
 
 	logger.Info().Msgf("checkpoint file has been successfully stored at %v/%v", outputDir, outputFile)
@@ -81,19 +85,25 @@ func StoreCheckpointV6(
 	return nil
 }
 
-// 1. version
-// 2. checksum of each part file (17 in total)
-// 3. checksum of the main file itself
-func storeCheckpointSummary(
+// 		1. version
+//		2. checksum of each part file (17 in total)
+// 		3. checksum of the main file itself
+func storeCheckpointHeader(
 	subTrieChecksums []uint32,
 	topTrieChecksum uint32,
 	outputDir string,
 	outputFile string,
 	logger *zerolog.Logger,
 ) error {
-	closable, err := createWriterForCheckpointSummary(outputDir, outputFile, logger)
+	// sanity check
+	if len(subTrieChecksums) != subtrieCountByLevel(subtrieLevel) {
+		return fmt.Errorf("expect subtrie level %v to have %v checksums, but got %v",
+			subtrieLevel, subtrieCountByLevel(subtrieLevel), len(subTrieChecksums))
+	}
+
+	closable, err := createWriterForCheckpointHeader(outputDir, outputFile, logger)
 	if err != nil {
-		return fmt.Errorf("could not store checkpoint summary: %w", err)
+		return fmt.Errorf("could not store checkpoint header: %w", err)
 	}
 	defer func() {
 		closeErr := closable.Close()
@@ -103,27 +113,45 @@ func storeCheckpointSummary(
 		}
 	}()
 
-	// write version
-	version := encodeVersion(MagicBytes, VersionV6)
 	writer := NewCRC32Writer(closable)
-	_, err = writer.Write(version)
+
+	// write version
+	_, err = writer.Write(encodeVersion(MagicBytes, VersionV6))
 	if err != nil {
-		return fmt.Errorf("cannot write checksum summary header: %w", err)
+		return fmt.Errorf("cannot write version into checkpoint header: %w", err)
 	}
 
-	// TODO: write checksums
+	// encode subtrieCount
+	_, err = writer.Write(encodeSubtrieCount(subtrieCount))
+	if err != nil {
+		return fmt.Errorf("cannot write subtrie level into checkpoint header: %w", err)
+	}
+
+	//  write subtrie checksums
+	for i, subtrieSum := range subTrieChecksums {
+		_, err = writer.Write(encodeCRC32Sum(subtrieSum))
+		if err != nil {
+			return fmt.Errorf("cannot write %v-th subtriechecksum into checkpoint header: %w", i, err)
+		}
+	}
+
+	// write top level trie checksum
+	_, err = writer.Write(encodeCRC32Sum(topTrieChecksum))
+	if err != nil {
+		return fmt.Errorf("cannot write top level trie checksum into checkpoint header: %w", err)
+	}
 
 	// write checksum to the end of the file
 	checksum := writer.Crc32()
 	_, err = writer.Write(encodeCRC32Sum(checksum))
 	if err != nil {
-		return fmt.Errorf("cannot write CRC32 checksum to checkpoint summary: %w", err)
+		return fmt.Errorf("cannot write CRC32 checksum to checkpoint header: %w", err)
 	}
 	return nil
 }
 
-func createWriterForCheckpointSummary(outputDir string, outputFile string, logger *zerolog.Logger) (io.WriteCloser, error) {
-	fullPath := filePathHeader(outputDir, outputFile)
+func createWriterForCheckpointHeader(outputDir string, outputFile string, logger *zerolog.Logger) (io.WriteCloser, error) {
+	fullPath := filePathCheckpointHeader(outputDir, outputFile)
 	if utilsio.FileExists(fullPath) {
 		return nil, fmt.Errorf("checkpoint file already exists at %v", fullPath)
 	}
@@ -180,17 +208,11 @@ func storeTopLevelNodesAndTrieRoots(
 		return 0, fmt.Errorf("could not store trie root nodes: %w", err)
 	}
 
-	err = storeFooter(topLevelNodesCount, uint16(len(tries)), writer)
+	checksum, err := storeTopLevelTrieFooter(topLevelNodesCount, uint16(len(tries)), writer)
 	if err != nil {
 		return 0, fmt.Errorf("could not store footer: %w", err)
 	}
 
-	// write checksum to the end of the file
-	checksum := writer.Crc32()
-	_, err = writer.Write(encodeCRC32Sum(checksum))
-	if err != nil {
-		return 0, fmt.Errorf("cannot write CRC32 checksum to top level part file: %w", err)
-	}
 	return checksum, nil
 }
 
@@ -391,20 +413,12 @@ func storeCheckpointSubTrie(
 	totalNodeCount := nodeCounter - 1
 
 	// write total number of node as footer
-	footer := encodeSubtrieFooter(totalNodeCount)
-	_, err = writer.Write(footer)
+	checksum, err := storeSubtrieFooter(totalNodeCount, writer)
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("cannot write checkpoint subtrie footer: %w", err)
+		return nil, 0, 0, fmt.Errorf("could not store subtrie footer %w", err)
 	}
 
-	// write checksum to the end of the file
-	crc32Sum := writer.Crc32()
-	_, err = writer.Write(encodeCRC32Sum(crc32Sum))
-	if err != nil {
-		return nil, 0, 0, fmt.Errorf("cannot write CRC32 checksum %v", err)
-	}
-
-	return subtrieRootNodes, totalNodeCount, crc32Sum, nil
+	return subtrieRootNodes, totalNodeCount, checksum, nil
 }
 
 func storeTopLevelNodes(
@@ -462,13 +476,37 @@ func storeTries(
 	return nil
 }
 
-func storeFooter(topLevelNodesCount uint64, rootTrieCount uint16, writer io.Writer) error {
+func storeTopLevelTrieFooter(topLevelNodesCount uint64, rootTrieCount uint16, writer *Crc32Writer) (uint32, error) {
 	footer := encodeFooter(topLevelNodesCount, rootTrieCount)
 	_, err := writer.Write(footer)
 	if err != nil {
-		return fmt.Errorf("cannot write checkpoint footer: %w", err)
+		return 0, fmt.Errorf("cannot write checkpoint footer: %w", err)
 	}
-	return nil
+
+	// write checksum to the end of the file
+	checksum := writer.Crc32()
+	_, err = writer.Write(encodeCRC32Sum(checksum))
+	if err != nil {
+		return 0, fmt.Errorf("cannot write CRC32 checksum to top level part file: %w", err)
+	}
+
+	return checksum, nil
+}
+
+func storeSubtrieFooter(nodeCount uint64, writer *Crc32Writer) (uint32, error) {
+	footer := encodeSubtrieFooter(nodeCount)
+	_, err := writer.Write(footer)
+	if err != nil {
+		return 0, fmt.Errorf("cannot write checkpoint subtrie footer: %w", err)
+	}
+
+	// write checksum to the end of the file
+	crc32Sum := writer.Crc32()
+	_, err = writer.Write(encodeCRC32Sum(crc32Sum))
+	if err != nil {
+		return 0, fmt.Errorf("cannot write CRC32 checksum %v", err)
+	}
+	return crc32Sum, nil
 }
 
 func encodeFooter(topLevelNodesCount uint64, rootTrieCount uint16) []byte {
@@ -510,7 +548,7 @@ func encodeCRC32Sum(checksum uint32) []byte {
 
 func decodeCRC32Sum(encoded []byte) (uint32, error) {
 	if len(encoded) != crc32SumSize {
-		return 0, fmt.Errorf("wrong crc32sum, expect %v, got %v", crc32SumSize, len(encoded))
+		return 0, fmt.Errorf("wrong crc32sum size, expect %v, got %v", crc32SumSize, len(encoded))
 	}
 	return binary.BigEndian.Uint32(encoded), nil
 }
@@ -525,9 +563,22 @@ func encodeVersion(magic uint16, version uint16) []byte {
 
 func decodeVersion(encoded []byte) (uint16, uint16, error) {
 	if len(encoded) != encMagicSize+encVersionSize {
-		return 0, 0, fmt.Errorf("wrong version, expect %v, got %v", encMagicSize+encVersionSize, len(encoded))
+		return 0, 0, fmt.Errorf("wrong version size, expect %v, got %v", encMagicSize+encVersionSize, len(encoded))
 	}
 	magicBytes := binary.BigEndian.Uint16(encoded)
 	version := binary.BigEndian.Uint16(encoded[encMagicSize:])
 	return magicBytes, version, nil
+}
+
+func encodeSubtrieCount(level uint16) []byte {
+	bytes := make([]byte, encSubtrieCountSize)
+	binary.BigEndian.PutUint16(bytes, level)
+	return bytes
+}
+
+func decodeSubtrieCount(encoded []byte) (uint16, error) {
+	if len(encoded) != encSubtrieCountSize {
+		return 0, fmt.Errorf("wrong subtrie level size, expect %v, got %v", encSubtrieCountSize, len(encoded))
+	}
+	return binary.BigEndian.Uint16(encoded), nil
 }
