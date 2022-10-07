@@ -28,6 +28,7 @@ func extractExecutionState(
 	outputDir string,
 	log zerolog.Logger,
 	chain flow.Chain,
+	version int,
 	migrate bool,
 	report bool,
 ) error {
@@ -116,6 +117,7 @@ func extractExecutionState(
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
+		version,
 	)
 	if err != nil {
 		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
