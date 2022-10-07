@@ -357,7 +357,7 @@ func TestAllPartFileExist(t *testing.T) {
 			require.NoErrorf(t, err, "fail to find sub trie file path")
 
 			logger := unittest.Logger()
-			require.NoErrorf(t, StoreCheckpointV6(tries, dir, fileName, &logger), "fail to store checkpoint")
+			require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger), "fail to store checkpoint")
 
 			// delete i-th part file, then the error should mention i-th file missing
 			err = os.Remove(fileToDelete)
@@ -375,8 +375,8 @@ func TestCannotStoreTwice(t *testing.T) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger), "fail to store checkpoint")
 		// checkpoint already exist, can't store again
-		require.Error(t, StoreCheckpointV6(tries, dir, fileName, &logger))
+		require.Error(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger))
 	})
 }
