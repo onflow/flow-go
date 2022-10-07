@@ -47,14 +47,28 @@ func ReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*t
 		return nil, fmt.Errorf("fail to check all checkpoint part file exist: %w", err)
 	}
 
-	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums)
+	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not read subtrie from dir: %w", err)
 	}
 
+	logger.Info().Msg("finish reading all v6 subtrie files, start reading top level tries")
+
 	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum)
 	if err != nil {
 		return nil, fmt.Errorf("could not read top level nodes or tries: %w", err)
+	}
+
+	logger.Info().Msgf("finish reading all trie roots, trie root count: %v", len(tries))
+	if len(tries) > 0 {
+		first, last := tries[0], tries[len(tries)-1]
+		logger.Info().
+			Str("first_hash", first.RootHash().String()).
+			Uint64("first_reg_count", first.AllocatedRegCount()).
+			Str("last", last.RootHash().String()).
+			Uint64("last_reg_count", last.AllocatedRegCount()).
+			Int("version", 6).
+			Msg("checkpoint tries roots")
 	}
 
 	return tries, nil
@@ -249,13 +263,13 @@ func noneCheckpointFileExist(dir string, fileName string, totalSubtrieFiles int)
 	return fmt.Errorf("checkpoint part file already exist %v: %w", matched, errCheckpointFileExist)
 }
 
-func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32) ([][]*node.Node, error) {
+func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32, logger *zerolog.Logger) ([][]*node.Node, error) {
 	numOfSubTries := len(subtrieChecksums)
 	resultChs := make([]chan *resultReadSubTrie, 0, numOfSubTries)
 	for i := 0; i < numOfSubTries; i++ {
 		resultCh := make(chan *resultReadSubTrie)
 		go func(i int) {
-			nodes, err := readCheckpointSubTrie(dir, fileName, i, subtrieChecksums[i])
+			nodes, err := readCheckpointSubTrie(dir, fileName, i, subtrieChecksums[i], logger)
 			resultCh <- &resultReadSubTrie{
 				Nodes: nodes,
 				Err:   err,
@@ -283,7 +297,7 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 // 2. nodes
 // 3. node count
 // 4. checksum
-func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint32) ([]*node.Node, error) {
+func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint32, logger *zerolog.Logger) ([]*node.Node, error) {
 	filepath, _, err := filePathSubTries(dir, fileName, index)
 	if err != nil {
 		return nil, err
@@ -315,7 +329,10 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 	var bufReader io.Reader = bufio.NewReaderSize(f, defaultBufioReadSize)
 	reader := NewCRC32Reader(bufReader)
 
-	scratch := make([]byte, 1024*4)           // must not be less than 1024
+	// read file part index and verify
+	scratch := make([]byte, 1024*4) // must not be less than 1024
+	logging := logProgress(fmt.Sprintf("reading %v-th sub trie roots", index), int(nodesCount), logger)
+
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	for i := uint64(1); i <= nodesCount; i++ {
 		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
@@ -328,6 +345,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 			return nil, fmt.Errorf("cannot read node %d: %w", i, err)
 		}
 		nodes[i] = node
+		logging(i)
 	}
 
 	// read footer and discard, since we only care about checksum
