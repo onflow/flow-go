@@ -2,7 +2,6 @@ package factories
 
 import (
 	"fmt"
-
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/module"
@@ -16,13 +15,14 @@ import (
 )
 
 type EpochComponentsFactory struct {
-	me       module.Local
-	pools    *epochs.TransactionPools
-	builder  *BuilderFactory
-	state    *ClusterStateFactory
-	hotstuff *HotStuffFactory
-	proposal *ProposalEngineFactory
-	sync     *SyncEngineFactory
+	me         module.Local
+	pools      *epochs.TransactionPools
+	builder    *BuilderFactory
+	state      *ClusterStateFactory
+	hotstuff   *HotStuffFactory
+	proposal   *ProposalEngineFactory
+	sync       *SyncEngineFactory
+	messageHub *MessageHubFactory
 }
 
 var _ epochmgr.EpochComponentsFactory = (*EpochComponentsFactory)(nil)
@@ -35,16 +35,18 @@ func NewEpochComponentsFactory(
 	hotstuff *HotStuffFactory,
 	proposal *ProposalEngineFactory,
 	sync *SyncEngineFactory,
+	mesageHub *MessageHubFactory,
 ) *EpochComponentsFactory {
 
 	factory := &EpochComponentsFactory{
-		me:       me,
-		pools:    pools,
-		builder:  builder,
-		state:    state,
-		hotstuff: hotstuff,
-		proposal: proposal,
-		sync:     sync,
+		me:         me,
+		pools:      pools,
+		builder:    builder,
+		state:      state,
+		hotstuff:   hotstuff,
+		proposal:   proposal,
+		sync:       sync,
+		messageHub: mesageHub,
 	}
 	return factory
 }
@@ -58,6 +60,7 @@ func (factory *EpochComponentsFactory) Create(
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
+	messageHub component.Component,
 	err error,
 ) {
 
@@ -163,6 +166,13 @@ func (factory *EpochComponentsFactory) Create(
 	proposal = proposalEng.
 		WithConsensus(hotstuff).
 		WithSync(syncCore)
+
+	clusterMessageHub, err := factory.messageHub.Create(state, headers, payloads, hotstuff, proposalEng, hotstuffModules)
+	if err != nil {
+		err = fmt.Errorf("could not create message hub: %w", err)
+	}
+	hotstuffModules.Notifier.AddConsumer(clusterMessageHub)
+	messageHub = clusterMessageHub
 
 	return
 }

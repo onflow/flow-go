@@ -82,7 +82,6 @@ func (f *ProposalEngineFactory) Create(
 
 	engine, err := compliance.NewEngine(
 		f.log,
-		f.net,
 		f.me,
 		f.protoState,
 		payloads,

@@ -25,6 +25,7 @@ type EpochComponentsFactory interface {
 		hotstuff module.HotStuff,
 		voteAggregator hotstuff.VoteAggregator,
 		timeoutAggregator hotstuff.TimeoutAggregator,
+		messageHub component.Component,
 		err error,
 	)
 }

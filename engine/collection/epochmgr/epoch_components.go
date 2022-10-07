@@ -16,6 +16,7 @@ type EpochComponents struct {
 	*component.ComponentManager
 	state             cluster.State
 	comp              component.Component
+	messageHub        component.Component
 	sync              module.ReadyDoneAware
 	hotstuff          module.HotStuff
 	voteAggregator    hotstuff.VoteAggregator
@@ -31,6 +32,7 @@ func NewEpochComponents(
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
+	messageHub component.Component,
 ) *EpochComponents {
 	components := &EpochComponents{
 		state:             state,
@@ -48,8 +50,9 @@ func NewEpochComponents(
 		voteAggregator.Start(ctx)
 		timeoutAggregator.Start(ctx)
 		comp.Start(ctx)
+		messageHub.Start(ctx)
 		// wait until all components start
-		<-util.AllReady(components.comp, components.sync, components.voteAggregator, components.timeoutAggregator)
+		<-util.AllReady(components.comp, components.sync, components.voteAggregator, components.timeoutAggregator, components.messageHub)
 
 		// signal that startup has finished, and we are ready to go
 		ready()
@@ -57,7 +60,7 @@ func NewEpochComponents(
 		// wait for shutdown to be commenced
 		<-ctx.Done()
 		// wait for compliance engine and event loop to shut down
-		<-util.AllDone(components.comp, components.sync, components.voteAggregator, components.timeoutAggregator)
+		<-util.AllDone(components.comp, components.sync, components.voteAggregator, components.timeoutAggregator, components.messageHub)
 	})
 	components.ComponentManager = builder.Build()
 

@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -49,7 +48,6 @@ type MessageHub struct {
 
 	// injected dependencies
 	compliance        network.MessageProcessor
-	prov              consensus.ProposalProvider
 	hotstuff          module.HotStuff
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
@@ -62,7 +60,6 @@ func NewMessageHub(log zerolog.Logger,
 	net network.Network,
 	me module.Local,
 	compliance network.MessageProcessor,
-	prov consensus.ProposalProvider,
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
@@ -101,7 +98,6 @@ func NewMessageHub(log zerolog.Logger,
 		headers:                headers,
 		payloads:               payloads,
 		compliance:             compliance,
-		prov:                   prov,
 		hotstuff:               hotstuff,
 		voteAggregator:         voteAggregator,
 		timeoutAggregator:      timeoutAggregator,

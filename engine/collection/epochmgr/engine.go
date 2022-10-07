@@ -184,12 +184,12 @@ func (e *Engine) Done() <-chan struct{} {
 // - ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
 func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
 
-	state, prop, sync, hot, voteAggregator, timeoutAggregator, err := e.factory.Create(epoch)
+	state, prop, sync, hot, voteAggregator, timeoutAggregator, messageHub, err := e.factory.Create(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", epoch, err)
 	}
 
-	components := NewEpochComponents(state, prop, sync, hot, voteAggregator, timeoutAggregator)
+	components := NewEpochComponents(state, prop, sync, hot, voteAggregator, timeoutAggregator, messageHub)
 	return components, nil
 }
 
