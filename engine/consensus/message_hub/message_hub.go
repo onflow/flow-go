@@ -389,6 +389,14 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			SignerID: originID,
 			SigData:  msg.SigData,
 		}
+		h.log.Info().
+			Uint64("block_view", v.View).
+			Hex("block_id", v.BlockID[:]).
+			Hex("voter", v.SignerID[:]).
+			Str("vote_id", v.ID().String()).
+			Msg("block vote received, forwarding block vote to hotstuff vote aggregator")
+
+		// forward the vote to hotstuff for processing
 		h.voteAggregator.AddVote(v)
 	case *messages.TimeoutObject:
 		t := &model.TimeoutObject{
@@ -398,6 +406,12 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			SignerID:   originID,
 			SigData:    msg.SigData,
 		}
+		h.log.Info().
+			Hex("origin_id", originID[:]).
+			Uint64("view", t.View).
+			Str("timeout_id", t.ID().String()).
+			Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
+		// forward the timeout to hotstuff for processing
 		h.timeoutAggregator.AddTimeout(t)
 	default:
 		h.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
