@@ -29,12 +29,15 @@ var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 // it returns (nil, os.ErrNotExist) if a certain file is missing, use (os.IsNotExist to check)
 // it returns (nil, ErrEOFNotReached) if a certain part file is malformed
 // it returns (nil, err) if running into any exception
-func ReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
 
 	logger.Info().Msgf("reading v6 checkpoint file")
 
-	headerPath := filePathCheckpointHeader(dir, fileName)
+	// the full path of header file
+	headerPath := headerFile.Name()
+	dir, fileName := filepath.Split(headerPath)
+
 	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not read header: %w", err)
@@ -74,6 +77,21 @@ func ReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*t
 	return tries, nil
 }
 
+// OpenAndReadCheckpointV6 open the checkpoint file and read it with ReadCheckpointV6
+func OpenAndReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+	filepath := filePathCheckpointHeader(dir, fileName)
+
+	f, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
+	}
+	defer func(f *os.File) {
+		f.Close()
+	}(f)
+
+	return ReadCheckpointV6(f, logger)
+}
+
 func filePathCheckpointHeader(dir string, fileName string) string {
 	return path.Join(dir, fileName)
 }
@@ -111,8 +129,11 @@ func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
 func readCheckpointHeader(filepath string, logger *zerolog.Logger) ([]uint32, uint32, error) {
 	closable, err := os.Open(filepath)
 	if err != nil {
-		return nil, 0, fmt.Errorf("could not open file %v: %w", filepath, err)
+		return nil, 0, fmt.Errorf("could not seek to start for header file: %w", err)
 	}
+
+	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
+	reader := NewCRC32Reader(bufReader)
 	defer func(f *os.File) {
 		evictErr := evictFileFromLinuxPageCache(f, false, logger)
 		if evictErr != nil {
@@ -121,8 +142,6 @@ func readCheckpointHeader(filepath string, logger *zerolog.Logger) ([]uint32, ui
 		}
 		f.Close()
 	}(closable)
-
-	reader := NewCRC32Reader(bufio.NewReaderSize(closable, defaultBufioReadSize))
 
 	// read the magic bytes and check version
 	err = validateFileHeader(MagicBytesCheckpointHeader, VersionV6, reader)

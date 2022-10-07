@@ -207,7 +207,7 @@ func TestWriteAndReadCheckpointV6(t *testing.T) {
 		fileName := "checkpoint"
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger), "fail to store checkpoint")
-		decoded, err := ReadCheckpointV6(dir, fileName, &logger)
+		decoded, err := OpenAndReadCheckpointV6(dir, fileName, &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
 	})
@@ -219,7 +219,7 @@ func TestWriteAndReadCheckpointV6MultipleTries(t *testing.T) {
 		fileName := "checkpoint-multi-file"
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger), "fail to store checkpoint")
-		decoded, err := ReadCheckpointV6(dir, fileName, &logger)
+		decoded, err := OpenAndReadCheckpointV6(dir, fileName, &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
 	})
@@ -325,7 +325,7 @@ func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
 
 		// store tries into v6 then read back, then store into v5
 		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
-		decoded, err := ReadCheckpointV6(dir, "checkpoint-v6", &logger)
+		decoded, err := OpenAndReadCheckpointV6(dir, "checkpoint-v6", &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/checkpoint-v6", dir)
 		require.NoErrorf(t, storeCheckpointV5(decoded, dir, "checkpoint-v6-v5", &logger), "fail to store checkpoint")
 
@@ -362,7 +362,7 @@ func TestAllPartFileExist(t *testing.T) {
 			err = os.Remove(fileToDelete)
 			require.NoError(t, err, "fail to remove part file")
 
-			_, err = ReadCheckpointV6(dir, fileName, &logger)
+			_, err = OpenAndReadCheckpointV6(dir, fileName, &logger)
 			require.ErrorIs(t, err, os.ErrNotExist, "wrong error type returned")
 		}
 	})
