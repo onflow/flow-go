@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
@@ -292,11 +293,15 @@ func StoreCheckpoint(dir string, fileName string, logger *zerolog.Logger, tries 
 		return fmt.Errorf("could not create writer: %w", err)
 	}
 	defer func() {
-		closeError := writer.Close()
-		// Return close error if there isn't any prior error to return.
-		if err == nil {
-			err = closeError
+		var errs *multierror.Error
+		if err != nil {
+			errs = multierror.Append(errs, err)
 		}
+		closeError := writer.Close()
+		if closeError != nil {
+			errs = multierror.Append(errs, closeError)
+		}
+		err = errs.ErrorOrNil()
 	}()
 
 	crc32Writer := NewCRC32Writer(writer)
@@ -481,7 +486,7 @@ func StoreCheckpoint(dir string, fileName string, logger *zerolog.Logger, tries 
 		return fmt.Errorf("cannot write CRC32: %w", err)
 	}
 
-	return nil
+	return err // to be updated by defer function
 }
 
 // storeUniqueNodes iterates and serializes unique nodes for trie with given root node.
