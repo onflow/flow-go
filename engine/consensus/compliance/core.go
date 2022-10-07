@@ -191,7 +191,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// if the proposal is connected to a block that is neither in the cache, nor
 	// in persistent storage, its direct parent is missing; cache the proposal
 	// and request the parent
-	_, err = c.headers.ByBlockID(header.ParentID)
+	parent, err := c.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
 		_ = c.pending.Add(originID, proposal)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
@@ -211,7 +211,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(proposal)
+	err = c.processBlockAndDescendants(proposal, parent)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -232,16 +232,8 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 // processed as well.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
-func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) error {
+func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, parent *flow.Header) error {
 	blockID := proposal.Header.ID()
-
-	// retrieve the parent block
-	//  - once we reach this point, the parent block must have been validated
-	//    and inserted to the protocol state
-	parent, err := c.headers.ByBlockID(proposal.Header.ParentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve proposal parent: %w", err)
-	}
 
 	log := c.log.With().
 		Str("block_id", blockID.String()).
@@ -251,7 +243,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 		Logger()
 
 	// process block itself
-	err = c.processBlockProposal(proposal, parent)
+	err := c.processBlockProposal(proposal, parent)
 	if err != nil {
 		if engine.IsOutdatedInputError(err) {
 			// child is outdated by the time we started processing it
@@ -297,7 +289,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 			Header:  child.Header,
 			Payload: child.Payload,
 		}
-		cpr := c.processBlockAndDescendants(childProposal)
+		cpr := c.processBlockAndDescendants(childProposal, proposal.Header)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
