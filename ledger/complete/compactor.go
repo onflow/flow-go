@@ -343,7 +343,8 @@ func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger,
 		}
 	}()
 
-	err = realWAL.StoreCheckpoint(writer, tries...)
+	fileName := realWAL.NumberToFilename(checkpointNum)
+	err = realWAL.StoreCheckpoint(checkpointer.Dir(), fileName, &logger, tries...)
 	if err != nil {
 		return fmt.Errorf("error serializing checkpoint (%d): %w", checkpointNum, err)
 	}

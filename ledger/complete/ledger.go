@@ -433,15 +433,9 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("finished running pre-checkpoint reporters")
 
-	l.logger.Info().Msg("creating a checkpoint for the new trie")
-	writer, err := realWAL.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
-	}
+	l.logger.Info().Msg("creating a checkpoint for the new trie, storing the checkpoint to the file")
 
-	l.logger.Info().Msg("storing the checkpoint to the file")
-
-	err = realWAL.StoreCheckpoint(writer, newTrie)
+	err = realWAL.StoreCheckpoint(outputDir, outputFile, &l.logger, newTrie)
 
 	// Writing the checkpoint takes time to write and copy.
 	// Without relying on an exit code or stdout, we need to know when the copy is complete.
@@ -453,11 +447,10 @@ func (l *Ledger) ExportCheckpointAt(
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
 	}
-	writer.Close()
 
 	l.logger.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
 
-	l.logger.Info().Msgf("finished running post-checkpoint reporters")
+	l.logger.Info().Msgf("start running post-checkpoint reporters")
 
 	// running post checkpoint reporters
 	for i, reporter := range postCheckpointReporters {

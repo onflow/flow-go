@@ -2,13 +2,12 @@ package wal_test
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
-	"io"
 	"math"
 	"math/rand"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -210,9 +209,7 @@ func Test_Checkpointing(t *testing.T) {
 			checkpointer, err := wal2.NewCheckpointer()
 			require.NoError(t, err)
 
-			err = checkpointer.Checkpoint(10, func() (io.WriteCloser, error) {
-				return checkpointer.CheckpointWriter(10)
-			})
+			err = checkpointer.Checkpoint(10)
 			require.NoError(t, err)
 
 			require.FileExists(t, path.Join(dir, "checkpoint.00000010")) //make sure we have checkpoint file
@@ -376,21 +373,15 @@ func Test_Checkpointing(t *testing.T) {
 			checkpointer, err := wal6.NewCheckpointer()
 			require.NoError(t, err)
 
-			err = checkpointer.Checkpoint(4, func() (io.WriteCloser, error) {
-				return checkpointer.CheckpointWriter(4)
-			})
+			err = checkpointer.Checkpoint(4)
 			require.NoError(t, err)
 			require.FileExists(t, path.Join(dir, "checkpoint.00000004"))
 
-			err = checkpointer.Checkpoint(6, func() (io.WriteCloser, error) {
-				return checkpointer.CheckpointWriter(6)
-			})
+			err = checkpointer.Checkpoint(6)
 			require.NoError(t, err)
 			require.FileExists(t, path.Join(dir, "checkpoint.00000006"))
 
-			err = checkpointer.Checkpoint(8, func() (io.WriteCloser, error) {
-				return checkpointer.CheckpointWriter(8)
-			})
+			err = checkpointer.Checkpoint(8)
 			require.NoError(t, err)
 			require.FileExists(t, path.Join(dir, "checkpoint.00000008"))
 
@@ -443,57 +434,57 @@ func Test_Checkpointing(t *testing.T) {
 	})
 }
 
-func TestCheckpointFileError(t *testing.T) {
-
-	unittest.RunWithTempDir(t, func(dir string) {
-
-		wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
-		require.NoError(t, err)
-
-		// create WAL
-
-		keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
-		values := testutils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
-		update, err := ledger.NewUpdate(ledger.State(trie.EmptyTrieRootHash()), keys, values)
-		require.NoError(t, err)
-
-		trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
-		require.NoError(t, err)
-
-		_, _, err = wal.RecordUpdate(trieUpdate)
-		require.NoError(t, err)
-
-		// some buffer time of the checkpointer to run
-		time.Sleep(1 * time.Second)
-		<-wal.Done()
-
-		require.FileExists(t, path.Join(dir, "00000001")) //make sure WAL segment is saved
-
-		wal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
-		require.NoError(t, err)
-
-		checkpointer, err := wal2.NewCheckpointer()
-		require.NoError(t, err)
-
-		t.Run("write error", func(t *testing.T) {
-			errWrite := errors.New("unexpected write error")
-
-			err = checkpointer.Checkpoint(1, func() (io.WriteCloser, error) {
-				return newWriteCloserWithErrors(errWrite, nil), nil
-			})
-			require.ErrorIs(t, err, errWrite)
-		})
-
-		t.Run("close error", func(t *testing.T) {
-			errClose := errors.New("unexpected close error")
-
-			err = checkpointer.Checkpoint(1, func() (io.WriteCloser, error) {
-				return newWriteCloserWithErrors(nil, errClose), nil
-			})
-			require.ErrorIs(t, err, errClose)
-		})
-	})
-}
+// func TestCheckpointFileError(t *testing.T) {
+//
+// 	unittest.RunWithTempDir(t, func(dir string) {
+//
+// 		wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+// 		require.NoError(t, err)
+//
+// 		// create WAL
+//
+// 		keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
+// 		values := testutils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+// 		update, err := ledger.NewUpdate(ledger.State(trie.EmptyTrieRootHash()), keys, values)
+// 		require.NoError(t, err)
+//
+// 		trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
+// 		require.NoError(t, err)
+//
+// 		_, _, err = wal.RecordUpdate(trieUpdate)
+// 		require.NoError(t, err)
+//
+// 		// some buffer time of the checkpointer to run
+// 		time.Sleep(1 * time.Second)
+// 		<-wal.Done()
+//
+// 		require.FileExists(t, path.Join(dir, "00000001")) //make sure WAL segment is saved
+//
+// 		wal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+// 		require.NoError(t, err)
+//
+// 		checkpointer, err := wal2.NewCheckpointer()
+// 		require.NoError(t, err)
+//
+// 		t.Run("write error", func(t *testing.T) {
+// 			errWrite := errors.New("unexpected write error")
+//
+// 			err = checkpointer.Checkpoint(1, func() (io.WriteCloser, error) {
+// 				return newWriteCloserWithErrors(errWrite, nil), nil
+// 			})
+// 			require.ErrorIs(t, err, errWrite)
+// 		})
+//
+// 		t.Run("close error", func(t *testing.T) {
+// 			errClose := errors.New("unexpected close error")
+//
+// 			err = checkpointer.Checkpoint(1, func() (io.WriteCloser, error) {
+// 				return newWriteCloserWithErrors(nil, errClose), nil
+// 			})
+// 			require.ErrorIs(t, err, errClose)
+// 		})
+// 	})
+// }
 
 // randomlyModifyFile picks random byte and modifies it
 // this should be enough to cause checkpoint loading to fail
@@ -547,35 +538,36 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 		someHash := updatedTrie.RootNode().LeftChild().Hash() // Hash of left child
 
 		file, err := os.CreateTemp(dir, "temp-checkpoint")
-		filepath := file.Name()
 		require.NoError(t, err)
+		fullpath := file.Name()
+		_, fileName := filepath.Split(fullpath)
 
-		err = realWAL.StoreCheckpoint(file, updatedTrie)
+		err = realWAL.StoreCheckpoint(dir, fileName, &logger, updatedTrie)
 		require.NoError(t, err)
 
 		file.Close()
 
 		t.Run("works without data modification", func(t *testing.T) {
 			logger := zerolog.Nop()
-			tries, err := realWAL.LoadCheckpoint(filepath, &logger)
+			tries, err := realWAL.LoadCheckpoint(fullpath, &logger)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(tries))
 			require.Equal(t, updatedTrie, tries[0])
 		})
 
 		t.Run("detects modified data", func(t *testing.T) {
-			b, err := os.ReadFile(filepath)
+			b, err := os.ReadFile(fullpath)
 			require.NoError(t, err)
 
 			index := bytes.Index(b, someHash[:])
 			require.NotEqual(t, -1, index)
 			b[index] = 23
 
-			err = os.WriteFile(filepath, b, 0644)
+			err = os.WriteFile(fullpath, b, 0644)
 			require.NoError(t, err)
 
 			logger := zerolog.Nop()
-			tries, err := realWAL.LoadCheckpoint(filepath, &logger)
+			tries, err := realWAL.LoadCheckpoint(fullpath, &logger)
 			require.Error(t, err)
 			require.Nil(t, tries)
 			require.Contains(t, err.Error(), "checksum")
