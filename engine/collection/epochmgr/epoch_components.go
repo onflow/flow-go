@@ -41,6 +41,7 @@ func NewEpochComponents(
 		hotstuff:          hotstuff,
 		voteAggregator:    voteAggregator,
 		timeoutAggregator: timeoutAggregator,
+		messageHub:        messageHub,
 	}
 
 	builder := component.NewComponentManagerBuilder()
