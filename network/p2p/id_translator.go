@@ -19,7 +19,7 @@ var (
 // IDTranslator provides an interface for converting from Flow ID's to LibP2P peer ID's
 // and vice versa.
 type IDTranslator interface {
-	// GetPeerID returns the peer ID for the given Flow ID.
+	// GetPeerID returns the peer ID for the given `flow.Identifier`.
 	// During normal operations, the following error returns are expected
 	//  * ErrUnknownId if the given Identifier is unknown
 	//  * ErrInvalidId if the given Identifier has an invalid format.
@@ -31,7 +31,7 @@ type IDTranslator interface {
 	// TODO: implementations do not fully adhere to this convention on error returns
 	GetPeerID(flow.Identifier) (peer.ID, error)
 
-	// GetFlowID returns the Flow ID for the given peer ID.
+	// GetFlowID returns the `flow.Identifier` for the given `peer.ID`.
 	// During normal operations, the following error returns are expected
 	//  * ErrUnknownId if the given Identifier is unknown
 	//  * ErrInvalidId if the given Identifier has an invalid format.

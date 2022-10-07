@@ -17,7 +17,7 @@ import (
 // IdentifierSet represents a set of node IDs (operator-defined) whose communication should be blocked.
 type IdentifierSet map[flow.Identifier]struct{}
 
-// Includes returns true iff id ∈ s
+// Contains returns true iff id ∈ s
 func (s IdentifierSet) Contains(id flow.Identifier) bool {
 	_, found := s[id]
 	return found
@@ -110,7 +110,7 @@ func (w *NodeBlocklistWrapper) Identities(filter flow.IdentityFilter) flow.Ident
 	idtx := make(flow.IdentityList, 0, len(identities))
 	w.m.RLock()
 	for _, identity := range identities {
-		if w.blocklist.Includes(identity.NodeID) {
+		if w.blocklist.Contains(identity.NodeID) {
 			var i flow.Identity = *identity // shallow copy is sufficient, because `Ejected` flag is in top-level struct
 			i.Ejected = true
 			idtx = append(idtx, &i)
@@ -130,20 +130,20 @@ func (w *NodeBlocklistWrapper) Identities(filter flow.IdentityFilter) flow.Ident
 // flag in the identity.
 func (w *NodeBlocklistWrapper) ByNodeID(identifier flow.Identifier) (*flow.Identity, bool) {
 	identity, b := w.identityProvider.ByNodeID(identifier)
-	return w.applyBlocklist(identity), b
+	return w.setEjectedIfBlocked(identity), b
 }
 
-// applyBlocklist checks whether the node with the given identity is on the `blocklist`.
+// setEjectedIfBlocked checks whether the node with the given identity is on the `blocklist`.
 // Shortcuts:
 //   - If the node's identity is nil, there is nothing to do because we don't generate identities here.
 //   - If the node is already ejected, we don't have to check the blocklist.
-func (w *NodeBlocklistWrapper) applyBlocklist(identity *flow.Identity) *flow.Identity {
+func (w *NodeBlocklistWrapper) setEjectedIfBlocked(identity *flow.Identity) *flow.Identity {
 	if identity == nil || identity.Ejected {
 		return identity
 	}
 
 	w.m.RLock()
-	isBlocked := w.blocklist.Includes(identity.NodeID)
+	isBlocked := w.blocklist.Contains(identity.NodeID)
 	w.m.RUnlock()
 	if !isBlocked {
 		return identity
@@ -165,7 +165,7 @@ func (w *NodeBlocklistWrapper) applyBlocklist(identity *flow.Identity) *flow.Ide
 // flag in the identity.
 func (w *NodeBlocklistWrapper) ByPeerID(p peer.ID) (*flow.Identity, bool) {
 	identity, b := w.identityProvider.ByPeerID(p)
-	return w.applyBlocklist(identity), b
+	return w.setEjectedIfBlocked(identity), b
 }
 
 // persistBlocklist writes the given blocklist to the database. To avoid legacy
