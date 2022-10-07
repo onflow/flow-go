@@ -2,10 +2,12 @@ package wal
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
@@ -21,7 +23,7 @@ import (
 //     the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
 //
 // it returns (tries, nil) if there was no error
-// it returns (nil, os.ErrNotExist) if a certain file is missing
+// it returns (nil, os.ErrNotExist) if a certain file is missing, use (os.IsNotExist to check)
 // it returns (nil, err) if running into any exception
 func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
@@ -151,22 +153,92 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 
 // allPartFileExist check if all the part files of the checkpoint file exist
 // it returns nil if all files exist
-// it returns os.ErrNotExist if some file is missing
+// it returns os.ErrNotExist if some file is missing, use (os.IsNotExist to check)
 // it returns err if running into any exception
 func allPartFileExist(dir string, fileName string, totalSubtrieFiles int) error {
-	for i := 0; i < totalSubtrieFiles; i++ {
-		filePath, _, err := filePathSubTries(dir, fileName, i)
-		if err != nil {
-			return fmt.Errorf("fail to find file path for %v-th subtrie file: %w", i, err)
-		}
+	matched, err := findCheckpointPartFiles(dir, fileName)
+	if err != nil {
+		return fmt.Errorf("could not check all checkpoint part file exist: %w", err)
+	}
 
-		// ensure file exists
-		_, err = os.Stat(filePath)
+	// header + subtrie files + top level file
+	if len(matched) != 1+totalSubtrieFiles+1 {
+		return fmt.Errorf("some checkpoint part file is missing. found part files %v. err :%w",
+			matched, os.ErrNotExist)
+	}
+
+	return nil
+}
+
+// findCheckpointPartFiles returns a slice of file full paths of the part files for the checkpoint file
+// with the given fileName under the given folder.
+// - it return the matching part files, note it might not contains all the part files.
+// - it return error if running any exception
+func findCheckpointPartFiles(dir string, fileName string) ([]string, error) {
+	headerPath := filePathHeader(dir, fileName)
+	pattern := headerPath + "*"
+	matched, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("could not find checkpoint files: %w", err)
+	}
+
+	// build a lookup with matched
+	lookup := make(map[string]struct{})
+	for _, match := range matched {
+		lookup[match] = struct{}{}
+	}
+
+	parts := make([]string, 0)
+	// check header exists
+	_, ok := lookup[headerPath]
+	if ok {
+		parts = append(parts, headerPath)
+		delete(lookup, headerPath)
+	}
+
+	// check all subtrie parts
+	for i := 0; i < subtrieCount; i++ {
+		subtriePath, _, err := filePathSubTries(dir, fileName, i)
 		if err != nil {
-			return fmt.Errorf("fail to check %v-th subtrie file exist: %w", i, err)
+			return nil, err
+		}
+		_, ok := lookup[subtriePath]
+		if ok {
+			parts = append(parts, subtriePath)
+			delete(lookup, subtriePath)
 		}
 	}
-	return nil
+
+	// check top level trie part file
+	toplevelPath, _ := filePathTopTries(dir, fileName)
+
+	_, ok = lookup[toplevelPath]
+	if ok {
+		parts = append(parts, toplevelPath)
+		delete(lookup, toplevelPath)
+	}
+
+	return parts, nil
+}
+
+var errCheckpointFileExist = errors.New("checkpoint file exists already")
+
+// noneCheckpointFileExist check if none of the checkpoint header file or the part files exist
+// it returns nil if none exists
+// it returns errCheckpointFileExist if a checkpoint file exists already
+// it returns err if running into any other exception
+func noneCheckpointFileExist(dir string, fileName string, totalSubtrieFiles int) error {
+	matched, err := findCheckpointPartFiles(dir, fileName)
+	if err != nil {
+		return err
+	}
+
+	// no part file found, means noneCheckpointFileExist
+	if len(matched) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("checkpoint part file already exist %v: %w", matched, errCheckpointFileExist)
 }
 
 func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32) ([][]*node.Node, error) {
