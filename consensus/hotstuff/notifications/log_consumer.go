@@ -1,8 +1,9 @@
 package notifications
 
 import (
-	"github.com/rs/zerolog"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"

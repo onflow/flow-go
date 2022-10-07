@@ -1,10 +1,11 @@
 package notifications
 
 import (
+	"time"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"time"
 )
 
 // NoopConsumer is an implementation of the notifications consumer that

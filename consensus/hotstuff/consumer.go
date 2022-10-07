@@ -1,9 +1,10 @@
 package hotstuff
 
 import (
+	"time"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"time"
 )
 
 // FinalizationConsumer consumes outbound notifications produced by the finalization logic.
