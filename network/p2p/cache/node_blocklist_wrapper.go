@@ -64,15 +64,15 @@ func NewNodeBlocklistWrapper(identityProvider id.IdentityProvider, db *badger.DB
 // and then (non-atomically!) the in-memory set of blocked nodes is updated. This strongly
 // benefits performance and modularity. No errors are expected during normal operations.
 func (w *NodeBlocklistWrapper) Update(blocklist flow.IdentifierList) error {
-	b := blocklist.Lookup() // convert slice to
+	b := blocklist.Lookup() // converts slice to map
+
+	w.m.Lock()
+	defer w.m.Unlock()
 	err := persistBlocklist(b, w.db)
 	if err != nil {
 		return fmt.Errorf("failed to persist set of blocked nodes to the data base: %w", err)
 	}
-
-	w.m.Lock()
 	w.blocklist = b
-	w.m.Unlock()
 	return nil
 }
 
