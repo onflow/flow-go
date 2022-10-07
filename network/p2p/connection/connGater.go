@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 var _ connmgr.ConnectionGater = (*ConnGater)(nil)
@@ -107,7 +108,7 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 			lg.Error().
 				Err(err).
 				Str("local_address", addr.LocalMultiaddr().String()).
-				Bool("suspicious", true).
+				Bool(logging.KeySuspicious, true).
 				Msg("rejected inbound connection")
 			return false
 		}

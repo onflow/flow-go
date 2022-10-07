@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // defaultSyncRequestQueueCapacity maximum capacity of sync requests queue
@@ -210,7 +211,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 			Uint64("to", req.ToHeight).
 			Uint64("size", (req.ToHeight-req.FromHeight)+1).
 			Uint("max_size", maxSize).
-			Bool("suspicious", true).
+			Bool(logging.KeySuspicious, true).
 			Msg("range request is too large")
 
 		req.ToHeight = maxHeight
@@ -273,7 +274,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 		logger.Warn().
 			Int("size", len(req.BlockIDs)).
 			Uint("max_size", maxSize).
-			Bool("suspicious", true).
+			Bool(logging.KeySuspicious, true).
 			Msg("batch request is too large")
 	}
 

@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -519,7 +520,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 				Str("event_type", msg.Type).
 				Str("channel", msg.ChannelID).
 				Int("maxSize", maxSize).
-				Bool("suspicious", true).
+				Bool(logging.KeySuspicious, true).
 				Msg("received message exceeded permissible message maxSize")
 			return
 		}
@@ -622,7 +623,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 			Hex("event_id", msg.EventID).
 			Str("event_type", msg.Type).
 			Str("channel", msg.ChannelID).
-			Bool("suspicious", true).
+			Bool(logging.KeySuspicious, true).
 			Msg("failed to decode message payload")
 		return
 	}

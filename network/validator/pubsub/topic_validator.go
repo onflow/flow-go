@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/validator"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // messagePubKey extracts the public key of the envelope signer from a libp2p message.
@@ -92,7 +93,7 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 				Err(err).
 				Str("peer_id", from.String()).
 				Hex("sender", msg.OriginID).
-				Bool("suspicious", true).
+				Bool(logging.KeySuspicious, true).
 				Msg("filtering message from un-allowed peer")
 			return pubsub.ValidationReject
 		}
@@ -118,7 +119,7 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 				Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
 				Str("peer_id", from.String()).
 				Hex("sender", msg.OriginID).
-				Bool("suspicious", true).
+				Bool(logging.KeySuspicious, true).
 				Msg("rejecting message")
 			return pubsub.ValidationReject
 		}

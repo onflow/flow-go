@@ -54,7 +54,7 @@ func (c *Consumer) logOffense(networkOffense string, violation *Violation) {
 		Str("message_type", violation.MsgType).
 		Str("channel", violation.Channel.String()).
 		Bool("unicast_message", violation.IsUnicast).
-		Bool("suspicious", true).
+		Bool(logging.KeySuspicious, true).
 		Str("role", role).
 		Hex("sender_id", logging.ID(nodeID))
 
