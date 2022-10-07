@@ -3,9 +3,15 @@ package automate
 import (
 	"fmt"
 	"testing"
+	"text/template"
 
 	"github.com/stretchr/testify/require"
 )
+
+type Replacement struct {
+	NodeID   string
+	ImageTag string
+}
 
 func TestGenerateValues(t *testing.T) {
 	fmt.Printf("Starting tests")
@@ -46,4 +52,21 @@ func TestLoadString(t *testing.T) {
 	expected := "Test string 123"
 
 	require.Equal(t, expected, actual, "Mismatching strings")
+}
+
+func TestSubString(t *testing.T) {
+	var replacements Replacement
+	replacements.NodeID = "abc123"
+	replacements.ImageTag = "v0.27-1234"
+	original := textReader("templates/test_templates/templates_test.yml")
+	newString := ""
+
+	template_string, err := template.New("todos").Parse(original)
+	if err != nil {
+		panic(err)
+	}
+	err = template_string.Execute(newString, replacements)
+	if err != nil {
+		panic(err)
+	}
 }
