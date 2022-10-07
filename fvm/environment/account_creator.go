@@ -36,6 +36,37 @@ type BootstrapAccountCreator interface {
 	)
 }
 
+// This ensures cadence can't access unexpected operations while parsing
+// programs.
+type ParseRestrictedAccountCreator struct {
+	txnState *state.TransactionState
+	impl     AccountCreator
+}
+
+func NewParseRestrictedAccountCreator(
+	txnState *state.TransactionState,
+	creator AccountCreator,
+) AccountCreator {
+	return ParseRestrictedAccountCreator{
+		txnState: txnState,
+		impl:     creator,
+	}
+}
+
+func (creator ParseRestrictedAccountCreator) CreateAccount(
+	payer runtime.Address,
+) (
+	runtime.Address,
+	error,
+) {
+	if creator.txnState.IsParseRestricted() {
+		return runtime.Address{}, errors.NewParseRestrictedModeInvalidAccessFailure(
+			"CreateAccount")
+	}
+
+	return creator.impl.CreateAccount(payer)
+}
+
 type AccountCreator interface {
 	CreateAccount(payer runtime.Address) (runtime.Address, error)
 }
