@@ -935,6 +935,10 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		require.True(t, ok)
 		_, ok = commits[blocks["D"].ID()]
 		require.True(t, ok)
+
+		// make sure no stopping has been engaged, as it was not set
+		set, _, _ := ctx.stopControl.GetStopHeight()
+		require.False(t, set)
 	})
 }
 
