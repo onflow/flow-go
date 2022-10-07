@@ -329,6 +329,7 @@ func adjustTPS(
 			currentTxs := uint(lg.GetTxExecuted())
 			inflight := currentSentTxs - int(currentTxs)
 			currentTPS := float64(currentTxs-lastTxs) / now.Sub(lastTs).Seconds()
+			inflightPerWorker := inflight / int(targetTPS)
 
 			unboundedTPS := uint(math.Ceil(currentTPS))
 
@@ -347,6 +348,7 @@ func adjustTPS(
 						Float64("lastTPS", lastTPS).
 						Float64("currentTPS", currentTPS).
 						Int("inflight", inflight).
+						Int("inflightPerWorker", inflightPerWorker).
 						Msg("skipped adjusting TPS")
 
 					lastTxs = currentTxs
@@ -367,6 +369,7 @@ func adjustTPS(
 				Uint("unboundedTPS", unboundedTPS).
 				Uint("targetTPS", boundedTPS).
 				Int("inflight", inflight).
+				Int("inflightPerWorker", inflightPerWorker).
 				Msg("adjusting TPS")
 
 			err := lg.SetTPS(boundedTPS)
