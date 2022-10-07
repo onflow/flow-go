@@ -14,11 +14,12 @@ import (
 
 // ReadCheckpointV6 reads checkpoint file from a main file and 17 file parts.
 // the main file stores:
-// 		1. version
-//		2. checksum of each part file (17 in total)
-// 		3. checksum of the main file itself
-// 	the first 16 files parts contain the trie nodes below the subtrieLevel
-//	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
+//   - version
+//   - checksum of each part file (17 in total)
+//   - checksum of the main file itself
+//     the first 16 files parts contain the trie nodes below the subtrieLevel
+//     the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
+//
 // it returns (tries, nil) if there was no error
 // it returns (nil, os.ErrNotExist) if a certain file is missing
 // it returns (nil, err) if running into any exception
