@@ -712,7 +712,6 @@ func main() {
 			// initialize the compliance engine
 			comp, err = compliance.NewEngine(
 				node.Logger,
-				node.Network,
 				node.Me,
 				prov,
 				complianceCore,
@@ -748,6 +747,8 @@ func main() {
 				comp,
 				prov,
 				hot,
+				hotstuffModules.VoteAggregator,
+				hotstuffModules.TimeoutAggregator,
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Payloads,
