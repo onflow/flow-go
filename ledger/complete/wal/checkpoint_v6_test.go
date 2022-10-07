@@ -163,7 +163,7 @@ func TestEncodeSubTrie(t *testing.T) {
 					continue
 				}
 				index := indices[root]
-				require.Equal(t, root.Hash(), nodes[index].Hash(),
+				require.Equal(t, root.Hash(), nodes[index-1].Hash(), // -1 because readCheckpointSubTrie returns nodes[1:]
 					"readCheckpointSubTrie should return nodes where the root should be found "+
 						"by the index specified by the indices returned by storeCheckpointSubTrie")
 			}
@@ -187,17 +187,18 @@ func TestGetNodesByIndex(t *testing.T) {
 		ns[i] = randomNode()
 	}
 	subtrieNodes := [][]*node.Node{
-		[]*node.Node{nil, ns[0], ns[1]},
-		[]*node.Node{nil, ns[2]},
-		[]*node.Node{nil},
-		[]*node.Node{nil},
+		[]*node.Node{ns[0], ns[1]},
+		[]*node.Node{ns[2]},
+		[]*node.Node{},
+		[]*node.Node{},
 	}
 	topLevelNodes := []*node.Node{nil, ns[3]}
+	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
 
 	for i := uint64(1); i <= 4; i++ {
-		node, err := getNodeByIndex(subtrieNodes, topLevelNodes, i)
+		node, err := getNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, i)
 		require.NoError(t, err, "cannot get node by index", i)
-		require.Equal(t, ns[i-1], node, "got wrong node by index", i)
+		require.Equal(t, ns[i-1], node, "got wrong node by index %v", i)
 	}
 }
 
