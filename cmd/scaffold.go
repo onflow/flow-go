@@ -740,7 +740,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 	fnb.Module("id providers", func(node *NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
 		node.IDTranslator = idCache
 
@@ -748,7 +748,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
 		node.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
 		}
 
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(

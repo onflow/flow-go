@@ -637,7 +637,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
@@ -645,7 +645,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
 		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
 		}
 
 		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {

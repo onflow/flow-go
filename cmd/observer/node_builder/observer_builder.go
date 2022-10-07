@@ -720,7 +720,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
@@ -728,7 +728,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
 		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
 		}
 
 		// use the default identifier provider
