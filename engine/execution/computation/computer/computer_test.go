@@ -187,7 +187,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 
 		chain := flow.Localnet.Chain()
-		vm := fvm.NewVM()
+		vm := fvm.NewVirtualMachine()
 		progs := programs.NewEmptyBlockPrograms()
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
@@ -419,7 +419,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 						return emittingRuntime
 					})))
 
-		vm := fvm.NewVM()
+		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := new(mocktracker.Storage)
@@ -496,7 +496,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 						return rt
 					})))
 
-		vm := fvm.NewVM()
+		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := new(mocktracker.Storage)
@@ -592,7 +592,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 						return rt
 					})))
 
-		vm := fvm.NewVM()
+		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := new(mocktracker.Storage)
@@ -758,7 +758,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	address := flow.HexToAddress("1234")
 	fag := &FixedAddressGenerator{Address: address}
 
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext()
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
@@ -822,7 +822,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		fvm.WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 
 	rag := &RandomAddressGenerator{}
 

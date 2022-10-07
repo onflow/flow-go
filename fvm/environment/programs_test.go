@@ -113,7 +113,7 @@ func Test_Programs(t *testing.T) {
 
 	txnState := state.NewTransactionState(mainView, state.DefaultParameters())
 
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 	programs := programsStorage.NewEmptyBlockPrograms()
 
 	accounts := environment.NewAccounts(txnState)

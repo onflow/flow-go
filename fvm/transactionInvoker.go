@@ -123,7 +123,7 @@ func (i TransactionInvoker) Process(
 		return false
 	}
 
-	env := NewTransactionEnv(ctx, txnState, programs, proc.Transaction, proc.TxIndex, span)
+	env := NewTransactionEnvironment(ctx, txnState, programs, proc.Transaction, proc.TxIndex, span)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)
