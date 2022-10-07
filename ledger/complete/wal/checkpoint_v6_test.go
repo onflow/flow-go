@@ -143,7 +143,7 @@ func TestEncodeSubTrie(t *testing.T) {
 
 			if len(indices) > 1 {
 				require.Len(t, indices, len(roots),
-					fmt.Sprintf("indices %v should include all roots %v", indices[nil], roots[0]))
+					fmt.Sprintf("indices should include all roots, indices[nil] %v, roots[0] %v", indices[nil], roots[0]))
 			}
 			// each root should be included in the indices
 			for _, root := range roots {
