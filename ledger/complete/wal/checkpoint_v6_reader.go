@@ -77,6 +77,21 @@ func filePathTopTries(dir string, fileName string) (string, string) {
 	return path.Join(dir, topTriesFileName), fileName
 }
 
+func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
+	paths := make([]string, 0)
+
+	paths = append(paths, filePathCheckpointHeader(dir, fileName))
+
+	subtrieCount := subtrieCountByLevel(subtrieLevel)
+	for i := 0; i < subtrieCount; i++ {
+		paths = append(paths, path.Join(dir, fmt.Sprintf("%v.%v", fileName, i)))
+	}
+
+	p, _ := filePathTopTries(dir, fileName)
+	paths = append(paths, p)
+	return paths
+}
+
 // readCheckpointHeader takes a file path and returns subtrieChecksums and topTrieChecksum
 // any error returned are exceptions
 func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
@@ -168,7 +183,7 @@ func allPartFileExist(dir string, fileName string, totalSubtrieFiles int) error 
 // - it return the matching part files, note it might not contains all the part files.
 // - it return error if running any exception
 func findCheckpointPartFiles(dir string, fileName string) ([]string, error) {
-	headerPath := filePathHeader(dir, fileName)
+	headerPath := filePathCheckpointHeader(dir, fileName)
 	pattern := headerPath + "*"
 	matched, err := filepath.Glob(pattern)
 	if err != nil {

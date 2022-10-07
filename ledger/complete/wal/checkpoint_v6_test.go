@@ -1,11 +1,18 @@
 package wal
 
 import (
+	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
+	"path"
+	"path/filepath"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
@@ -77,10 +84,54 @@ func createSimpleTrie(t *testing.T) []*trie.MTrie {
 	return tries
 }
 
+func randPathPayload() (ledger.Path, ledger.Payload) {
+	var path ledger.Path
+	rand.Read(path[:])
+	payload := testutils.RandomPayload(1, 100)
+	return path, *payload
+}
+
+func randNPathPayloads(n int) ([]ledger.Path, []ledger.Payload) {
+	paths := make([]ledger.Path, n)
+	payloads := make([]ledger.Payload, n)
+	for i := 0; i < n; i++ {
+		path, payload := randPathPayload()
+		paths[i] = path
+		payloads[i] = payload
+	}
+	return paths, payloads
+}
+
+func createMultipleRandomTries(t *testing.T) []*trie.MTrie {
+	tries := make([]*trie.MTrie, 0)
+	activeTrie := trie.NewEmptyMTrie()
+
+	// add tries with no shared paths
+	for i := 0; i < 100; i++ {
+		paths, payloads := randNPathPayloads(100)
+		activeTrie, _, err := trie.NewTrieWithUpdatedRegisters(activeTrie, paths, payloads, false)
+		require.NoError(t, err, "update registers")
+		tries = append(tries, activeTrie)
+	}
+
+	// add trie with some shared path
+	sharedPaths, payloads1 := randNPathPayloads(100)
+	activeTrie, _, err := trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads1, false)
+	require.NoError(t, err, "update registers")
+	tries = append(tries, activeTrie)
+
+	_, payloads2 := randNPathPayloads(100)
+	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads2, false)
+	require.NoError(t, err, "update registers")
+	tries = append(tries, activeTrie)
+
+	return tries
+}
+
 func TestEncodeSubTrie(t *testing.T) {
 	file := "checkpoint"
 	logger := unittest.Logger()
-	tries := createSimpleTrie(t)
+	tries := createMultipleRandomTries(t)
 	estimatedSubtrieNodeCount := estimateSubtrieNodeCount(tries[0])
 	subtrieRoots := createSubTrieRoots(tries)
 
@@ -91,8 +142,8 @@ func TestEncodeSubTrie(t *testing.T) {
 			require.NoError(t, err)
 
 			if len(indices) > 1 {
-				require.Len(t, indices, len(roots)+1, // +1 means the default (nil: 0) is included
-					"indices %v should include all roots %v", indices, roots)
+				require.Len(t, indices, len(roots),
+					fmt.Sprintf("indices should include all roots, indices[nil] %v, roots[0] %v", indices[nil], roots[0]))
 			}
 			// each root should be included in the indices
 			for _, root := range roots {
@@ -163,6 +214,133 @@ func TestWriteAndReadCheckpointV6(t *testing.T) {
 	})
 }
 
+func TestWriteAndReadCheckpointV6MultipleTries(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createMultipleRandomTries(t)
+		fileName := "checkpoint-multi-file"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6(tries, dir, fileName, &logger), "fail to store checkpoint")
+		decoded, err := ReadCheckpointV6(dir, fileName, &logger)
+		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		requireTriesEqual(t, tries, decoded)
+	})
+}
+
+// test running checkpointing twice will produce the same checkpoint file
+func TestCheckpointV6IsDeterminstic(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createMultipleRandomTries(t)
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6(tries, dir, "checkpoint1", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6(tries, dir, "checkpoint2", &logger), "fail to store checkpoint")
+		require.NoError(t, compareFiles(
+			path.Join(dir, "checkpoint1"),
+			path.Join(dir, "checkpoint2")),
+			"found difference in checkpoint files")
+	})
+}
+
+// compareFiles takes two files' full path, and read them bytes by bytes and compare if
+// the two files are identical
+// it returns nil if identical
+// it returns error if there is difference
+func compareFiles(file1, file2 string) error {
+	closable1, err := os.Open(file1)
+	if err != nil {
+		return fmt.Errorf("could not open file 1 %v: %w", closable1, err)
+	}
+	defer func(f *os.File) {
+		f.Close()
+	}(closable1)
+
+	closable2, err := os.Open(file1)
+	if err != nil {
+		return fmt.Errorf("could not open file 2 %v: %w", closable2, err)
+	}
+	defer func(f *os.File) {
+		f.Close()
+	}(closable2)
+
+	reader1 := bufio.NewReaderSize(closable1, defaultBufioReadSize)
+	reader2 := bufio.NewReaderSize(closable2, defaultBufioReadSize)
+
+	buf1 := make([]byte, defaultBufioReadSize)
+	buf2 := make([]byte, defaultBufioReadSize)
+	for {
+		_, err1 := reader1.Read(buf1)
+		_, err2 := reader2.Read(buf2)
+		if errors.Is(err1, io.EOF) && errors.Is(err2, io.EOF) {
+			break
+		}
+
+		if err1 != nil {
+			return err1
+		}
+		if err2 != nil {
+			return err2
+		}
+
+		if !bytes.Equal(buf1, buf2) {
+			return fmt.Errorf("bytes are different: %x, %x", buf1, buf2)
+		}
+	}
+
+	return nil
+}
+
+func storeCheckpointV5(tries []*trie.MTrie, dir string, fileName string, logger *zerolog.Logger) error {
+	closable, err := createWriterForCheckpointHeader(dir, fileName, logger)
+	if err != nil {
+		return fmt.Errorf("could not store checkpoint header: %w", err)
+	}
+	defer func() {
+		closeErr := closable.Close()
+		// Return close error if there isn't any prior error to return.
+		if err == nil {
+			err = closeErr
+		}
+	}()
+
+	return StoreCheckpointV5(closable, tries...)
+}
+
+func TestWriteAndReadCheckpointV5(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createMultipleRandomTries(t)
+		fileName := "checkpoint1"
+		logger := unittest.Logger()
+
+		require.NoErrorf(t, storeCheckpointV5(tries, dir, fileName, &logger), "fail to store checkpoint")
+		decoded, err := LoadCheckpoint(filepath.Join(dir, fileName), &logger)
+		require.NoErrorf(t, err, "fail to load checkpoint")
+		requireTriesEqual(t, tries, decoded)
+	})
+}
+
+// test that converting a v6 back to v5 would produce the same v5 checkpoint as
+// producing directly to v5
+func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createMultipleRandomTries(t)
+		logger := unittest.Logger()
+
+		// store tries into v6 then read back, then store into v5
+		require.NoErrorf(t, StoreCheckpointV6(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
+		decoded, err := ReadCheckpointV6(dir, "checkpoint-v6", &logger)
+		require.NoErrorf(t, err, "fail to read checkpoint %v/checkpoint-v6", dir)
+		require.NoErrorf(t, storeCheckpointV5(decoded, dir, "checkpoint-v6-v5", &logger), "fail to store checkpoint")
+
+		// store tries directly into v5 checkpoint
+		require.NoErrorf(t, storeCheckpointV5(tries, dir, "checkpoint-v5", &logger), "fail to store checkpoint")
+
+		// compare the two v5 checkpoint files should be identical
+		require.NoError(t, compareFiles(
+			path.Join(dir, "checkpoint-v5"),
+			path.Join(dir, "checkpoint-v6-v5")),
+			"found difference in checkpoint files")
+	})
+}
+
 // verify that if a part file is missing then os.ErrNotExist should return
 func TestAllPartFileExist(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
@@ -185,7 +363,7 @@ func TestAllPartFileExist(t *testing.T) {
 			err = os.Remove(fileToDelete)
 			require.NoError(t, err, "fail to remove part file")
 
-			_, err = ReadCheckpointV6(dir, fileName)
+			_, err = ReadCheckpointV6(dir, fileName, &logger)
 			require.ErrorIs(t, err, os.ErrNotExist, "wrong error type returned")
 		}
 	})
