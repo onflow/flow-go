@@ -35,7 +35,7 @@ func ReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*t
 	logger.Info().Msgf("reading v6 checkpoint file")
 
 	headerPath := filePathCheckpointHeader(dir, fileName)
-	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath)
+	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not read header: %w", err)
 	}
@@ -54,7 +54,7 @@ func ReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*t
 
 	logger.Info().Msg("finish reading all v6 subtrie files, start reading top level tries")
 
-	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum)
+	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not read top level nodes or tries: %w", err)
 	}
@@ -108,12 +108,17 @@ func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
 
 // readCheckpointHeader takes a file path and returns subtrieChecksums and topTrieChecksum
 // any error returned are exceptions
-func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
+func readCheckpointHeader(filepath string, logger *zerolog.Logger) ([]uint32, uint32, error) {
 	closable, err := os.Open(filepath)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func(f *os.File) {
+		evictErr := evictFileFromLinuxPageCache(f, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict header file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
 		f.Close()
 	}(closable)
 
@@ -307,7 +312,11 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func(f *os.File) {
-		//TODO: we should evict file from Linux page cache here, so it doesn't keep 170+GB in RAM when that can be used instead for caching more frequently read data.
+		evictErr := evictFileFromLinuxPageCache(f, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict subtrie file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
 		f.Close()
 	}(f)
 
@@ -421,14 +430,18 @@ func readSubTriesFooter(f *os.File) (uint64, uint32, error) {
 // 6. node count
 // 7. trie count
 // 6. checksum
-func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32) ([]*trie.MTrie, error) {
+func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	filepath, _ := filePathTopTries(dir, fileName)
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func() {
-		// TODO: evict
+		evictErr := evictFileFromLinuxPageCache(file, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict top trie file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
 		_ = file.Close()
 	}()
 
