@@ -484,19 +484,11 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
 type PanickingVM struct{}
 
-func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
-	return p.RunV2(f, procedure, view)
-}
-
-func (p *PanickingVM) RunV2(f fvm.Context, procedure fvm.Procedure, view state.View) error {
+func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
-func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
-	panic("not expected")
-}
-
-func (p *PanickingVM) GetAccountV2(f fvm.Context, address flow.Address, view state.View) (*flow.Account, error) {
+func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, view state.View) (*flow.Account, error) {
 	panic("not expected")
 }
 
@@ -504,11 +496,7 @@ type LongRunningVM struct {
 	duration time.Duration
 }
 
-func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
-	return l.RunV2(f, procedure, view)
-}
-
-func (l *LongRunningVM) RunV2(f fvm.Context, procedure fvm.Procedure, view state.View) error {
+func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	time.Sleep(l.duration)
 	// satisfy value marshaller
 	if scriptProcedure, is := procedure.(*fvm.ScriptProcedure); is {
@@ -518,11 +506,7 @@ func (l *LongRunningVM) RunV2(f fvm.Context, procedure fvm.Procedure, view state
 	return nil
 }
 
-func (l *LongRunningVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
-	panic("not expected")
-}
-
-func (l *LongRunningVM) GetAccountV2(f fvm.Context, address flow.Address, view state.View) (*flow.Account, error) {
+func (l *LongRunningVM) GetAccount(f fvm.Context, address flow.Address, view state.View) (*flow.Account, error) {
 	panic("not expected")
 }
 

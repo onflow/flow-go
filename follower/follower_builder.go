@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -122,7 +121,7 @@ type FollowerServiceBuilder struct {
 	// for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
-	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
+	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
 	FollowerEng *followereng.Engine
@@ -388,7 +387,7 @@ func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
 	return net, nil
 }
 
-func publicNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
+func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
 	return []network.MessageValidator{
 		// filter out messages sent by this node itself
 		validator.ValidateNotSender(selfID),
@@ -477,7 +476,7 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
 		// use the default identifier provider
-		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
+		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
 				var result flow.IdentifierList
 
@@ -592,12 +591,9 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 					p2pdht.AsClient(),
 					dht.BootstrapPeers(pis...),
 				)
-			}).
-			SetPubSub(p2ppubsub.NewGossipSub).
-			Build(ctx)
-
+			}).Build(ctx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not build libp2p node: %w", err)
 		}
 
 		builder.LibP2PNode = node

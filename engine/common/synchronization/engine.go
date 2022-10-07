@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	synccore "github.com/onflow/flow-go/module/chainsync"
-	identifier "github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -45,7 +44,7 @@ type Engine struct {
 	pollInterval         time.Duration
 	scanInterval         time.Duration
 	core                 module.SyncCore
-	participantsProvider identifier.IdentifierProvider
+	participantsProvider module.IdentifierProvider
 	finalizedHeader      *FinalizedHeaderCache
 
 	requestHandler *RequestHandler // component responsible for handling requests
@@ -65,7 +64,7 @@ func New(
 	comp network.Engine,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
-	participantsProvider identifier.IdentifierProvider,
+	participantsProvider module.IdentifierProvider,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 

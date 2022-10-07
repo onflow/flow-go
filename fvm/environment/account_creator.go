@@ -59,12 +59,11 @@ func (creator ParseRestrictedAccountCreator) CreateAccount(
 	runtime.Address,
 	error,
 ) {
-	if creator.txnState.IsParseRestricted() {
-		return runtime.Address{}, errors.NewParseRestrictedModeInvalidAccessFailure(
-			"CreateAccount")
-	}
-
-	return creator.impl.CreateAccount(payer)
+	return parseRestrict1Arg1Ret(
+		creator.txnState,
+		"CreateAccount",
+		creator.impl.CreateAccount,
+		payer)
 }
 
 type AccountCreator interface {

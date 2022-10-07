@@ -258,6 +258,15 @@ func TopicFromChannel(channel Channel, rootBlockID flow.Identifier) Topic {
 	return Topic(fmt.Sprintf("%s/%s", string(channel), rootBlockID.String()))
 }
 
+// TopicsFromChannels returns the unique LibP2P topics form the channels.
+func TopicsFromChannels(channels ChannelList, rootBlockID flow.Identifier) []Topic {
+	topics := make([]Topic, 0, len(channels))
+	for _, channel := range channels {
+		topics = append(topics, TopicFromChannel(channel, rootBlockID))
+	}
+	return topics
+}
+
 func ChannelFromTopic(topic Topic) (Channel, bool) {
 	if IsClusterChannel(Channel(topic)) {
 		return Channel(topic), true
