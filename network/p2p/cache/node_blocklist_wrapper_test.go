@@ -62,7 +62,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestHonestNode() {
 	})
 	s.Run("Identities", func() {
 		identities := unittest.IdentityListFixture(11)
-		filter := filter.In(identities[3:4])
+		f := filter.In(identities[3:4])
 		expectedFilteredIdentities := identities.Filter(filter)
 		s.provider.On("Identities", mock.Anything).Return(
 			func(filter flow.IdentityFilter) flow.IdentityList {

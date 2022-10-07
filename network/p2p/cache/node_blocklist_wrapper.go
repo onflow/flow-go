@@ -18,7 +18,7 @@ import (
 type IdentifierSet map[flow.Identifier]struct{}
 
 // Includes returns true iff id ∈ s
-func (s IdentifierSet) Includes(id flow.Identifier) bool {
+func (s IdentifierSet) Contains(id flow.Identifier) bool {
 	_, found := s[id]
 	return found
 }
@@ -43,7 +43,7 @@ type NodeBlocklistWrapper struct {
 var _ id.IdentityProvider = (*NodeBlocklistWrapper)(nil)
 
 // NewNodeBlocklistWrapper wraps the given `IdentityProvider`. The blocklist is
-// loaded from the data base (or assumed to be empty if no data base entry is present).
+// loaded from the database (or assumed to be empty if no database entry is present).
 func NewNodeBlocklistWrapper(identityProvider id.IdentityProvider, db *badger.DB) (*NodeBlocklistWrapper, error) {
 	blocklist, err := retrieveBlocklist(db)
 	if err != nil {
@@ -158,7 +158,7 @@ func (w *NodeBlocklistWrapper) applyBlocklist(identity *flow.Identity) *flow.Ide
 }
 
 // ByPeerID returns the full identity for the node with the given peer ID,
-// where ID is the way the libP2P refers to the node. The function
+// peer.ID is the libp2p-level identifier of a Flow node. The function
 // has the same semantics as a map lookup, where the boolean return value is
 // true if and only if Identity has been found, i.e. `Identity` is not nil.
 // Caution: function returns include ejected nodes. Please check the `Ejected`
@@ -168,8 +168,8 @@ func (w *NodeBlocklistWrapper) ByPeerID(p peer.ID) (*flow.Identity, bool) {
 	return w.applyBlocklist(identity), b
 }
 
-// persistBlocklist writes the given blocklist to the data base. To avoid legacy
-// entries in the data base, we pure the entire data base entry if `blocklist` is
+// persistBlocklist writes the given blocklist to the database. To avoid legacy
+// entries in the database, we prune the entire data base entry if `blocklist` is
 // empty. No errors are expected during normal operations.
 func persistBlocklist(blocklist IdentifierSet, db *badger.DB) error {
 	if len(blocklist) == 0 {
@@ -179,7 +179,7 @@ func persistBlocklist(blocklist IdentifierSet, db *badger.DB) error {
 }
 
 // retrieveBlocklist reads the set of blocked nodes from the data base.
-// In case no data base entry exists, an empty set (nil map) is returned.
+// In case no database entry exists, an empty set (nil map) is returned.
 // No errors are expected during normal operations.
 func retrieveBlocklist(db *badger.DB) (IdentifierSet, error) {
 	var blocklist map[flow.Identifier]struct{}
