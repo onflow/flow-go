@@ -287,7 +287,6 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
 		// we should not attempt to process the children
 		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
-		cs.voteAggregator.AssertExpectations(cs.T())
 	})
 
 	cs.Run("view for unknown epoch error", func() {
@@ -362,7 +361,6 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
 		// we should not attempt to process the children
 		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
-		cs.voteAggregator.AssertExpectations(cs.T())
 	})
 
 	cs.Run("outdated block", func() {
