@@ -17,7 +17,7 @@ import (
 )
 
 const subtrieLevel = 4
-const subtrieCount = 1 << subtrieLevel
+const subtrieCount = 1 << subtrieLevel // 16
 
 func subtrieCountByLevel(level uint16) int {
 	return 1 << level
@@ -31,15 +31,28 @@ type resultStoringSubTrie struct {
 	Err       error
 }
 
+// StoreCheckpointV6SingleThread stores checkpoint file in v6 in a single threaded manner,
+// useful when EN is executing block.
+func StoreCheckpointV6SingleThread(tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
+	return StoreCheckpointV6(tries, outputDir, outputFile, logger, 1)
+}
+
+// StoreCheckpointV6SingleThread stores checkpoint file in v6 in max workers,
+// useful during state extraction
+func StoreCheckpointV6Concurrent(tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
+	return StoreCheckpointV6(tries, outputDir, outputFile, logger, 16)
+}
+
 // StoreCheckpointV6 stores checkpoint file into a main file and 17 file parts.
 // the main file stores:
-// 		1. version
-//		2. checksum of each part file (17 in total)
-// 		3. checksum of the main file itself
-// 	the first 16 files parts contain the trie nodes below the subtrieLevel
-//	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
+//   - version
+//   - checksum of each part file (17 in total)
+//   - checksum of the main file itself
+//     the first 16 files parts contain the trie nodes below the subtrieLevel
+//     the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
+// nWorker specifies how many workers to encode subtrie concurrently, valid range [1,16]
 func StoreCheckpointV6(
-	tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
+	tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger, nWorker uint) error {
 	if len(tries) == 0 {
 		logger.Info().Msg("no tries to be checkpointed")
 		return nil
@@ -51,7 +64,15 @@ func StoreCheckpointV6(
 		Uint64("first_reg_count", first.AllocatedRegCount()).
 		Str("last", last.RootHash().String()).
 		Uint64("last_reg_count", last.AllocatedRegCount()).
+		Int("version", 6).
 		Msgf("storing checkpoint for %v tries to %v", len(tries), outputDir)
+
+	// make sure a checkpoint file with same name doesn't exist
+	// part file with same name doesn't exist either
+	err := noneCheckpointFileExist(outputDir, outputFile, subtrieCount)
+	if err != nil {
+		return fmt.Errorf("fail to check if checkpoint file already exist: %w", err)
+	}
 
 	subtrieRoots := createSubTrieRoots(tries)
 
@@ -62,6 +83,7 @@ func StoreCheckpointV6(
 		outputDir,
 		outputFile,
 		logger,
+		nWorker,
 	)
 	if err != nil {
 		return fmt.Errorf("could not store sub trie: %w", err)
@@ -86,7 +108,6 @@ func StoreCheckpointV6(
 }
 
 // 		1. version
-//		2. subtrieLevel
 //		2. checksum of each part file (17 in total)
 // 		3. checksum of the main file itself
 func storeCheckpointHeader(
@@ -117,7 +138,7 @@ func storeCheckpointHeader(
 	writer := NewCRC32Writer(closable)
 
 	// write version
-	_, err = writer.Write(encodeVersion(MagicBytes, VersionV6))
+	_, err = writer.Write(encodeVersion(MagicBytesCheckpointHeader, VersionV6))
 	if err != nil {
 		return fmt.Errorf("cannot write version into checkpoint header: %w", err)
 	}
@@ -192,6 +213,12 @@ func storeTopLevelNodesAndTrieRoots(
 
 	writer := NewCRC32Writer(closable)
 
+	// write version
+	_, err = writer.Write(encodeVersion(MagicBytesCheckpointToptrie, VersionV6))
+	if err != nil {
+		return 0, fmt.Errorf("cannot write version into checkpoint header: %w", err)
+	}
+
 	topLevelNodeIndices, topLevelNodesCount, err := storeTopLevelNodes(
 		tries,
 		subTrieRootIndices,
@@ -257,6 +284,7 @@ func storeSubTrieConcurrently(
 	outputDir string,
 	outputFile string,
 	logger *zerolog.Logger,
+	nWorker uint,
 ) (
 	map[*node.Node]uint64, // node indices
 	uint64, // node count
@@ -265,31 +293,42 @@ func storeSubTrieConcurrently(
 ) {
 	logger.Info().Msgf("storing %v subtrie groups with average node count %v for each subtrie", subtrieCount, estimatedSubtrieNodeCount)
 
-	resultChs := make([]chan *resultStoringSubTrie, 0, len(subtrieRoots))
-	for i, subTrieRoot := range subtrieRoots {
-		resultCh := make(chan *resultStoringSubTrie)
-		go func(i int, subTrieRoot []*node.Node) {
-			roots, nodeCount, checksum, err := storeCheckpointSubTrie(
-				i, subTrieRoot, estimatedSubtrieNodeCount, outputDir, outputFile, logger)
-			resultCh <- &resultStoringSubTrie{
-				Index:     i,
-				Roots:     roots,
-				NodeCount: nodeCount,
-				Checksum:  checksum,
-				Err:       err,
-			}
-			close(resultCh)
-		}(i, subTrieRoot)
-		resultChs = append(resultChs, resultCh)
-	}
+	resultChs := make(chan chan *resultStoringSubTrie, nWorker)
+	go func() {
+		for i, subTrieRoot := range subtrieRoots {
+			resultCh := make(chan *resultStoringSubTrie)
+			resultChs <- resultCh
+			// resultsChs only has nWorker number of buffer room,
+			// if resultCh can be pushed to resultChs, then we will work on this channel
+			// otherwise, the push will be blocked until the result is finished
+			go func(i int, subTrieRoot []*node.Node) {
+				roots, nodeCount, checksum, err := storeCheckpointSubTrie(
+					i, subTrieRoot, estimatedSubtrieNodeCount, outputDir, outputFile, logger)
+				resultCh <- &resultStoringSubTrie{
+					Index:     i,
+					Roots:     roots,
+					NodeCount: nodeCount,
+					Checksum:  checksum,
+					Err:       err,
+				}
+				close(resultCh)
+			}(i, subTrieRoot)
+		}
+
+		close(resultChs)
+	}()
 
 	logger.Info().Msgf("subtrie roots have been stored")
 
 	results := make(map[*node.Node]uint64, subAndTopNodeCount)
 	results[nil] = 0
 	nodeCounter := uint64(0)
-	checksums := make([]uint32, 0, len(resultChs))
-	for _, resultCh := range resultChs {
+	checksums := make([]uint32, 0, len(results))
+	for {
+		resultCh, ok := <-resultChs
+		if !ok {
+			break
+		}
 		result := <-resultCh
 		if result.Err != nil {
 			return nil, 0, nil, fmt.Errorf("fail to store %v-th subtrie, trie: %w", result.Index, result.Err)
@@ -345,7 +384,7 @@ func createClosableWriter(dir string, logger *zerolog.Logger, fileName string, f
 }
 
 // subtrie file contains:
-// 1. checkpoint version // TODO
+// 1. checkpoint version
 // 2. nodes
 // 3. node count
 // 4. checksum
@@ -375,6 +414,13 @@ func storeCheckpointSubTrie(
 	// create a CRC32 writer, so that any bytes passed to the writer will
 	// be used to calculate CRC32 checksum
 	writer := NewCRC32Writer(closable)
+
+	// write version
+	_, err = writer.Write(encodeVersion(MagicBytesCheckpointSubtrie, VersionV6))
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("cannot write version into checkpoint subtrie file: %w", err)
+	}
+
 	// topLevelNodes contains all unique nodes of given tries
 	// from root to subtrie root and their index
 	// (ordered by node traversal sequence).
