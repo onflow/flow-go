@@ -449,14 +449,13 @@ func readSubTriesFooter(f *os.File) (uint64, uint32, error) {
 }
 
 // 17th part file contains:
-// 1. checkpoint version TODO
-// 2. checkpoint file part index TODO
-// 3. subtrieNodeCount TODO
-// 4. top level nodes
-// 5. trie roots
-// 6. node count
-// 7. trie count
-// 6. checksum
+// 1. checkpoint version
+// 2. subtrieNodeCount
+// 3. top level nodes
+// 4. trie roots
+// 5. node count
+// 6. trie count
+// 7. checksum
 func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	filepath, _ := filePathTopTries(dir, fileName)
 	file, err := os.Open(filepath)
@@ -485,8 +484,8 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	}
 
 	if topTrieChecksum != expectedSum {
-		return nil, fmt.Errorf("mismatch checksum in top trie file. checksum from checkpoint header %v does not"+
-			"match with checksum in top trie file %v", topTrieChecksum, expectedSum)
+		return nil, fmt.Errorf("mismatch top trie checksum, header file has %v, toptrie file has %v",
+			topTrieChecksum, expectedSum)
 	}
 
 	// restart from the beginning of the file, make sure CRC32Reader has seen all the bytes
@@ -504,10 +503,26 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 		return nil, fmt.Errorf("could not read version for top trie: %w", err)
 	}
 
-	topLevelNodes := make([]*node.Node, topLevelNodesCount+1) //+1 for 0 index meaning nil
-	tries := make([]*trie.MTrie, triesCount)
+	// read subtrie count and validate
+	buf := make([]byte, encNodeCountSize)
+	_, err = io.ReadFull(reader, buf)
+	if err != nil {
+		return nil, fmt.Errorf("could not read subtrie node count: %w", err)
+	}
+	readSubtrieNodeCount, err := decodeSubtrieNodeCount(buf)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode node count: %w", err)
+	}
 
 	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
+
+	if readSubtrieNodeCount != totalSubTrieNodeCount {
+		return nil, fmt.Errorf("mismatch subtrie node count, read from disk (%v), but got actual node count (%v)",
+			readSubtrieNodeCount, totalSubTrieNodeCount)
+	}
+
+	topLevelNodes := make([]*node.Node, topLevelNodesCount+1) //+1 for 0 index meaning nil
+	tries := make([]*trie.MTrie, triesCount)
 
 	// Scratch buffer is used as temporary buffer that reader can read into.
 	// Raw data in scratch buffer should be copied or converted into desired
