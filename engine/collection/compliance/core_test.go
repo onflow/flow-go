@@ -257,6 +257,7 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 //   - should not go through compliance checks
 //   - should not be added to the state
 //   - we should not attempt to process its children
+//   - we should notify VoteAggregator, for known errors
 func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 
 	// create a proposal that has two ancestors in the cache
@@ -325,6 +326,7 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 // but fails compliance checks.
 //   - should not be added to the state
 //   - we should not attempt to process its children
+//   - we should notify VoteAggregator, for known errors
 func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
 
 	// create a proposal that has two ancestors in the cache
