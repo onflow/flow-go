@@ -495,6 +495,13 @@ func main() {
 				qcContractClients,
 			)
 
+			messageHubFactory := factories.NewMessageHubFactory(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.State,
+			)
+
 			factory := factories.NewEpochComponentsFactory(
 				node.Me,
 				pools,
@@ -503,6 +510,7 @@ func main() {
 				hotstuffFactory,
 				proposalFactory,
 				syncFactory,
+				messageHubFactory,
 			)
 
 			heightEvents := gadgets.NewHeights()
