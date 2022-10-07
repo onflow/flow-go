@@ -2,12 +2,10 @@ package fvm
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
@@ -149,9 +147,10 @@ func (i TransactionInvoker) Process(
 	computationUsed := env.ComputationUsed()
 	memoryEstimate := env.MemoryEstimate()
 
-	// log te execution intensities here, so tha they do not contain data from storage limit checks and
-	// transaction deduction, because the payer is not charged for those.
-	i.logExecutionIntensities(ctx, txnState, txIDStr)
+	// log the execution intensities here, so that they do not contain data from
+	// storage limit checks and transaction deduction, because the payer is not
+	// charged for those.
+	env.LogExecutionIntensities()
 
 	if processErr == nil {
 		// disable the limit checks on states
@@ -264,7 +263,7 @@ func (i TransactionInvoker) deductTransactionFees(
 	}
 
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be
-	// dynamic.	Execution effort will be connected to computation used.
+	// dynamic. Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
 	_, err = env.DeductTransactionFees(
 		proc.Transaction.Payer,
@@ -278,29 +277,4 @@ func (i TransactionInvoker) deductTransactionFees(
 			err)
 	}
 	return nil
-}
-
-// logExecutionIntensities logs execution intensities of the transaction
-func (i TransactionInvoker) logExecutionIntensities(
-	ctx Context,
-	txnState *state.TransactionState,
-	txHash string,
-) {
-	if ctx.Logger.Debug().Enabled() {
-		computation := zerolog.Dict()
-		for s, u := range txnState.ComputationIntensities() {
-			computation.Uint(strconv.FormatUint(uint64(s), 10), u)
-		}
-		memory := zerolog.Dict()
-		for s, u := range txnState.MemoryIntensities() {
-			memory.Uint(strconv.FormatUint(uint64(s), 10), u)
-		}
-		ctx.Logger.Info().
-			Uint64("ledgerInteractionUsed", txnState.InteractionUsed()).
-			Uint("computationUsed", txnState.TotalComputationUsed()).
-			Uint64("memoryEstimate", txnState.TotalMemoryEstimate()).
-			Dict("computationIntensities", computation).
-			Dict("memoryIntensities", memory).
-			Msg("transaction execution data")
-	}
 }

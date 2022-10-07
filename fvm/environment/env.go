@@ -33,6 +33,7 @@ type Environment interface {
 
 	// ProgramLogger
 	Logs() []string
+	LogExecutionIntensities()
 
 	// EventEmitter
 	Events() []flow.Event

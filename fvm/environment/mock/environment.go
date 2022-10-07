@@ -16,6 +16,8 @@ import (
 
 	interpreter "github.com/onflow/cadence/runtime/interpreter"
 
+	meter "github.com/onflow/flow-go/fvm/meter"
+
 	mock "github.com/stretchr/testify/mock"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -198,6 +200,22 @@ func (_m *Environment) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*runtime.ReusableCadenceRuntime)
+		}
+	}
+
+	return r0
+}
+
+// ComputationIntensities provides a mock function with given fields:
+func (_m *Environment) ComputationIntensities() meter.MeteredComputationIntensities {
+	ret := _m.Called()
+
+	var r0 meter.MeteredComputationIntensities
+	if rf, ok := ret.Get(0).(func() meter.MeteredComputationIntensities); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(meter.MeteredComputationIntensities)
 		}
 	}
 
@@ -729,6 +747,20 @@ func (_m *Environment) ImplementationDebugLog(message string) error {
 	return r0
 }
 
+// InteractionUsed provides a mock function with given fields:
+func (_m *Environment) InteractionUsed() uint64 {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
 // IsServiceAccountAuthorizer provides a mock function with given fields:
 func (_m *Environment) IsServiceAccountAuthorizer() bool {
 	ret := _m.Called()
@@ -757,6 +789,11 @@ func (_m *Environment) LimitAccountStorage() bool {
 	return r0
 }
 
+// LogExecutionIntensities provides a mock function with given fields:
+func (_m *Environment) LogExecutionIntensities() {
+	_m.Called()
+}
+
 // Logs provides a mock function with given fields:
 func (_m *Environment) Logs() []string {
 	ret := _m.Called()
@@ -782,6 +819,22 @@ func (_m *Environment) MemoryEstimate() uint64 {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
+// MemoryIntensities provides a mock function with given fields:
+func (_m *Environment) MemoryIntensities() meter.MeteredMemoryIntensities {
+	ret := _m.Called()
+
+	var r0 meter.MeteredMemoryIntensities
+	if rf, ok := ret.Get(0).(func() meter.MeteredMemoryIntensities); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(meter.MeteredMemoryIntensities)
+		}
 	}
 
 	return r0

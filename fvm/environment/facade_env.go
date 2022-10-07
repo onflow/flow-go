@@ -2,9 +2,11 @@ package environment
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -258,6 +260,29 @@ func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
 	env.AccountFreezer.Reset()
+}
+
+// LogExecutionIntensities logs execution intensities of the transaction
+func (env *facadeEnvironment) LogExecutionIntensities() {
+	if !env.Logger().Debug().Enabled() {
+		return
+	}
+
+	computation := zerolog.Dict()
+	for s, u := range env.ComputationIntensities() {
+		computation.Uint(strconv.FormatUint(uint64(s), 10), u)
+	}
+	memory := zerolog.Dict()
+	for s, u := range env.MemoryIntensities() {
+		memory.Uint(strconv.FormatUint(uint64(s), 10), u)
+	}
+	env.Logger().Info().
+		Uint64("ledgerInteractionUsed", env.InteractionUsed()).
+		Uint64("computationUsed", env.ComputationUsed()).
+		Uint64("memoryEstimate", env.MemoryEstimate()).
+		Dict("computationIntensities", computation).
+		Dict("memoryIntensities", memory).
+		Msg("transaction execution data")
 }
 
 // Miscellaneous cadence runtime.Interface API.

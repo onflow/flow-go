@@ -5,6 +5,8 @@ package mock
 import (
 	common "github.com/onflow/cadence/runtime/common"
 
+	meter "github.com/onflow/flow-go/fvm/meter"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,8 +15,38 @@ type Meter struct {
 	mock.Mock
 }
 
+// ComputationIntensities provides a mock function with given fields:
+func (_m *Meter) ComputationIntensities() meter.MeteredComputationIntensities {
+	ret := _m.Called()
+
+	var r0 meter.MeteredComputationIntensities
+	if rf, ok := ret.Get(0).(func() meter.MeteredComputationIntensities); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(meter.MeteredComputationIntensities)
+		}
+	}
+
+	return r0
+}
+
 // ComputationUsed provides a mock function with given fields:
 func (_m *Meter) ComputationUsed() uint64 {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
+// InteractionUsed provides a mock function with given fields:
+func (_m *Meter) InteractionUsed() uint64 {
 	ret := _m.Called()
 
 	var r0 uint64
@@ -36,6 +68,22 @@ func (_m *Meter) MemoryEstimate() uint64 {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
+// MemoryIntensities provides a mock function with given fields:
+func (_m *Meter) MemoryIntensities() meter.MeteredMemoryIntensities {
+	ret := _m.Called()
+
+	var r0 meter.MeteredMemoryIntensities
+	if rf, ok := ret.Get(0).(func() meter.MeteredMemoryIntensities); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(meter.MeteredMemoryIntensities)
+		}
 	}
 
 	return r0
