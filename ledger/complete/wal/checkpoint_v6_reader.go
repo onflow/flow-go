@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/rs/zerolog"
 )
 
 // ReadCheckpointV6 reads checkpoint file from a main file and 17 file parts.
@@ -25,8 +26,11 @@ import (
 // it returns (tries, nil) if there was no error
 // it returns (nil, os.ErrNotExist) if a certain file is missing, use (os.IsNotExist to check)
 // it returns (nil, err) if running into any exception
-func ReadCheckpointV6(dir string, fileName string) ([]*trie.MTrie, error) {
+func ReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
+
+	logger.Info().Msgf("reading v6 checkpoint file")
+
 	headerPath := filePathCheckpointHeader(dir, fileName)
 	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath)
 	if err != nil {
@@ -133,23 +137,6 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 
 	return subtrieChecksums, topTrieChecksum, nil
 }
-
-// func readNodeCountAndTriesCount(f *os.File) (uint64, uint16, error) {
-// 	// read the node count and tries count from the end of the file
-// 	const footerOffset = encNodeCountSize + encTrieCountSize + crc32SumSize
-// 	const footerSize = encNodeCountSize + encTrieCountSize // footer doesn't include crc32 sum
-// 	footer := make([]byte, footerSize)                     // must not be less than 1024
-// 	_, err := f.Seek(-footerOffset, io.SeekEnd)
-// 	if err != nil {
-// 		return 0, 0, fmt.Errorf("cannot seek to footer: %w", err)
-// 	}
-// 	_, err = io.ReadFull(f, footer)
-// 	if err != nil {
-// 		return 0, 0, fmt.Errorf("could not read footer: %w", err)
-// 	}
-//
-// 	return decodeFooter(footer)
-// }
 
 // allPartFileExist check if all the part files of the checkpoint file exist
 // it returns nil if all files exist
@@ -385,8 +372,6 @@ func readSubTriesFooter(f *os.File) (uint64, uint32, error) {
 // 7. trie count
 // 6. checksum
 func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32) ([]*trie.MTrie, error) {
-	// TODO: read subtrie count
-
 	filepath, _ := filePathTopTries(dir, fileName)
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -396,8 +381,6 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 		// TODO: evict
 		_ = file.Close()
 	}()
-
-	// TODO: read checksum and validate
 
 	topLevelNodesCount, triesCount, expectedSum, err := readTopTriesFooter(file)
 	if err != nil {
@@ -418,7 +401,6 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	tries := make([]*trie.MTrie, triesCount)
 
 	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
-	// TODO: read subtrie Node count and validate
 
 	var bufReader io.Reader = bufio.NewReaderSize(file, defaultBufioReadSize)
 	reader := NewCRC32Reader(bufReader)
@@ -498,7 +480,6 @@ func readSubtrieCount(reader io.Reader) (uint16, error) {
 		return 0, err
 	}
 	return decodeSubtrieCount(bytes)
-
 }
 
 func readCRC32Sum(reader io.Reader) (uint32, error) {

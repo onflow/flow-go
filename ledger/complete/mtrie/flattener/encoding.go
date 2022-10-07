@@ -308,34 +308,10 @@ func EncodeTrie(trie *trie.MTrie, rootIndex uint64, scratch []byte) []byte {
 // ReadTrie reconstructs a trie from data read from reader.
 func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*trie.MTrie, error) {
 
-	if len(scratch) < encodedTrieSize {
-		scratch = make([]byte, encodedTrieSize)
-	}
-
-	// Read encoded trie
-	_, err := io.ReadFull(reader, scratch[:encodedTrieSize])
+	rootIndex, regCount, regSize, readRootHash, err :=
+		DecodeTrieData(reader, scratch)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read serialized trie: %w", err)
-	}
-
-	pos := 0
-
-	// Decode root node index
-	rootIndex := binary.BigEndian.Uint64(scratch)
-	pos += encNodeIndexSize
-
-	// Decode trie reg count (8 bytes)
-	regCount := binary.BigEndian.Uint64(scratch[pos:])
-	pos += encRegCountSize
-
-	// Decode trie reg size (8 bytes)
-	regSize := binary.BigEndian.Uint64(scratch[pos:])
-	pos += encRegSizeSize
-
-	// Decode root node hash
-	readRootHash, err := hash.ToHash(scratch[pos : pos+encHashSize])
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode hash of serialized trie: %w", err)
+		return nil, fmt.Errorf("could not decode trie data: %w", err)
 	}
 
 	rootNode, err := getNode(rootIndex)

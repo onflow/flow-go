@@ -550,7 +550,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 		filepath := file.Name()
 		require.NoError(t, err)
 
-		err = realWAL.StoreCheckpoint(file, updatedTrie)
+		err = realWAL.StoreCheckpointV5(file, updatedTrie)
 		require.NoError(t, err)
 
 		file.Close()

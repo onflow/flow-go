@@ -51,6 +51,7 @@ func StoreCheckpointV6(
 		Uint64("first_reg_count", first.AllocatedRegCount()).
 		Str("last", last.RootHash().String()).
 		Uint64("last_reg_count", last.AllocatedRegCount()).
+		Int("version", 6).
 		Msgf("storing checkpoint for %v tries to %v", len(tries), outputDir)
 
 	// make sure a checkpoint file with same name doesn't exist
@@ -381,6 +382,7 @@ func storeCheckpointSubTrie(
 	// create a CRC32 writer, so that any bytes passed to the writer will
 	// be used to calculate CRC32 checksum
 	writer := NewCRC32Writer(closable)
+
 	// topLevelNodes contains all unique nodes of given tries
 	// from root to subtrie root and their index
 	// (ordered by node traversal sequence).
