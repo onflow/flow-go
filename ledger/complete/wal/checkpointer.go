@@ -30,7 +30,10 @@ import (
 
 const checkpointFilenamePrefix = "checkpoint."
 
-const MagicBytes uint16 = 0x2137
+const MagicBytesCheckpointHeader uint16 = 0x2137
+const MagicBytesCheckpointSubtrie uint16 = 0x2136
+const MagicBytesCheckpointToptrie uint16 = 0x2135
+
 const VersionV1 uint16 = 0x01
 
 // Versions was reset while changing trie format, so now bump it to 3 to avoid conflicts
@@ -49,8 +52,8 @@ const VersionV4 uint16 = 0x04
 const VersionV5 uint16 = 0x05
 
 // Version 6 includes these changes:
-// - trie nodes are stored in additional 17 checkpoint files, with .0, .1, .2, ... .16 as
-//   file name extension
+//   - trie nodes are stored in additional 17 checkpoint files, with .0, .1, .2, ... .16 as
+//     file name extension
 const VersionV6 uint16 = 0x06
 
 // MaxVersion is the latest checkpoint version we support.
@@ -58,12 +61,13 @@ const VersionV6 uint16 = 0x06
 const MaxVersion = VersionV6
 
 const (
-	encMagicSize     = 2
-	encVersionSize   = 2
-	headerSize       = encMagicSize + encVersionSize
-	encNodeCountSize = 8
-	encTrieCountSize = 2
-	crc32SumSize     = 4
+	encMagicSize        = 2
+	encVersionSize      = 2
+	headerSize          = encMagicSize + encVersionSize
+	encSubtrieCountSize = 2
+	encNodeCountSize    = 8
+	encTrieCountSize    = 2
+	crc32SumSize        = 4
 )
 
 // defaultBufioReadSize replaces the default bufio buffer size of 4096 bytes.
@@ -241,7 +245,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		}
 	}()
 
-	err = StoreCheckpoint(writer, tries...)
+	err = StoreCheckpointV5(writer, tries...)
 
 	c.wal.log.Info().Msgf("created checkpoint %d with %d tries", to, len(tries))
 
@@ -284,7 +288,7 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 	}, nil
 }
 
-// StoreCheckpoint writes the given tries to checkpoint file, and also appends
+// StoreCheckpointV5 writes the given tries to checkpoint file, and also appends
 // a CRC32 file checksum for integrity check.
 // Checkpoint file consists of a flattened forest. Specifically, it consists of:
 //   - a list of encoded nodes, where references to other nodes are by list index.
@@ -299,7 +303,7 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 // as for each node, the children have been previously encountered.
 // TODO: evaluate alternatives to CRC32 since checkpoint file is many GB in size.
 // TODO: add concurrency if the performance gains are enough to offset complexity.
-func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
+func StoreCheckpointV5(writer io.Writer, tries ...*trie.MTrie) error {
 
 	crc32Writer := NewCRC32Writer(writer)
 
@@ -312,7 +316,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 
 	// Write header: magic (2 bytes) + version (2 bytes)
 	header := scratch[:headerSize]
-	binary.BigEndian.PutUint16(header, MagicBytes)
+	binary.BigEndian.PutUint16(header, MagicBytesCheckpointHeader)
 	binary.BigEndian.PutUint16(header[encMagicSize:], VersionV5)
 
 	_, err := crc32Writer.Write(header)
@@ -577,13 +581,13 @@ func getNodesAtLevel(root *node.Node, level uint) []*node.Node {
 }
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
-	filename := NumberToFilename(checkpoint)
-	return LoadCheckpoint(c.dir, filename, &c.wal.log)
+	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
+	return LoadCheckpoint(filepath, &c.wal.log)
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
-	filename := bootstrap.FilenameWALRootCheckpoint
-	return LoadCheckpoint(c.dir, filename, &c.wal.log)
+	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
+	return LoadCheckpoint(filepath, &c.wal.log)
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
@@ -600,8 +604,7 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
-func LoadCheckpoint(dir string, filename string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
-	filepath := path.Join(dir, filename)
+func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
@@ -616,10 +619,10 @@ func LoadCheckpoint(dir string, filename string, logger *zerolog.Logger) ([]*tri
 		_ = file.Close()
 	}()
 
-	return readCheckpoint(file, dir, filename)
+	return readCheckpoint(file, logger)
 }
 
-func readCheckpoint(f *os.File, dir string, filename string) ([]*trie.MTrie, error) {
+func readCheckpoint(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 
 	// Read header: magic (2 bytes) + version (2 bytes)
 	header := make([]byte, headerSize)
@@ -638,8 +641,8 @@ func readCheckpoint(f *os.File, dir string, filename string) ([]*trie.MTrie, err
 		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
 	}
 
-	if magicBytes != MagicBytes {
-		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytes)
+	if magicBytes != MagicBytesCheckpointHeader {
+		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytesCheckpointHeader)
 	}
 
 	switch version {
@@ -648,9 +651,7 @@ func readCheckpoint(f *os.File, dir string, filename string) ([]*trie.MTrie, err
 	case VersionV4:
 		return readCheckpointV4(f)
 	case VersionV5:
-		return readCheckpointV5(f)
-	case VersionV6:
-		return ReadCheckpointV6(dir, filename)
+		return readCheckpointV5(f, logger)
 	default:
 		return nil, fmt.Errorf("unsupported file version %x", version)
 	}
@@ -859,7 +860,8 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 
 // readCheckpointV5 decodes checkpoint file (version 5) and returns a list of tries.
 // Checkpoint file header (magic and version) are verified by the caller.
-func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
+func readCheckpointV5(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+	logger.Info().Msgf("reading v5 checkpoint file")
 
 	// Scratch buffer is used as temporary buffer that reader can read into.
 	// Raw data in scratch buffer should be copied or converted into desired
@@ -979,7 +981,7 @@ func ReadLastTrieRootHashFromCheckpoint(f *os.File) (hash.Hash, error) {
 	magic := binary.BigEndian.Uint16(header)
 	version := binary.BigEndian.Uint16(header[encMagicSize:])
 
-	if magic != MagicBytes {
+	if magic != MagicBytesCheckpointHeader {
 		return hash.DummyHash, errors.New("invalid magic bytes in checkpoint")
 	}
 
