@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -519,6 +520,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 				Str("event_type", msg.Type).
 				Str("channel", msg.ChannelID).
 				Int("maxSize", maxSize).
+				Bool(logging.KeySuspicious, true).
 				Msg("received message exceeded permissible message maxSize")
 			return
 		}
@@ -621,6 +623,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 			Hex("event_id", msg.EventID).
 			Str("event_type", msg.Type).
 			Str("channel", msg.ChannelID).
+			Bool(logging.KeySuspicious, true).
 			Msg("failed to decode message payload")
 		return
 	}
@@ -666,19 +669,22 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload interface{}) {
 	originID := flow.HashToID(msg.OriginID)
 
-	m.log.Debug().
+	logger := m.log.With().
 		Str("channel", msg.ChannelID).
 		Str("type", msg.Type).
 		Str("origin_id", originID.String()).
-		Msg("processing new message")
+		Logger()
 
 	// run through all the message validators
 	for _, v := range m.validators {
 		// if any one fails, stop message propagation
 		if !v.Validate(*msg) {
+			logger.Debug().Msg("new message filtered by message validators")
 			return
 		}
 	}
+
+	logger.Debug().Msg("processing new message")
 
 	// if validation passed, send the message to the overlay
 	err := m.ov.Receive(originID, msg, decodedMsgPayload)
