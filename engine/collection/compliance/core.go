@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -289,46 +288,6 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 	// submit the model to hotstuff for processing
 	log.Info().Msg("forwarding block proposal to hotstuff")
 	c.hotstuff.SubmitProposal(header, parent.View)
-
-	return nil
-}
-
-// OnBlockVote handles votes for blocks by passing them to the core consensus
-// algorithm
-func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
-
-	c.log.Debug().
-		Hex("origin_id", originID[:]).
-		Hex("block_id", vote.BlockID[:]).
-		Uint64("view", vote.View).
-		Msg("received vote")
-
-	c.voteAggregator.AddVote(&model.Vote{
-		View:     vote.View,
-		BlockID:  vote.BlockID,
-		SignerID: originID,
-		SigData:  vote.SigData,
-	})
-	return nil
-}
-
-func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.ClusterTimeoutObject) error {
-	t := &model.TimeoutObject{
-		View:       timeout.View,
-		NewestQC:   timeout.NewestQC,
-		LastViewTC: timeout.LastViewTC,
-		SignerID:   originID,
-		SigData:    timeout.SigData,
-	}
-
-	c.log.Debug().
-		Hex("origin_id", originID[:]).
-		Uint64("view", t.View).
-		Str("timeout_id", t.ID().String()).
-		Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
-
-	// forward the timeout to hotstuff for processing
-	c.timeoutAggregator.AddTimeout(t)
 
 	return nil
 }

@@ -229,7 +229,7 @@ func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("could not get cluster members for broadcasting timeout: %w", err)
 	}
 	// create the timeout message
-	msg := &messages.TimeoutObject{
+	msg := &messages.ClusterTimeoutObject{
 		View:       timeout.View,
 		NewestQC:   timeout.NewestQC,
 		LastViewTC: timeout.LastViewTC,
