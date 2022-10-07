@@ -150,7 +150,6 @@ func (factory *EpochComponentsFactory) Create(
 		metrics,
 		builder,
 		headers,
-		proposalEng,
 		hotstuffModules,
 	)
 	if err != nil {
