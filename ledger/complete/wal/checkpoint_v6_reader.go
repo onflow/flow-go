@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
@@ -14,23 +15,30 @@ import (
 	"github.com/rs/zerolog"
 )
 
+var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
+
 // ReadCheckpointV6 reads checkpoint file from a main file and 17 file parts.
 // the main file stores:
-// 		1. version
-//		2. checksum of each part file (17 in total)
-// 		3. checksum of the main file itself
-// 	the first 16 files parts contain the trie nodes below the subtrieLevel
-//	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
+//   - version
+//   - checksum of each part file (17 in total)
+//   - checksum of the main file itself
+//     the first 16 files parts contain the trie nodes below the subtrieLevel
+//     the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
+//
 // it returns (tries, nil) if there was no error
-// it returns (nil, os.ErrNotExist) if a certain file is missing
+// it returns (nil, os.ErrNotExist) if a certain file is missing, use (os.IsNotExist to check)
+// it returns (nil, ErrEOFNotReached) if a certain part file is malformed
 // it returns (nil, err) if running into any exception
-func ReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
 
 	logger.Info().Msgf("reading v6 checkpoint file")
 
-	headerPath := filePathCheckpointHeader(dir, fileName)
-	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath)
+	// the full path of header file
+	headerPath := headerFile.Name()
+	dir, fileName := filepath.Split(headerPath)
+
+	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not read header: %w", err)
 	}
@@ -49,7 +57,7 @@ func ReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*t
 
 	logger.Info().Msg("finish reading all v6 subtrie files, start reading top level tries")
 
-	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum)
+	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not read top level nodes or tries: %w", err)
 	}
@@ -67,6 +75,21 @@ func ReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*t
 	}
 
 	return tries, nil
+}
+
+// OpenAndReadCheckpointV6 open the checkpoint file and read it with ReadCheckpointV6
+func OpenAndReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+	filepath := filePathCheckpointHeader(dir, fileName)
+
+	f, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
+	}
+	defer func(f *os.File) {
+		f.Close()
+	}(f)
+
+	return ReadCheckpointV6(f, logger)
 }
 
 func filePathCheckpointHeader(dir string, fileName string) string {
@@ -103,26 +126,27 @@ func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
 
 // readCheckpointHeader takes a file path and returns subtrieChecksums and topTrieChecksum
 // any error returned are exceptions
-func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
+func readCheckpointHeader(filepath string, logger *zerolog.Logger) ([]uint32, uint32, error) {
 	closable, err := os.Open(filepath)
 	if err != nil {
-		return nil, 0, fmt.Errorf("could not open file %v: %w", filepath, err)
+		return nil, 0, fmt.Errorf("could not seek to start for header file: %w", err)
 	}
-	defer func(f *os.File) {
-		f.Close()
-	}(closable)
 
 	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
 	reader := NewCRC32Reader(bufReader)
+	defer func(f *os.File) {
+		evictErr := evictFileFromLinuxPageCache(f, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict header file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
+		f.Close()
+	}(closable)
 
-	// read the magic bytes and header
-	version, err := readVersion(reader)
+	// read the magic bytes and check version
+	err = validateFileHeader(MagicBytesCheckpointHeader, VersionV6, reader)
 	if err != nil {
 		return nil, 0, err
-	}
-
-	if version != VersionV6 {
-		return nil, 0, fmt.Errorf("wrong version: %v", version)
 	}
 
 	// read the subtrie level
@@ -160,9 +184,9 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 			expectedSum, actualSum)
 	}
 
-	err = reachedEOF(reader)
+	err = ensureReachedEOF(reader)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("fail to read checkpoint header file: %w", err)
 	}
 
 	return subtrieChecksums, topTrieChecksum, nil
@@ -170,22 +194,92 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 
 // allPartFileExist check if all the part files of the checkpoint file exist
 // it returns nil if all files exist
-// it returns os.ErrNotExist if some file is missing
+// it returns os.ErrNotExist if some file is missing, use (os.IsNotExist to check)
 // it returns err if running into any exception
 func allPartFileExist(dir string, fileName string, totalSubtrieFiles int) error {
-	for i := 0; i < totalSubtrieFiles; i++ {
-		filePath, _, err := filePathSubTries(dir, fileName, i)
-		if err != nil {
-			return fmt.Errorf("fail to find file path for %v-th subtrie file: %w", i, err)
-		}
+	matched, err := findCheckpointPartFiles(dir, fileName)
+	if err != nil {
+		return fmt.Errorf("could not check all checkpoint part file exist: %w", err)
+	}
 
-		// ensure file exists
-		_, err = os.Stat(filePath)
+	// header + subtrie files + top level file
+	if len(matched) != 1+totalSubtrieFiles+1 {
+		return fmt.Errorf("some checkpoint part file is missing. found part files %v. err :%w",
+			matched, os.ErrNotExist)
+	}
+
+	return nil
+}
+
+// findCheckpointPartFiles returns a slice of file full paths of the part files for the checkpoint file
+// with the given fileName under the given folder.
+// - it return the matching part files, note it might not contains all the part files.
+// - it return error if running any exception
+func findCheckpointPartFiles(dir string, fileName string) ([]string, error) {
+	headerPath := filePathCheckpointHeader(dir, fileName)
+	pattern := headerPath + "*"
+	matched, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("could not find checkpoint files: %w", err)
+	}
+
+	// build a lookup with matched
+	lookup := make(map[string]struct{})
+	for _, match := range matched {
+		lookup[match] = struct{}{}
+	}
+
+	parts := make([]string, 0)
+	// check header exists
+	_, ok := lookup[headerPath]
+	if ok {
+		parts = append(parts, headerPath)
+		delete(lookup, headerPath)
+	}
+
+	// check all subtrie parts
+	for i := 0; i < subtrieCount; i++ {
+		subtriePath, _, err := filePathSubTries(dir, fileName, i)
 		if err != nil {
-			return fmt.Errorf("fail to check %v-th subtrie file exist: %w", i, err)
+			return nil, err
+		}
+		_, ok := lookup[subtriePath]
+		if ok {
+			parts = append(parts, subtriePath)
+			delete(lookup, subtriePath)
 		}
 	}
-	return nil
+
+	// check top level trie part file
+	toplevelPath, _ := filePathTopTries(dir, fileName)
+
+	_, ok = lookup[toplevelPath]
+	if ok {
+		parts = append(parts, toplevelPath)
+		delete(lookup, toplevelPath)
+	}
+
+	return parts, nil
+}
+
+var errCheckpointFileExist = errors.New("checkpoint file exists already")
+
+// noneCheckpointFileExist check if none of the checkpoint header file or the part files exist
+// it returns nil if none exists
+// it returns errCheckpointFileExist if a checkpoint file exists already
+// it returns err if running into any other exception
+func noneCheckpointFileExist(dir string, fileName string, totalSubtrieFiles int) error {
+	matched, err := findCheckpointPartFiles(dir, fileName)
+	if err != nil {
+		return err
+	}
+
+	// no part file found, means noneCheckpointFileExist
+	if len(matched) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("checkpoint part file already exist %v: %w", matched, errCheckpointFileExist)
 }
 
 func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32, logger *zerolog.Logger) ([][]*node.Node, error) {
@@ -218,7 +312,7 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 }
 
 // subtrie file contains:
-// 1. checkpoint version // TODO
+// 1. checkpoint version
 // 2. nodes
 // 3. node count
 // 4. checksum
@@ -232,9 +326,19 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func(f *os.File) {
-		//TODO: we should evict file from Linux page cache here, so it doesn't keep 170+GB in RAM when that can be used instead for caching more frequently read data.
+		evictErr := evictFileFromLinuxPageCache(f, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict subtrie file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
 		f.Close()
 	}(f)
+
+	// valite the magic bytes and version
+	err = validateFileHeader(MagicBytesCheckpointSubtrie, VersionV6, f)
+	if err != nil {
+		return nil, err
+	}
 
 	nodesCount, expectedSum, err := readSubTriesFooter(f)
 	if err != nil {
@@ -242,17 +346,24 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 	}
 
 	if checksum != expectedSum {
-		return nil, fmt.Errorf("mismatch checksum in subtrie file. checksum from checkpoint header %v does not"+
-			"match with checksum in subtrie file %v", checksum, expectedSum)
+		return nil, fmt.Errorf("mismatch checksum in subtrie file. checksum from checkpoint header %v does not "+
+			"match with the checksum in subtrie file %v", checksum, expectedSum)
 	}
 
+	// restart from the beginning of the file, make sure CRC32Reader has seen all the bytes
+	// in order to compute the correct checksum
 	_, err = f.Seek(0, io.SeekStart)
 	if err != nil {
 		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
 	}
 
-	var bufReader io.Reader = bufio.NewReaderSize(f, defaultBufioReadSize)
-	reader := NewCRC32Reader(bufReader)
+	reader := NewCRC32Reader(bufio.NewReaderSize(f, defaultBufioReadSize))
+
+	// read version again for calculating checksum
+	_, _, err = readFileHeader(reader)
+	if err != nil {
+		return nil, fmt.Errorf("could not read version again for subtrie: %w", err)
+	}
 
 	// read file part index and verify
 	scratch := make([]byte, 1024*4) // must not be less than 1024
@@ -287,15 +398,15 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 			expectedSum, actualSum)
 	}
 
-	// read the checksum and discard, since we only care about whether reachedEOF
+	// read the checksum and discard, since we only care about whether ensureReachedEOF
 	_, err = io.ReadFull(reader, scratch[:crc32SumSize])
 	if err != nil {
 		return nil, fmt.Errorf("could not read subtrie file's checksum: %w", err)
 	}
 
-	err = reachedEOF(reader)
+	err = ensureReachedEOF(reader)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fail to read %v-th sutrie file: %w", index, err)
 	}
 
 	// TODO: simplify getNodeByIndex() logic if we reslice nodes here to remove the nil node at index 0.
@@ -346,17 +457,28 @@ func readSubTriesFooter(f *os.File) (uint64, uint32, error) {
 // 6. node count
 // 7. trie count
 // 6. checksum
-func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32) ([]*trie.MTrie, error) {
+func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	filepath, _ := filePathTopTries(dir, fileName)
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func() {
-		// TODO: evict
+		evictErr := evictFileFromLinuxPageCache(file, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict top trie file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
 		_ = file.Close()
 	}()
 
+	// read and validate magic bytes and version
+	err = validateFileHeader(MagicBytesCheckpointToptrie, VersionV6, file)
+	if err != nil {
+		return nil, err
+	}
+
+	// read subtrie Node count and validate
 	topLevelNodesCount, triesCount, expectedSum, err := readTopTriesFooter(file)
 	if err != nil {
 		return nil, fmt.Errorf("could not read top tries footer: %w", err)
@@ -367,18 +489,25 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 			"match with checksum in top trie file %v", topTrieChecksum, expectedSum)
 	}
 
+	// restart from the beginning of the file, make sure CRC32Reader has seen all the bytes
+	// in order to compute the correct checksum
 	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {
 		return nil, fmt.Errorf("could not seek to 0: %w", err)
+	}
+
+	reader := NewCRC32Reader(bufio.NewReaderSize(file, defaultBufioReadSize))
+
+	// read version again for calculating checksum
+	_, _, err = readFileHeader(reader)
+	if err != nil {
+		return nil, fmt.Errorf("could not read version for top trie: %w", err)
 	}
 
 	topLevelNodes := make([]*node.Node, topLevelNodesCount+1) //+1 for 0 index meaning nil
 	tries := make([]*trie.MTrie, triesCount)
 
 	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
-
-	var bufReader io.Reader = bufio.NewReaderSize(file, defaultBufioReadSize)
-	reader := NewCRC32Reader(bufReader)
 
 	// Scratch buffer is used as temporary buffer that reader can read into.
 	// Raw data in scratch buffer should be copied or converted into desired
@@ -428,35 +557,44 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 			expectedSum, actualSum)
 	}
 
-	// read the checksum and discard, since we only care about whether reachedEOF
+	// read the checksum and discard, since we only care about whether ensureReachedEOF
 	_, err = io.ReadFull(reader, scratch[:crc32SumSize])
 	if err != nil {
 		return nil, fmt.Errorf("could not read checksum from top trie file: %w", err)
 	}
 
-	err = reachedEOF(reader)
+	err = ensureReachedEOF(reader)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fail to read top trie file: %w", err)
 	}
 
 	return tries, nil
 }
 
-func readVersion(reader io.Reader) (uint16, error) {
+func readFileHeader(reader io.Reader) (uint16, uint16, error) {
 	bytes := make([]byte, encMagicSize+encVersionSize)
 	_, err := io.ReadFull(reader, bytes)
 	if err != nil {
-		return 0, fmt.Errorf("cannot read version: %w", err)
+		return 0, 0, fmt.Errorf("cannot read magic ID and version: %w", err)
 	}
-	magic, version, err := decodeVersion(bytes)
+	return decodeVersion(bytes)
+}
+
+func validateFileHeader(expectedMagic uint16, expectedVersion uint16, reader io.Reader) error {
+	magic, version, err := readFileHeader(reader)
 	if err != nil {
-		return 0, err
-	}
-	if magic != MagicBytes {
-		return 0, fmt.Errorf("wrong magic bytes %v", magic)
+		return err
 	}
 
-	return version, nil
+	if magic != expectedMagic {
+		return fmt.Errorf("wrong magic bytes, expect %v, bot got: %v", expectedMagic, magic)
+	}
+
+	if version != expectedVersion {
+		return fmt.Errorf("wrong version, expect %v, bot got: %v", expectedVersion, version)
+	}
+
+	return nil
 }
 
 func readSubtrieCount(reader io.Reader) (uint16, error) {
@@ -551,14 +689,20 @@ func getNodeByIndex(subtrieNodes [][]*node.Node, topLevelNodes []*node.Node, ind
 	return topLevelNodes[offset+1], nil
 }
 
-// reachedEOF checks if the reader has reached end of file
+// ensureReachedEOF checks if the reader has reached end of file
 // it returns nil if reached EOF
+// it returns ErrEOFNotReached if didn't reach end of file
 // any error returned are exception
-func reachedEOF(reader io.Reader) error {
+func ensureReachedEOF(reader io.Reader) error {
 	b := make([]byte, 1)
 	_, err := reader.Read(b)
 	if errors.Is(err, io.EOF) {
 		return nil
 	}
-	return fmt.Errorf("expect to reach EOF, but didn't %v: %w", b, err)
+
+	if err == nil {
+		return ErrEOFNotReached
+	}
+
+	return fmt.Errorf("fail to check if reached EOF: %w", err)
 }

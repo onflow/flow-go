@@ -43,18 +43,14 @@ func CompareV5(f1 *os.File, f2 *os.File) error {
 		return fmt.Errorf("cannot seek to start of file 2: %w", err)
 	}
 
-	v1, err := readVersion(f1)
+	err = validateFileHeader(MagicBytesCheckpointHeader, VersionV5, f1)
 	if err != nil {
 		return fmt.Errorf("could not read version 1: %w", err)
 	}
 
-	v2, err := readVersion(f2)
+	err = validateFileHeader(MagicBytesCheckpointHeader, VersionV5, f2)
 	if err != nil {
 		return fmt.Errorf("could not read version 2: %w", err)
-	}
-
-	if v1 != v2 {
-		return fmt.Errorf("different version: %v != %v", v1, v2)
 	}
 
 	scratch := make([]byte, 1024*4) // must not be less than 1024

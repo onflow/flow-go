@@ -30,7 +30,10 @@ import (
 
 const checkpointFilenamePrefix = "checkpoint."
 
-const MagicBytes uint16 = 0x2137
+const MagicBytesCheckpointHeader uint16 = 0x2137
+const MagicBytesCheckpointSubtrie uint16 = 0x2136
+const MagicBytesCheckpointToptrie uint16 = 0x2135
+
 const VersionV1 uint16 = 0x01
 
 // Versions was reset while changing trie format, so now bump it to 3 to avoid conflicts
@@ -49,8 +52,8 @@ const VersionV4 uint16 = 0x04
 const VersionV5 uint16 = 0x05
 
 // Version 6 includes these changes:
-// - trie nodes are stored in additional 17 checkpoint files, with .0, .1, .2, ... .16 as
-//   file name extension
+//   - trie nodes are stored in additional 17 checkpoint files, with .0, .1, .2, ... .16 as
+//     file name extension
 const VersionV6 uint16 = 0x06
 
 // MaxVersion is the latest checkpoint version we support.
@@ -313,7 +316,7 @@ func StoreCheckpointV5(writer io.Writer, tries ...*trie.MTrie) error {
 
 	// Write header: magic (2 bytes) + version (2 bytes)
 	header := scratch[:headerSize]
-	binary.BigEndian.PutUint16(header, MagicBytes)
+	binary.BigEndian.PutUint16(header, MagicBytesCheckpointHeader)
 	binary.BigEndian.PutUint16(header[encMagicSize:], VersionV5)
 
 	_, err := crc32Writer.Write(header)
@@ -638,8 +641,8 @@ func readCheckpoint(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
 	}
 
-	if magicBytes != MagicBytes {
-		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytes)
+	if magicBytes != MagicBytesCheckpointHeader {
+		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytesCheckpointHeader)
 	}
 
 	switch version {
@@ -978,7 +981,7 @@ func ReadLastTrieRootHashFromCheckpoint(f *os.File) (hash.Hash, error) {
 	magic := binary.BigEndian.Uint16(header)
 	version := binary.BigEndian.Uint16(header[encMagicSize:])
 
-	if magic != MagicBytes {
+	if magic != MagicBytesCheckpointHeader {
 		return hash.DummyHash, errors.New("invalid magic bytes in checkpoint")
 	}
 
