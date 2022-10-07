@@ -17,7 +17,7 @@ import (
 )
 
 const subtrieLevel = 4
-const subtrieCount = 1 << subtrieLevel
+const subtrieCount = 1 << subtrieLevel // 16
 
 func subtrieCountByLevel(level uint16) int {
 	return 1 << level
@@ -33,11 +33,11 @@ type resultStoringSubTrie struct {
 
 // StoreCheckpointV6 stores checkpoint file into a main file and 17 file parts.
 // the main file stores:
-// 		1. version
-//		2. checksum of each part file (17 in total)
-// 		3. checksum of the main file itself
-// 	the first 16 files parts contain the trie nodes below the subtrieLevel
-//	the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
+//   - version
+//   - checksum of each part file (17 in total)
+//   - checksum of the main file itself
+//     the first 16 files parts contain the trie nodes below the subtrieLevel
+//     the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
 func StoreCheckpointV6(
 	tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
 	if len(tries) == 0 {
@@ -53,6 +53,13 @@ func StoreCheckpointV6(
 		Uint64("last_reg_count", last.AllocatedRegCount()).
 		Int("version", 6).
 		Msgf("storing checkpoint for %v tries to %v", len(tries), outputDir)
+
+	// make sure a checkpoint file with same name doesn't exist
+	// part file with same name doesn't exist either
+	err := noneCheckpointFileExist(outputDir, outputFile, subtrieCount)
+	if err != nil {
+		return fmt.Errorf("fail to check if checkpoint file already exist: %w", err)
+	}
 
 	subtrieRoots := createSubTrieRoots(tries)
 
@@ -87,7 +94,6 @@ func StoreCheckpointV6(
 }
 
 // 		1. version
-//		2. subtrieLevel
 //		2. checksum of each part file (17 in total)
 // 		3. checksum of the main file itself
 func storeCheckpointHeader(
