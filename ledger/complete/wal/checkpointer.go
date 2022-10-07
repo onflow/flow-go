@@ -49,8 +49,8 @@ const VersionV4 uint16 = 0x04
 const VersionV5 uint16 = 0x05
 
 // Version 6 includes these changes:
-// - trie nodes are stored in additional 17 checkpoint files, with .0, .1, .2, ... .16 as
-//   file name extension
+//   - trie nodes are stored in additional 17 checkpoint files, with .0, .1, .2, ... .16 as
+//     file name extension
 const VersionV6 uint16 = 0x06
 
 // MaxVersion is the latest checkpoint version we support.
