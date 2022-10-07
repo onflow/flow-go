@@ -60,7 +60,7 @@ const (
 
 	// Auto TPS scaling constants
 	additiveIncrease       = 50
-	multiplicativeDecrease = 0.7
+	multiplicativeDecrease = 0.8
 	adjustInterval         = 20 * time.Second
 )
 
@@ -312,7 +312,9 @@ func adjustTPS(
 	lg *benchmark.ContLoadGenerator,
 	log zerolog.Logger,
 	interval time.Duration,
-	minTPS, maxTPS, maxInflight uint,
+	minTPS uint,
+	maxTPS uint,
+	maxInflight uint,
 ) error {
 	targetTPS := minTPS
 	lastTs := time.Now()
@@ -320,11 +322,13 @@ func adjustTPS(
 	lastTxs := uint(lg.GetTxExecuted())
 	for {
 		select {
-		case <-time.After(interval):
+		// NOTE: not using a ticker here since adjusting worker count in SetTPS
+		// can take a while and lead to uneven feedback intervals.
+		case now := <-time.After(interval):
 			currentSentTxs := lg.GetTxSent()
 			currentTxs := uint(lg.GetTxExecuted())
 			inflight := currentSentTxs - int(currentTxs)
-			currentTPS := float64(currentTxs-lastTxs) / math.Floor(time.Since(lastTs).Seconds())
+			currentTPS := float64(currentTxs-lastTxs) / now.Sub(lastTs).Seconds()
 
 			// Do not touch target TPS if TPS rate incresed since last check.
 			if (currentTPS > float64(lastTPS)) && (inflight < int(maxInflight)) {
@@ -336,7 +340,7 @@ func adjustTPS(
 
 				lastTxs = currentTxs
 				lastTPS = currentTPS
-				lastTs = time.Now()
+				lastTs = now
 
 				continue
 			}
@@ -371,7 +375,9 @@ func adjustTPS(
 			}
 
 			targetTPS = boundedTPS
-			// SetTPS is a blocking call, so we need to re-fetch the TxExecuted value.
+			//
+			// SetTPS is a blocking call, so we need to re-fetch the TxExecuted and time.
+			//
 			lastTxs = uint(lg.GetTxExecuted())
 			lastTPS = currentTPS
 			lastTs = time.Now()
