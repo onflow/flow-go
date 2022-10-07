@@ -15,6 +15,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
+
 // ReadCheckpointV6 reads checkpoint file from a main file and 17 file parts.
 // the main file stores:
 //   - version
@@ -25,6 +27,7 @@ import (
 //
 // it returns (tries, nil) if there was no error
 // it returns (nil, os.ErrNotExist) if a certain file is missing, use (os.IsNotExist to check)
+// it returns (nil, ErrEOFNotReached) if a certain part file is malformed
 // it returns (nil, err) if running into any exception
 func ReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	// TODO: read the main file and check the version
@@ -123,8 +126,6 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 	actualSum := reader.Crc32()
 
 	// read the stored checksum, and compare with the actual sum
-	// the same Crc32 reader is being used for simplicity, but the updated checksum
-	// won't be used.
 	expectedSum, err := readCRC32Sum(reader)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not read checkpoint header checksum: %w", err)
@@ -133,6 +134,11 @@ func readCheckpointHeader(filepath string) ([]uint32, uint32, error) {
 	if actualSum != expectedSum {
 		return nil, 0, fmt.Errorf("invalid checksum in checkpoint header, expected %v, actual %v",
 			expectedSum, actualSum)
+	}
+
+	err = ensureReachedEOF(reader)
+	if err != nil {
+		return nil, 0, fmt.Errorf("fail to read checkpoint header file: %w", err)
 	}
 
 	return subtrieChecksums, topTrieChecksum, nil
@@ -323,6 +329,17 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 			expectedSum, actualSum)
 	}
 
+	// read the checksum and discard, since we only care about whether ensureReachedEOF
+	_, err = io.ReadFull(reader, scratch[:crc32SumSize])
+	if err != nil {
+		return nil, fmt.Errorf("could not read subtrie file's checksum: %w", err)
+	}
+
+	err = ensureReachedEOF(reader)
+	if err != nil {
+		return nil, fmt.Errorf("fail to read %v-th sutrie file: %w", index, err)
+	}
+
 	// TODO: simplify getNodeByIndex() logic if we reslice nodes here to remove the nil node at index 0.
 	// return nodes[1:], nil
 	return nodes, nil
@@ -453,6 +470,17 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 			expectedSum, actualSum)
 	}
 
+	// read the checksum and discard, since we only care about whether ensureReachedEOF
+	_, err = io.ReadFull(reader, scratch[:crc32SumSize])
+	if err != nil {
+		return nil, fmt.Errorf("could not read checksum from top trie file: %w", err)
+	}
+
+	err = ensureReachedEOF(reader)
+	if err != nil {
+		return nil, fmt.Errorf("fail to read top trie file: %w", err)
+	}
+
 	return tries, nil
 }
 
@@ -563,4 +591,22 @@ func getNodeByIndex(subtrieNodes [][]*node.Node, topLevelNodes []*node.Node, ind
 
 	// +1 because first item is always nil
 	return topLevelNodes[offset+1], nil
+}
+
+// ensureReachedEOF checks if the reader has reached end of file
+// it returns nil if reached EOF
+// it returns ErrEOFNotReached if didn't reach end of file
+// any error returned are exception
+func ensureReachedEOF(reader io.Reader) error {
+	b := make([]byte, 1)
+	_, err := reader.Read(b)
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+
+	if err == nil {
+		return ErrEOFNotReached
+	}
+
+	return fmt.Errorf("fail to check if reached EOF: %w", err)
 }
