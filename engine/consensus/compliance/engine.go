@@ -26,12 +26,6 @@ import (
 // defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
 const defaultBlockQueueCapacity = 10_000
 
-// defaultVoteQueueCapacity maximum capacity of inbound queue for `messages.BlockVote`s
-const defaultVoteQueueCapacity = 1000
-
-// defaultTimeoutObjectsQueueCapacity maximum capacity of inbound queue for `messages.TimeoutObject`s
-const defaultTimeoutObjectsQueueCapacity = 1000
-
 // Engine is a wrapper around `compliance.Core`. The Engine queues inbound messages, relevant
 // node-internal notifications, and manages the worker routines processing the inbound events,
 // and forwards outbound messages to the networking layer.
@@ -53,7 +47,6 @@ type Engine struct {
 	// tracking finalized view
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
-	con                        network.Conduit
 
 	cm *component.ComponentManager
 	component.Component
