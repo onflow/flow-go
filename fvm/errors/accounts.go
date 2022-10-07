@@ -1,12 +1,10 @@
 package errors
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func NewAccountNotFoundError(address flow.Address) *CodedError {
+func NewAccountNotFoundError(address flow.Address) CodedError {
 	return NewCodedError(
 		ErrCodeAccountNotFoundError,
 		"account not found for address %s",
@@ -23,7 +21,7 @@ func IsAccountNotFoundError(err error) bool {
 // address.
 //
 // TODO maybe this should be failure since user has no control over this
-func NewAccountAlreadyExistsError(address flow.Address) *CodedError {
+func NewAccountAlreadyExistsError(address flow.Address) CodedError {
 	return NewCodedError(
 		ErrCodeAccountAlreadyExistsError,
 		"account with address %s already exists",
@@ -35,7 +33,7 @@ func NewAccountAlreadyExistsError(address flow.Address) *CodedError {
 func NewAccountPublicKeyNotFoundError(
 	address flow.Address,
 	keyIndex uint64,
-) *CodedError {
+) CodedError {
 	return NewCodedError(
 		ErrCodeAccountPublicKeyNotFoundError,
 		"account public key not found for address %s and key index %d",
@@ -51,25 +49,24 @@ func IsAccountAccountPublicKeyNotFoundError(err error) bool {
 // FrozenAccountError is returned when a frozen account signs a transaction
 type FrozenAccountError struct {
 	address flow.Address
+
+	CodedError
 }
 
 // NewFrozenAccountError constructs a new FrozenAccountError
-func NewFrozenAccountError(address flow.Address) FrozenAccountError {
-	return FrozenAccountError{address: address}
+func NewFrozenAccountError(address flow.Address) CodedError {
+	return FrozenAccountError{
+		address: address,
+		CodedError: NewCodedError(
+			ErrCodeFrozenAccountError,
+			"account %s is frozen",
+			address),
+	}
 }
 
 // Address returns the address of frozen account
 func (e FrozenAccountError) Address() flow.Address {
 	return e.address
-}
-
-func (e FrozenAccountError) Error() string {
-	return fmt.Sprintf("%s account %s is frozen", e.Code().String(), e.address)
-}
-
-// Code returns the error code for this error type
-func (e FrozenAccountError) Code() ErrorCode {
-	return ErrCodeFrozenAccountError
 }
 
 // NewAccountPublicKeyLimitError constructs a new CodedError.  It is returned
@@ -78,7 +75,7 @@ func NewAccountPublicKeyLimitError(
 	address flow.Address,
 	counts uint64,
 	limit uint64,
-) *CodedError {
+) CodedError {
 	return NewCodedError(
 		ErrCodeAccountPublicKeyLimitError,
 		"account's (%s) public key count (%d) exceeded the limit (%d)",

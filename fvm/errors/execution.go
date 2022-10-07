@@ -1,7 +1,6 @@
 package errors
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/onflow/cadence/runtime"
@@ -9,40 +8,27 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// CadenceRuntimeError captures a collection of errors provided by cadence runtime
-// it cover cadence errors such as
-// NotDeclaredError, NotInvokableError, ArgumentCountError, TransactionNotDeclaredError,
-// ConditionError, RedeclarationError, DereferenceError,
-// OverflowError, UnderflowError, DivisionByZeroError,
-// DestroyedCompositeError,  ForceAssignmentToNonNilResourceError, ForceNilError,
-// TypeMismatchError, InvalidPathDomainError, OverwriteError, CyclicLinkError,
-// ArrayIndexOutOfBoundsError, ...
+// NewCadenceRuntimeError constructs a new CodedError which captures a
+// collection of errors provided by cadence runtime. It cover cadence errors
+// such as:
+//
+// NotDeclaredError, NotInvokableError, ArgumentCountError,
+// TransactionNotDeclaredError, ConditionError, RedeclarationError,
+// DereferenceError, OverflowError, UnderflowError, DivisionByZeroError,
+// DestroyedCompositeError,  ForceAssignmentToNonNilResourceError,
+// ForceNilError, TypeMismatchError, InvalidPathDomainError, OverwriteError,
+// CyclicLinkError, ArrayIndexOutOfBoundsError, ...
+//
 // The Cadence error might have occurred because of an inner fvm Error.
-type CadenceRuntimeError struct {
-	errorWrapper
-}
-
-// NewCadenceRuntimeError constructs a new CadenceRuntimeError and wraps a cadence runtime error
-func NewCadenceRuntimeError(err runtime.Error) CadenceRuntimeError {
-	return CadenceRuntimeError{
-		errorWrapper: errorWrapper{
-			err: err,
-		},
-	}
-}
-
-func (e CadenceRuntimeError) Error() string {
-	return fmt.Sprintf("%s cadence runtime error %s", e.Code().String(), e.err.Error())
-}
-
-// Code returns the error code for this error
-func (e CadenceRuntimeError) Code() ErrorCode {
-	return ErrCodeCadenceRunTimeError
+func NewCadenceRuntimeError(err runtime.Error) CodedError {
+	return WrapCodedError(
+		ErrCodeCadenceRunTimeError,
+		err,
+		"cadence runtime error")
 }
 
 func IsCadenceRuntimeError(err error) bool {
-	var t CadenceRuntimeError
-	return As(err, &t)
+	return HasErrorCode(err, ErrCodeCadenceRunTimeError)
 }
 
 // NewTransactionFeeDeductionFailedError constructs a new CodedError which
@@ -52,7 +38,7 @@ func NewTransactionFeeDeductionFailedError(
 	payer flow.Address,
 	txFees uint64,
 	err error,
-) *CodedError {
+) CodedError {
 	return WrapCodedError(
 		ErrCodeTransactionFeeDeductionFailedError,
 		err,
@@ -63,7 +49,7 @@ func NewTransactionFeeDeductionFailedError(
 
 // NewComputationLimitExceededError constructs a new CodedError which indicates
 // that computation has exceeded its limit.
-func NewComputationLimitExceededError(limit uint64) *CodedError {
+func NewComputationLimitExceededError(limit uint64) CodedError {
 	return NewCodedError(
 		ErrCodeComputationLimitExceededError,
 		"computation exceeds limit (%d)",
@@ -77,7 +63,7 @@ func IsComputationLimitExceededError(err error) bool {
 
 // NewMemoryLimitExceededError constructs a new CodedError which indicates
 // that execution has exceeded its memory limits.
-func NewMemoryLimitExceededError(limit uint64) *CodedError {
+func NewMemoryLimitExceededError(limit uint64) CodedError {
 	return NewCodedError(
 		ErrCodeMemoryLimitExceededError,
 		"memory usage exceeds limit (%d)",
@@ -95,7 +81,7 @@ func NewStorageCapacityExceededError(
 	address flow.Address,
 	storageUsed uint64,
 	storageCapacity uint64,
-) *CodedError {
+) CodedError {
 	return NewCodedError(
 		ErrCodeStorageCapacityExceeded,
 		"The account with address (%s) uses %d bytes of storage which is "+
@@ -114,7 +100,7 @@ func IsStorageCapacityExceededError(err error) bool {
 // transaction has produced events with size more than limit.
 func NewEventLimitExceededError(
 	totalByteSize uint64,
-	limit uint64) *CodedError {
+	limit uint64) CodedError {
 	return NewCodedError(
 		ErrCodeEventLimitExceededError,
 		"total event byte size (%d) exceeds limit (%d)",
@@ -129,7 +115,7 @@ func NewStateKeySizeLimitError(
 	key string,
 	size uint64,
 	limit uint64,
-) *CodedError {
+) CodedError {
 	return NewCodedError(
 		ErrCodeStateKeySizeLimitError,
 		"key %s has size %d which is higher than storage key size limit %d.",
@@ -144,7 +130,7 @@ func NewStateValueSizeLimitError(
 	value flow.RegisterValue,
 	size uint64,
 	limit uint64,
-) *CodedError {
+) CodedError {
 	valueStr := ""
 	if len(value) > 23 {
 		valueStr = string(value[0:10]) + "..." + string(value[len(value)-10:])
@@ -166,7 +152,7 @@ func NewStateValueSizeLimitError(
 func NewLedgerInteractionLimitExceededError(
 	used uint64,
 	limit uint64,
-) *CodedError {
+) CodedError {
 	return NewCodedError(
 		ErrCodeLedgerInteractionLimitExceededError,
 		"max interaction with storage has exceeded the limit "+
@@ -182,7 +168,7 @@ func IsLedgerInteractionLimitExceededError(err error) bool {
 // NewOperationNotSupportedError construct a new CodedError. It is generated
 // when an operation (e.g. getting block info) is not supported in the current
 // environment.
-func NewOperationNotSupportedError(operation string) *CodedError {
+func NewOperationNotSupportedError(operation string) CodedError {
 	return NewCodedError(
 		ErrCodeOperationNotSupportedError,
 		"operation (%s) is not supported in this environment",
@@ -199,7 +185,7 @@ func IsOperationNotSupportedError(err error) bool {
 //
 // note: this error is used by scripts only and won't be emitted for
 // transactions since transaction execution has to be deterministic.
-func NewScriptExecutionCancelledError(err error) *CodedError {
+func NewScriptExecutionCancelledError(err error) CodedError {
 	return WrapCodedError(
 		ErrCodeScriptExecutionCancelledError,
 		err,
@@ -211,7 +197,7 @@ func NewScriptExecutionCancelledError(err error) *CodedError {
 //
 // note: this error is used by scripts only and won't be emitted for
 // transactions since transaction execution has to be deterministic.
-func NewScriptExecutionTimedOutError() *CodedError {
+func NewScriptExecutionTimedOutError() CodedError {
 	return NewCodedError(
 		ErrCodeScriptExecutionTimedOutError,
 		"script execution is timed out and did not finish executing within "+
@@ -223,7 +209,7 @@ func NewScriptExecutionTimedOutError() *CodedError {
 func NewCouldNotGetExecutionParameterFromStateError(
 	address string,
 	path string,
-) *CodedError {
+) CodedError {
 	return NewCodedError(
 		ErrCodeCouldNotDecodeExecutionParameterFromState,
 		"could not get execution parameter from the state "+
