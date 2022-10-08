@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	mocks "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -97,32 +98,34 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlacklistedNode() {
 		expectedfound := b
 
 		s.Run(fmt.Sprintf("IdentityProvider.ByNodeID returning (<non-nil identity>, %v)", expectedfound), func() {
-			identity := blocklist[index.Inc()]
-			s.provider.On("ByNodeID", identity.NodeID).Return(identity, expectedfound)
+			originalIdentity := blocklist[index.Inc()]
+			s.provider.On("ByNodeID", originalIdentity.NodeID).Return(originalIdentity, expectedfound)
 
-			var backupIdentity flow.Identity = *identity   // unmodified backup Identity
-			var expectedIdentity flow.Identity = *identity // expected Identity is a copy of the original
-			expectedIdentity.Ejected = true                // with the `Ejected` flag set to true
+			var expectedIdentity flow.Identity = *originalIdentity // expected Identity is a copy of the original
+			expectedIdentity.Ejected = true                        // with the `Ejected` flag set to true
 
-			i, found := s.wrapper.ByNodeID(identity.NodeID)
+			i, found := s.wrapper.ByNodeID(originalIdentity.NodeID)
 			require.Equal(s.T(), expectedfound, found)
 			require.Equal(s.T(), &expectedIdentity, i)
-			require.Equal(s.T(), &backupIdentity, identity) // verify that identity returned by wrapped `IdentityProvider` is not modified
+
+			// check that originalIdentity returned by wrapped `IdentityProvider` is _not_ modified
+			require.False(s.T(), originalIdentity.Ejected)
 		})
 
 		s.Run(fmt.Sprintf("IdentityProvider.ByPeerID returning (<non-nil identity>, %v)", expectedfound), func() {
-			identity := blocklist[index.Inc()]
-			peerID := (peer.ID)(identity.NodeID.String())
-			s.provider.On("ByPeerID", peerID).Return(identity, expectedfound)
+			originalIdentity := blocklist[index.Inc()]
+			peerID := (peer.ID)(originalIdentity.NodeID.String())
+			s.provider.On("ByPeerID", peerID).Return(originalIdentity, expectedfound)
 
-			var backupIdentity flow.Identity = *identity   // unmodified backup Identity
-			var expectedIdentity flow.Identity = *identity // expected Identity is a copy of the original
-			expectedIdentity.Ejected = true                // with the `Ejected` flag set to true
+			var expectedIdentity flow.Identity = *originalIdentity // expected Identity is a copy of the original
+			expectedIdentity.Ejected = true                        // with the `Ejected` flag set to true
 
 			i, found := s.wrapper.ByPeerID(peerID)
 			require.Equal(s.T(), expectedfound, found)
 			require.Equal(s.T(), &expectedIdentity, i)
-			require.Equal(s.T(), &backupIdentity, identity) // verify that identity returned by wrapped `IdentityProvider` is not modified
+
+			// check that originalIdentity returned by `IdentityProvider` is _not_ modified by wrapper
+			require.False(s.T(), originalIdentity.Ejected)
 		})
 	}
 
@@ -131,16 +134,25 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlacklistedNode() {
 		honestIdentities := unittest.IdentityListFixture(8)
 		combinedIdentities := honestIdentities.Union(blocklist)
 		combinedIdentities = combinedIdentities.DeterministicShuffle(1234)
+		numIdentities := len(combinedIdentities)
+
 		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
 
 		noFilter := filter.In(nil)
 		identities := s.wrapper.Identities(noFilter)
 
-		require.Equal(s.T(), len(combinedIdentities), len(identities))
+		require.Equal(s.T(), numIdentities, len(identities)) // expected number resulting identities have the
 		for _, i := range identities {
 			_, isBlocked := blocklistLookup[i.NodeID]
 			require.Equal(s.T(), isBlocked, i.Ejected)
 		}
+
+		// check that original `combinedIdentities` returned by `IdentityProvider` are _not_ modified by wrapper
+		require.Equal(s.T(), numIdentities, len(combinedIdentities)) // length of list should not be modified by wrapper
+		for _, i := range combinedIdentities {
+			require.False(s.T(), i.Ejected) // Ejected flag should still have the original value (false here)
+		}
+
 	})
 }
 
@@ -166,4 +178,107 @@ func (s *NodeBlocklistWrapperTestSuite) TestUnknownNode() {
 			require.Nil(s.T(), identity)
 		})
 	}
+}
+
+// TestBlocklistAddRemove checks that adding and subsequently removing a node from the blocklist
+// it in combination a no-op. We test two scenarious
+//   - Node whose original `Identity` has `Ejected = false`:
+//     After adding the node to the blocklist and then removing it again, the `Ejected` should be false.
+//   - Node whose original `Identity` has `Ejected = true`:
+//     After adding the node to the blocklist and then removing it again, the `Ejected` should be still be false.
+func (s *NodeBlocklistWrapperTestSuite) TestBlocklistAddRemove() {
+	for _, originalEjected := range []bool{true, false} {
+		s.Run(fmt.Sprintf("Add & remove node with Ejected = %v", originalEjected), func() {
+			originalIdentity := unittest.IdentityFixture()
+			originalIdentity.Ejected = originalEjected
+			peerID := (peer.ID)(originalIdentity.NodeID.String())
+			s.provider.On("ByNodeID", originalIdentity.NodeID).Return(originalIdentity, true)
+			s.provider.On("ByPeerID", peerID).Return(originalIdentity, true)
+
+			// step 1: before putting node on blocklist,
+			// an Identity with `Ejected` equal to the original value should be returned
+			i, found := s.wrapper.ByNodeID(originalIdentity.NodeID)
+			require.True(s.T(), found)
+			require.Equal(s.T(), originalEjected, i.Ejected)
+
+			i, found = s.wrapper.ByPeerID(peerID)
+			require.True(s.T(), found)
+			require.Equal(s.T(), originalEjected, i.Ejected)
+
+			// step 2: _after_ putting node on blocklist,
+			// an Identity with `Ejected` equal to `true` should be returned
+			err := s.wrapper.Update(flow.IdentifierList{originalIdentity.NodeID})
+			require.NoError(s.T(), err)
+
+			i, found = s.wrapper.ByNodeID(originalIdentity.NodeID)
+			require.True(s.T(), found)
+			require.True(s.T(), i.Ejected)
+
+			i, found = s.wrapper.ByPeerID(peerID)
+			require.True(s.T(), found)
+			require.True(s.T(), i.Ejected)
+
+			// step 3: after removing the node from the blocklist,
+			// an Identity with `Ejected` equal to the original value should be returned
+			err = s.wrapper.Update(flow.IdentifierList{})
+			require.NoError(s.T(), err)
+
+			i, found = s.wrapper.ByNodeID(originalIdentity.NodeID)
+			require.True(s.T(), found)
+			require.Equal(s.T(), originalEjected, i.Ejected)
+
+			i, found = s.wrapper.ByPeerID(peerID)
+			require.True(s.T(), found)
+			require.Equal(s.T(), originalEjected, i.Ejected)
+		})
+	}
+}
+
+// TestUpdate tests updating, clearing and retrieving the blocklist
+// Note: conceptually, the blocklist is a set, i.e. not order dependent.
+// The wrapper internally converts the list to a set and vice versa. Therefore
+// the order is not preserved by `GetBlocklist`. Consequently, we compare
+// map-based representations here.
+func (s *NodeBlocklistWrapperTestSuite) TestUpdate() {
+	blocklist1 := unittest.IdentifierListFixture(8)
+	blocklist2 := unittest.IdentifierListFixture(11)
+	blocklist3 := unittest.IdentifierListFixture(5)
+
+	err := s.wrapper.Update(blocklist1)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), blocklist1.Lookup(), s.wrapper.GetBlocklist().Lookup())
+
+	err = s.wrapper.Update(blocklist2)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), blocklist2.Lookup(), s.wrapper.GetBlocklist().Lookup())
+
+	err = s.wrapper.ClearBlocklist()
+	require.NoError(s.T(), err)
+	require.Empty(s.T(), s.wrapper.GetBlocklist())
+
+	err = s.wrapper.Update(blocklist3)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), blocklist3.Lookup(), s.wrapper.GetBlocklist().Lookup())
+}
+
+// TestDataBasePersist verifies that blocklist is persisted in database
+func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
+	blocklist := unittest.IdentifierListFixture(8)
+
+	err := s.wrapper.Update(blocklist)
+	var b1 map[flow.Identifier]struct{}
+	err = s.DB.View(operation.RetrieveBlocklist(&b1))
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), blocklist.Lookup(), b1)
+
+	err = s.wrapper.ClearBlocklist()
+	var b2 map[flow.Identifier]struct{}
+	err = s.DB.View(operation.RetrieveBlocklist(&b2))
+	require.Empty(s.T(), b2)
+
+	err = s.wrapper.Update(blocklist)
+	var b3 map[flow.Identifier]struct{}
+	err = s.DB.View(operation.RetrieveBlocklist(&b3))
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), blocklist.Lookup(), b3)
 }
