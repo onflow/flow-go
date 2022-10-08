@@ -324,44 +324,40 @@ func adjustTPS(
 		select {
 		// NOTE: not using a ticker here since adjusting worker count in SetTPS
 		// can take a while and lead to uneven feedback intervals.
-		case now := <-time.After(interval):
+		case nowTs := <-time.After(interval):
 			currentSentTxs := lg.GetTxSent()
 			currentTxs := uint(lg.GetTxExecuted())
+
 			inflight := currentSentTxs - int(currentTxs)
-			currentTPS := float64(currentTxs-lastTxs) / now.Sub(lastTs).Seconds()
 			inflightPerWorker := inflight / int(targetTPS)
 
-			unboundedTPS := uint(math.Ceil(currentTPS))
+			skip, currentTPS, unboundedTPS := computeTPS(
+				lastTxs,
+				currentTxs,
+				lastTs,
+				nowTs,
+				lastTPS,
+				targetTPS,
+				inflight,
+				maxInflight,
+			)
 
-			// To avoid setting target TPS below current TPS,
-			// we decrease the former one by the multiplicativeDecrease factor.
-			//
-			// This shortcut is only applicable when current inflight is less than maxInflight.
-			if ((float64(unboundedTPS) >= float64(targetTPS)*multiplicativeDecrease) && (inflight < int(maxInflight))) ||
-				(unboundedTPS >= targetTPS) {
+			if skip {
+				log.Info().
+					Float64("lastTPS", lastTPS).
+					Float64("currentTPS", currentTPS).
+					Int("inflight", inflight).
+					Int("inflightPerWorker", inflightPerWorker).
+					Msg("skipped adjusting TPS")
 
-				unboundedTPS = targetTPS + additiveIncrease
-			} else {
-				// Do not reduce the target if TPS incresed since the last round.
-				if (currentTPS > float64(lastTPS)) && (inflight < int(maxInflight)) {
-					log.Info().
-						Float64("lastTPS", lastTPS).
-						Float64("currentTPS", currentTPS).
-						Int("inflight", inflight).
-						Int("inflightPerWorker", inflightPerWorker).
-						Msg("skipped adjusting TPS")
+				lastTxs = currentTxs
+				lastTPS = currentTPS
+				lastTs = nowTs
 
-					lastTxs = currentTxs
-					lastTPS = currentTPS
-					lastTs = now
-
-					continue
-				}
-
-				unboundedTPS = uint(float64(targetTPS) * multiplicativeDecrease)
+				continue
 			}
-			boundedTPS := boundTPS(unboundedTPS, minTPS, maxTPS)
 
+			boundedTPS := boundTPS(unboundedTPS, minTPS, maxTPS)
 			log.Info().
 				Uint("lastTargetTPS", targetTPS).
 				Float64("lastTPS", lastTPS).
@@ -388,6 +384,43 @@ func adjustTPS(
 			return nil
 		}
 	}
+}
+
+func computeTPS(
+	lastTxs uint,
+	currentTxs uint,
+	lastTs time.Time,
+	nowTs time.Time,
+	lastTPS float64,
+	targetTPS uint,
+	inflight int,
+	maxInflight uint,
+) (bool, float64, uint) {
+	timeDiff := nowTs.Sub(lastTs).Seconds()
+	if timeDiff == 0 {
+		return true, 0, 0
+	}
+
+	currentTPS := float64(currentTxs-lastTxs) / timeDiff
+	unboundedTPS := uint(math.Ceil(currentTPS))
+
+	// To avoid setting target TPS below current TPS,
+	// we decrease the former one by the multiplicativeDecrease factor.
+	//
+	// This shortcut is only applicable when current inflight is less than maxInflight.
+	if ((float64(unboundedTPS) >= float64(targetTPS)*multiplicativeDecrease) && (inflight < int(maxInflight))) ||
+		(unboundedTPS >= targetTPS) {
+
+		unboundedTPS = targetTPS + additiveIncrease
+	} else {
+		// Do not reduce the target if TPS incresed since the last round.
+		if (currentTPS > float64(lastTPS)) && (inflight < int(maxInflight)) {
+			return true, currentTPS, 0
+		}
+
+		unboundedTPS = uint(float64(targetTPS) * multiplicativeDecrease)
+	}
+	return false, currentTPS, unboundedTPS
 }
 
 func boundTPS(tps, min, max uint) uint {
