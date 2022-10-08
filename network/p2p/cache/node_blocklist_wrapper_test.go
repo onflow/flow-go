@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	mocks "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -265,22 +266,29 @@ func (s *NodeBlocklistWrapperTestSuite) TestUpdate() {
 func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 	blocklist := unittest.IdentifierListFixture(8)
 
+	// update blocklist and check DB that the new value is there
 	err := s.wrapper.Update(blocklist)
+	require.NoError(s.T(), err)
+
 	var b1 map[flow.Identifier]struct{}
 	err = s.DB.View(operation.RetrieveBlocklist(&b1))
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocklist.Lookup(), b1)
 
+	// clear blocklist and check that DB has no entry anymore (returns `storage.ErrNotFound`)
 	err = s.wrapper.ClearBlocklist()
+	require.NoError(s.T(), err)
+
 	var b2 map[flow.Identifier]struct{}
 	err = s.DB.View(operation.RetrieveBlocklist(&b2))
-	require.NoError(s.T(), err)
+	require.ErrorIs(s.T(), err, storage.ErrNotFound)
 	require.Empty(s.T(), b2)
 
+	// update blocklist and check DB that it also has the new list
 	err = s.wrapper.Update(blocklist)
+	require.NoError(s.T(), err)
 	var b3 map[flow.Identifier]struct{}
 	err = s.DB.View(operation.RetrieveBlocklist(&b3))
-	require.NoError(s.T(), err)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocklist.Lookup(), b3)
 }
