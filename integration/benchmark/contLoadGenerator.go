@@ -302,6 +302,14 @@ func (lg *ContLoadGenerator) stopWorkers(num int) error {
 	return nil
 }
 
+// GetTPS returns the current TPS.
+func (lg *ContLoadGenerator) GetTPS() uint {
+	lg.workersMutex.Lock()
+	defer lg.workersMutex.Unlock()
+
+	return uint(len(lg.workers))
+}
+
 // SetTPS compares the given TPS to the current TPS to determine whether to increase
 // or decrease the load.
 // It increases/decreases the load by adjusting the number of workers, since each worker

@@ -15,6 +15,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+	"go.einride.tech/pid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -58,10 +59,18 @@ const (
 	feedbackEnabled             = true
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
 
-	// Auto TPS scaling constants
-	additiveIncrease       = 50
-	multiplicativeDecrease = 0.8
-	adjustInterval         = 20 * time.Second
+	//
+	// P-controller parameters
+	//
+
+	// desiredInflightPerWorker is the target for the controller.
+	// Steady state value is ~17. Here we set it slightly higher so that the controller
+	// constantly pushes the system slightly out of balance to determine its maximum.
+	desiredInflightPerWorker = 22.0
+	// proportionalGain is the proportional gain of the controller.  Lower if controller starts to oscillate.
+	proportionalGain = 0.5
+	// adjustInterval is the interval between controller updates.  Should be at least 1 RTT of the system, we set it to ~3.
+	adjustInterval = 60 * time.Second
 )
 
 func main() {
@@ -138,7 +147,6 @@ func main() {
 		Dur("duration", loadCase.duration).
 		Msg("Running load case...")
 
-	maxInflight := *maxTPSFlag * accountMultiplier
 	lg, err := benchmark.New(
 		ctx,
 		log,
@@ -151,7 +159,7 @@ func main() {
 			FlowTokenAddress:      &flowTokenAddress,
 		},
 		benchmark.LoadParams{
-			NumberOfAccounts: maxInflight,
+			NumberOfAccounts: *maxTPSFlag * accountMultiplier,
 			LoadType:         benchmark.LoadType(loadType),
 			FeedbackEnabled:  feedbackEnabled,
 		},
@@ -196,14 +204,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := adjustTPS(
-			lg,
-			log,
-			adjustInterval,
-			loadCase.tps,
-			uint(*maxTPSFlag),
-			uint(maxInflight/2),
-		)
+		err := adjustTPS(lg, log, adjustInterval, loadCase.tps, uint(*maxTPSFlag))
 		if err != nil && !errors.Is(err, context.Canceled) {
 			log.Fatal().Err(err).Msgf("unable to adjust tps")
 		}
@@ -299,27 +300,25 @@ func sendDataToBigQuery(
 	return nil
 }
 
-// adjustTPS tries to find the maximum TPS that the network can handle using a simple AIMD algorithm.
-// The algorithm starts with minTPS as a target.  Each time it is able to reach the target TPS, it
-// increases the target by `additiveIncrease`. Each time it fails to reach the target TPS, it decreases
-// the target by `multiplicativeDecrease` factor.
-//
-// To avoid oscillation and speedup conversion we skip the adjustment stage if TPS grew
-// compared to the last round.
-//
-// Target TPS is always bounded by [minTPS, maxTPS].
+// adjustTPS tries to find the maximum TPS that the network can handle using a simple PID controller.
 func adjustTPS(
 	lg *benchmark.ContLoadGenerator,
 	log zerolog.Logger,
 	interval time.Duration,
 	minTPS uint,
 	maxTPS uint,
-	maxInflight uint,
 ) error {
-	targetTPS := minTPS
 	lastTs := time.Now()
-	lastTPS := float64(minTPS)
 	lastTxs := uint(lg.GetTxExecuted())
+
+	c := pid.Controller{
+		// P controller.
+		// We do not use I and D terms becuase they would likely lead to excessive oscillation.
+		Config: pid.ControllerConfig{
+			ProportionalGain: proportionalGain,
+		},
+	}
+
 	for {
 		select {
 		// NOTE: not using a ticker here since adjusting worker count in SetTPS
@@ -328,44 +327,37 @@ func adjustTPS(
 			currentSentTxs := lg.GetTxSent()
 			currentTxs := uint(lg.GetTxExecuted())
 
+			timeDiff := nowTs.Sub(lastTs)
+			currentTPS := float64(currentTxs-lastTxs) / timeDiff.Seconds()
+			desiredTPS := float64(lg.GetTPS())
+
 			inflight := currentSentTxs - int(currentTxs)
-			inflightPerWorker := inflight / int(targetTPS)
 
-			skip, currentTPS, unboundedTPS := computeTPS(
-				lastTxs,
-				currentTxs,
-				lastTs,
-				nowTs,
-				lastTPS,
-				targetTPS,
-				inflight,
-				maxInflight,
-			)
-
-			if skip {
-				log.Info().
-					Float64("lastTPS", lastTPS).
-					Float64("currentTPS", currentTPS).
-					Int("inflight", inflight).
-					Int("inflightPerWorker", inflightPerWorker).
-					Msg("skipped adjusting TPS")
-
-				lastTxs = currentTxs
-				lastTPS = currentTPS
-				lastTs = nowTs
-
+			if currentTPS <= math.SmallestNonzeroFloat64 {
+				log.Warn().Msg("TPS is <=0, skipping adjustment")
 				continue
 			}
 
-			boundedTPS := boundTPS(unboundedTPS, minTPS, maxTPS)
+			currentIPW := float64(inflight) / currentTPS
+			c.Update(pid.ControllerInput{
+				ReferenceSignal:  desiredInflightPerWorker,
+				ActualSignal:     currentIPW,
+				SamplingInterval: timeDiff,
+			})
+
+			targetIWP := currentIPW + c.State.ControlSignal
+			ratio := targetIWP / currentIPW
+			// We do not want to adjust TPS below what we already have.
+			targetTPS := math.Max(desiredTPS*ratio, currentTPS)
+			boundedTPS := boundTPS(targetTPS, minTPS, maxTPS)
+
 			log.Info().
-				Uint("lastTargetTPS", targetTPS).
-				Float64("lastTPS", lastTPS).
 				Float64("currentTPS", currentTPS).
-				Uint("unboundedTPS", unboundedTPS).
-				Uint("targetTPS", boundedTPS).
+				Float64("unboundedTPS", targetTPS).
+				Uint("boundedTPS", boundedTPS).
 				Int("inflight", inflight).
-				Int("inflightPerWorker", inflightPerWorker).
+				Float64("currentIPW", currentIPW).
+				Float64("targetIWP", targetIWP).
 				Msg("adjusting TPS")
 
 			err := lg.SetTPS(boundedTPS)
@@ -373,12 +365,10 @@ func adjustTPS(
 				return fmt.Errorf("unable to set tps: %w", err)
 			}
 
-			targetTPS = boundedTPS
 			//
 			// SetTPS is a blocking call, so we need to re-fetch the TxExecuted and time.
 			//
 			lastTxs = uint(lg.GetTxExecuted())
-			lastTPS = currentTPS
 			lastTs = time.Now()
 		case <-lg.Done():
 			return nil
@@ -386,50 +376,14 @@ func adjustTPS(
 	}
 }
 
-func computeTPS(
-	lastTxs uint,
-	currentTxs uint,
-	lastTs time.Time,
-	nowTs time.Time,
-	lastTPS float64,
-	targetTPS uint,
-	inflight int,
-	maxInflight uint,
-) (bool, float64, uint) {
-	timeDiff := nowTs.Sub(lastTs).Seconds()
-	if timeDiff == 0 {
-		return true, 0, 0
-	}
-
-	currentTPS := float64(currentTxs-lastTxs) / timeDiff
-	unboundedTPS := uint(math.Ceil(currentTPS))
-
-	// To avoid setting target TPS below current TPS,
-	// we decrease the former one by the multiplicativeDecrease factor.
-	//
-	// This shortcut is only applicable when current inflight is less than maxInflight.
-	if ((float64(unboundedTPS) >= float64(targetTPS)*multiplicativeDecrease) && (inflight < int(maxInflight))) ||
-		(unboundedTPS >= targetTPS) {
-
-		unboundedTPS = targetTPS + additiveIncrease
-	} else {
-		// Do not reduce the target if TPS incresed since the last round.
-		if (currentTPS > float64(lastTPS)) && (inflight < int(maxInflight)) {
-			return true, currentTPS, 0
-		}
-
-		unboundedTPS = uint(float64(targetTPS) * multiplicativeDecrease)
-	}
-	return false, currentTPS, unboundedTPS
-}
-
-func boundTPS(tps, min, max uint) uint {
+// boundTPS bounds the given TPS to the given min and max values.
+func boundTPS(tps float64, min uint, max uint) uint {
 	switch {
-	case tps < min:
+	case tps < float64(min) || math.IsNaN(tps):
 		return min
-	case tps > max:
+	case tps > float64(max):
 		return max
 	default:
-		return tps
+		return uint(tps)
 	}
 }
