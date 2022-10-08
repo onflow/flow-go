@@ -274,11 +274,13 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 	err = s.wrapper.ClearBlocklist()
 	var b2 map[flow.Identifier]struct{}
 	err = s.DB.View(operation.RetrieveBlocklist(&b2))
+	require.NoError(s.T(), err)
 	require.Empty(s.T(), b2)
 
 	err = s.wrapper.Update(blocklist)
 	var b3 map[flow.Identifier]struct{}
 	err = s.DB.View(operation.RetrieveBlocklist(&b3))
+	require.NoError(s.T(), err)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocklist.Lookup(), b3)
 }
