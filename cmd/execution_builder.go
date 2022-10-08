@@ -142,6 +142,7 @@ type ExecutionNode struct {
 	executionDataPruner           *pruner.Pruner
 	executionDataBlobstore        blobs.Blobstore
 	executionDataTracker          tracker.Storage
+	blobserviceDependable         *module.ProxiedReadyDoneAware
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -174,6 +175,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
+		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
@@ -368,6 +370,10 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		return nil, fmt.Errorf("failed to register blob service: %w", err)
 	}
 
+	// add blobservice into ReadyDoneAware dependency passed to peer manager
+	// this configures peer manager to wait for the blobservice to be ready before starting
+	exeNode.blobserviceDependable.Init(bs)
+
 	var providerMetrics module.ExecutionDataProviderMetrics = metrics.NewNoopCollector()
 	if node.MetricsEnabled {
 		providerMetrics = metrics.NewExecutionDataProviderCollector()
@@ -528,6 +534,12 @@ func (exeNode *ExecutionNode) LoadExecutionDataDatastore(
 	}
 	exeNode.executionDataDatastore = ds
 	exeNode.builder.ShutdownFunc(ds.Close)
+	return nil
+}
+
+func (exeNode *ExecutionNode) LoadBlobservicePeerManagerDependencies(node *NodeConfig) error {
+	exeNode.blobserviceDependable = module.NewProxiedReadyDoneAware()
+	exeNode.builder.PeerManagerDependencies.Add(exeNode.blobserviceDependable)
 	return nil
 }
 

@@ -13,8 +13,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go/network/p2p/scoring"
-
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
@@ -28,6 +26,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -77,6 +77,19 @@ type NodeBuilder interface {
 	// In both cases, the object is started according to its interface when the node is run,
 	// and the node will wait for the component to exit gracefully.
 	Component(name string, f ReadyDoneFactory) NodeBuilder
+
+	// DependableComponent adds a new component to the node that conforms to the ReadyDoneAware
+	// interface. The builder will wait until all of the components in the dependencies list are ready
+	// before constructing the component.
+	//
+	// The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
+	// In both cases, the object is started when the node is run, and the node will wait for the
+	// component to exit gracefully.
+	//
+	// IMPORTANT: Dependable components are started in parallel with no guaranteed run order, so all
+	// dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
+	// MUST be idempotent.
+	DependableComponent(name string, f ReadyDoneFactory, dependencies *DependencyList) NodeBuilder
 
 	// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
 	// interface, and calls the provided error handler when an irrecoverable error is encountered.
@@ -159,6 +172,7 @@ type BaseConfig struct {
 	HeroCacheMetricsEnable      bool
 	SyncCoreConfig              chainsync.Config
 	CodecFactory                func() network.Codec
+	LibP2PNode                  *p2pnode.Node
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
@@ -203,6 +217,11 @@ type NodeConfig struct {
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey
 	NetworkKey        crypto.PrivateKey
+
+	// list of dependencies for network peer manager startup
+	PeerManagerDependencies *DependencyList
+	// ReadyDoneAware implementation of the network middleware for DependableComponents
+	middlewareDependable *module.ProxiedReadyDoneAware
 
 	// ID providers
 	IdentityProvider             module.IdentityProvider
@@ -271,4 +290,15 @@ func DefaultBaseConfig() *BaseConfig {
 		CodecFactory:           codecFactory,
 		ComplianceConfig:       compliance.DefaultConfig(),
 	}
+}
+
+// DependencyList is a slice of ReadyDoneAware implementations that are used by DependableComponent
+// to define the list of depenencies that must be ready before starting the component.
+type DependencyList struct {
+	components []module.ReadyDoneAware
+}
+
+// Add adds a new ReadyDoneAware implementation to the list of dependencies.
+func (d *DependencyList) Add(component module.ReadyDoneAware) {
+	d.components = append(d.components, component)
 }

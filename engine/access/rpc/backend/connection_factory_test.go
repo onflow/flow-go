@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestProxyAccessAPI(t *testing.T) {
@@ -429,10 +431,16 @@ func (n *node) setupNode(t *testing.T) {
 }
 
 func (n *node) start(t *testing.T) {
+	// using a wait group here to ensure the goroutine has started before returning. Otherwise,
+	// there's a race condition where the server is sometimes stopped before it has started
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		wg.Done()
 		err := n.server.Serve(n.listener)
 		assert.NoError(t, err)
 	}()
+	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Millisecond, "could not start goroutine on time")
 }
 
 func (n *node) stop(t *testing.T) {
