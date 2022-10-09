@@ -252,7 +252,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		)
 		require.NoError(t, err)
 
-		vm := fvm.NewVM()
+		vm := fvm.NewVirtualMachine()
 
 		blocks := new(fvmMock.Blocks)
 

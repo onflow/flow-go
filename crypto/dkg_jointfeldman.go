@@ -9,7 +9,6 @@ package crypto
 import "C"
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -33,7 +32,7 @@ import (
 // the private key of a BLS threshold signature scheme.
 // Using the complaints mechanism, each dealer is qualified or disqualified
 // from the protocol, and the overall key is taking into account
-// all chunks from qualified leaders.
+// all chunks from qualified dealers.
 
 // Private keys are scalar in Zr, where r is the group order of G1/G2
 // Public keys are in G2.
@@ -64,6 +63,15 @@ type JointFeldmanState struct {
 //
 // An instance is run by a single participant and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created.
+//
+// The function returns:
+// - (nil, InvalidInputsError) if:
+//   - size if not in [DKGMinSize, DKGMaxSize]
+//   - threshold is not in [MinimumThreshold, size-1]
+//   - myIndex is not in [0, size-1]
+//   - dealerIndex is not in [0, size-1]
+//
+// - (dkgInstance, nil) otherwise
 func NewJointFeldman(size int, threshold int, myIndex int,
 	processor DKGProcessor) (DKGState, error) {
 
@@ -94,13 +102,18 @@ func (s *JointFeldmanState) init() {
 	}
 }
 
-// Start starts running Joint Feldman protocol in the current participant
+// Start triggers Joint Feldman protocol start for the current participant.
 // The seed is used to generate the FVSS secret polynomial
 // (including the instance group private key) when the current
 // participant is the dealer.
+//
+// The returned error is :
+//   - dkgInvalidStateTransitionError if the DKG instance is already running.
+//   - error if an unexpected exception occurs
+//   - nil otherwise.
 func (s *JointFeldmanState) Start(seed []byte) error {
 	if s.jointRunning {
-		return errors.New("dkg is already running")
+		return dkgInvalidStateTransitionErrorf("dkg is already running")
 	}
 
 	for i := index(0); int(i) < s.size; i++ {
@@ -114,10 +127,15 @@ func (s *JointFeldmanState) Start(seed []byte) error {
 	return nil
 }
 
-// NextTimeout sets the next timeout of the protocol if any timeout applies
+// NextTimeout sets the next timeout of the protocol if any timeout applies.
+//
+// The returned error is :
+//   - dkgInvalidStateTransitionError if the DKG instance was not running.
+//   - dkgInvalidStateTransitionError if the DKG instance already called the 2 required timeouts.
+//   - nil otherwise.
 func (s *JointFeldmanState) NextTimeout() error {
 	if !s.jointRunning {
-		return fmt.Errorf("dkg protocol %d is not running", s.myIndex)
+		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 
 	for i := index(0); int(i) < s.size; i++ {
@@ -135,13 +153,14 @@ func (s *JointFeldmanState) NextTimeout() error {
 // - all the public key shares corresponding to the participants private
 // key shares.
 // - the finalized private key which is the current participant's own private key share
-// - the returned erorr is :
-//   - dkgFailureError if the disqualified leaders exceeded the threshold.
-//   - other error if Start() was not called, or NextTimeout() was not called twice
+//
+// The returned error is:
+//   - dkgFailureError if the disqualified dealers exceeded the threshold.
+//   - dkgInvalidStateTransitionError Start() was not called, or NextTimeout() was not called twice
 //   - nil otherwise.
 func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.jointRunning {
-		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.myIndex)
+		return nil, nil, nil, dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 
 	disqualifiedTotal := 0
@@ -149,7 +168,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 		// check previous timeouts were called
 		if !s.fvss[i].sharesTimeout || !s.fvss[i].complaintsTimeout {
 			return nil, nil, nil,
-				fmt.Errorf("%d: two timeouts should be set before ending dkg", s.myIndex)
+				dkgInvalidStateTransitionErrorf("%d: two timeouts should be set before ending dkg", s.myIndex)
 		}
 
 		// check if a complaint has remained without an answer
@@ -178,7 +197,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 				disqualifiedTotal, s.threshold, s.size)
 	}
 
-	// wrap up the keys from qualified leaders
+	// wrap up the keys from qualified dealers
 	jointx, jointPublicKey, jointy := s.sumUpQualifiedKeys(s.size - disqualifiedTotal)
 
 	// private key of the current participant
@@ -197,9 +216,14 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 
 // HandleBroadcastMsg processes a new broadcasted message received by the current participant
 // orig is the message origin index
+//
+// The function returns:
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
-		return fmt.Errorf("dkg protocol %d is not running", s.myIndex)
+		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandleBroadcastMsg(orig, msg)
@@ -212,9 +236,14 @@ func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 
 // HandlePrivateMsg processes a new private message received by the current participant
 // orig is the message origin index
+//
+// The function returns:
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *JointFeldmanState) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
-		return fmt.Errorf("dkg protocol %d is not running", s.myIndex)
+		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandlePrivateMsg(orig, msg)
@@ -234,9 +263,14 @@ func (s *JointFeldmanState) Running() bool {
 // for a reason outside of the DKG protocol
 // The caller should make sure all honest participants call this function,
 // otherwise, the protocol can be broken
+//
+// The function returns:
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *JointFeldmanState) ForceDisqualify(participant int) error {
 	if !s.jointRunning {
-		return errors.New("dkg is not running")
+		return dkgInvalidStateTransitionErrorf("dkg is not running")
 	}
 	// disqualify the participant in the fvss instance where they are a dealer
 	err := s.fvss[participant].ForceDisqualify(participant)
@@ -246,7 +280,7 @@ func (s *JointFeldmanState) ForceDisqualify(participant int) error {
 	return nil
 }
 
-// sum up the 3 type of keys from all qualified leaders to end the protocol
+// sum up the 3 type of keys from all qualified dealers to end the protocol
 func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2, []pointG2) {
 	qualifiedx, qualifiedPubKey, qualifiedy := s.getQualifiedKeys(qualified)
 
@@ -268,7 +302,7 @@ func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2
 	return &jointx, &jointPublicKey, jointy
 }
 
-// get the 3 type of keys from all qualified leaders
+// get the 3 type of keys from all qualified dealers
 func (s *JointFeldmanState) getQualifiedKeys(qualified int) ([]scalar, []pointG2, [][]pointG2) {
 	qualifiedx := make([]scalar, 0, qualified)
 	qualifiedPubKey := make([]pointG2, 0, qualified)

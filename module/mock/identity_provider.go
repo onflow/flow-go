@@ -4,7 +4,6 @@ package mock
 
 import (
 	flow "github.com/onflow/flow-go/model/flow"
-
 	mock "github.com/stretchr/testify/mock"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"

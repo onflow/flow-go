@@ -6,12 +6,101 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
 // AccountInfo exposes various account balance and storage statistics.
-type AccountInfo struct {
+type AccountInfo interface {
+	GetStorageUsed(address common.Address) (uint64, error)
+	GetStorageCapacity(address common.Address) (uint64, error)
+	GetAccountBalance(address common.Address) (uint64, error)
+	GetAccountAvailableBalance(address common.Address) (uint64, error)
+	GetAccount(address flow.Address) (*flow.Account, error)
+}
+
+type ParseRestrictedAccountInfo struct {
+	txnState *state.TransactionState
+	impl     AccountInfo
+}
+
+func NewParseRestrictedAccountInfo(
+	txnState *state.TransactionState,
+	impl AccountInfo,
+) AccountInfo {
+	return ParseRestrictedAccountInfo{
+		txnState: txnState,
+		impl:     impl,
+	}
+}
+
+func (info ParseRestrictedAccountInfo) GetStorageUsed(
+	address common.Address,
+) (
+	uint64,
+	error,
+) {
+	return parseRestrict1Arg1Ret(
+		info.txnState,
+		"GetStorageUsed",
+		info.impl.GetStorageUsed,
+		address)
+}
+
+func (info ParseRestrictedAccountInfo) GetStorageCapacity(
+	address common.Address,
+) (
+	uint64,
+	error,
+) {
+	return parseRestrict1Arg1Ret(
+		info.txnState,
+		"GetStorageCapacity",
+		info.impl.GetStorageCapacity,
+		address)
+}
+
+func (info ParseRestrictedAccountInfo) GetAccountBalance(
+	address common.Address,
+) (
+	uint64,
+	error,
+) {
+	return parseRestrict1Arg1Ret(
+		info.txnState,
+		"GetAccountBalance",
+		info.impl.GetAccountBalance,
+		address)
+}
+
+func (info ParseRestrictedAccountInfo) GetAccountAvailableBalance(
+	address common.Address,
+) (
+	uint64,
+	error,
+) {
+	return parseRestrict1Arg1Ret(
+		info.txnState,
+		"GetAccountAvailableBalance",
+		info.impl.GetAccountAvailableBalance,
+		address)
+}
+
+func (info ParseRestrictedAccountInfo) GetAccount(
+	address flow.Address,
+) (
+	*flow.Account,
+	error,
+) {
+	return parseRestrict1Arg1Ret(
+		info.txnState,
+		"GetAccount",
+		info.impl.GetAccount,
+		address)
+}
+
+type accountInfo struct {
 	tracer *Tracer
 	meter  Meter
 
@@ -27,8 +116,8 @@ func NewAccountInfo(
 	accounts Accounts,
 	systemContracts *SystemContracts,
 	serviceAccountEnabled bool,
-) *AccountInfo {
-	return &AccountInfo{
+) AccountInfo {
+	return &accountInfo{
 		tracer:                tracer,
 		meter:                 meter,
 		accounts:              accounts,
@@ -37,7 +126,7 @@ func NewAccountInfo(
 	}
 }
 
-func (info *AccountInfo) GetStorageUsed(
+func (info *accountInfo) GetStorageUsed(
 	address common.Address,
 ) (
 	uint64,
@@ -66,7 +155,7 @@ func StorageMBUFixToBytesUInt(result cadence.Value) uint64 {
 	return result.ToGoValue().(uint64) / 100
 }
 
-func (info *AccountInfo) GetStorageCapacity(
+func (info *accountInfo) GetStorageCapacity(
 	address common.Address,
 ) (
 	uint64,
@@ -90,7 +179,7 @@ func (info *AccountInfo) GetStorageCapacity(
 	return StorageMBUFixToBytesUInt(result), nil
 }
 
-func (info *AccountInfo) GetAccountBalance(
+func (info *accountInfo) GetAccountBalance(
 	address common.Address,
 ) (
 	uint64,
@@ -110,7 +199,7 @@ func (info *AccountInfo) GetAccountBalance(
 	return result.ToGoValue().(uint64), nil
 }
 
-func (info *AccountInfo) GetAccountAvailableBalance(
+func (info *accountInfo) GetAccountAvailableBalance(
 	address common.Address,
 ) (
 	uint64,
@@ -132,7 +221,7 @@ func (info *AccountInfo) GetAccountAvailableBalance(
 	return result.ToGoValue().(uint64), nil
 }
 
-func (info *AccountInfo) GetAccount(
+func (info *accountInfo) GetAccount(
 	address flow.Address,
 ) (
 	*flow.Account,

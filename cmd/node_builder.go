@@ -21,12 +21,13 @@ import (
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -77,6 +78,19 @@ type NodeBuilder interface {
 	// and the node will wait for the component to exit gracefully.
 	Component(name string, f ReadyDoneFactory) NodeBuilder
 
+	// DependableComponent adds a new component to the node that conforms to the ReadyDoneAware
+	// interface. The builder will wait until all of the components in the dependencies list are ready
+	// before constructing the component.
+	//
+	// The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
+	// In both cases, the object is started when the node is run, and the node will wait for the
+	// component to exit gracefully.
+	//
+	// IMPORTANT: Dependable components are started in parallel with no guaranteed run order, so all
+	// dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
+	// MUST be idempotent.
+	DependableComponent(name string, f ReadyDoneFactory, dependencies *DependencyList) NodeBuilder
+
 	// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
 	// interface, and calls the provided error handler when an irrecoverable error is encountered.
 	// Use RestartableComponent if the component is not critical to the node's safe operation and
@@ -123,6 +137,7 @@ type NodeBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
+	NetworkConfig
 	nodeIDHex                   string
 	AdminAddr                   string
 	AdminCert                   string
@@ -142,9 +157,6 @@ type BaseConfig struct {
 	level                       string
 	metricsPort                 uint
 	BootstrapDir                string
-	PeerUpdateInterval          time.Duration
-	UnicastMessageTimeout       time.Duration
-	DNSCacheTTL                 time.Duration
 	profilerEnabled             bool
 	uploaderEnabled             bool
 	profilerDir                 string
@@ -157,18 +169,27 @@ type BaseConfig struct {
 	guaranteesCacheSize         uint
 	receiptsCacheSize           uint
 	db                          *badger.DB
-	PreferredUnicastProtocols   []string
-	// NetworkConnectionPruning determines whether connections to nodes
-	// that are not part of protocol state should be trimmed
-	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
-	NetworkConnectionPruning        bool
-	NetworkReceivedMessageCacheSize uint32
-	HeroCacheMetricsEnable          bool
-	SyncCoreConfig                  chainsync.Config
-	CodecFactory                    func() network.Codec
+	HeroCacheMetricsEnable      bool
+	SyncCoreConfig              chainsync.Config
+	CodecFactory                func() network.Codec
+	LibP2PNode                  *p2pnode.Node
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
+}
+
+type NetworkConfig struct {
+	// NetworkConnectionPruning determines whether connections to nodes
+	// that are not part of protocol state should be trimmed
+	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
+	NetworkConnectionPruning bool
+
+	PeerScoringEnabled              bool // enables peer scoring on pubsub
+	PreferredUnicastProtocols       []string
+	NetworkReceivedMessageCacheSize uint32
+	PeerUpdateInterval              time.Duration
+	UnicastMessageTimeout           time.Duration
+	DNSCacheTTL                     time.Duration
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -197,10 +218,15 @@ type NodeConfig struct {
 	StakingKey        crypto.PrivateKey
 	NetworkKey        crypto.PrivateKey
 
+	// list of dependencies for network peer manager startup
+	PeerManagerDependencies *DependencyList
+	// ReadyDoneAware implementation of the network middleware for DependableComponents
+	middlewareDependable *module.ProxiedReadyDoneAware
+
 	// ID providers
-	IdentityProvider             id.IdentityProvider
+	IdentityProvider             module.IdentityProvider
 	IDTranslator                 p2p.IDTranslator
-	SyncEngineIdentifierProvider id.IdentifierProvider
+	SyncEngineIdentifierProvider module.IdentifierProvider
 
 	// root state information
 	RootSnapshot protocol.Snapshot
@@ -225,40 +251,54 @@ func DefaultBaseConfig() *BaseConfig {
 	codecFactory := func() network.Codec { return cbor.NewCodec() }
 
 	return &BaseConfig{
-		nodeIDHex:                       NotSet,
-		AdminAddr:                       NotSet,
-		AdminCert:                       NotSet,
-		AdminKey:                        NotSet,
-		AdminClientCAs:                  NotSet,
-		BindAddr:                        NotSet,
-		BootstrapDir:                    "bootstrap",
-		datadir:                         datadir,
-		secretsdir:                      NotSet,
-		secretsDBEnabled:                true,
-		level:                           "info",
-		PeerUpdateInterval:              connection.DefaultPeerUpdateInterval,
-		UnicastMessageTimeout:           middleware.DefaultUnicastTimeout,
-		metricsPort:                     8080,
-		profilerEnabled:                 false,
-		uploaderEnabled:                 false,
-		profilerDir:                     "profiler",
-		profilerInterval:                15 * time.Minute,
-		profilerDuration:                10 * time.Second,
-		profilerMemProfileRate:          runtime.MemProfileRate,
-		tracerEnabled:                   false,
-		tracerSensitivity:               4,
-		MetricsEnabled:                  true,
-		receiptsCacheSize:               bstorage.DefaultCacheSize,
-		guaranteesCacheSize:             bstorage.DefaultCacheSize,
-		NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
+		NetworkConfig: NetworkConfig{
+			PeerUpdateInterval:              connection.DefaultPeerUpdateInterval,
+			UnicastMessageTimeout:           middleware.DefaultUnicastTimeout,
+			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
+			// By default we let networking layer trim connections to all nodes that
+			// are no longer part of protocol state.
+			NetworkConnectionPruning: connection.ConnectionPruningEnabled,
+			PeerScoringEnabled:       scoring.DefaultPeerScoringEnabled,
+		},
+		nodeIDHex:        NotSet,
+		AdminAddr:        NotSet,
+		AdminCert:        NotSet,
+		AdminKey:         NotSet,
+		AdminClientCAs:   NotSet,
+		BindAddr:         NotSet,
+		BootstrapDir:     "bootstrap",
+		datadir:          datadir,
+		secretsdir:       NotSet,
+		secretsDBEnabled: true,
+		level:            "info",
 
-		// By default we let networking layer trim connections to all nodes that
-		// are no longer part of protocol state.
-		NetworkConnectionPruning: connection.ConnectionPruningEnabled,
+		metricsPort:            8080,
+		profilerEnabled:        false,
+		uploaderEnabled:        false,
+		profilerDir:            "profiler",
+		profilerInterval:       15 * time.Minute,
+		profilerDuration:       10 * time.Second,
+		profilerMemProfileRate: runtime.MemProfileRate,
+		tracerEnabled:          false,
+		tracerSensitivity:      4,
+		MetricsEnabled:         true,
+		receiptsCacheSize:      bstorage.DefaultCacheSize,
+		guaranteesCacheSize:    bstorage.DefaultCacheSize,
 
 		HeroCacheMetricsEnable: false,
 		SyncCoreConfig:         chainsync.DefaultConfig(),
 		CodecFactory:           codecFactory,
 		ComplianceConfig:       compliance.DefaultConfig(),
 	}
+}
+
+// DependencyList is a slice of ReadyDoneAware implementations that are used by DependableComponent
+// to define the list of depenencies that must be ready before starting the component.
+type DependencyList struct {
+	components []module.ReadyDoneAware
+}
+
+// Add adds a new ReadyDoneAware implementation to the list of dependencies.
+func (d *DependencyList) Add(component module.ReadyDoneAware) {
+	d.components = append(d.components, component)
 }

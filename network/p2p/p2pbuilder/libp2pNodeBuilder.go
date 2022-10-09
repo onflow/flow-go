@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -25,19 +26,21 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
-type LibP2PFactoryFunc func(context.Context) (*p2pnode.Node, error)
+type LibP2PFactoryFunc func() (*p2pnode.Node, error)
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
@@ -46,13 +49,16 @@ func DefaultLibP2PNodeFactory(
 	address string,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
-	idProvider id.IdentityProvider,
+	idProvider module.IdentityProvider,
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
+	peerScoringEnabled bool,
 	role string,
+	connectionPruning bool,
+	updateInterval time.Duration,
 ) LibP2PFactoryFunc {
 
-	return func(ctx context.Context) (*p2pnode.Node, error) {
+	return func() (*p2pnode.Node, error) {
 		connManager := connection.NewConnManager(log, metrics)
 
 		// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
@@ -76,14 +82,18 @@ func DefaultLibP2PNodeFactory(
 					dht.AsServer(),
 				)
 			}).
-			SetPubSub(pubsub.NewGossipSub)
+			SetPeerManagerOptions(connectionPruning, updateInterval)
+
+		if peerScoringEnabled {
+			builder.EnableGossipSubPeerScoring(idProvider)
+		}
 
 		if role != "ghost" {
 			r, _ := flow.ParseRole(role)
 			builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
 		}
 
-		return builder.Build(ctx)
+		return builder.Build()
 	}
 }
 
@@ -101,22 +111,26 @@ type NodeBuilder interface {
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
-	SetPubSub(func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)) NodeBuilder
-	Build(context.Context) (*p2pnode.Node, error)
+	EnableGossipSubPeerScoring(module.IdentityProvider) NodeBuilder
+	SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder
+	Build() (*p2pnode.Node, error)
 }
 
 type LibP2PNodeBuilder struct {
-	sporkID            flow.Identifier
-	addr               string
-	networkKey         fcrypto.PrivateKey
-	logger             zerolog.Logger
-	basicResolver      madns.BasicResolver
-	subscriptionFilter pubsub.SubscriptionFilter
-	resourceManager    network.ResourceManager
-	connManager        connmgr.ConnManager
-	connGater          connmgr.ConnectionGater
-	routingFactory     func(context.Context, host.Host) (routing.Routing, error)
-	pubsubFactory      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
+	sporkID                   flow.Identifier
+	addr                      string
+	networkKey                fcrypto.PrivateKey
+	logger                    zerolog.Logger
+	basicResolver             madns.BasicResolver
+	subscriptionFilter        pubsub.SubscriptionFilter
+	resourceManager           network.ResourceManager
+	connManager               connmgr.ConnManager
+	connGater                 connmgr.ConnectionGater
+	idProvider                module.IdentityProvider
+	gossipSubPeerScoring      bool // whether to enable gossipsub peer scoring
+	routingFactory            func(context.Context, host.Host) (routing.Routing, error)
+	peerManagerEnablePruning  bool
+	peerManagerUpdateInterval time.Duration
 }
 
 func NewNodeBuilder(
@@ -133,48 +147,59 @@ func NewNodeBuilder(
 	}
 }
 
+// SetBasicResolver sets the DNS resolver for the node.
 func (builder *LibP2PNodeBuilder) SetBasicResolver(br madns.BasicResolver) NodeBuilder {
 	builder.basicResolver = br
 	return builder
 }
 
+// SetSubscriptionFilter sets the pubsub subscription filter for the node.
 func (builder *LibP2PNodeBuilder) SetSubscriptionFilter(filter pubsub.SubscriptionFilter) NodeBuilder {
 	builder.subscriptionFilter = filter
 	return builder
 }
 
+// SetResourceManager sets the resource manager for the node.
 func (builder *LibP2PNodeBuilder) SetResourceManager(manager network.ResourceManager) NodeBuilder {
 	builder.resourceManager = manager
 	return builder
 }
 
+// SetConnectionManager sets the connection manager for the node.
 func (builder *LibP2PNodeBuilder) SetConnectionManager(manager connmgr.ConnManager) NodeBuilder {
 	builder.connManager = manager
 	return builder
 }
 
+// SetConnectionGater sets the connection gater for the node.
 func (builder *LibP2PNodeBuilder) SetConnectionGater(gater connmgr.ConnectionGater) NodeBuilder {
 	builder.connGater = gater
 	return builder
 }
 
+// SetRoutingSystem sets the routing factory function.
 func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder {
 	builder.routingFactory = f
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetPubSub(f func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)) NodeBuilder {
-	builder.pubsubFactory = f
+func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.IdentityProvider) NodeBuilder {
+	builder.gossipSubPeerScoring = true
+	builder.idProvider = provider
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*p2pnode.Node, error) {
+// SetPeerManagerFactory sets the peer manager factory function.
+func (builder *LibP2PNodeBuilder) SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder {
+	builder.peerManagerEnablePruning = connectionPruning
+	builder.peerManagerUpdateInterval = updateInterval
+	return builder
+}
+
+// Build creates a new libp2p node using the configured options.
+func (builder *LibP2PNodeBuilder) Build() (*p2pnode.Node, error) {
 	if builder.routingFactory == nil {
 		return nil, errors.New("routing factory is not set")
-	}
-
-	if builder.pubsubFactory == nil {
-		return nil, errors.New("pubsub factory is not set")
 	}
 
 	var opts []libp2p.Option
@@ -201,47 +226,91 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*p2pnode.Node, err
 		opts = append(opts, libp2p.ConnectionGater(builder.connGater))
 	}
 
-	host, err := DefaultLibP2PHost(ctx, builder.addr, builder.networkKey, opts...)
+	h, err := DefaultLibP2PHost(builder.addr, builder.networkKey, opts...)
+
 	if err != nil {
 		return nil, err
 	}
 
-	rsys, err := builder.routingFactory(ctx, host)
+	pCache, err := p2pnode.NewProtocolPeerCache(builder.logger, h)
 	if err != nil {
 		return nil, err
 	}
 
-	psOpts := append(
-		DefaultPubsubOptions(p2pnode.DefaultMaxPubSubMsgSize),
-		pubsub.WithDiscovery(discoveryRouting.NewRoutingDiscovery(rsys)),
-		pubsub.WithMessageIdFn(DefaultMessageIDFunction),
+	unicastManager := unicast.NewUnicastManager(
+		builder.logger,
+		unicast.NewLibP2PStreamFactory(h),
+		builder.sporkID,
 	)
 
-	if builder.subscriptionFilter != nil {
-		psOpts = append(psOpts, pubsub.WithSubscriptionFilter(builder.subscriptionFilter))
+	var peerManager *connection.PeerManager
+	if builder.peerManagerUpdateInterval > 0 {
+		connector, err := connection.NewLibp2pConnector(builder.logger, h, builder.peerManagerEnablePruning)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
+		}
+
+		peerManager = connection.NewPeerManager(builder.logger, builder.peerManagerUpdateInterval, connector)
 	}
 
-	pubSub, err := builder.pubsubFactory(ctx, host, psOpts...)
-	if err != nil {
-		return nil, err
-	}
+	node := p2pnode.NewNode(builder.logger, h, pCache, unicastManager, peerManager)
 
-	pCache, err := p2pnode.NewProtocolPeerCache(builder.logger, host)
-	if err != nil {
-		return nil, err
-	}
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			rsys, err := builder.routingFactory(ctx, h)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("could not create libp2p node routing: %w", err))
+			}
 
-	n := p2pnode.NewNode(builder.logger, host, pubSub, rsys, pCache, unicast.NewUnicastManager(
-		builder.logger,
-		unicast.NewLibP2PStreamFactory(host),
-		builder.sporkID,
-	))
-	return n, nil
+			node.SetRouting(rsys)
+
+			psOpts := append(
+				DefaultPubsubOptions(p2pnode.DefaultMaxPubSubMsgSize),
+				pubsub.WithDiscovery(discoveryRouting.NewRoutingDiscovery(rsys)),
+				pubsub.WithMessageIdFn(DefaultMessageIDFunction),
+			)
+
+			if builder.subscriptionFilter != nil {
+				psOpts = append(psOpts, pubsub.WithSubscriptionFilter(builder.subscriptionFilter))
+			}
+
+			var scoreOpt *scoring.ScoreOption
+			if builder.gossipSubPeerScoring {
+				scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider)
+				psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
+			}
+
+			pubSub, err := pubsub.NewGossipSub(ctx, h, psOpts...)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
+			}
+			if scoreOpt != nil {
+				scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, pubSub))
+			}
+
+			node.SetPubSub(pubSub)
+
+			ready()
+			<-ctx.Done()
+
+			err = node.Stop()
+			if err != nil {
+				// ignore context cancellation errors
+				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+					ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
+				}
+			}
+		}).
+		Build()
+
+	node.Component = cm
+
+	return node, nil
 }
 
 // DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
 // customized with options
-func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host,
+func DefaultLibP2PHost(address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host,
 	error) {
 	defaultOptions, err := defaultLibP2POptions(address, key)
 	if err != nil {
@@ -298,9 +367,9 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 
 func DefaultPubsubOptions(maxPubSubMsgSize int) []pubsub.Option {
 	return []pubsub.Option{
-		// skip message signing
+		// enforce message signing
 		pubsub.WithMessageSigning(true),
-		// skip message signature
+		// enforce message signature verification
 		pubsub.WithStrictSignatureVerification(true),
 		// set max message size limit for 1-k PubSub messaging
 		pubsub.WithMaxMessageSize(maxPubSubMsgSize),

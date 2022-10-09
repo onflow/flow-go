@@ -9,14 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO(patrick): rm once emulator is updated ...
-func NewStateTransaction(
-	startView View,
-	params StateParameters,
-) *TransactionState {
-	return NewTransactionState(startView, params)
-}
-
 type nestedTransactionStackFrame struct {
 	state *State
 

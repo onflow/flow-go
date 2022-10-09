@@ -40,7 +40,7 @@ type TransactionProcedure struct {
 	ServiceEvents   []flow.Event
 	ComputationUsed uint64
 	MemoryEstimate  uint64
-	Err             errors.Error
+	Err             errors.CodedError
 	TraceSpan       otelTrace.Span
 }
 

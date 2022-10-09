@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -54,16 +56,19 @@ func TestMultiAddress(t *testing.T) {
 // TestSingleNodeLifeCycle evaluates correct lifecycle translation from start to stop the node
 func TestSingleNodeLifeCycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	node, _ := p2pfixtures.NodeFixture(
 		t,
-		ctx,
 		unittest.IdentifierFixture(),
 		"test_single_node_life_cycle",
 	)
 
-	p2pfixtures.StopNode(t, node)
+	node.Start(signalerCtx)
+	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, node)
+
+	cancel()
+	unittest.RequireComponentsDoneBefore(t, 100*time.Millisecond, node)
 }
 
 // TestGetPeerInfo evaluates the deterministic translation between the nodes address and
@@ -93,11 +98,12 @@ func TestGetPeerInfo(t *testing.T) {
 func TestAddPeers(t *testing.T) {
 	count := 3
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create nodes
-	nodes, identities := p2pfixtures.NodesFixture(t, ctx, unittest.IdentifierFixture(), "test_add_peers", count)
-	defer p2pfixtures.StopNodes(t, nodes)
+	nodes, identities := p2pfixtures.NodesFixture(t, unittest.IdentifierFixture(), "test_add_peers", count)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, identity := range identities[1:] {
@@ -114,13 +120,15 @@ func TestAddPeers(t *testing.T) {
 func TestRemovePeers(t *testing.T) {
 	count := 3
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create nodes
-	nodes, identities := p2pfixtures.NodesFixture(t, ctx, unittest.IdentifierFixture(), "test_remove_peers", count)
+	nodes, identities := p2pfixtures.NodesFixture(t, unittest.IdentifierFixture(), "test_remove_peers", count)
 	peerInfos, errs := utils.PeerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
-	defer p2pfixtures.StopNodes(t, nodes)
+
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// add nodes two and three to the first node as its peers
 	for _, pInfo := range peerInfos[1:] {
@@ -139,29 +147,34 @@ func TestRemovePeers(t *testing.T) {
 
 func TestConnGater(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkID := unittest.IdentifierFixture()
 
 	node1Peers := make(map[peer.ID]struct{})
-	node1, identity1 := p2pfixtures.NodeFixture(t, ctx, sporkID, "test_conn_gater", p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
+	node1, identity1 := p2pfixtures.NodeFixture(t, sporkID, "test_conn_gater", p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
 		if _, ok := node1Peers[pid]; !ok {
 			return fmt.Errorf("peer id not found: %s", pid.String())
 		}
 		return nil
 	}))
-	defer p2pfixtures.StopNode(t, node1)
+
+	p2pfixtures.StartNode(t, signalerCtx, node1, 100*time.Millisecond)
+	defer p2pfixtures.StopNode(t, node1, cancel, 100*time.Millisecond)
+
 	node1Info, err := utils.PeerAddressInfo(identity1)
 	assert.NoError(t, err)
 
 	node2Peers := make(map[peer.ID]struct{})
-	node2, identity2 := p2pfixtures.NodeFixture(t, ctx, sporkID, "test_conn_gater", p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
+	node2, identity2 := p2pfixtures.NodeFixture(t, sporkID, "test_conn_gater", p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
 		if _, ok := node2Peers[pid]; !ok {
 			return fmt.Errorf("id not found: %s", pid.String())
 		}
 		return nil
 	}))
-	defer p2pfixtures.StopNode(t, node2)
+	p2pfixtures.StartNode(t, signalerCtx, node2, 100*time.Millisecond)
+	defer p2pfixtures.StopNode(t, node2, cancel, 100*time.Millisecond)
+
 	node2Info, err := utils.PeerAddressInfo(identity2)
 	assert.NoError(t, err)
 
