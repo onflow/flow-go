@@ -9,7 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
@@ -37,7 +37,7 @@ type ProtocolStateIDCache struct {
 	logger     zerolog.Logger
 }
 
-var _ id.IdentityProvider = (*ProtocolStateIDCache)(nil)
+var _ module.IdentityProvider = (*ProtocolStateIDCache)(nil)
 var _ protocol.Consumer = (*ProtocolStateIDCache)(nil)
 var _ p2p.IDTranslator = (*ProtocolStateIDCache)(nil)
 

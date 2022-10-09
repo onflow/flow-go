@@ -9,7 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -23,7 +23,7 @@ func (s IdentifierSet) Contains(id flow.Identifier) bool {
 	return found
 }
 
-// NodeBlocklistWrapper is a wrapper for an `id.IdentityProvider` instance, where the
+// NodeBlocklistWrapper is a wrapper for an `module.IdentityProvider` instance, where the
 // wrapper overrides the `Ejected` flag to true for all NodeIDs in a `blocklist`.
 // To avoid modifying the source of the identities, the wrapper creates shallow copies
 // of the identities (whenever necessary) and modifies the `Ejected` flag only in
@@ -36,15 +36,15 @@ type NodeBlocklistWrapper struct {
 	m  sync.RWMutex
 	db *badger.DB
 
-	identityProvider id.IdentityProvider
+	identityProvider module.IdentityProvider
 	blocklist        IdentifierSet // `IdentifierSet` is a map, hence efficient O(1) lookup
 }
 
-var _ id.IdentityProvider = (*NodeBlocklistWrapper)(nil)
+var _ module.IdentityProvider = (*NodeBlocklistWrapper)(nil)
 
 // NewNodeBlocklistWrapper wraps the given `IdentityProvider`. The blocklist is
 // loaded from the database (or assumed to be empty if no database entry is present).
-func NewNodeBlocklistWrapper(identityProvider id.IdentityProvider, db *badger.DB) (*NodeBlocklistWrapper, error) {
+func NewNodeBlocklistWrapper(identityProvider module.IdentityProvider, db *badger.DB) (*NodeBlocklistWrapper, error) {
 	blocklist, err := retrieveBlocklist(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read set of blocked node IDs from data base: %w", err)
