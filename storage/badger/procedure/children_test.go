@@ -29,7 +29,7 @@ func TestIndexAndLookupChild(t *testing.T) {
 		require.NoError(t, err)
 
 		// retrieved child should be the stored child
-		require.Equal(t, []flow.Identifier{childID}, retrievedIDs)
+		require.Equal(t, flow.IdentifierList{childID}, retrievedIDs)
 	})
 }
 
@@ -55,7 +55,7 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 		err = db.View(procedure.LookupBlockChildren(parentID, &retrievedIDs))
 		require.NoError(t, err)
 
-		require.Equal(t, []flow.Identifier{child1ID, child2ID}, retrievedIDs)
+		require.Equal(t, flow.IdentifierList{child1ID, child2ID}, retrievedIDs)
 	})
 }
 
@@ -98,15 +98,15 @@ func TestDirectChildren(t *testing.T) {
 
 		err = db.View(procedure.LookupBlockChildren(b1, &retrievedIDs))
 		require.NoError(t, err)
-		require.Equal(t, []flow.Identifier{b2}, retrievedIDs)
+		require.Equal(t, flow.IdentifierList{b2}, retrievedIDs)
 
 		err = db.View(procedure.LookupBlockChildren(b2, &retrievedIDs))
 		require.NoError(t, err)
-		require.Equal(t, []flow.Identifier{b3}, retrievedIDs)
+		require.Equal(t, flow.IdentifierList{b3}, retrievedIDs)
 
 		err = db.View(procedure.LookupBlockChildren(b3, &retrievedIDs))
 		require.NoError(t, err)
-		require.Equal(t, []flow.Identifier{b4}, retrievedIDs)
+		require.Equal(t, flow.IdentifierList{b4}, retrievedIDs)
 
 		err = db.View(procedure.LookupBlockChildren(b4, &retrievedIDs))
 		require.NoError(t, err)
