@@ -13,8 +13,8 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "hotstuff-view",
-	Short: "get or set hotstuff current view",
+	Use:   "read-hotstuff",
+	Short: "read hotstuff liveness/safety data",
 }
 
 var RootCmd = rootCmd
