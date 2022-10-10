@@ -197,6 +197,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageBurstLimit, "unicast-message-burst-limit", 0, "amount of unicast messages that can be sent by a peer at one time")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthRateLimit, "unicast-bandwidth-rate-limit", 0, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", 0, "bandwidth size in bytes a peer is allowed to send at one time")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-rate-limit-lockout-duration", 10, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
 	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitDryRun, "unicast-rate-limit-dry-run", true, "disable peer disconnects and connections gating when rate limiting peers")
 
 }
@@ -313,7 +314,11 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 	// override noop unicast message rate limiter
 	if fnb.BaseConfig.UnicastMessageRateLimit > 0 && fnb.BaseConfig.UnicastMessageBurstLimit > 0 {
-		unicastMessageRateLimiter := unicast.NewMessageRateLimiter(rate.Limit(fnb.BaseConfig.UnicastMessageRateLimit), fnb.BaseConfig.UnicastMessageBurstLimit)
+		unicastMessageRateLimiter := unicast.NewMessageRateLimiter(
+			rate.Limit(fnb.BaseConfig.UnicastMessageRateLimit),
+			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
+			fnb.BaseConfig.UnicastMessageBurstLimit,
+		)
 		unicastRateLimiters.MessageRateLimiter = unicastMessageRateLimiter
 
 		// avoid connection gating and pruning during dry run
@@ -327,7 +332,11 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 	// override noop unicast bandwidth rate limiter
 	if fnb.BaseConfig.UnicastBandwidthRateLimit > 0 && fnb.BaseConfig.UnicastBandwidthBurstLimit > 0 {
-		unicastBandwidthRateLimiter := unicast.NewBandWidthRateLimiter(rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit), fnb.BaseConfig.UnicastBandwidthBurstLimit)
+		unicastBandwidthRateLimiter := unicast.NewBandWidthRateLimiter(
+			rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit),
+			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
+			fnb.BaseConfig.UnicastBandwidthBurstLimit,
+		)
 		unicastRateLimiters.BandWidthRateLimiter = unicastBandwidthRateLimiter
 
 		// avoid connection gating and pruning during dry run

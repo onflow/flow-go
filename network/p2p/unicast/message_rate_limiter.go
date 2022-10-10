@@ -14,22 +14,22 @@ import (
 // be created per some configured interval. A new stream is created each time a libP2P
 // node sends a direct message.
 type MessageRateLimiterImpl struct {
-	rateLimitedPeers *rateLimitedPeersMap
-	limiters         *rateLimiterMap
-	limit            rate.Limit
-	burst            int
-	now              GetTimeNow
+	limiters                 *rateLimiterMap
+	limit                    rate.Limit
+	burst                    int
+	now                      GetTimeNow
+	rateLimitLockoutDuration time.Duration // the amount of time that has to pass before a peer is allowed to connect
 }
 
 // NewMessageRateLimiter returns a new MessageRateLimiterImpl. The cleanup loop will be started in a
 // separate goroutine and should be stopped by calling Close.
-func NewMessageRateLimiter(limit rate.Limit, burst int, opts ...RateLimiterOpt) *MessageRateLimiterImpl {
+func NewMessageRateLimiter(limit rate.Limit, burst, lockoutDuration int, opts ...RateLimiterOpt) *MessageRateLimiterImpl {
 	l := &MessageRateLimiterImpl{
-		rateLimitedPeers: newRateLimitedPeersMap(rateLimiterTTL, cleanUpTickInterval),
-		limiters:         newLimiterMap(rateLimiterTTL, cleanUpTickInterval),
-		limit:            limit,
-		burst:            burst,
-		now:              time.Now,
+		limiters:                 newLimiterMap(rateLimiterTTL, cleanUpTickInterval),
+		limit:                    limit,
+		burst:                    burst,
+		now:                      time.Now,
+		rateLimitLockoutDuration: time.Duration(lockoutDuration) * time.Second,
 	}
 
 	for _, opt := range opts {
@@ -44,30 +44,31 @@ func NewMessageRateLimiter(limit rate.Limit, burst int, opts ...RateLimiterOpt) 
 func (s *MessageRateLimiterImpl) Allow(peerID peer.ID, _ *message.Message) bool {
 	limiter := s.getLimiter(peerID)
 	if !limiter.AllowN(s.now(), 1) {
-		s.rateLimitedPeers.store(peerID)
+		s.limiters.updateLastRateLimit(peerID, s.now())
 		return false
 	} else {
-		s.rateLimitedPeers.remove(peerID)
 		return true
 	}
 }
 
 // IsRateLimited returns true is a peer is currently rate limited.
 func (s *MessageRateLimiterImpl) IsRateLimited(peerID peer.ID) bool {
-	return s.rateLimitedPeers.exists(peerID)
+	metadata, ok := s.limiters.get(peerID)
+	if !ok {
+		return false
+	}
+	return time.Since(metadata.lastRateLimit) < s.rateLimitLockoutDuration
 }
 
 // Start starts cleanup loop for underlying caches.
 func (s *MessageRateLimiterImpl) Start() {
 	go s.limiters.cleanupLoop()
-	go s.rateLimitedPeers.cleanupLoop()
 }
 
 // Stop sends cleanup signal to underlying rate limiters and rate limited peers maps. After the rate limiter
 // is closed it can not be reused.
 func (s *MessageRateLimiterImpl) Stop() {
 	s.limiters.close()
-	s.rateLimitedPeers.close()
 }
 
 // SetTimeNowFunc overrides the default time.Now func with the GetTimeNow func provided.
@@ -77,8 +78,8 @@ func (s *MessageRateLimiterImpl) SetTimeNowFunc(now GetTimeNow) {
 
 // getLimiter returns limiter for the peerID, if a limiter does not exist one is created and stored.
 func (s *MessageRateLimiterImpl) getLimiter(peerID peer.ID) *rate.Limiter {
-	if limiter, ok := s.limiters.get(peerID); ok {
-		return limiter
+	if metadata, ok := s.limiters.get(peerID); ok {
+		return metadata.limiter
 	}
 
 	limiter := rate.NewLimiter(s.limit, s.burst)

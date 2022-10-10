@@ -58,9 +58,9 @@ func TestLimiterMap_cleanup(t *testing.T) {
 	peerID3 := peer.ID("id3")
 	m.store(peerID3, rate.NewLimiter(0, 0))
 
-	// manually set lastActive on 2 items so that they are removed during cleanup
-	m.limiters[peerID2].lastActive = start.Add(-10 * time.Minute)
-	m.limiters[peerID3].lastActive = start.Add(-20 * time.Minute)
+	// manually set lastAccessed on 2 items so that they are removed during cleanup
+	m.limiters[peerID2].lastAccessed = start.Add(-10 * time.Minute)
+	m.limiters[peerID3].lastAccessed = start.Add(-20 * time.Minute)
 
 	// light clean up will only remove expired keys
 	m.cleanup()
@@ -97,10 +97,10 @@ func TestLimiterMap_cleanupLoopDone(t *testing.T) {
 	peerID3 := peer.ID("id3")
 	m.store(peerID3, rate.NewLimiter(0, 0))
 
-	// manually set lastActive on 2 items so that they are removed during cleanup
-	m.limiters[peerID1].lastActive = start.Add(-10 * time.Minute)
-	m.limiters[peerID2].lastActive = start.Add(-10 * time.Minute)
-	m.limiters[peerID3].lastActive = start.Add(-20 * time.Minute)
+	// manually set lastAccessed on 2 items so that they are removed during cleanup
+	m.limiters[peerID1].lastAccessed = start.Add(-10 * time.Minute)
+	m.limiters[peerID2].lastAccessed = start.Add(-10 * time.Minute)
+	m.limiters[peerID3].lastAccessed = start.Add(-20 * time.Minute)
 
 	// kick off clean up process, tick should happen immediately
 	go m.cleanupLoop()
