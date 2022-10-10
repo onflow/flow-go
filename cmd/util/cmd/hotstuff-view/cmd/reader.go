@@ -1,20 +1,25 @@
 package cmd
 
 import (
+	"github.com/dgraph-io/badger/v2"
+
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-type Reader struct {
-	persister *persister.Persister
+// HotstuffReader exposes only the read-only parts of the Hotstuff Persister component.
+// This is used to read information about the HotStuff instance's current state from CLI tools.
+// CAUTION: the write functions are hidden here, because it is NOT SAFE to use them outside
+// the Hotstuff state machine.
+type HotstuffReader interface {
+	// GetLivenessData retrieves the latest persisted liveness data.
+	GetLivenessData() (*hotstuff.LivenessData, error)
+	// GetSafetyData retrieves the latest persisted safety data.
+	GetSafetyData() (*hotstuff.SafetyData, error)
 }
 
-func NewReader(persister *persister.Persister) *Reader {
-	return &Reader{
-		persister: persister,
-	}
-}
-
-// TODO replace with GetLivenessData, GetSafetyData https://github.com/dapperlabs/flow-go/issues/6388
-func (r *Reader) GetHotstuffView() (uint64, error) {
-	panic("not implemented - to be removed")
+// NewHotstuffReader returns a new Persister, constrained to read-only operations.
+func NewHotstuffReader(db *badger.DB, chainID flow.ChainID) HotstuffReader {
+	return persister.New(db, chainID)
 }
