@@ -47,7 +47,7 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	panic(relic_panic)
 }
 
-func NeutralBLSPublicKey() PublicKey {
+func IdentityBLSPublicKey() PublicKey {
 	panic(relic_panic)
 }
 

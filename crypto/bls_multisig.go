@@ -192,9 +192,9 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	return newPubKeyBLSBLS12381(&sum), nil
 }
 
-// NeutralBLSPublicKey returns a neutral public key which corresponds to the point
-// at infinity in G2 (neutral element of G2).
-func NeutralBLSPublicKey() PublicKey {
+// IdentityBLSPublicKey returns a neutral public key which corresponds to the point
+// at infinity in G2 (identtity element of G2).
+func IdentityBLSPublicKey() PublicKey {
 	// set BLS context
 	blsInstance.reInit()
 

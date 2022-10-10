@@ -408,7 +408,7 @@ func TestAggregatePubKeys(t *testing.T) {
 	// aggregate with the neutral key
 	t.Run("neutral list", func(t *testing.T) {
 		// aggregate the neutral key with a non neutral key
-		keys := []PublicKey{pks[0], NeutralBLSPublicKey()}
+		keys := []PublicKey{pks[0], IdentityBLSPublicKey()}
 		aggPkWithNeutral, err := AggregateBLSPublicKeys(keys)
 		assert.NoError(t, err)
 		assert.True(t, aggPkWithNeutral.Equals(pks[0]),
