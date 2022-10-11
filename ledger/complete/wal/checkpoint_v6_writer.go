@@ -50,6 +50,7 @@ func StoreCheckpointV6Concurrent(tries []*trie.MTrie, outputDir string, outputFi
 //   - checksum of the main file itself
 //     the first 16 files parts contain the trie nodes below the subtrieLevel
 //     the last part file contains the top level trie nodes above the subtrieLevel and all the trie root nodes.
+//
 // nWorker specifies how many workers to encode subtrie concurrently, valid range [1,16]
 func StoreCheckpointV6(
 	tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger, nWorker uint) error {
@@ -121,9 +122,9 @@ func storeCheckpointV6(
 	return nil
 }
 
-// 		1. version
-//		2. checksum of each part file (17 in total)
-// 		3. checksum of the main file itself
+// 1. version
+// 2. checksum of each part file (17 in total)
+// 3. checksum of the main file itself
 func storeCheckpointHeader(
 	subTrieChecksums []uint32,
 	topTrieChecksum uint32,

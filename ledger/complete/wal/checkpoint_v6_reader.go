@@ -9,10 +9,11 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
-	"github.com/rs/zerolog"
 )
 
 var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")

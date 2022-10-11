@@ -6,8 +6,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/rs/zerolog/log"
+
+	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 )
 
 func CompareV5(f1 *os.File, f2 *os.File) error {
