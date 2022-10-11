@@ -93,22 +93,6 @@ func (vm *VirtualMachine) Run(
 		return fmt.Errorf("error creating transaction programs: %w", err)
 	}
 
-	// Note: it is safe to skip committing the parsed programs for non-normal
-	// transactions (i.e., bootstrap and script) since this is only an
-	// optimization.
-	if proc.Type() == TransactionProcedureType {
-		defer func() {
-			commitErr := txnPrograms.Commit()
-			if commitErr != nil {
-				// NOTE: txnPrograms commit error does not impact correctness,
-				// but may slow down execution since some programs may need to
-				// be re-parsed.
-				ctx.Logger.Warn().Err(commitErr).Msg(
-					"failed to commit transaction programs")
-			}
-		}()
-	}
-
 	meterParams := meter.DefaultParameters().
 		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
 		WithMemoryLimit(proc.MemoryLimit(ctx))
@@ -141,7 +125,21 @@ func (vm *VirtualMachine) Run(
 			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
-	return proc.Run(ctx, txnState, txnPrograms)
+	err = proc.Run(ctx, txnState, txnPrograms)
+	if err != nil {
+		return err
+	}
+
+	// Note: it is safe to skip committing the parsed programs for non-normal
+	// transactions (i.e., bootstrap and script) since these do not invalidate
+	// programs.
+	if proc.Type() == TransactionProcedureType {
+		// NOTE: It is not safe to ignore txnPrograms' commit error for
+		// transactions that trigger programs invalidation.
+		return txnPrograms.Commit()
+	}
+
+	return nil
 }
 
 // GetAccount returns an account by address or an error if none exists.
