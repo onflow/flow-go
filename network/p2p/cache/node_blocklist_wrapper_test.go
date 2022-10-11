@@ -186,7 +186,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestUnknownNode() {
 //   - Node whose original `Identity` has `Ejected = false`:
 //     After adding the node to the blocklist and then removing it again, the `Ejected` should be false.
 //   - Node whose original `Identity` has `Ejected = true`:
-//     After adding the node to the blocklist and then removing it again, the `Ejected` should be still be false.
+//     After adding the node to the blocklist and then removing it again, the `Ejected` should be still be true.
 func (s *NodeBlocklistWrapperTestSuite) TestBlocklistAddRemove() {
 	for _, originalEjected := range []bool{true, false} {
 		s.Run(fmt.Sprintf("Add & remove node with Ejected = %v", originalEjected), func() {
