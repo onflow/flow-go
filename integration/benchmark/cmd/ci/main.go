@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 	"strings"
@@ -51,9 +53,14 @@ const (
 	loadType                    = "token-transfer"
 	metricport                  = uint(8080)
 	accessNodeAddress           = "127.0.0.1:3569"
-	accountMultiplier           = 100
+	accountMultiplier           = 50
 	feedbackEnabled             = true
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
+
+	// Auto TPS scaling constants
+	additiveIncrease       = 50
+	multiplicativeDecrease = 0.8
+	adjustInterval         = 20 * time.Second
 )
 
 func main() {
@@ -128,6 +135,7 @@ func main() {
 		Dur("duration", loadCase.duration).
 		Msg("Running load case...")
 
+	maxInflight := *maxTPSFlag * accountMultiplier
 	lg, err := benchmark.New(
 		ctx,
 		log,
@@ -140,7 +148,7 @@ func main() {
 			FlowTokenAddress:      &flowTokenAddress,
 		},
 		benchmark.LoadParams{
-			NumberOfAccounts: *maxTPSFlag * accountMultiplier,
+			NumberOfAccounts: maxInflight,
 			LoadType:         benchmark.LoadType(loadType),
 			FeedbackEnabled:  feedbackEnabled,
 		},
@@ -182,14 +190,32 @@ func main() {
 			osVersion)
 	}()
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := adjustTPS(
+			lg,
+			log,
+			adjustInterval,
+			loadCase.tps,
+			uint(*maxTPSFlag),
+			uint(maxInflight/2),
+		)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			log.Fatal().Err(err).Msgf("unable to adjust tps")
+		}
+	}()
+
 	select {
 	case <-time.After(loadCase.duration):
-	case <-ctx.Done(): //TODO: the loader currently doesn't ever cancel the context
-		// add logging here to express the *why* of lg choose to cancel the context.
-		// when the loader cancels its own context it may also call Stop() on itself
-		// this may become redundant.
+	case <-ctx.Done():
+		// TODO(rbtz): the loader currently doesn't ever cancel the context.
+		log.Warn().Err(ctx.Err()).Msg("loader context canceled")
 	}
+
+	log.Info().Msg("Stopping load generator")
 	lg.Stop()
+	log.Info().Msg("Waiting for workers to finish")
 	wg.Wait()
 
 	if len(dataSlices) == 0 {
@@ -199,6 +225,7 @@ func main() {
 	if *localDev {
 		outputLocalData(dataSlices, log)
 	} else {
+		log.Info().Msg("Uploading data to BigQuery")
 		err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("unable to send data to bigquery")
@@ -285,5 +312,140 @@ func outputLocalData(slices []dataSlice, log zerolog.Logger) {
 	err = os.WriteFile(fileName, jsonText, 0666)
 	if err != nil {
 		log.Fatal().Err(err)
+	}
+}
+
+// adjustTPS tries to find the maximum TPS that the network can handle using a simple AIMD algorithm.
+// The algorithm starts with minTPS as a target.  Each time it is able to reach the target TPS, it
+// increases the target by `additiveIncrease`. Each time it fails to reach the target TPS, it decreases
+// the target by `multiplicativeDecrease` factor.
+//
+// To avoid oscillation and speedup conversion we skip the adjustment stage if TPS grew
+// compared to the last round.
+//
+// Target TPS is always bounded by [minTPS, maxTPS].
+func adjustTPS(
+	lg *benchmark.ContLoadGenerator,
+	log zerolog.Logger,
+	interval time.Duration,
+	minTPS uint,
+	maxTPS uint,
+	maxInflight uint,
+) error {
+	targetTPS := minTPS
+	lastTs := time.Now()
+	lastTPS := float64(minTPS)
+	lastTxs := uint(lg.GetTxExecuted())
+	for {
+		select {
+		// NOTE: not using a ticker here since adjusting worker count in SetTPS
+		// can take a while and lead to uneven feedback intervals.
+		case nowTs := <-time.After(interval):
+			currentSentTxs := lg.GetTxSent()
+			currentTxs := uint(lg.GetTxExecuted())
+
+			inflight := currentSentTxs - int(currentTxs)
+			inflightPerWorker := inflight / int(targetTPS)
+
+			skip, currentTPS, unboundedTPS := computeTPS(
+				lastTxs,
+				currentTxs,
+				lastTs,
+				nowTs,
+				lastTPS,
+				targetTPS,
+				inflight,
+				maxInflight,
+			)
+
+			if skip {
+				log.Info().
+					Float64("lastTPS", lastTPS).
+					Float64("currentTPS", currentTPS).
+					Int("inflight", inflight).
+					Int("inflightPerWorker", inflightPerWorker).
+					Msg("skipped adjusting TPS")
+
+				lastTxs = currentTxs
+				lastTPS = currentTPS
+				lastTs = nowTs
+
+				continue
+			}
+
+			boundedTPS := boundTPS(unboundedTPS, minTPS, maxTPS)
+			log.Info().
+				Uint("lastTargetTPS", targetTPS).
+				Float64("lastTPS", lastTPS).
+				Float64("currentTPS", currentTPS).
+				Uint("unboundedTPS", unboundedTPS).
+				Uint("targetTPS", boundedTPS).
+				Int("inflight", inflight).
+				Int("inflightPerWorker", inflightPerWorker).
+				Msg("adjusting TPS")
+
+			err := lg.SetTPS(boundedTPS)
+			if err != nil {
+				return fmt.Errorf("unable to set tps: %w", err)
+			}
+
+			targetTPS = boundedTPS
+			//
+			// SetTPS is a blocking call, so we need to re-fetch the TxExecuted and time.
+			//
+			lastTxs = uint(lg.GetTxExecuted())
+			lastTPS = currentTPS
+			lastTs = time.Now()
+		case <-lg.Done():
+			return nil
+		}
+	}
+}
+
+func computeTPS(
+	lastTxs uint,
+	currentTxs uint,
+	lastTs time.Time,
+	nowTs time.Time,
+	lastTPS float64,
+	targetTPS uint,
+	inflight int,
+	maxInflight uint,
+) (bool, float64, uint) {
+	timeDiff := nowTs.Sub(lastTs).Seconds()
+	if timeDiff == 0 {
+		return true, 0, 0
+	}
+
+	currentTPS := float64(currentTxs-lastTxs) / timeDiff
+	unboundedTPS := uint(math.Ceil(currentTPS))
+
+	// To avoid setting target TPS below current TPS,
+	// we decrease the former one by the multiplicativeDecrease factor.
+	//
+	// This shortcut is only applicable when current inflight is less than maxInflight.
+	if ((float64(unboundedTPS) >= float64(targetTPS)*multiplicativeDecrease) && (inflight < int(maxInflight))) ||
+		(unboundedTPS >= targetTPS) {
+
+		unboundedTPS = targetTPS + additiveIncrease
+	} else {
+		// Do not reduce the target if TPS incresed since the last round.
+		if (currentTPS > float64(lastTPS)) && (inflight < int(maxInflight)) {
+			return true, currentTPS, 0
+		}
+
+		unboundedTPS = uint(float64(targetTPS) * multiplicativeDecrease)
+	}
+	return false, currentTPS, unboundedTPS
+}
+
+func boundTPS(tps, min, max uint) uint {
+	switch {
+	case tps < min:
+		return min
+	case tps > max:
+		return max
+	default:
+		return tps
 	}
 }

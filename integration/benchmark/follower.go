@@ -103,10 +103,10 @@ func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOp
 	return f, nil
 }
 
-func (f *txFollowerImpl) getAllCollections(block *flowsdk.Block) ([]flowsdk.Collection, error) {
+func (f *txFollowerImpl) getAllCollections(ctx context.Context, block *flowsdk.Block) ([]flowsdk.Collection, error) {
 	cols := make([]flowsdk.Collection, 0, len(block.CollectionGuarantees))
 	for i, guaranteed := range block.CollectionGuarantees {
-		col, err := f.client.GetCollection(f.ctx, guaranteed.CollectionID)
+		col, err := f.client.GetCollection(ctx, guaranteed.CollectionID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get collection: %d: %s: %w",
 				i, guaranteed.CollectionID.Hex(), err)
@@ -144,40 +144,20 @@ func (f *txFollowerImpl) run() {
 	defer t.Stop()
 	defer close(f.stopped)
 
-	var totalTxs, totalUnknownTxs uint64
-	for lastBlockTime := time.Now(); ; {
+	lastBlockTime := time.Now()
 
+	var totalTxs, totalUnknownTxs uint64
+	for {
 		select {
 		case <-f.ctx.Done():
 			return
 		case <-t.C:
 		}
+
 		blockResolutionStart := time.Now()
-
-		hdr, err := f.client.GetLatestBlockHeader(f.ctx, true)
+		block, cols, err := f.pollCollections()
 		if err != nil {
-			f.logger.Error().Err(err).Msg("failed to get latest block header")
-			continue
-		}
-
-		nextHeight := f.Height() + 1
-		if hdr.Height < nextHeight {
-			f.logger.Trace().Uint64("want", nextHeight).Uint64("got", hdr.Height).
-				Msg("expected block is not yet sealed")
-			continue
-		}
-
-		getBlockByHeightTime := time.Now()
-		block, err := f.client.GetBlockByHeight(f.ctx, nextHeight)
-		if err != nil {
-			f.logger.Trace().Err(err).Msg("next block is not yet available, retrying")
-			continue
-		}
-		getBlockByHeightDuration := time.Since(getBlockByHeightTime)
-
-		cols, err := f.getAllCollections(block)
-		if err != nil {
-			f.logger.Trace().Err(err).Msg("collections are not yet available, retrying")
+			f.logger.Trace().Err(err).Uint64("next_height", f.Height()+1).Msg("collections are not ready yet")
 			continue
 		}
 
@@ -190,7 +170,6 @@ func (f *txFollowerImpl) run() {
 			Hex("blockID", block.ID.Bytes()).
 			Dur("timeSinceLastBlockInMS", time.Since(lastBlockTime)).
 			Dur("timeToParseBlockInMS", time.Since(blockResolutionStart)).
-			Dur("timeToGetBlockByHeightInMS", getBlockByHeightDuration).
 			Int("numCollections", len(block.CollectionGuarantees)).
 			Int("numSeals", len(block.Seals)).
 			Uint64("txsTotal", totalTxs).
@@ -204,6 +183,33 @@ func (f *txFollowerImpl) run() {
 
 		lastBlockTime = time.Now()
 	}
+}
+
+func (f *txFollowerImpl) pollCollections() (*flowsdk.Block, []flowsdk.Collection, error) {
+	ctx, cancel := context.WithTimeout(f.ctx, 10*time.Second)
+	defer cancel()
+
+	hdr, err := f.client.GetLatestBlockHeader(ctx, true)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get latest block header: %w", err)
+	}
+
+	nextHeight := f.Height() + 1
+	if hdr.Height < nextHeight {
+		return nil, nil, fmt.Errorf("expected block is not yet sealed: want %d, got %d", nextHeight, hdr.Height)
+	}
+
+	block, err := f.client.GetBlockByHeight(ctx, nextHeight)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get block by height: %w", err)
+	}
+
+	cols, err := f.getAllCollections(ctx, block)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get collections: %w", err)
+	}
+
+	return block, cols, nil
 }
 
 // Follow returns a channel that will be closed when the transaction is completed.
