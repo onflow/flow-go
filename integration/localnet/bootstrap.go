@@ -191,7 +191,7 @@ func prepareCommonHostFolders() {
 			panic(err)
 		}
 
-		if err := os.Mkdir(dir, 0777); err != nil {
+		if err := os.Mkdir(dir, 0755); err != nil {
 			panic(err)
 		}
 	}
@@ -300,7 +300,7 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 		dataDir = "./" + filepath.Join(DataDir, role, nodeId)
 	}
 
-	err := os.MkdirAll(dataDir, 0777)
+	err := os.MkdirAll(dataDir, 0755)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
@@ -310,7 +310,7 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 	if nodeId != "" {
 		profilerDir = "./" + filepath.Join(ProfilerDir, role, nodeId)
 	}
-	err = os.MkdirAll(profilerDir, 0777)
+	err = os.MkdirAll(profilerDir, 0755)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
@@ -401,7 +401,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 
 	// create the execution state dir for the node
 	trieDir := "./" + filepath.Join(TrieDir, container.Role.String(), container.NodeID.String())
-	err := os.MkdirAll(trieDir, 0777)
+	err := os.MkdirAll(trieDir, 0755)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
