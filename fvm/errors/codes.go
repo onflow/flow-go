@@ -22,7 +22,8 @@ const (
 	FailureCodeStateMergeFailure  ErrorCode = 2003
 	FailureCodeBlockFinderFailure ErrorCode = 2004
 	// Deprecated: No longer used.
-	FailureCodeHasherFailure ErrorCode = 2005
+	FailureCodeHasherFailure                           ErrorCode = 2005
+	FailureCodeParseRestrictedModeInvalidAccessFailure ErrorCode = 2006
 	// Deprecated: No longer used.
 	FailureCodeMetaTransactionFailure ErrorCode = 2100
 )
@@ -47,6 +48,7 @@ const (
 	ErrCodeInvalidEnvelopeSignatureError ErrorCode = 1009
 
 	// base errors 1050 - 1100
+	// Deprecated: No longer used.
 	ErrCodeFVMInternalError            ErrorCode = 1050
 	ErrCodeValueError                  ErrorCode = 1051
 	ErrCodeInvalidArgumentError        ErrorCode = 1052

@@ -15,6 +15,13 @@ import (
 // In order to optimize equally for unforgeability and robustness,
 // the input threshold value (t) should be set to t = floor((n-1)/2).
 
+const (
+	// ThresholdSignMinSize is the minimum size of a group participating in a threshold signature protocol
+	ThresholdSignMinSize = MinimumThreshold + 1
+	// ThresholdSignMaxSize is the maximum size of a group participating in a threshold signature protocol
+	ThresholdSignMaxSize = DKGMaxSize
+)
+
 // ThresholdSignatureInspector is an inspector of the threshold signature protocol.
 // The interface only allows inspecting the threshold signing protocol without taking part in it.
 type ThresholdSignatureInspector interface {
@@ -83,8 +90,8 @@ type ThresholdSignatureInspector interface {
 	// Returns:
 	// - (signature, nil) if no error occurred
 	// - (nil, notEnoughSharesError) if not enough shares were collected
-	// - (nil, invalidInputsError) if at least one collected share does not serialize to a valid BLS signature,
-	//    or if the constructed signature failed to verify against the group public key and stored message. This post-verification
+	// - (nil, invalidSignatureError) if at least one collected share does not serialize to a valid BLS signature.
+	// - (nil, invalidInputsError) if the constructed signature failed to verify against the group public key and stored message. This post-verification
 	//    is required  for safety, as `TrustedAdd` allows adding invalid signatures.
 	// - (nil, error) for any other unexpected error.
 	ThresholdSignature() (Signature, error)

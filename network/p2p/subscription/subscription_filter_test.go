@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
@@ -109,15 +110,16 @@ func TestFilterSubscribe(t *testing.T) {
 // TestCanSubscribe tests that the subscription filter blocks a node from subscribing
 // to channel that its role shouldn't subscribe to
 func TestCanSubscribe(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
 	identity, privateKey := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 	sporkId := unittest.IdentifierFixture()
 
 	collectionNode := p2pfixtures.CreateNode(t, identity.NodeID, privateKey, sporkId, zerolog.Nop(), p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
-	defer func() {
-		done, err := collectionNode.Stop()
-		require.NoError(t, err)
-		unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop collection node on time")
-	}()
+
+	p2pfixtures.StartNode(t, signalerCtx, collectionNode, 100*time.Millisecond)
+	defer p2pfixtures.StopNode(t, collectionNode, cancel, 1*time.Second)
 
 	logger := unittest.Logger()
 	topicValidator := flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
