@@ -3,11 +3,14 @@
         - --datadir=/data/protocol
         - --secretsdir=/data/secret
         - --loglevel=INFO
-        - --bind=0.0.0.0:3569
         - --profiler-enabled=false
         - --profile-uploader-enabled=false
         - --tracer-enabled=false
         - --profiler-dir=/profiler
         - --profiler-interval=2m
-        - --nodeid=REPLACE_NODE_ID
-        - --chunk-alpha=1
+        - --bind=0.0.0.0:3569
+        - --nodeid={{.NodeID}}
+        - --triedir=/trie
+        - --rpc-addr=0.0.0.0:9000
+        - --cadence-tracing=false
+        - --extensive-tracing=false

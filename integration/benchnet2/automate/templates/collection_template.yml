@@ -9,7 +9,7 @@
         - --bind=0.0.0.0:3569
         - --profiler-dir=/profiler
         - --profiler-interval=2m
-        - --nodeid=REPLACE_NODE_ID
+        - --nodeid={{.NodeID}}
         - --block-rate-delay=950ms
         - --hotstuff-timeout=2.15s
         - --hotstuff-min-timeout=2.15s

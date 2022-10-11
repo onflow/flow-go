@@ -9,7 +9,7 @@
         - "--profiler-dir=/profiler"
         - "--profiler-interval=2m"
         - "--bind=0.0.0.0:3569"
-        - "--nodeid=REPLACE_NODE_ID"
+        - "--nodeid={{.NodeID}}"
         - "--rpc-addr=0.0.0.0:9000"
         - "--secure-rpc-addr=0.0.0.0:9001"
         - "--http-addr=0.0.0.0:8000"

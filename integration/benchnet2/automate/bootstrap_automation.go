@@ -97,7 +97,7 @@ func GenerateValuesYaml(nodeConfig map[string]int) {
 	generateValuesYaml(nodeConfig, "templates")
 }
 
-func generateValuesYaml(nodeConfig map[string]int, path string) {
+func generateValuesYaml(nodeConfig map[string]int, templatePath string, inputPath string) {
 	nodesData := loadNodeJsonData()
 
 	values := createFile("values.yml")

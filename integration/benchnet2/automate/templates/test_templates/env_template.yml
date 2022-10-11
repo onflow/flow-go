@@ -1,0 +1,3 @@
+      env_template:
+      image: {{.ImageTag}}
+      nodeId: {{.NodeID}}

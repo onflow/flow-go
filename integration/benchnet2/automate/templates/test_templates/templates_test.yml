@@ -13,5 +13,5 @@
           value: ""
         - name: BINSTAT_DMP_PATH
           value: ""
-      image: REPLACE_IMAGE
-      nodeId: REPLACE_NODE_ID
+      image: {{.ImageTag}}
+      nodeId: {{.NodeID}}

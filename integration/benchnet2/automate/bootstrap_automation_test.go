@@ -1,6 +1,7 @@
 package automate
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 	"text/template"
@@ -55,18 +56,21 @@ func TestLoadString(t *testing.T) {
 }
 
 func TestSubString(t *testing.T) {
+	fmt.Println("Starting templates test")
 	var replacements Replacement
 	replacements.NodeID = "abc123"
 	replacements.ImageTag = "v0.27-1234"
 	original := textReader("templates/test_templates/templates_test.yml")
-	newString := ""
+	var doc bytes.Buffer
 
 	template_string, err := template.New("todos").Parse(original)
 	if err != nil {
 		panic(err)
 	}
-	err = template_string.Execute(newString, replacements)
+	err = template_string.Execute(&doc, replacements)
 	if err != nil {
 		panic(err)
 	}
+	s := doc.String()
+	fmt.Println(s)
 }

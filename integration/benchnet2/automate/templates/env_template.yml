@@ -13,5 +13,5 @@
           value: ""
         - name: BINSTAT_DMP_PATH
           value: ""
-      image: {{ImageTag}}
-      nodeId: {{NodeID}}
+      image: {{.ImageTag}}
+      nodeId: {{.NodeID}}
