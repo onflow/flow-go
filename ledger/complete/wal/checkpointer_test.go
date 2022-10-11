@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"os"
 	"path"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -537,15 +536,10 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 
 		someHash := updatedTrie.RootNode().LeftChild().Hash() // Hash of left child
 
-		file, err := os.CreateTemp(dir, "temp-checkpoint")
-		require.NoError(t, err)
-		fullpath := file.Name()
-		_, fileName := filepath.Split(fullpath)
+		fullpath := path.Join(dir, "temp-checkpoint")
 
-		err = realWAL.StoreCheckpoint(dir, fileName, &logger, updatedTrie)
+		err = realWAL.StoreCheckpoint(dir, "temp-checkpoint", &logger, updatedTrie)
 		require.NoError(t, err)
-
-		file.Close()
 
 		t.Run("works without data modification", func(t *testing.T) {
 			logger := zerolog.Nop()
