@@ -97,3 +97,9 @@ tps-test-ci:
 	make start-thin
 	go run --tags relic ../benchmark/cmd/ci -tps 1
 	make stop
+
+.PHONY: clean-data
+clean-data:
+	docker build -t environment-clean ../../cmd
+	docker run --mount=type=bind,source"$(pwd)"/data,target=/data environment-clean chmod -R 777 /data
+	rm -rf ./data
