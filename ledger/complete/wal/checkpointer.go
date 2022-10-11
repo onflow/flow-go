@@ -287,7 +287,12 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 // as for each node, the children have been previously encountered.
 // TODO: evaluate alternatives to CRC32 since checkpoint file is many GB in size.
 // TODO: add concurrency if the performance gains are enough to offset complexity.
-func StoreCheckpoint(dir string, fileName string, logger *zerolog.Logger, tries ...*trie.MTrie) error {
+func StoreCheckpoint(dir string, fileName string, logger *zerolog.Logger, tries ...*trie.MTrie) (
+	// error
+	// Note, the above code, which didn't define the name "err" for the returned error, would be wrong,
+	// beause err needs to be defined in order to be updated by the defer function
+	err error,
+) {
 	writer, err := CreateCheckpointWriterForFile(dir, fileName, logger)
 	if err != nil {
 		return fmt.Errorf("could not create writer: %w", err)
@@ -301,6 +306,7 @@ func StoreCheckpoint(dir string, fileName string, logger *zerolog.Logger, tries 
 		if closeError != nil {
 			errs = multierror.Append(errs, closeError)
 		}
+		// update the returned err
 		err = errs.ErrorOrNil()
 	}()
 
@@ -486,7 +492,7 @@ func StoreCheckpoint(dir string, fileName string, logger *zerolog.Logger, tries 
 		return fmt.Errorf("cannot write CRC32: %w", err)
 	}
 
-	return err // to be updated by defer function
+	return nil
 }
 
 // storeUniqueNodes iterates and serializes unique nodes for trie with given root node.
