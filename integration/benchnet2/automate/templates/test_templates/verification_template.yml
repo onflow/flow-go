@@ -1,1 +1,1 @@
-      verification_template={{.NodeID}}
+      verification_template: {{.NodeID}}

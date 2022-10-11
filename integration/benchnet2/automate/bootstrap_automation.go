@@ -1,13 +1,14 @@
 package automate
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
-	"strings"
 )
 
 // User struct which contains a name
@@ -21,27 +22,32 @@ type Node struct {
 	StakingPubKey string `json:"StakingPubKey"`
 }
 
-var ACCESS_TEMPLATE string = "access_template.yml"
-var COLLECTION_TEMPLATE string = "collection_template.yml"
-var CONSENSUS_TEMPLATE string = "consensus_template.yml"
-var EXECUTION_TEMPLATE string = "execution_template.yml"
-var VERIFICATION_TEMPLATE string = "verification_template.yml"
-var RESOURCES_TEMPLATE string = "resources_template.yml"
-var ENV_TEMPLATE string = "nv_template.yml"
+type ReplacementData struct {
+	NodeID   string
+	ImageTag string
+}
+
+var DEFAULT_NODE_INFO_PATH = "../bootstrap/public-root-information/node-infos.pub.json"
+
+var ACCESS_TEMPLATE string = "/access_template.yml"
+var COLLECTION_TEMPLATE string = "/collection_template.yml"
+var CONSENSUS_TEMPLATE string = "/consensus_template.yml"
+var EXECUTION_TEMPLATE string = "/execution_template.yml"
+var VERIFICATION_TEMPLATE string = "/verification_template.yml"
+var RESOURCES_TEMPLATE string = "/resources_template.yml"
+var ENV_TEMPLATE string = "/env_template.yml"
 var TEMPLATE_PATH string = "templates/"
 
 var VALUES_HEADER string = "branch: fake-branch\n# Commit must be a string\ncommit: \"123456\"\n\ndefaults: {}\n"
 
-var ACCESS_IMAGE string = "gcr.io/flow-container-registry/access:v0.27.6"
-var COLLECTION_IMAGE string = "gcr.io/flow-container-registry/collection:v0.27.6"
-var CONSENSUS_IMAGE string = "gcr.io/flow-container-registry/consensus:v0.27.6"
-var EXECUTION_IMAGE string = "gcr.io/flow-container-registry/execution:v0.27.6"
-var VERIFICATION_IMAGE string = "gcr.io/flow-container-registry/verification:v0.27.6"
+var DEFAULT_ACCESS_IMAGE string = "gcr.io/flow-container-registry/access:v0.27.6"
+var DEFAULT_COLLECTION_IMAGE string = "gcr.io/flow-container-registry/collection:v0.27.6"
+var DEFAULT_CONSENSUS_IMAGE string = "gcr.io/flow-container-registry/consensus:v0.27.6"
+var DEFAULT_EXECUTION_IMAGE string = "gcr.io/flow-container-registry/execution:v0.27.6"
+var DEFAULT_VERIFICATION_IMAGE string = "gcr.io/flow-container-registry/verification:v0.27.6"
 
-func loadNodeJsonData() map[string]Node {
-	var node_info_path = "../bootstrap/public-root-information/node-infos.pub.json"
-
-	jsonFile, err := os.Open(node_info_path)
+func loadNodeJsonData(nodeInfoPath string) map[string]Node {
+	jsonFile, err := os.Open(nodeInfoPath)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -61,11 +67,6 @@ func loadNodeJsonData() map[string]Node {
 	}
 
 	return nodeMap
-}
-
-func replaceStrings(template string, target string, replacement string) string {
-	updated := strings.ReplaceAll(template, target, replacement)
-	return updated
 }
 
 func textReader(path string) string {
@@ -93,83 +94,111 @@ func createFile(filename string) *os.File {
 	return file
 }
 
-func GenerateValuesYaml(nodeConfig map[string]int) {
-	generateValuesYaml(nodeConfig, "templates")
-}
+func GenerateValuesYaml(nodeConfig map[string]int, jsonDataFilePath string, templatePath string, outputPath string) {
+	var nodesData map[string]Node
+	var templateFolder string
+	if jsonDataFilePath == "" {
+		nodesData = loadNodeJsonData(DEFAULT_NODE_INFO_PATH)
+	} else {
+		nodesData = loadNodeJsonData(jsonDataFilePath)
+	}
 
-func generateValuesYaml(nodeConfig map[string]int, templatePath string, inputPath string) {
-	nodesData := loadNodeJsonData()
+	if templatePath == "" {
+		templateFolder = TEMPLATE_PATH
+	} else {
+		templateFolder = templatePath
+	}
 
-	values := createFile("values.yml")
+	valuesFilePath := outputPath + "/values.yml"
+	values := createFile(valuesFilePath)
+	log.Printf("Values file created at %s", outputPath)
 
-	resources := textReader(RESOURCES_TEMPLATE)
-	env := textReader(ENV_TEMPLATE)
+	envTemplate := createTemplate(templateFolder + ENV_TEMPLATE)
+	resources := textReader(templateFolder + RESOURCES_TEMPLATE)
+
 	yamlWriter(values, VALUES_HEADER)
 
 	yamlWriter(values, "access:\n")
 	yamlWriter(values, resources)
 
-	access_data := textReader(ACCESS_TEMPLATE)
+	accessTemplate := createTemplate(templateFolder + ACCESS_TEMPLATE)
 	for i := 1; i <= nodeConfig["access"]; i++ {
 		name := fmt.Sprint("access", i)
-		nodeId := nodesData[name].NodeID
+		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_ACCESS_IMAGE}
 
-		writeNodeData(values, name, env, nodeId, ACCESS_IMAGE, access_data)
+		writeNodeData(values, name, envTemplate, accessTemplate, replacementData)
 	}
 
 	yamlWriter(values, "collection:\n")
 	yamlWriter(values, resources)
 
-	collection_data := textReader(COLLECTION_TEMPLATE)
+	collectionTemplate := createTemplate(templateFolder + COLLECTION_TEMPLATE)
 	for i := 1; i <= nodeConfig["collection"]; i++ {
 		name := fmt.Sprint("collection", i)
-		nodeId := nodesData[name].NodeID
+		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_COLLECTION_IMAGE}
 
-		writeNodeData(values, name, env, nodeId, COLLECTION_IMAGE, collection_data)
+		writeNodeData(values, name, envTemplate, collectionTemplate, replacementData)
 	}
 
 	yamlWriter(values, "consensus:\n")
 	yamlWriter(values, resources)
 
-	consensus_data := textReader(CONSENSUS_TEMPLATE)
+	consensusTemplate := createTemplate(templateFolder + CONSENSUS_TEMPLATE)
 	for i := 1; i <= nodeConfig["consensus"]; i++ {
 		name := fmt.Sprint("consensus", i)
-		nodeId := nodesData[name].NodeID
+		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_CONSENSUS_IMAGE}
 
-		writeNodeData(values, name, env, nodeId, CONSENSUS_IMAGE, consensus_data)
+		writeNodeData(values, name, envTemplate, consensusTemplate, replacementData)
 	}
 
 	yamlWriter(values, "execution:\n")
 	yamlWriter(values, resources)
 
-	execution_data := textReader(EXECUTION_TEMPLATE)
+	executionTemplate := createTemplate(templateFolder + EXECUTION_TEMPLATE)
 	for i := 1; i <= nodeConfig["execution"]; i++ {
 		name := fmt.Sprint("execution", i)
-		nodeId := nodesData[name].NodeID
+		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_EXECUTION_IMAGE}
 
-		writeNodeData(values, name, env, nodeId, EXECUTION_IMAGE, execution_data)
+		writeNodeData(values, name, envTemplate, executionTemplate, replacementData)
 	}
 
 	yamlWriter(values, "verification:\n")
 	yamlWriter(values, resources)
 
-	verification_data := textReader(VERIFICATION_TEMPLATE)
+	verificationTemplate := createTemplate(templateFolder + VERIFICATION_TEMPLATE)
 	for i := 1; i <= nodeConfig["verification"]; i++ {
 		name := fmt.Sprint("verification", i)
-		nodeId := nodesData[name].NodeID
+		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_VERIFICATION_IMAGE}
 
-		writeNodeData(values, name, env, nodeId, VERIFICATION_IMAGE, verification_data)
+		writeNodeData(values, name, envTemplate, verificationTemplate, replacementData)
 	}
 
 	values.Close()
 }
 
-func writeNodeData(file *os.File, name string, env string, nodeId string, image string, data string) {
-	replacedData := replaceStrings(data, "REPLACE_NODE_ID", nodeId)
-	replacedEnv := replaceStrings(env, "REPLACE_NODE_ID", nodeId)
-	replacedEnv = replaceStrings(replacedEnv, "REPLACE_IMAGE", image)
+func writeNodeData(file *os.File, name string, envTemplate *template.Template, data *template.Template, replacementData ReplacementData) {
+	replacedData := replaceTemplateData(data, replacementData)
+	replacedEnv := replaceTemplateData(envTemplate, replacementData)
 
 	yamlWriter(file, "    "+name+":\n")
 	yamlWriter(file, replacedData)
 	yamlWriter(file, replacedEnv)
+}
+
+func replaceTemplateData(template *template.Template, data ReplacementData) string {
+	var doc bytes.Buffer
+	err := template.Execute(&doc, data)
+	if err != nil {
+		panic(err)
+	}
+	return doc.String()
+}
+
+func createTemplate(templatePath string) *template.Template {
+	template, err := template.New("todos").Parse(textReader(templatePath))
+	if err != nil {
+		panic(err)
+	}
+
+	return template
 }

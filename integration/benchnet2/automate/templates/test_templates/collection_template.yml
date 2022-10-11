@@ -1,1 +1,1 @@
-      collection_template={{.NodeID}}
+      collection_template: {{.NodeID}}

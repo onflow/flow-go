@@ -1,0 +1,114 @@
+[
+  {
+    "Role": "access",
+    "Address": "access2.leon-yu:3569",
+    "NodeID": "access2",
+    "Weight": 1000,
+    "NetworkPubKey": "69034f242d1de57d9f89af04b7d1fd1c8ba60fc88f19b43b9532e560f266e185de4b80d0555429ccf8c4aedb9862f79baee645fdc360d44ea0657aaf4bb84644",
+    "StakingPubKey": "b9c746cae034e24d59248a9db97edc5f961e2909650b7dbf9a01350f1a4fcc344114838aa89c772a8631aea0c6dfe0940888e8ceb21b3639ba7a97d2cc5c843aef60d181e2b5a49ed2e35126e71f02d3972687746cfda39ebb47fb0fb91c4e85"
+  },
+  {
+    "Role": "collection",
+    "Address": "collection1.leon-yu:3569",
+    "NodeID": "collection1",
+    "Weight": 1000,
+    "NetworkPubKey": "42dab0c63a3b9052f00b722a743099e02662882fedbe2f21ce3fde5f21f51e61476b9f871367b2a43058da3a6b319a40e5af9f62f55b525d4079fa98b43e2bff",
+    "StakingPubKey": "80a8d615b176df85cca778d9974789f7cda2834d1e514724bf3cc56166fb29043463542b821ed9965ee38a5ab5d55231158a11c2f68342eb3dfd3a5846394b601100a5753d80a87070c535609191abacd74264286f461e411b738562861caae4"
+  },
+  {
+    "Role": "collection",
+    "Address": "collection2.leon-yu:3569",
+    "NodeID": "collection2",
+    "Weight": 1000,
+    "NetworkPubKey": "44d47c6fd496788b24a6a3bcf6cbe8c7f01baa744d79052de20cdb33ee54748669c298bfae93c0456c21a7cdddfb6f49f69ff8682aad6024bcb8059465019135",
+    "StakingPubKey": "8eacbd2b4b6f4bc17e688cbe3310f82428905aefa63fa573729cfe9b3bc1518d27e39c0c9d5e0fb1304ce342e82e6e9f1150bda8d7ddc04ac48be6686e0d1ad7f89e63988a1500fd15b3c72c80d001e0b631824845199027e2c89f19b35e808c"
+  },
+  {
+    "Role": "collection",
+    "Address": "collection3.leon-yu:3569",
+    "NodeID": "collection3",
+    "Weight": 1000,
+    "NetworkPubKey": "c4d2b9011b17d626b77a148a9841ada7a1aa5299dbc26f3aca36708d3e7e5ef4d4b0953a15afb3d88569b59b2f650dea41e3ce29436aedcfec3a77907e2656cb",
+    "StakingPubKey": "884f07fd9de198ecca24f6eef41bc4fa64e0f42b3f305396a4b512a86c77ce37f77c1463cca8a9d840073473f56065e5131a479120fc1aa56581057d1116c5bbfb9452f69f303ec20b241fc718f81152b9c0017a5d9e06e09b07fe81d2db9875"
+  },
+  {
+    "Role": "collection",
+    "Address": "collection4.leon-yu:3569",
+    "NodeID": "collection4",
+    "Weight": 1000,
+    "NetworkPubKey": "bb1a6b7070d70902ab8e9429bdcb530de749e569e447e67f5312c7e7258878fd2a2dd96ce41576e8709f4fa978ee6a7d0dfa430a6c30102b4446a0d32dd28b57",
+    "StakingPubKey": "b6551182bf8d893bfe02d6dafd9543ced4d93965fcd1b7db754ba3cb3b641c7b3788e57a1e4bc8d71bba41f4801ba04413c27d1db5b0ce3d6a6efd2cacc68a28b91abfa58757cbaa949142eedb3d9690361d5571a86314bdf4ca2db416f2d215"
+  },
+  {
+    "Role": "collection",
+    "Address": "collection5.leon-yu:3569",
+    "NodeID": "collection5",
+    "Weight": 1000,
+    "NetworkPubKey": "77af53efa34f86c496909c5a1523f192deab3517c34ad28fae408ea41762238ebc954db3f87a9ca2c30e358ac035d15ea9be62b681c0ebf78c65859576b9efa9",
+    "StakingPubKey": "b6ebf101f138a81951a823684e0dff2a5cba131c9bf27e68470bef5eecb8c5915b5742ec0e8ee026ffcfc6778c911a82081b614b20cba9843be4aa0131492937cff6f61ea332c8b07dc60b5c8b25774993515e1018ac156f075831189477ed94"
+  },
+  {
+    "Role": "collection",
+    "Address": "collection6.leon-yu:3569",
+    "NodeID": "44696574657220536869726c657900cef32ec5203ab585ae144b0d368c89e9af",
+    "Weight": 1000,
+    "NetworkPubKey": "7fffceefc7e1366bec62eb733c95819295cd65e072f7f7a6ec4157061fab1e920f42e47f4658cb76002d5e4f3ba6e0883e662da855d407109bd7997c377d1bfe",
+    "StakingPubKey": "9952c55dfffabd4e7b2a671873b984ca7b97919ed59b2ba5933a3d75c246169f7030e4bfa1a034a066d4b3225d59340c02dd8155ca1f4209480e1950ecefdd3318d4fc688bb30994ce78ec9c58657156f3e63400a8fd5b355f7281df0ca81aa2"
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus1.leon-yu:3569",
+    "NodeID": "consensus1",
+    "Weight": 1000,
+    "NetworkPubKey": "6c59f0744c468e4480efc18bc142fe0d45da87e33a206ab7de9ff7c36e8a237660237bbae9203a6e5894592dc95930f99ad98bdd48871784fff7d5a689c76975",
+    "StakingPubKey": "857e6086e273829715a41fe2a70362c712f1cc35dccbb041734b36e74e59986481027c50e65f6f60cc5ba171a8554f8a06340cd2b16f61fde2baac524791876a23e67c13716350de99c83fe376e27dd538d52db6ca1b37889a7778c0c667cb23"
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus2.leon-yu:3569",
+    "NodeID": "consensus2",
+    "Weight": 1000,
+    "NetworkPubKey": "4baaaf26e45ba3ee0e0a92153267cbb5020148eea720ef90434f7a44afc6367fb89d3ac410b4ac6d4e63cbd140bc840ae814c244f95daa3f4b9df7fecec28ca4",
+    "StakingPubKey": "b84517b364203df6e5524872c2efc421323f23a3c155c8b4a1d2f3acc8a91697da98ed22df1f45a2c45a3af26ddff67e14aa39332cfdc85aff9937044e02765f5e5155f429c56c9fc33b63e6aaf109f16e75eebfe9bc2835cbcf5ac6bbde0877"
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus3.leon-yu:3569",
+    "NodeID": "consensus3",
+    "Weight": 1000,
+    "NetworkPubKey": "17fd3d3f847cef47f7794c0fa7554395e32471920ec2cd1c3b0ba4e0ff820371f698d898c9d4ee4d49c5b7c606c3bed1cdb811ae7b16c57a9a405bba07307d88",
+    "StakingPubKey": "85227631339a117f5aa21415a07a83a4f75318d1fa555ec499c437afebb5c942ee4786924f0c0543ebc31c76e4f78b2c0ac8d4902a0d4570913d740824e1b12d76bcff43ecc0c1ee47592055cf2c25707f6a5a49749da6ab3dacc393234fd3ad"
+  },
+  {
+    "Role": "execution",
+    "Address": "execution1.leon-yu:3569",
+    "NodeID": "execution1",
+    "Weight": 1000,
+    "NetworkPubKey": "a265ba6b440855158c6ab79f7f1c519982201e39b78c5ec67dbf3aad40f4bdcc5b533b6d17eb5c091021f4c4f003dbf0fde92e46fec1b26a2e909381e470642b",
+    "StakingPubKey": "81bce55e3b0651f9125c80fb6d1935256936cc05d295f5d5815b127ca4c47142b67985224cec55e8981f3930bbaef8d01790cfb411707cd80d689845c1b41debb27d6b65520ebce9345cede1962d7ab2f4cb2620a54e8d3868ed620fc688a33a"
+  },
+  {
+    "Role": "access",
+    "Address": "access1.leon-yu:3569",
+    "NodeID": "access1",
+    "Weight": 1000,
+    "NetworkPubKey": "5393d39a6c757d378d9fca1114c68b7ede5ec20235771d00292befcc278bde931896bc93b9e0c884fda3f608fd004d04484f3fa724f5542c156c8ed76f355600",
+    "StakingPubKey": "ac167fae529106bcf41bc63158106f84a10f9353782fe1ca0c0a80fb877613a21ef028e1c6304c48f38d902bf841e9a2041e474b8c92661bdc81f23dcd0de127b7853b9331cae585528bfb33b3c7dba3689015c6dbdc7d047ece675d963b631f"
+  },
+  {
+    "Role": "execution",
+    "Address": "execution2.leon-yu:3569",
+    "NodeID": "execution2",
+    "Weight": 1000,
+    "NetworkPubKey": "0c8908b7bfec03cef91a9d6b6291437acd826316ce1a3518d92a40a3bde91990bf8fde7f8755f76c63a1a5aee027581e56db3ba38afa88eb75ffbb2a6f28f111",
+    "StakingPubKey": "adba9efdb185ce162cc9a48a4fd2e2d118483d7ec4e836e6d9bc6095465680d6f2395840fc5096aeb5ac2b940087b87b0d6fbaa08afade13c4fb21ea87df34baff4b3deec0aa3829ce4f2f3430bec8560257572ff503c9f8086743639cd531f5"
+  },
+  {
+    "Role": "verification",
+    "Address": "verification1.leon-yu:3569",
+    "NodeID": "verification1",
+    "Weight": 1000,
+    "NetworkPubKey": "30f2492203fe3d33059d6aad011b9cd344e8e13ec7c5cc9947f4a7b0fbc279def626d6e093842682129c0892306c0141d52b49e4ae5cb39b1c5f990422f2bd2b",
+    "StakingPubKey": "9316b24cce6c92712f85021f21e981195b0922b3379a38f6ceca6cef0d84a0ce8f46ee651cd8c3254e75bc3c47ac64300a8c19aa38460c68644b77761a282ce4bb43678649e5e4843fc454bb72b81869815076410379989599a78edb528eddfa"
+  }
+]

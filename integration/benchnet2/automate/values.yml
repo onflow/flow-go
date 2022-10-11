@@ -1,0 +1,85 @@
+branch: fake-branch
+# Commit must be a string
+commit: "123456"
+
+defaults: {}
+access:
+  defaults:"200m"
+    access1:
+      access_template: access1
+      env_template:
+      image: gcr.io/flow-container-registry/access:v0.27.6
+      nodeId: access1
+    access2:
+      access_template: access2
+      env_template:
+      image: gcr.io/flow-container-registry/access:v0.27.6
+      nodeId: access2
+collection:
+  defaults:"200m"
+    collection1:
+      collection_template: collection1
+      env_template:
+      image: gcr.io/flow-container-registry/collection:v0.27.6
+      nodeId: collection1
+    collection2:
+      collection_template: collection2
+      env_template:
+      image: gcr.io/flow-container-registry/collection:v0.27.6
+      nodeId: collection2
+    collection3:
+      collection_template: collection3
+      env_template:
+      image: gcr.io/flow-container-registry/collection:v0.27.6
+      nodeId: collection3
+    collection4:
+      collection_template: collection4
+      env_template:
+      image: gcr.io/flow-container-registry/collection:v0.27.6
+      nodeId: collection4
+    collection5:
+      collection_template: collection5
+      env_template:
+      image: gcr.io/flow-container-registry/collection:v0.27.6
+      nodeId: collection5
+    collection6:
+      collection_template: 44696574657220536869726c657900cef32ec5203ab585ae144b0d368c89e9af
+      env_template:
+      image: gcr.io/flow-container-registry/collection:v0.27.6
+      nodeId: 44696574657220536869726c657900cef32ec5203ab585ae144b0d368c89e9af
+consensus:
+  defaults:"200m"
+    consensus1:
+      consensus_template: consensus1
+      env_template:
+      image: gcr.io/flow-container-registry/consensus:v0.27.6
+      nodeId: consensus1
+    consensus2:
+      consensus_template: consensus2
+      env_template:
+      image: gcr.io/flow-container-registry/consensus:v0.27.6
+      nodeId: consensus2
+    consensus3:
+      consensus_template: consensus3
+      env_template:
+      image: gcr.io/flow-container-registry/consensus:v0.27.6
+      nodeId: consensus3
+execution:
+  defaults:"200m"
+    execution1:
+      execution_template: execution1
+      env_template:
+      image: gcr.io/flow-container-registry/execution:v0.27.6
+      nodeId: execution1
+    execution2:
+      execution_template: execution2
+      env_template:
+      image: gcr.io/flow-container-registry/execution:v0.27.6
+      nodeId: execution2
+verification:
+  defaults:"200m"
+    verification1:
+      verification_template: verification1
+      env_template:
+      image: gcr.io/flow-container-registry/verification:v0.27.6
+      nodeId: verification1

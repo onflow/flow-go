@@ -1,0 +1,4 @@
+templates_test:
+replacement1: {{.NodeID}}
+replacement2: {{.ImageTag}}
+replacement3: {{.ReplaceThree}}
