@@ -11,6 +11,7 @@ import (
 
 	prometheusWAL "github.com/m4ksio/wal/wal"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -73,7 +74,7 @@ func TestCompactor(t *testing.T) {
 
 		t.Run("creates checkpoints", func(t *testing.T) {
 
-			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
+			wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
 			l, err = NewLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
@@ -184,6 +185,7 @@ func TestCompactor(t *testing.T) {
 					name != "00000010" {
 					err := os.Remove(path.Join(dir, name))
 					require.NoError(t, err)
+					log.Info().Msgf("removed file %v/%v", dir, name)
 				}
 			}
 		})
@@ -194,7 +196,7 @@ func TestCompactor(t *testing.T) {
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
 
-			wal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
+			wal2, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
 			l2, err = NewLedger(wal2, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
