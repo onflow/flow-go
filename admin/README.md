@@ -49,7 +49,7 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-required-approvals-for-sealing", "data": 1}'
 ```
 
-### To get required apporvals for sealing
+### To get required approvals for sealing
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-required-approvals-for-sealing"}'
 ```
