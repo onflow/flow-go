@@ -194,7 +194,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	// unicast stream handler rate limits
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageRateLimit, "unicast-message-rate-limit", 0, "amount of unicast messages that sent by a peer per second")
-	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageBurstLimit, "unicast-message-burst-limit", 0, "amount of unicast messages that can be sent by a peer at one time")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageBurstLimit, "unicast-message-burst-limit", 1, "amount of unicast messages that can be sent by a peer at one time")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthRateLimit, "unicast-bandwidth-rate-limit", 0, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", 0, "bandwidth size in bytes a peer is allowed to send at one time")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastRateLimitLockoutDuration, "unicast-rate-limit-lockout-duration", 10, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
