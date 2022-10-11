@@ -10,15 +10,15 @@ import (
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
-func newTestStateTransaction() *state.StateHolder {
-	return state.NewStateTransaction(
+func newTestTransactionState() *state.TransactionState {
+	return state.NewTransactionState(
 		utils.NewSimpleView(),
 		state.DefaultParameters(),
 	)
 }
 
 func TestUnrestrictedNestedTransactionBasic(t *testing.T) {
-	txn := newTestStateTransaction()
+	txn := newTestTransactionState()
 
 	mainState := txn.MainTransactionId().StateForTestingOnly()
 
@@ -95,7 +95,7 @@ func TestUnrestrictedNestedTransactionBasic(t *testing.T) {
 }
 
 func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
-	txn := newTestStateTransaction()
+	txn := newTestTransactionState()
 
 	mainId := txn.MainTransactionId()
 	mainState := mainId.StateForTestingOnly()
@@ -240,7 +240,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 }
 
 func TestRestartNestedTransaction(t *testing.T) {
-	txn := newTestStateTransaction()
+	txn := newTestTransactionState()
 
 	require.Equal(t, 0, txn.NumNestedTransactions())
 
@@ -293,7 +293,7 @@ func TestRestartNestedTransaction(t *testing.T) {
 }
 
 func TestRestartNestedTransactionWithInvalidId(t *testing.T) {
-	txn := newTestStateTransaction()
+	txn := newTestTransactionState()
 
 	require.Equal(t, 0, txn.NumNestedTransactions())
 
@@ -329,7 +329,7 @@ func TestRestartNestedTransactionWithInvalidId(t *testing.T) {
 }
 
 func TestUnrestrictedCannotCommitParseRestricted(t *testing.T) {
-	txn := newTestStateTransaction()
+	txn := newTestTransactionState()
 
 	loc := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{1, 1, 1}),
@@ -350,7 +350,7 @@ func TestUnrestrictedCannotCommitParseRestricted(t *testing.T) {
 }
 
 func TestUnrestrictedCannotCommitMainTransaction(t *testing.T) {
-	txn := newTestStateTransaction()
+	txn := newTestTransactionState()
 
 	id1, err := txn.BeginNestedTransaction()
 	require.NoError(t, err)
@@ -368,7 +368,7 @@ func TestUnrestrictedCannotCommitMainTransaction(t *testing.T) {
 }
 
 func TestUnrestrictedCannotCommitUnexpectedNested(t *testing.T) {
-	txn := newTestStateTransaction()
+	txn := newTestTransactionState()
 
 	mainId := txn.MainTransactionId()
 
@@ -382,7 +382,7 @@ func TestUnrestrictedCannotCommitUnexpectedNested(t *testing.T) {
 }
 
 func TestParseRestrictedCannotBeginUnrestrictedNestedTransaction(t *testing.T) {
-	txn := newTestStateTransaction()
+	txn := newTestTransactionState()
 
 	loc := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{1, 1, 1}),
@@ -403,7 +403,7 @@ func TestParseRestrictedCannotBeginUnrestrictedNestedTransaction(t *testing.T) {
 }
 
 func TestParseRestrictedCannotCommitUnrestricted(t *testing.T) {
-	txn := newTestStateTransaction()
+	txn := newTestTransactionState()
 
 	loc := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{1, 1, 1}),
@@ -423,7 +423,7 @@ func TestParseRestrictedCannotCommitUnrestricted(t *testing.T) {
 }
 
 func TestParseRestrictedCannotCommitLocationMismatch(t *testing.T) {
-	txn := newTestStateTransaction()
+	txn := newTestTransactionState()
 
 	loc := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{1, 1, 1}),

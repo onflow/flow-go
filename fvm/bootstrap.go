@@ -21,7 +21,7 @@ import (
 // with the default accounts and contracts required by the Flow virtual machine.
 type BootstrapProcedure struct {
 	ctx       Context
-	sth       *state.StateHolder
+	txnState  *state.TransactionState
 	programs  *programs.TransactionPrograms
 	rootBlock *flow.Header
 
@@ -243,21 +243,21 @@ func Bootstrap(
 
 func (b *BootstrapProcedure) Run(
 	ctx Context,
-	sth *state.StateHolder,
+	txnState *state.TransactionState,
 	programs *programs.TransactionPrograms,
 ) error {
 	b.ctx = NewContextFromParent(
 		ctx,
 		WithContractDeploymentRestricted(false))
 	b.rootBlock = flow.Genesis(flow.ChainID(ctx.Chain.String())).Header
-	b.sth = sth
+	b.txnState = txnState
 	b.programs = programs
 
 	// initialize the account addressing state
 	b.accountCreator = environment.NewBootstrapAccountCreator(
-		b.sth,
+		b.txnState,
 		ctx.Chain,
-		environment.NewAccounts(b.sth))
+		environment.NewAccounts(b.txnState))
 
 	service := b.createServiceAccount()
 
@@ -373,7 +373,7 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 		Transaction(
 			blueprints.DeployFungibleTokenContractTransaction(fungibleToken),
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy fungible token contract: %s", txError, err)
@@ -390,7 +390,7 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 				fungibleToken,
 				flowToken),
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy Flow token contract: %s", txError, err)
@@ -410,7 +410,7 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 				flowFees,
 			),
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy fees contract: %s", txError, err)
@@ -431,7 +431,7 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 				service,
 				contract),
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
@@ -449,7 +449,7 @@ func (b *BootstrapProcedure) deployContractAuditVouchers(service flow.Address) {
 				contract,
 				"FlowContractAudits"),
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy contract audit vouchers contract: %s", txError, err)
@@ -463,7 +463,7 @@ func (b *BootstrapProcedure) createMinter(service, flowToken flow.Address) {
 				service,
 				flowToken),
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to create flow token minter: %s", txError, err)
@@ -477,7 +477,7 @@ func (b *BootstrapProcedure) deployDKG(service flow.Address) {
 			blueprints.DeployContractTransaction(service, contract, "FlowDKG"),
 			0,
 		),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy DKG contract: %s", txError, err)
@@ -491,7 +491,7 @@ func (b *BootstrapProcedure) deployQC(service flow.Address) {
 			blueprints.DeployContractTransaction(service, contract, "FlowClusterQC"),
 			0,
 		),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy QC contract: %s", txError, err)
@@ -514,7 +514,7 @@ func (b *BootstrapProcedure) deployIDTableStaking(service, fungibleToken, flowTo
 				b.epochConfig.RewardCut),
 			0,
 		),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy IDTableStaking contract: %s", txError, err)
@@ -542,7 +542,7 @@ func (b *BootstrapProcedure) deployEpoch(service, fungibleToken, flowToken, flow
 			blueprints.DeployEpochTransaction(service, contract, b.epochConfig),
 			0,
 		),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy Epoch contract: %s", txError, err)
@@ -564,7 +564,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 				contract,
 				"FlowServiceAccount"),
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy service account contract: %s", txError, err)
@@ -583,7 +583,7 @@ func (b *BootstrapProcedure) mintInitialTokens(
 				service,
 				initialSupply),
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to mint initial token supply: %s", txError, err)
@@ -607,7 +607,7 @@ func (b *BootstrapProcedure) setupParameters(
 				restrictedAccountCreationEnabled,
 			),
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to setup parameters: %s", txError, err)
@@ -625,7 +625,7 @@ func (b *BootstrapProcedure) setupFees(service, flowFees flow.Address, surgeFact
 				executionEffortCost,
 			),
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to setup fees: %s", txError, err)
@@ -663,7 +663,7 @@ func (b *BootstrapProcedure) setupExecutionEffortWeights(service flow.Address) {
 		Transaction(
 			tb,
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to setup execution effort weights: %s", txError, err)
@@ -687,7 +687,7 @@ func (b *BootstrapProcedure) setupExecutionMemoryWeights(service flow.Address) {
 		Transaction(
 			tb,
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to setup execution memory weights: %s", txError, err)
@@ -705,7 +705,7 @@ func (b *BootstrapProcedure) setExecutionMemoryLimitTransaction(service flow.Add
 		Transaction(
 			tb,
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to setup execution memory limit: %s", txError, err)
@@ -723,7 +723,7 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 				flowToken,
 				feeContract),
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to setup storage for service accounts: %s", txError, err)
@@ -739,7 +739,7 @@ func (b *BootstrapProcedure) setStakingAllowlist(service flow.Address, allowedID
 				allowedIDs,
 			),
 			0),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to set staking allow-list: %s", txError, err)
@@ -760,7 +760,7 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 					nodeAddress),
 				0,
 			),
-			b.sth,
+			b.txnState,
 			b.programs,
 		)
 		panicOnMetaInvokeErrf("failed to setup machine account: %s", txError, err)
@@ -773,7 +773,7 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 				flowToken,
 				nodeAddress),
 				0),
-			b.sth,
+			b.txnState,
 			b.programs,
 		)
 		panicOnMetaInvokeErrf("failed to fund node staking account: %s", txError, err)
@@ -788,7 +788,7 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 				nodeAddress,
 				id),
 				0),
-			b.sth,
+			b.txnState,
 			b.programs,
 		)
 		panicOnMetaInvokeErrf("failed to register node: %s", txError, err)
@@ -803,7 +803,7 @@ func (b *BootstrapProcedure) deployStakingProxyContract(service flow.Address) {
 			blueprints.DeployContractTransaction(service, contract, "StakingProxy"),
 			0,
 		),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy StakingProxy contract: %s", txError, err)
@@ -830,7 +830,7 @@ func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fu
 			blueprints.DeployLockedTokensTransaction(service, contract, publicKeys),
 			0,
 		),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 
@@ -854,7 +854,7 @@ func (b *BootstrapProcedure) deployStakingCollection(service flow.Address, fungi
 			blueprints.DeployContractTransaction(service, contract, "FlowStakingCollection"),
 			0,
 		),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
@@ -875,13 +875,13 @@ func (b *BootstrapProcedure) setContractDeploymentRestrictions(service flow.Addr
 			txBody,
 			0,
 		),
-		b.sth,
+		b.txnState,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
 }
 
-func panicOnMetaInvokeErrf(msg string, txError errors.Error, err error) {
+func panicOnMetaInvokeErrf(msg string, txError errors.CodedError, err error) {
 	if txError != nil {
 		panic(fmt.Sprintf(msg, txError.Error()))
 	}
@@ -909,10 +909,10 @@ func FlowTokenAddress(chain flow.Chain) flow.Address {
 func (b *BootstrapProcedure) invokeMetaTransaction(
 	parentCtx Context,
 	tx *TransactionProcedure,
-	stTxn *state.StateHolder,
+	txnState *state.TransactionState,
 	programs *programs.TransactionPrograms,
 ) (
-	errors.Error,
+	errors.CodedError,
 	error,
 ) {
 	invoker := NewTransactionInvoker()
@@ -923,7 +923,7 @@ func (b *BootstrapProcedure) invokeMetaTransaction(
 		WithTransactionFeesEnabled(false),
 	)
 
-	err := invoker.Process(ctx, tx, stTxn, programs)
+	err := invoker.Process(ctx, tx, txnState, programs)
 	txErr, fatalErr := errors.SplitErrorTypes(err)
 	return txErr, fatalErr
 }

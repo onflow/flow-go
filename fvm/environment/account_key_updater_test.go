@@ -1,7 +1,6 @@
 package environment
 
 import (
-	errors2 "errors"
 	"fmt"
 	"testing"
 	"unicode/utf8"
@@ -51,8 +50,7 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 	err = akh.addEncodedAccountKey(runtime.Address(address), encodedPublicKey)
 	require.Error(t, err)
 
-	err = errors2.Unwrap(err)
-	require.IsType(t, errors.ValueError{}, err)
+	require.True(t, errors.IsValueError(err))
 
 	errorString := err.Error()
 	assert.True(t, utf8.ValidString(errorString))
@@ -79,8 +77,7 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_sign_algo(t *testi
 
 	_, err := NewAccountPublicKey(publicKey, sema.HashAlgorithmSHA2_384, 0, 0)
 
-	err = errors2.Unwrap(err)
-	require.IsType(t, errors.ValueError{}, err)
+	require.True(t, errors.IsValueError(err))
 
 	require.Contains(t, err.Error(), fmt.Sprintf("%d", invalidSignAlgo))
 
@@ -110,8 +107,7 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_hash_algo(t *testi
 
 	_, err := NewAccountPublicKey(publicKey, invalidHashAlgo, 0, 0)
 
-	err = errors2.Unwrap(err)
-	require.IsType(t, errors.ValueError{}, err)
+	require.True(t, errors.IsValueError(err))
 
 	require.Contains(t, err.Error(), fmt.Sprintf("%d", invalidHashAlgo))
 
@@ -139,8 +135,7 @@ func TestNewAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 
 	_, err := NewAccountPublicKey(publicKey, runtime.HashAlgorithmSHA2_256, 0, 0)
 
-	err = errors2.Unwrap(err)
-	require.IsType(t, errors.ValueError{}, err)
+	require.True(t, errors.IsValueError(err))
 
 	errorString := err.Error()
 	assert.True(t, utf8.ValidString(errorString))

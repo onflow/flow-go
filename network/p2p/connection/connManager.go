@@ -27,7 +27,7 @@ type ConnManager struct {
 
 func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics) *ConnManager {
 	cn := &ConnManager{
-		log:         log,
+		log:         log.With().Str("component", "conn_manager").Logger(),
 		NullConnMgr: connmgr.NullConnMgr{},
 		metrics:     metrics,
 		protected:   make(map[peer.ID]map[string]struct{}),

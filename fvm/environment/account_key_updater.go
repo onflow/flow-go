@@ -135,6 +135,82 @@ type AccountKeyUpdater interface {
 	)
 }
 
+type ParseRestrictedAccountKeyUpdater struct {
+	txnState *state.TransactionState
+	impl     AccountKeyUpdater
+}
+
+func NewParseRestrictedAccountKeyUpdater(
+	txnState *state.TransactionState,
+	impl AccountKeyUpdater,
+) ParseRestrictedAccountKeyUpdater {
+	return ParseRestrictedAccountKeyUpdater{
+		txnState: txnState,
+		impl:     impl,
+	}
+}
+
+func (updater ParseRestrictedAccountKeyUpdater) AddEncodedAccountKey(
+	address runtime.Address,
+	publicKey []byte,
+) error {
+	return parseRestrict2Arg(
+		updater.txnState,
+		"AddEncodedAccountKey",
+		updater.impl.AddEncodedAccountKey,
+		address,
+		publicKey)
+}
+
+func (updater ParseRestrictedAccountKeyUpdater) RevokeEncodedAccountKey(
+	address runtime.Address,
+	index int,
+) (
+	[]byte,
+	error,
+) {
+	return parseRestrict2Arg1Ret(
+		updater.txnState,
+		"RevokeEncodedAccountKey",
+		updater.impl.RevokeEncodedAccountKey,
+		address,
+		index)
+}
+
+func (updater ParseRestrictedAccountKeyUpdater) AddAccountKey(
+	address runtime.Address,
+	publicKey *runtime.PublicKey,
+	hashAlgo runtime.HashAlgorithm,
+	weight int,
+) (
+	*runtime.AccountKey,
+	error,
+) {
+	return parseRestrict4Arg1Ret(
+		updater.txnState,
+		"AddAccountKey",
+		updater.impl.AddAccountKey,
+		address,
+		publicKey,
+		hashAlgo,
+		weight)
+}
+
+func (updater ParseRestrictedAccountKeyUpdater) RevokeAccountKey(
+	address runtime.Address,
+	keyIndex int,
+) (
+	*runtime.AccountKey,
+	error,
+) {
+	return parseRestrict2Arg1Ret(
+		updater.txnState,
+		"RevokeAccountKey",
+		updater.impl.RevokeAccountKey,
+		address,
+		keyIndex)
+}
+
 type NoAccountKeyUpdater struct{}
 
 func (NoAccountKeyUpdater) AddEncodedAccountKey(
@@ -181,7 +257,7 @@ type accountKeyUpdater struct {
 	meter  Meter
 
 	accounts Accounts
-	stTxn    *state.StateHolder
+	txnState *state.TransactionState
 	env      Environment
 }
 
@@ -189,14 +265,14 @@ func NewAccountKeyUpdater(
 	tracer *Tracer,
 	meter Meter,
 	accounts Accounts,
-	stTxn *state.StateHolder,
+	txnState *state.TransactionState,
 	env Environment,
 ) *accountKeyUpdater {
 	return &accountKeyUpdater{
 		tracer:   tracer,
 		meter:    meter,
 		accounts: accounts,
-		stTxn:    stTxn,
+		txnState: txnState,
 		env:      env,
 	}
 }
@@ -459,7 +535,7 @@ func (updater *accountKeyUpdater) AddEncodedAccountKey(
 	// TODO do a call to track the computation usage and memory usage
 	//
 	// don't enforce limit during adding a key
-	updater.stTxn.RunWithAllLimitsDisabled(func() {
+	updater.txnState.RunWithAllLimitsDisabled(func() {
 		err = updater.addEncodedAccountKey(address, publicKey)
 	})
 
