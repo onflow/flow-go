@@ -40,7 +40,7 @@ import (
 
 func TestPrograms_TestContractUpdates(t *testing.T) {
 	chain := flow.Mainnet.Chain()
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -191,7 +191,7 @@ func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header
 func TestPrograms_TestBlockForks(t *testing.T) {
 	block := unittest.BlockFixture()
 	chain := flow.Emulator.Chain()
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext(
 		fvm.WithBlockHeader(block.Header),
 		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: &block}}),

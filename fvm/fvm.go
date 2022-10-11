@@ -56,41 +56,14 @@ func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
-	Runtime runtime.Runtime // DEPRECATED.  DO NOT USE.
 }
 
-func NewVM() *VirtualMachine {
+func NewVirtualMachine() *VirtualMachine {
 	return &VirtualMachine{}
 }
 
-// DEPRECATED.  DO NOT USE.
-//
-// TODO(patrick): remove after emulator is updated.
-//
-// Emulator is a special snowflake which prevents fvm from every changing its
-// APIs (integration test uses a pinned version of the emulator, which in turn
-// uses a pinned non-master version of flow-go).  This method is expose to break
-// the ridiculous circular dependency between the two builds.
-func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
-	return &VirtualMachine{
-		Runtime: rt,
-	}
-}
-
-// DEPRECATED.  DO NOT USE.
-//
-// TODO(patrick): remove after emulator is updated
-//
 // Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, _ *programs.Programs) (err error) {
-	return vm.RunV2(ctx, proc, v)
-}
-
-// TODO(patrick): rename back to Run after emulator is fully updated (this
-// takes at least 3 sporks ...).
-//
-// Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) RunV2(
+func (vm *VirtualMachine) Run(
 	ctx Context,
 	proc Procedure,
 	v state.View,
@@ -171,18 +144,8 @@ func (vm *VirtualMachine) RunV2(
 	return proc.Run(ctx, txnState, txnPrograms)
 }
 
-// DEPRECATED. DO NOT USE
-//
-// TODO(patrick): remove after emulator is updated
-func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
-	return vm.GetAccountV2(ctx, address, v)
-}
-
-// TODO(patrick): rename back to GetAccount after emulator is fully updated
-// (this takes at least 3 sporks ...).
-//
-// GetAccountV2 returns an account by address or an error if none exists.
-func (vm *VirtualMachine) GetAccountV2(
+// GetAccount returns an account by address or an error if none exists.
+func (vm *VirtualMachine) GetAccount(
 	ctx Context,
 	address flow.Address,
 	v state.View,

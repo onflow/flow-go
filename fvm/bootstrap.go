@@ -881,7 +881,7 @@ func (b *BootstrapProcedure) setContractDeploymentRestrictions(service flow.Addr
 	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
 }
 
-func panicOnMetaInvokeErrf(msg string, txError errors.Error, err error) {
+func panicOnMetaInvokeErrf(msg string, txError errors.CodedError, err error) {
 	if txError != nil {
 		panic(fmt.Sprintf(msg, txError.Error()))
 	}
@@ -912,7 +912,7 @@ func (b *BootstrapProcedure) invokeMetaTransaction(
 	txnState *state.TransactionState,
 	programs *programs.TransactionPrograms,
 ) (
-	errors.Error,
+	errors.CodedError,
 	error,
 ) {
 	invoker := NewTransactionInvoker()

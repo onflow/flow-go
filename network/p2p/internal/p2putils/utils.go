@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 

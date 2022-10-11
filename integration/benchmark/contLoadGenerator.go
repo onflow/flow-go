@@ -313,13 +313,18 @@ func (lg *ContLoadGenerator) SetTPS(desired uint) error {
 	currentTPS := len(lg.workers)
 	diff := int(desired) - currentTPS
 
+	var err error
 	switch {
 	case diff > 0:
-		return lg.startWorkers(diff)
+		err = lg.startWorkers(diff)
 	case diff < 0:
-		return lg.stopWorkers(-diff)
+		err = lg.stopWorkers(-diff)
 	}
-	return nil
+
+	if err == nil {
+		lg.loaderMetrics.SetTPSConfigured(desired)
+	}
+	return err
 }
 
 func (lg *ContLoadGenerator) Stop() {
