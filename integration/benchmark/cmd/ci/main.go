@@ -64,13 +64,13 @@ const (
 	//
 
 	// desiredInflightPerWorker is the target for the controller.
-	// Steady state value is ~17. Here we set it slightly higher so that the controller
+	// Steady state value is ~17. Here we set it higher so that the controller
 	// constantly pushes the system slightly out of balance to determine its maximum.
-	desiredInflightPerWorker = 22.0
+	desiredInflightPerWorker = 30
 	// proportionalGain is the proportional gain of the controller.  Lower if controller starts to oscillate.
-	proportionalGain = 0.5
+	proportionalGain = 1.0
 	// adjustInterval is the interval between controller updates.  Should be at least 1 RTT of the system, we set it to ~3.
-	adjustInterval = 60 * time.Second
+	adjustInterval = 20 * time.Second
 )
 
 func main() {
