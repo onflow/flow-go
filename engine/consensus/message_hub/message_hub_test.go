@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	consensus "github.com/onflow/flow-go/engine/consensus/mock"
+	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -162,6 +163,58 @@ func (s *MessageHubSuite) TearDownTest() {
 		assert.NoError(s.T(), err)
 	default:
 	}
+}
+
+// TestProcessIncomingMessages tests processing of incoming messages, MessageHub matches messages by type
+// and sends them to other modules which execute business logic.
+func (s *MessageHubSuite) TestProcessIncomingMessages() {
+	var channel channels.Channel
+	originID := unittest.IdentifierFixture()
+	s.Run("to-compliance-engine", func() {
+		block := unittest.BlockFixture()
+		syncedBlockMsg := &events.SyncedBlock{
+			OriginID: originID,
+			Block:    &block,
+		}
+		s.compliance.On("Process", channel, s.myID, syncedBlockMsg).Return(nil).Once()
+		err := s.hub.Process(channel, originID, syncedBlockMsg)
+		require.NoError(s.T(), err)
+
+		blockProposalMsg := &messages.BlockProposal{
+			Header:  block.Header,
+			Payload: block.Payload,
+		}
+		s.compliance.On("Process", channel, s.myID, blockProposalMsg).Return(nil).Once()
+		err = s.hub.Process(channel, originID, blockProposalMsg)
+		require.NoError(s.T(), err)
+	})
+	s.Run("to-vote-aggregator", func() {
+		expectedVote := unittest.VoteFixture(unittest.WithVoteSignerID(originID))
+		msg := &messages.BlockVote{
+			View:    expectedVote.View,
+			BlockID: expectedVote.BlockID,
+			SigData: expectedVote.SigData,
+		}
+		s.voteAggregator.On("AddVote", expectedVote)
+		err := s.hub.Process(channel, originID, msg)
+		require.NoError(s.T(), err)
+	})
+	s.Run("to-timeout-aggregator", func() {
+		expectedTimeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectSignerID(originID))
+		msg := &messages.TimeoutObject{
+			View:       expectedTimeout.View,
+			NewestQC:   expectedTimeout.NewestQC,
+			LastViewTC: expectedTimeout.LastViewTC,
+			SigData:    expectedTimeout.SigData,
+		}
+		s.timeoutAggregator.On("AddTimeout", expectedTimeout)
+		err := s.hub.Process(channel, originID, msg)
+		require.NoError(s.T(), err)
+	})
+	s.Run("unsupported-msg-type", func() {
+		err := s.hub.Process(channel, originID, struct{}{})
+		require.NoError(s.T(), err)
+	})
 }
 
 // TestBroadcastProposalWithDelay tests broadcasting proposals with different inputs

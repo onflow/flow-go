@@ -385,9 +385,9 @@ func (h *MessageHub) BroadcastProposalWithDelay(proposal *flow.Header, delay tim
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *events.SyncedBlock:
-		return h.compliance.Process(channel, originID, message)
+		return h.compliance.Process(channel, h.me.NodeID(), message)
 	case *messages.BlockProposal:
-		return h.compliance.Process(channel, originID, message)
+		return h.compliance.Process(channel, h.me.NodeID(), message)
 	case *messages.BlockVote:
 		v := &model.Vote{
 			View:     msg.View,
