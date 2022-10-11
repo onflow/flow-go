@@ -142,6 +142,7 @@ type ExecutionNode struct {
 	executionDataPruner           *pruner.Pruner
 	executionDataBlobstore        blobs.Blobstore
 	executionDataTracker          tracker.Storage
+	blobserviceDependable         *module.ProxiedReadyDoneAware
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -174,6 +175,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
+		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
@@ -277,8 +279,8 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 		exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
 		exeNode.commits = storage.NewCommits(node.Metrics.Cache, node.DB)
 		exeNode.computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
-		exeNode.collections = storage.NewCollections(node.DB, exeNode.transactions)
 		exeNode.transactions = storage.NewTransactions(node.Metrics.Cache, node.DB)
+		exeNode.collections = storage.NewCollections(node.DB, exeNode.transactions)
 		exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
 
 		// Setting up RetryableUploader for GCP uploader
@@ -367,6 +369,10 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	if err != nil {
 		return nil, fmt.Errorf("failed to register blob service: %w", err)
 	}
+
+	// add blobservice into ReadyDoneAware dependency passed to peer manager
+	// this configures peer manager to wait for the blobservice to be ready before starting
+	exeNode.blobserviceDependable.Init(bs)
 
 	var providerMetrics module.ExecutionDataProviderMetrics = metrics.NewNoopCollector()
 	if node.MetricsEnabled {
@@ -528,6 +534,12 @@ func (exeNode *ExecutionNode) LoadExecutionDataDatastore(
 	}
 	exeNode.executionDataDatastore = ds
 	exeNode.builder.ShutdownFunc(ds.Close)
+	return nil
+}
+
+func (exeNode *ExecutionNode) LoadBlobservicePeerManagerDependencies(node *NodeConfig) error {
+	exeNode.blobserviceDependable = module.NewProxiedReadyDoneAware()
+	exeNode.builder.PeerManagerDependencies.Add(exeNode.blobserviceDependable)
 	return nil
 }
 
@@ -914,7 +926,7 @@ func getContractEpochCounter(vm computer.VirtualMachine, vmCtx fvm.Context, view
 	script := fvm.Script(scriptCode)
 
 	// execute the script
-	err = vm.RunV2(vmCtx, script, view)
+	err = vm.Run(vmCtx, script, view)
 	if err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, internal error while executing script: %w", err)
 	}

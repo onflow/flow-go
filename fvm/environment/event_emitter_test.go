@@ -161,9 +161,13 @@ func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, e
 		environment.NewTracer(environment.DefaultTracerParams()),
 		environment.NewMeter(stTxn),
 		chain.Chain(),
-		flow.ZeroID,
-		0,
-		address,
+		environment.TransactionInfoParams{
+			TxId:    flow.ZeroID,
+			TxIndex: 0,
+			TxBody: &flow.TransactionBody{
+				Payer: address,
+			},
+		},
 		environment.EventEmitterParams{
 			ServiceEventCollectionEnabled: false,
 			EventCollectionByteSizeLimit:  eventEmitLimit,

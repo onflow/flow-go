@@ -71,7 +71,7 @@ type ComputationConfig struct {
 	ScriptExecutionTimeLimit time.Duration
 
 	// When NewCustomVirtualMachine is nil, the manager will create a standard
-	// fvm virtual machine via fvm.NewVM.  Otherwise, the manager
+	// fvm virtual machine via fvm.NewVirtualMachine.  Otherwise, the manager
 	// will create a virtual machine using this function.
 	//
 	// Note that this is primarily used for testing.
@@ -114,7 +114,7 @@ func New(
 	if params.NewCustomVirtualMachine != nil {
 		vm = params.NewCustomVirtualMachine()
 	} else {
-		vm = fvm.NewVM()
+		vm = fvm.NewVirtualMachine()
 	}
 
 	options := []fvm.Option{
@@ -244,7 +244,7 @@ func (e *Manager) ExecuteScript(
 			}
 		}()
 
-		return e.vm.RunV2(blockCtx, script, view)
+		return e.vm.Run(blockCtx, script, view)
 	}()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
@@ -337,7 +337,7 @@ func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, vie
 		fvm.WithBlockPrograms(
 			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
 
-	account, err := e.vm.GetAccountV2(blockCtx, address, view)
+	account, err := e.vm.GetAccount(blockCtx, address, view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account (%s) at block (%s): %w", address.String(), blockHeader.ID(), err)
 	}

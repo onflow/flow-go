@@ -1,84 +1,64 @@
 package errors
 
-import (
-	"errors"
-	"fmt"
-)
-
-func NewUnknownFailure(err error) *CodedFailure {
-	return WrapCodedFailure(
+func NewUnknownFailure(err error) CodedError {
+	return WrapCodedError(
 		FailureCodeUnknownFailure,
 		err,
 		"unknown failure")
 }
 
-// NewEncodingFailure formats and returns a new CodedFailure which
-// captures an fatal error sourced from encoding issues
+// NewEncodingFailuref formats and returns a new EncodingFailure
 func NewEncodingFailuref(
 	err error,
 	msg string,
 	args ...interface{},
-) *CodedFailure {
-	return WrapCodedFailure(
+) CodedError {
+	return WrapCodedError(
 		FailureCodeEncodingFailure,
 		err,
 		"encoding failed: "+msg,
 		args...)
 }
 
-// LedgerFailure captures a fatal error cause by ledger failures
-type LedgerFailure struct {
-	errorWrapper
+// NewLedgerFailure constructs a new CodedError which captures a fatal error
+// cause by ledger failures.
+func NewLedgerFailure(err error) CodedError {
+	return WrapCodedError(
+		FailureCodeLedgerFailure,
+		err,
+		"ledger returns unsuccessful")
 }
 
-// NewLedgerFailure constructs a new LedgerFailure
-func NewLedgerFailure(err error) LedgerFailure {
-	return LedgerFailure{
-		errorWrapper: errorWrapper{err: err},
-	}
-}
-
-func (e LedgerFailure) Error() string {
-	return fmt.Sprintf("%s ledger returns unsuccessful: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e LedgerFailure) FailureCode() ErrorCode {
-	return FailureCodeLedgerFailure
-}
-
-// IsALedgerFailure returns true if the error or any of the wrapped errors is a ledger failure
+// IsALedgerFailure returns true if the error or any of the wrapped errors is
+// a ledger failure
 func IsALedgerFailure(err error) bool {
-	var t LedgerFailure
-	return errors.As(err, &t)
+	return HasErrorCode(err, FailureCodeLedgerFailure)
 }
 
-// StateMergeFailure captures a fatal caused by state merge
-type StateMergeFailure struct {
-	errorWrapper
+// NewStateMergeFailure constructs a new CodedError which captures a fatal
+// caused by state merge.
+func NewStateMergeFailure(err error) CodedError {
+	return WrapCodedError(
+		FailureCodeStateMergeFailure,
+		err,
+		"can not merge the state")
 }
 
-// NewStateMergeFailure constructs a new StateMergeFailure
-func NewStateMergeFailure(err error) StateMergeFailure {
-	return StateMergeFailure{
-		errorWrapper: errorWrapper{err: err},
-	}
-}
-
-func (e StateMergeFailure) Error() string {
-	return fmt.Sprintf("%s can not merge the state: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e StateMergeFailure) FailureCode() ErrorCode {
-	return FailureCodeStateMergeFailure
-}
-
-// NewBlockFinderFailure constructs a new CodedFailure which captures a fatal
+// NewBlockFinderFailure constructs a new CodedError which captures a fatal
 // caused by block finder.
-func NewBlockFinderFailure(err error) *CodedFailure {
-	return WrapCodedFailure(
+func NewBlockFinderFailure(err error) CodedError {
+	return WrapCodedError(
 		FailureCodeBlockFinderFailure,
 		err,
 		"can not retrieve the block")
+}
+
+// NewParseRestrictedModeInvalidAccessFailure constructs a CodedError which
+// captures a fatal caused by Cadence accessing an unexpected environment
+// operation while it is parsing programs.
+func NewParseRestrictedModeInvalidAccessFailure(op string) CodedError {
+	return NewCodedError(
+		FailureCodeParseRestrictedModeInvalidAccessFailure,
+		"cannot access %s while cadence is in parse restricted mode",
+		op)
 }
