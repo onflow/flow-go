@@ -349,6 +349,7 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 		for _, filter := range m.peerManagerFilters {
 			if err := filter(id); err != nil {
 				m.log.Debug().
+					Err(err).
 					Str("peer_id", id.Pretty()).
 					Msg("filtering topology peer")
 
