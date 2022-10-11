@@ -100,6 +100,6 @@ tps-test-ci:
 
 .PHONY: clean-data
 clean-data:
-	docker build -t environment-clean ../../cmd
+	DOCKER_BUILDKIT=1 docker build -t environment-clean ../../cmd
 	docker run --mount=type=bind,source"$(pwd)"/data,target=/data environment-clean chmod -R 777 /data
 	rm -rf ./data
