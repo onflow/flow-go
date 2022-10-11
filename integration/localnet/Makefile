@@ -97,7 +97,7 @@ tps-ci-smoke:
 tps-test-ci:
 	make init
 	make start-thin
-	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps 25 -max-tps 300 -duration 30m
+	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps 15 -max-tps 30 -duration 3m
 	make stop
 
 .PHONY: clean-data
