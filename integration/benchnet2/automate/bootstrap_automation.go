@@ -29,13 +29,13 @@ type ReplacementData struct {
 
 var DEFAULT_NODE_INFO_PATH = "../bootstrap/public-root-information/node-infos.pub.json"
 
-var ACCESS_TEMPLATE string = "/access_template.yml"
-var COLLECTION_TEMPLATE string = "/collection_template.yml"
-var CONSENSUS_TEMPLATE string = "/consensus_template.yml"
-var EXECUTION_TEMPLATE string = "/execution_template.yml"
-var VERIFICATION_TEMPLATE string = "/verification_template.yml"
-var RESOURCES_TEMPLATE string = "/resources_template.yml"
-var ENV_TEMPLATE string = "/env_template.yml"
+var ACCESS_TEMPLATE string = "access_template.yml"
+var COLLECTION_TEMPLATE string = "collection_template.yml"
+var CONSENSUS_TEMPLATE string = "consensus_template.yml"
+var EXECUTION_TEMPLATE string = "execution_template.yml"
+var VERIFICATION_TEMPLATE string = "verification_template.yml"
+var RESOURCES_TEMPLATE string = "resources_template.yml"
+var ENV_TEMPLATE string = "env_template.yml"
 var TEMPLATE_PATH string = "templates/"
 
 var VALUES_HEADER string = "branch: fake-branch\n# Commit must be a string\ncommit: \"123456\"\n\ndefaults: {}\n"
@@ -49,9 +49,9 @@ var DEFAULT_VERIFICATION_IMAGE string = "gcr.io/flow-container-registry/verifica
 func loadNodeJsonData(nodeInfoPath string) map[string]Node {
 	jsonFile, err := os.Open(nodeInfoPath)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
-	fmt.Println("Successfully Opened node-infos.pub.json")
+	log.Printf("Successfully Opened %s", nodeInfoPath)
 	defer jsonFile.Close()
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
@@ -94,7 +94,7 @@ func createFile(filename string) *os.File {
 	return file
 }
 
-func GenerateValuesYaml(nodeConfig map[string]int, jsonDataFilePath string, templatePath string, outputPath string) {
+func GenerateValuesYaml(nodeConfig map[string]int, jsonDataFilePath string, templatePath string, outputFilePath string) {
 	var nodesData map[string]Node
 	var templateFolder string
 	if jsonDataFilePath == "" {
@@ -109,9 +109,12 @@ func GenerateValuesYaml(nodeConfig map[string]int, jsonDataFilePath string, temp
 		templateFolder = templatePath
 	}
 
-	valuesFilePath := outputPath + "/values.yml"
+	valuesFilePath := "/values.yml"
+	if outputFilePath != "" {
+		valuesFilePath = outputFilePath
+	}
 	values := createFile(valuesFilePath)
-	log.Printf("Values file created at %s", outputPath)
+	log.Printf("Values file created at %s", outputFilePath)
 
 	envTemplate := createTemplate(templateFolder + ENV_TEMPLATE)
 	resources := textReader(templateFolder + RESOURCES_TEMPLATE)
@@ -173,6 +176,7 @@ func GenerateValuesYaml(nodeConfig map[string]int, jsonDataFilePath string, temp
 		writeNodeData(values, name, envTemplate, verificationTemplate, replacementData)
 	}
 
+	log.Printf("Values files successfully written to %s", outputFilePath)
 	values.Close()
 }
 
@@ -189,7 +193,7 @@ func replaceTemplateData(template *template.Template, data ReplacementData) stri
 	var doc bytes.Buffer
 	err := template.Execute(&doc, data)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	return doc.String()
 }
@@ -197,7 +201,7 @@ func replaceTemplateData(template *template.Template, data ReplacementData) stri
 func createTemplate(templatePath string) *template.Template {
 	template, err := template.New("todos").Parse(textReader(templatePath))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	return template
