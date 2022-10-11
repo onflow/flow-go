@@ -23,6 +23,8 @@ CADENCE_TRACING=false
 COMMIT=$(shell git rev-parse HEAD)
 VERSION=localnetbuild
 
+CURRENT_DIRECTORY=$(shell pwd)
+
 .PHONY: init
 init:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
@@ -101,5 +103,5 @@ tps-test-ci:
 .PHONY: clean-data
 clean-data:
 	DOCKER_BUILDKIT=1 docker build -t environment-clean ../../cmd
-	docker run --mount=type=bind,source"$(pwd)"/data,target=/data environment-clean chmod -R 777 /data
+	docker run --mount=type=bind,source="$(CURRENT_DIRECTORY)"/data,target=/data environment-clean chmod -R 777 /data
 	rm -rf ./data
