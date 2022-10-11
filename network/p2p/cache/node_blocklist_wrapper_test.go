@@ -233,8 +233,10 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlocklistAddRemove() {
 	}
 }
 
-// TestUpdate tests updating, clearing and retrieving the blocklist
-// Note: conceptually, the blocklist is a set, i.e. not order dependent.
+// TestUpdate tests updating, clearing and retrieving the blocklist.
+// This test verifies that the wrapper updates _its own internal state_ correctly.
+// Note:
+// conceptually, the blocklist is a set, i.e. not order dependent.
 // The wrapper internally converts the list to a set and vice versa. Therefore
 // the order is not preserved by `GetBlocklist`. Consequently, we compare
 // map-based representations here.
@@ -261,6 +263,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestUpdate() {
 }
 
 // TestDataBasePersist verifies database interactions of the wrapper with the data base.
+// This test verifies that the blocklist updates are persisted across restarts.
 // To decouple this test from the lower-level data base design, we proceed as follows:
 //   - We do data-base operation through the exported methods from `NodeBlocklistWrapper`
 //   - Then, we create a new `NodeBlocklistWrapper` backed by the same data base. Since it is a
