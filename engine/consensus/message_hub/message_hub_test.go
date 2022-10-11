@@ -2,6 +2,7 @@ package message_hub
 
 import (
 	"context"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	consensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -22,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 )
@@ -86,6 +88,11 @@ func (s *MessageHubSuite) SetupTest() {
 
 	// set up protocol state mock
 	s.state = &protocol.MutableState{}
+	s.state.On("Final").Return(
+		func() protint.Snapshot {
+			return s.snapshot
+		},
+	)
 	s.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) protint.Snapshot {
 			return s.snapshot
@@ -157,33 +164,6 @@ func (s *MessageHubSuite) TearDownTest() {
 	}
 }
 
-// TestSendVote tests that single vote can be sent and properly processed
-func (s *MessageHubSuite) TestSendVote() {
-	// create parameters to send a vote
-	blockID := unittest.IdentifierFixture()
-	view := rand.Uint64()
-	sig := unittest.SignatureFixture()
-	recipientID := unittest.IdentifierFixture()
-	vote := &messages.BlockVote{
-		BlockID: blockID,
-		View:    view,
-		SigData: sig,
-	}
-
-	done := make(chan struct{})
-	*s.con = *mocknetwork.NewConduit(s.T())
-	s.con.On("Unicast", vote, recipientID).
-		Run(func(_ mock.Arguments) { close(done) }).
-		Return(nil).
-		Once()
-
-	// submit the vote
-	s.hub.SendVote(blockID, view, sig, recipientID)
-
-	// wait for vote to be sent
-	unittest.AssertClosesBefore(s.T(), done, time.Second)
-}
-
 // TestBroadcastProposalWithDelay tests broadcasting proposals with different inputs
 func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 	// add execution node to participants to make sure we exclude them from broadcast
@@ -251,10 +231,9 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 			Once()
 		s.prov.On("ProvideProposal", expectedBroadcastMsg).Return()
 
-		broadcasted := make(chan struct{}) // closed when proposal is broadcast
-		*s.con = *mocknetwork.NewConduit(s.T())
+		broadcast := make(chan struct{}) // closed when proposal is broadcast
 		s.con.On("Publish", expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
-			Run(func(_ mock.Arguments) { close(broadcasted) }).
+			Run(func(_ mock.Arguments) { close(broadcast) }).
 			Return(nil).
 			Once()
 
@@ -262,6 +241,66 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 		err := s.hub.processQueuedBlock(&headerFromHotstuff)
 		require.NoError(s.T(), err, "header broadcast should pass")
 
-		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcasted, submitted), time.Second)
+		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
 	})
+}
+
+// TestProcessMultipleMessagesHappyPath tests submitting all types of messages through full processing pipeline and
+// asserting that expected message transmissions happened as expected.
+func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
+	var wg sync.WaitGroup
+
+	s.Run("vote", func() {
+		wg.Add(1)
+		// prepare vote fixture
+		vote := unittest.VoteFixture()
+		recipientID := unittest.IdentifierFixture()
+		s.con.On("Unicast", mock.Anything, recipientID).Run(func(_ mock.Arguments) {
+			wg.Done()
+		}).Return(nil)
+
+		// submit vote
+		s.hub.SendVote(vote.BlockID, vote.View, vote.SigData, recipientID)
+	})
+	s.Run("timeout", func() {
+		wg.Add(1)
+		// prepare timeout fixture
+		timeout := helper.TimeoutObjectFixture()
+		expectedBroadcastMsg := &messages.TimeoutObject{
+			View:       timeout.View,
+			NewestQC:   timeout.NewestQC,
+			LastViewTC: timeout.LastViewTC,
+			SigData:    timeout.SigData,
+		}
+		s.con.On("Publish", expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
+			Run(func(_ mock.Arguments) { wg.Done() }).
+			Return(nil)
+		// submit timeout
+		s.hub.BroadcastTimeout(timeout)
+	})
+	s.Run("proposal", func() {
+		wg.Add(1)
+		// prepare proposal fixture
+		proposal := unittest.BlockWithParentAndProposerFixture(s.T(), s.head, s.myID)
+		s.headers.On("ByBlockID", proposal.Header.ParentID).Return(s.head, nil)
+		s.payloads.On("ByBlockID", proposal.Header.ID()).Return(proposal.Payload, nil)
+
+		// unset chain and height to make sure they are correctly reconstructed
+		s.hotstuff.On("SubmitProposal", proposal.Header, s.head.View)
+		expectedBroadcastMsg := &messages.BlockProposal{
+			Header:  proposal.Header,
+			Payload: proposal.Payload,
+		}
+		s.con.On("Publish", expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
+			Run(func(_ mock.Arguments) { wg.Done() }).
+			Return(nil)
+		s.prov.On("ProvideProposal", expectedBroadcastMsg).Return()
+
+		// submit proposal
+		s.hub.BroadcastProposalWithDelay(proposal.Header, 0)
+	})
+
+	unittest.RequireReturnsBefore(s.T(), func() {
+		wg.Wait()
+	}, time.Second, "expect to process messages before timeout")
 }
