@@ -235,7 +235,7 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 	c.wal.log.Info().Msgf("serializing checkpoint %d", to)
 
 	fileName := NumberToFilename(to)
-	err = StoreCheckpoint(c.wal.dir, fileName, &c.wal.log, tries...)
+	err = StoreCheckpointV6Concurrent(tries, c.wal.dir, fileName, &c.wal.log)
 
 	c.wal.log.Info().Msgf("created checkpoint %d with %d tries", to, len(tries))
 
