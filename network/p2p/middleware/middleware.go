@@ -349,7 +349,6 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 		for _, filter := range m.peerManagerFilters {
 			if err := filter(id); err != nil {
 				m.log.Debug().
-					Err(err).
 					Str("peer_id", id.Pretty()).
 					Msg("filtering topology peer")
 
@@ -515,6 +514,13 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 	}()
 
+	// check if peer is currently rate limited before continuing to process stream.
+	if m.unicastRateLimiters.MessageRateLimiter.IsRateLimited(remotePeer) || m.unicastRateLimiters.BandWidthRateLimiter.IsRateLimited(remotePeer) {
+		log.Debug().
+			Msg("dropping unicast stream from rate limited peer")
+		return
+	}
+
 	// TODO: We need to allow per-topic timeouts and message size limits.
 	// This allows us to configure higher limits for topics on which we expect
 	// to receive large messages (e.g. Chunk Data Packs), and use the normal
@@ -535,11 +541,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	r := ggio.NewDelimitedReader(s, LargeMsgMaxUnicastMsgSize)
 
 	for {
-		// check if peer is currently rate limited before continuing to process stream.
-		if m.unicastRateLimiters.MessageRateLimiter.IsRateLimited(remotePeer) {
-			return
-		}
-
 		if ctx.Err() != nil {
 			return
 		}
