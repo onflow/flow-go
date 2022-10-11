@@ -331,20 +331,8 @@ func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger,
 
 	startTime := time.Now()
 
-	writer, err := checkpointer.CheckpointWriter(checkpointNum)
-	if err != nil {
-		return fmt.Errorf("cannot generate checkpoint writer: %w", err)
-	}
-	defer func() {
-		closeErr := writer.Close()
-		// Return close error if there isn't any prior error to return.
-		if err == nil {
-			err = closeErr
-		}
-	}()
-
 	fileName := realWAL.NumberToFilename(checkpointNum)
-	err = realWAL.StoreCheckpoint(checkpointer.Dir(), fileName, &logger, tries...)
+	err := realWAL.StoreCheckpoint(checkpointer.Dir(), fileName, &logger, tries...)
 	if err != nil {
 		return fmt.Errorf("error serializing checkpoint (%d): %w", checkpointNum, err)
 	}
