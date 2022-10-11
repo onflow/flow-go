@@ -110,9 +110,9 @@ func randZrStar(x *scalar) {
 	C.bn_randZr_star((*C.bn_st)(x))
 }
 
-// mapToZr reads a scalar from a slice of bytes and maps it to Zr
+// mapToZrStar reads a scalar from a slice of bytes and maps it to Zr
 // the resulting scalar is in the range 0 < k < r
-func mapToZr(x *scalar, src []byte) error {
+func mapToZrStar(x *scalar, src []byte) error {
 	if len(src) > maxScalarSize {
 		return invalidInputsErrorf(
 			"input slice length must be less than %d",
