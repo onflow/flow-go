@@ -15,8 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	mocks "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/p2p/cache"
-	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -262,33 +260,84 @@ func (s *NodeBlocklistWrapperTestSuite) TestUpdate() {
 	require.Equal(s.T(), blocklist3.Lookup(), s.wrapper.GetBlocklist().Lookup())
 }
 
-// TestDataBasePersist verifies that blocklist is persisted in database
+// TestDataBasePersist verifies database interactions of the wrapper with the data base.
+// To decouple this test from the lower-level data base design, we proceed as follows:
+//   - We do data-base operation through the exported methods from `NodeBlocklistWrapper`
+//   - Then, we create a new `NodeBlocklistWrapper` backed by the same data base. Since it is a
+//     new wrapper, it must read its state from the data base. Hence, if the new wrapper returns
+//     the correct data, we have strong evidence that data-base interactions are correct.
+//
+// Note: The wrapper internally converts the list to a set and vice versa. Therefore
+// the order is not preserved by `GetBlocklist`. Consequently, we compare
+// map-based representations here.
 func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 	blocklist := unittest.IdentifierListFixture(8)
+	blocklist2 := unittest.IdentifierListFixture(8)
 
-	// update blocklist and check DB that the new value is there
-	err := s.wrapper.Update(blocklist)
-	require.NoError(s.T(), err)
+	s.Run("Get blocklist from empty database", func() {
+		require.Empty(s.T(), s.wrapper.GetBlocklist())
+	})
 
-	var b1 map[flow.Identifier]struct{}
-	err = s.DB.View(operation.RetrieveBlocklist(&b1))
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocklist.Lookup(), b1)
+	s.Run("Clear blocklist on empty database", func() {
+		err := s.wrapper.ClearBlocklist() // No-op as data base does not contain any block list
+		require.NoError(s.T(), err)
+		require.Empty(s.T(), s.wrapper.GetBlocklist())
 
-	// clear blocklist and check that DB has no entry anymore (returns `storage.ErrNotFound`)
-	err = s.wrapper.ClearBlocklist()
-	require.NoError(s.T(), err)
+		// newly created wrapper should read `blocklist` from data base during initialization
+		w, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+		require.NoError(s.T(), err)
+		require.Empty(s.T(), w.GetBlocklist())
+	})
 
-	var b2 map[flow.Identifier]struct{}
-	err = s.DB.View(operation.RetrieveBlocklist(&b2))
-	require.ErrorIs(s.T(), err, storage.ErrNotFound)
-	require.Empty(s.T(), b2)
+	s.Run("Update blocklist and init new wrapper from database", func() {
+		err := s.wrapper.Update(blocklist)
+		require.NoError(s.T(), err)
 
-	// update blocklist and check DB that it also has the new list
-	err = s.wrapper.Update(blocklist)
-	require.NoError(s.T(), err)
-	var b3 map[flow.Identifier]struct{}
-	err = s.DB.View(operation.RetrieveBlocklist(&b3))
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocklist.Lookup(), b3)
+		// newly created wrapper should read `blocklist` from data base during initialization
+		w, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), blocklist.Lookup(), w.GetBlocklist().Lookup())
+	})
+
+	s.Run("Update and overwrite blocklist and then init new wrapper from database", func() {
+		err := s.wrapper.Update(blocklist)
+		require.NoError(s.T(), err)
+
+		err = s.wrapper.Update(blocklist2)
+		require.NoError(s.T(), err)
+
+		// newly created wrapper should read initial state from data base
+		w, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), blocklist2.Lookup(), w.GetBlocklist().Lookup())
+	})
+
+	s.Run("Update & clear & update and then init new wrapper from database", func() {
+		// set blocklist ->
+		// newly created wrapper should now read this list from data base during initialization
+		err := s.wrapper.Update(blocklist)
+		require.NoError(s.T(), err)
+
+		w0, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), blocklist.Lookup(), w0.GetBlocklist().Lookup())
+
+		// clear blocklist ->
+		// newly created wrapper should now read empty blocklist from data base during initialization
+		err = s.wrapper.ClearBlocklist()
+		require.NoError(s.T(), err)
+
+		w1, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+		require.NoError(s.T(), err)
+		require.Empty(s.T(), w1.GetBlocklist())
+
+		// set blocklist2 ->
+		// newly created wrapper should now read this list from data base during initialization
+		err = s.wrapper.Update(blocklist2)
+		require.NoError(s.T(), err)
+
+		w2, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), blocklist2.Lookup(), w2.GetBlocklist().Lookup())
+	})
 }

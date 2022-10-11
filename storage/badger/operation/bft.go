@@ -1,9 +1,13 @@
 package operation
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 // PurgeBlocklist removes the set of blocked nodes IDs from the data base.
@@ -11,7 +15,13 @@ import (
 // No errors are expected during normal operations.
 // TODO: TEMPORARY manual override for adding node IDs to list of ejected nodes, applies to networking layer only
 func PurgeBlocklist() func(*badger.Txn) error {
-	return remove(makePrefix(blockedNodeIDs))
+	return func(tx *badger.Txn) error {
+		err := remove(makePrefix(blockedNodeIDs))(tx)
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("enexpected error while purging blocklist: %w", err)
+		}
+		return nil
+	}
 }
 
 // PersistBlocklist writes the set of blocked nodes IDs into the data base.
