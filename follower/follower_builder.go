@@ -97,7 +97,7 @@ func DefaultFollowerServiceConfig() *FollowerServiceConfig {
 	}
 }
 
-// ObserverServiceBuilder provides the common functionality needed to bootstrap a Flow staked and observer
+// FollowerServiceBuilder provides the common functionality needed to bootstrap a Flow staked and observer
 // It is composed of the FlowNodeBuilder, the FollowerServiceConfig and contains all the components and modules needed for the
 // staked and observers
 type FollowerServiceBuilder struct {
@@ -105,7 +105,7 @@ type FollowerServiceBuilder struct {
 	*FollowerServiceConfig
 
 	// components
-	LibP2PNode              p2pnode.LibP2PNode
+	LibP2PNode              *p2pnode.Node
 	FollowerState           protocol.MutableState
 	SyncCore                *synchronization.Core
 	FinalizationDistributor *pubsub.FinalizationDistributor
@@ -560,7 +560,7 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 //   - No peer manager
 //   - Default libp2p pubsub options
 func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
-	return func(ctx context.Context) (p2pnode.LibP2PNode, error) {
+	return func() (*p2pnode.Node, error) {
 		var pis []peer.AddrInfo
 
 		for _, b := range builder.bootstrapIdentities {

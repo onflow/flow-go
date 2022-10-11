@@ -240,7 +240,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	testOneToKMessagingFails(ctx, t, node1, sub2, topicAfterSpork)
 }
 
-func testOneToOneMessagingSucceeds(t *testing.T, sourceNode p2pnode.LibP2PNode, peerInfo peer.AddrInfo) {
+func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *p2pnode.Node, peerInfo peer.AddrInfo) {
 	// create stream from node 1 to node 2
 	sourceNode.Host().Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
 	s, err := sourceNode.CreateStream(context.Background(), peerInfo.ID)
@@ -249,7 +249,7 @@ func testOneToOneMessagingSucceeds(t *testing.T, sourceNode p2pnode.LibP2PNode, 
 	assert.NotNil(t, s)
 }
 
-func testOneToOneMessagingFails(t *testing.T, sourceNode p2pnode.LibP2PNode, peerInfo peer.AddrInfo) {
+func testOneToOneMessagingFails(t *testing.T, sourceNode *p2pnode.Node, peerInfo peer.AddrInfo) {
 	// create stream from source node to destination address
 	sourceNode.Host().Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
 	_, err := sourceNode.CreateStream(context.Background(), peerInfo.ID)
@@ -261,7 +261,7 @@ func testOneToOneMessagingFails(t *testing.T, sourceNode p2pnode.LibP2PNode, pee
 
 func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
-	sourceNode p2pnode.LibP2PNode,
+	sourceNode *p2pnode.Node,
 	dstnSub *pubsub.Subscription,
 	topic channels.Topic) {
 
@@ -283,7 +283,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 
 func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
-	sourceNode p2pnode.LibP2PNode,
+	sourceNode *p2pnode.Node,
 	dstnSub *pubsub.Subscription,
 	topic channels.Topic) {
 

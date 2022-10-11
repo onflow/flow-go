@@ -79,7 +79,7 @@ type Middleware struct {
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
 	// and worker routines.
 	wg                         *sync.WaitGroup
-	libP2PNode                 p2pnode.LibP2PNode
+	libP2PNode                 *p2pnode.Node
 	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
@@ -304,7 +304,7 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 // a more efficient candidate.
 //
 // The following benign errors can be returned:
-// - he peer ID for the target node ID cannot be found.
+// - the peer ID for the target node ID cannot be found.
 // - the msg size was too large.
 // - failed to send message to peer.
 //

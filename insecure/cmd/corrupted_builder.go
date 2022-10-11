@@ -52,10 +52,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 
 		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupted conduit factory initiated")
 
-		cnf := corruptible.LibP2PNodeFactory(cnb.Logger, myAddr, cnb.NetworkKey, cnb.SporkID, cnb.IdentityProvider, cnb.Metrics.Network, cnb.Resolver, cnb.BaseConfig.NodeRole, corruptible.AcceptAllTopicValidator)
-		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupted libP2P node factory initiated")
-
-		flowNetwork, err := cnb.FlowNodeBuilder.InitFlowNetwork(node, ccf, cnf)
+		flowNetwork, err := cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, ccf)
 		if err != nil {
 			return nil, fmt.Errorf("could not initiate flow network: %w", err)
 		}

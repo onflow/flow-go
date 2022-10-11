@@ -2,6 +2,7 @@ package scoring_test
 
 import (
 	"context"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"math/rand"
 	"regexp"
 	"testing"
@@ -176,8 +177,8 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	for _, role := range flow.Roles() {
 		peerId := p2pfixtures.PeerIdFixture(t)
 		unauthorizedChannels := channels.Channels(). // all channels
-								ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
-								ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
+			ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
+			ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
 		sporkID := unittest.IdentifierFixture()
 		unauthorizedTopics := make([]string, 0, len(unauthorizedChannels))
 		for _, channel := range unauthorizedChannels {
@@ -256,21 +257,23 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
 
+	topicValidator := flowpubsub.TopicValidator(unittest.Logger(), unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter())
+
 	// consensus node subscribes to the block topic.
-	conSub, err := conNode.Subscribe(blockTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	conSub, err := conNode.Subscribe(blockTopic, topicValidator)
 	require.NoError(t, err)
 
 	// both verification nodes subscribe to the blocks and chunks topic (because they are allowed to).
-	ver1SubBlocks, err := verNode1.Subscribe(blockTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	ver1SubBlocks, err := verNode1.Subscribe(blockTopic, topicValidator)
 	require.NoError(t, err)
 
-	ver1SubChunks, err := verNode1.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	ver1SubChunks, err := verNode1.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), topicValidator)
 	require.NoError(t, err)
 
-	ver2SubBlocks, err := verNode2.Subscribe(blockTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	ver2SubBlocks, err := verNode2.Subscribe(blockTopic, topicValidator)
 	require.NoError(t, err)
 
-	ver2SubChunks, err := verNode2.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	ver2SubChunks, err := verNode2.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), topicValidator)
 	require.NoError(t, err)
 
 	// wait for the subscriptions to be established
@@ -287,7 +290,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	// now consensus node is doing something very bad!
 	// it is subscribing to a channel that it is not supposed to subscribe to.
-	conSubChunks, err := conNode.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	conSubChunks, err := conNode.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), topicValidator)
 	require.NoError(t, err)
 
 	// let's wait for a bit to subscription propagate.
