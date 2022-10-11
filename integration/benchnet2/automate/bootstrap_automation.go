@@ -86,7 +86,7 @@ func yamlWriter(file *os.File, content string) {
 }
 
 func createFile(filename string) *os.File {
-	file, err := os.OpenFile("values.yml", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -109,12 +109,12 @@ func GenerateValuesYaml(nodeConfig map[string]int, jsonDataFilePath string, temp
 		templateFolder = templatePath
 	}
 
-	valuesFilePath := "/values.yml"
+	valuesFilePath := "values.yml"
 	if outputFilePath != "" {
 		valuesFilePath = outputFilePath
 	}
 	values := createFile(valuesFilePath)
-	log.Printf("Values file created at %s", outputFilePath)
+	log.Printf("Values file created at %s", valuesFilePath)
 
 	envTemplate := createTemplate(templateFolder + ENV_TEMPLATE)
 	resources := textReader(templateFolder + RESOURCES_TEMPLATE)
