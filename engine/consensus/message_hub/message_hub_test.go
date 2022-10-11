@@ -2,6 +2,16 @@ package message_hub
 
 import (
 	"context"
+	"math/rand"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	consensus "github.com/onflow/flow-go/engine/consensus/mock"
@@ -19,21 +29,13 @@ import (
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"math/rand"
-	"sync"
-	"testing"
-	"time"
 )
 
 func TestMessageHub(t *testing.T) {
 	suite.Run(t, new(MessageHubSuite))
 }
 
-// MessageHubSuite tests the consensus message hub.
+// MessageHubSuite tests the consensus message hub. Holds mocked dependencies that are used by different test scenarios.
 type MessageHubSuite struct {
 	suite.Suite
 
@@ -129,8 +131,6 @@ func (s *MessageHubSuite) SetupTest() {
 		},
 		nil,
 	)
-
-	unittest.ReadyDoneify(s.hotstuff)
 
 	hub, err := NewMessageHub(
 		unittest.Logger(),
