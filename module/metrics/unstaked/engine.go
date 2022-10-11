@@ -1,6 +1,8 @@
 package unstaked
 
-import "github.com/onflow/flow-go/module"
+import (
+	"github.com/onflow/flow-go/module"
+)
 
 type EngineCollector struct {
 	metrics module.EngineMetrics
