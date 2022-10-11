@@ -168,7 +168,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 			h.log.Info().
 				Uint64("view", packed.vote.View).
 				Hex("block_id", packed.vote.BlockID[:]).
-				Msg("packed has been processed successfully")
+				Msg("vote has been processed successfully")
 
 			continue
 		}
