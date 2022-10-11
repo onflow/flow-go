@@ -1,4 +1,4 @@
-package net
+package corruptnet
 
 // This test file covers corrupt network tests that are not ingress or egress specific, including error conditions.
 

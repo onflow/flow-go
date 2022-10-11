@@ -1,4 +1,4 @@
-package net
+package corruptnet
 
 import (
 	"github.com/golang/protobuf/ptypes/empty"

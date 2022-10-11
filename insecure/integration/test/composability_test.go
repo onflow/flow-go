@@ -13,7 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
-	corruptnet "github.com/onflow/flow-go/insecure/net"
+	"github.com/onflow/flow-go/insecure/corruptnet"
 	"github.com/onflow/flow-go/insecure/orchestrator"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"

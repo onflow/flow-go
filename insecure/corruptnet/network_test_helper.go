@@ -1,4 +1,4 @@
-package net
+package corruptnet
 
 // This file has helper function that are only used for testing.
 
