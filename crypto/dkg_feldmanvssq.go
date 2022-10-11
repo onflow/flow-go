@@ -8,7 +8,6 @@ package crypto
 import "C"
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -20,13 +19,13 @@ import (
 // (and hence this is a centralized generation).
 // The dealer generates key shares for a BLS-based
 // threshold signature scheme and distributes the shares over the (n)
-// partcipants including itself. The particpants validate their shares
-// using a public verifiaction vector shared by the dealer and are able
+// participants including itself. The participants validate their shares
+// using a public verification vector shared by the dealer and are able
 // to broadcast complaints against a misbehaving dealer.
 
 // The dealer has the chance to avoid being disqualified by broadcasting
-// a complaint answer. The protocol ends with all honest particiants
-// reaching a consensus about the dealer qualification/disqualifiaction.
+// a complaint answer. The protocol ends with all honest participants
+// reaching a consensus about the dealer qualification/disqualification.
 
 // Private keys are scalar in Zr, where r is the group order of G1/G2
 // Public keys are in G2.
@@ -60,11 +59,19 @@ type complaint struct {
 	answer         scalar
 }
 
-// NewFeldmanVSSq creates a new instance of a Feldman VSS protocol
+// NewFeldmanVSSQual creates a new instance of a Feldman VSS protocol
 // with a qualification mechanism.
 //
 // An instance is run by a single participant and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
+//
+// The function returns:
+//   - (nil, InvalidInputsError) if:
+//   - size if not in [DKGMinSize, DKGMaxSize]
+//   - threshold is not in [MinimumThreshold, size-1]
+//   - myIndex is not in [0, size-1]
+//   - dealerIndex is not in [0, size-1]
+//   - (dkgInstance, nil) otherwise
 func NewFeldmanVSSQual(size int, threshold int, myIndex int,
 	processor DKGProcessor, dealerIndex int) (DKGState, error) {
 
@@ -95,48 +102,56 @@ func (s *feldmanVSSQualState) init() {
 // the Feldman VSS Qual protocol.
 // The first call is a timeout for sharing the private shares.
 // The second call is a timeout for broadcasting the complaints.
+//
+// The returned erorr is :
+//   - dkgInvalidStateTransitionError if the DKG instance was not running.
+//   - dkgInvalidStateTransitionError if the DKG instance already called the 2 required timeouts.
+//   - nil otherwise.
 func (s *feldmanVSSQualState) NextTimeout() error {
 	if !s.running {
-		return fmt.Errorf("dkg protocol %d is not running", s.myIndex)
+		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
+	if s.complaintsTimeout {
+		return dkgInvalidStateTransitionErrorf("the next timeout should be to end DKG protocol")
+	}
+
 	// if dealer is already disqualified, there is nothing to do
 	if s.disqualified {
-		if s.sharesTimeout {
-			s.complaintsTimeout = true
-		} else {
+		if !s.sharesTimeout {
 			s.sharesTimeout = true
+			return nil
+		} else {
+			s.complaintsTimeout = true
+			return nil
 		}
-		return nil
 	}
-	if !s.sharesTimeout && !s.complaintsTimeout {
+
+	if !s.sharesTimeout {
 		s.setSharesTimeout()
 		return nil
-	}
-	if s.sharesTimeout && !s.complaintsTimeout {
+	} else {
 		s.setComplaintsTimeout()
 		return nil
 	}
-	return errors.New("the next timeout should be to end DKG protocol")
 }
 
-// End ends the protocol in the current participant
-// It returns the finalized public data and participant private key share.
-// - the group public key corresponding to the group secret key
-// - all the public key shares corresponding to the participants private
-// key shares.
-// - the finalized private key which is the current participant's own private key share
-// This is also a timeout to receiving all complaint answers
-// - the returned erorr is :
-//   - dkgFailureError if the dealer was disqualified.
-//   - other error if Start() was not called, or NextTimeout() was not called twice
-//   - nil otherwise.
+// End ends the protocol in the current participant.
+// This is also a timeout to receiving all complaint answers.
+// It returns the finalized public data and participant private key share:
+//  1. the group public key corresponding to the group secret key
+//  2. all the public key shares corresponding to the participants private key shares.
+//  3. the finalized private key which is the current participant's own private key share
+//  4. Error Returns:
+//     - dkgFailureError if the dealer was disqualified.
+//     - dkgInvalidStateTransition if Start() was not called, or NextTimeout() was not called twice
+//     - nil otherwise.
 func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
-		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.myIndex)
+		return nil, nil, nil, dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 	if !s.sharesTimeout || !s.complaintsTimeout {
 		return nil, nil, nil,
-			fmt.Errorf("%d: two timeouts should be set before ending dkg", s.myIndex)
+			dkgInvalidStateTransitionErrorf("%d: two timeouts should be set before ending dkg", s.myIndex)
 	}
 	s.running = false
 	// check if a complaint has remained without an answer
@@ -179,9 +194,14 @@ const (
 
 // HandleBroadcastMsg processes a new broadcasted message received by the current participant.
 // orig is the message origin index
+//
+// The function returns:
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.running {
-		return errors.New("dkg is not running")
+		return dkgInvalidStateTransitionErrorf("dkg is not running")
 	}
 
 	if orig >= s.Size() || orig < 0 {
@@ -230,9 +250,14 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 
 // HandlePrivateMsg processes a new private message received by the current participant.
 // orig is the message origin index.
+//
+// The function returns:
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.running {
-		return errors.New("dkg is not running")
+		return dkgInvalidStateTransitionErrorf("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
 		return invalidInputsErrorf(
@@ -263,9 +288,14 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 // for a reason outside of the DKG protocol
 // The caller should make sure all honest participants call this function,
 // otherwise, the protocol can be broken
+//
+// The function returns:
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *feldmanVSSQualState) ForceDisqualify(participant int) error {
 	if !s.running {
-		return errors.New("dkg is not running")
+		return dkgInvalidStateTransitionErrorf("dkg is not running")
 	}
 	if participant >= s.Size() || participant < 0 {
 		return invalidInputsErrorf(
@@ -278,6 +308,9 @@ func (s *feldmanVSSQualState) ForceDisqualify(participant int) error {
 	return nil
 }
 
+// The function does not check the call respects the machine
+// state transition of feldmanVSSQual. The calling function must make sure this call
+// is valid.
 func (s *feldmanVSSQualState) setSharesTimeout() {
 	s.sharesTimeout = true
 	// if verif vector is not received, disqualify the dealer
@@ -293,6 +326,9 @@ func (s *feldmanVSSQualState) setSharesTimeout() {
 	}
 }
 
+// The function does not check the call respects the machine
+// state transition of feldmanVSSQual. The calling function must make sure this call
+// is valid.
 func (s *feldmanVSSQualState) setComplaintsTimeout() {
 	s.complaintsTimeout = true
 	// if more than t complaints are received, the dealer is disqualified
@@ -308,7 +344,6 @@ func (s *feldmanVSSQualState) setComplaintsTimeout() {
 }
 
 func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
-
 	// only accept private shares from the dealer.
 	if origin != s.dealerIndex {
 		return
@@ -369,7 +404,6 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 }
 
 func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
-
 	// only accept the verification vector from the dealer.
 	if origin != s.dealerIndex {
 		return

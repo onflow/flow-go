@@ -58,11 +58,13 @@ type ContLoadGenerator struct {
 	accounts            []*flowAccount
 	availableAccounts   chan *flowAccount // queue with accounts available for workers
 	workerStatsTracker  *WorkerStatsTracker
-	workers             []*Worker
-	stopped             bool // TODO(ajm): remove this and just use the channel in Init()
 	stoppedChannel      chan struct{}
 	follower            TxFollower
 	availableAccountsLo int
+	workFunc            workFunc
+
+	workersMutex sync.Mutex
+	workers      []*Worker
 }
 
 type NetworkParams struct {
@@ -73,7 +75,6 @@ type NetworkParams struct {
 }
 
 type LoadParams struct {
-	TPS              int
 	NumberOfAccounts int
 	LoadType         LoadType
 
@@ -143,7 +144,7 @@ func New(
 		}
 	}
 
-	lGen := &ContLoadGenerator{
+	lg := &ContLoadGenerator{
 		log:                 log,
 		loaderMetrics:       loaderMetrics,
 		loadParams:          loadParams,
@@ -159,13 +160,36 @@ func New(
 		stoppedChannel:      make(chan struct{}),
 	}
 
-	return lGen, nil
+	// TODO(rbtz): hide load implementation behind an interface
+	switch loadParams.LoadType {
+	case TokenTransferLoadType:
+		lg.workFunc = lg.sendTokenTransferTx
+	case TokenAddKeysLoadType:
+		lg.workFunc = lg.sendAddKeyTx
+	case ConstExecCostLoadType:
+		lg.workFunc = lg.sendConstExecCostTx
+	case CompHeavyLoadType, EventHeavyLoadType, LedgerHeavyLoadType:
+		lg.workFunc = lg.sendFavContractTx
+	default:
+		return nil, fmt.Errorf("unknown load type: %s", loadParams.LoadType)
+	}
+
+	return lg, nil
+}
+
+func (lg *ContLoadGenerator) stopped() bool {
+	select {
+	case <-lg.stoppedChannel:
+		return true
+	default:
+		return false
+	}
 }
 
 // TODO(rbtz): make part of New
 func (lg *ContLoadGenerator) Init() error {
 	for i := 0; i < lg.loadParams.NumberOfAccounts; i += accountCreationBatchSize {
-		if lg.stopped {
+		if lg.stopped() {
 			return nil
 		}
 
@@ -199,6 +223,8 @@ func (lg *ContLoadGenerator) Init() error {
 			return err
 		}
 	}
+
+	lg.workerStatsTracker.StartPrinting(1 * time.Second)
 
 	return nil
 }
@@ -241,55 +267,76 @@ func (lg *ContLoadGenerator) setupFavContract() error {
 	return nil
 }
 
-func (lg *ContLoadGenerator) Start() {
-	// spawn workers
-	for i := 0; i < lg.loadParams.TPS; i++ {
-		var worker Worker
-
-		// TODO(rbtz): create an interface for different load types: Start()
-		switch lg.loadParams.LoadType {
-		case TokenTransferLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.sendTokenTransferTx)
-		case TokenAddKeysLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.sendAddKeyTx)
-		case ConstExecCostLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.sendConstExecCostTx)
-		// other types
-		default:
-			worker = NewWorker(i, 1*time.Second, lg.sendFavContractTx)
-		}
-
+func (lg *ContLoadGenerator) startWorkers(num int) error {
+	for i := 0; i < num; i++ {
+		worker := NewWorker(len(lg.workers), 1*time.Second, lg.workFunc)
 		worker.Start()
-		lg.workerStatsTracker.AddWorker()
+		lg.workers = append(lg.workers, worker)
+	}
+	lg.workerStatsTracker.AddWorkers(num)
+	return nil
+}
 
-		lg.workers = append(lg.workers, &worker)
+func (lg *ContLoadGenerator) stopWorkers(num int) error {
+	if num > len(lg.workers) {
+		return fmt.Errorf("can't stop %d workers, only %d available", num, len(lg.workers))
 	}
 
-	lg.workerStatsTracker.StartPrinting(1 * time.Second)
+	wg := sync.WaitGroup{}
+	wg.Add(num)
+
+	idx := len(lg.workers) - num
+	toRemove := lg.workers[idx:]
+	lg.workers = lg.workers[:idx]
+
+	for _, w := range toRemove {
+		go func(w *Worker) {
+			defer wg.Done()
+			lg.log.Debug().Int("workerID", w.workerID).Msg("stopping worker")
+			w.Stop()
+		}(w)
+	}
+	wg.Wait()
+	lg.workerStatsTracker.AddWorkers(-num)
+
+	return nil
+}
+
+// SetTPS compares the given TPS to the current TPS to determine whether to increase
+// or decrease the load.
+// It increases/decreases the load by adjusting the number of workers, since each worker
+// is responsible for sending the load at 1 TPS.
+func (lg *ContLoadGenerator) SetTPS(desired uint) error {
+	lg.workersMutex.Lock()
+	defer lg.workersMutex.Unlock()
+
+	currentTPS := len(lg.workers)
+	diff := int(desired) - currentTPS
+
+	var err error
+	switch {
+	case diff > 0:
+		err = lg.startWorkers(diff)
+	case diff < 0:
+		err = lg.stopWorkers(-diff)
+	}
+
+	if err == nil {
+		lg.loaderMetrics.SetTPSConfigured(desired)
+	}
+	return err
 }
 
 func (lg *ContLoadGenerator) Stop() {
-	if lg.stopped {
+	if lg.stopped() {
 		lg.log.Warn().Msg("Stop() called on generator when already stopped")
 		return
 	}
 
 	defer lg.log.Debug().Msg("stopped generator")
 
-	lg.stopped = true
-	wg := sync.WaitGroup{}
-	wg.Add(len(lg.workers))
-	for _, w := range lg.workers {
-		w := w
-
-		go func() {
-			defer wg.Done()
-
-			lg.log.Debug().Int("workerID", w.workerID).Msg("stopping worker")
-			w.Stop()
-		}()
-	}
-	wg.Wait()
+	lg.log.Debug().Msg("stopping workers")
+	_ = lg.SetTPS(0)
 	lg.workerStatsTracker.StopPrinting()
 	lg.log.Debug().Msg("stopping follower")
 	lg.follower.Stop()

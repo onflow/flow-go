@@ -12,10 +12,27 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
+
+type ContractUpdaterParams struct {
+	// Depricated: RestrictedDeploymentEnabled is deprecated use
+	// SetIsContractDeploymentRestrictedTransaction instead.
+	// Can be removed after all networks are migrated to
+	// SetIsContractDeploymentRestrictedTransaction
+	RestrictContractDeployment bool
+	RestrictContractRemoval    bool
+}
+
+func DefaultContractUpdaterParams() ContractUpdaterParams {
+	return ContractUpdaterParams{
+		RestrictContractDeployment: true,
+		RestrictContractRemoval:    true,
+	}
+}
 
 type sortableContractUpdates struct {
 	keys    []programs.ContractUpdateKey
@@ -49,17 +66,73 @@ func (lists *sortableContractUpdates) Less(i, j int) bool {
 // Note that scripts cannot modify smart contracts, but must expose the API in
 // compliance with the runtime environment interface.
 type ContractUpdater interface {
+	// Cadence's runtime API.  Note that the script variant will return
+	// OperationNotSupportedError.
 	UpdateAccountContractCode(
 		address runtime.Address,
 		name string,
 		code []byte,
 	) error
 
+	// Cadence's runtime API.  Note that the script variant will return
+	// OperationNotSupportedError.
 	RemoveAccountContractCode(address runtime.Address, name string) error
 
 	Commit() ([]programs.ContractUpdateKey, error)
 
 	Reset()
+}
+
+type ParseRestrictedContractUpdater struct {
+	txnState *state.TransactionState
+	impl     ContractUpdater
+}
+
+func NewParseRestrictedContractUpdater(
+	txnState *state.TransactionState,
+	impl ContractUpdater,
+) ParseRestrictedContractUpdater {
+	return ParseRestrictedContractUpdater{
+		txnState: txnState,
+		impl:     impl,
+	}
+}
+
+func (updater ParseRestrictedContractUpdater) UpdateAccountContractCode(
+	address runtime.Address,
+	name string,
+	code []byte,
+) error {
+	return parseRestrict3Arg(
+		updater.txnState,
+		"UpdateAccountContractCode",
+		updater.impl.UpdateAccountContractCode,
+		address,
+		name,
+		code)
+}
+
+func (updater ParseRestrictedContractUpdater) RemoveAccountContractCode(
+	address runtime.Address,
+	name string,
+) error {
+	return parseRestrict2Arg(
+		updater.txnState,
+		"RemoveAccountContractCode",
+		updater.impl.RemoveAccountContractCode,
+		address,
+		name)
+}
+
+func (updater ParseRestrictedContractUpdater) Commit() (
+	[]programs.ContractUpdateKey,
+	error,
+) {
+	return updater.impl.Commit()
+}
+
+func (updater ParseRestrictedContractUpdater) Reset() {
+	updater.impl.Reset()
 }
 
 type NoContractUpdater struct{}
@@ -97,9 +170,9 @@ type ContractUpdaterStubs interface {
 }
 
 type contractUpdaterStubsImpl struct {
-	chain                      flow.Chain
-	restrictContractDeployment bool
-	restrictContractRemoval    bool
+	chain flow.Chain
+
+	ContractUpdaterParams
 
 	logger          *ProgramLogger
 	systemContracts *SystemContracts
@@ -113,7 +186,7 @@ func (impl *contractUpdaterStubsImpl) RestrictedDeploymentEnabled() bool {
 		// fallback to the default value set by the configuration
 		// after the contract deployment bool is set by the state on all
 		// chains, this logic can be simplified
-		return impl.restrictContractDeployment
+		return impl.RestrictContractDeployment
 	}
 	return enabled
 }
@@ -154,7 +227,7 @@ func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
 func (impl *contractUpdaterStubsImpl) RestrictedRemovalEnabled() bool {
 	// TODO read this from the chain similar to the contract deployment
 	// but for now we would honor the fallback context flag
-	return impl.restrictContractRemoval
+	return impl.RestrictContractRemoval
 }
 
 // GetAuthorizedAccounts returns a list of addresses authorized by the service
@@ -227,8 +300,7 @@ func NewContractUpdaterForTesting(
 		accounts,
 		nil,
 		nil,
-		false,
-		false,
+		DefaultContractUpdaterParams(),
 		nil,
 		nil,
 		nil)
@@ -242,8 +314,7 @@ func NewContractUpdater(
 	accounts Accounts,
 	transactionInfo TransactionInfo,
 	chain flow.Chain,
-	restrictContractDeployment bool,
-	restrictContractRemoval bool,
+	params ContractUpdaterParams,
 	logger *ProgramLogger,
 	systemContracts *SystemContracts,
 	runtime *Runtime,
@@ -254,12 +325,11 @@ func NewContractUpdater(
 		accounts:        accounts,
 		transactionInfo: transactionInfo,
 		ContractUpdaterStubs: &contractUpdaterStubsImpl{
-			logger:                     logger,
-			chain:                      chain,
-			restrictContractDeployment: restrictContractDeployment,
-			restrictContractRemoval:    restrictContractRemoval,
-			systemContracts:            systemContracts,
-			runtime:                    runtime,
+			logger:                logger,
+			chain:                 chain,
+			ContractUpdaterParams: params,
+			systemContracts:       systemContracts,
+			runtime:               runtime,
 		},
 	}
 

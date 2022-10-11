@@ -138,6 +138,10 @@ func (b *BadgerRetryableUploaderWrapper) RetryUpload() error {
 	for _, blockID := range blockIDs {
 		wg.Add(1)
 		go func(blockID flow.Identifier) {
+			defer wg.Done()
+
+			log.Debug().Msgf("retrying upload for computation result of block %s", blockID.String())
+
 			var cr_err error
 			retComputationResult, err := b.reconstructComputationResult(blockID)
 			if err != nil {
@@ -150,13 +154,13 @@ func (b *BadgerRetryableUploaderWrapper) RetryUpload() error {
 			// Do Upload
 			if cr_err = b.uploader.Upload(retComputationResult); cr_err != nil {
 				log.Error().Err(cr_err).Msgf(
-					"Failed to update ComputationResult with BlockID %s", blockID)
+					"Failed to re-upload ComputationResult with BlockID %s", blockID)
 				retErr = cr_err
+			} else {
+				log.Debug().Msgf("computation result of block %s was successfully re-uploaded", blockID.String())
 			}
 
 			b.metrics.ExecutionComputationResultUploadRetried()
-
-			wg.Done()
 		}(blockID)
 	}
 	wg.Wait()

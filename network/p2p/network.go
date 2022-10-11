@@ -13,11 +13,11 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
@@ -57,7 +57,7 @@ func WithConduitFactory(f network.ConduitFactory) NetworkOptFunction {
 type Network struct {
 	sync.RWMutex
 	*component.ComponentManager
-	identityProvider            id.IdentityProvider
+	identityProvider            module.IdentityProvider
 	logger                      zerolog.Logger
 	codec                       network.Codec
 	me                          module.Local
@@ -108,7 +108,7 @@ type NetworkParameters struct {
 	Topology            network.Topology
 	SubscriptionManager network.SubscriptionManager
 	Metrics             module.NetworkMetrics
-	IdentityProvider    id.IdentityProvider
+	IdentityProvider    module.IdentityProvider
 	ReceiveCache        *netcache.ReceiveCache
 	Options             []NetworkOptFunction
 }
