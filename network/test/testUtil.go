@@ -251,7 +251,6 @@ type optsConfig struct {
 	idOpts              []func(*flow.Identity)
 	dhtPrefix           string
 	dhtOpts             []dht.Option
-	connectionGating    bool
 	unicastRateLimiters *unicast.RateLimiters
 	peerUpdateInterval  time.Duration
 	networkMetrics      module.NetworkMetrics
