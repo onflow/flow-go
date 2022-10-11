@@ -197,7 +197,7 @@ func main() {
 	}
 
 	if *localDev {
-		outputLocalData(dataSlices)
+		outputLocalData(dataSlices, log)
 	} else {
 		err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
 		if err != nil {
@@ -273,10 +273,10 @@ func sendDataToBigQuery(
 	return nil
 }
 
-func outputLocalData(slices []dataSlice) {
+func outputLocalData(slices []dataSlice, log zerolog.Logger) {
 	jsonText, err := json.MarshalIndent(slices, "", "    ")
 	if err != nil {
-		println("Error converting slice data to json")
+		log.Fatal().Msg("Error converting slice data to json")
 	}
 
 	// output human-readable json blob
@@ -284,6 +284,6 @@ func outputLocalData(slices []dataSlice) {
 	fileName := fmt.Sprintf("tps-results-%v.json", timestamp.Format("2006-02-01 15:04"))
 	err = os.WriteFile(fileName, jsonText, 0666)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal().Err(err)
 	}
 }
