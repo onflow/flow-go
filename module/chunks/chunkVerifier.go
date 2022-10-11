@@ -188,7 +188,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	for i, tx := range transactions {
 		txView := chunkView.NewChild()
 
-		err := fcv.vm.RunV2(context, tx, txView)
+		err := fcv.vm.Run(context, tx, txView)
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )

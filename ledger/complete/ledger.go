@@ -434,9 +434,7 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("finished running pre-checkpoint reporters")
 
-	l.logger.Info().Msg("creating a checkpoint for the new trie")
-
-	l.logger.Info().Msg("storing the checkpoint to the file")
+	l.logger.Info().Msg("creating a checkpoint for the new trie, storing the checkpoint to the file")
 
 	err = os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
@@ -446,12 +444,7 @@ func (l *Ledger) ExportCheckpointAt(
 	if version == 6 {
 		err = realWAL.StoreCheckpointV6Concurrent([]*trie.MTrie{newTrie}, outputDir, outputFile, &l.logger)
 	} else if version == 5 {
-		writer, err := realWAL.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
-		if err != nil {
-			return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
-		}
-		err = realWAL.StoreCheckpointV5(writer, newTrie)
-		writer.Close()
+		err = realWAL.StoreCheckpointV5(outputDir, ouputFile, &l.logger, newTrie)
 	} else {
 		return ledger.State(hash.DummyHash), fmt.Errorf("invalid version:%v", version)
 	}
@@ -469,7 +462,7 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
 
-	l.logger.Info().Msgf("finished running post-checkpoint reporters")
+	l.logger.Info().Msgf("start running post-checkpoint reporters")
 
 	// running post checkpoint reporters
 	for i, reporter := range postCheckpointReporters {

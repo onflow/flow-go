@@ -1,10 +1,10 @@
 COLLECTION = 3
-CONSENSUS = 3
+CONSENSUS = 2
 VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
 EXECUTION = 2
 VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
 VERIFICATION = 1
-ACCESS = 2
+ACCESS = 1
 OBSERVER = 0
 NCLUSTERS=1
 EPOCHLEN=10000   # 0 means use default
@@ -55,9 +55,10 @@ else
 endif
 
 # Creates a light version of the localnet with just 1 instance for each node type
+# (Except for consensus and execution nodes, which are set to 2)
 .PHONY: init-light
 init-light:
-	$(MAKE) -e COLLECTION=1 CONSENSUS=2 EXECUTION=1 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
+	$(MAKE) -e COLLECTION=1 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
 
 # Creates a version of localnet configured with short epochs
 .PHONY: init-short-epochs
@@ -88,7 +89,7 @@ tps-ci-smoke:
 
 .PHONY: tps-test-ci
 tps-test-ci:
-	make init
-	make start
-	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps 25 -max-tps 300 -duration 30m
-	make stop
+	$(MAKE) -e COLLECTION=5 VERIFICATION=5 NCLUSTERS=5 init
+	$(MAKE) start
+	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps 25 -max-tps 500 -duration 30m
+	$(MAKE) stop

@@ -3,7 +3,6 @@ package complete_test
 import (
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -70,9 +69,7 @@ func BenchmarkNewCheckpoint(b *testing.B) {
 	start := time.Now()
 	b.ResetTimer()
 
-	err = checkpointer.Checkpoint(to-1, func() (io.WriteCloser, error) {
-		return checkpointer.CheckpointWriter(to - 1)
-	})
+	err = checkpointer.Checkpoint(to - 1)
 
 	b.StopTimer()
 	elapsed := time.Since(start)

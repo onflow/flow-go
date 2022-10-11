@@ -8,9 +8,6 @@ import (
 	"github.com/onflow/cadence/runtime/errors"
 )
 
-// TODO(patrick): remove after emulator is updated.
-type Error = CodedError
-
 type CodedError interface {
 	Code() ErrorCode
 
@@ -67,6 +64,17 @@ func findImportantCodedError(err error) (CodedError, bool) {
 			return coded, false
 		}
 	}
+}
+
+// IsFailure returns true if the error is un-coded, or if the error contains
+// a failure code.
+func IsFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	coded, isUnknown := findImportantCodedError(err)
+	return isUnknown || coded.Code().IsFailure()
 }
 
 // SplitErrorTypes splits the error into fatal (failures) and non-fatal errors

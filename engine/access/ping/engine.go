@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 )
@@ -23,7 +22,7 @@ const PingInterval = time.Minute
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
-	idProvider   id.IdentityProvider
+	idProvider   module.IdentityProvider
 	idTranslator p2p.IDTranslator
 	me           module.Local
 	metrics      module.PingMetrics
@@ -35,7 +34,7 @@ type Engine struct {
 
 func New(
 	log zerolog.Logger,
-	idProvider id.IdentityProvider,
+	idProvider module.IdentityProvider,
 	idTranslator p2p.IDTranslator,
 	me module.Local,
 	metrics module.PingMetrics,

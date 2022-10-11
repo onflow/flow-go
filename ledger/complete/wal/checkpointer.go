@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -184,7 +185,7 @@ func (c *Checkpointer) NotCheckpointedSegments() (from, to int, err error) {
 }
 
 // Checkpoint creates new checkpoint stopping at given segment
-func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, error)) (err error) {
+func (c *Checkpointer) Checkpoint(to int) (err error) {
 
 	_, notCheckpointedTo, err := c.NotCheckpointedSegments()
 	if err != nil {
@@ -233,19 +234,8 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 
 	c.wal.log.Info().Msgf("serializing checkpoint %d", to)
 
-	writer, err := targetWriter()
-	if err != nil {
-		return fmt.Errorf("cannot generate writer: %w", err)
-	}
-	defer func() {
-		closeErr := writer.Close()
-		// Return close error if there isn't any prior error to return.
-		if err == nil {
-			err = closeErr
-		}
-	}()
-
-	err = StoreCheckpointV5(writer, tries...)
+	fileName := NumberToFilename(to)
+	err = StoreCheckpoint(c.wal.dir, fileName, &c.wal.log, tries...)
 
 	c.wal.log.Info().Msgf("created checkpoint %d with %d tries", to, len(tries))
 
@@ -263,6 +253,10 @@ func NumberToFilename(n int) string {
 
 func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 	return CreateCheckpointWriterForFile(c.dir, NumberToFilename(to), &c.wal.log)
+}
+
+func (c *Checkpointer) Dir() string {
+	return c.dir
 }
 
 // CreateCheckpointWriterForFile returns a file writer that will write to a temporary file and then move it to the checkpoint folder by renaming it.
@@ -303,7 +297,28 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 // as for each node, the children have been previously encountered.
 // TODO: evaluate alternatives to CRC32 since checkpoint file is many GB in size.
 // TODO: add concurrency if the performance gains are enough to offset complexity.
-func StoreCheckpointV5(writer io.Writer, tries ...*trie.MTrie) error {
+func StoreCheckpointV5(dir string, fileName string, logger *zerolog.Logger, tries ...*trie.MTrie) (
+	// error
+	// Note, the above code, which didn't define the name "err" for the returned error, would be wrong,
+	// beause err needs to be defined in order to be updated by the defer function
+	err error,
+) {
+	writer, err := CreateCheckpointWriterForFile(dir, fileName, logger)
+	if err != nil {
+		return fmt.Errorf("could not create writer: %w", err)
+	}
+	defer func() {
+		var errs *multierror.Error
+		if err != nil {
+			errs = multierror.Append(errs, err)
+		}
+		closeError := writer.Close()
+		if closeError != nil {
+			errs = multierror.Append(errs, closeError)
+		}
+		// update the returned err
+		err = errs.ErrorOrNil()
+	}()
 
 	crc32Writer := NewCRC32Writer(writer)
 
@@ -319,7 +334,7 @@ func StoreCheckpointV5(writer io.Writer, tries ...*trie.MTrie) error {
 	binary.BigEndian.PutUint16(header, MagicBytesCheckpointHeader)
 	binary.BigEndian.PutUint16(header[encMagicSize:], VersionV5)
 
-	_, err := crc32Writer.Write(header)
+	_, err = crc32Writer.Write(header)
 	if err != nil {
 		return fmt.Errorf("cannot write checkpoint header: %w", err)
 	}
