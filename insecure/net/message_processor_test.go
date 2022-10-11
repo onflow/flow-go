@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/network/mocknetwork"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
@@ -38,9 +37,14 @@ func TestProcess_AttackerRegistered(t *testing.T) {
 // This test simulates the attacker not being registered by making HandleIncomingEvent() return false.
 func TestProcess_AttackerNotRegistered(t *testing.T) {
 	originalProcessor := mocknetwork.NewEngine(t)
-	ingressController := mockinsecure.NewIngressController(t)
-	ingressController.On("HandleIncomingEvent", mock.Anything, mock.Anything, mock.Anything).Return(false)
+
+	channel := channels.TestNetworkChannel
 	originId := unittest.IdentifierFixture()
+	msg := &message.TestMessage{Text: "this is a test msg"}
+
+	ingressController := mockinsecure.NewIngressController(t)
+	ingressController.On("HandleIncomingEvent", msg, channel, originId).Return(false)
+
 	corruptChannel := channels.TestNetworkChannel
 	ingressMsg := &message.TestMessage{Text: "this is a test msg"}
 
