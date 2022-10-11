@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
@@ -130,7 +131,9 @@ func storeCheckpointHeader(
 	outputDir string,
 	outputFile string,
 	logger *zerolog.Logger,
-) error {
+) (
+	errToReturn error,
+) {
 	// sanity check
 	if len(subTrieChecksums) != subtrieCountByLevel(subtrieLevel) {
 		return fmt.Errorf("expect subtrie level %v to have %v checksums, but got %v",
@@ -142,11 +145,7 @@ func storeCheckpointHeader(
 		return fmt.Errorf("could not store checkpoint header: %w", err)
 	}
 	defer func() {
-		closeErr := closable.Close()
-		// Return close error if there isn't any prior error to return.
-		if err == nil {
-			err = closeErr
-		}
+		errToReturn = closeAndMergeError(closable, err)
 	}()
 
 	writer := NewCRC32Writer(closable)
@@ -211,18 +210,17 @@ func storeTopLevelNodesAndTrieRoots(
 	outputDir string,
 	outputFile string,
 	logger *zerolog.Logger,
-) (uint32, error) {
+) (
+	checksumOfTopTriePartFile uint32,
+	errToReturn error,
+) {
 	// the remaining nodes and data will be stored into the same file
 	closable, err := createWriterForTopTries(outputDir, outputFile, logger)
 	if err != nil {
 		return 0, fmt.Errorf("could not create writer for top tries: %w", err)
 	}
 	defer func() {
-		closeErr := closable.Close()
-		// Return close error if there isn't any prior error to return.
-		if err == nil {
-			err = closeErr
-		}
+		errToReturn = closeAndMergeError(closable, err)
 	}()
 
 	writer := NewCRC32Writer(closable)
@@ -419,7 +417,11 @@ func storeCheckpointSubTrie(
 	outputFile string,
 	logger *zerolog.Logger,
 ) (
-	map[*node.Node]uint64, uint64, uint32, error) {
+	rootNodesOfAllSubtries map[*node.Node]uint64,
+	totalSubtrieNodeCount uint64,
+	checksumOfSubtriePartfile uint32,
+	errToReturn error,
+) {
 
 	closable, err := createWriterForSubtrie(outputDir, outputFile, logger, i)
 	if err != nil {
@@ -427,11 +429,7 @@ func storeCheckpointSubTrie(
 	}
 
 	defer func() {
-		closeErr := closable.Close()
-		// Return close error if there isn't any prior error to return.
-		if err == nil {
-			err = closeErr
-		}
+		errToReturn = closeAndMergeError(closable, err)
 	}()
 
 	// create a CRC32 writer, so that any bytes passed to the writer will
@@ -677,4 +675,37 @@ func decodeSubtrieCount(encoded []byte) (uint16, error) {
 		return 0, fmt.Errorf("wrong subtrie level size, expect %v, got %v", encSubtrieCountSize, len(encoded))
 	}
 	return binary.BigEndian.Uint16(encoded), nil
+}
+
+// closeAndMergeError close the closable and merge the closeErr with the given err into a multierror
+// Note: when using this function in a defer function, don't use as below:
+// func XXX() (
+//   err error,
+// ) {
+// 		def func() {
+//       // bad, because the definition of err might get overwritten
+//       err = closeAndMergeError(closable, err)
+//    }()
+//
+// Better to use as below:
+// func XXX() (
+//   errToReturn error,
+// ) {
+// 		def func() {
+//       // good, because the error to returned is only updated here, and guaranteed to be
+//       // returned
+//       errToReturn = closeAndMergeError(closable, err)
+//    }()
+func closeAndMergeError(closable io.Closer, err error) error {
+	var merr *multierror.Error
+	if err != nil {
+		merr = multierror.Append(merr, err)
+	}
+
+	closeError := closable.Close()
+	if closeError != nil {
+		merr = multierror.Append(merr, closeError)
+	}
+
+	return merr.ErrorOrNil()
 }
