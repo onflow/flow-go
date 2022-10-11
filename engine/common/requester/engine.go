@@ -278,6 +278,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
+	e.log.Debug().Int("num_entities", len(e.items)).Msg("selecting entities")
+
 	// get the current top-level set of valid providers
 	providers, err := e.state.Final().Identities(e.selector)
 	if err != nil {
@@ -346,6 +348,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			item.RetryAfter = e.cfg.RetryMaximum
 		}
 
+		e.log.Debug().Hex("entity", logging.ID(entityID)).Msg("selected entity")
+
 		// if we reached the maximum size for a batch, bail
 		if uint(len(entityIDs)) >= e.cfg.BatchThreshold {
 			break
@@ -362,11 +366,32 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		Nonce:     rand.Uint64(),
 		EntityIDs: entityIDs,
 	}
+
+	requestStart := time.Now()
+
+	if e.log.Debug().Enabled() {
+		e.log.Debug().
+			Hex("provider", logging.ID(providerID)).
+			Uint64("nonce", req.Nonce).
+			Int("num_selected", len(entityIDs)).
+			Strs("entities", logging.IDs(entityIDs)).
+			Msg("sending entity request")
+	}
+
 	err = e.con.Unicast(req, providerID)
 	if err != nil {
 		return true, fmt.Errorf("could not send request: %w", err)
 	}
 	e.requests[req.Nonce] = req
+
+	if e.log.Debug().Enabled() {
+		e.log.Debug().
+			Hex("provider", logging.ID(providerID)).
+			Uint64("nonce", req.Nonce).
+			Strs("entities", logging.IDs(entityIDs)).
+			TimeDiff("duration", time.Now(), requestStart).
+			Msg("entity request sent")
+	}
 
 	// NOTE: we forget about requests after the expiry of the shortest retry time
 	// from the entities in the list; this means that we purge requests aggressively.
@@ -418,6 +443,14 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		if len(providers) == 0 {
 			return engine.NewInvalidInputErrorf("invalid provider origin (%x)", originID)
 		}
+	}
+
+	if e.log.Debug().Enabled() {
+		e.log.Debug().
+			Hex("provider", logging.ID(originID)).
+			Strs("entities", logging.IDs(res.EntityIDs)).
+			Uint64("nonce", res.Nonce).
+			Msg("onEntityResponse entries received")
 	}
 
 	// build a list of needed entities; if not available, process anyway,
