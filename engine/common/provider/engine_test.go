@@ -189,7 +189,7 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 		return entity, nil
 	}
 
-	final := &protocol.Snapshot{}
+	final := protocol.NewSnapshot(t)
 	final.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
