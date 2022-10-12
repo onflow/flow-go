@@ -4,6 +4,8 @@ import (
 	"math"
 	"time"
 
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
@@ -26,7 +28,7 @@ type Config struct {
 	// TimeoutDecrease: MULTIPLICATIVE factor for decreasing timeout on progress
 	TimeoutDecrease float64
 	// BlockRateDelayMS is a delay to broadcast the proposal in order to control block production rate [MILLISECONDS]
-	BlockRateDelayMS float64
+	BlockRateDelayMS *atomic.Float64
 }
 
 var DefaultConfig = NewDefaultConfig()
@@ -94,8 +96,8 @@ func NewConfig(
 	if timeoutDecrease <= 0 || 1 <= timeoutDecrease {
 		return Config{}, model.NewConfigurationErrorf("timeoutDecrease must be in range (0,1)")
 	}
-	if blockRateDelay < 0 {
-		return Config{}, model.NewConfigurationErrorf("blockRateDelay must be must be non-negative")
+	if err := validBlockRateDelay(blockRateDelay); err != nil {
+		return Config{}, err
 	}
 
 	tc := Config{
@@ -104,9 +106,18 @@ func NewConfig(
 		VoteAggregationTimeoutFraction: voteAggregationTimeoutFraction,
 		TimeoutIncrease:                timeoutIncrease,
 		TimeoutDecrease:                timeoutDecrease,
-		BlockRateDelayMS:               float64(blockRateDelay.Milliseconds()),
+		BlockRateDelayMS:               atomic.NewFloat64(float64(blockRateDelay.Milliseconds())),
 	}
 	return tc, nil
+}
+
+// validBlockRateDelay validates a block rate delay config.
+// Returns model.ConfigurationError for invalid config inputs.
+func validBlockRateDelay(blockRateDelay time.Duration) error {
+	if blockRateDelay < 0 {
+		return model.NewConfigurationErrorf("blockRateDelay must be must be non-negative")
+	}
+	return nil
 }
 
 // StandardVoteAggregationTimeoutFraction calculates a standard value for the VoteAggregationTimeoutFraction in case a block delay is used.

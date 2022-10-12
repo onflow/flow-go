@@ -503,6 +503,7 @@ func defaultService(role, dataDir, profilerDir string, i int) Service {
 			fmt.Sprintf("--tracer-enabled=%t", tracing),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
+			fmt.Sprintf("--admin-addr=0.0.0.0:%d", AdminToolPort),
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
