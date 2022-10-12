@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"math"
 	"os"
 	"runtime"
@@ -53,6 +54,7 @@ const (
 	loadType                    = "token-transfer"
 	metricport                  = uint(8080)
 	accessNodeAddress           = "127.0.0.1:3569"
+	pushgateway                 = "127.0.0.1:9091"
 	accountMultiplier           = 50
 	feedbackEnabled             = true
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
@@ -109,6 +111,11 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	if *localDev {
+		sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
+		defer sp.Stop()
+	}
 
 	loadCase := LoadCase{tps: uint(*initialTPSFlag), duration: *durationFlag}
 
