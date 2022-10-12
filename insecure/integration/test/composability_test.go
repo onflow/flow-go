@@ -151,7 +151,7 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corru
 	unittest.RequireCloseBefore(
 		t,
 		corruptNetwork.Ready(),
-		1*time.Second,
+		100*time.Millisecond,
 		"could not start corrupt network on time")
 
 	unittest.RequireReturnsBefore(t, func() {
@@ -163,7 +163,7 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corru
 
 	// terminates orchestratorNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, corruptNetwork.Done(), 1*time.Second, "could not stop corrupt network on time")
+	unittest.RequireCloseBefore(t, corruptNetwork.Done(), 100*time.Millisecond, "could not stop corrupt network on time")
 
 	unittest.RequireReturnsBefore(t, func() {
 		// stops the stub network of corrupted node.
@@ -209,10 +209,10 @@ func withAttackOrchestrator(
 
 	// starts orchestrator network
 	orchestratorNetwork.Start(orchestratorNetworkCtx)
-	unittest.RequireCloseBefore(t, orchestratorNetwork.Ready(), 1*time.Second, "could not start orchestrator network on time")
+	unittest.RequireCloseBefore(t, orchestratorNetwork.Ready(), 100*time.Millisecond, "could not start orchestrator network on time")
 	run(t)
 
 	// terminates orchestratorNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, orchestratorNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
+	unittest.RequireCloseBefore(t, orchestratorNetwork.Done(), 100*time.Millisecond, "could not stop orchestrator network on time")
 }

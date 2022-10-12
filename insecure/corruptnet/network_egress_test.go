@@ -51,7 +51,7 @@ func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 		err := corruptNetwork.ConnectAttacker(&empty.Empty{}, attacker) // blocking call
 		require.NoError(t, err)
 	}()
-	unittest.RequireReturnsBefore(t, attackerRegistered.Wait, 1*time.Second, "could not register attacker on time")
+	unittest.RequireReturnsBefore(t, attackerRegistered.Wait, 100*time.Millisecond, "could not register attacker on time")
 
 	targetIds := unittest.IdentifierListFixture(10)
 	msg := &message.TestMessage{Text: "this is a test msg"}
@@ -192,7 +192,7 @@ func TestProcessAttackerMessage_MessageSentOnFlowNetwork(t *testing.T) {
 			unittest.RequireReturnsBefore(
 				t,
 				corruptedEventDispatchedOnFlowNetWg.Wait,
-				1*time.Second,
+				100*time.Millisecond,
 				"attacker's message was not dispatched on flow network on time")
 		})
 }
@@ -263,7 +263,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 			unittest.RequireReturnsBefore(
 				t,
 				corruptedEventDispatchedOnFlowNetWg.Wait,
-				1*time.Second,
+				100*time.Millisecond,
 				"attacker's message was not dispatched on flow network on time")
 		})
 }
@@ -308,7 +308,7 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 			unittest.RequireReturnsBefore(
 				t,
 				corruptedEventDispatchedOnFlowNetWg.Wait,
-				1*time.Second,
+				100*time.Millisecond,
 				"attacker's message was not dispatched on flow network on time")
 		})
 }
@@ -368,7 +368,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 			unittest.RequireReturnsBefore(
 				t,
 				corruptedEventDispatchedOnFlowNetWg.Wait,
-				1*time.Second,
+				100*time.Millisecond,
 				"attacker's message was not dispatched on flow network on time")
 		})
 }
@@ -412,7 +412,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 			unittest.RequireReturnsBefore(
 				t,
 				corruptedEventDispatchedOnFlowNetWg.Wait,
-				1*time.Second,
+				100*time.Millisecond,
 				"attacker's message was not dispatched on flow network on time")
 		})
 }

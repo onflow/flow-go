@@ -71,9 +71,9 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 		require.NoError(t, connection.SendMessage(msg))
 
 		// checks a timely arrival of the registration and sent message at the cn.
-		unittest.RequireCloseBefore(t, attackerRegistered, 1*time.Second, "cn could not receive attacker registration on time")
+		unittest.RequireCloseBefore(t, attackerRegistered, 100*time.Millisecond, "cn could not receive attacker registration on time")
 		// imitates sending a message from cn to attacker through corrupted connection.
-		unittest.RequireCloseBefore(t, sentMsgReceived, 1*time.Second, "cn could not receive message sent on connection on time")
+		unittest.RequireCloseBefore(t, sentMsgReceived, 100*time.Millisecond, "cn could not receive message sent on connection on time")
 	})
 }
 
@@ -121,12 +121,12 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 		require.NoError(t, err)
 
 		// checks a timely attacker registration as well as arrival of the sent message by cn to corrupted connection
-		unittest.RequireCloseBefore(t, registerMsgReceived, 1*time.Second, "cn could not receive attacker registration on time")
+		unittest.RequireCloseBefore(t, registerMsgReceived, 100*time.Millisecond, "cn could not receive attacker registration on time")
 
 		// imitates sending a message from cn to attacker through corrupted connection.
 		require.NoError(t, cn.attackerObserveStream.Send(msg))
 
-		unittest.RequireCloseBefore(t, sentMsgReceived, 1*time.Second, "corrupted connection could not receive cn message on time")
+		unittest.RequireCloseBefore(t, sentMsgReceived, 100*time.Millisecond, "corrupted connection could not receive cn message on time")
 	})
 }
 
@@ -151,11 +151,11 @@ func withMockCorruptNetwork(t *testing.T, run func(flow.Identity, irrecoverable.
 
 	// starts corrupt network
 	cn.Start(cnCtx)
-	unittest.RequireCloseBefore(t, cn.Ready(), 1*time.Second, "could not start corrupt network on time")
+	unittest.RequireCloseBefore(t, cn.Ready(), 100*time.Millisecond, "could not start corrupt network on time")
 
 	run(*corruptedIdentity, cnCtx, cn)
 
 	// terminates orchestratorNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, cn.Done(), 1*time.Second, "could not stop corrupt network on time")
+	unittest.RequireCloseBefore(t, cn.Done(), 100*time.Millisecond, "could not stop corrupt network on time")
 }

@@ -107,7 +107,7 @@ func runCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
 
 	// start corruptible network
 	corruptibleNetwork.Start(ccfCtx)
-	unittest.RequireCloseBefore(t, corruptibleNetwork.Ready(), 1*time.Second, "could not start corruptible network on time")
+	unittest.RequireCloseBefore(t, corruptibleNetwork.Ready(), 100*time.Millisecond, "could not start corruptible network on time")
 
 	// extracting port that ccf gRPC server is running on
 	_, ccfPortStr, err := net.SplitHostPort(corruptibleNetwork.ServerAddress())
@@ -128,5 +128,5 @@ func runCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
 
 	// terminates orchestratorNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, corruptibleNetwork.Done(), 1*time.Second, "could not stop corruptible conduit on time")
+	unittest.RequireCloseBefore(t, corruptibleNetwork.Done(), 100*time.Millisecond, "could not stop corruptible conduit on time")
 }

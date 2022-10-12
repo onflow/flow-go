@@ -37,7 +37,7 @@ func TestHandleIncomingEvent_AttackerRegistered(t *testing.T) {
 				err := corruptNetwork.ConnectAttacker(&empty.Empty{}, attacker) // blocking call
 				require.NoError(t, err)
 			}()
-			unittest.RequireReturnsBefore(t, attackerRegistered.Wait, 1*time.Second, "could not register attacker on time")
+			unittest.RequireReturnsBefore(t, attackerRegistered.Wait, 100*time.Millisecond, "could not register attacker on time")
 
 			originId := unittest.IdentifierFixture()
 			msg := &message.TestMessage{Text: "this is a test msg"}
