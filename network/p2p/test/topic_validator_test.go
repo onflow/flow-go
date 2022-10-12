@@ -56,7 +56,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	isStaked := func(pid peer.ID) error {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
-			return fmt.Errorf("could not translate the peer_id %s to a Flow identifier: %w", pid.Pretty(), err)
+			return fmt.Errorf("could not translate the peer_id %s to a Flow identifier: %w", pid.String(), err)
 		}
 
 		if _, ok := ids.ByNodeID(fid); !ok {

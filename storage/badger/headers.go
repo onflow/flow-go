@@ -150,7 +150,7 @@ func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 }
 
 func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
-	var blockIDs []flow.Identifier
+	var blockIDs flow.IdentifierList
 	err := h.db.View(procedure.LookupBlockChildren(parentID, &blockIDs))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up children: %w", err)

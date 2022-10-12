@@ -61,7 +61,7 @@ func NewConnGater(log zerolog.Logger, opts ...ConnGaterOption) *ConnGater {
 func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
 	if len(c.onInterceptPeerDialFilters) == 0 {
 		c.log.Debug().
-			Str("peer_id", p.Pretty()).
+			Str("peer_id", p.String()).
 			Msg("allowing outbound connection intercept peer dial has no peer filters set")
 		return true
 	}
@@ -70,7 +70,7 @@ func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
 		// log the filtered outbound connection attempt
 		c.log.Warn().
 			Err(err).
-			Str("peer_id", p.Pretty()).
+			Str("peer_id", p.String()).
 			Msg("rejected outbound connection attempt")
 		return false
 	}
