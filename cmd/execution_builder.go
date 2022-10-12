@@ -16,7 +16,6 @@ import (
 	"github.com/ipfs/go-bitswap"
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -78,7 +77,6 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -377,68 +375,39 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	error,
 ) {
 	// build list of Access nodes that are allowed to request execution data from this node
-	allowedANs := make(map[flow.Identifier]bool)
-	for _, an := range strings.Split(exeNode.exeConf.executionDataAllowedPeers, ",") {
-		anID, err := flow.HexStringToIdentifier(an)
-		if err != nil {
-			return nil, fmt.Errorf("invalid AN ID %s: %w", an, err)
-		}
+	var allowedANs map[flow.Identifier]bool
+	if exeNode.exeConf.executionDataAllowedPeers != "" {
+		ids := strings.Split(exeNode.exeConf.executionDataAllowedPeers, ",")
+		allowedANs = make(map[flow.Identifier]bool, len(ids))
+		for _, idHex := range ids {
+			anID, err := flow.HexStringToIdentifier(idHex)
+			if err != nil {
+				return nil, fmt.Errorf("invalid node ID %s: %w", idHex, err)
+			}
 
-		id, ok := exeNode.builder.IdentityProvider.ByNodeID(anID)
-		if !ok {
-			return nil, fmt.Errorf("could not get identity for AN: %s", err)
-		}
+			id, ok := exeNode.builder.IdentityProvider.ByNodeID(anID)
+			if !ok {
+				return nil, fmt.Errorf("allowed node ID %s is not in identity list", idHex)
+			}
 
-		if id.Role != flow.RoleAccess {
-			return nil, fmt.Errorf("node ID %s is not an access node", id.NodeID.String())
-		}
+			if id.Role != flow.RoleAccess {
+				return nil, fmt.Errorf("allowed node ID %s is not an access node", id.NodeID.String())
+			}
 
-		if id.Ejected {
-			return nil, fmt.Errorf("node ID %s is ejected", id.NodeID.String())
-		}
+			if id.Ejected {
+				return nil, fmt.Errorf("allowed node ID %s is ejected", id.NodeID.String())
+			}
 
-		allowedANs[anID] = true
+			allowedANs[anID] = true
+		}
 	}
 
 	opts := []network.BlobServiceOption{
 		blob.WithBitswapOptions(
-			// only allow Access nodes on the allow list to request execution data
-			bitswap.WithPeerBlockRequestFilter(func(peerID peer.ID, _ cid.Cid) bool {
-				lg := exeNode.builder.Logger.With().
-					Str("component", "blob_service").
-					Str("peer_id", peerID.String()).
-					Logger()
-
-				if id, ok := exeNode.builder.IdentityProvider.ByPeerID(peerID); ok {
-					lg = lg.With().
-						Str("peer_node_id", id.NodeID.String()).
-						Str("role", id.Role.String()).
-						Logger()
-
-					// TODO: when execution data verification is enabled, add verification nodes here
-					if id.Role != flow.RoleAccess || id.Ejected {
-						lg.Warn().
-							Bool(logging.KeySuspicious, true).
-							Msg("rejecting request from unauthorized peer: unauthorized role")
-						return false
-					}
-
-					if len(allowedANs) > 0 && !allowedANs[id.NodeID] {
-						lg.Warn().
-							Bool(logging.KeySuspicious, true).
-							Msg("rejecting request from unauthorized peer: not in allowed list")
-						return false
-					}
-
-					lg.Debug().Msg("accepting request from peer")
-					return true
-				}
-
-				lg.Warn().
-					Bool(logging.KeySuspicious, true).
-					Msg("rejecting request from unknown peer")
-				return false
-			}),
+			// Only allow block requests from staked ANs on the allowedANs list (if set)
+			bitswap.WithPeerBlockRequestFilter(
+				blob.AuthorizedRequester(allowedANs, exeNode.builder.IdentityProvider, exeNode.builder.Logger),
+			),
 		),
 	}
 

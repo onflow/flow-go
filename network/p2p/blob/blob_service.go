@@ -14,18 +14,21 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	provider "github.com/ipfs/go-ipfs-provider"
 	"github.com/ipfs/go-ipfs-provider/simple"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 	"golang.org/x/time/rate"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/logging"
 
 	ipld "github.com/ipfs/go-ipld-format"
 )
@@ -237,4 +240,55 @@ func (r *rateLimitedBlockStore) Get(ctx context.Context, c cid.Cid) (blocks.Bloc
 	r.metrics.BytesRead(size)
 
 	return r.Blockstore.Get(ctx, c)
+}
+
+// AuthorizedRequester returns a callback function used by bitswap to authorize block requests
+// A request is authorized if the peer is
+// * known by the identity provider
+// * not ejected
+// * an Access node
+// * in the allowedNodes list (if non-empty)
+func AuthorizedRequester(
+	allowedNodes map[flow.Identifier]bool,
+	identityProvider module.IdentityProvider,
+	logger zerolog.Logger,
+) func(peer.ID, cid.Cid) bool {
+	return func(peerID peer.ID, _ cid.Cid) bool {
+		lg := logger.With().
+			Str("component", "blob_service").
+			Str("peer_id", peerID.String()).
+			Logger()
+
+		id, ok := identityProvider.ByPeerID(peerID)
+
+		if !ok {
+			lg.Warn().
+				Bool(logging.KeySuspicious, true).
+				Msg("rejecting request from unknown peer")
+			return false
+		}
+
+		lg = lg.With().
+			Str("peer_node_id", id.NodeID.String()).
+			Str("role", id.Role.String()).
+			Logger()
+
+		// TODO: when execution data verification is enabled, add verification nodes here
+		if id.Role != flow.RoleAccess || id.Ejected {
+			lg.Warn().
+				Bool(logging.KeySuspicious, true).
+				Msg("rejecting request from peer: unauthorized role")
+			return false
+		}
+
+		if allowedNodes != nil && len(allowedNodes) > 0 && !allowedNodes[id.NodeID] {
+			lg.Warn().
+				Bool(logging.KeySuspicious, true).
+				Msg("rejecting request from peer: not in allowed list")
+			return false
+		}
+
+		lg.Debug().Msg("accepting request from peer")
+		return true
+	}
 }
