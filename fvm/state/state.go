@@ -237,10 +237,6 @@ func (s *State) TotalEmittedEventBytes() uint64 {
 	return s.meter.TotalEmittedEventBytes()
 }
 
-func (s *State) TotalEventCounter() uint32 {
-	return s.meter.TotalEventCounter()
-}
-
 // MergeState applies the changes from a the given view to this view.
 func (s *State) MergeState(other *State) error {
 	err := s.view.MergeView(other.view)
