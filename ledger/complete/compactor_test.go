@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"regexp"
 	"sync"
 	"testing"
 	"time"
@@ -42,6 +43,7 @@ func (co *CompactorObserver) OnNext(val interface{}) {
 			co.done <- struct{}{}
 		}
 	}
+	fmt.Println("Compactor observer res:", res)
 }
 
 func (co *CompactorObserver) OnError(err error) {}
@@ -102,6 +104,9 @@ func TestCompactorCreation(t *testing.T) {
 			// and checkpointDistance is 3, then, 10 segment files should trigger generating checkpoint:
 			// 2, 5, 8, that's why the fromBound is 8
 			for i := 0; i < size; i++ {
+				// slow down updating the ledger, because running too fast would cause the previous checkpoint
+				// to not finish and get delayed
+				time.Sleep(500 * time.Millisecond)
 
 				payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
@@ -188,14 +193,20 @@ func TestCompactorCreation(t *testing.T) {
 			for _, fileInfo := range files {
 
 				name := fileInfo.Name()
-
-				if name != "checkpoint.00000008" &&
-					name != "00000009" &&
+				if name == "00000009" ||
 					name != "00000010" {
-					err := os.Remove(path.Join(dir, name))
-					require.NoError(t, err)
-					log.Info().Msgf("removed file %v/%v", dir, name)
+					continue
 				}
+
+				// checkpoint V6 has multiple files
+				matched, _ := regexp.MatchString(name, "checkpoint.00000008")
+				if matched {
+					continue
+				}
+
+				err := os.Remove(path.Join(dir, name))
+				require.NoError(t, err)
+				log.Info().Msgf("removed file %v/%v", dir, name)
 			}
 		})
 

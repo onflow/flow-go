@@ -157,6 +157,7 @@ func (w *DiskWAL) replay(
 
 	loadedCheckpoint := -1
 	startSegment := from
+	checkpointLoaded := false
 
 	checkpointer, err := w.NewCheckpointer()
 	if err != nil {
@@ -201,6 +202,7 @@ func (w *DiskWAL) replay(
 				return fmt.Errorf("error while handling checkpoint: %w", err)
 			}
 			loadedCheckpoint = latestCheckpoint
+			checkpointLoaded = true
 			break
 		}
 
@@ -231,10 +233,14 @@ func (w *DiskWAL) replay(
 			}
 
 			w.log.Info().Msgf("root checkpoint loaded")
+			checkpointLoaded = true
 		}
 	}
 
-	w.log.Info().Msgf("replaying segments from %d to %d", startSegment, to)
+	w.log.Info().
+		Bool("checkpoint_loaded", checkpointLoaded).
+		Int("loaded_checkpoint", loadedCheckpoint).
+		Msgf("replaying segments from %d to %d", startSegment, to)
 
 	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
 		Dir:   w.wal.Dir(),
