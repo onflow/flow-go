@@ -13,6 +13,8 @@ import (
 
 // StopControl is a specialized component used by ingestion.Engine to encapsulate
 // control of pausing/stopping blocks execution.
+// It is intended to work tightly with the Engine, not as a general mechanism or interface.
+// StopControl follows states described in StopState
 type StopControl struct {
 	sync.RWMutex
 	height             uint64
@@ -23,6 +25,25 @@ type StopControl struct {
 	stopAfterExecuting flow.Identifier
 	log                zerolog.Logger
 }
+
+type stopControlState byte
+
+const (
+	// StopControlOff default state, envisioned to be used most of the time. Stopping module is simply off,
+	// blocks will be processed "as usual"
+	StopControlOff stopControlState = iota
+
+	// StopControlSet means stop height is set but not reached yet, and nothing related to stopping happened yet.
+	// We can still go back to StopControlOff or progress to StopControlCommenced.
+	StopControlSet
+
+	// StopControlCommenced indicates that stopping process has commenced and no parameters can be changed anymore.
+	// For example, blocks at or above stop height has been received, but finalization didn't reach stop height yet
+	StopControlCommenced
+
+	// StopControlPaused means EN has stopped processing blocks. It can happen by reaching stop height
+	StopControlPaused
+)
 
 // NewStopControl creates new empty NewStopControl
 func NewStopControl(log zerolog.Logger, paused bool) *StopControl {

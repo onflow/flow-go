@@ -17,26 +17,26 @@ import (
 func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 	t.Run("when processing block at stop height", func(t *testing.T) {
-		sah := NewStopControl(zerolog.Nop(), false)
+		sc := NewStopControl(zerolog.Nop(), false)
 
 		// first update is always successful
-		oldSet, _, _, err := sah.SetStopHeight(21, false)
+		oldSet, _, _, err := sc.SetStopHeight(21, false)
 		require.NoError(t, err)
 		require.False(t, oldSet)
 
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
-		sah.BlockProcessable(header)
+		sc.BlockProcessable(header)
 
-		oldSet, _, _, err = sah.SetStopHeight(37, false)
+		oldSet, _, _, err = sc.SetStopHeight(37, false)
 		require.NoError(t, err)
 		require.True(t, oldSet)
 
 		// block at stop height, it should be skipped
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
-		sah.BlockProcessable(header)
+		sc.BlockProcessable(header)
 
-		_, _, _, err = sah.SetStopHeight(2137, false)
+		_, _, _, err = sc.SetStopHeight(2137, false)
 		require.Error(t, err)
 	})
 
@@ -44,10 +44,10 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		execState := new(mock.ReadOnlyExecutionState)
 
-		sah := NewStopControl(zerolog.Nop(), false)
+		sc := NewStopControl(zerolog.Nop(), false)
 
 		// first update is always successful
-		oldSet, _, _, err := sah.SetStopHeight(21, false)
+		oldSet, _, _, err := sc.SetStopHeight(21, false)
 		require.NoError(t, err)
 		require.False(t, oldSet)
 
@@ -56,18 +56,41 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
-		sah.BlockFinalized(context.TODO(), execState, header)
+		sc.BlockFinalized(context.TODO(), execState, header)
 
-		oldSet, _, _, err = sah.SetStopHeight(37, false)
+		oldSet, _, _, err = sc.SetStopHeight(37, false)
 		require.NoError(t, err)
 		require.True(t, oldSet)
 
 		// block at stop height, it should be skipped
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
-		sah.BlockFinalized(context.TODO(), execState, header)
+		sc.BlockFinalized(context.TODO(), execState, header)
 
-		_, _, _, err = sah.SetStopHeight(2137, false)
+		_, _, _, err = sc.SetStopHeight(2137, false)
 		require.Error(t, err)
 	})
+}
+
+// TestOutOfOrderCallsStillWorks check if StopControl behaves properly even if blocks and finalization
+// arrive out of order. While proper order should be guaranteed by consensus follower, it's still worth
+// a test in case functions are called
+func TestOutOfOrderCallsStillWorks(t *testing.T) {
+
+	execState := new(mock.ReadOnlyExecutionState)
+	//execState.On()
+
+	headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
+	headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
+	headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
+	headerD := unittest.BlockHeaderWithParentFixture(headerC) // 23
+
+	sc := NewStopControl(zerolog.Nop(), false)
+
+	// set stop at 22, so 21 is the last height which should be processed
+	oldSet, _, _, err := sc.SetStopHeight(22, false)
+	require.NoError(t, err)
+	require.False(t, oldSet)
+
+	sc.BlockFinalized(context.TODO(), execState, headerD)
 
 }
