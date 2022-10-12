@@ -44,6 +44,7 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-transactions", "data": { "start-height": 340, "end-height": 343 }}'
 ```
 
+$$TODO remove/update
 ### To set required approvals for sealing
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-required-approvals-for-sealing", "data": 1}'
@@ -52,4 +53,9 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 ### To get required approvals for sealing
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-required-approvals-for-sealing"}'
+```
+
+### To get a config value
+```
+curl localhost:3706/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-config", "data": "consensus-required-approvals-for-sealing"}'
 ```
