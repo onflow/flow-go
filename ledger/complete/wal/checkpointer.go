@@ -237,9 +237,13 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 	// during normal operation,  single thread is used in order to minimize the memory footprint,
 	err = StoreCheckpointV6SingleThread(tries, c.wal.dir, fileName, &c.wal.log)
 
+	if err != nil {
+		return fmt.Errorf("could not create checkpoint for %v: %w", to, err)
+	}
+
 	c.wal.log.Info().Msgf("created checkpoint %d with %d tries", to, len(tries))
 
-	return err
+	return nil
 }
 
 func NumberToFilenamePart(n int) string {

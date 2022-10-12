@@ -208,6 +208,8 @@ func Test_Checkpointing(t *testing.T) {
 			checkpointer, err := wal2.NewCheckpointer()
 			require.NoError(t, err)
 
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000010"))
+
 			err = checkpointer.Checkpoint(10)
 			require.NoError(t, err)
 

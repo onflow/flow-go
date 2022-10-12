@@ -110,7 +110,7 @@ func filePathSubTries(dir string, fileName string, index int) (string, string, e
 
 func filePathTopTries(dir string, fileName string) (string, string) {
 	topTriesFileName := fmt.Sprintf("%v.%03d", fileName, subtrieCount)
-	return path.Join(dir, topTriesFileName), fileName
+	return path.Join(dir, topTriesFileName), topTriesFileName
 }
 
 func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
