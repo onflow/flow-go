@@ -91,6 +91,8 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 		lg := log.With().
 			Str("peer_id", from.String()).
 			Hex("sender", msg.OriginID).
+			Str("topic", rawMsg.GetTopic()).
+			Str("channel", msg.ChannelID).
 			Logger()
 
 		// verify sender is a known peer
@@ -107,15 +109,17 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 		actualChannel, ok := channels.ChannelFromTopic(topic)
 		if !ok {
 			lg.Warn().
-				Err(fmt.Errorf("invalid topic in message")).
+				Err(fmt.Errorf("could not map topic to channel")).
 				Bool(logging.KeySuspicious, true).
 				Msg("rejecting message")
 			return pubsub.ValidationReject
 		}
 
-		if channels.Channel(msg.ChannelID) != actualChannel {
+		channel := channels.Channel(msg.ChannelID)
+		if channel != actualChannel {
 			log.Warn().
-				Err(fmt.Errorf("topic in message does not match pubsub topic")).
+				Err(fmt.Errorf("channel id in message does not match pubsub topic")).
+				Str("actual_channel", actualChannel.String()).
 				Bool(logging.KeySuspicious, true).
 				Msg("rejecting message")
 			return pubsub.ValidationReject
