@@ -77,6 +77,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestHonestNode() {
 // TestDenylistedNode tests proper handling of identities _on_ the blocklist:
 //   - For any identity `i` with `i.NodeID ∈ blocklist`, the returned identity
 //     should have `i.Ejected` set to `true` (irrespective of the `Ejected`
+//     flag's initial returned by the wrapped `IdentityProvider`).
 //   - The wrapper should _copy_ the identity and _not_ write into the wrapped
 //     IdentityProvider's memory.
 //   - For `IdentityProvider.ByNodeID` and `IdentityProvider.ByPeerID`:
