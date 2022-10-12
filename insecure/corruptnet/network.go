@@ -119,7 +119,8 @@ func NewCorruptNetwork(
 
 // Register serves as the typical network registration of the given message processor on the channel.
 // Except, it first wraps the given processor around a corrupt message processor, and then
-// registers the corrupt message processor to the original flow network.
+// registers the corrupt message processor to the original Flow network.
+// Returns a non nil error if fails to register the corrupt message processor with the original Flow network.
 func (n *Network) Register(channel channels.Channel, messageProcessor flownet.MessageProcessor) (flownet.Conduit, error) {
 	corruptProcessor := NewCorruptMessageProcessor(
 		n.logger.With().Str("module", "corrupted-message-processor").Hex("corrupt_id", logging.ID(n.me.NodeID())).Logger(),
@@ -140,6 +141,7 @@ func (n *Network) Register(channel channels.Channel, messageProcessor flownet.Me
 
 // RegisterBlobService directly invokes the corresponding method on the underlying Flow network instance. It does not perform
 // any corruption and passes everything through as it is.
+// Returns a non nil error if fails to register with original Flow network.
 func (n *Network) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...flownet.BlobServiceOption) (flownet.BlobService,
 	error) {
 	return n.flowNetwork.RegisterBlobService(channel, store, opts...)
@@ -147,6 +149,7 @@ func (n *Network) RegisterBlobService(channel channels.Channel, store datastore.
 
 // RegisterPingService directly invokes the corresponding method on the underlying Flow network instance. It does not perform
 // any corruption and passes everything through as it is.
+// Returns a non nil error if fails to register with original Flow network.
 func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider flownet.PingInfoProvider) (flownet.PingService, error) {
 	return n.flowNetwork.RegisterPingService(pingProtocolID, pingInfoProvider)
 }
@@ -160,6 +163,8 @@ func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvid
 //
 // Messages sent from attack orchestrator to this corrupt network are considered dictated in the sense that they are sent on behalf
 // of this corrupt network instance on the original Flow network to other Flow nodes.
+//
+// Returns a fatal error and crashes if message from attacker is invalid (i.e. contains both ingress and egress message or neither ingress nor egress message).
 func (n *Network) ProcessAttackerMessage(stream insecure.CorruptNetwork_ProcessAttackerMessageServer) error {
 	for {
 		select {
