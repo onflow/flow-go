@@ -26,7 +26,7 @@ func TestOrchestratorNetworkObserve_MultipleConcurrentMessages(t *testing.T) {
 	testOrchestratorNetworkObserve(t, 10)
 }
 
-// testOrchestratorNetworkObserve evaluates that upon receiving concurrent messages from corruptible conduits, the orchestrator network
+// testOrchestratorNetworkObserve evaluates that upon receiving concurrent messages from corrupt network, the orchestrator network
 // decodes the messages into events and relays them to its registered orchestrator.
 func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
@@ -39,7 +39,7 @@ func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
 			// mocks orchestrator to receive each event exactly once.
 			orchestratorWG := mockOrchestratorHandlingEgressEvent(t, orchestrator, egressEvents)
 
-			// sends all messages concurrently to the orchestrator network (imitating corruptible conduits sending
+			// sends all messages concurrently to the orchestrator network (imitating corrupt networks sending
 			// messages concurrently to orchestrator network).
 			orchestratorNetworkSendWG := sync.WaitGroup{}
 			orchestratorNetworkSendWG.Add(concurrencyDegree)
@@ -87,7 +87,7 @@ func TestOrchestratorNetworkPublish_ConcurrentMessages(t *testing.T) {
 }
 
 // testOrchestratorNetwork evaluates that the orchestrator can successfully route an event to a corrupted node through the orchestrator network.
-// By a corrupted node here, we mean a node that runs with a corruptible conduit factory.
+// By a corrupted node here, we mean a node that runs with a corrupt network.
 func testOrchestratorNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
 	_, egressEvents, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), protocol, concurrencyDegree)
@@ -257,13 +257,13 @@ func withMockCorruptNetworks(
 
 	count := len(corruptedIds)
 
-	// life-cycle management of corruptible conduit factory.
+	// life-cycle management of corrupt network.
 	ctx, cancel := context.WithCancel(context.Background())
 	corruptNetworkCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
 		case err := <-errChan:
-			t.Error("mock corruptible conduit factory startup encountered fatal error", err)
+			t.Error("mock corrupt network startup encountered fatal error", err)
 		case <-ctx.Done():
 			return
 		}
@@ -275,7 +275,7 @@ func withMockCorruptNetworks(
 		// factory
 		corruptNetwork := newMockCorruptNetwork()
 		corruptNetwork.Start(corruptNetworkCtx)
-		unittest.RequireCloseBefore(t, corruptNetwork.Ready(), 100*time.Millisecond, "could not start corruptible conduit factory on time")
+		unittest.RequireCloseBefore(t, corruptNetwork.Ready(), 100*time.Millisecond, "could not start corrupt network on time")
 		corruptNetworks[i] = corruptNetwork
 
 		// port mapping
@@ -293,6 +293,6 @@ func withMockCorruptNetworks(
 
 	// stop all corruptNetworks
 	for i := 0; i < count; i++ {
-		unittest.RequireCloseBefore(t, corruptNetworks[i].Done(), 100*time.Millisecond, "could not stop corruptible conduit factory on time")
+		unittest.RequireCloseBefore(t, corruptNetworks[i].Done(), 100*time.Millisecond, "could not stop corrupt network on time")
 	}
 }
