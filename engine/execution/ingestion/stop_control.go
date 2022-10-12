@@ -114,6 +114,7 @@ func (s *StopControl) SetStopHeight(height uint64, crash bool) (uint64, bool, er
 // GetStopHeight returns:
 //   - height
 //   - crash
+//
 // Values are undefined if they were not previously set
 func (s *StopControl) GetStopHeight() (uint64, bool) {
 	s.RLock()
