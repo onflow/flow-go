@@ -49,18 +49,19 @@ func (co *CompactorObserver) OnComplete() {
 	close(co.done)
 }
 
-// TestCompactor tests creation of WAL segments and checkpoints, and
+// TestCompactorCreation tests creation of WAL segments and checkpoints, and
 // checks if the rebuilt ledger state matches previous ledger state.
-func TestCompactor(t *testing.T) {
+func TestCompactorCreation(t *testing.T) {
 	const (
 		numInsPerStep      = 2
 		pathByteSize       = 32
-		minPayloadByteSize = 2 << 15
-		maxPayloadByteSize = 2 << 16
+		minPayloadByteSize = 2 << 15 // 64  KB
+		maxPayloadByteSize = 2 << 16 // 128 KB
 		size               = 10
 		checkpointDistance = 3
 		checkpointsToKeep  = 1
 		forestCapacity     = size * 10
+		segmentSize        = 32 * 1024 // 32 KB
 	)
 
 	metricsCollector := &metrics.NoopCollector{}
@@ -74,7 +75,7 @@ func TestCompactor(t *testing.T) {
 
 		t.Run("creates checkpoints", func(t *testing.T) {
 
-			wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
+			wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			l, err = NewLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
@@ -83,7 +84,7 @@ func TestCompactor(t *testing.T) {
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
 			// so we should get at least `size` segments
 
-			compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 			require.NoError(t, err)
 
 			co := CompactorObserver{fromBound: 8, done: make(chan struct{})}
@@ -92,9 +93,14 @@ func TestCompactor(t *testing.T) {
 			// Run Compactor in background.
 			<-compactor.Ready()
 
+			log.Info().Msgf("compactor is ready")
+
 			rootState := l.InitialState()
 
 			// Generate the tree and create WAL
+			// update the ledger size (10) times, since each update will trigger a segment file creation
+			// and checkpointDistance is 3, then, 10 segment files should trigger generating checkpoint:
+			// 2, 5, 8, that's why the fromBound is 8
 			for i := 0; i < size; i++ {
 
 				payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
@@ -111,6 +117,8 @@ func TestCompactor(t *testing.T) {
 				update, err := ledger.NewUpdate(rootState, keys, values)
 				require.NoError(t, err)
 
+				log.Info().Msgf("update ledger with min payload byte size: %v, %v will trigger segment file creation",
+					numInsPerStep*minPayloadByteSize, segmentSize)
 				newState, _, err := l.Set(update)
 				require.NoError(t, err)
 
@@ -127,7 +135,8 @@ func TestCompactor(t *testing.T) {
 				rootState = newState
 			}
 
-			// wait for the bound-checking observer to confirm checkpoints have been made
+			log.Info().Msgf("wait for the bound-checking observer to confirm checkpoints have been made")
+
 			select {
 			case <-co.done:
 				// continue
@@ -278,7 +287,7 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 		// saved data after updates
 		savedData := make(map[ledger.RootHash]map[string]*ledger.Payload)
 
-		wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
+		wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 		require.NoError(t, err)
 
 		l, err = NewLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
@@ -287,7 +296,7 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 		// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
 		// so we should get at least `size` segments
 
-		compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+		compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 		require.NoError(t, err)
 
 		co := CompactorObserver{fromBound: 8, done: make(chan struct{})}
@@ -403,13 +412,13 @@ func TestCompactorAccuracy(t *testing.T) {
 		// Create DiskWAL and Ledger repeatedly to test rebuilding ledger state at restart.
 		for i := 0; i < 3; i++ {
 
-			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
+			wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
 			l, err := NewLedger(wal, forestCapacity, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
 			require.NoError(t, err)
 
-			compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 			require.NoError(t, err)
 
 			fromBound := lastCheckpointNum + (size / 2)
@@ -611,13 +620,13 @@ func TestCompactorConcurrency(t *testing.T) {
 		// There are 1-2 records per segment (according to logs), so
 		// generate size/2 segments.
 
-		wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
+		wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 		require.NoError(t, err)
 
 		l, err := NewLedger(wal, forestCapacity, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+		compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 		require.NoError(t, err)
 
 		fromBound := lastCheckpointNum + (size / 2 * numGoroutine)

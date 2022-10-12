@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-const SegmentSize = 32 * 1024 * 1024
+const SegmentSize = 32 * 1024 * 1024 // 32 MB
 
 type DiskWAL struct {
 	wal            *prometheusWAL.WAL
@@ -155,7 +155,6 @@ func (w *DiskWAL) replay(
 		return fmt.Errorf("end of range cannot be smaller than beginning")
 	}
 
-	checkpointLoaded := false
 	loadedCheckpoint := -1
 	startSegment := from
 
@@ -202,7 +201,6 @@ func (w *DiskWAL) replay(
 				return fmt.Errorf("error while handling checkpoint: %w", err)
 			}
 			loadedCheckpoint = latestCheckpoint
-			checkpointLoaded = true
 			break
 		}
 
@@ -233,14 +231,7 @@ func (w *DiskWAL) replay(
 			}
 
 			w.log.Info().Msgf("root checkpoint loaded")
-			checkpointLoaded = true
 		}
-	}
-
-	// if should load checkpoint, but not loaded, then return error
-	if useCheckpoints && !checkpointLoaded {
-		return fmt.Errorf("no checkpoint file was found, tried all checkpoint files, but none of them is valid: %v",
-			allCheckpoints)
 	}
 
 	w.log.Info().Msgf("replaying segments from %d to %d", startSegment, to)
