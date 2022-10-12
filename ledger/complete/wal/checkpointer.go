@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -302,23 +301,14 @@ func StoreCheckpointV5(dir string, fileName string, logger *zerolog.Logger, trie
 	// error
 	// Note, the above code, which didn't define the name "err" for the returned error, would be wrong,
 	// beause err needs to be defined in order to be updated by the defer function
-	err error,
+	errToReturn error,
 ) {
 	writer, err := CreateCheckpointWriterForFile(dir, fileName, logger)
 	if err != nil {
 		return fmt.Errorf("could not create writer: %w", err)
 	}
 	defer func() {
-		var errs *multierror.Error
-		if err != nil {
-			errs = multierror.Append(errs, err)
-		}
-		closeError := writer.Close()
-		if closeError != nil {
-			errs = multierror.Append(errs, closeError)
-		}
-		// update the returned err
-		err = errs.ErrorOrNil()
+		errToReturn = closeAndMergeError(writer, err)
 	}()
 
 	crc32Writer := NewCRC32Writer(writer)
@@ -620,7 +610,9 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
-func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func LoadCheckpoint(filepath string, logger *zerolog.Logger) (
+	tries []*trie.MTrie,
+	errToReturn error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
@@ -632,7 +624,7 @@ func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, err
 			// No need to return this error because it's possible to continue normal operations.
 		}
 
-		_ = file.Close()
+		errToReturn = closeAndMergeError(file, err)
 	}()
 
 	return readCheckpoint(file, logger)
