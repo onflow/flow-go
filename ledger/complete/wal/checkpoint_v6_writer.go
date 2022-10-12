@@ -40,7 +40,7 @@ func StoreCheckpointV6SingleThread(tries []*trie.MTrie, outputDir string, output
 	return StoreCheckpointV6(tries, outputDir, outputFile, logger, 1)
 }
 
-// StoreCheckpointV6SingleThread stores checkpoint file in v6 in max workers,
+// StoreCheckpointV6Concurrent stores checkpoint file in v6 in max workers,
 // useful during state extraction
 func StoreCheckpointV6Concurrent(tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
 	return StoreCheckpointV6(tries, outputDir, outputFile, logger, 16)
@@ -312,7 +312,7 @@ func storeSubTrieConcurrently(
 ) {
 	logger.Info().Msgf("storing %v subtrie groups with average node count %v for each subtrie", subtrieCount, estimatedSubtrieNodeCount)
 
-	if nWorker == 0 && nWorker > subtrieCount {
+	if nWorker == 0 || nWorker > subtrieCount {
 		return nil, 0, nil, fmt.Errorf("invalid nWorker %v, the valid range is [1,%v]", nWorker, subtrieCount)
 	}
 
