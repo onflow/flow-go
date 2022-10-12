@@ -120,7 +120,7 @@ func (w *DiskWAL) Replay(
 	}
 	err = w.replay(from, to, checkpointFn, updateFn, deleteFn, true)
 	if err != nil {
-		return fmt.Errorf("could not replay segments [from:to], [%v:%v]: %w", from, to, err)
+		return fmt.Errorf("could not replay segments [%v:%v]: %w", from, to, err)
 	}
 	return nil
 }

@@ -117,7 +117,7 @@ func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
 
 	subtrieCount := subtrieCountByLevel(subtrieLevel)
 	for i := 0; i < subtrieCount; i++ {
-		paths = append(paths, path.Join(dir, fmt.Sprintf("%v.%v", fileName, i)))
+		paths = append(paths, path.Join(dir, fmt.Sprintf("%s.%03d", fileName, i)))
 	}
 
 	p, _ := filePathTopTries(dir, fileName)
@@ -133,8 +133,6 @@ func readCheckpointHeader(filepath string, logger *zerolog.Logger) ([]uint32, ui
 		return nil, 0, fmt.Errorf("could not seek to start for header file: %w", err)
 	}
 
-	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
-	reader := NewCRC32Reader(bufReader)
 	defer func(f *os.File) {
 		evictErr := evictFileFromLinuxPageCache(f, false, logger)
 		if evictErr != nil {
@@ -144,6 +142,8 @@ func readCheckpointHeader(filepath string, logger *zerolog.Logger) ([]uint32, ui
 		f.Close()
 	}(closable)
 
+	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
+	reader := NewCRC32Reader(bufReader)
 	// read the magic bytes and check version
 	err = validateFileHeader(MagicBytesCheckpointHeader, VersionV6, reader)
 	if err != nil {
