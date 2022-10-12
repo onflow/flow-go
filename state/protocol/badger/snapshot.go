@@ -102,7 +102,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 // return the same child.
 func (s *Snapshot) validChild() (*flow.Header, error) {
 
-	var childIDs []flow.Identifier
+	var childIDs flow.IdentifierList
 	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &childIDs))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up children: %w", err)
@@ -345,7 +345,7 @@ func (s *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
 }
 
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
-	var children []flow.Identifier
+	var children flow.IdentifierList
 	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &children))
 	if err != nil {
 		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
