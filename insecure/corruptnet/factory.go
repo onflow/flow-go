@@ -1,4 +1,4 @@
-package corruptible
+package corruptnet
 
 import (
 	"context"
@@ -15,22 +15,22 @@ import (
 
 const networkingProtocolTCP = "tcp"
 
-// ConduitFactory implements a corruptible conduit factory, that creates corruptible conduits.
+// ConduitFactory implements a corrupt conduit factory, that creates corrupt conduits.
 type ConduitFactory struct {
 	logger           zerolog.Logger
 	adapter          network.Adapter
 	egressController insecure.EgressController
 }
 
-var _ insecure.CorruptibleConduitFactory = &ConduitFactory{}
+var _ insecure.CorruptConduitFactory = &ConduitFactory{}
 
-func NewCorruptibleConduitFactory(logger zerolog.Logger, chainId flow.ChainID) *ConduitFactory {
+func NewCorruptConduitFactory(logger zerolog.Logger, chainId flow.ChainID) *ConduitFactory {
 	if chainId != flow.BftTestnet {
-		panic("illegal chain id for using corruptible conduit factory")
+		panic("illegal chain id for using corrupt conduit factory")
 	}
 
 	factory := &ConduitFactory{
-		logger: logger.With().Str("module", "corruptible-conduit-factory").Logger(),
+		logger: logger.With().Str("module", "corrupt-conduit-factory").Logger(),
 	}
 
 	return factory

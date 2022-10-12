@@ -3,6 +3,7 @@ package environment
 import (
 	"encoding/binary"
 	"math/rand"
+	"sync"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -11,7 +12,11 @@ import (
 
 type UnsafeRandomGenerator struct {
 	tracer *Tracer
-	rng    *rand.Rand
+
+	blockHeader *flow.Header
+
+	rng      *rand.Rand
+	seedOnce sync.Once
 }
 
 func NewUnsafeRandomGenerator(
@@ -19,25 +24,39 @@ func NewUnsafeRandomGenerator(
 	blockHeader *flow.Header,
 ) *UnsafeRandomGenerator {
 	gen := &UnsafeRandomGenerator{
-		tracer: tracer,
-	}
-
-	if blockHeader != nil {
-		// Seed the random number generator with entropy created from the block
-		// header ID. The random number generator will be used by the
-		// UnsafeRandom function.
-		id := blockHeader.ID()
-		source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
-		gen.rng = rand.New(source)
+		tracer:      tracer,
+		blockHeader: blockHeader,
 	}
 
 	return gen
 }
 
+// seed seeds the random number generator with the block header ID.
+// This allows lazy seeding of the random number generator,
+// since not a lot of transactions/scripts use it and the time it takes to seed it is not negligible.
+func (gen *UnsafeRandomGenerator) seed() {
+	gen.seedOnce.Do(func() {
+		if gen.blockHeader == nil {
+			return
+		}
+		// Seed the random number generator with entropy created from the block
+		// header ID. The random number generator will be used by the
+		// UnsafeRandom function.
+		id := gen.blockHeader.ID()
+		source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
+		gen.rng = rand.New(source)
+	})
+}
+
 // UnsafeRandom returns a random uint64, where the process of random number
 // derivation is not cryptographically secure.
+// this is not thread safe, due to gen.rng.Read(buf).
+// Its also not thread safe because each thread needs to be deterministically seeded with a different seed.
+// This is Ok because a single transaction has a single UnsafeRandomGenerator and is run in a single thread.
 func (gen *UnsafeRandomGenerator) UnsafeRandom() (uint64, error) {
 	defer gen.tracer.StartExtensiveTracingSpanFromRoot(trace.FVMEnvUnsafeRandom).End()
+
+	gen.seed()
 
 	if gen.rng == nil {
 		return 0, errors.NewOperationNotSupportedError("UnsafeRandom")

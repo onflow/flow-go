@@ -698,6 +698,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
+				expectedEventIndex := uint32(0)
 				for _, e := range tx.Events {
 					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
 						deposits = append(deposits, e)
@@ -705,6 +706,9 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
 						withdraws = append(withdraws, e)
 					}
+					// event index numbers have to be an increasing uint sequence (0,1,2...)
+					require.Equal(t, expectedEventIndex, e.EventIndex)
+					expectedEventIndex++
 				}
 
 				require.Len(t, deposits, 2)
