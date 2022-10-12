@@ -89,6 +89,8 @@ func run(*cobra.Command, []string) {
 			log.Fatal().Err(err).Msg("malformed block hash")
 		}
 
+		log.Info().Msgf("extracting state by block ID: %v", blockID)
+
 		db := common.InitStorage(flagDatadir)
 		defer db.Close()
 
@@ -111,6 +113,8 @@ func run(*cobra.Command, []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("invalid state commitment length")
 		}
+
+		log.Info().Msgf("extracting state by state commitment: %v", stateCommitment)
 	}
 
 	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 {
