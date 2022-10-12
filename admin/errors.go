@@ -21,6 +21,11 @@ func NewInvalidAdminParameterError(field string, msg string, actualVal any) *Inv
 	}
 }
 
+func IsInvalidAdminParameterError(err error) bool {
+	var target *InvalidAdminParameterError
+	return errors.As(err, &target)
+}
+
 func (i *InvalidAdminParameterError) Error() string {
 	return i.msg
 }

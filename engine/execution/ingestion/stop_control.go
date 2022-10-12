@@ -62,6 +62,8 @@ func NewStopControl(log zerolog.Logger, paused bool) *StopControl {
 
 // GetState returns current state of StopControl module
 func (s *StopControl) GetState() StopControlState {
+	s.RLock()
+	defer s.RUnlock()
 	return s.state
 }
 

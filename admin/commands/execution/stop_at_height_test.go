@@ -42,8 +42,7 @@ func TestCommandParsing(t *testing.T) {
 
 		err := cmd.Validator(req)
 
-		invalidAdminParameterError := &admin.InvalidAdminParameterError{}
-		require.ErrorAs(t, err, &invalidAdminParameterError)
+		require.True(t, admin.IsInvalidAdminParameterError(err))
 	})
 
 	t.Run("wrong height type", func(t *testing.T) {
@@ -56,8 +55,7 @@ func TestCommandParsing(t *testing.T) {
 
 		err := cmd.Validator(req)
 
-		invalidAdminParameterError := &admin.InvalidAdminParameterError{}
-		require.ErrorAs(t, err, &invalidAdminParameterError)
+		require.True(t, admin.IsInvalidAdminParameterError(err))
 	})
 
 	t.Run("wrong height type", func(t *testing.T) {
@@ -70,8 +68,7 @@ func TestCommandParsing(t *testing.T) {
 
 		err := cmd.Validator(req)
 
-		invalidAdminParameterError := &admin.InvalidAdminParameterError{}
-		require.ErrorAs(t, err, &invalidAdminParameterError)
+		require.True(t, admin.IsInvalidAdminParameterError(err))
 	})
 
 	t.Run("negative", func(t *testing.T) {
@@ -84,8 +81,7 @@ func TestCommandParsing(t *testing.T) {
 
 		err := cmd.Validator(req)
 
-		invalidAdminParameterError := &admin.InvalidAdminParameterError{}
-		require.ErrorAs(t, err, &invalidAdminParameterError)
+		require.True(t, admin.IsInvalidAdminParameterError(err))
 	})
 
 }
