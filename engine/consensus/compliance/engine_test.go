@@ -154,7 +154,7 @@ func (cs *EngineSuite) TestBroadcastProposalWithDelay() {
 		}
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		cs.hotstuff.On("SubmitProposal", &headerFromHotstuff, parent.View).
+		cs.hotstuff.On("SubmitProposal", &headerFromHotstuff).
 			Run(func(args mock.Arguments) { close(submitted) }).
 			Once()
 
@@ -210,7 +210,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
-		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
+		cs.hotstuff.On("SubmitProposal", block.Header).Return()
 		err := cs.engine.Process(channels.ConsensusCommittee, originID, proposal)
 		cs.Assert().NoError(err)
 		wg.Done()

@@ -204,7 +204,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	cs.hotstuff.On("SubmitProposal", proposal.Header, cs.head.Header.View)
+	cs.hotstuff.On("SubmitProposal", proposal.Header)
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -246,7 +246,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
 
-	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Once()
+	cs.hotstuff.On("SubmitProposal", block.Header).Once()
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -329,10 +329,10 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
-	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.Header.View).Once()
-	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Once()
-	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Once()
-	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Once()
+	cs.hotstuff.On("SubmitProposal", parent.Header).Once()
+	cs.hotstuff.On("SubmitProposal", block1.Header).Once()
+	cs.hotstuff.On("SubmitProposal", block2.Header).Once()
+	cs.hotstuff.On("SubmitProposal", block3.Header).Once()
 
 	// execute the connected children handling
 	err := cs.core.processBlockAndDescendants(proposal)
@@ -448,7 +448,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 		proposals[1].Header.ID(),
 		proposals[2].Header.ID(),
 	}
-	cs.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Times(4).Run(
+	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
 			header := args.Get(0).(*flow.Header)
 			assert.Equal(cs.T(), order[index], header.ID(), "should submit correct header to hotstuff")

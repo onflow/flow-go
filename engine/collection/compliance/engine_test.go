@@ -251,7 +251,7 @@ func (cs *EngineSuite) TestBroadcastProposalWithDelay() {
 		}
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		cs.hotstuff.On("SubmitProposal", &headerFromHotstuff, parent.Header.View).
+		cs.hotstuff.On("SubmitProposal", &headerFromHotstuff).
 			Run(func(args mock.Arguments) { close(submitted) }).
 			Once()
 
@@ -311,7 +311,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
-		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.Header.View)
+		cs.hotstuff.On("SubmitProposal", block.Header)
 		err := cs.engine.Process(channel, originID, proposal)
 		cs.Assert().NoError(err)
 		wg.Done()
@@ -351,6 +351,6 @@ func (cs *EngineSuite) TestOnFinalizedBlock() {
 		Run(func(_ mock.Arguments) { wg.Done() }).
 		Return(uint(0)).Once()
 
-	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock.Header, finalizedBlock.Header.View-1))
+	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock.Header))
 	unittest.AssertReturnsBefore(cs.T(), wg.Wait, time.Second, "an expected call to block buffer wasn't made")
 }
