@@ -193,7 +193,6 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 		(C.int)(len(points)))
 
 	sumKey := newPubKeyBLSBLS12381(&sum)
-	sumKey.isIdentity = C.ep2_is_infty((*C.ep2_st)(&sum)) != valid
 	return sumKey, nil
 }
 
@@ -252,9 +251,6 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 		(*C.ep2_st)(&pointsToSubtract[0]), (C.int)(len(pointsToSubtract)))
 
 	resultKey := newPubKeyBLSBLS12381(&resultPoint)
-	// cache the identity comparison
-	resultKey.isIdentity = C.ep2_is_infty((*C.ep2_st)(&resultPoint)) != valid
-
 	return resultKey, nil
 }
 

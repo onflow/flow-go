@@ -418,9 +418,13 @@ type pubKeyBLSBLS12381 struct {
 // empty scalar.
 func newPubKeyBLSBLS12381(p *pointG2) *pubKeyBLSBLS12381 {
 	if p != nil {
-		return &pubKeyBLSBLS12381{
+		key := &pubKeyBLSBLS12381{
 			point: *p,
 		}
+		// cache the identity comparison for a faster check
+		// during signature verifications
+		key.isIdentity = C.ep2_is_infty((*C.ep2_st)(p)) != valid
+		return key
 	}
 	return &pubKeyBLSBLS12381{}
 }

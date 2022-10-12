@@ -180,14 +180,11 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 
 	// Group public key
 	Y := newPubKeyBLSBLS12381(&s.vA[0])
-	// identity comparison
-	Y.isIdentity = C.ep2_is_infty((*C.ep2_st)(&s.vA[0])) != valid
 
 	// The participants public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range s.y {
 		y[i] = newPubKeyBLSBLS12381(&p)
-		y[i].isIdentity = C.ep2_is_infty((*C.ep2_st)(&p)) != valid
 	}
 
 	// check if current public key share or group public key is identity.
@@ -196,7 +193,7 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	// TODO: update generateShares to make sure no public key share is identity AND
 	// update receiveVector function to disqualify the dealer if any public key share
 	// is identity, only when FeldmanVSSQ is not a building primitive of Joint-Feldman
-	if y[s.myIndex].isIdentity {
+	if C.bn_is_zero((*C.bn_st)(&s.x)) != valid {
 		return nil, nil, nil, dkgFailureErrorf("private key share is identity and therefore invalid")
 	}
 	if Y.isIdentity {

@@ -206,13 +206,11 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 
 	// Group public key
 	Y := newPubKeyBLSBLS12381(jointPublicKey)
-	Y.isIdentity = C.ep2_is_infty((*C.ep2_st)(&s.vA[0])) != valid
 
 	// The participants public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range jointy {
 		y[i] = newPubKeyBLSBLS12381(&p)
-		y[i].isIdentity = C.ep2_is_infty((*C.ep2_st)(&p)) != valid
 	}
 
 	// check if current public key share or group public key is identity.
@@ -224,7 +222,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	// key is initially uniformly distributed over the 2^255 possible values. We can argue that
 	// the known uniformity-bias caused by malicious dealers in Joint-Feldman does not weaken
 	// the likelihood of generarting an identity key to practical probabilities.
-	if y[s.myIndex].isIdentity {
+	if C.bn_is_zero((*C.bn_st)(jointx)) != valid {
 		return nil, nil, nil, dkgFailureErrorf("private key share is identity and is therefore invalid")
 	}
 	if Y.isIdentity {
