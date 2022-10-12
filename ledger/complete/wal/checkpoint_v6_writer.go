@@ -668,22 +668,23 @@ func decodeSubtrieCount(encoded []byte) (uint16, error) {
 // closeAndMergeError close the closable and merge the closeErr with the given err into a multierror
 // Note: when using this function in a defer function, don't use as below:
 // func XXX() (
-//   err error,
-// ) {
-// 		def func() {
-//       // bad, because the definition of err might get overwritten
-//       err = closeAndMergeError(closable, err)
-//    }()
+//
+//	err error,
+//	) {
+//		def func() {
+//			// bad, because the definition of err might get overwritten
+//			err = closeAndMergeError(closable, err)
+//		}()
 //
 // Better to use as below:
 // func XXX() (
-//   errToReturn error,
-// ) {
-// 		def func() {
-//       // good, because the error to returned is only updated here, and guaranteed to be
-//       // returned
-//       errToReturn = closeAndMergeError(closable, err)
-//    }()
+//
+//	errToReturn error,
+//	) {
+//		def func() {
+//			// good, because the error to returned is only updated here, and guaranteed to be returned
+//			errToReturn = closeAndMergeError(closable, err)
+//		}()
 func closeAndMergeError(closable io.Closer, err error) error {
 	var merr *multierror.Error
 	if err != nil {
