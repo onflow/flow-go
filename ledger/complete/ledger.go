@@ -444,7 +444,7 @@ func (l *Ledger) ExportCheckpointAt(
 	if version == 6 {
 		err = realWAL.StoreCheckpointV6Concurrent([]*trie.MTrie{newTrie}, outputDir, outputFile, &l.logger)
 	} else if version == 5 {
-		err = realWAL.StoreCheckpointV5(outputDir, ouputFile, &l.logger, newTrie)
+		err = realWAL.StoreCheckpointV5(outputDir, outputFile, &l.logger, newTrie)
 	} else {
 		return ledger.State(hash.DummyHash), fmt.Errorf("invalid version:%v", version)
 	}

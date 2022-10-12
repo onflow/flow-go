@@ -234,7 +234,7 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 	c.wal.log.Info().Msgf("serializing checkpoint %d", to)
 
 	fileName := NumberToFilename(to)
-	err = StoreCheckpoint(c.wal.dir, fileName, &c.wal.log, tries...)
+	err = StoreCheckpointV6Concurrent(tries, c.wal.dir, fileName, &c.wal.log)
 
 	c.wal.log.Info().Msgf("created checkpoint %d with %d tries", to, len(tries))
 
@@ -659,6 +659,8 @@ func readCheckpoint(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 		return readCheckpointV4(f)
 	case VersionV5:
 		return readCheckpointV5(f, logger)
+	case VersionV6:
+		return ReadCheckpointV6(f, logger)
 	default:
 		return nil, fmt.Errorf("unsupported file version %x", version)
 	}

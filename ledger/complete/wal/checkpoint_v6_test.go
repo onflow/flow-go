@@ -296,19 +296,7 @@ func compareFiles(file1, file2 string) error {
 }
 
 func storeCheckpointV5(tries []*trie.MTrie, dir string, fileName string, logger *zerolog.Logger) error {
-	closable, err := createWriterForCheckpointHeader(dir, fileName, logger)
-	if err != nil {
-		return fmt.Errorf("could not store checkpoint header: %w", err)
-	}
-	defer func() {
-		closeErr := closable.Close()
-		// Return close error if there isn't any prior error to return.
-		if err == nil {
-			err = closeErr
-		}
-	}()
-
-	return StoreCheckpointV5(closable, tries...)
+	return StoreCheckpointV5(dir, fileName, logger, tries...)
 }
 
 func TestWriteAndReadCheckpointV5(t *testing.T) {
