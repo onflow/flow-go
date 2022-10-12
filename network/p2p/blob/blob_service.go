@@ -14,8 +14,8 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	provider "github.com/ipfs/go-ipfs-provider"
 	"github.com/ipfs/go-ipfs-provider/simple"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
@@ -281,7 +281,7 @@ func AuthorizedRequester(
 			return false
 		}
 
-		if allowedNodes != nil && len(allowedNodes) > 0 && !allowedNodes[id.NodeID] {
+		if len(allowedNodes) > 0 && !allowedNodes[id.NodeID] {
 			lg.Warn().
 				Bool(logging.KeySuspicious, true).
 				Msg("rejecting request from peer: not in allowed list")
