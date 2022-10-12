@@ -3,6 +3,7 @@ package unittest
 import (
 	"encoding/json"
 	"math"
+	"math/rand"
 	"os"
 	"os/exec"
 	"regexp"
@@ -428,6 +429,16 @@ func CrashTestWithExpectedStatus(
 	// expect logger.Fatal() message to be pushed to stdout
 	outStr := string(outBytes)
 	require.Contains(t, outStr, expectedErrorMsg)
+}
+
+// GenerateRandomStringWithLen returns a string of random alpha characters of the provided length
+func GenerateRandomStringWithLen(commentLen uint) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	bytes := make([]byte, commentLen)
+	for i := range bytes {
+		bytes[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(bytes)
 }
 
 // NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware

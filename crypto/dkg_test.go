@@ -169,18 +169,18 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		lateChansTimeout2[i] = make(chan *message, 5*n)
 	}
 
-	// number of leaders in the protocol
-	var leaders int
+	// number of dealers in the protocol
+	var dealers int
 	if dkg == jointFeldman {
-		leaders = n
+		dealers = n
 	} else {
-		leaders = 1
+		dealers = 1
 	}
 
 	// create n processors for all participants
 	processors := make([]testDKGProcessor, 0, n)
 	for current := 0; current < n; current++ {
-		list := make([]bool, leaders)
+		list := make([]bool, dealers)
 		processors = append(processors, testDKGProcessor{
 			current:           current,
 			chans:             chans,
@@ -211,8 +211,8 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		// r1 = r2 = 0
 
 	case invalidShares:
-		r1 = mrand.Intn(leaders + 1)      // leaders with invalid shares and will get disqualified
-		r2 = mrand.Intn(leaders - r1 + 1) // leaders with invalid shares but will recover
+		r1 = mrand.Intn(dealers + 1)      // dealers with invalid shares and will get disqualified
+		r2 = mrand.Intn(dealers - r1 + 1) // dealers with invalid shares but will recover
 		h = r1
 
 		var i int
@@ -225,7 +225,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		t.Logf("%d participants will be disqualified, %d other participants will recover\n", r1, r2)
 
 	case invalidVector:
-		r1 = 1 + mrand.Intn(leaders) // leaders with invalid vector and will get disqualified
+		r1 = 1 + mrand.Intn(dealers) // dealers with invalid vector and will get disqualified
 		h = r1
 
 		// in this case r2 = 0
@@ -235,9 +235,9 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		t.Logf("%d participants will be disqualified\n", r1)
 
 	case invalidComplaint:
-		r1 = 1 + mrand.Intn(leaders-1) // participants with invalid complaints and will get disqualified.
+		r1 = 1 + mrand.Intn(dealers-1) // participants with invalid complaints and will get disqualified.
 		// r1>= 1 to have at least one malicious dealer, and r1<leadrers-1 to leave space for the trigger dealer below.
-		r2 = mrand.Intn(leaders - r1) // participants with timeouted complaints: they are considered qualified by honest participants
+		r2 = mrand.Intn(dealers - r1) // participants with timeouted complaints: they are considered qualified by honest participants
 		// but their results are invalid
 		h = r1 + r2 // r2 shouldn't be verified for protocol correctness
 
@@ -247,17 +247,17 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		for i := r1; i < r1+r2; i++ {
 			processors[i].malicious = timeoutedComplaintBroadcast
 		}
-		// The participant (r1+r2) will send wrong shares and cause the 0..r1+r2-1 leaders to send complaints.
+		// The participant (r1+r2) will send wrong shares and cause the 0..r1+r2-1 dealers to send complaints.
 		// This participant doesn't risk getting disqualified as the complaints against them
 		// are invalid and won't count. The participant doesn't even answer the complaint.
 		processors[r1+r2].malicious = invalidSharesComplainTrigger
 		t.Logf("%d participants will be disqualified, %d other participants won't be disqualified.\n", r1, r2)
 
 	case invalidComplaintAnswer:
-		r1 = 1 + mrand.Intn(leaders-1) // participants with invalid complaint answers and will get disqualified.
+		r1 = 1 + mrand.Intn(dealers-1) // participants with invalid complaint answers and will get disqualified.
 		// r1>= 1 to have at least one malicious dealer, and r1<leadrers-1 to leave space for the complaint sender.
 		h = r1
-		// the 0..r1-1 leaders will send invalid shares to n-1 to trigger complaints.
+		// the 0..r1-1 dealers will send invalid shares to n-1 to trigger complaints.
 		for i := 0; i < r1; i++ {
 			processors[i].malicious = invalidComplaintAnswerBroadcast
 		}
@@ -336,7 +336,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	// assertions and results:
 
 	// check the disqualified list for all non-disqualified participants
-	expected := make([]bool, leaders)
+	expected := make([]bool, dealers)
 	for i := 0; i < r1; i++ {
 		expected[i] = true
 	}
@@ -735,11 +735,102 @@ func (proc *testDKGProcessor) invalidComplaintAnswerBroadcast(data []byte) {
 	}
 }
 
-func TestErrorTypes(t *testing.T) {
-	t.Run("dkgFailureError", func(t *testing.T) {
+// implements a dummy DKGProcessor
+type dummyTestDKGProcessor struct {
+}
+
+func (proc dummyTestDKGProcessor) PrivateSend(int, []byte)     {}
+func (proc dummyTestDKGProcessor) Broadcast([]byte)            {}
+func (proc dummyTestDKGProcessor) Disqualify(int, string)      {}
+func (proc dummyTestDKGProcessor) FlagMisbehavior(int, string) {}
+
+func TestDKGErrorTypes(t *testing.T) {
+	t.Run("dkgFailureError sanity", func(t *testing.T) {
 		failureError := dkgFailureErrorf("some error")
+		invInpError := invalidInputsErrorf("")
 		otherError := fmt.Errorf("some error")
 		assert.True(t, IsDKGFailureError(failureError))
 		assert.False(t, IsDKGFailureError(otherError))
+		assert.False(t, IsDKGFailureError(invInpError))
+		assert.False(t, IsDKGFailureError(nil))
+		assert.False(t, IsInvalidInputsError(failureError))
+	})
+
+	t.Run("dkgInvalidStateTransitionError sanity", func(t *testing.T) {
+		failureError := dkgInvalidStateTransitionErrorf("some error")
+		invInpError := invalidInputsErrorf("")
+		otherError := fmt.Errorf("some error")
+		assert.True(t, IsDKGInvalidStateTransitionError(failureError))
+		assert.False(t, IsInvalidInputsError(failureError))
+		assert.False(t, IsDKGInvalidStateTransitionError(invInpError))
+		assert.False(t, IsDKGInvalidStateTransitionError(otherError))
+		assert.False(t, IsDKGInvalidStateTransitionError(nil))
+	})
+}
+
+func TestDKGTransitionErrors(t *testing.T) {
+	n := 5
+	threshold := 3
+	myIndex := 0
+	dealer := 1
+	seed := make([]byte, SeedMinLenDKG)
+
+	t.Run("feldman VSS", func(t *testing.T) {
+		state, err := NewFeldmanVSS(n, threshold, myIndex, dummyTestDKGProcessor{}, dealer)
+		require.NoError(t, err)
+		// calls before start
+		err = state.ForceDisqualify(1)
+		assert.True(t, IsDKGInvalidStateTransitionError(err))
+		err = state.HandlePrivateMsg(1, []byte{})
+		assert.True(t, IsDKGInvalidStateTransitionError(err))
+		err = state.HandleBroadcastMsg(1, []byte{})
+		assert.True(t, IsDKGInvalidStateTransitionError(err))
+		_, _, _, err = state.End()
+		assert.True(t, IsDKGInvalidStateTransitionError(err))
+	})
+
+	t.Run("Feldman VSS Qualif and joint-Feldman ", func(t *testing.T) {
+		stateFVSSQ, err := NewFeldmanVSSQual(n, threshold, myIndex, dummyTestDKGProcessor{}, dealer)
+		require.NoError(t, err)
+		stateJF, err := NewJointFeldman(n, threshold, myIndex, dummyTestDKGProcessor{})
+		require.NoError(t, err)
+
+		for _, state := range []DKGState{stateFVSSQ, stateJF} {
+			// calls before start
+			err = state.ForceDisqualify(1)
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			err = state.HandlePrivateMsg(1, []byte{})
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			err = state.HandleBroadcastMsg(1, []byte{})
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			_, _, _, err = state.End()
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			err = state.NextTimeout()
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			// after start
+			err = state.Start(seed)
+			require.NoError(t, err)
+			_, _, _, err = state.End()
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			// after first timeout
+			err = state.NextTimeout()
+			require.NoError(t, err)
+			err = state.Start(seed)
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			_, _, _, err = state.End()
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			// after second timeout
+			err = state.NextTimeout()
+			require.NoError(t, err)
+			err = state.Start(seed)
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			err = state.NextTimeout()
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			// after end
+			_, _, _, err = state.End()
+			require.True(t, IsDKGFailureError(err))
+			err = state.NextTimeout()
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+		}
 	})
 }

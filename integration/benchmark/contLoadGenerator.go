@@ -310,19 +310,35 @@ func (lg *ContLoadGenerator) SetTPS(desired uint) error {
 	lg.workersMutex.Lock()
 	defer lg.workersMutex.Unlock()
 
+	if lg.stopped() {
+		return fmt.Errorf("SetTPS called after loader is stopped: %w", context.Canceled)
+	}
+
+	return lg.unsafeSetTPS(desired)
+}
+
+func (lg *ContLoadGenerator) unsafeSetTPS(desired uint) error {
 	currentTPS := len(lg.workers)
 	diff := int(desired) - currentTPS
 
+	var err error
 	switch {
 	case diff > 0:
-		return lg.startWorkers(diff)
+		err = lg.startWorkers(diff)
 	case diff < 0:
-		return lg.stopWorkers(-diff)
+		err = lg.stopWorkers(-diff)
 	}
-	return nil
+
+	if err == nil {
+		lg.loaderMetrics.SetTPSConfigured(desired)
+	}
+	return err
 }
 
 func (lg *ContLoadGenerator) Stop() {
+	lg.workersMutex.Lock()
+	defer lg.workersMutex.Unlock()
+
 	if lg.stopped() {
 		lg.log.Warn().Msg("Stop() called on generator when already stopped")
 		return
@@ -330,16 +346,20 @@ func (lg *ContLoadGenerator) Stop() {
 
 	defer lg.log.Debug().Msg("stopped generator")
 
-	lg.log.Debug().Msg("stopping workers")
-	_ = lg.SetTPS(0)
-	lg.workerStatsTracker.StopPrinting()
 	lg.log.Debug().Msg("stopping follower")
 	lg.follower.Stop()
+	lg.log.Debug().Msg("stopping workers")
+	_ = lg.unsafeSetTPS(0)
+	lg.workerStatsTracker.StopPrinting()
 	close(lg.stoppedChannel)
 }
 
 func (lg *ContLoadGenerator) Done() <-chan struct{} {
 	return lg.stoppedChannel
+}
+
+func (lg *ContLoadGenerator) GetTxSent() int {
+	return lg.workerStatsTracker.GetTxSent()
 }
 
 func (lg *ContLoadGenerator) GetTxExecuted() int {
@@ -717,7 +737,8 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 			lg.workerStatsTracker.IncTxExecuted()
 			return
 		case <-time.After(slowTransactionThreshold):
-			log.Warn().
+			// TODO(rbtz): add a counter for slow transactions
+			log.Trace().
 				Hex("txID", transferTx.ID().Bytes()).
 				Dur("duration", time.Since(startTime)).
 				Int("availableAccounts", len(lg.availableAccounts)).

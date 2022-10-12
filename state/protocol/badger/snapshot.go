@@ -102,7 +102,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 // return the same child.
 func (s *Snapshot) validChild() (*flow.Header, error) {
 
-	var childIDs []flow.Identifier
+	var childIDs flow.IdentifierList
 	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &childIDs))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up children: %w", err)
@@ -345,7 +345,7 @@ func (s *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
 }
 
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
-	var children []flow.Identifier
+	var children flow.IdentifierList
 	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &children))
 	if err != nil {
 		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
@@ -465,26 +465,25 @@ type EpochQuery struct {
 // Current returns the current epoch.
 func (q *EpochQuery) Current() protocol.Epoch {
 
+	// all errors returned from storage reads here are unexpected, because all
+	// snapshots reside within a current epoch, which must be queriable
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to get epoch statuses for block ID %s: %w",
-			q.snap.blockID, err))
+		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
 	}
 	setup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to get epoch setups for setup ID %s at block %v: %w",
-			status.CurrentEpoch.SetupID, q.snap.blockID, err))
+		return invalid.NewEpochf("could not get current EpochSetup (id=%x) for block %x: %w", status.CurrentEpoch.SetupID, q.snap.blockID, err)
 	}
 	commit, err := q.snap.state.epoch.commits.ByID(status.CurrentEpoch.CommitID)
 	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to get epoch commits for commit ID %s at block %v: %w",
-			status.CurrentEpoch.CommitID, q.snap.blockID, err))
+		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.CurrentEpoch.CommitID, q.snap.blockID, err)
 	}
 
 	epoch, err := inmem.NewCommittedEpoch(setup, commit)
 	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to get new committed epoch with setup (%s) and commit (%s) at block %v: %w",
-			setup.ID(), commit.ID(), q.snap.blockID, err))
+		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
+		return invalid.NewEpochf("could not convert current epoch at block %x: %s", q.snap.blockID, err.Error())
 	}
 	return epoch
 }
@@ -494,11 +493,12 @@ func (q *EpochQuery) Next() protocol.Epoch {
 
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
 	}
 	phase, err := status.Phase()
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// critical error: malformed EpochStatus in storage
+		return invalid.NewEpochf("read malformed EpochStatus from storage: %w", err)
 	}
 	// if we are in the staking phase, the next epoch is not setup yet
 	if phase == flow.EpochPhaseStaking {
@@ -508,12 +508,14 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	// if we are in setup phase, return a SetupEpoch
 	nextSetup, err := q.snap.state.epoch.setups.ByID(status.NextEpoch.SetupID)
 	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
+		// all errors are critical, because we must be able to retrieve EpochSetup when in setup phase
+		return invalid.NewEpochf("could not get next EpochSetup (id=%x) for block %x: %w", status.NextEpoch.SetupID, q.snap.blockID, err)
 	}
 	if phase == flow.EpochPhaseSetup {
 		epoch, err := inmem.NewSetupEpoch(nextSetup)
 		if err != nil {
-			return invalid.NewEpoch(err)
+			// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
+			return invalid.NewEpochf("could not convert next (setup) epoch: %s", err.Error())
 		}
 		return epoch
 	}
@@ -521,11 +523,13 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	// if we are in committed phase, return a CommittedEpoch
 	nextCommit, err := q.snap.state.epoch.commits.ByID(status.NextEpoch.CommitID)
 	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
+		// all errors are critical, because we must be able to retrieve EpochCommit when in committed phase
+		return invalid.NewEpochf("could not get next EpochCommit (id=%x) for block %x: %w", status.NextEpoch.CommitID, q.snap.blockID, err)
 	}
 	epoch, err := inmem.NewCommittedEpoch(nextSetup, nextCommit)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
+		return invalid.NewEpochf("could not convert next (committed) epoch: %s", err.Error())
 	}
 	return epoch
 }
@@ -537,7 +541,7 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
 	}
 
 	// CASE 1: there is no previous epoch - this indicates we are in the first
@@ -550,16 +554,19 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	// for the previous epoch
 	setup, err := q.snap.state.epoch.setups.ByID(status.PreviousEpoch.SetupID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// all errors are critical, because we must be able to retrieve EpochSetup for previous epoch
+		return invalid.NewEpochf("could not get previous EpochSetup (id=%x) for block %x: %w", status.PreviousEpoch.SetupID, q.snap.blockID, err)
 	}
 	commit, err := q.snap.state.epoch.commits.ByID(status.PreviousEpoch.CommitID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// all errors are critical, because we must be able to retrieve EpochCommit for previous epoch
+		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.PreviousEpoch.CommitID, q.snap.blockID, err)
 	}
 
 	epoch, err := inmem.NewCommittedEpoch(setup, commit)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
+		return invalid.NewEpochf("could not convert previous epoch: %s", err.Error())
 	}
 	return epoch
 }

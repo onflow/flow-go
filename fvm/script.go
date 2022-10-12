@@ -25,7 +25,7 @@ type ScriptProcedure struct {
 	Events         []flow.Event
 	GasUsed        uint64
 	MemoryEstimate uint64
-	Err            errors.Error
+	Err            errors.CodedError
 }
 
 type ScriptProcessor interface {
