@@ -191,14 +191,13 @@ func storeCheckpointHeader(
 var createWriterForCheckpointHeader = createClosableWriter
 
 // 17th part file contains:
-// 1. checkpoint version TODO
-// 2. checkpoint file part index TODO
-// 3. subtrieNodeCount
-// 4. top level nodes
-// 5. trie roots
-// 6. node count
-// 7. trie count
-// 6. checksum
+// 1. checkpoint version
+// 2. subtrieNodeCount
+// 3. top level nodes
+// 4. trie roots
+// 5. node count
+// 6. trie count
+// 7. checksum
 func storeTopLevelNodesAndTrieRoots(
 	tries []*trie.MTrie,
 	subTrieRootIndices map[*node.Node]uint64,

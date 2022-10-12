@@ -31,8 +31,6 @@ var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 // it returns (nil, ErrEOFNotReached) if a certain part file is malformed
 // it returns (nil, err) if running into any exception
 func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
-	// TODO: read the main file and check the version
-
 	logger.Info().Msgf("reading v6 checkpoint file")
 
 	// the full path of header file
@@ -51,6 +49,8 @@ func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 		return nil, fmt.Errorf("fail to check all checkpoint part file exist: %w", err)
 	}
 
+	// TODO making number of goroutine configable for reading subtries, which can help us
+	// test the code on machines that don't have as much RAM as EN by using fewer goroutines.
 	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not read subtrie from dir: %w", err)
