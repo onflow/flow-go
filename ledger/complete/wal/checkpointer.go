@@ -667,6 +667,8 @@ func readCheckpoint(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 		return readCheckpointV4(f)
 	case VersionV5:
 		return readCheckpointV5(f, logger)
+	case VersionV6:
+		return ReadCheckpointV6(f, logger)
 	default:
 		return nil, fmt.Errorf("unsupported file version %x", version)
 	}
