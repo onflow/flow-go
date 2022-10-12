@@ -41,8 +41,8 @@ const (
 	// It can only progress to StopControlPaused
 	StopControlCommenced
 
-	// StopControlPaused means EN has stopped processing blocks. It can happen by reaching set stop height, or
-	// if the node was started with a pause mode.
+	// StopControlPaused means EN has stopped processing blocks. It can happen by reaching the set stopping `height`, or
+	// if the node was started in pause mode.
 	// It is a final state and cannot be changed
 	StopControlPaused
 )
@@ -80,7 +80,7 @@ func (s *StopControl) IsPaused() bool {
 //   - height
 //   - crash
 //
-// Returns error is the stopping process has already commenced, new values will be rejected.
+// Returns error if the stopping process has already commenced, new values will be rejected.
 func (s *StopControl) SetStopHeight(height uint64, crash bool) (uint64, bool, error) {
 	s.Lock()
 	defer s.Unlock()
