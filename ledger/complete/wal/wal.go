@@ -116,7 +116,7 @@ func (w *DiskWAL) Replay(
 ) error {
 	from, to, err := w.Segments()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not find segments: %w", err)
 	}
 	err = w.replay(from, to, checkpointFn, updateFn, deleteFn, true)
 	if err != nil {
@@ -132,9 +132,13 @@ func (w *DiskWAL) ReplayLogsOnly(
 ) error {
 	from, to, err := w.Segments()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not find segments: %w", err)
 	}
-	return w.replay(from, to, checkpointFn, updateFn, deleteFn, false)
+	err = w.replay(from, to, checkpointFn, updateFn, deleteFn, false)
+	if err != nil {
+		return fmt.Errorf("could not replay WAL only for segments [%v:%v]: %w", from, to, err)
+	}
+	return nil
 }
 
 func (w *DiskWAL) replay(
@@ -151,6 +155,7 @@ func (w *DiskWAL) replay(
 		return fmt.Errorf("end of range cannot be smaller than beginning")
 	}
 
+	checkpointLoaded := false
 	loadedCheckpoint := -1
 	startSegment := from
 
@@ -159,8 +164,9 @@ func (w *DiskWAL) replay(
 		return fmt.Errorf("cannot create checkpointer: %w", err)
 	}
 
+	var allCheckpoints []int
 	if useCheckpoints {
-		allCheckpoints, err := checkpointer.Checkpoints()
+		allCheckpoints, err = checkpointer.Checkpoints()
 		if err != nil {
 			return fmt.Errorf("cannot get list of checkpoints: %w", err)
 		}
@@ -196,6 +202,7 @@ func (w *DiskWAL) replay(
 				return fmt.Errorf("error while handling checkpoint: %w", err)
 			}
 			loadedCheckpoint = latestCheckpoint
+			checkpointLoaded = true
 			break
 		}
 
@@ -226,7 +233,14 @@ func (w *DiskWAL) replay(
 			}
 
 			w.log.Info().Msgf("root checkpoint loaded")
+			checkpointLoaded = true
 		}
+	}
+
+	// if should load checkpoint, but not loaded, then return error
+	if useCheckpoints && !checkpointLoaded {
+		return fmt.Errorf("no checkpoint file was found, tried all checkpoint files, but none of them is valid: %v",
+			allCheckpoints)
 	}
 
 	w.log.Info().Msgf("replaying segments from %d to %d", startSegment, to)
