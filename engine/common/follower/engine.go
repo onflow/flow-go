@@ -408,16 +408,10 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}
 
-	// retrieve the parent
-	parent, err := e.headers.ByBlockID(header.ParentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve proposal parent: %w", err)
-	}
-
 	log.Info().Msg("forwarding block proposal to hotstuff")
 
 	// submit the model to follower for processing
-	e.follower.SubmitProposal(header, parent.View)
+	e.follower.SubmitProposal(header)
 
 	// check for any descendants of the block to process
 	err = e.processPendingChildren(ctx, header)

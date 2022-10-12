@@ -44,9 +44,9 @@ func (_m *HotStuffFollower) Ready() <-chan struct{} {
 	return r0
 }
 
-// SubmitProposal provides a mock function with given fields: proposal, parentView
-func (_m *HotStuffFollower) SubmitProposal(proposal *flow.Header, parentView uint64) {
-	_m.Called(proposal, parentView)
+// SubmitProposal provides a mock function with given fields: proposal
+func (_m *HotStuffFollower) SubmitProposal(proposal *flow.Header) {
+	_m.Called(proposal)
 }
 
 type mockConstructorTestingTNewHotStuffFollower interface {

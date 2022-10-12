@@ -51,9 +51,9 @@ func (_m *HotStuff) Start(_a0 irrecoverable.SignalerContext) {
 	_m.Called(_a0)
 }
 
-// SubmitProposal provides a mock function with given fields: proposal, parentView
-func (_m *HotStuff) SubmitProposal(proposal *flow.Header, parentView uint64) {
-	_m.Called(proposal, parentView)
+// SubmitProposal provides a mock function with given fields: proposal
+func (_m *HotStuff) SubmitProposal(proposal *flow.Header) {
+	_m.Called(proposal)
 }
 
 type mockConstructorTestingTNewHotStuff interface {

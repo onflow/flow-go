@@ -16,7 +16,7 @@ type HotStuff interface {
 	//
 	// Block proposals must be submitted in order and only if they extend a
 	// block already known to HotStuff core.
-	SubmitProposal(proposal *flow.Header, parentView uint64)
+	SubmitProposal(proposal *flow.Header)
 }
 
 // HotStuffFollower is run by non-consensus nodes to observe the block chain
@@ -47,5 +47,5 @@ type HotStuffFollower interface {
 	//
 	// Block proposals must be submitted in order, i.e. a proposal's parent must
 	// have been previously processed by the HotStuffFollower.
-	SubmitProposal(proposal *flow.Header, parentView uint64)
+	SubmitProposal(proposal *flow.Header)
 }

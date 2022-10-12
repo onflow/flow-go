@@ -33,11 +33,12 @@ func New(signer hotstuff.Signer, committee hotstuff.Replicas, builder module.Bui
 // MakeBlockProposal builds a new HotStuff block proposal using the given view,
 // the given quorum certificate for its parent and [optionally] a timeout certificate for last view(could be nil).
 // No errors are expected during normal operation.
-func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error) {
+func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Header, error) {
 	// the custom functions allows us to set some custom fields on the block;
 	// in hotstuff, we use this for view number and signature-related fields
 	setHotstuffFields := func(header *flow.Header) error {
 		header.View = view
+		header.ParentView = qc.View
 		header.ParentVoterIndices = qc.SignerIndices
 		header.ParentVoterSigData = qc.SigData
 		header.ProposerID = bp.committee.Self()
@@ -69,8 +70,5 @@ func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertifica
 		return nil, fmt.Errorf("could not build block proposal on top of %v: %w", qc.BlockID, err)
 	}
 
-	// turn the signed flow header into a proposal
-	proposal := model.ProposalFromFlow(header, qc.View)
-
-	return proposal, nil
+	return header, nil
 }

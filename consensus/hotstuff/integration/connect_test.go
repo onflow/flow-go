@@ -40,7 +40,7 @@ func Connect(instances []*Instance) {
 				header.Height = parent.Height + 1
 
 				// convert into proposal immediately
-				proposal := model.ProposalFromFlow(header, parent.View)
+				proposal := model.ProposalFromFlow(header)
 
 				// store locally and loop back to engine for processing
 				sender.ProcessBlock(proposal)

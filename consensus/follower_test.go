@@ -179,7 +179,7 @@ func (s *HotStuffFollowerSuite) TestSubmitProposal() {
 
 	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
-	s.submitProposal(nextBlock, rootBlockView)
+	s.submitProposal(nextBlock)
 }
 
 // TestFollowerFinalizedBlock verifies that when submitting 2 extra blocks
@@ -190,13 +190,13 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	expectedFinalized := s.mockConsensus.extendBlock(s.rootHeader.View+1, s.rootHeader)
 	s.notifier.On("OnBlockIncorporated", blockWithID(expectedFinalized.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(expectedFinalized.ID())).Return(nil).Once()
-	s.submitProposal(expectedFinalized, s.rootHeader.View)
+	s.submitProposal(expectedFinalized)
 
 	// direct 1-chain on top of expectedFinalized
 	nextBlock := s.mockConsensus.extendBlock(expectedFinalized.View+1, expectedFinalized)
 	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
-	s.submitProposal(nextBlock, expectedFinalized.View)
+	s.submitProposal(nextBlock)
 
 	// indirect 2-chain on top of expectedFinalized
 	lastBlock := nextBlock
@@ -205,7 +205,7 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	s.notifier.On("OnFinalizedBlock", blockWithID(expectedFinalized.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
 	s.updater.On("MakeFinal", blockID(expectedFinalized.ID())).Return(nil).Once()
-	s.submitProposal(nextBlock, lastBlock.View)
+	s.submitProposal(nextBlock)
 }
 
 // TestOutOfOrderBlocks verifies that when submitting a variety of blocks with view numbers
@@ -266,20 +266,20 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 
 	// now we feed the blocks in some wild view order into the Follower
 	// (Caution: we still have to make sure the parent is known, before we give its child to the Follower)
-	s.submitProposal(block03, rootView)
-	s.submitProposal(block07, rootView+3)
-	s.submitProposal(block11, rootView+7)
-	s.submitProposal(block01, rootView)
-	s.submitProposal(block05, rootView+1)
-	s.submitProposal(block17, rootView+11)
-	s.submitProposal(block09, rootView+5)
-	s.submitProposal(block06, rootView+5)
-	s.submitProposal(block10, rootView+9)
-	s.submitProposal(block04, rootView+3)
-	s.submitProposal(block13, rootView+9)
-	s.submitProposal(block14, rootView+13)
-	s.submitProposal(block08, rootView+7)
-	s.submitProposal(block02, rootView+1)
+	s.submitProposal(block03)
+	s.submitProposal(block07)
+	s.submitProposal(block11)
+	s.submitProposal(block01)
+	s.submitProposal(block05)
+	s.submitProposal(block17)
+	s.submitProposal(block09)
+	s.submitProposal(block06)
+	s.submitProposal(block10)
+	s.submitProposal(block04)
+	s.submitProposal(block13)
+	s.submitProposal(block14)
+	s.submitProposal(block08)
+	s.submitProposal(block02)
 
 	// Block 20 should now finalize the fork up to and including block13
 	s.notifier.On("OnFinalizedBlock", blockWithID(block01.ID())).Return().Once()
@@ -290,7 +290,7 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 	s.updater.On("MakeFinal", blockID(block09.ID())).Return(nil).Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(block13.ID())).Return().Once()
 	s.updater.On("MakeFinal", blockID(block13.ID())).Return(nil).Once()
-	s.submitProposal(block20, rootView+14)
+	s.submitProposal(block20)
 }
 
 // blockWithID returns a testify `argumentMatcher` that only accepts blocks with the given ID
@@ -304,8 +304,8 @@ func blockID(expectedBlockID flow.Identifier) interface{} {
 }
 
 // submitProposal submits the given (proposal, parentView) pair to the Follower.
-func (s *HotStuffFollowerSuite) submitProposal(proposal *flow.Header, parentView uint64) {
-	s.follower.SubmitProposal(proposal, parentView)
+func (s *HotStuffFollowerSuite) submitProposal(proposal *flow.Header) {
+	s.follower.SubmitProposal(proposal)
 }
 
 // MockConsensus is used to generate Blocks for a mocked consensus committee

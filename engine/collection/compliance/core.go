@@ -280,15 +280,9 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
 	}
 
-	// retrieve the parent
-	parent, err := c.headers.ByBlockID(header.ParentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve proposal parent: %w", err)
-	}
-
 	// submit the model to hotstuff for processing
 	log.Info().Msg("forwarding block proposal to hotstuff")
-	c.hotstuff.SubmitProposal(header, parent.View)
+	c.hotstuff.SubmitProposal(header)
 
 	return nil
 }

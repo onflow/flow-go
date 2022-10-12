@@ -493,7 +493,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		}
 
 		// forward collection proposal to node's local consensus instance
-		e.core.hotstuff.SubmitProposal(header, parent.View) // non-blocking
+		e.core.hotstuff.SubmitProposal(header) // non-blocking
 
 		// create the proposal message for the collection
 		msg := &messages.ClusterBlockProposal{

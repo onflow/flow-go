@@ -471,7 +471,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			e.log.Fatal().Err(err).Msg("could not get consensus recipient for broadcasting proposal")
 		}
 
-		e.core.hotstuff.SubmitProposal(header, parent.View) // non-blocking
+		e.core.hotstuff.SubmitProposal(header) // non-blocking
 
 		// NOTE: some fields are not needed for the message
 		// - proposer ID is conveyed over the network message
