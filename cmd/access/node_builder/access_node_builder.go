@@ -643,16 +643,20 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityPr
 	}
 }
 
-// accessNodeBuilder builds a staked access node.
-// The access node can optionally participate in the public network publishing data for the observers downstream.
 func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
+		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
-		builder.IdentityProvider = idCache
+		// The following wrapper allows to black-list byzantine nodes via an admin command:
+		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
+		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		if err != nil {
+			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+		}
 
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
@@ -661,12 +665,9 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 					filter.Not(filter.HasNodeID(node.Me.NodeID())),
 					p2p.NotEjectedFilter,
 				),
-				idCache,
+				builder.IdentityProvider,
 			)
 		}
-
-		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
-
 		return nil
 	})
 }

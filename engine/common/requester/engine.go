@@ -300,6 +300,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 		// if the item reached maximum amount of retries, drop
 		if item.NumAttempts >= e.cfg.RetryAttempts {
+			e.log.Debug().Str("entity_id", entityID.String()).Msg("dropping entity ID max amount of retries reached")
 			delete(e.items, entityID)
 			continue
 		}
@@ -407,6 +408,10 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	}()
 
 	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityRequest)
+	e.log.Debug().
+		Uint64("nonce", req.Nonce).
+		Strs("entity_ids", flow.IdentifierList(req.EntityIDs).Strings()).
+		Msg("entity request sent")
 
 	return true, nil
 }
@@ -429,6 +434,9 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 }
 
 func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.EntityResponse) error {
+	lg := e.log.With().Str("origin_id", originID.String()).Uint64("nonce", res.Nonce).Logger()
+
+	lg.Debug().Strs("entity_ids", flow.IdentifierList(res.EntityIDs).Strings()).Msg("entity response received")
 
 	if e.cfg.ValidateStaking {
 
@@ -479,6 +487,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		// the entity might already have been returned in another response
 		item, exists := e.items[entityID]
 		if !exists {
+			lg.Debug().Hex("entity_id", logging.ID(entityID)).Msg("entity not in items skipping")
 			continue
 		}
 
@@ -493,8 +502,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 			actualEntityID := entity.ID()
 			// validate that we got correct entity, exactly what we were expecting
 			if entityID != actualEntityID {
-				e.log.Error().
-					Hex("origin", logging.ID(originID)).
+				lg.Error().
 					Hex("stated_entity_id", logging.ID(entityID)).
 					Hex("provided_entity", logging.ID(actualEntityID)).
 					Msg("provided entity does not match stated ID")
