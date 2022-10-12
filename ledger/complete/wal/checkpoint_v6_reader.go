@@ -79,7 +79,10 @@ func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 }
 
 // OpenAndReadCheckpointV6 open the checkpoint file and read it with ReadCheckpointV6
-func OpenAndReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func OpenAndReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) (
+	tries []*trie.MTrie,
+	errToReturn error,
+) {
 	filepath := filePathCheckpointHeader(dir, fileName)
 
 	f, err := os.Open(filepath)
@@ -87,7 +90,7 @@ func OpenAndReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func(f *os.File) {
-		f.Close()
+		errToReturn = closeAndMergeError(f, err)
 	}(f)
 
 	return ReadCheckpointV6(f, logger)
@@ -131,7 +134,11 @@ func filePathPattern(dir string, fileName string) string {
 
 // readCheckpointHeader takes a file path and returns subtrieChecksums and topTrieChecksum
 // any error returned are exceptions
-func readCheckpointHeader(filepath string, logger *zerolog.Logger) ([]uint32, uint32, error) {
+func readCheckpointHeader(filepath string, logger *zerolog.Logger) (
+	checksumsOfSubtries []uint32,
+	checksumOfTopTrie uint32,
+	errToReturn error,
+) {
 	closable, err := os.Open(filepath)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not open header file: %w", err)
@@ -143,7 +150,7 @@ func readCheckpointHeader(filepath string, logger *zerolog.Logger) ([]uint32, ui
 			logger.Warn().Msgf("failed to evict header file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
-		f.Close()
+		errToReturn = closeAndMergeError(f, err)
 	}(closable)
 
 	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
@@ -321,7 +328,10 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 // 2. nodes
 // 3. node count
 // 4. checksum
-func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint32, logger *zerolog.Logger) ([]*node.Node, error) {
+func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint32, logger *zerolog.Logger) (
+	subtrieRootNodes []*node.Node,
+	errToReturn error,
+) {
 	filepath, _, err := filePathSubTries(dir, fileName, index)
 	if err != nil {
 		return nil, err
@@ -336,7 +346,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 			logger.Warn().Msgf("failed to evict subtrie file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
-		f.Close()
+		errToReturn = closeAndMergeError(f, err)
 	}(f)
 
 	// valite the magic bytes and version
@@ -461,7 +471,10 @@ func readSubTriesFooter(f *os.File) (uint64, uint32, error) {
 // 5. node count
 // 6. trie count
 // 7. checksum
-func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32, logger *zerolog.Logger) (
+	rootTries []*trie.MTrie,
+	errToReturn error,
+) {
 	filepath, _ := filePathTopTries(dir, fileName)
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -473,7 +486,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 			logger.Warn().Msgf("failed to evict top trie file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
-		_ = file.Close()
+		errToReturn = closeAndMergeError(file, err)
 	}()
 
 	// read and validate magic bytes and version
