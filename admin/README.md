@@ -57,5 +57,9 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 
 ### To get a config value
 ```
-curl localhost:3706/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-config", "data": "consensus-required-approvals-for-sealing"}'
+curl localhost:3705/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-config", "data": "consensus-required-approvals-for-sealing"}'
+```
+
+```
+curl localhost:3705/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"consensus-required-approvals-for-sealing": 0}}'
 ```

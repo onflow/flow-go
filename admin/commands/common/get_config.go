@@ -41,7 +41,7 @@ func (s *GetConfigCommand) Validator(req *admin.CommandRequest) error {
 	}
 
 	field, ok := s.configs.GetField(configName)
-	if ok {
+	if !ok {
 		return fmt.Errorf("unknown config field: %s", configName)
 	}
 

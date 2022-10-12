@@ -88,8 +88,6 @@ func NewManager() *Manager {
 func (m *Manager) GetField(name string) (Field, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	fmt.Println("fields: ", m.fields)
-	fmt.Println("name: ", name)
 	field, ok := m.fields[name]
 	return field, ok
 }
@@ -149,7 +147,7 @@ func (m *Manager) RegisterUintConfig(name string, get GetUintConfigFunc, set Set
 			return get()
 		},
 		Set: func(val any) error {
-			fval, ok := val.(float64)
+			fval, ok := val.(float64) // JSON numbers always parse to float64
 			if !ok {
 				return fmt.Errorf("invalid type for bool config: %T", val)
 			}
