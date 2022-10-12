@@ -231,7 +231,7 @@ func storeTopLevelNodesAndTrieRoots(
 	}
 
 	// write subTriesNodeCount
-	_, err = writer.Write(encodeSubtrieNodeCount(subTriesNodeCount))
+	_, err = writer.Write(encodeNodeCount(subTriesNodeCount))
 	if err != nil {
 		return 0, fmt.Errorf("could not write subtrie node count: %w", err)
 	}
@@ -563,7 +563,7 @@ func deleteCheckpointFiles(outputDir string, outputFile string) error {
 }
 
 func storeTopLevelTrieFooter(topLevelNodesCount uint64, rootTrieCount uint16, writer *Crc32Writer) (uint32, error) {
-	footer := encodeFooter(topLevelNodesCount, rootTrieCount)
+	footer := encodeTopLevelNodesAndTriesFooter(topLevelNodesCount, rootTrieCount)
 	_, err := writer.Write(footer)
 	if err != nil {
 		return 0, fmt.Errorf("cannot write checkpoint footer: %w", err)
@@ -580,7 +580,7 @@ func storeTopLevelTrieFooter(topLevelNodesCount uint64, rootTrieCount uint16, wr
 }
 
 func storeSubtrieFooter(nodeCount uint64, writer *Crc32Writer) (uint32, error) {
-	footer := encodeSubtrieFooter(nodeCount)
+	footer := encodeNodeCount(nodeCount)
 	_, err := writer.Write(footer)
 	if err != nil {
 		return 0, fmt.Errorf("cannot write checkpoint subtrie footer: %w", err)
@@ -623,20 +623,6 @@ func decodeNodeCount(encoded []byte) (uint64, error) {
 		return 0, fmt.Errorf("wrong subtrie node count size, expect %v, got %v", encNodeCountSize, len(encoded))
 	}
 	return binary.BigEndian.Uint64(encoded), nil
-}
-
-func encodeSubtrieFooter(totalNodeCount uint64) []byte {
-	footer := make([]byte, encNodeCountSize)
-	binary.BigEndian.PutUint64(footer, totalNodeCount)
-	return footer
-}
-
-func decodeSubtrieFooter(footer []byte) (uint64, error) {
-	if len(footer) != encNodeCountSize {
-		return 0, fmt.Errorf("wrong subtrie footer size, expect %v, got %v", encNodeCountSize, len(footer))
-	}
-	nodesCount := binary.BigEndian.Uint64(footer)
-	return nodesCount, nil
 }
 
 func encodeCRC32Sum(checksum uint32) []byte {

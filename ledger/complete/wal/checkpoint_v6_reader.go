@@ -438,7 +438,7 @@ func readSubTriesFooter(f *os.File) (uint64, uint32, error) {
 		return 0, 0, fmt.Errorf("could not read footer: %w", err)
 	}
 
-	nodeCount, err := decodeSubtrieFooter(footer)
+	nodeCount, err := decodeNodeCount(footer)
 	if err != nil {
 		return 0, 0, fmt.Errorf("could not decode subtrie node count: %w", err)
 	}
@@ -514,7 +514,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	if err != nil {
 		return nil, fmt.Errorf("could not read subtrie node count: %w", err)
 	}
-	readSubtrieNodeCount, err := decodeSubtrieNodeCount(buf)
+	readSubtrieNodeCount, err := decodeNodeCount(buf)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode node count: %w", err)
 	}
@@ -650,7 +650,7 @@ func readTopTriesFooter(f *os.File) (uint64, uint16, uint32, error) {
 		return 0, 0, 0, fmt.Errorf("cannot read footer: %w", err)
 	}
 
-	nodeCount, trieCount, err := decodeFooter(footer)
+	nodeCount, trieCount, err := decodeTopLevelNodesAndTriesFooter(footer)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("could not decode top trie footer: %w", err)
 	}

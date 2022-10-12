@@ -43,23 +43,16 @@ func TestCRC32SumEncoding(t *testing.T) {
 	require.Equal(t, v, s)
 }
 
-func TestSubtrieFooterEncoding(t *testing.T) {
-	v := uint64(100)
-	s, err := decodeSubtrieFooter(encodeSubtrieFooter(v))
-	require.NoError(t, err)
-	require.Equal(t, v, s)
-}
-
 func TestSubtrieNodeCountEncoding(t *testing.T) {
 	v := uint64(10000)
-	s, err := decodeSubtrieNodeCount(encodeSubtrieNodeCount(v))
+	s, err := decodeNodeCount(encodeNodeCount(v))
 	require.NoError(t, err)
 	require.Equal(t, v, s)
 }
 
 func TestFooterEncoding(t *testing.T) {
 	n1, r1 := uint64(40), uint16(500)
-	n2, r2, err := decodeFooter(encodeFooter(n1, r1))
+	n2, r2, err := decodeTopLevelNodesAndTriesFooter(encodeTopLevelNodesAndTriesFooter(n1, r1))
 	require.NoError(t, err)
 	require.Equal(t, n1, n2)
 	require.Equal(t, r1, r2)
