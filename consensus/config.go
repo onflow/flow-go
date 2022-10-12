@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 )
 
 // HotstuffModules is a helper structure to encapsulate dependencies to create
@@ -29,6 +30,19 @@ type ParticipantConfig struct {
 	TimeoutIncreaseFactor      float64       // the factor at which the timeout grows when timeouts occur
 	TimeoutDecreaseFactor      float64       // the factor at which the timeout grows when timeouts occur
 	BlockRateDelay             time.Duration // a delay to broadcast block proposal in order to control the block production rate
+}
+
+func DefaultParticipantConfig() ParticipantConfig {
+	defTimeout := timeout.DefaultConfig
+	cfg := ParticipantConfig{
+		TimeoutInitial:             time.Duration(defTimeout.ReplicaTimeout) * time.Millisecond,
+		TimeoutMinimum:             time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
+		TimeoutAggregationFraction: defTimeout.VoteAggregationTimeoutFraction,
+		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
+		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
+		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS.Load()) * time.Millisecond,
+	}
+	return cfg
 }
 
 type Option func(*ParticipantConfig)

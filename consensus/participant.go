@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -36,18 +35,10 @@ func NewParticipant(
 	pending []*flow.Header,
 	modules *HotstuffModules,
 	options ...Option,
-) (module.HotStuff, error) {
+) (*eventloop.EventLoop, error) {
 
 	// initialize the default configuration
-	defTimeout := timeout.DefaultConfig
-	cfg := ParticipantConfig{
-		TimeoutInitial:             time.Duration(defTimeout.ReplicaTimeout) * time.Millisecond,
-		TimeoutMinimum:             time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
-		TimeoutAggregationFraction: defTimeout.VoteAggregationTimeoutFraction,
-		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
-		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
-		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
-	}
+	cfg := DefaultParticipantConfig()
 
 	// apply the configuration options
 	for _, option := range options {

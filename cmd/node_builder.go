@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
@@ -203,6 +204,7 @@ type NodeConfig struct {
 	NodeID            flow.Identifier
 	Me                module.Local
 	Tracer            module.Tracer
+	ConfigManager     *updatable_configs.Manager
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
