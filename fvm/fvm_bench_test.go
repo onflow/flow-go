@@ -145,7 +145,7 @@ type BasicBlockExecutor struct {
 }
 
 func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -118,7 +119,7 @@ func (suite *ProtocolStateProviderTestSuite) checkStateTransition() {
 	}
 	for _, participant := range oldParticipants {
 		_, err := suite.provider.GetPeerID(participant.NodeID)
-		require.Error(suite.T(), err)
+		require.ErrorIs(suite.T(), err, p2p.ErrUnknownId)
 	}
 }
 
@@ -141,4 +142,17 @@ func (suite *ProtocolStateProviderTestSuite) TestIDTranslation() {
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), fid, participant.NodeID)
 	}
+}
+
+// TestUnknownIDs verifies that `ProtocolStateIDCache` complies with `p2p.IDTranslator`
+// interface specification: we expect an `p2p.ErrUnknownId` when attempting to
+// translate an unknown `peer.ID` or `flow.Identifier`.
+func (suite *ProtocolStateProviderTestSuite) TestUnknownIDs() {
+	unknwonFlowID := unittest.IdentifierFixture()
+	_, err := suite.provider.GetPeerID(unknwonFlowID)
+	require.ErrorIs(suite.T(), err, p2p.ErrUnknownId)
+
+	unknownPeerID := peer.ID("unknownPeerID")
+	_, err = suite.provider.GetFlowID(unknownPeerID)
+	require.ErrorIs(suite.T(), err, p2p.ErrUnknownId)
 }

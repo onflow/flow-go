@@ -124,9 +124,9 @@ func testOrchestratorNetwork(t *testing.T, protocol insecure.Protocol, concurren
 			}
 
 			// all events should be sent to orchestratorNetwork in a timely fashion.
-			unittest.RequireReturnsBefore(t, orchestratorNetworkSendWG.Wait, 1*time.Second, "could not send all events to orchestratorNetwork on time")
+			unittest.RequireReturnsBefore(t, orchestratorNetworkSendWG.Wait, 100*time.Millisecond, "could not send all events to orchestratorNetwork on time")
 			// all events should be relayed to the connections by the orchestratorNetwork in a timely fashion.
-			unittest.RequireReturnsBefore(t, attackerMsgReceived.Wait, 1*time.Second, "connections could not receive messages on time")
+			unittest.RequireReturnsBefore(t, attackerMsgReceived.Wait, 100*time.Millisecond, "connections could not receive messages on time")
 		})
 }
 
@@ -196,7 +196,7 @@ func withMockOrchestrator(t *testing.T,
 
 			// starts orchestratorNetwork
 			orchestratorNetwork.Start(attackCtx)
-			unittest.RequireCloseBefore(t, orchestratorNetwork.Ready(), 1*time.Second, "could not start orchestratorNetwork on time")
+			unittest.RequireCloseBefore(t, orchestratorNetwork.Ready(), 100*time.Millisecond, "could not start orchestratorNetwork on time")
 
 			attackerRegisteredOnAllCNs := &sync.WaitGroup{}
 			attackerRegisteredOnAllCNs.Add(len(corruptNetworks))
@@ -209,13 +209,13 @@ func withMockOrchestrator(t *testing.T,
 				}()
 			}
 
-			unittest.RequireReturnsBefore(t, attackerRegisteredOnAllCNs.Wait, 1*time.Second, "could not register attacker on all corruptNetworks on time")
+			unittest.RequireReturnsBefore(t, attackerRegisteredOnAllCNs.Wait, 100*time.Millisecond, "could not register attacker on all corruptNetworks on time")
 
 			run(orchestratorNetwork, orchestrator, corruptNetworks)
 
 			// terminates orchestratorNetwork
 			cancel()
-			unittest.RequireCloseBefore(t, orchestratorNetwork.Done(), 1*time.Second, "could not stop orchestratorNetwork on time")
+			unittest.RequireCloseBefore(t, orchestratorNetwork.Done(), 100*time.Millisecond, "could not stop orchestratorNetwork on time")
 		})
 }
 
@@ -275,7 +275,7 @@ func withMockCorruptNetworks(
 		// factory
 		corruptNetwork := newMockCorruptNetwork()
 		corruptNetwork.Start(corruptNetworkCtx)
-		unittest.RequireCloseBefore(t, corruptNetwork.Ready(), 1*time.Second, "could not start corruptible conduit factory on time")
+		unittest.RequireCloseBefore(t, corruptNetwork.Ready(), 100*time.Millisecond, "could not start corruptible conduit factory on time")
 		corruptNetworks[i] = corruptNetwork
 
 		// port mapping
@@ -293,6 +293,6 @@ func withMockCorruptNetworks(
 
 	// stop all corruptNetworks
 	for i := 0; i < count; i++ {
-		unittest.RequireCloseBefore(t, corruptNetworks[i].Done(), 1*time.Second, "could not stop corruptible conduit factory on time")
+		unittest.RequireCloseBefore(t, corruptNetworks[i].Done(), 100*time.Millisecond, "could not stop corruptible conduit factory on time")
 	}
 }

@@ -7,11 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
+	"github.com/onflow/flow-go/network/mocknetwork"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
-	cnet "github.com/onflow/flow-go/insecure/net"
+	"github.com/onflow/flow-go/insecure/corruptnet"
 	"github.com/onflow/flow-go/insecure/orchestrator"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -19,8 +23,9 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/network"
 )
+
+type Channel string
 
 // TestCorruptNetworkFrameworkHappyPath implements a round-trip test that checks the composibility of the entire happy path of the corrupt
 // network framework. The test runs two engines on two distinct network instances, one with normal conduit,
@@ -34,7 +39,7 @@ import (
 func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 	// We first start ccf and then the orchestrator network, since the order of startup matters, i.e., on startup, the orchestrator network tries
 	// to connect to all ccfs.
-	withCorruptNetwork(t, func(t *testing.T, corruptedIdentity flow.Identity, corruptNetwork *cnet.Network, hub *stub.Hub) {
+	withCorruptNetwork(t, func(t *testing.T, corruptedIdentity flow.Identity, corruptNetwork *corruptnet.Network, hub *stub.Hub) {
 		// these are the events which orchestrator will send instead of the original ingress and egress events coming to and from
 		// the corrupted engine, respectively.
 		corruptedEgressEvent := &message.TestMessage{Text: "this is a corrupted egress message"}
@@ -65,13 +70,13 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 				testChannel := channels.TestNetworkChannel
 
 				// corrupted node network
-				corruptedEngine := &network.Engine{}
+				corruptedEngine := mocknetwork.NewEngine(t)
 				corruptedConduit, err := corruptNetwork.Register(testChannel, corruptedEngine)
 				require.NoError(t, err)
 
 				// honest network
 				honestIdentity := unittest.IdentityFixture()
-				honestEngine := &network.Engine{}
+				honestEngine := mocknetwork.NewEngine(t)
 				honestNodeNetwork := stub.NewNetwork(t, honestIdentity.NodeID, hub)
 				// in this test, the honest node is only the receiver, hence, we discard
 				// the created conduit.
@@ -82,25 +87,20 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 				wg.Add(2) // wait for both egress and ingress events to be received.
 
 				// we expect to receive the corrupted egress event on the honest node.
-				honestEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
-					// implementing the process logic of the honest engine on reception of message from underlying network.
-					require.Equal(t, testChannel, channel)               // event must arrive at the channel set by orchestrator.
-					require.Equal(t, corruptedIdentity.NodeID, originId) // origin id of the message must be the corrupted node.
-					require.Equal(t, corruptedEgressEvent, event)        // content of event must be swapped with corrupted event.
-
+				// event must arrive at the channel set by orchestrator.
+				// origin id of the message must be the corrupted node.
+				// content of event must be swapped with corrupted event.
+				honestEngine.On("Process", testChannel, corruptedIdentity.NodeID, corruptedEgressEvent).Return(nil).Run(func(args mock.Arguments) {
 					wg.Done()
-					return nil
 				})
 
 				// we expect to receive the corrupted ingress event on the corrupted node.
-				corruptedEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
-					// implementing the process logic of the corrupted engine on reception of message from underlying network.
-					require.Equal(t, testChannel, channel)            // event must arrive at the channel set by orchestrator.
-					require.Equal(t, honestIdentity.NodeID, originId) // origin id of the message must be the honest node.
-					require.Equal(t, corruptedIngressEvent, event)    // content of event must be swapped with corrupted event.
-
+				// event must arrive at the channel set by orchestrator.
+				// origin id of the message must be the honest node.
+				// content of event must be swapped with corrupted event.
+				corruptedEngine.On("Process", testChannel, honestIdentity.NodeID, corruptedIngressEvent).Return(nil).Run(func(args mock.Arguments) {
+					// simulate the Process logic of the corrupted engine on reception of message from underlying network.
 					wg.Done()
-					return nil
 				})
 
 				go func() {
@@ -120,7 +120,7 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 }
 
 // withCorruptNetwork creates a real corrupt network, starts it, runs the "run" function, and then stops it.
-func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *cnet.Network, *stub.Hub)) {
+func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corruptnet.Network, *stub.Hub)) {
 	codec := unittest.NetworkCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
@@ -136,9 +136,9 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *cnet.
 		}
 	}()
 	hub := stub.NewNetworkHub()
-	ccf := cnet.NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
+	ccf := corruptnet.NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	flowNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
-	corruptNetwork, err := cnet.NewCorruptNetwork(
+	corruptNetwork, err := corruptnet.NewCorruptNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
 		insecure.DefaultAddress,
@@ -153,7 +153,7 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *cnet.
 	unittest.RequireCloseBefore(
 		t,
 		corruptNetwork.Ready(),
-		1*time.Second,
+		100*time.Millisecond,
 		"could not start corrupt network on time")
 
 	unittest.RequireReturnsBefore(t, func() {
@@ -165,7 +165,7 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *cnet.
 
 	// terminates orchestratorNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, corruptNetwork.Done(), 1*time.Second, "could not stop corrupt network on time")
+	unittest.RequireCloseBefore(t, corruptNetwork.Done(), 100*time.Millisecond, "could not stop corrupt network on time")
 
 	unittest.RequireReturnsBefore(t, func() {
 		// stops the stub network of corrupted node.
@@ -211,10 +211,10 @@ func withAttackOrchestrator(
 
 	// starts orchestrator network
 	orchestratorNetwork.Start(orchestratorNetworkCtx)
-	unittest.RequireCloseBefore(t, orchestratorNetwork.Ready(), 1*time.Second, "could not start orchestrator network on time")
+	unittest.RequireCloseBefore(t, orchestratorNetwork.Ready(), 100*time.Millisecond, "could not start orchestrator network on time")
 	run(t)
 
 	// terminates orchestratorNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, orchestratorNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
+	unittest.RequireCloseBefore(t, orchestratorNetwork.Done(), 100*time.Millisecond, "could not stop orchestrator network on time")
 }

@@ -144,6 +144,11 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 }
 
 func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityRequest) error {
+	lg := e.log.With().Uint64("nonce", req.Nonce).Str("origin_id", originID.String()).Logger()
+
+	lg.Debug().
+		Strs("entity_ids", flow.IdentifierList(req.EntityIDs).Strings()).
+		Msg("entity request received")
 
 	// TODO: add reputation system to punish nodes for malicious behaviour (spam / repeated requests)
 
@@ -163,9 +168,21 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 	// try to retrieve each entity and skip missing ones
 	entities := make([]flow.Entity, 0, len(req.EntityIDs))
 	entityIDs := make([]flow.Identifier, 0, len(req.EntityIDs))
+	seen := make(map[flow.Identifier]struct{})
 	for _, entityID := range req.EntityIDs {
+		// skip requesting duplicate entity IDs
+		if _, ok := seen[entityID]; ok {
+			lg.Warn().
+				Str("entity_id", entityID.String()).
+				Msg("duplicate entity ID in entity request")
+			continue
+		}
+
 		entity, err := e.retrieve(entityID)
 		if errors.Is(err, storage.ErrNotFound) {
+			lg.Debug().
+				Str("entity_id", entityID.String()).
+				Msg("entity not found")
 			continue
 		}
 		if err != nil {
@@ -173,6 +190,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 		}
 		entities = append(entities, entity)
 		entityIDs = append(entityIDs, entityID)
+		seen[entityID] = struct{}{}
 	}
 
 	// encode all of the entities
@@ -202,6 +220,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 	}
 
 	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityResponse)
+	lg.Debug().Msg("entity response sent")
 
 	return nil
 }

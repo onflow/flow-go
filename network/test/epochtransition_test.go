@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -176,10 +177,10 @@ func (suite *MutableIdentityTableSuite) setupStateMock() {
 // addNodes creates count many new nodes and appends them to the suite state variables
 func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	// create the ids, middlewares and networks
-	ids, mws, nets, _ := GenerateIDsMiddlewaresNetworks(
-		ctx,
+	ids, nodes, mws, nets, _ := GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
 		suite.logger,
@@ -187,6 +188,8 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 		mocknetwork.NewViolationsConsumer(suite.T()),
 	)
 	suite.cancels = append(suite.cancels, cancel)
+
+	StartNodesAndNetworks(signalerCtx, suite.T(), nodes, nets, 100*time.Millisecond)
 
 	// create the engines for the new nodes
 	engines := GenerateEngines(suite.T(), nets)

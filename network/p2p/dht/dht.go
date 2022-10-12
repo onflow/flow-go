@@ -33,12 +33,12 @@ func NewDHT(ctx context.Context, host host.Host, prefix protocol.ID, logger zero
 	peerAddedCb := routingTable.PeerAdded
 	routingTable.PeerRemoved = func(pid peer.ID) {
 		peerRemovedCb(pid)
-		dhtLogger.Debug().Str("peer_id", pid.Pretty()).Msg("peer removed from routing table")
+		dhtLogger.Debug().Str("peer_id", pid.String()).Msg("peer removed from routing table")
 		metrics.RoutingTablePeerRemoved()
 	}
 	routingTable.PeerAdded = func(pid peer.ID) {
 		peerAddedCb(pid)
-		dhtLogger.Debug().Str("peer_id", pid.Pretty()).Msg("peer added to routing table")
+		dhtLogger.Debug().Str("peer_id", pid.String()).Msg("peer added to routing table")
 		metrics.RoutingTablePeerAdded()
 	}
 
