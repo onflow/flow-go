@@ -1250,8 +1250,6 @@ github.com/onflow/flow-go/crypto v0.12.0/go.mod h1:oXuvU0Dr4lHKgye6nHEFbBXIWNv+d
 github.com/onflow/flow-go/crypto v0.24.4 h1:SwEtoVS2TidCIHYCZMgQ7U2YsqhI9upnw94fhdHTubM=
 github.com/onflow/flow-go/crypto v0.24.4/go.mod h1:dkVL98P6GHR48iD9zCB6XlnkJX8IQd00FKgt1reV90w=
 github.com/onflow/flow/protobuf/go/flow v0.1.9/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
-github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20220718115540-bd33a4f1cc17 h1:6WpzhtcpYKRJ1zfL3aCY8Sg8LO3BBfIuhmNdLJC2Y/k=
-github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20220718115540-bd33a4f1cc17/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
 github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221012172052-e4ab66320562 h1:o93fhWRjGS3o0vJmj/9lcm283d1TaDb3D1B2i2lLpoU=
 github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221012172052-e4ab66320562/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
 github.com/onflow/sdks v0.4.4 h1:aJPGJJLAN+mlBWAQxsyuJXeRRMFeLwU6Mp4e/YL6bdU=
