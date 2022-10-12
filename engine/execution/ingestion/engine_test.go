@@ -158,7 +158,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
-	stopControl := NewStopControl(zerolog.Nop(), false)
+	stopControl := NewStopControl(zerolog.Nop(), false, 0)
 
 	engine, err = New(
 		log,
@@ -1480,7 +1480,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		checkAuthorizedAtBlock,
 		nil,
 		nil,
-		NewStopControl(zerolog.Nop(), false),
+		NewStopControl(zerolog.Nop(), false, 0),
 	)
 
 	require.NoError(t, err)

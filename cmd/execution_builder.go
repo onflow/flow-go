@@ -147,11 +147,11 @@ type ExecutionNode struct {
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
+
 	exeNode := &ExecutionNode{
 		builder:             builder.FlowNodeBuilder,
 		exeConf:             builder.exeConf,
 		toTriggerCheckpoint: atomic.NewBool(false),
-		stopControl:         ingestion.NewStopControl(builder.Logger.With().Str("compontent", "stop_control").Logger(), builder.exeConf.pauseExecution),
 	}
 
 	builder.FlowNodeBuilder.
@@ -181,6 +181,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
+		Module("execution state", exeNode.LoadExecutionState).
+		Module("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
@@ -412,29 +414,10 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	}
 	exeNode.computationManager = manager
 
-	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
-	stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
-
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
 	exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
 	exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
-
-	exeNode.executionState = state.NewExecutionState(
-		exeNode.ledgerStorage,
-		stateCommitments,
-		node.Storage.Blocks,
-		node.Storage.Headers,
-		node.Storage.Collections,
-		chunkDataPacks,
-		exeNode.results,
-		exeNode.myReceipts,
-		exeNode.events,
-		exeNode.serviceEvents,
-		exeNode.txResults,
-		node.DB,
-		node.Tracer,
-	)
 
 	var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
 	if node.HeroCacheMetricsEnable {
@@ -551,6 +534,47 @@ func (exeNode *ExecutionNode) LoadBlobservicePeerManagerDependencies(node *NodeC
 func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	exeNode.executionDataBlobstore = blobs.NewBlobstore(exeNode.executionDataDatastore)
 	exeNode.executionDataStore = execution_data.NewExecutionDataStore(exeNode.executionDataBlobstore, execution_data.DefaultSerializer)
+	return nil
+}
+
+func (exeNode *ExecutionNode) LoadExecutionState(
+	node *NodeConfig,
+) error {
+	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
+
+	exeNode.executionState = state.NewExecutionState(
+		exeNode.ledgerStorage,
+		stateCommitments,
+		node.Storage.Blocks,
+		node.Storage.Headers,
+		node.Storage.Collections,
+		chunkDataPacks,
+		exeNode.results,
+		exeNode.myReceipts,
+		exeNode.events,
+		exeNode.serviceEvents,
+		exeNode.txResults,
+		node.DB,
+		node.Tracer,
+	)
+
+	return nil
+}
+
+func (exeNode *ExecutionNode) LoadStopControl(
+	node *NodeConfig,
+) error {
+	lastExecutedHeight, _, err := exeNode.executionState.GetHighestExecutedBlockID(context.TODO())
+	if err != nil {
+		return fmt.Errorf("cannot get the latest executed block height for stop control: %w", err)
+	}
+
+	exeNode.stopControl = ingestion.NewStopControl(
+		exeNode.builder.Logger.With().Str("compontent", "stop_control").Logger(),
+		exeNode.exeConf.pauseExecution,
+		lastExecutedHeight)
+
 	return nil
 }
 

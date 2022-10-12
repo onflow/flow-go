@@ -625,6 +625,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
 
+	latestExecutedHeight, _, err := execState.GetHighestExecutedBlockID(context.TODO())
+	require.NoError(t, err)
+
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
 		node.Log,
@@ -650,7 +653,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		checkAuthorizedAtBlock,
 		nil,
 		nil,
-		ingestion.NewStopControl(node.Log.With().Str("compontent", "stop_control").Logger(), false),
+		ingestion.NewStopControl(node.Log.With().Str("compontent", "stop_control").Logger(), false, latestExecutedHeight),
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)

@@ -22,7 +22,7 @@ type StopControl struct {
 	stopAfterExecuting flow.Identifier
 	log                zerolog.Logger
 	state              StopControlState
-	lastExecutedHeight uint64 // last executed height, conveniently defaults to zero
+	lastExecutedHeight uint64 // last executed height
 }
 
 type StopControlState byte
@@ -33,7 +33,7 @@ const (
 	StopControlOff StopControlState = iota
 
 	// StopControlSet means stop height is set but not reached yet, and nothing related to stopping happened yet.
-	// We can still go back to StopControlOff or progress to StopControlCommenced.
+	// We could still go back to StopControlOff or progress to StopControlCommenced.
 	StopControlSet
 
 	// StopControlCommenced indicates that stopping process has commenced and no parameters can be changed anymore.
@@ -48,15 +48,16 @@ const (
 )
 
 // NewStopControl creates new empty NewStopControl
-func NewStopControl(log zerolog.Logger, paused bool) *StopControl {
+func NewStopControl(log zerolog.Logger, paused bool, lastExecutedHeight uint64) *StopControl {
 	state := StopControlOff
 	if paused {
 		state = StopControlPaused
 	}
 	log.Debug().Msgf("created StopControl module with paused = %t", paused)
 	return &StopControl{
-		log:   log,
-		state: state,
+		log:                log,
+		state:              state,
+		lastExecutedHeight: lastExecutedHeight,
 	}
 }
 
