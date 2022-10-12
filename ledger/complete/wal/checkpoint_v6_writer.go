@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
+	"path/filepath"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
@@ -56,7 +59,7 @@ func StoreCheckpointV6(
 	tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger, nWorker uint) error {
 	err := storeCheckpointV6(tries, outputDir, outputFile, logger, nWorker)
 	if err != nil {
-		cleanupErr := cleanupTempFiles(outputDir, outputFile)
+		cleanupErr := deleteCheckpointFiles(outputDir, outputFile)
 		if cleanupErr != nil {
 			return fmt.Errorf("fail to cleanup temp file %s, after running into error: %w", cleanupErr, err)
 		}
@@ -187,14 +190,7 @@ func storeCheckpointHeader(
 	return nil
 }
 
-func createWriterForCheckpointHeader(outputDir string, outputFile string, logger *zerolog.Logger) (io.WriteCloser, error) {
-	fullPath := filePathCheckpointHeader(outputDir, outputFile)
-	if utilsio.FileExists(fullPath) {
-		return nil, fmt.Errorf("checkpoint file already exists at %v", fullPath)
-	}
-
-	return createClosableWriter(outputDir, logger, outputFile, fullPath)
-}
+var createWriterForCheckpointHeader = createClosableWriter
 
 // 17th part file contains:
 // 1. checkpoint version TODO
@@ -240,8 +236,11 @@ func storeTopLevelNodesAndTrieRoots(
 		return 0, fmt.Errorf("could not write subtrie node count: %w", err)
 	}
 
+	scratch := make([]byte, 1024*4)
+
 	// write top level nodes
 	topLevelNodeIndices, topLevelNodesCount, err := storeTopLevelNodes(
+		scratch,
 		tries,
 		subTrieRootIndices,
 		subTriesNodeCount+1, // the counter is 1 more than the node count, because the first item is nil
@@ -254,7 +253,7 @@ func storeTopLevelNodesAndTrieRoots(
 	logger.Info().Msgf("top level nodes have been stored. top level node count: %v", topLevelNodesCount)
 
 	// write tries
-	err = storeTries(tries, topLevelNodeIndices, writer)
+	err = storeTries(scratch, tries, topLevelNodeIndices, writer)
 	if err != nil {
 		return 0, fmt.Errorf("could not store trie root nodes: %w", err)
 	}
@@ -317,7 +316,11 @@ func storeSubTrieConcurrently(
 ) {
 	logger.Info().Msgf("storing %v subtrie groups with average node count %v for each subtrie", subtrieCount, estimatedSubtrieNodeCount)
 
-	resultChs := make(chan chan *resultStoringSubTrie, nWorker)
+	if nWorker == 0 && nWorker > subtrieCount {
+		return nil, 0, nil, fmt.Errorf("invalid nWorker %v, the valid range is [1,%v]", nWorker, subtrieCount)
+	}
+
+	resultChs := make(chan chan *resultStoringSubTrie, nWorker-1)
 	go func() {
 		for i, subTrieRoot := range subtrieRoots {
 			resultCh := make(chan *resultStoringSubTrie)
@@ -347,7 +350,7 @@ func storeSubTrieConcurrently(
 	results := make(map[*node.Node]uint64, subAndTopNodeCount)
 	results[nil] = 0
 	nodeCounter := uint64(0)
-	checksums := make([]uint32, 0, len(results))
+	checksums := make([]uint32, 0, len(subtrieRoots))
 	for {
 		resultCh, ok := <-resultChs
 		if !ok {
@@ -372,27 +375,26 @@ func storeSubTrieConcurrently(
 }
 
 func createWriterForTopTries(dir string, file string, logger *zerolog.Logger) (io.WriteCloser, error) {
-	fullPath, topTriesFileName := filePathTopTries(dir, file)
-	if utilsio.FileExists(fullPath) {
-		return nil, fmt.Errorf("checkpoint file for top tries %s already exists", fullPath)
-	}
+	_, topTriesFileName := filePathTopTries(dir, file)
 
-	return createClosableWriter(dir, logger, topTriesFileName, fullPath)
+	return createClosableWriter(dir, topTriesFileName, logger)
 }
 
 func createWriterForSubtrie(dir string, file string, logger *zerolog.Logger, index int) (io.WriteCloser, error) {
-	fullPath, subTriesFileName, err := filePathSubTries(dir, file, index)
+	_, subTriesFileName, err := filePathSubTries(dir, file, index)
 	if err != nil {
 		return nil, err
 	}
-	if utilsio.FileExists(fullPath) {
-		return nil, fmt.Errorf("checkpoint file for %v-th sub trie %s already exists", index, fullPath)
-	}
 
-	return createClosableWriter(dir, logger, subTriesFileName, fullPath)
+	return createClosableWriter(dir, subTriesFileName, logger)
 }
 
-func createClosableWriter(dir string, logger *zerolog.Logger, fileName string, fullPath string) (io.WriteCloser, error) {
+func createClosableWriter(dir string, fileName string, logger *zerolog.Logger) (io.WriteCloser, error) {
+	fullPath := path.Join(dir, fileName)
+	if utilsio.FileExists(fullPath) {
+		return nil, fmt.Errorf("checkpoint part file %v already exists", fullPath)
+	}
+
 	tmpFile, err := os.CreateTemp(dir, fmt.Sprintf("writing-%v-*", fileName))
 	if err != nil {
 		return nil, fmt.Errorf("could not create temporary file for checkpoint toptries: %w", err)
@@ -493,6 +495,7 @@ func storeCheckpointSubTrie(
 }
 
 func storeTopLevelNodes(
+	scratch []byte,
 	tries []*trie.MTrie,
 	subTrieRootIndices map[*node.Node]uint64,
 	initNodeCounter uint64,
@@ -500,7 +503,6 @@ func storeTopLevelNodes(
 	map[*node.Node]uint64,
 	uint64,
 	error) {
-	scratch := make([]byte, 1024*4)
 	nodeCounter := initNodeCounter
 	var err error
 	for _, t := range tries {
@@ -523,10 +525,10 @@ func storeTopLevelNodes(
 }
 
 func storeTries(
+	scratch []byte,
 	tries []*trie.MTrie,
 	topLevelNodes map[*node.Node]uint64,
 	writer io.Writer) error {
-	scratch := make([]byte, 1024*4)
 	for _, t := range tries {
 		rootNode := t.RootNode()
 
@@ -549,15 +551,24 @@ func storeTries(
 
 // remove any temporary files when checkpointing encountered error
 // any error returned are exception
-func cleanupTempFiles(outputDir string, outputFile string) error {
-	filesToRemove := filePaths(outputDir, outputFile, subtrieLevel)
+func deleteCheckpointFiles(outputDir string, outputFile string) error {
+	pattern := filePathPattern(outputDir, outputFile)
+	filesToRemove, err := filepath.Glob(pattern)
+	if err != nil {
+		return fmt.Errorf("could not glob checkpoint files to delete with pattern %v: %w",
+			pattern, err,
+		)
+	}
+
+	var merror *multierror.Error
 	for _, file := range filesToRemove {
 		err := os.Remove(file)
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("could not remove file %v: %w", file, err)
+		if err != nil {
+			merror = multierror.Append(merror, err)
 		}
 	}
-	return nil
+
+	return merror.ErrorOrNil()
 }
 
 func storeTopLevelTrieFooter(topLevelNodesCount uint64, rootTrieCount uint16, writer *Crc32Writer) (uint32, error) {

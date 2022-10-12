@@ -125,6 +125,10 @@ func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
 	return paths
 }
 
+func filePathPattern(dir string, fileName string) string {
+	return fmt.Sprintf("%v*", filePathCheckpointHeader(dir, fileName))
+}
+
 // readCheckpointHeader takes a file path and returns subtrieChecksums and topTrieChecksum
 // any error returned are exceptions
 func readCheckpointHeader(filepath string, logger *zerolog.Logger) ([]uint32, uint32, error) {

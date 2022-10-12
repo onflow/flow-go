@@ -736,7 +736,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				state, _, err = led.Set(u)
 				require.NoError(t, err)
 
-				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint", 5)
+				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint", 6)
 				require.NoError(t, err)
 				assert.Equal(t, newState, state)
 

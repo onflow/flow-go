@@ -28,7 +28,7 @@ func extractExecutionState(
 	outputDir string,
 	log zerolog.Logger,
 	chain flow.Chain,
-	version int,
+	version int, // to be removed after next spork
 	migrate bool,
 	report bool,
 ) error {

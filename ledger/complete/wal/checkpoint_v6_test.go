@@ -338,7 +338,7 @@ func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
 
 func TestCleanupOnErrorIfNotExist(t *testing.T) {
 	t.Run("works if temp files not exist", func(t *testing.T) {
-		require.NoError(t, cleanupTempFiles("not-exist", "checkpoint-v6"))
+		require.NoError(t, deleteCheckpointFiles("not-exist", "checkpoint-v6"))
 	})
 
 	// if it can clean up all files after successful storing, then it can
@@ -350,7 +350,7 @@ func TestCleanupOnErrorIfNotExist(t *testing.T) {
 
 			// store tries into v6 then read back, then store into v5
 			require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
-			require.NoError(t, cleanupTempFiles(dir, "checkpoint-v6"))
+			require.NoError(t, deleteCheckpointFiles(dir, "checkpoint-v6"))
 
 			// verify all files are removed
 			files := filePaths(dir, "checkpoint-v6", subtrieLevel)

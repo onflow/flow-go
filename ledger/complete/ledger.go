@@ -438,7 +438,7 @@ func (l *Ledger) ExportCheckpointAt(
 
 	err = os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %v: %w", outputDir, err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %s: %w", outputDir, err)
 	}
 
 	if version == 6 {
