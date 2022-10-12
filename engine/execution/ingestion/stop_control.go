@@ -77,7 +77,7 @@ func (s *StopControl) IsPaused() bool {
 //   - height
 //   - crash
 //
-// Returns error is the stopping process has already commenced, new values will be rejected.
+// Returns error if the stopping process has already commenced, new values will be rejected.
 func (s *StopControl) SetStopHeight(height uint64, crash bool) (uint64, bool, error) {
 	s.Lock()
 	defer s.Unlock()
