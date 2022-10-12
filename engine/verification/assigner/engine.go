@@ -3,6 +3,7 @@ package assigner
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -33,7 +34,7 @@ type Engine struct {
 	newChunkListener      module.NewJobListener     // to notify chunk queue consumer about a new chunk.
 	blockConsumerNotifier module.ProcessingNotifier // to report a block has been processed.
 	stopAtHeight          uint64
-	stopAtBlockID         flow.Identifier
+	stopAtBlockID         atomic.Value
 }
 
 func New(
@@ -47,7 +48,7 @@ func New(
 	newChunkListener module.NewJobListener,
 	stopAtHeight uint64,
 ) *Engine {
-	return &Engine{
+	e := &Engine{
 		unit:             engine.NewUnit(),
 		log:              log.With().Str("engine", "assigner").Logger(),
 		metrics:          metrics,
@@ -58,8 +59,9 @@ func New(
 		chunksQueue:      chunksQueue,
 		newChunkListener: newChunkListener,
 		stopAtHeight:     stopAtHeight,
-		stopAtBlockID:    flow.ZeroID,
 	}
+	e.stopAtBlockID.Store(flow.ZeroID)
+	return e
 }
 
 func (e *Engine) WithBlockConsumerNotifier(notifier module.ProcessingNotifier) {
@@ -172,7 +174,7 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 	if e.stopAtHeight > 0 && block.Header.Height == e.stopAtHeight {
-		e.stopAtBlockID = block.ID()
+		e.stopAtBlockID.Store(block.ID())
 	}
 
 	blockID := block.ID()
@@ -211,7 +213,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		assignedChunksCount += uint64(len(chunkList))
 		for _, chunk := range chunkList {
 
-			if e.stopAtHeight > 0 && e.stopAtBlockID == chunk.BlockID {
+			if e.stopAtHeight > 0 && e.stopAtBlockID.Load() == chunk.BlockID {
 				resultLog.Fatal().
 					Hex("chunk_id", logging.ID(chunk.ID())).
 					Msgf("Chunk for block at finalized height %d received - stopping node", e.stopAtHeight)
