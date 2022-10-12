@@ -28,6 +28,8 @@ type Header struct {
 	Timestamp time.Time
 	// View number at which this block was proposed.
 	View uint64
+	// ParentView number at which parent block was proposed.
+	ParentView uint64
 	// ParentVoterIndices is a bitvector that represents all the voters for the parent block.
 	ParentVoterIndices []byte
 	// ParentVoterSigData is an aggregated signature over the parent block. Not a single cryptographic
@@ -54,6 +56,7 @@ func (h Header) Body() interface{} {
 		PayloadHash        Identifier
 		Timestamp          uint64
 		View               uint64
+		ParentView         uint64
 		ParentVoterIndices []byte
 		ParentVoterSigData []byte
 		ProposerID         Identifier
@@ -65,6 +68,7 @@ func (h Header) Body() interface{} {
 		PayloadHash:        h.PayloadHash,
 		Timestamp:          uint64(h.Timestamp.UnixNano()),
 		View:               h.View,
+		ParentView:         h.ParentView,
 		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerID:         h.ProposerID,
