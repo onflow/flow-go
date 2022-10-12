@@ -145,7 +145,7 @@ func (w *DiskWAL) replay(
 	useCheckpoints bool,
 ) error {
 
-	w.log.Debug().Msgf("replaying WAL from %d to %d", from, to)
+	w.log.Info().Msgf("loading checkpoint with WAL from %d to %d", from, to)
 
 	if to < from {
 		return fmt.Errorf("end of range cannot be smaller than beginning")
@@ -214,6 +214,8 @@ func (w *DiskWAL) replay(
 			return fmt.Errorf("cannot check root checkpoint existence: %w", err)
 		}
 		if hasRootCheckpoint {
+			w.log.Info().Msgf("loading root checkpoint")
+
 			flattenedForest, err := checkpointer.LoadRootCheckpoint()
 			if err != nil {
 				return fmt.Errorf("cannot load root checkpoint: %w", err)
@@ -222,6 +224,8 @@ func (w *DiskWAL) replay(
 			if err != nil {
 				return fmt.Errorf("error while handling root checkpoint: %w", err)
 			}
+
+			w.log.Info().Msgf("root checkpoint loaded")
 		}
 	}
 
@@ -266,7 +270,7 @@ func (w *DiskWAL) replay(
 		}
 	}
 
-	w.log.Info().Msgf("finished replaying WAL from %d to %d", from, to)
+	w.log.Info().Msgf("finished loading checkpoint and replaying WAL from %d to %d", from, to)
 
 	return nil
 }

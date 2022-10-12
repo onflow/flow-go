@@ -66,6 +66,8 @@ func extractExecutionState(
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
 
+	log.Info().Msgf("waiting for compactor to load checkpoint and WAL")
+
 	<-compactor.Ready()
 
 	defer func() {
