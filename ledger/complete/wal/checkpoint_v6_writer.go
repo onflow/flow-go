@@ -80,10 +80,10 @@ func storeCheckpointV6(
 	logger.Info().
 		Str("first_hash", first.RootHash().String()).
 		Uint64("first_reg_count", first.AllocatedRegCount()).
-		Str("last", last.RootHash().String()).
+		Str("last_hash", last.RootHash().String()).
 		Uint64("last_reg_count", last.AllocatedRegCount()).
 		Int("version", 6).
-		Msgf("storing checkpoint for %v tries to %v", len(tries), outputDir)
+		Msgf("storing checkpoint for %v tries to %s", len(tries), path.Join(outputDir, outputFile))
 
 	// make sure a checkpoint file with same name doesn't exist
 	// part file with same name doesn't exist either
@@ -345,17 +345,11 @@ func storeSubTrieConcurrently(
 		close(resultChs)
 	}()
 
-	logger.Info().Msgf("subtrie roots have been stored")
-
 	results := make(map[*node.Node]uint64, subAndTopNodeCount)
 	results[nil] = 0
 	nodeCounter := uint64(0)
 	checksums := make([]uint32, 0, len(subtrieRoots))
-	for {
-		resultCh, ok := <-resultChs
-		if !ok {
-			break
-		}
+	for resultCh := range resultChs {
 		result := <-resultCh
 		if result.Err != nil {
 			return nil, 0, nil, fmt.Errorf("fail to store %v-th subtrie, trie: %w", result.Index, result.Err)
@@ -447,10 +441,7 @@ func storeCheckpointSubTrie(
 		return nil, 0, 0, fmt.Errorf("cannot write version into checkpoint subtrie file: %w", err)
 	}
 
-	// topLevelNodes contains all unique nodes of given tries
-	// from root to subtrie root and their index
-	// (ordered by node traversal sequence).
-	// Index 0 is a special case with nil node.
+	// subtrieRootNodes contains given subtrie root nodes and their index.
 	subtrieRootNodes := make(map[*node.Node]uint64, subtrieCount)
 
 	// nodeCounter is counter for all unique nodes.
@@ -604,14 +595,14 @@ func storeSubtrieFooter(nodeCount uint64, writer *Crc32Writer) (uint32, error) {
 	return crc32Sum, nil
 }
 
-func encodeFooter(topLevelNodesCount uint64, rootTrieCount uint16) []byte {
+func encodeTopLevelNodesAndTriesFooter(topLevelNodesCount uint64, rootTrieCount uint16) []byte {
 	footer := make([]byte, encNodeCountSize+encTrieCountSize)
 	binary.BigEndian.PutUint64(footer, topLevelNodesCount)
 	binary.BigEndian.PutUint16(footer[encNodeCountSize:], rootTrieCount)
 	return footer
 }
 
-func decodeFooter(footer []byte) (uint64, uint16, error) {
+func decodeTopLevelNodesAndTriesFooter(footer []byte) (uint64, uint16, error) {
 	const footerSize = encNodeCountSize + encTrieCountSize // footer doesn't include crc32 sum
 	if len(footer) != footerSize {
 		return 0, 0, fmt.Errorf("wrong footer size, expect %v, got %v", footerSize, len(footer))
@@ -621,13 +612,13 @@ func decodeFooter(footer []byte) (uint64, uint16, error) {
 	return nodesCount, triesCount, nil
 }
 
-func encodeSubtrieNodeCount(nodeCount uint64) []byte {
+func encodeNodeCount(nodeCount uint64) []byte {
 	footer := make([]byte, encNodeCountSize)
 	binary.BigEndian.PutUint64(footer, nodeCount)
 	return footer
 }
 
-func decodeSubtrieNodeCount(encoded []byte) (uint64, error) {
+func decodeNodeCount(encoded []byte) (uint64, error) {
 	if len(encoded) != encNodeCountSize {
 		return 0, fmt.Errorf("wrong subtrie node count size, expect %v, got %v", encNodeCountSize, len(encoded))
 	}
