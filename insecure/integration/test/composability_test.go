@@ -2,12 +2,14 @@ package test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/stretchr/testify/mock"
 	"net"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/mock"
+
+	"github.com/onflow/flow-go/network/mocknetwork"
 
 	"github.com/stretchr/testify/require"
 
