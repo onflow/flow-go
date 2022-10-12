@@ -19,46 +19,57 @@ type StopControl struct {
 	sync.RWMutex
 	height             uint64
 	crash              bool
-	commenced          bool // if stopping process has started. We disallow any changes then.
-	set                bool // whether stop at height has been set at all, it its envisioned most of the time it won't
-	paused             bool // if execution is paused
 	stopAfterExecuting flow.Identifier
 	log                zerolog.Logger
+	state              StopControlState
+	lastExecutedHeight uint64 // last executed height, conveniently defaults to zero
 }
 
-type stopControlState byte
+type StopControlState byte
 
 const (
 	// StopControlOff default state, envisioned to be used most of the time. Stopping module is simply off,
-	// blocks will be processed "as usual"
-	StopControlOff stopControlState = iota
+	// blocks will be processed "as usual".
+	StopControlOff StopControlState = iota
 
 	// StopControlSet means stop height is set but not reached yet, and nothing related to stopping happened yet.
 	// We can still go back to StopControlOff or progress to StopControlCommenced.
 	StopControlSet
 
 	// StopControlCommenced indicates that stopping process has commenced and no parameters can be changed anymore.
-	// For example, blocks at or above stop height has been received, but finalization didn't reach stop height yet
+	// For example, blocks at or above stop height has been received, but finalization didn't reach stop height yet.
+	// It can only progress to StopControlPaused
 	StopControlCommenced
 
-	// StopControlPaused means EN has stopped processing blocks. It can happen by reaching stop height
+	// StopControlPaused means EN has stopped processing blocks. It can happen by reaching set stop height, or
+	// if the node was started with a pause mode.
+	// It is a final state and cannot be changed
 	StopControlPaused
 )
 
 // NewStopControl creates new empty NewStopControl
 func NewStopControl(log zerolog.Logger, paused bool) *StopControl {
-	return &StopControl{
-		paused:    paused,
-		commenced: paused,
-		log:       log,
+	state := StopControlOff
+	if paused {
+		state = StopControlPaused
 	}
+	log.Debug().Msgf("created StopControl module with paused = %t", paused)
+	return &StopControl{
+		log:   log,
+		state: state,
+	}
+}
+
+// GetState returns current state of StopControl module
+func (s *StopControl) GetState() StopControlState {
+	return s.state
 }
 
 // IsPaused returns true is block execution has been paused
 func (s *StopControl) IsPaused() bool {
 	s.RLock()
 	defer s.RUnlock()
-	return s.paused
+	return s.state == StopControlPaused
 }
 
 // SetStopHeight sets new stop height and crash mode, and return old values:
@@ -67,60 +78,74 @@ func (s *StopControl) IsPaused() bool {
 //   - crash
 //
 // Returns error is the stopping process has already commenced, new values will be rejected.
-func (s *StopControl) SetStopHeight(height uint64, crash bool) (bool, uint64, bool, error) {
+func (s *StopControl) SetStopHeight(height uint64, crash bool) (uint64, bool, error) {
 	s.Lock()
 	defer s.Unlock()
 
-	oldSet := s.set
 	oldHeight := s.height
 	oldCrash := s.crash
 
-	if s.commenced {
-		return oldSet, oldHeight, oldCrash, fmt.Errorf("cannot update stop height, stopping already in progress for height %d with crash=%t", oldHeight, oldCrash)
+	if s.state == StopControlCommenced {
+		return oldHeight, oldCrash, fmt.Errorf("cannot update stop height, stopping commenced for height %d with crash=%t", oldHeight, oldCrash)
 	}
 
-	s.set = true
+	if s.state == StopControlPaused {
+		return oldHeight, oldCrash, fmt.Errorf("cannot update stop height, already paused")
+	}
+
+	if s.lastExecutedHeight >= height {
+		return oldHeight, oldCrash, fmt.Errorf("cannot update stop height, given height %d at or below last executed %d", height, s.lastExecutedHeight)
+	}
+
+	s.log.Info().
+		Uint64("height", height).Bool("crash", crash).
+		Uint64("old_height", oldHeight).Bool("old_crash", oldCrash).Msg("new stop height set")
+
+	s.log.Debug().Int8("previous_state", int8(s.state)).Int8("new_state", int8(StopControlSet)).Msg("StopControl state transition")
+	s.state = StopControlSet
+
 	s.height = height
 	s.crash = crash
 	s.stopAfterExecuting = flow.ZeroID
 
-	return oldSet, oldHeight, oldCrash, nil
+	return oldHeight, oldCrash, nil
 }
 
 // GetStopHeight returns:
-//   - set, whether values are set
 //   - height
 //   - crash
-func (s *StopControl) GetStopHeight() (bool, uint64, bool) {
+// Values are undefined if they were not previously set
+func (s *StopControl) GetStopHeight() (uint64, bool) {
 	s.RLock()
 	defer s.RUnlock()
 
-	return s.set, s.height, s.crash
+	return s.height, s.crash
 }
 
 // BlockProcessable should be called when new block is processable.
-// It returns boolean indicating if processing should skip this block.
+// It returns boolean indicating if the block should be processed.
 func (s *StopControl) BlockProcessable(b *flow.Header) bool {
 
 	s.Lock()
 	defer s.Unlock()
 
-	if !s.set {
-		return false
+	if s.state == StopControlOff {
+		return true
 	}
 
-	if s.paused {
-		return true
+	if s.state == StopControlPaused {
+		return false
 	}
 
 	// skips blocks at or above requested stop height
 	if b.Height >= s.height {
 		s.log.Warn().Msgf("Skipping execution of %s at height %d because stop has been requested at height %d", b.ID(), b.Height, s.height)
-		s.commenced = true
-		return true
+		s.log.Debug().Int8("previous_state", int8(s.state)).Int8("new_state", int8(StopControlCommenced)).Msg("StopControl state transition")
+		s.state = StopControlCommenced // if block was skipped, move into commenced state
+		return false
 	}
 
-	return false
+	return true
 }
 
 // BlockFinalized should be called when a block is marked as finalized
@@ -129,7 +154,7 @@ func (s *StopControl) BlockFinalized(ctx context.Context, execState state.ReadOn
 	s.Lock()
 	defer s.Unlock()
 
-	if s.paused || !s.set {
+	if s.state == StopControlOff || s.state == StopControlPaused {
 		return
 	}
 
@@ -151,7 +176,6 @@ func (s *StopControl) BlockFinalized(ctx context.Context, execState state.ReadOn
 			s.stopExecution()
 		} else {
 			s.stopAfterExecuting = h.ParentID
-			s.set = true
 		}
 
 	}
@@ -163,7 +187,15 @@ func (s *StopControl) BlockExecuted(h *flow.Header) {
 	s.Lock()
 	defer s.Unlock()
 
-	if !s.set {
+	if s.state == StopControlPaused {
+		return
+	}
+
+	if h.Height > s.lastExecutedHeight {
+		s.lastExecutedHeight = h.Height
+	}
+
+	if s.state == StopControlOff {
 		return
 	}
 
@@ -181,8 +213,8 @@ func (s *StopControl) stopExecution() {
 	if s.crash {
 		s.log.Fatal().Msgf("Crashing as finalization reached requested stop height %d", s.height)
 	} else {
-		s.paused = true
-		s.commenced = true
+		s.log.Debug().Int8("previous_state", int8(s.state)).Int8("new_state", int8(StopControlPaused)).Msg("StopControl state transition")
+		s.state = StopControlPaused
 		s.log.Warn().Msgf("Pausing execution as finalization reached requested stop height %d", s.height)
 	}
 }

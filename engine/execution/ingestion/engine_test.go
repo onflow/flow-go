@@ -937,8 +937,8 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		require.True(t, ok)
 
 		// make sure no stopping has been engaged, as it was not set
-		set, _, _ := ctx.stopControl.GetStopHeight()
-		require.False(t, set)
+		stopState := ctx.stopControl.GetState()
+		require.Equal(t, stopState, StopControlOff)
 	})
 }
 
@@ -956,7 +956,7 @@ func TestStopAtHeight(t *testing.T) {
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header)
 
 		// stop at block C
-		_, _, _, err := ctx.stopControl.SetStopHeight(blockSealed.Height+3, false)
+		_, _, err := ctx.stopControl.SetStopHeight(blockSealed.Height+3, false)
 		require.NoError(t, err)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
@@ -1062,7 +1062,7 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header)
 
 		// stop at block B, so B-1 (A) will be last executed
-		_, _, _, err := ctx.stopControl.SetStopHeight(blocks["B"].Height(), false)
+		_, _, err := ctx.stopControl.SetStopHeight(blocks["B"].Height(), false)
 		require.NoError(t, err)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
