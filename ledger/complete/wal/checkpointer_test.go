@@ -54,13 +54,13 @@ func Test_WAL(t *testing.T) {
 			checkpointsToKeep  = 1
 		)
 
-		diskWal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, realWAL.SegmentSize)
+		diskWal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, realWAL.SegmentSize)
 		require.NoError(t, err)
 
 		led, err := complete.NewLedger(diskWal, size*10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), size, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+		compactor, err := complete.NewCompactor(led, diskWal, unittest.Logger(), size, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 		require.NoError(t, err)
 
 		<-compactor.Ready()
@@ -93,7 +93,7 @@ func Test_WAL(t *testing.T) {
 		<-led.Done()
 		<-compactor.Done()
 
-		diskWal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, realWAL.SegmentSize)
+		diskWal2, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, realWAL.SegmentSize)
 		require.NoError(t, err)
 		led2, err := complete.NewLedger(diskWal2, (size*10)+10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
@@ -141,7 +141,7 @@ func Test_Checkpointing(t *testing.T) {
 
 		t.Run("create WAL and initial trie", func(t *testing.T) {
 
-			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+			wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -188,7 +188,7 @@ func Test_Checkpointing(t *testing.T) {
 
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000010"))
 
-			wal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+			wal2, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			err = wal2.Replay(
@@ -220,7 +220,7 @@ func Test_Checkpointing(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("read checkpoint", func(t *testing.T) {
-			wal3, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+			wal3, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			err = wal3.Replay(
@@ -276,7 +276,7 @@ func Test_Checkpointing(t *testing.T) {
 			unittest.RequireFileEmpty(t, path.Join(dir, "00000011"))
 
 			//generate one more segment
-			wal4, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+			wal4, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			update, err := ledger.NewUpdate(ledger.State(rootHash), keys2, values2)
@@ -300,7 +300,7 @@ func Test_Checkpointing(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("replay both checkpoint and updates after checkpoint", func(t *testing.T) {
-			wal5, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+			wal5, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			updatesLeft := 1 // there should be only one update
@@ -346,7 +346,7 @@ func Test_Checkpointing(t *testing.T) {
 		})
 
 		t.Run("advise to evict checkpoints from page cache", func(t *testing.T) {
-			logger := zerolog.Nop()
+			logger := unittest.Logger()
 			evictedFileNames, err := wal.EvictAllCheckpointsFromLinuxPageCache(dir, &logger)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(evictedFileNames))
@@ -358,7 +358,7 @@ func Test_Checkpointing(t *testing.T) {
 			f6, err := mtrie.NewForest(size*10, metricsCollector, nil)
 			require.NoError(t, err)
 
-			wal6, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+			wal6, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			// make sure no earlier checkpoints exist
@@ -437,7 +437,7 @@ func Test_Checkpointing(t *testing.T) {
 //
 // 	unittest.RunWithTempDir(t, func(dir string) {
 //
-// 		wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+// 		wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
 // 		require.NoError(t, err)
 //
 // 		// create WAL
@@ -459,7 +459,7 @@ func Test_Checkpointing(t *testing.T) {
 //
 // 		require.FileExists(t, path.Join(dir, "00000001")) //make sure WAL segment is saved
 //
-// 		wal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+// 		wal2, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
 // 		require.NoError(t, err)
 //
 // 		checkpointer, err := wal2.NewCheckpointer()
@@ -542,7 +542,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("works without data modification", func(t *testing.T) {
-			logger := zerolog.Nop()
+			logger := unittest.Logger()
 			tries, err := realWAL.LoadCheckpoint(fullpath, &logger)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(tries))
@@ -560,7 +560,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 			err = os.WriteFile(fullpath, b, 0644)
 			require.NoError(t, err)
 
-			logger := zerolog.Nop()
+			logger := unittest.Logger()
 			tries, err := realWAL.LoadCheckpoint(fullpath, &logger)
 			require.Error(t, err)
 			require.Nil(t, tries)
