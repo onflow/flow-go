@@ -6,13 +6,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"math"
 	"os"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/rs/zerolog"
