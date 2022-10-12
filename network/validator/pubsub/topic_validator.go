@@ -88,13 +88,36 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 			return pubsub.ValidationReject
 		}
 
+		lg := log.With().
+			Str("peer_id", from.String()).
+			Hex("sender", msg.OriginID).
+			Logger()
+
+		// verify sender is a known peer
 		if err := peerFilter(from); err != nil {
-			log.Warn().
+			lg.Warn().
 				Err(err).
-				Str("peer_id", from.String()).
-				Hex("sender", msg.OriginID).
 				Bool(logging.KeySuspicious, true).
 				Msg("filtering message from un-allowed peer")
+			return pubsub.ValidationReject
+		}
+
+		// verify ChannelID in message matches the topic over which the message was received
+		topic := channels.Topic(rawMsg.GetTopic())
+		actualChannel, ok := channels.ChannelFromTopic(topic)
+		if !ok {
+			lg.Warn().
+				Err(fmt.Errorf("invalid topic in message")).
+				Bool(logging.KeySuspicious, true).
+				Msg("rejecting message")
+			return pubsub.ValidationReject
+		}
+
+		if channels.Channel(msg.ChannelID) != actualChannel {
+			log.Warn().
+				Err(fmt.Errorf("topic in message does not match pubsub topic")).
+				Bool(logging.KeySuspicious, true).
+				Msg("rejecting message")
 			return pubsub.ValidationReject
 		}
 
@@ -114,11 +137,8 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 		default:
 			// unexpected error condition. this indicates there's a bug
 			// don't crash as a result of external inputs since that creates a DoS vector.
-			log.
-				Error().
+			lg.Error().
 				Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
-				Str("peer_id", from.String()).
-				Hex("sender", msg.OriginID).
 				Bool(logging.KeySuspicious, true).
 				Msg("rejecting message")
 			return pubsub.ValidationReject
