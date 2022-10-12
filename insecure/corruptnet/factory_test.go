@@ -1,4 +1,4 @@
-package corruptible
+package corruptnet
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 // TestNewConduit_HappyPath checks when factory has an adapter registered and an egress controller,
 // it can successfully create conduits.
 func TestNewConduit_HappyPath(t *testing.T) {
-	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
+	ccf := NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	channel := channels.TestNetworkChannel
 	require.NoError(t, ccf.RegisterEgressController(&mockinsecure.EgressController{}))
 	require.NoError(t, ccf.RegisterAdapter(&mocknetwork.Adapter{}))
@@ -29,8 +29,8 @@ func TestNewConduit_HappyPath(t *testing.T) {
 
 // TestRegisterAdapter_FailDoubleRegistration checks that CorruptibleConduitFactory can be registered with only one adapter.
 func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
-	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
-	adapter := &mocknetwork.Adapter{}
+	ccf := NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
+	adapter := mocknetwork.NewAdapter(t)
 
 	// registering adapter should be successful
 	require.NoError(t, ccf.RegisterAdapter(adapter))
@@ -41,7 +41,7 @@ func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
 
 // TestRegisterEgressController_FailDoubleRegistration checks that CorruptibleConduitFactory can be registered with only one egress controller.
 func TestRegisterEgressController_FailDoubleRegistration(t *testing.T) {
-	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
+	ccf := NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	egressController := &mockinsecure.EgressController{}
 
 	// registering egress controller should be successful
@@ -55,7 +55,7 @@ func TestRegisterEgressController_FailDoubleRegistration(t *testing.T) {
 // TestNewConduit_MissingAdapter checks when factory does not have an adapter registered (but does have egress controller),
 // any attempts on creating a conduit fails with an error.
 func TestNewConduit_MissingAdapter(t *testing.T) {
-	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
+	ccf := NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	channel := channels.TestNetworkChannel
 	require.NoError(t, ccf.RegisterEgressController(&mockinsecure.EgressController{}))
 
@@ -67,7 +67,7 @@ func TestNewConduit_MissingAdapter(t *testing.T) {
 // TestNewConduit_MissingEgressController checks that test fails when factory doesn't have egress controller,
 // but does have adapter.
 func TestNewConduit_MissingEgressController(t *testing.T) {
-	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
+	ccf := NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	channel := channels.TestNetworkChannel
 	require.NoError(t, ccf.RegisterAdapter(&mocknetwork.Adapter{}))
 
