@@ -470,6 +470,7 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 		PayloadHash:        IdentifierFixture(),
 		Timestamp:          time.Now().UTC(),
 		View:               view,
+		ParentView:         parent.View,
 		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataFixture(),
 		ProposerID:         IdentifierFixture(),

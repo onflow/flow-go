@@ -1235,8 +1235,8 @@ github.com/onflow/atree v0.4.0/go.mod h1:7Qe1xaW0YewvouLXrugzMFUYXNoRQ8MT/UsVAWx
 github.com/onflow/cadence v0.15.0/go.mod h1:KMzDF6cIv6nb5PJW9aITaqazbmJX8MMeibFcpPP385M=
 github.com/onflow/cadence v0.27.0 h1:r/WfdDal2KbDFOBkyNCwoUw37j/f9ky+w5pwjOc3nZE=
 github.com/onflow/cadence v0.27.0/go.mod h1:h+SbY8RNl6Q6sT6l/2cvpUZUJNCbzJya+3Bkwe/0YwY=
-github.com/onflow/flow v0.3.2 h1:z3IuKOjM9Tvf0pXfloTbrLxM5nTunI47cklsDd+wxBE=
-github.com/onflow/flow v0.3.2/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
+github.com/onflow/flow v0.3.3-0.20221012172052-e4ab66320562 h1:owE+JYzi/ohlW1zJGNo0trynqSC5NEYOXE5xz/SjD2A=
+github.com/onflow/flow v0.3.3-0.20221012172052-e4ab66320562/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220720151516-797b149ceaaa h1:hcEp3INfkLh9jFODC9PHPQeisAd9rterujabee9il8w=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220720151516-797b149ceaaa/go.mod h1:T6yhM+kWrFxiP6F3hh8lh9DcocHfmv48P4ITnjLhKSk=
 github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220720151516-797b149ceaaa h1:0brc9iDezo2Gc7yH3p7+La1iFe4WRDg6HYT6llyP8+E=
@@ -1252,6 +1252,8 @@ github.com/onflow/flow-go/crypto v0.24.4/go.mod h1:dkVL98P6GHR48iD9zCB6XlnkJX8IQ
 github.com/onflow/flow/protobuf/go/flow v0.1.9/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20220718115540-bd33a4f1cc17 h1:6WpzhtcpYKRJ1zfL3aCY8Sg8LO3BBfIuhmNdLJC2Y/k=
 github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20220718115540-bd33a4f1cc17/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
+github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221012172052-e4ab66320562 h1:o93fhWRjGS3o0vJmj/9lcm283d1TaDb3D1B2i2lLpoU=
+github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221012172052-e4ab66320562/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
 github.com/onflow/sdks v0.4.4 h1:aJPGJJLAN+mlBWAQxsyuJXeRRMFeLwU6Mp4e/YL6bdU=
 github.com/onflow/sdks v0.4.4/go.mod h1:F0dj0EyHC55kknLkeD10js4mo14yTdMotnWMslPirrU=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
