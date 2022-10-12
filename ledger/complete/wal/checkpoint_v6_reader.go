@@ -117,7 +117,7 @@ func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
 
 	subtrieCount := subtrieCountByLevel(subtrieLevel)
 	for i := 0; i < subtrieCount; i++ {
-		paths = append(paths, path.Join(dir, fmt.Sprintf("%v.%v", fileName, i)))
+		paths = append(paths, path.Join(dir, fmt.Sprintf("%s.%03d", fileName, i)))
 	}
 
 	p, _ := filePathTopTries(dir, fileName)
@@ -130,7 +130,7 @@ func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
 func readCheckpointHeader(filepath string, logger *zerolog.Logger) ([]uint32, uint32, error) {
 	closable, err := os.Open(filepath)
 	if err != nil {
-		return nil, 0, fmt.Errorf("could not seek to start for header file: %w", err)
+		return nil, 0, fmt.Errorf("could not open header file: %w", err)
 	}
 
 	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
@@ -535,7 +535,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	// read the nodes from subtrie level to the root level
 	for i := uint64(1); i <= topLevelNodesCount; i++ {
 		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
-			if nodeIndex > i+uint64(totalSubTrieNodeCount) {
+			if nodeIndex >= i+uint64(totalSubTrieNodeCount) {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}
 
@@ -651,7 +651,7 @@ func readTopTriesFooter(f *os.File) (uint64, uint16, uint32, error) {
 		return 0, 0, 0, fmt.Errorf("could not decode top trie footer: %w", err)
 	}
 
-	checksum, err := readCRC32Sum(bufio.NewReaderSize(f, defaultBufioReadSize))
+	checksum, err := readCRC32Sum(f)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("cannot read checksum for top trie file: %w", err)
 	}
