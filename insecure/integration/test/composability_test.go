@@ -15,8 +15,8 @@ import (
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/insecure/attackernet"
 	"github.com/onflow/flow-go/insecure/corruptnet"
-	"github.com/onflow/flow-go/insecure/orchestrator"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -187,9 +187,9 @@ func withAttackOrchestrator(
 		egressEventCorrupter:  egressEventCorrupter,
 		ingressEventCorrupter: ingressEventCorrupter,
 	}
-	connector := orchestrator.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
+	connector := attackernet.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
 
-	orchestratorNetwork, err := orchestrator.NewOrchestratorNetwork(
+	orchestratorNetwork, err := attackernet.NewOrchestratorNetwork(
 		unittest.Logger(),
 		codec,
 		o,

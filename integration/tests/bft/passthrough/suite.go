@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/ghost/client"
-	"github.com/onflow/flow-go/insecure/orchestrator"
+	"github.com/onflow/flow-go/insecure/attackernet"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
@@ -34,7 +34,7 @@ type Suite struct {
 	verID                   flow.Identifier      // corrupted verification node
 	PreferredUnicasts       string               // preferred unicast protocols between execution and verification nodes.
 	Orchestrator            *dummyOrchestrator
-	orchestratorNetwork     *orchestrator.Network
+	orchestratorNetwork     *attackernet.Network
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -146,8 +146,8 @@ func (s *Suite) SetupSuite() {
 
 	// start orchestrator network
 	codec := unittest.NetworkCodec()
-	connector := orchestrator.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
-	orchestratorNetwork, err := orchestrator.NewOrchestratorNetwork(s.log,
+	connector := attackernet.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
+	orchestratorNetwork, err := attackernet.NewOrchestratorNetwork(s.log,
 		codec,
 		s.Orchestrator,
 		connector,

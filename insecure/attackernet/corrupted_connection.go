@@ -1,4 +1,4 @@
-package orchestrator
+package attackernet
 
 import (
 	"context"
