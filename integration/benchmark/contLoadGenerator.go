@@ -735,6 +735,21 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 				Dur("duration", time.Since(startTime)).
 				Msg("transaction confirmed")
 			lg.workerStatsTracker.IncTxExecuted()
+			result, err := lg.flowClient.GetTransactionResult(context.Background(), transferTx.ID())
+
+			if err != nil {
+				log.Error().
+					Err(err).
+					Hex("txID", transferTx.ID().Bytes()).
+					Msg("Unable to retrieve transaction result")
+			} else if result.Error != nil {
+				log.Warn().
+					Err(result.Error).
+					Hex("txID", transferTx.ID().Bytes()).
+					Msg("Transaction result contains an error.")
+				lg.workerStatsTracker.IncTxFailed()
+			}
+
 			return
 		case <-time.After(slowTransactionThreshold):
 			// TODO(rbtz): add a counter for slow transactions

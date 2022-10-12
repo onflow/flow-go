@@ -12,6 +12,7 @@ type WorkerStats struct {
 	workers     int
 	txsSent     int
 	txsExecuted int
+	txsFailed   int
 }
 
 // WorkerStatsTracker keeps track of worker stats
@@ -50,11 +51,25 @@ func (st *WorkerStatsTracker) IncTxExecuted() {
 	st.stats.txsExecuted++
 }
 
+func (st *WorkerStatsTracker) IncTxFailed() {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	st.stats.txsFailed++
+}
+
 func (st *WorkerStatsTracker) GetTxExecuted() int {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
 	return st.stats.txsExecuted
+}
+
+func (st *WorkerStatsTracker) GetTxFailed() int {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	return st.stats.txsFailed
 }
 
 func (st *WorkerStatsTracker) AddWorkers(i int) {
@@ -112,6 +127,7 @@ func (st *WorkerStatsTracker) Digest() string {
 		"workers",
 		"total TXs sent",
 		"total TXs finished",
+		"total TXs failed",
 		"Avg TPS (last 10s)",
 	})
 
@@ -120,6 +136,7 @@ func (st *WorkerStatsTracker) Digest() string {
 		stats.workers,
 		stats.txsSent,
 		stats.txsExecuted,
+		stats.txsFailed,
 		// use 11 seconds to correct for rounding in buckets
 		st.AvgTPSBetween(time.Now().Add(-11*time.Second), time.Now()),
 	})

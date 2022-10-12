@@ -68,3 +68,6 @@ go.work.sum
 
 # Ledger checkpoint status files
 **/checkpoint_status.json
+
+# Local Loader Testing Results
+tps-results*.json
