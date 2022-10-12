@@ -66,11 +66,11 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	defer rwm.Close()
 
 	l := migrations.NewView(payload)
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		l,
 		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
 	)
-	gen := environment.NewAddressGenerator(stTxn, r.Chain)
+	gen := environment.NewAddressGenerator(txnState, r.Chain)
 
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
 
@@ -136,7 +136,7 @@ type balanceProcessor struct {
 }
 
 func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 	blockPrograms := programs.NewEmptyBlockPrograms()
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
@@ -144,18 +144,18 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		fvm.WithBlockPrograms(blockPrograms))
 
 	v := view.NewChild()
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		v,
 		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
 	)
-	accounts := environment.NewAccounts(stTxn)
+	accounts := environment.NewAccounts(txnState)
 
 	txnPrograms, err := blockPrograms.NewSnapshotReadTransactionPrograms(0, 0)
 	if err != nil {
 		panic(err)
 	}
 
-	env := fvm.NewScriptEnv(context.Background(), ctx, stTxn, txnPrograms)
+	env := fvm.NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
 
 	return &balanceProcessor{
 		vm:       vm,
@@ -320,7 +320,7 @@ func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.RunV2(c.ctx, script, c.view)
+	err := c.vm.Run(c.ctx, script, c.view)
 	if err != nil {
 		return 0, false, err
 	}
@@ -341,7 +341,7 @@ func (c *balanceProcessor) fusdBalance(address flow.Address) (uint64, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.RunV2(c.ctx, script, c.view)
+	err := c.vm.Run(c.ctx, script, c.view)
 	if err != nil {
 		return 0, err
 	}
@@ -358,7 +358,7 @@ func (c *balanceProcessor) moments(address flow.Address) (int, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.RunV2(c.ctx, script, c.view)
+	err := c.vm.Run(c.ctx, script, c.view)
 	if err != nil {
 		return 0, err
 	}

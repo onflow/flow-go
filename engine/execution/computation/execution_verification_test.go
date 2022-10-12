@@ -632,7 +632,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	txs [][]*flow.TransactionBody,
 	opts []fvm.Option,
 	bootstrapOpts []fvm.BootstrapProcedureOption) *execution.ComputationResult {
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 
 	logger := zerolog.Nop()
 

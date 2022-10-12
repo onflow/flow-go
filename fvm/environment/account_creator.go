@@ -36,6 +36,36 @@ type BootstrapAccountCreator interface {
 	)
 }
 
+// This ensures cadence can't access unexpected operations while parsing
+// programs.
+type ParseRestrictedAccountCreator struct {
+	txnState *state.TransactionState
+	impl     AccountCreator
+}
+
+func NewParseRestrictedAccountCreator(
+	txnState *state.TransactionState,
+	creator AccountCreator,
+) AccountCreator {
+	return ParseRestrictedAccountCreator{
+		txnState: txnState,
+		impl:     creator,
+	}
+}
+
+func (creator ParseRestrictedAccountCreator) CreateAccount(
+	payer runtime.Address,
+) (
+	runtime.Address,
+	error,
+) {
+	return parseRestrict1Arg1Ret(
+		creator.txnState,
+		"CreateAccount",
+		creator.impl.CreateAccount,
+		payer)
+}
+
 type AccountCreator interface {
 	CreateAccount(payer runtime.Address) (runtime.Address, error)
 }
@@ -60,9 +90,9 @@ func (NoAccountCreator) CreateAccount(
 // updates the state when next address is called (This secondary functionality
 // is only used in utility command line).
 type accountCreator struct {
-	stateTransaction *state.StateHolder
-	chain            flow.Chain
-	accounts         Accounts
+	txnState *state.TransactionState
+	chain    flow.Chain
+	accounts Accounts
 
 	isServiceAccountEnabled bool
 
@@ -74,29 +104,29 @@ type accountCreator struct {
 }
 
 func NewAddressGenerator(
-	stateTransaction *state.StateHolder,
+	txnState *state.TransactionState,
 	chain flow.Chain,
 ) AddressGenerator {
 	return &accountCreator{
-		stateTransaction: stateTransaction,
-		chain:            chain,
+		txnState: txnState,
+		chain:    chain,
 	}
 }
 
 func NewBootstrapAccountCreator(
-	stateTransaction *state.StateHolder,
+	txnState *state.TransactionState,
 	chain flow.Chain,
 	accounts Accounts,
 ) BootstrapAccountCreator {
 	return &accountCreator{
-		stateTransaction: stateTransaction,
-		chain:            chain,
-		accounts:         accounts,
+		txnState: txnState,
+		chain:    chain,
+		accounts: accounts,
 	}
 }
 
 func NewAccountCreator(
-	stateTransaction *state.StateHolder,
+	txnState *state.TransactionState,
 	chain flow.Chain,
 	accounts Accounts,
 	isServiceAccountEnabled bool,
@@ -106,7 +136,7 @@ func NewAccountCreator(
 	systemContracts *SystemContracts,
 ) AccountCreator {
 	return &accountCreator{
-		stateTransaction:        stateTransaction,
+		txnState:                txnState,
 		chain:                   chain,
 		accounts:                accounts,
 		isServiceAccountEnabled: isServiceAccountEnabled,
@@ -118,10 +148,10 @@ func NewAccountCreator(
 }
 
 func (creator *accountCreator) bytes() ([]byte, error) {
-	stateBytes, err := creator.stateTransaction.Get(
+	stateBytes, err := creator.txnState.Get(
 		"",
 		keyAddressState,
-		creator.stateTransaction.EnforceLimits())
+		creator.txnState.EnforceLimits())
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to read address generator state from the state: %w",
@@ -165,11 +195,11 @@ func (creator *accountCreator) NextAddress() (flow.Address, error) {
 	}
 
 	// update the ledger state
-	err = creator.stateTransaction.Set(
+	err = creator.txnState.Set(
 		"",
 		keyAddressState,
 		addressGenerator.Bytes(),
-		creator.stateTransaction.EnforceLimits())
+		creator.txnState.EnforceLimits())
 	if err != nil {
 		return address, fmt.Errorf(
 			"failed to update the state with address generator state: %w",
@@ -243,7 +273,7 @@ func (creator *accountCreator) CreateAccount(
 
 	// don't enforce limit during account creation
 	var addr runtime.Address
-	creator.stateTransaction.RunWithAllLimitsDisabled(func() {
+	creator.txnState.RunWithAllLimitsDisabled(func() {
 		addr, err = creator.createAccount(payer)
 	})
 

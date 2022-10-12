@@ -142,8 +142,8 @@ func (r *FungibleTokenTracker) worker(
 	for j := range jobs {
 
 		view := migrations.NewView(j.payloads)
-		stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-		accounts := environment.NewAccounts(stTxn)
+		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		accounts := environment.NewAccounts(txnState)
 		storage := cadenceRuntime.NewStorage(
 			&migrations.AccountsAtreeLedger{Accounts: accounts},
 			nil,
@@ -194,7 +194,11 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 	if compValue.IsResourceKinded(nil) {
 		typeIDStr := string(compValue.TypeID())
 		if _, ok := r.vaultTypeIDs[typeIDStr]; ok {
-			b := uint64(compValue.GetField(inter, nil, "balance").(interpreter.UFix64Value))
+			b := uint64(compValue.GetField(
+				inter,
+				interpreter.EmptyLocationRange,
+				"balance",
+			).(interpreter.UFix64Value))
 			if b > 0 {
 				r.rw.Write(TokenDataPoint{
 					Path:    tr.String(),

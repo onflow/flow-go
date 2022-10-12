@@ -26,7 +26,7 @@ const (
 type Procedure interface {
 	Run(
 		ctx Context,
-		sth *state.StateHolder,
+		txnState *state.TransactionState,
 		programs *programs.TransactionPrograms,
 	) error
 
@@ -56,41 +56,14 @@ func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
-	Runtime runtime.Runtime // DEPRECATED.  DO NOT USE.
 }
 
-func NewVM() *VirtualMachine {
+func NewVirtualMachine() *VirtualMachine {
 	return &VirtualMachine{}
 }
 
-// DEPRECATED.  DO NOT USE.
-//
-// TODO(patrick): remove after emulator is updated.
-//
-// Emulator is a special snowflake which prevents fvm from every changing its
-// APIs (integration test uses a pinned version of the emulator, which in turn
-// uses a pinned non-master version of flow-go).  This method is expose to break
-// the ridiculous circular dependency between the two builds.
-func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
-	return &VirtualMachine{
-		Runtime: rt,
-	}
-}
-
-// DEPRECATED.  DO NOT USE.
-//
-// TODO(patrick): remove after emulator is updated
-//
 // Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, _ *programs.Programs) (err error) {
-	return vm.RunV2(ctx, proc, v)
-}
-
-// TODO(patrick): rename back to Run after emulator is fully updated (this
-// takes at least 3 sporks ...).
-//
-// Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) RunV2(
+func (vm *VirtualMachine) Run(
 	ctx Context,
 	proc Procedure,
 	v state.View,
@@ -159,7 +132,7 @@ func (vm *VirtualMachine) RunV2(
 	eventSizeLimit := ctx.EventCollectionByteSizeLimit
 	meterParams = meterParams.WithEventEmitByteLimit(eventSizeLimit)
 
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		v,
 		state.DefaultParameters().
 			WithMeterParameters(meterParams).
@@ -168,21 +141,11 @@ func (vm *VirtualMachine) RunV2(
 			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
-	return proc.Run(ctx, stTxn, txnPrograms)
+	return proc.Run(ctx, txnState, txnPrograms)
 }
 
-// DEPRECATED. DO NOT USE
-//
-// TODO(patrick): remove after emulator is updated
-func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
-	return vm.GetAccountV2(ctx, address, v)
-}
-
-// TODO(patrick): rename back to GetAccount after emulator is fully updated
-// (this takes at least 3 sporks ...).
-//
-// GetAccountV2 returns an account by address or an error if none exists.
-func (vm *VirtualMachine) GetAccountV2(
+// GetAccount returns an account by address or an error if none exists.
+func (vm *VirtualMachine) GetAccount(
 	ctx Context,
 	address flow.Address,
 	v state.View,
@@ -190,7 +153,7 @@ func (vm *VirtualMachine) GetAccountV2(
 	*flow.Account,
 	error,
 ) {
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		v,
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
@@ -212,7 +175,7 @@ func (vm *VirtualMachine) GetAccountV2(
 			err)
 	}
 
-	env := NewScriptEnv(context.Background(), ctx, stTxn, txnPrograms)
+	env := NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
 	account, err := env.GetAccount(address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {

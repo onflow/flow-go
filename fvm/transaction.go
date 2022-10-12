@@ -24,7 +24,7 @@ type TransactionProcessor interface {
 	Process(
 		Context,
 		*TransactionProcedure,
-		*state.StateHolder,
+		*state.TransactionState,
 		*programs.TransactionPrograms,
 	) error
 }
@@ -40,7 +40,7 @@ type TransactionProcedure struct {
 	ServiceEvents   []flow.Event
 	ComputationUsed uint64
 	MemoryEstimate  uint64
-	Err             errors.Error
+	Err             errors.CodedError
 	TraceSpan       otelTrace.Span
 }
 
@@ -50,11 +50,11 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
 
 func (proc *TransactionProcedure) Run(
 	ctx Context,
-	st *state.StateHolder,
+	txnState *state.TransactionState,
 	programs *programs.TransactionPrograms,
 ) error {
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(ctx, proc, st, programs)
+		err := p.Process(ctx, proc, txnState, programs)
 		txErr, failure := errors.SplitErrorTypes(err)
 		if failure != nil {
 			// log the full error path

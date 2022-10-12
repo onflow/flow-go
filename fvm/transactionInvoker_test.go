@@ -34,7 +34,7 @@ func TestSafetyCheck(t *testing.T) {
 		view := utils.NewSimpleView()
 		context := fvm.NewContext(fvm.WithLogger(log))
 
-		stTxn := state.NewStateTransaction(
+		txnState := state.NewTransactionState(
 			view,
 			state.DefaultParameters().
 				WithMaxKeySizeAllowed(context.MaxStateKeySize).
@@ -46,7 +46,7 @@ func TestSafetyCheck(t *testing.T) {
 		txnPrograms, err := blockPrograms.NewTransactionPrograms(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, stTxn, txnPrograms)
+		err = txInvoker.Process(context, proc, txnState, txnPrograms)
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -67,7 +67,7 @@ func TestSafetyCheck(t *testing.T) {
 		view := utils.NewSimpleView()
 		context := fvm.NewContext(fvm.WithLogger(log))
 
-		stTxn := state.NewStateTransaction(
+		txnState := state.NewTransactionState(
 			view,
 			state.DefaultParameters().
 				WithMaxKeySizeAllowed(context.MaxStateKeySize).
@@ -79,7 +79,7 @@ func TestSafetyCheck(t *testing.T) {
 		txnPrograms, err := blockPrograms.NewTransactionPrograms(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, stTxn, txnPrograms)
+		err = txInvoker.Process(context, proc, txnState, txnPrograms)
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")

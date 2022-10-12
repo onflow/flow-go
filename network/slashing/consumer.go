@@ -19,7 +19,7 @@ const (
 	senderEjectedViolation      = "sender_ejected"
 )
 
-// Consumer is a struct that logs a message for any slashable offences.
+// Consumer is a struct that logs a message for any slashable offenses.
 // This struct will be updated in the future when slashing is implemented.
 type Consumer struct {
 	log     zerolog.Logger
@@ -54,6 +54,7 @@ func (c *Consumer) logOffense(networkOffense string, violation *Violation) {
 		Str("message_type", violation.MsgType).
 		Str("channel", violation.Channel.String()).
 		Bool("unicast_message", violation.IsUnicast).
+		Bool(logging.KeySuspicious, true).
 		Str("role", role).
 		Hex("sender_id", logging.ID(nodeID))
 
