@@ -136,7 +136,7 @@ type balanceProcessor struct {
 }
 
 func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 	blockPrograms := programs.NewEmptyBlockPrograms()
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),

@@ -74,6 +74,13 @@ func (st *WorkerStatsTracker) AddTxSent() {
 	st.txsSentPerSecond[now]++
 }
 
+func (st *WorkerStatsTracker) GetTxSent() int {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	return st.stats.txsSent
+}
+
 func (st *WorkerStatsTracker) GetStats() WorkerStats {
 	st.mux.Lock()
 	defer st.mux.Unlock()

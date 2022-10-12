@@ -872,7 +872,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.VerifierEngine == nil {
-		vm := fvm.NewVM()
+		vm := fvm.NewVirtualMachine()
 
 		blockFinder := environment.NewBlockFinder(node.Headers)
 

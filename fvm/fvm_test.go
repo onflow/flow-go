@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -60,7 +61,7 @@ func (vmt vmTest) withContextOptions(opts ...fvm.Option) vmTest {
 }
 
 func createChainAndVm(chainID flow.ChainID) (flow.Chain, *fvm.VirtualMachine) {
-	return chainID.Chain(), fvm.NewVM()
+	return chainID.Chain(), fvm.NewVirtualMachine()
 }
 
 func (vmt vmTest) run(
@@ -144,7 +145,7 @@ func (vmt bootstrappedVmTest) run(
 	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
-		f(t, fvm.NewVM(), vmt.chain, vmt.ctx, vmt.view.NewChild(), vmt.programs.NewChildBlockPrograms())
+		f(t, fvm.NewVirtualMachine(), vmt.chain, vmt.ctx, vmt.view.NewChild(), vmt.programs.NewChildBlockPrograms())
 	}
 }
 
@@ -1098,7 +1099,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 	for k, v := range meter.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}
-	memoryWeights[common.MemoryKindBoolValue] = 20_000_000_000
+
+	const highWeight = 20_000_000_000
+	memoryWeights[common.MemoryKindIntegerExpression] = highWeight
 
 	t.Run("normal transactions should fail with high memory weights", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
@@ -1124,7 +1127,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: AuthAccount) {
-					var a = false
+					var a = 1
                   }
                 }
 			`)).
@@ -1138,7 +1141,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view)
 			require.NoError(t, err)
-			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
+			require.Greater(t, tx.MemoryEstimate, uint64(highWeight))
 
 			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
 		},
@@ -1160,7 +1163,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: AuthAccount) {
-					var a = false
+					var a = 1
                   }
                 }
 			`)).
@@ -1174,7 +1177,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view)
 			require.NoError(t, err)
-			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
+			require.Greater(t, tx.MemoryEstimate, uint64(highWeight))
 
 			require.NoError(t, tx.Err)
 		},

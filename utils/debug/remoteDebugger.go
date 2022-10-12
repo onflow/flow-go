@@ -19,7 +19,7 @@ type RemoteDebugger struct {
 func NewRemoteDebugger(grpcAddress string,
 	chain flow.Chain,
 	logger zerolog.Logger) *RemoteDebugger {
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 
 	// no signature processor here
 	// TODO Maybe we add fee-deduction step as well

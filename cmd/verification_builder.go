@@ -195,7 +195,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
-			vm := fvm.NewVM()
+			vm := fvm.NewVirtualMachine()
 			fvmOptions := append(
 				[]fvm.Option{fvm.WithLogger(node.Logger)},
 				node.FvmOptions...,

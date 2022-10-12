@@ -13,9 +13,9 @@ import (
 func notEjectedPeerFilter(idProvider module.IdentityProvider) p2p.PeerFilter {
 	return func(p peer.ID) error {
 		if id, found := idProvider.ByPeerID(p); !found {
-			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.Pretty())
+			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.String())
 		} else if id.Ejected {
-			return fmt.Errorf("node with the peer_id %s is ejected", id.NodeID)
+			return fmt.Errorf("peer %s with node id %s is ejected", p.String(), id.NodeID.String())
 		}
 
 		return nil
