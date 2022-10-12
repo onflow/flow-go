@@ -324,10 +324,6 @@ func (s *TransactionState) TotalEmittedEventBytes() uint64 {
 	return s.currentState().TotalEmittedEventBytes()
 }
 
-func (s *TransactionState) TotalEventCounter() uint32 {
-	return s.currentState().TotalEventCounter()
-}
-
 func (s *TransactionState) ViewForTestingOnly() View {
 	return s.currentState().View()
 }
