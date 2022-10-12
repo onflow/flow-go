@@ -77,10 +77,10 @@ func storeCheckpointV6(
 	logger.Info().
 		Str("first_hash", first.RootHash().String()).
 		Uint64("first_reg_count", first.AllocatedRegCount()).
-		Str("last", last.RootHash().String()).
+		Str("last_hash", last.RootHash().String()).
 		Uint64("last_reg_count", last.AllocatedRegCount()).
 		Int("version", 6).
-		Msgf("storing checkpoint for %v tries to %v", len(tries), outputDir)
+		Msgf("storing checkpoint for %v tries to %s", len(tries), path.Join(outputDir, outputFile))
 
 	// make sure a checkpoint file with same name doesn't exist
 	// part file with same name doesn't exist either
