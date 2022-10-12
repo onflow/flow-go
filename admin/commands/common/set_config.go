@@ -44,9 +44,9 @@ func (s *SetConfigCommand) Handler(_ context.Context, req *admin.CommandRequest)
 		return nil, fmt.Errorf("could not set new config value for %s: %w", validatedReq.field)
 	}
 
-	res := setConfigResponse{
-		OldValue: oldValue,
-		NewValue: validatedReq.value,
+	res := map[string]any{
+		"oldValue": oldValue,
+		"newValue": validatedReq.value,
 	}
 
 	return res, nil
@@ -74,7 +74,7 @@ func (s *SetConfigCommand) Validator(req *admin.CommandRequest) error {
 	}
 
 	field, ok := s.configs.GetField(configName)
-	if ok {
+	if !ok {
 		return fmt.Errorf("unknown config field: %s", configName)
 	}
 
