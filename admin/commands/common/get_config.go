@@ -46,7 +46,7 @@ func (s *GetConfigCommand) Validator(req *admin.CommandRequest) error {
 	}
 
 	// we have found a corresponding updatable config field, set it in the ValidatorData
-	// field - we will attempt
+	// field - we will read it in the Handler
 	req.ValidatorData = validatedGetConfigData{
 		field: field,
 	}
