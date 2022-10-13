@@ -158,8 +158,8 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	logger := unittest.Logger()
 
+	topicValidator := flowpubsub.TopicValidator(logger, codec, unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
 	for _, n := range nodes {
-		topicValidator := flowpubsub.TopicValidator(logger, codec, unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
 		s, err := n.Subscribe(topic, topicValidator)
 		require.NoError(t, err)
 
