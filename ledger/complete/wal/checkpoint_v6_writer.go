@@ -410,6 +410,8 @@ func createClosableWriter(dir string, fileName string, logger *zerolog.Logger) (
 	}, nil
 }
 
+// storeCheckpointSubTrie traverse each root node, and store the subtrie nodes into
+// the subtrie part file at index i
 // subtrie file contains:
 // 1. checkpoint version
 // 2. nodes
@@ -418,12 +420,12 @@ func createClosableWriter(dir string, fileName string, logger *zerolog.Logger) (
 func storeCheckpointSubTrie(
 	i int,
 	roots []*node.Node,
-	estimatedSubtrieNodeCount int,
+	estimatedSubtrieNodeCount int, // for estimate the amount of memory to be preallocated
 	outputDir string,
 	outputFile string,
 	logger *zerolog.Logger,
 ) (
-	rootNodesOfAllSubtries map[*node.Node]uint64,
+	rootNodesOfAllSubtries map[*node.Node]uint64, // the stored position of each unique root node
 	totalSubtrieNodeCount uint64,
 	checksumOfSubtriePartfile uint32,
 	errToReturn error,

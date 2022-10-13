@@ -137,22 +137,40 @@ func TestEncodeSubTrie(t *testing.T) {
 
 	for index, roots := range subtrieRoots {
 		unittest.RunWithTempDir(t, func(dir string) {
-			indices, nodeCount, checksum, err := storeCheckpointSubTrie(
+			uniqueIndices, nodeCount, checksum, err := storeCheckpointSubTrie(
 				index, roots, estimatedSubtrieNodeCount, dir, file, &logger)
 			require.NoError(t, err)
 
-			if len(indices) > 1 {
-				require.Len(t, indices, len(roots),
-					fmt.Sprintf("indices should include all roots, indices[nil] %v, roots[0] %v", indices[nil], roots[0]))
-			}
-			// each root should be included in the indices
-			for _, root := range roots {
-				_, ok := indices[root]
-				require.True(t, ok, "each root should be included in the indices")
+			// subtrie roots might have duplciates, that why we group the them,
+			// and store each group in different part file in order to deduplicate.
+			// the returned uniqueIndices contains the index for each unique roots.
+			// in order to verify that, we build a uniqueRoots first, and verify
+			// if any unique root is missing from the uniqueIndices
+			uniqueRoots := make(map[*node.Node]struct{})
+			for i, root := range roots {
+				if root == nil {
+					fmt.Println(i, "-th subtrie root is nil")
+				}
+				_, ok := uniqueRoots[root]
+				if ok {
+					fmt.Println(i, "-th subtrie root is a duplicate")
+				}
+				uniqueRoots[root] = struct{}{}
 			}
 
-			logger.Info().Msgf("sub trie checkpoint stored, indices: %v, node count: %v, checksum: %v",
-				indices, nodeCount, checksum)
+			// each root should be included in the uniqueIndices
+			for _, root := range roots {
+				_, ok := uniqueIndices[root]
+				require.True(t, ok, "each root should be included in the uniqueIndices")
+			}
+
+			if len(uniqueIndices) > 1 {
+				require.Len(t, uniqueIndices, len(uniqueRoots),
+					fmt.Sprintf("uniqueIndices should include all roots, uniqueIndices[nil] %v, roots[0] %v", uniqueIndices[nil], roots[0]))
+			}
+
+			logger.Info().Msgf("sub trie checkpoint stored, uniqueIndices: %v, node count: %v, checksum: %v",
+				uniqueIndices, nodeCount, checksum)
 
 			// all the nodes
 			nodes, err := readCheckpointSubTrie(dir, file, index, checksum, &logger)
@@ -162,10 +180,10 @@ func TestEncodeSubTrie(t *testing.T) {
 				if root == nil {
 					continue
 				}
-				index := indices[root]
+				index := uniqueIndices[root]
 				require.Equal(t, root.Hash(), nodes[index-1].Hash(), // -1 because readCheckpointSubTrie returns nodes[1:]
 					"readCheckpointSubTrie should return nodes where the root should be found "+
-						"by the index specified by the indices returned by storeCheckpointSubTrie")
+						"by the index specified by the uniqueIndices returned by storeCheckpointSubTrie")
 			}
 		})
 	}
