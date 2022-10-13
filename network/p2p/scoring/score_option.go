@@ -17,8 +17,8 @@ const (
 
 	DefaultAppSpecificScoreWeight = 1
 	MaxAppSpecificPenalty         = -100
+	MinAppSpecificPenalty         = -1
 	MaxAppSpecificReward          = 100
-	MinAppSpecificReward          = -1
 
 	// DefaultGossipThreshold when a peer's score drops below this threshold,
 	// no gossip is emitted towards that peer and gossip from that peer is ignored.
@@ -67,7 +67,7 @@ const (
 	// Validation Constraint: must be non-negative.
 	//
 	// How we use it:
-	// We set it to the MaxAppSpecificReward + 1 so that we only opportunistically graft peers that are not access nodes (i.e., with MinAppSpecificReward),
+	// We set it to the MaxAppSpecificReward + 1 so that we only opportunistically graft peers that are not access nodes (i.e., with MinAppSpecificPenalty),
 	// or penalized peers (i.e., with MaxAppSpecificPenalty).
 	DefaultOpportunisticGraftThreshold = MaxAppSpecificReward + 1
 )
@@ -209,11 +209,11 @@ func defaultAppSpecificScoreFunction(logger zerolog.Logger, idProvider module.Id
 		}
 
 		// checks if peer is an access node, and if so, pushes it to the
-		// edges of the network by giving the minimum reward.
+		// edges of the network by giving the minimum penalty.
 		if flowId.Role == flow.RoleAccess {
 			lg.Info().
-				Msg("rewarding access node with minimum reward value")
-			return MinAppSpecificReward
+				Msg("pushing access node to edge by penalizing with minimum penalty value")
+			return MinAppSpecificPenalty
 		}
 
 		logger.Info().
