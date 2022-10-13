@@ -93,9 +93,14 @@ func storeCheckpointV6(
 
 	// make sure a checkpoint file with same name doesn't exist
 	// part file with same name doesn't exist either
-	err := noneCheckpointFileExist(outputDir, outputFile, subtrieCount)
+	matched, err := findCheckpointPartFiles(outputDir, outputFile)
 	if err != nil {
 		return fmt.Errorf("fail to check if checkpoint file already exist: %w", err)
+	}
+
+	// no part file found, means noneCheckpointFileExist
+	if len(matched) == 0 {
+		return nil
 	}
 
 	subtrieRoots := createSubTrieRoots(tries)

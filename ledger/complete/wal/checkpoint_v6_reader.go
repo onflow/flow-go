@@ -279,24 +279,6 @@ func findCheckpointPartFiles(dir string, fileName string) ([]string, error) {
 
 var errCheckpointFileExist = errors.New("checkpoint file exists already")
 
-// noneCheckpointFileExist check if none of the checkpoint header file or the part files exist
-// it returns nil if none exists
-// it returns errCheckpointFileExist if a checkpoint file exists already
-// it returns err if running into any other exception
-func noneCheckpointFileExist(dir string, fileName string, totalSubtrieFiles int) error {
-	matched, err := findCheckpointPartFiles(dir, fileName)
-	if err != nil {
-		return err
-	}
-
-	// no part file found, means noneCheckpointFileExist
-	if len(matched) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf("checkpoint part file already exist %v: %w", matched, errCheckpointFileExist)
-}
-
 func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32, logger *zerolog.Logger) ([][]*node.Node, error) {
 	numOfSubTries := len(subtrieChecksums)
 	resultChs := make([]chan *resultReadSubTrie, 0, numOfSubTries)
