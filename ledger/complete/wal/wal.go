@@ -39,7 +39,7 @@ func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module
 		pathByteSize:   pathByteSize,
 		log:            logger.With().Str("module", "diskwal").Logger(),
 		dir:            dir,
-		outputVersion:  VersionV6,
+		outputVersion:  MaxVersion,
 	}, nil
 }
 
