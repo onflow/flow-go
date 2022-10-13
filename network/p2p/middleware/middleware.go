@@ -192,7 +192,7 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 func (m *Middleware) isProtocolParticipant() p2p.PeerFilter {
 	return func(p peer.ID) error {
 		if _, ok := m.ov.Identity(p); !ok {
-			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.Pretty())
+			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.String())
 		}
 		return nil
 	}

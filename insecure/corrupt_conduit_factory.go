@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 )
 
-type CorruptibleConduitFactory interface {
+type CorruptConduitFactory interface {
 	network.ConduitFactory
 
 	// SendOnFlowNetwork dispatches the given event to the networking layer of the node in order to be delivered

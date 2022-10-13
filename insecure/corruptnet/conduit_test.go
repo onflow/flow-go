@@ -1,4 +1,4 @@
-package corruptible
+package corruptnet
 
 import (
 	"context"
