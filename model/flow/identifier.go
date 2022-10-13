@@ -14,10 +14,8 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
-	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 const IdentifierLen = 32
@@ -208,7 +206,6 @@ func Sample(size uint, ids ...Identifier) []Identifier {
 
 func CidToId(c cid.Cid) (Identifier, error) {
 	decoded, err := mh.Decode(c.Hash())
-
 	if err != nil {
 		return ZeroID, fmt.Errorf("failed to decode CID: %w", err)
 	}
@@ -216,7 +213,6 @@ func CidToId(c cid.Cid) (Identifier, error) {
 	if decoded.Code != mh.SHA2_256 {
 		return ZeroID, fmt.Errorf("unsupported CID hash function: %v", decoded.Name)
 	}
-
 	if decoded.Length != IdentifierLen {
 		return ZeroID, fmt.Errorf("invalid CID length: %d", decoded.Length)
 	}

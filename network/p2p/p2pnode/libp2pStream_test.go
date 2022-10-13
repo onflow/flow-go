@@ -623,7 +623,7 @@ func TestConnectionGating(t *testing.T) {
 	node1Peers := make(map[peer.ID]struct{})
 	node1, node1Id := p2pfixtures.NodeFixture(t, sporkID, "test_connection_gating", p2pfixtures.WithPeerFilter(func(p peer.ID) error {
 		if _, ok := node1Peers[p]; !ok {
-			return fmt.Errorf("id not found: %s", p.Pretty())
+			return fmt.Errorf("id not found: %s", p.String())
 		}
 		return nil
 	}))
@@ -631,7 +631,7 @@ func TestConnectionGating(t *testing.T) {
 	node2Peers := make(map[peer.ID]struct{})
 	node2, node2Id := p2pfixtures.NodeFixture(t, sporkID, "test_connection_gating", p2pfixtures.WithPeerFilter(func(p peer.ID) error {
 		if _, ok := node2Peers[p]; !ok {
-			return fmt.Errorf("id not found: %s", p.Pretty())
+			return fmt.Errorf("id not found: %s", p.String())
 		}
 		return nil
 	}))

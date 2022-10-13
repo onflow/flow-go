@@ -1,4 +1,4 @@
-package corruptible
+package corruptnet
 
 // This file has helper function that are only used for testing.
 
@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/rs/zerolog"
 
 	"google.golang.org/grpc"
@@ -17,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/module/irrecoverable"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
@@ -26,9 +27,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// corruptibleNetworkFixture creates a corruptible Network with a mock Adapter.
+// corruptNetworkFixture creates a corruptible Network with a mock Adapter.
 // By default, no attacker is registered on this corruptible network.
-func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
+// This function is not meant to be used by tests directly because it expects the corrupt network to be properly started and stopped.
+// Otherwise, it will throw mock expectations errors.
+func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
 	// create corruptible network with no attacker registered
 	codec := unittest.NetworkCodec()
 
@@ -38,7 +41,7 @@ func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID 
 		corruptedIdentity = corruptedID[0]
 	}
 
-	flowNetwork := &mocknetwork.Network{}
+	flowNetwork := mocknetwork.NewNetwork(t)
 	flowNetwork.On("Start", mock.Anything).Return()
 
 	// mock flow network will pretend to be ready when required
@@ -54,10 +57,11 @@ func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID 
 	flowNetwork.On("Done", mock.Anything).Return(func() <-chan struct{} {
 		return done
 	})
-	ccf := NewCorruptibleConduitFactory(logger, flow.BftTestnet)
+	ccf := NewCorruptConduitFactory(logger, flow.BftTestnet)
 
-	// set up adapter, so we can check that it called the expected method
-	adapter := &mocknetwork.Adapter{}
+	// set up adapter, so we can check that it called the expected method.
+	// It will be checked automatically without having to remember to call mock.AssertExpectationsForObjects()
+	adapter := mocknetwork.NewAdapter(t)
 	err := ccf.RegisterAdapter(adapter)
 	require.NoError(t, err)
 
@@ -75,14 +79,14 @@ func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID 
 	return corruptibleNetwork, adapter
 }
 
-// withCorruptibleNetwork creates and starts a corruptible network, runs the "run" function and then
+// runCorruptNetworkTest creates and starts a corruptible network, runs the "run" function of a simulated attacker and then
 // terminates the network.
-func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
+func runCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
 	run func(
 		flow.Identity, // identity of ccf
 		*Network, // corruptible network
 		*mocknetwork.Adapter, // mock adapter that corrupted network uses to communicate with authorized flow nodes.
-		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
+		insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 	)) {
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
@@ -99,11 +103,11 @@ func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
 		}
 	}()
 
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, logger, corruptedIdentity)
+	corruptibleNetwork, adapter := corruptNetworkFixture(t, logger, corruptedIdentity)
 
 	// start corruptible network
 	corruptibleNetwork.Start(ccfCtx)
-	unittest.RequireCloseBefore(t, corruptibleNetwork.Ready(), 1*time.Second, "could not start corruptible network on time")
+	unittest.RequireCloseBefore(t, corruptibleNetwork.Ready(), 100*time.Millisecond, "could not start corruptible network on time")
 
 	// extracting port that ccf gRPC server is running on
 	_, ccfPortStr, err := net.SplitHostPort(corruptibleNetwork.ServerAddress())
@@ -116,7 +120,7 @@ func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	require.NoError(t, err)
 
-	client := insecure.NewCorruptibleConduitFactoryClient(gRpcClient)
+	client := insecure.NewCorruptNetworkClient(gRpcClient)
 	stream, err := client.ProcessAttackerMessage(context.Background())
 	require.NoError(t, err)
 
@@ -124,5 +128,5 @@ func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
 
 	// terminates orchestratorNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, corruptibleNetwork.Done(), 1*time.Second, "could not stop corruptible conduit on time")
+	unittest.RequireCloseBefore(t, corruptibleNetwork.Done(), 100*time.Millisecond, "could not stop corruptible conduit on time")
 }
