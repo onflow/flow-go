@@ -175,6 +175,7 @@ func (emitter *eventEmitter) ServiceEvents() []flow.Event {
 type EventCollection struct {
 	events        flow.EventsList
 	serviceEvents flow.EventsList
+	eventCounter  uint32
 	meter         Meter
 }
 
@@ -182,6 +183,7 @@ func NewEventCollection(meter Meter) *EventCollection {
 	return &EventCollection{
 		events:        make([]flow.Event, 0, 10),
 		serviceEvents: make([]flow.Event, 0, 10),
+		eventCounter:  uint32(0),
 		meter:         meter,
 	}
 }
@@ -192,6 +194,7 @@ func (collection *EventCollection) Events() []flow.Event {
 
 func (collection *EventCollection) AppendEvent(event flow.Event, size uint64) error {
 	collection.events = append(collection.events, event)
+	collection.eventCounter++
 	return collection.meter.MeterEmittedEvent(size)
 }
 
@@ -204,6 +207,7 @@ func (collection *EventCollection) AppendServiceEvent(
 	size uint64,
 ) error {
 	collection.serviceEvents = append(collection.serviceEvents, event)
+	collection.eventCounter++
 	return collection.meter.MeterEmittedEvent(size)
 }
 
@@ -212,7 +216,7 @@ func (collection *EventCollection) TotalByteSize() uint64 {
 }
 
 func (collection *EventCollection) TotalEventCounter() uint32 {
-	return collection.meter.TotalEventCounter()
+	return collection.eventCounter
 }
 
 // IsServiceEvent determines whether or not an emitted Cadence event is

@@ -636,12 +636,10 @@ func TestEventLimits(t *testing.T) {
 		err := meter1.MeterEmittedEvent(testSize1)
 		require.NoError(t, err)
 		require.Equal(t, testSize1, meter1.TotalEmittedEventBytes())
-		require.Equal(t, uint32(1), meter1.TotalEventCounter())
 
 		err = meter1.MeterEmittedEvent(testSize2)
 		require.NoError(t, err)
 		require.Equal(t, testSize1+testSize2, meter1.TotalEmittedEventBytes())
-		require.Equal(t, uint32(2), meter1.TotalEventCounter())
 	})
 
 	t.Run("metering event emit - exceeding limit", func(t *testing.T) {
@@ -654,7 +652,6 @@ func TestEventLimits(t *testing.T) {
 		err := meter1.MeterEmittedEvent(testSize1)
 		require.NoError(t, err)
 		require.Equal(t, testSize1, meter1.TotalEmittedEventBytes())
-		require.Equal(t, uint32(1), meter1.TotalEventCounter())
 
 		err = meter1.MeterEmittedEvent(testSize2)
 		eventLimitExceededError := errors.NewEventLimitExceededError(
@@ -683,6 +680,5 @@ func TestEventLimits(t *testing.T) {
 		// merge
 		meter1.MergeMeter(meter2)
 		require.Equal(t, testSize1+testSize2, meter1.TotalEmittedEventBytes())
-		require.Equal(t, uint32(2), meter1.TotalEventCounter())
 	})
 }
