@@ -29,7 +29,7 @@ type StopControl struct {
 	state StopControlState
 
 	// used to prevent setting stop height to block which has already been executed
-	lastExecutingHeight uint64
+	highestExecutingHeight uint64
 }
 
 type StopControlState byte
@@ -62,9 +62,9 @@ func NewStopControl(log zerolog.Logger, paused bool, lastExecutedHeight uint64) 
 	}
 	log.Debug().Msgf("created StopControl module with paused = %t", paused)
 	return &StopControl{
-		log:                 log,
-		state:               state,
-		lastExecutingHeight: lastExecutedHeight,
+		log:                    log,
+		state:                  state,
+		highestExecutingHeight: lastExecutedHeight,
 	}
 }
 
@@ -103,8 +103,8 @@ func (s *StopControl) SetStopHeight(height uint64, crash bool) (uint64, bool, er
 	}
 
 	// +1 because we track last executing height, so +1 is the lowest possible block to stop
-	if height <= s.lastExecutingHeight+1 {
-		return oldHeight, oldCrash, fmt.Errorf("cannot update stop height, given height %d at or below last executed %d", height, s.lastExecutingHeight)
+	if height <= s.highestExecutingHeight+1 {
+		return oldHeight, oldCrash, fmt.Errorf("cannot update stop height, given height %d at or below last executed %d", height, s.highestExecutingHeight)
 	}
 
 	s.log.Info().
@@ -186,6 +186,7 @@ func (s *StopControl) blockFinalized(ctx context.Context, execState state.ReadOn
 			s.stopExecution()
 		} else {
 			s.stopAfterExecuting = h.ParentID
+			s.log.Info().Msgf("Node scheduled to stop executing after executing block %s at height %d", s.stopAfterExecuting.String(), h.Height-1)
 		}
 
 	}
@@ -207,6 +208,9 @@ func (s *StopControl) blockExecuted(h *flow.Header) {
 
 		if h.Height == s.height-1 {
 			s.stopExecution()
+		} else {
+			s.log.Warn().Msgf("Inconsistent stopping state. Scheduled to stop after executing block ID %s and height %d, but this block has a height %d. ",
+				h.ID().String(), s.height-1, h.Height)
 		}
 	}
 }
@@ -228,9 +232,9 @@ func (s *StopControl) executingBlockHeight(height uint64) {
 		return
 	}
 
-	// updating the highest executing height, which will be used to reject setting stop height that 
-	// is too low. 
+	// updating the highest executing height, which will be used to reject setting stop height that
+	// is too low.
 	if height > s.highestExecutingHeight {
-		s.lastExecutingHeight = height
+		s.highestExecutingHeight = height
 	}
 }
