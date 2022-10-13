@@ -182,10 +182,17 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
-		//Module("bootstrap", exeNode.LoadBootstrapper).
-		Module("execution state", exeNode.LoadExecutionState).
-		//Module("stop control", exeNode.LoadStopControl).
+		Module("bootstrap", exeNode.LoadBootstrapper).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
+
+		// TODO: Modules should be able to depends on components
+		// Because all modules are always bootstrapped first, before components,
+		// its not possible to have a module depending on a Component.
+		// This is the case for a StopControl which needs to query ExecutionState which needs execution state ledger.
+		// I prefer to use dummy component now and keep the bootstrapping steps properly separated,
+		// so it will be easier to follow and refactor later
+		Component("execution state", exeNode.LoadExecutionState).
+		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
 		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
@@ -416,11 +423,6 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	}
 	exeNode.computationManager = manager
 
-	// Needed for gRPC server, make sure to assign to main scoped vars
-	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
-	exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
-	exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
-
 	var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
 	if node.HeroCacheMetricsEnable {
 		chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
@@ -541,9 +543,18 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 
 func (exeNode *ExecutionNode) LoadExecutionState(
 	node *NodeConfig,
-) error {
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+
 	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 	stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
+
+	// Needed for gRPC server, make sure to assign to main scoped vars
+	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
+	exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
+	exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
 
 	exeNode.executionState = state.NewExecutionState(
 		exeNode.ledgerStorage,
@@ -561,15 +572,18 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		node.Tracer,
 	)
 
-	return nil
+	return &module.NoopReadyDoneAware{}, nil
 }
 
 func (exeNode *ExecutionNode) LoadStopControl(
 	node *NodeConfig,
-) error {
+) (
+	module.ReadyDoneAware,
+	error,
+) {
 	lastExecutedHeight, _, err := exeNode.executionState.GetHighestExecutedBlockID(context.TODO())
 	if err != nil {
-		return fmt.Errorf("cannot get the latest executed block height for stop control: %w", err)
+		return nil, fmt.Errorf("cannot get the latest executed block height for stop control: %w", err)
 	}
 
 	exeNode.stopControl = ingestion.NewStopControl(
@@ -577,7 +591,7 @@ func (exeNode *ExecutionNode) LoadStopControl(
 		exeNode.exeConf.pauseExecution,
 		lastExecutedHeight)
 
-	return nil
+	return &module.NoopReadyDoneAware{}, nil
 }
 
 func (exeNode *ExecutionNode) LoadExecutionStateLedger(
@@ -586,42 +600,9 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	module.ReadyDoneAware,
 	error,
 ) {
-	// check if the execution database already exists
-	bootstrapper := bootstrap.NewBootstrapper(node.Logger)
-
-	commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.DB)
-	if err != nil {
-		return nil, fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
-	}
-
-	// if the execution database does not exist, then we need to bootstrap the execution database.
-	if !bootstrapped {
-		// when bootstrapping, the bootstrap folder must have a checkpoint file
-		// we need to cover this file to the trie folder to restore the trie to restore the execution state.
-		err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
-		if err != nil {
-			return nil, fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
-		}
-
-		// TODO: check that the checkpoint file contains the root block's statecommit hash
-
-		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
-		if err != nil {
-			return nil, fmt.Errorf("could not bootstrap execution database: %w", err)
-		}
-	} else {
-		// if execution database has been bootstrapped, then the root statecommit must equal to the one
-		// in the bootstrap folder
-		if commit != node.RootSeal.FinalState {
-			return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %x, "+
-				"bootstap has statecommitment: %x",
-				commit, node.RootSeal.FinalState)
-		}
-	}
-
 	// DiskWal is a dependent component because we need to ensure
 	// that all WAL updates are completed before closing opened WAL segment.
-	//var err error
+	var err error
 	exeNode.diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
 		node.MetricsRegisterer, exeNode.collector, exeNode.exeConf.triedir, int(exeNode.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
