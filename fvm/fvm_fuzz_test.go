@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -102,6 +103,7 @@ var fuzzTransactionTypes = []transactionType{
 			// if there is an error, it should be computation exceeded
 			if results.tx.Err != nil {
 				require.Len(t, results.tx.Events, 3)
+				ensureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
@@ -114,6 +116,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			ensureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -133,6 +136,7 @@ var fuzzTransactionTypes = []transactionType{
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.tx.Err)
 			require.Len(t, results.tx.Events, 3)
+			ensureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the failed transfer
@@ -144,6 +148,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			ensureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -160,6 +165,7 @@ var fuzzTransactionTypes = []transactionType{
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.tx.Err)
 			require.Len(t, results.tx.Events, 3)
+			ensureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the panic
@@ -171,6 +177,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			ensureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -186,6 +193,7 @@ var fuzzTransactionTypes = []transactionType{
 			// if there is an error, it should be computation exceeded
 			if results.tx.Err != nil {
 				require.Len(t, results.tx.Events, 3)
+				ensureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
@@ -198,12 +206,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
-			// event indices have to be an increasing uint sequence (0, 1, 2 ...)
-			expectedEventIndex := uint32(0)
-			for _, event := range results.tx.Events {
-				require.Equal(t, expectedEventIndex, event.EventIndex)
-				expectedEventIndex++
-			}
+			ensureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 }
@@ -306,4 +309,26 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 			privateKey:   privateKey,
 			chain:        bootstrappedVMTest.chain,
 		}
+}
+
+func ensureEventsIndexSeq(t *testing.T, events []flow.Event, chainID flow.ChainID) {
+	expectedEventIndex := uint32(0)
+	for _, event := range events {
+		require.Equal(t, expectedEventIndex, event.EventIndex)
+		if isServiceEvent(event, chainID) {
+			expectedEventIndex += 2
+		} else {
+			expectedEventIndex++
+		}
+	}
+}
+
+func isServiceEvent(event flow.Event, chainID flow.ChainID) bool {
+	serviceEvents, _ := systemcontracts.ServiceEventsForChain(chainID)
+	for _, serviceEvent := range serviceEvents.All() {
+		if serviceEvent.EventType() == event.Type {
+			return true
+		}
+	}
+	return false
 }
