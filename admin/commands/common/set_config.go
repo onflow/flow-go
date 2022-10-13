@@ -41,7 +41,7 @@ func (s *SetConfigCommand) Handler(_ context.Context, req *admin.CommandRequest)
 		return nil, err
 	}
 	if err != nil {
-		return nil, fmt.Errorf("unexpected error setting config field %s: %w", validatedReq.field)
+		return nil, fmt.Errorf("unexpected error setting config field %s: %w", validatedReq.field.Name, err)
 	}
 
 	res := map[string]any{
