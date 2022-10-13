@@ -19,7 +19,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -465,17 +464,4 @@ func NewResourceManager(t *testing.T) p2pNetwork.ResourceManager {
 	require.NoError(t, err)
 
 	return rm
-}
-
-// StopNodes stop all nodes in the input slice
-func StopNodes(t *testing.T, nodes []*p2pnode.Node) {
-	for _, n := range nodes {
-		StopNode(t, n)
-	}
-}
-
-// StopNode stops node
-func StopNode(t *testing.T, node *p2pnode.Node) {
-	err := node.Stop()
-	assert.NoError(t, err)
 }
