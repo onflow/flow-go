@@ -182,9 +182,9 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
-		Module("bootstrap", exeNode.LoadBootstrapper).
+		//Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("execution state", exeNode.LoadExecutionState).
-		Module("stop control", exeNode.LoadStopControl).
+		//Module("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
