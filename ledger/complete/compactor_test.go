@@ -28,7 +28,7 @@ import (
 
 // slow down updating the ledger, because running too fast would cause the previous checkpoint
 // to not finish and get delayed, and this might cause tests to stuck
-const LedgerUpdateDelay = time.Millisecond * 200
+const LedgerUpdateDelay = time.Millisecond * 500
 
 // Compactor observer that waits until it gets notified of a
 // latest checkpoint larger than fromBound
