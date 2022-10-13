@@ -630,7 +630,8 @@ func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
 }
 
 func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
-	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
+	name := NumberToFilename(checkpoint)
+	return deleteCheckpointFiles(c.dir, name)
 }
 
 func LoadCheckpoint(filepath string, logger *zerolog.Logger) (
