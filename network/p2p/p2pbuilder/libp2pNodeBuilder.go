@@ -111,9 +111,9 @@ type NodeBuilder interface {
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
-	Build() (*p2pnode.Node, error)
 	SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder
 	EnableGossipSubPeerScoring(module.IdentityProvider, ...scoring.PeerScoreParamsOption) NodeBuilder
+	Build() (*p2pnode.Node, error)
 }
 
 type LibP2PNodeBuilder struct {
