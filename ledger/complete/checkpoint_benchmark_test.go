@@ -47,19 +47,17 @@ func benchmarkStoreCheckpoint(b *testing.B, version int, concurrent bool) {
 	outputDir := filepath.Join(dir, subdir)
 	err = os.Mkdir(outputDir, 0755)
 	if err != nil {
-		b.Fatalf("cannot output dir %s: %s", outputDir, err)
+		b.Fatalf("cannot create output dir %s: %s", outputDir, err)
 	}
 	defer func() {
 		// Remove output directory and its contents.
 		os.RemoveAll(outputDir)
 	}()
 
-	fmt.Printf("New checkpoint will be created in directory %s\n", outputDir)
-
 	// Load checkpoint
 	tries, err := wal.LoadCheckpoint(*checkpointFile, &log)
 	if err != nil {
-		b.Fatalf("cannot create forest: %s", err)
+		b.Fatalf("cannot load checkpoint: %s", err)
 	}
 
 	start := time.Now()
@@ -81,7 +79,7 @@ func benchmarkStoreCheckpoint(b *testing.B, version int, concurrent bool) {
 	elapsed := time.Since(start)
 
 	if err != nil {
-		b.Fatal(err)
+		b.Fatalf("cannot store checkpoint: %s", err)
 	}
 
 	b.ReportMetric(float64(elapsed/time.Millisecond), fmt.Sprintf("storecheckpoint_v%d_time_(ms)", version))
@@ -102,15 +100,12 @@ func BenchmarkLoadCheckpoint(b *testing.B) {
 
 	// Load checkpoint
 	_, err = wal.LoadCheckpoint(*checkpointFile, &log)
-	if err != nil {
-		b.Fatalf("cannot create forest: %s", err)
-	}
 
 	b.StopTimer()
 	elapsed := time.Since(start)
 
 	if err != nil {
-		b.Fatal(err)
+		b.Fatalf("cannot load checkpoint : %s", err)
 	}
 
 	b.ReportMetric(float64(elapsed/time.Millisecond), "loadcheckpoint_time_(ms)")
