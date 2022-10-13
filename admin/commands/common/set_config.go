@@ -37,8 +37,11 @@ func (s *SetConfigCommand) Handler(_ context.Context, req *admin.CommandRequest)
 	oldValue := validatedReq.field.Get()
 
 	err := validatedReq.field.Set(validatedReq.value)
+	if updatable_configs.IsValidationError(err) {
+		return nil, err
+	}
 	if err != nil {
-		return nil, fmt.Errorf("could not set new config value for %s: %w", validatedReq.field)
+		return nil, fmt.Errorf("unexpected error setting config field %s: %w", validatedReq.field)
 	}
 
 	res := map[string]any{
@@ -76,7 +79,7 @@ func (s *SetConfigCommand) Validator(req *admin.CommandRequest) error {
 	}
 
 	// we have found a corresponding updatable config field, set it in the ValidatorData
-	// field - we will attempt
+	// field - we will attempt to apply the change in Handler
 	req.ValidatorData = validatedSetConfigData{
 		field: field,
 		value: configValue,

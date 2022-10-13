@@ -1,12 +1,14 @@
 package timeout
 
 import (
+	"fmt"
 	"math"
 	"time"
 
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/module/updatable_configs"
 )
 
 // Config contains the configuration parameters for ExponentialIncrease-LinearDecrease
@@ -117,6 +119,27 @@ func validBlockRateDelay(blockRateDelay time.Duration) error {
 	if blockRateDelay < 0 {
 		return model.NewConfigurationErrorf("blockRateDelay must be must be non-negative")
 	}
+	return nil
+}
+
+// GetBlockRateDelay returns the block rate delay as a Duration. This is used by
+// the dyamic config manager.
+func (c *Config) GetBlockRateDelay() time.Duration {
+	ms := c.BlockRateDelayMS.Load()
+	return time.Millisecond * time.Duration(ms)
+}
+
+// SetBlockRateDelay sets the block rate delay. It is used to modify this config
+// value while HotStuff is running.
+// Returns updatable_configs.ValidationError if the new value is invalid.
+func (c *Config) SetBlockRateDelay(delay time.Duration) error {
+	if err := validBlockRateDelay(delay); err != nil {
+		if model.IsConfigurationError(err) {
+			return updatable_configs.NewValidationErrorf("invalid block rate delay: %w", err)
+		}
+		return fmt.Errorf("unexpected error validating block rate delay: %w", err)
+	}
+	c.BlockRateDelayMS.Store(float64(delay.Milliseconds()))
 	return nil
 }
 

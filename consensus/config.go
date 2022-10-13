@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/module/updatable_configs"
 )
 
 // HotstuffModules is a helper structure to encapsulate dependencies to create
@@ -23,13 +24,14 @@ type HotstuffModules struct {
 }
 
 type ParticipantConfig struct {
-	StartupTime                time.Time     // the time when consensus participant enters first view
-	TimeoutInitial             time.Duration // the initial timeout for the pacemaker
-	TimeoutMinimum             time.Duration // the minimum timeout for the pacemaker
-	TimeoutAggregationFraction float64       // the percentage part of the timeout period reserved for vote aggregation
-	TimeoutIncreaseFactor      float64       // the factor at which the timeout grows when timeouts occur
-	TimeoutDecreaseFactor      float64       // the factor at which the timeout grows when timeouts occur
-	BlockRateDelay             time.Duration // a delay to broadcast block proposal in order to control the block production rate
+	StartupTime                time.Time                    // the time when consensus participant enters first view
+	TimeoutInitial             time.Duration                // the initial timeout for the pacemaker
+	TimeoutMinimum             time.Duration                // the minimum timeout for the pacemaker
+	TimeoutAggregationFraction float64                      // the percentage part of the timeout period reserved for vote aggregation
+	TimeoutIncreaseFactor      float64                      // the factor at which the timeout grows when timeouts occur
+	TimeoutDecreaseFactor      float64                      // the factor at which the timeout grows when timeouts occur
+	BlockRateDelay             time.Duration                // a delay to broadcast block proposal in order to control the block production rate
+	Registerer                 updatable_configs.Registerer // optional: for registering HotStuff configs as dynamically configurable
 }
 
 func DefaultParticipantConfig() ParticipantConfig {
@@ -40,7 +42,8 @@ func DefaultParticipantConfig() ParticipantConfig {
 		TimeoutAggregationFraction: defTimeout.VoteAggregationTimeoutFraction,
 		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
 		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
-		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS.Load()) * time.Millisecond,
+		BlockRateDelay:             defTimeout.GetBlockRateDelay(),
+		Registerer:                 nil,
 	}
 	return cfg
 }
@@ -86,5 +89,11 @@ func WithVoteAggregationTimeoutFraction(fraction float64) Option {
 func WithBlockRateDelay(delay time.Duration) Option {
 	return func(cfg *ParticipantConfig) {
 		cfg.BlockRateDelay = delay
+	}
+}
+
+func WithConfigRegisterer(reg updatable_configs.Registerer) Option {
+	return func(cfg *ParticipantConfig) {
+		cfg.Registerer = reg
 	}
 }
