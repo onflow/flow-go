@@ -162,6 +162,125 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 }
 
+// TestTopicValidator_TopicMismatch tests that the libP2P node topic validator rejects messages with mismatched topics
+func TestTopicValidator_TopicMismatch(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	// create a hooked logger
+	logger, hook := unittest.HookedLogger()
+
+	sporkId := unittest.IdentifierFixture()
+
+	sn1, _ := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
+	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
+
+	nodes := []*p2pnode.Node{sn1, sn2}
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+
+	channel := channels.ConsensusCommittee
+	topic := channels.TopicFromChannel(channel, sporkId)
+
+	pInfo2, err := utils.PeerAddressInfo(identity2)
+	require.NoError(t, err)
+
+	// node1 is connected to node2
+	// sn1 <-> sn2
+	require.NoError(t, sn1.AddPeer(ctx, pInfo2))
+
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+
+	// sn2 will subscribe with an unauthenticated callback to allow processing of message after the authorization check
+	_, err = sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	require.NoError(t, err)
+
+	// sn2 will subscribe with an unauthenticated callback to allow it to send the unauthenticated message
+	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	require.NoError(t, err)
+
+	// let nodes form the mesh
+	time.Sleep(time.Second)
+
+	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel5s()
+	// create a dummy block proposal to publish from our SN node
+	header := unittest.BlockHeaderFixture()
+
+	// encode the block proposal message with an incorrect value for ChannelID
+	bz, err := unittest.NetworkCodec().Encode(&messages.BlockProposal{Header: header})
+	require.NoError(t, err)
+
+	msg := message.Message{
+		ChannelID: "invalid-channel",
+		Payload:   bz,
+	}
+	data1, err := msg.Marshal()
+	require.NoError(t, err)
+
+	err = sn2.Publish(timedCtx, topic, data1)
+
+	// publish fails because the channel validation fails
+	require.Error(t, err)
+
+	// ensure the correct error is contained in the logged error
+	require.Contains(t, hook.Logs(), "channel id in message does not match pubsub topic")
+}
+
+// TestTopicValidator_InvalidTopic tests that the libP2P node topic validator rejects messages with invalid topics
+func TestTopicValidator_InvalidTopic(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	// create a hooked logger
+	logger, hook := unittest.HookedLogger()
+
+	sporkId := unittest.IdentifierFixture()
+
+	sn1, _ := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
+	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
+
+	nodes := []*p2pnode.Node{sn1, sn2}
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+
+	topic := channels.Topic("invalid-topic")
+
+	pInfo2, err := utils.PeerAddressInfo(identity2)
+	require.NoError(t, err)
+
+	// node1 is connected to node2
+	// sn1 <-> sn2
+	require.NoError(t, sn1.AddPeer(ctx, pInfo2))
+
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+
+	// sn2 will subscribe with an unauthenticated callback to allow processing of message after the authorization check
+	_, err = sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	require.NoError(t, err)
+
+	// sn2 will subscribe with an unauthenticated callback to allow it to send the unauthenticated message
+	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	require.NoError(t, err)
+
+	// let nodes form the mesh
+	time.Sleep(time.Second)
+
+	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel5s()
+	// create a dummy block proposal to publish from our SN node
+	header := unittest.BlockHeaderFixture()
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
+
+	err = sn2.Publish(timedCtx, topic, data1)
+
+	// publish fails because the topic conversion fails
+	require.Error(t, err)
+
+	// ensure the correct error is contained in the logged error
+	require.Contains(t, hook.Logs(), "could not convert topic to channel")
+}
+
 // TestAuthorizedSenderValidator_Unauthorized tests that the authorized sender validator rejects messages from nodes that are not authorized to send the message
 func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())

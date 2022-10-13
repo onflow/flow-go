@@ -109,19 +109,17 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 		actualChannel, ok := channels.ChannelFromTopic(topic)
 		if !ok {
 			lg.Warn().
-				Err(fmt.Errorf("could not map topic to channel")).
 				Bool(logging.KeySuspicious, true).
-				Msg("rejecting message")
+				Msg("could not convert topic to channel")
 			return pubsub.ValidationReject
 		}
 
 		channel := channels.Channel(msg.ChannelID)
 		if channel != actualChannel {
 			log.Warn().
-				Err(fmt.Errorf("channel id in message does not match pubsub topic")).
 				Str("actual_channel", actualChannel.String()).
 				Bool(logging.KeySuspicious, true).
-				Msg("rejecting message")
+				Msg("channel id in message does not match pubsub topic")
 			return pubsub.ValidationReject
 		}
 
