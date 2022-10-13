@@ -60,6 +60,7 @@ type Field struct {
 	Name string
 	// Set is the setter function for the config field. It enforces validation rules
 	// and applies the new config value.
+	// Returns ValidationError if the new config value is invalid.
 	Set SetAnyConfigFunc
 	// Get is the getter function for the config field. It returns the current value
 	// for the config field.

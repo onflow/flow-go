@@ -12,6 +12,8 @@ import (
 
 var _ commands.AdminCommand = (*SetConfigCommand)(nil)
 
+// SetConfigCommand is an admin command which enables setting any config field which
+// has registered as dynamically updatable with the config Manager.
 type SetConfigCommand struct {
 	configs *updatable_configs.Manager
 }
@@ -27,11 +29,6 @@ func NewSetConfigCommand(configs *updatable_configs.Manager) *SetConfigCommand {
 type validatedSetConfigData struct {
 	field updatable_configs.Field
 	value any
-}
-
-type setConfigResponse struct {
-	OldValue any
-	NewValue any
 }
 
 func (s *SetConfigCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
