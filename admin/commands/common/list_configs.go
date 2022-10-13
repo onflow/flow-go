@@ -2,8 +2,6 @@ package common
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -24,18 +22,19 @@ func NewListConfigCommand(configs *updatable_configs.Manager) *ListConfigCommand
 	}
 }
 
-// Handler returns a human-readable list string of available updatable config fields.
-func (s *ListConfigCommand) Handler(_ context.Context, _ *admin.CommandRequest) (interface{}, error) {
+func (s *ListConfigCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	fields := s.configs.AllFields()
 
-	res := strings.Builder{}
-	res.WriteString("Configurable Fields:\n")
+	// create a response
+	res := make(map[string]any, len(fields))
 	for _, field := range fields {
-		res.WriteString(fmt.Sprintf("- %s (%s)\n", field.Name, field.TypeName))
+		res[field.Name] = map[string]any{
+			"type": field.TypeName,
+		}
 	}
-	return res.String(), nil
+	return res, nil
 }
 
-func (s *ListConfigCommand) Validator(_ *admin.CommandRequest) error {
+func (s *ListConfigCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
