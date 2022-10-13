@@ -54,10 +54,12 @@ type (
 	GetDurationConfigFunc func() time.Duration
 )
 
-// Field represents one dynamically configurable field.
+// Field represents one dynamically configurable config field.
 type Field struct {
 	// Name is the name of the config field, must be globally unique.
 	Name string
+	// TypeName is a human-readable string defining the expected type of inputs.
+	TypeName string
 	// Set is the setter function for the config field. It enforces validation rules
 	// and applies the new config value.
 	// Returns ValidationError if the new config value is invalid.
@@ -93,6 +95,17 @@ func (m *Manager) GetField(name string) (Field, bool) {
 	return field, ok
 }
 
+// AllFields returns all currently registered fields.
+func (m *Manager) AllFields() []Field {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	fields := make([]Field, 0, len(m.fields))
+	for _, field := range m.fields {
+		fields = append(fields, field)
+	}
+	return fields
+}
+
 var _ Registerer = (*Manager)(nil)
 
 // Registerer provides an interface for registering config fields which can be
@@ -118,7 +131,8 @@ func (m *Manager) RegisterBoolConfig(name string, get GetBoolConfigFunc, set Set
 	}
 
 	field := Field{
-		Name: name,
+		Name:     name,
+		TypeName: "bool",
 		Get: func() any {
 			return get()
 		},
@@ -143,7 +157,8 @@ func (m *Manager) RegisterUintConfig(name string, get GetUintConfigFunc, set Set
 	}
 
 	field := Field{
-		Name: name,
+		Name:     name,
+		TypeName: "uint",
 		Get: func() any {
 			return get()
 		},
@@ -168,7 +183,8 @@ func (m *Manager) RegisterDurationConfig(name string, get GetDurationConfigFunc,
 	}
 
 	field := Field{
-		Name: name,
+		Name:     name,
+		TypeName: "duration",
 		Get: func() any {
 			return get()
 		},
