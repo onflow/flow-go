@@ -51,7 +51,7 @@ func (w *DiskWAL) UnpauseRecord() {
 	w.paused = false
 }
 
-func (w *DiskWAL) UseVersion5() {
+func (w *DiskWAL) UseCheckpointVersion5() {
 	w.outputVersion = VersionV5
 }
 
