@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -141,6 +142,7 @@ func (s *ScoreOption) preparePeerScoreParams() {
 				s.logger.Error().
 					Err(err).
 					Str("peer_id", pid.String()).
+					Bool(logging.KeySuspicious, true).
 					Msg("invalid subscription detected, penalizing peer")
 				return MaxAppSpecificPenalty
 			}

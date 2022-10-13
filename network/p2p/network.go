@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -516,7 +517,9 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 
 	eng, err := n.subscriptionManager.GetEngine(qm.Target)
 	if err != nil {
-		logger.Err(err).Msg("failed to submit message")
+		logger.Err(err).
+			Bool(logging.KeySuspicious, true).
+			Msg("failed to submit message")
 		return
 	}
 
