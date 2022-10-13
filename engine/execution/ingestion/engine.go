@@ -68,9 +68,9 @@ type Engine struct {
 	syncDeltas             mempool.Deltas      // storing the synced state deltas
 	syncFast               bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
-	pauseExecution         bool
 	executionDataPruner    *pruner.Pruner
 	uploaders              []uploader.Uploader
+	stopControl            *StopControl
 }
 
 func New(
@@ -95,9 +95,9 @@ func New(
 	syncThreshold int,
 	syncFast bool,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
-	pauseExecution bool,
 	pruner *pruner.Pruner,
 	uploaders []uploader.Uploader,
+	stopControl *StopControl,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -129,9 +129,9 @@ func New(
 		syncDeltas:             syncDeltas,
 		syncFast:               syncFast,
 		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
-		pauseExecution:         pauseExecution,
 		executionDataPruner:    pruner,
 		uploaders:              uploaders,
+		stopControl:            stopControl,
 	}
 
 	// move to state syncing engine
@@ -148,7 +148,7 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	if !e.pauseExecution {
+	if !e.stopControl.IsPaused() {
 		if computation.GetUploaderEnabled() {
 			if err := e.retryUpload(); err != nil {
 				e.log.Warn().Msg("failed to re-upload all ComputationResults")
@@ -418,9 +418,8 @@ func (e *Engine) reloadBlock(
 // Note: BlockProcessable might be called multiple times for the same block.
 func (e *Engine) BlockProcessable(b *flow.Header) {
 
-	// when the flag is on, no block will be executed. Useful for EN to serve
-	// execution state queries
-	if e.pauseExecution {
+	// skip if stopControl tells to skip
+	if !e.stopControl.blockProcessable(b) {
 		return
 	}
 
@@ -438,6 +437,12 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 	if err != nil {
 		e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to handle block")
 	}
+}
+
+// BlockFinalized implements part of state.protocol.Consumer interface.
+// Method gets called for every finalized block
+func (e *Engine) BlockFinalized(h *flow.Header) {
+	e.stopControl.blockFinalized(e.unit.Ctx(), e.execState, h)
 }
 
 // Main handling
@@ -581,6 +586,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	startedAt := time.Now()
 
+	e.stopControl.executingBlockHeight(executableBlock.Block.Header.Height)
+
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
 	defer span.End()
 
@@ -659,6 +666,10 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	if e.executionDataPruner != nil {
 		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
 	}
+
+	e.unit.Ctx()
+
+	e.stopControl.blockExecuted(executableBlock.Block.Header)
 }
 
 // we've executed the block, now we need to check:
