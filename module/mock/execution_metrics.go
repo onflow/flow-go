@@ -29,14 +29,19 @@ func (_m *ExecutionMetrics) ExecutionBlockDataUploadStarted() {
 	_m.Called()
 }
 
-// ExecutionBlockExecuted provides a mock function with given fields: dur, compUsed, txCounts, colCounts
-func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int) {
-	_m.Called(dur, compUsed, txCounts, colCounts)
+// ExecutionBlockExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, eventCounts, eventSize, txCounts, colCounts
+func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, eventCounts int, eventSize int, txCounts int, colCounts int) {
+	_m.Called(dur, compUsed, memoryUsed, eventCounts, eventSize, txCounts, colCounts)
 }
 
-// ExecutionCollectionExecuted provides a mock function with given fields: dur, compUsed, txCounts
-func (_m *ExecutionMetrics) ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int) {
-	_m.Called(dur, compUsed, txCounts)
+// ExecutionChunkDataPackGenerated provides a mock function with given fields: dur, proofSize, numberOfTransactions
+func (_m *ExecutionMetrics) ExecutionChunkDataPackGenerated(dur time.Duration, proofSize int, numberOfTransactions int) {
+	_m.Called(dur, proofSize, numberOfTransactions)
+}
+
+// ExecutionCollectionExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, eventCounts, eventSize, numberOfRegistersTouched, totalBytesWrittenToRegisters, txCounts
+func (_m *ExecutionMetrics) ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, eventCounts int, eventSize int, numberOfRegistersTouched int, totalBytesWrittenToRegisters int, txCounts int) {
+	_m.Called(dur, compUsed, memoryUsed, eventCounts, eventSize, numberOfRegistersTouched, totalBytesWrittenToRegisters, txCounts)
 }
 
 // ExecutionCollectionRequestRetried provides a mock function with given fields:
@@ -69,11 +74,6 @@ func (_m *ExecutionMetrics) ExecutionScriptExecuted(dur time.Duration, compUsed 
 	_m.Called(dur, compUsed, memoryUsed, memoryEstimate)
 }
 
-// ExecutionStateReadsPerBlock provides a mock function with given fields: reads
-func (_m *ExecutionMetrics) ExecutionStateReadsPerBlock(reads uint64) {
-	_m.Called(reads)
-}
-
 // ExecutionStorageStateCommitment provides a mock function with given fields: bytes
 func (_m *ExecutionMetrics) ExecutionStorageStateCommitment(bytes int64) {
 	_m.Called(bytes)
@@ -84,9 +84,9 @@ func (_m *ExecutionMetrics) ExecutionSync(syncing bool) {
 	_m.Called(syncing)
 }
 
-// ExecutionTransactionExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, memoryEstimate, eventCounts, failed
-func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, memoryEstimate uint64, eventCounts int, failed bool) {
-	_m.Called(dur, compUsed, memoryUsed, memoryEstimate, eventCounts, failed)
+// ExecutionTransactionExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, actualMemoryUsed, eventCounts, eventSize, failed
+func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, actualMemoryUsed uint64, eventCounts int, eventSize int, failed bool) {
+	_m.Called(dur, compUsed, memoryUsed, actualMemoryUsed, eventCounts, eventSize, failed)
 }
 
 // FinishBlockReceivedToExecuted provides a mock function with given fields: blockID

@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	executionUnittest "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,7 +24,7 @@ func Test_BuildChunkDataPack(t *testing.T) {
 			{flow.ZeroID},
 		})
 
-		_, _, result, err := execution.GenerateExecutionResultAndChunkDataPacks(unittest.IdentifierFixture(), unittest.StateCommitmentFixture(), cr)
+		_, _, result, err := execution.GenerateExecutionResultAndChunkDataPacks(&metrics.NoopCollector{}, unittest.IdentifierFixture(), unittest.StateCommitmentFixture(), cr)
 		assert.NoError(t, err)
 
 		require.Len(t, result.Chunks, 4) // +1 for system chunk

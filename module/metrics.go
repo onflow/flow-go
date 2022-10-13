@@ -436,9 +436,6 @@ type ExecutionMetrics interface {
 	// from being received for execution to execution being finished
 	FinishBlockReceivedToExecuted(blockID flow.Identifier)
 
-	// ExecutionStateReadsPerBlock reports number of state access/read operations per block
-	ExecutionStateReadsPerBlock(reads uint64)
-
 	// ExecutionStorageStateCommitment reports the storage size of a state commitment in bytes
 	ExecutionStorageStateCommitment(bytes int64)
 
@@ -446,13 +443,26 @@ type ExecutionMetrics interface {
 	ExecutionLastExecutedBlockHeight(height uint64)
 
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
-	ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int)
+	ExecutionBlockExecuted(dur time.Duration,
+		compUsed, memoryUsed uint64,
+		eventCounts, eventSize int,
+		txCounts, colCounts int)
 
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
-	ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int)
+	ExecutionCollectionExecuted(dur time.Duration,
+		compUsed, memoryUsed uint64,
+		eventCounts, eventSize int,
+		numberOfRegistersTouched, totalBytesWrittenToRegisters int,
+		txCounts int)
 
-	// ExecutionTransactionExecuted reports the total time, computation and memory spent on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64, eventCounts int, failed bool)
+	// ExecutionTransactionExecuted reports stats on executing a single transaction
+	ExecutionTransactionExecuted(dur time.Duration,
+		compUsed, memoryUsed, actualMemoryUsed uint64,
+		eventCounts, eventSize int,
+		failed bool)
+
+	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
+	ExecutionChunkDataPackGenerated(dur time.Duration, proofSize, numberOfTransactions int)
 
 	// ExecutionScriptExecuted reports the time and memory spent on executing an script
 	ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64)

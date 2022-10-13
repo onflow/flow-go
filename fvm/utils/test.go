@@ -93,6 +93,18 @@ func (v *SimpleView) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
 	return ids, values
 }
 
+func (v *SimpleView) NumberOfRegistersTouched() int {
+	return len(v.Ledger.RegisterTouches)
+}
+
+func (v *SimpleView) TotalBytesWrittenToRegisters() int {
+	bytesWritten := 0
+	for k := range v.Ledger.RegisterUpdated {
+		bytesWritten += len(v.Ledger.Registers[k].Value)
+	}
+	return bytesWritten
+}
+
 func (v *SimpleView) Touch(owner, key string) error {
 	return v.Ledger.Touch(owner, key)
 }
