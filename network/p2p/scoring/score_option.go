@@ -74,19 +74,36 @@ const (
 
 // ScoreOption is a functional option for configuring the peer scoring system.
 type ScoreOption struct {
-	logger              zerolog.Logger
-	validator           *SubscriptionValidator
-	idProvider          module.IdentityProvider
-	peerScoreParams     *pubsub.PeerScoreParams
-	peerThresholdParams *pubsub.PeerScoreThresholds
+	logger                   zerolog.Logger
+	validator                *SubscriptionValidator
+	idProvider               module.IdentityProvider
+	peerScoreParams          *pubsub.PeerScoreParams
+	peerThresholdParams      *pubsub.PeerScoreThresholds
+	appSpecificScoreFunction func(peer.ID) float64
 }
 
-func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider) *ScoreOption {
-	return &ScoreOption{
-		logger:     logger.With().Str("module", "pubsub_score_option").Logger(),
-		validator:  NewSubscriptionValidator(),
-		idProvider: idProvider,
+type PeerScoreParamsOption func(option *ScoreOption)
+
+func WithAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64) PeerScoreParamsOption {
+	return func(s *ScoreOption) {
+		s.appSpecificScoreFunction = appSpecificScoreFunction
 	}
+}
+
+func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider, opts ...PeerScoreParamsOption) *ScoreOption {
+	validator := NewSubscriptionValidator()
+	s := &ScoreOption{
+		logger:                   logger.With().Str("module", "pubsub_score_option").Logger(),
+		validator:                validator,
+		idProvider:               idProvider,
+		appSpecificScoreFunction: defaultAppSpecificScoreFunction(logger, idProvider, validator),
+	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s
 }
 
 func (s *ScoreOption) SetSubscriptionProvider(provider *SubscriptionProvider) {
@@ -142,42 +159,7 @@ func (s *ScoreOption) preparePeerScoreParams() {
 
 		// AppSpecificScore is a function that takes a peer ID and returns an application specific score.
 		// At the current stage, we only use it to penalize and reward the peers based on their subscriptions.
-		AppSpecificScore: func(pid peer.ID) float64 {
-			lg := s.logger.With().Str("peer_id", pid.String()).Logger()
-
-			// checks if peer has a valid Flow protocol identity.
-			flowId, err := HasValidFlowIdentity(s.idProvider, pid)
-			if err != nil {
-				lg.Error().
-					Err(err).
-					Msg("invalid peer identity, penalizing peer")
-				return MaxAppSpecificPenalty
-			}
-
-			lg = lg.With().
-				Hex("flow_id", logging.ID(flowId.NodeID)).
-				Str("role", flowId.Role.String()).
-				Logger()
-
-			// checks if peer has any subscription violation.
-			if err := s.validator.CheckSubscribedToAllowedTopics(pid, flowId.Role); err != nil {
-				lg.Err(err).
-					Msg("invalid subscription detected, penalizing peer")
-				return MaxAppSpecificPenalty
-			}
-
-			// checks if peer is an access node, and if so, pushes it to the
-			// edges of the network by giving the minimum reward.
-			if flowId.Role == flow.RoleAccess {
-				lg.Info().
-					Msg("rewarding access node with minimum reward value")
-				return MinAppSpecificReward
-			}
-
-			s.logger.Info().
-				Msg("rewarding well-behaved non-access node peer with maximum reward value")
-			return MaxAppSpecificReward
-		},
+		AppSpecificScore: s.appSpecificScoreFunction,
 		// AppSpecificWeight is the weight of the application specific score.
 		AppSpecificWeight: DefaultAppSpecificScoreWeight,
 	}
@@ -199,4 +181,43 @@ func (s *ScoreOption) BuildGossipSubScoreOption() pubsub.Option {
 		s.peerScoreParams,
 		s.peerThresholdParams,
 	)
+}
+
+func defaultAppSpecificScoreFunction(logger zerolog.Logger, idProvider module.IdentityProvider, validator *SubscriptionValidator) func(peer.ID) float64 {
+	return func(pid peer.ID) float64 {
+		lg := logger.With().Str("peer_id", pid.String()).Logger()
+
+		// checks if peer has a valid Flow protocol identity.
+		flowId, err := HasValidFlowIdentity(idProvider, pid)
+		if err != nil {
+			lg.Error().
+				Err(err).
+				Msg("invalid peer identity, penalizing peer")
+			return MaxAppSpecificPenalty
+		}
+
+		lg = lg.With().
+			Hex("flow_id", logging.ID(flowId.NodeID)).
+			Str("role", flowId.Role.String()).
+			Logger()
+
+		// checks if peer has any subscription violation.
+		if err := validator.CheckSubscribedToAllowedTopics(pid, flowId.Role); err != nil {
+			lg.Err(err).
+				Msg("invalid subscription detected, penalizing peer")
+			return MaxAppSpecificPenalty
+		}
+
+		// checks if peer is an access node, and if so, pushes it to the
+		// edges of the network by giving the minimum reward.
+		if flowId.Role == flow.RoleAccess {
+			lg.Info().
+				Msg("rewarding access node with minimum reward value")
+			return MinAppSpecificReward
+		}
+
+		logger.Info().
+			Msg("rewarding well-behaved non-access node peer with maximum reward value")
+		return MaxAppSpecificReward
+	}
 }

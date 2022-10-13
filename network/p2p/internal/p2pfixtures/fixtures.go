@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/message"
@@ -115,7 +116,11 @@ func NodeFixture(
 	}
 
 	if parameters.PeerScoringEnabled {
-		builder.EnableGossipSubPeerScoring(parameters.IdProvider)
+		scoreOptionParams := make([]scoring.PeerScoreParamsOption, 0)
+		if parameters.AppSpecificScore != nil {
+			scoreOptionParams = append(scoreOptionParams, scoring.WithAppSpecificScoreFunction(parameters.AppSpecificScore))
+		}
+		builder.EnableGossipSubPeerScoring(parameters.IdProvider, scoreOptionParams...)
 	}
 
 	n, err := builder.Build(ctx)
@@ -147,6 +152,7 @@ type NodeFixtureParameters struct {
 	Logger             zerolog.Logger
 	PeerScoringEnabled bool
 	IdProvider         module.IdentityProvider
+	AppSpecificScore   func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
 }
 
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
@@ -197,6 +203,12 @@ func WithPeerFilter(filter p2p.PeerFilter) NodeFixtureParameterOption {
 func WithRole(role flow.Role) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Role = role
+	}
+}
+
+func WithAppSpecificScore(score func(peer.ID) float64) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.AppSpecificScore = score
 	}
 }
 
