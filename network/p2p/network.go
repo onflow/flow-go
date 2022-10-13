@@ -517,6 +517,7 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 
 	eng, err := n.subscriptionManager.GetEngine(qm.Target)
 	if err != nil {
+		// This means the message was sent on a channel that the node has not registered an engine for
 		logger.Err(err).
 			Bool(logging.KeySuspicious, true).
 			Msg("failed to submit message")
