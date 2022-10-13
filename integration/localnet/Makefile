@@ -24,6 +24,8 @@ COMMIT=$(shell git rev-parse HEAD)
 VERSION=localnetbuild
 
 CURRENT_DIRECTORY=$(shell pwd)
+TPS_INIT=25
+TPS_MAX=500
 
 .PHONY: init
 init:
@@ -99,7 +101,7 @@ tps-ci-smoke:
 tps-test-ci:
 	$(MAKE) -e COLLECTION=5 VERIFICATION=5 NCLUSTERS=5 init
 	$(MAKE) start-thin
-	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps 25 -max-tps 500 -duration 30m
+	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps $(TPS_INIT) -max-tps $(TPS_MAX) -duration 30m
 	$(MAKE) stop
 
 .PHONY: clean-data
