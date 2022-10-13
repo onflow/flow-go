@@ -31,11 +31,12 @@ var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 // it returns (nil, ErrEOFNotReached) if a certain part file is malformed
 // it returns (nil, err) if running into any exception
 func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
-	logger.Info().Msgf("reading v6 checkpoint file")
-
 	// the full path of header file
 	headerPath := headerFile.Name()
 	dir, fileName := filepath.Split(headerPath)
+
+	lg := logger.With().Str("checkpoint_file", headerPath).Logger()
+	lg.Info().Msgf("reading v6 checkpoint file")
 
 	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath, logger)
 	if err != nil {
@@ -51,19 +52,19 @@ func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 
 	// TODO making number of goroutine configable for reading subtries, which can help us
 	// test the code on machines that don't have as much RAM as EN by using fewer goroutines.
-	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums, logger)
+	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums, &lg)
 	if err != nil {
 		return nil, fmt.Errorf("could not read subtrie from dir: %w", err)
 	}
 
-	logger.Info().Msg("finish reading all v6 subtrie files, start reading top level tries")
+	lg.Info().Msg("finish reading all v6 subtrie files, start reading top level tries")
 
-	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum, logger)
+	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum, &lg)
 	if err != nil {
 		return nil, fmt.Errorf("could not read top level nodes or tries: %w", err)
 	}
 
-	logger.Info().Msgf("finish reading all trie roots, trie root count: %v", len(tries))
+	lg.Info().Msgf("finish reading all trie roots, trie root count: %v", len(tries))
 	if len(tries) > 0 {
 		first, last := tries[0], tries[len(tries)-1]
 		logger.Info().

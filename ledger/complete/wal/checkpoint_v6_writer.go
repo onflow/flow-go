@@ -77,13 +77,18 @@ func storeCheckpointV6(
 	}
 
 	first, last := tries[0], tries[len(tries)-1]
-	logger.Info().
+	lg := logger.With().
+		Int("version", 6).
+		Int("trie_count", len(tries)).
+		Str("checkpoint_file", path.Join(outputDir, outputFile)).
+		Logger()
+
+	lg.Info().
 		Str("first_hash", first.RootHash().String()).
 		Uint64("first_reg_count", first.AllocatedRegCount()).
 		Str("last_hash", last.RootHash().String()).
 		Uint64("last_reg_count", last.AllocatedRegCount()).
-		Int("version", 6).
-		Msgf("storing checkpoint for %v tries to %s", len(tries), path.Join(outputDir, outputFile))
+		Msg("storing checkpoint")
 
 	// make sure a checkpoint file with same name doesn't exist
 	// part file with same name doesn't exist either
@@ -100,27 +105,27 @@ func storeCheckpointV6(
 		subTrieRootAndTopLevelTrieCount(tries),
 		outputDir,
 		outputFile,
-		logger,
+		&lg,
 		nWorker,
 	)
 	if err != nil {
 		return fmt.Errorf("could not store sub trie: %w", err)
 	}
 
-	logger.Info().Msgf("subtrie have been stored. sub trie node count: %v", subTriesNodeCount)
+	lg.Info().Msgf("subtrie have been stored. sub trie node count: %v", subTriesNodeCount)
 
 	topTrieChecksum, err := storeTopLevelNodesAndTrieRoots(
-		tries, subTrieRootIndices, subTriesNodeCount, outputDir, outputFile, logger)
+		tries, subTrieRootIndices, subTriesNodeCount, outputDir, outputFile, &lg)
 	if err != nil {
 		return fmt.Errorf("could not store top level tries: %w", err)
 	}
 
-	err = storeCheckpointHeader(subTrieChecksums, topTrieChecksum, outputDir, outputFile, logger)
+	err = storeCheckpointHeader(subTrieChecksums, topTrieChecksum, outputDir, outputFile, &lg)
 	if err != nil {
 		return fmt.Errorf("could not store checkpoint header: %w", err)
 	}
 
-	logger.Info().Msgf("checkpoint file has been successfully stored at %v/%v", outputDir, outputFile)
+	lg.Info().Msg("checkpoint file has been successfully stored")
 
 	return nil
 }

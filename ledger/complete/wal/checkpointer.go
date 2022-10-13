@@ -1086,9 +1086,9 @@ func evictFileFromLinuxPageCache(f *os.File, fsync bool, logger *zerolog.Logger)
 	fstat, err := f.Stat()
 	if err == nil {
 		fsize := fstat.Size()
-		logger.Info().Msgf("advised Linux to evict file %s (%d MiB) from page cache", f.Name(), fsize/1024/1024)
+		logger.Debug().Msgf("advised Linux to evict file %s (%d MiB) from page cache", f.Name(), fsize/1024/1024)
 	} else {
-		logger.Info().Msgf("advised Linux to evict file %s from page cache", f.Name())
+		logger.Debug().Msgf("advised Linux to evict file %s from page cache", f.Name())
 	}
 	return nil
 }
