@@ -26,6 +26,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// slow down updating the ledger, because running too fast would cause the previous checkpoint
+// to not finish and get delayed, and this might cause tests to stuck
+const LedgerUpdateDelay = time.Millisecond * 200
+
 // Compactor observer that waits until it gets notified of a
 // latest checkpoint larger than fromBound
 type CompactorObserver struct {
@@ -80,7 +84,7 @@ func TestCompactorCreation(t *testing.T) {
 			wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
-			l, err = NewLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
+			l, err = NewLedger(wal, size*10, metricsCollector, unittest.Logger(), DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -106,7 +110,7 @@ func TestCompactorCreation(t *testing.T) {
 			for i := 0; i < size; i++ {
 				// slow down updating the ledger, because running too fast would cause the previous checkpoint
 				// to not finish and get delayed
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(LedgerUpdateDelay)
 
 				payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
@@ -194,13 +198,16 @@ func TestCompactorCreation(t *testing.T) {
 
 				name := fileInfo.Name()
 				if name == "00000009" ||
-					name != "00000010" {
+					name == "00000010" ||
+					name == "00000011" {
+					log.Info().Msgf("keep file %v/%v", dir, name)
 					continue
 				}
 
 				// checkpoint V6 has multiple files
-				matched, _ := regexp.MatchString(name, "checkpoint.00000008")
+				matched, _ := regexp.MatchString("checkpoint.00000008*", name)
 				if matched {
+					log.Info().Msgf("keep file %v/%v", dir, name)
 					continue
 				}
 
@@ -219,7 +226,7 @@ func TestCompactorCreation(t *testing.T) {
 			wal2, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
-			l2, err = NewLedger(wal2, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
+			l2, err = NewLedger(wal2, size*10, metricsCollector, unittest.Logger(), DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			<-wal2.Done()
@@ -320,6 +327,10 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 
 		// Generate the tree and create WAL
 		for i := 0; i < size; i++ {
+
+			// slow down updating the ledger, because running too fast would cause the previous checkpoint
+			// to not finish and get delayed
+			time.Sleep(LedgerUpdateDelay)
 
 			payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
@@ -443,6 +454,9 @@ func TestCompactorAccuracy(t *testing.T) {
 			// Generate the tree and create WAL
 			// size+2 is used to ensure that size/2 segments are finalized.
 			for i := 0; i < size+2; i++ {
+				// slow down updating the ledger, because running too fast would cause the previous checkpoint
+				// to not finish and get delayed
+				time.Sleep(LedgerUpdateDelay)
 
 				payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
@@ -555,6 +569,9 @@ func TestCompactorTriggeredByAdminTool(t *testing.T) {
 		fmt.Println("2 trie updates will fill a segment file, and 12 trie updates will fill 6 segment files")
 		fmt.Println("13 trie updates in total will trigger segment 5 to be finished, which should trigger checkpoint 5")
 		for i := 0; i < 13; i++ {
+			// slow down updating the ledger, because running too fast would cause the previous checkpoint
+			// to not finish and get delayed
+			time.Sleep(LedgerUpdateDelay)
 
 			payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
@@ -658,6 +675,9 @@ func TestCompactorConcurrency(t *testing.T) {
 
 				// size+1 is used to ensure that size/2*numGoroutine segments are finalized.
 				for i := 0; i < size+1; i++ {
+					// slow down updating the ledger, because running too fast would cause the previous checkpoint
+					// to not finish and get delayed
+					time.Sleep(LedgerUpdateDelay)
 					payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
 					keys := make([]ledger.Key, len(payloads))
