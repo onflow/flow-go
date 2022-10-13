@@ -71,7 +71,6 @@ type ExecutionCollector struct {
 	scriptMemoryDifference                 prometheus.Histogram
 	numberOfAccounts                       prometheus.Gauge
 	chunkDataPackRequestProcessedTotal     prometheus.Counter
-	chunkDataPackGenerationTime            prometheus.Histogram
 	chunkDataPackProofSize                 prometheus.Histogram
 	chunkDataPackCollectionSize            prometheus.Histogram
 	stateSyncActive                        prometheus.Gauge
@@ -468,14 +467,6 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Help:      "the total number of chunk data pack requests processed by provider engine",
 	})
 
-	chunkDataPackGenerationTime := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemIngestion,
-		Name:      "chunk_data_pack_generation_duration_ms",
-		Help:      "the duration of generating a chunk data pack",
-		Buckets:   []float64{1, 5, 10, 25, 50, 75, 100, 150, 200},
-	})
-
 	chunkDataPackProofSize := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemIngestion,
@@ -574,7 +565,6 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		scriptMemoryEstimate:                   scriptMemoryEstimate,
 		scriptMemoryDifference:                 scriptMemoryDifference,
 		chunkDataPackRequestProcessedTotal:     chunkDataPackRequestProcessedTotal,
-		chunkDataPackGenerationTime:            chunkDataPackGenerationTime,
 		chunkDataPackProofSize:                 chunkDataPackProofSize,
 		chunkDataPackCollectionSize:            chunkDataPackCollectionSize,
 		blockDataUploadsInProgress:             blockDataUploadsInProgress,
@@ -729,8 +719,7 @@ func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 }
 
 // ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
-func (ec *ExecutionCollector) ExecutionChunkDataPackGenerated(dur time.Duration, proofSize, numberOfTransactions int) {
-	ec.chunkDataPackGenerationTime.Observe(float64(dur.Milliseconds()))
+func (ec *ExecutionCollector) ExecutionChunkDataPackGenerated(proofSize, numberOfTransactions int) {
 	ec.chunkDataPackProofSize.Observe(float64(proofSize))
 	ec.chunkDataPackCollectionSize.Observe(float64(numberOfTransactions))
 }

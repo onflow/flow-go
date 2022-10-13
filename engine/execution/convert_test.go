@@ -29,7 +29,6 @@ func Test_BuildChunkDataPack(t *testing.T) {
 		exemetrics := new(modulemock.ExecutionMetrics)
 		exemetrics.On("ExecutionChunkDataPackGenerated",
 			mock.Anything,
-			mock.Anything,
 			mock.Anything).
 			Return(nil).
 			Times(numberOfChunks) // 1 collection + system collection

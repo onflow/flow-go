@@ -462,7 +462,7 @@ type ExecutionMetrics interface {
 		failed bool)
 
 	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
-	ExecutionChunkDataPackGenerated(dur time.Duration, proofSize, numberOfTransactions int)
+	ExecutionChunkDataPackGenerated(proofSize, numberOfTransactions int)
 
 	// ExecutionScriptExecuted reports the time and memory spent on executing an script
 	ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64)
