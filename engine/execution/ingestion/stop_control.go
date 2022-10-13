@@ -17,12 +17,19 @@ import (
 // StopControl follows states described in StopState
 type StopControl struct {
 	sync.RWMutex
-	height             uint64
+	// desired stop height, the first value new version should be used, so this height WON'T
+	// be executed
+	height uint64
+
+	// if the node should crash or just pause after reaching stop height
 	crash              bool
 	stopAfterExecuting flow.Identifier
-	log                zerolog.Logger
-	state              StopControlState
-	lastExecutedHeight uint64 // last executed height
+
+	log   zerolog.Logger
+	state StopControlState
+
+	// used to prevent setting stop height to block which has already been executed
+	lastExecutingHeight uint64
 }
 
 type StopControlState byte
@@ -55,9 +62,9 @@ func NewStopControl(log zerolog.Logger, paused bool, lastExecutedHeight uint64) 
 	}
 	log.Debug().Msgf("created StopControl module with paused = %t", paused)
 	return &StopControl{
-		log:                log,
-		state:              state,
-		lastExecutedHeight: lastExecutedHeight,
+		log:                 log,
+		state:               state,
+		lastExecutingHeight: lastExecutedHeight,
 	}
 }
 
@@ -76,7 +83,6 @@ func (s *StopControl) IsPaused() bool {
 }
 
 // SetStopHeight sets new stop height and crash mode, and return old values:
-//   - set, whether values were previously set
 //   - height
 //   - crash
 //
@@ -96,8 +102,9 @@ func (s *StopControl) SetStopHeight(height uint64, crash bool) (uint64, bool, er
 		return oldHeight, oldCrash, fmt.Errorf("cannot update stop height, already paused")
 	}
 
-	if s.lastExecutedHeight >= height {
-		return oldHeight, oldCrash, fmt.Errorf("cannot update stop height, given height %d at or below last executed %d", height, s.lastExecutedHeight)
+	// +1 because we track last executing height, so +1 is the lowest possible block to stop
+	if height <= s.lastExecutingHeight+1 {
+		return oldHeight, oldCrash, fmt.Errorf("cannot update stop height, given height %d at or below last executed %d", height, s.lastExecutingHeight)
 	}
 
 	s.log.Info().
@@ -126,9 +133,9 @@ func (s *StopControl) GetStopHeight() (uint64, bool) {
 	return s.height, s.crash
 }
 
-// BlockProcessable should be called when new block is processable.
+// blockProcessable should be called when new block is processable.
 // It returns boolean indicating if the block should be processed.
-func (s *StopControl) BlockProcessable(b *flow.Header) bool {
+func (s *StopControl) blockProcessable(b *flow.Header) bool {
 
 	s.Lock()
 	defer s.Unlock()
@@ -152,8 +159,8 @@ func (s *StopControl) BlockProcessable(b *flow.Header) bool {
 	return true
 }
 
-// BlockFinalized should be called when a block is marked as finalized
-func (s *StopControl) BlockFinalized(ctx context.Context, execState state.ReadOnlyExecutionState, h *flow.Header) {
+// blockFinalized should be called when a block is marked as finalized
+func (s *StopControl) blockFinalized(ctx context.Context, execState state.ReadOnlyExecutionState, h *flow.Header) {
 
 	s.Lock()
 	defer s.Unlock()
@@ -186,20 +193,12 @@ func (s *StopControl) BlockFinalized(ctx context.Context, execState state.ReadOn
 
 }
 
-// BlockExecuted should be called after a block has finished execution
-func (s *StopControl) BlockExecuted(h *flow.Header) {
+// blockExecuted should be called after a block has finished execution
+func (s *StopControl) blockExecuted(h *flow.Header) {
 	s.Lock()
 	defer s.Unlock()
 
-	if s.state == StopControlPaused {
-		return
-	}
-
-	if h.Height > s.lastExecutedHeight {
-		s.lastExecutedHeight = h.Height
-	}
-
-	if s.state == StopControlOff {
+	if s.state == StopControlPaused || s.state == StopControlOff {
 		return
 	}
 
@@ -220,5 +219,17 @@ func (s *StopControl) stopExecution() {
 		s.log.Debug().Int8("previous_state", int8(s.state)).Int8("new_state", int8(StopControlPaused)).Msg("StopControl state transition")
 		s.state = StopControlPaused
 		s.log.Warn().Msgf("Pausing execution as finalization reached requested stop height %d", s.height)
+	}
+}
+
+// executingBlockHeight should be called while execution of height starts, used for internal tracking of the minimum
+// possible value of height
+func (s *StopControl) executingBlockHeight(height uint64) {
+	if s.state == StopControlPaused {
+		return
+	}
+
+	if height > s.lastExecutingHeight {
+		s.lastExecutingHeight = height
 	}
 }

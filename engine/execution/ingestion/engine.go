@@ -419,7 +419,7 @@ func (e *Engine) reloadBlock(
 func (e *Engine) BlockProcessable(b *flow.Header) {
 
 	// skip if stopControl tells to skip
-	if !e.stopControl.BlockProcessable(b) {
+	if !e.stopControl.blockProcessable(b) {
 		return
 	}
 
@@ -442,7 +442,7 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 // BlockFinalized implements part of state.protocol.Consumer interface.
 // Method gets called for every finalized block
 func (e *Engine) BlockFinalized(h *flow.Header) {
-	e.stopControl.BlockFinalized(e.unit.Ctx(), e.execState, h)
+	e.stopControl.blockFinalized(e.unit.Ctx(), e.execState, h)
 }
 
 // Main handling
@@ -586,6 +586,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	startedAt := time.Now()
 
+	e.stopControl.executingBlockHeight(executableBlock.Block.Header.Height)
+
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
 	defer span.End()
 
@@ -667,7 +669,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	e.unit.Ctx()
 
-	e.stopControl.BlockExecuted(executableBlock.Block.Header)
+	e.stopControl.blockExecuted(executableBlock.Block.Header)
 }
 
 // we've executed the block, now we need to check:
