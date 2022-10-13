@@ -278,22 +278,51 @@ func findCheckpointPartFiles(dir string, fileName string) ([]string, error) {
 	return parts, nil
 }
 
+type jobReadSubtrie struct {
+	Index    int
+	Checksum uint32
+	Result   chan<- *resultReadSubTrie
+}
+
+type resultReadSubTrie struct {
+	Nodes []*node.Node
+	Err   error
+}
+
 func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32, logger *zerolog.Logger) ([][]*node.Node, error) {
+
 	numOfSubTries := len(subtrieChecksums)
-	resultChs := make([]chan *resultReadSubTrie, 0, numOfSubTries)
-	for i := 0; i < numOfSubTries; i++ {
+	jobs := make(chan jobReadSubtrie, numOfSubTries)
+	resultChs := make([]<-chan *resultReadSubTrie, numOfSubTries)
+
+	// push all jobs into the channel
+	for i, checksum := range subtrieChecksums {
 		resultCh := make(chan *resultReadSubTrie)
-		go func(i int) {
-			nodes, err := readCheckpointSubTrie(dir, fileName, i, subtrieChecksums[i], logger)
-			resultCh <- &resultReadSubTrie{
-				Nodes: nodes,
-				Err:   err,
+		resultChs[i] = resultCh
+		jobs <- jobReadSubtrie{
+			Index:    i,
+			Checksum: checksum,
+			Result:   resultCh,
+		}
+	}
+	close(jobs)
+
+	// TODO: make nWorker configable
+	nWorker := numOfSubTries // use as many worker as the jobs to read subtries concurrently
+	for i := 0; i < nWorker; i++ {
+		go func() {
+			for job := range jobs {
+				nodes, err := readCheckpointSubTrie(dir, fileName, job.Index, job.Checksum, logger)
+				job.Result <- &resultReadSubTrie{
+					Nodes: nodes,
+					Err:   err,
+				}
+				close(job.Result)
 			}
-			close(resultCh)
-		}(i)
-		resultChs = append(resultChs, resultCh)
+		}()
 	}
 
+	// reading job results in the same order as their indices
 	nodesGroups := make([][]*node.Node, 0, len(resultChs))
 	for i, resultCh := range resultChs {
 		result := <-resultCh
@@ -411,11 +440,6 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 	// since nodes[0] is always `nil`, returning a slice without nodes[0] could simplify the
 	// implementation of getNodeByIndex
 	return nodes[1:], nil
-}
-
-type resultReadSubTrie struct {
-	Nodes []*node.Node
-	Err   error
 }
 
 func readSubTriesFooter(f *os.File) (uint64, uint32, error) {

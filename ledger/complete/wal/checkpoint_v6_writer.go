@@ -307,7 +307,7 @@ type resultStoringSubTrie struct {
 	Err       error
 }
 
-type job struct {
+type jobStoreSubTrie struct {
 	Index  int
 	Roots  []*node.Node
 	Result chan<- *resultStoringSubTrie
@@ -333,14 +333,14 @@ func storeSubTrieConcurrently(
 		return nil, 0, nil, fmt.Errorf("invalid nWorker %v, the valid range is [1,%v]", nWorker, subtrieCount)
 	}
 
-	jobs := make(chan job, len(subtrieRoots))
+	jobs := make(chan jobStoreSubTrie, len(subtrieRoots))
 	resultChs := make([]<-chan *resultStoringSubTrie, len(subtrieRoots))
 
 	// push all jobs into the channel
 	for i, roots := range subtrieRoots {
 		resultCh := make(chan *resultStoringSubTrie)
 		resultChs[i] = resultCh
-		jobs <- job{
+		jobs <- jobStoreSubTrie{
 			Index:  i,
 			Roots:  roots,
 			Result: resultCh,
