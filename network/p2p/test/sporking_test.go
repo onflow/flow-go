@@ -37,7 +37,7 @@ import (
 // TestCrosstalkPreventionOnNetworkKeyChange tests that a node from the old chain cannot talk to a node in the new chain
 // if it's network key is updated while the libp2p protocol ID remains the same
 func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test - passing in Flaky Test Monitor but keeps failing in CI and keeps blocking many PRs")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
