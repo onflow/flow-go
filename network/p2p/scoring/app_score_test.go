@@ -99,14 +99,14 @@ func TestMaliciousAccessNode_NoHonestPeerScoring(t *testing.T) {
 	total := 10
 	success := 0
 	for i := 0; i < total; i++ {
-		if testMaliciousAccessNodes_NoHonestPeerScoring(t) {
+		if testGossipSubPartitionWhenNoHonestPeerScoring(t) {
 			success++
 		}
 	}
 	require.Less(t, success, total)
 }
 
-func testMaliciousAccessNodes_NoHonestPeerScoring(t *testing.T) bool {
+func testGossipSubPartitionWhenNoHonestPeerScoring(t *testing.T) bool {
 	ctx := context.Background()
 	sporkId := unittest.IdentifierFixture()
 
@@ -127,16 +127,6 @@ func testMaliciousAccessNodes_NoHonestPeerScoring(t *testing.T) bool {
 
 	allNodes := append([]*p2pnode.Node{con1Node, con2Node}, accessNodeGroup...)
 	allIds := append([]*flow.Identity{&con1Id, &con2Id}, accessNodeIds...)
-
-	//provider := id.NewFixedIdentityProvider(allIds)
-	//idProvider.On("ByPeerID", mocktestify.Anything).Return(
-	//	func(peerId peer.ID) *flow.Identity {
-	//		identity, _ := provider.ByPeerID(peerId)
-	//		return identity
-	//	}, func(peerId peer.ID) bool {
-	//		_, ok := provider.ByPeerID(peerId)
-	//		return ok
-	//	})
 
 	defer p2pfixtures.StopNodes(t, allNodes)
 
