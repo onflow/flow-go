@@ -27,14 +27,6 @@ func subtrieCountByLevel(level uint16) int {
 	return 1 << level
 }
 
-type resultStoringSubTrie struct {
-	Index     int
-	Roots     map[*node.Node]uint64 // node index for root nodes
-	NodeCount uint64
-	Checksum  uint32
-	Err       error
-}
-
 // StoreCheckpointV6SingleThread stores checkpoint file in v6 in a single threaded manner,
 // useful when EN is executing block.
 func StoreCheckpointV6SingleThread(tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
@@ -307,6 +299,20 @@ func subTrieRootAndTopLevelTrieCount(tries []*trie.MTrie) int {
 	return len(tries) * subtrieCount * 2
 }
 
+type resultStoringSubTrie struct {
+	Index     int
+	Roots     map[*node.Node]uint64 // node index for root nodes
+	NodeCount uint64
+	Checksum  uint32
+	Err       error
+}
+
+type job struct {
+	Index  int
+	Roots  []*node.Node
+	Result chan<- *resultStoringSubTrie
+}
+
 func storeSubTrieConcurrently(
 	subtrieRoots [subtrieCount][]*node.Node,
 	estimatedSubtrieNodeCount int, // useful for preallocating memory for building unique node map when processing sub tries
@@ -327,37 +333,48 @@ func storeSubTrieConcurrently(
 		return nil, 0, nil, fmt.Errorf("invalid nWorker %v, the valid range is [1,%v]", nWorker, subtrieCount)
 	}
 
-	resultChs := make(chan chan *resultStoringSubTrie, nWorker-1)
-	go func() {
-		for i, subTrieRoot := range subtrieRoots {
-			resultCh := make(chan *resultStoringSubTrie)
-			resultChs <- resultCh
-			// resultsChs only has nWorker number of buffer room,
-			// if resultCh can be pushed to resultChs, then we will work on this channel
-			// otherwise, the push will be blocked until the result is finished
-			go func(i int, subTrieRoot []*node.Node) {
+	jobs := make(chan job, len(subtrieRoots))
+	resultChs := make([]<-chan *resultStoringSubTrie, len(subtrieRoots))
+
+	// push all jobs into the channel
+	for i, roots := range subtrieRoots {
+		resultCh := make(chan *resultStoringSubTrie)
+		resultChs[i] = resultCh
+		jobs <- job{
+			Index:  i,
+			Roots:  roots,
+			Result: resultCh,
+		}
+	}
+
+	// start nWorker number of goroutine to take the job from the jobs channel concurrently
+	// and work on them, after finish, continue until the jobs channel is drained
+	for i := 0; i < int(nWorker); i++ {
+		go func(i int) {
+			for job := range jobs {
 				roots, nodeCount, checksum, err := storeCheckpointSubTrie(
-					i, subTrieRoot, estimatedSubtrieNodeCount, outputDir, outputFile, logger)
-				resultCh <- &resultStoringSubTrie{
+					job.Index, job.Roots, estimatedSubtrieNodeCount, outputDir, outputFile, logger)
+
+				job.Result <- &resultStoringSubTrie{
 					Index:     i,
 					Roots:     roots,
 					NodeCount: nodeCount,
 					Checksum:  checksum,
 					Err:       err,
 				}
-				close(resultCh)
-			}(i, subTrieRoot)
-		}
-
-		close(resultChs)
-	}()
+			}
+		}(i)
+	}
 
 	results := make(map[*node.Node]uint64, subAndTopNodeCount)
 	results[nil] = 0
 	nodeCounter := uint64(0)
 	checksums := make([]uint32, 0, len(subtrieRoots))
-	for resultCh := range resultChs {
+
+	// reading job results in the same order as their indices
+	for _, resultCh := range resultChs {
 		result := <-resultCh
+
 		if result.Err != nil {
 			return nil, 0, nil, fmt.Errorf("fail to store %v-th subtrie, trie: %w", result.Index, result.Err)
 		}
