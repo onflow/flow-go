@@ -248,7 +248,7 @@ func mockOrchestratorHandlingEgressEvent(t *testing.T, orchestrator *mockinsecur
 	return orchestratorWG
 }
 
-// withMockCorruptNetworks creates and starts mock corrup networks for each given corrupted identity.
+// withMockCorruptNetworks creates and starts mock corrupt networks for each given corrupted identity.
 // These mock corrupt networks only run the gRPC part of an actual corrupt network. Once all corrupt networks are up and running, the injected "run" function is executed.
 func withMockCorruptNetworks(
 	t *testing.T,

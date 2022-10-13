@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// CorruptedNodeConnection abstracts connection between an attack orchestrator to a corruptible conduit factory (ccf)
+// CorruptedNodeConnection abstracts connection between an attack orchestrator to a corrupt network (cn)
 // through the orchestrator network.
 type CorruptedNodeConnection struct {
 	component.Component
@@ -54,7 +54,7 @@ func NewCorruptedNodeConnection(
 	return c
 }
 
-// SendMessage sends the message from orchestrator to the corrupted conduit factory.
+// SendMessage sends the message from orchestrator to the corrupt network.
 func (c *CorruptedNodeConnection) SendMessage(message *insecure.Message) error {
 	err := c.outbound.Send(message)
 	if err != nil {
@@ -88,7 +88,7 @@ func (c *CorruptedNodeConnection) receiveLoop() {
 	}
 }
 
-// CloseConnection closes the connection to the corrupted conduit factory.
+// CloseConnection closes gRPC client connection to the corrupt network (gRPC server).
 func (c *CorruptedNodeConnection) CloseConnection() error {
 	err := c.outbound.CloseSend()
 	if err != nil {

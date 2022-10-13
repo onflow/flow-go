@@ -5,12 +5,12 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// CorruptedNodeConnection abstracts connection from orchestrator to a corrupted conduit factory through the orchestrator network.
+// CorruptedNodeConnection abstracts connection from attacker to a corrupt network through the orchestrator network.
 type CorruptedNodeConnection interface {
 	// SendMessage sends the message from orchestrator to the corrupted conduit factory.
 	SendMessage(*Message) error
 
-	// CloseConnection closes the connection to the corrupted conduit factory.
+	// CloseConnection closes gRPC client connection to the corrupt network (gRPC server).
 	CloseConnection() error
 }
 

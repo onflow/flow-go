@@ -91,7 +91,7 @@ func (on *Network) start(ctx irrecoverable.SignalerContext) error {
 	return nil
 }
 
-// stop conducts the termination logic of the submodules of orchestrator network.
+// stop terminates all gRPC client connections within an orchestrator network.
 func (on *Network) stop() error {
 	// tears down connections to corrupt nodes.
 	var errors *multierror.Error
@@ -187,7 +187,7 @@ func (on *Network) processIngressMessage(message *insecure.IngressMessage) error
 
 	targetId, err := flow.ByteSliceToId(message.CorruptTargetID)
 	if err != nil {
-		return fmt.Errorf("could not convert corrupted target id to flow identifier: %w", err)
+		return fmt.Errorf("could not convert corrupt target id to flow identifier: %w", err)
 	}
 
 	// making sure events are sent sequentially to orchestrator.
