@@ -213,7 +213,7 @@ func (s *StopControl) blockExecuted(h *flow.Header) {
 
 func (s *StopControl) stopExecution() {
 	if s.crash {
-		s.log.Fatal().Msgf("Crashing as finalization reached requested stop height %d", s.height)
+		s.log.Fatal().Msgf("Crashing as finalization reached requested stop height %d and the highest executed block is (%d - 1)", s.height, s.height)
 	} else {
 		s.log.Debug().Int8("previous_state", int8(s.state)).Int8("new_state", int8(StopControlPaused)).Msg("StopControl state transition")
 		s.state = StopControlPaused
@@ -228,7 +228,9 @@ func (s *StopControl) executingBlockHeight(height uint64) {
 		return
 	}
 
-	if height > s.lastExecutingHeight {
+	// updating the highest executing height, which will be used to reject setting stop height that 
+	// is too low. 
+	if height > s.highestExecutingHeight {
 		s.lastExecutingHeight = height
 	}
 }
