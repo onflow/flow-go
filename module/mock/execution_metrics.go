@@ -34,8 +34,8 @@ func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, compUsed u
 	_m.Called(dur, compUsed, memoryUsed, eventCounts, eventSize, txCounts, colCounts)
 }
 
-// ExecutionChunkDataPackGenerated provides a mock function with given fields: dur, proofSize, numberOfTransactions
-func (_m *ExecutionMetrics) ExecutionChunkDataPackGenerated( proofSize int, numberOfTransactions int) {
+// ExecutionChunkDataPackGenerated provides a mock function with given fields: proofSize, numberOfTransactions
+func (_m *ExecutionMetrics) ExecutionChunkDataPackGenerated(proofSize int, numberOfTransactions int) {
 	_m.Called(proofSize, numberOfTransactions)
 }
 
