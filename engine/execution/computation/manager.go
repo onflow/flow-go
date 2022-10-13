@@ -71,7 +71,7 @@ type ComputationConfig struct {
 	ScriptExecutionTimeLimit time.Duration
 
 	// When NewCustomVirtualMachine is nil, the manager will create a standard
-	// fvm virtual machine via fvm.NewVM.  Otherwise, the manager
+	// fvm virtual machine via fvm.NewVirtualMachine.  Otherwise, the manager
 	// will create a virtual machine using this function.
 	//
 	// Note that this is primarily used for testing.
@@ -114,7 +114,7 @@ func New(
 	if params.NewCustomVirtualMachine != nil {
 		vm = params.NewCustomVirtualMachine()
 	} else {
-		vm = fvm.NewVM()
+		vm = fvm.NewVirtualMachine()
 	}
 
 	options := []fvm.Option{

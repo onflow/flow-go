@@ -54,7 +54,7 @@ var scriptLogThreshold = 1 * time.Second
 func TestComputeBlockWithStorage(t *testing.T) {
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
@@ -217,7 +217,7 @@ func TestExecuteScript(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 

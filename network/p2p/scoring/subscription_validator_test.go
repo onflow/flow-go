@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
@@ -166,23 +167,25 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 // 4. Verification node also publishes a chunk request on the RequestChunks channel.
 // 5. Test checks that consensus node does not receive the chunk request while the other verification node does.
 func TestSubscriptionValidator_Integration(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
 	sporkId := unittest.IdentifierFixture()
 
 	idProvider := mock.NewIdentityProvider(t)
 	// one consensus node.
-	conNode, conId := p2pfixtures.NodeFixture(t, ctx, sporkId, t.Name(),
+	conNode, conId := p2pfixtures.NodeFixture(t, sporkId, t.Name(),
 		p2pfixtures.WithLogger(unittest.Logger()),
 		p2pfixtures.WithPeerScoringEnabled(idProvider),
 		p2pfixtures.WithRole(flow.RoleConsensus))
 
 	// two verification node.
-	verNode1, verId1 := p2pfixtures.NodeFixture(t, ctx, sporkId, t.Name(),
+	verNode1, verId1 := p2pfixtures.NodeFixture(t, sporkId, t.Name(),
 		p2pfixtures.WithLogger(unittest.Logger()),
 		p2pfixtures.WithPeerScoringEnabled(idProvider),
 		p2pfixtures.WithRole(flow.RoleVerification))
 
-	verNode2, verId2 := p2pfixtures.NodeFixture(t, ctx, sporkId, t.Name(),
+	verNode2, verId2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(),
 		p2pfixtures.WithLogger(unittest.Logger()),
 		p2pfixtures.WithPeerScoringEnabled(idProvider),
 		p2pfixtures.WithRole(flow.RoleVerification))
@@ -200,7 +203,8 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 			return ok
 		})
 
-	defer p2pfixtures.StopNodes(t, nodes)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())

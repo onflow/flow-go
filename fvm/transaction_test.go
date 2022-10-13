@@ -106,7 +106,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, frozen)
 
-		vm := fvm.NewVM()
+		vm := fvm.NewVirtualMachine()
 
 		// deploy code to account
 
@@ -240,7 +240,7 @@ func TestAccountFreezing(t *testing.T) {
 		accounts := environment.NewAccounts(st)
 		programsStorage := programs.NewEmptyBlockPrograms()
 
-		vm := fvm.NewVM()
+		vm := fvm.NewVirtualMachine()
 
 		// deploy code to accounts
 		whateverContractCode := `
@@ -381,7 +381,7 @@ func TestAccountFreezing(t *testing.T) {
 
 	t.Run("service account cannot freeze itself", func(t *testing.T) {
 
-		vm := fvm.NewVM()
+		vm := fvm.NewVirtualMachine()
 		// create default context
 		programsStorage := programs.NewEmptyBlockPrograms()
 		context := fvm.NewContext(
@@ -476,7 +476,7 @@ func TestAccountFreezing(t *testing.T) {
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
 
-		vm := fvm.NewVM()
+		vm := fvm.NewVirtualMachine()
 
 		// deploy code to accounts
 		whateverCode := []byte(`

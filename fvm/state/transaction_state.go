@@ -9,14 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO(patrick): rm once emulator is updated ...
-func NewStateTransaction(
-	startView View,
-	params StateParameters,
-) *TransactionState {
-	return NewTransactionState(startView, params)
-}
-
 type nestedTransactionStackFrame struct {
 	state *State
 
@@ -330,10 +322,6 @@ func (s *TransactionState) MeterEmittedEvent(byteSize uint64) error {
 
 func (s *TransactionState) TotalEmittedEventBytes() uint64 {
 	return s.currentState().TotalEmittedEventBytes()
-}
-
-func (s *TransactionState) TotalEventCounter() uint32 {
-	return s.currentState().TotalEventCounter()
 }
 
 func (s *TransactionState) ViewForTestingOnly() View {

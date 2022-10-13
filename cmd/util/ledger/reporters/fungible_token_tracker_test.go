@@ -28,7 +28,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 	chain := flow.Testnet.Chain()
 	view := migrations.NewView(payloads)
 
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 	blockPrograms := programs.NewEmptyBlockPrograms()
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
