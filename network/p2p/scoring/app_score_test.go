@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
@@ -23,18 +24,20 @@ import (
 )
 
 func TestAccessNodeScore_Integration_HonestANs(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
 	sporkId := unittest.IdentifierFixture()
 
 	idProvider := mock.NewIdentityProvider(t)
 	// one consensus node.
-	groupOneNodes, groupOneIds := p2pfixtures.NodesFixture(t, ctx, sporkId, t.Name(), 12,
+	groupOneNodes, groupOneIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 12,
 		p2pfixtures.WithRole(flow.RoleConsensus),
 		p2pfixtures.WithPeerScoringEnabled(idProvider))
-	groupTwoNodes, groupTwoIds := p2pfixtures.NodesFixture(t, ctx, sporkId, t.Name(), 12,
+	groupTwoNodes, groupTwoIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 12,
 		p2pfixtures.WithRole(flow.RoleConsensus),
 		p2pfixtures.WithPeerScoringEnabled(idProvider))
-	accessNodeGroup, accessNodeIds := p2pfixtures.NodesFixture(t, ctx, sporkId, t.Name(), 12,
+	accessNodeGroup, accessNodeIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 12,
 		p2pfixtures.WithRole(flow.RoleAccess),
 		p2pfixtures.WithPeerScoringEnabled(idProvider))
 
@@ -50,8 +53,8 @@ func TestAccessNodeScore_Integration_HonestANs(t *testing.T) {
 			_, ok := provider.ByPeerID(peerId)
 			return ok
 		})
-
-	defer p2pfixtures.StopNodes(t, nodes)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
@@ -107,20 +110,22 @@ func TestMaliciousAccessNode_NoHonestPeerScoring(t *testing.T) {
 }
 
 func testGossipSubPartitionWhenNoHonestPeerScoring(t *testing.T) bool {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
 	sporkId := unittest.IdentifierFixture()
 
 	idProvider := mock.NewIdentityProvider(t)
 
 	// two (honest) consensus nodes but with NO peer scoring enabled!
-	con1Node, con1Id := p2pfixtures.NodeFixture(t, ctx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
-	con2Node, con2Id := p2pfixtures.NodeFixture(t, ctx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
+	con1Node, con1Id := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
+	con2Node, con2Id := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
 
 	// create > 2 * 12 malicious access nodes
 	// 12 is the maximum size of default GossipSub mesh.
 	// We want to make sure that it is unlikely for honest nodes to be in the same mesh (hence messages from
 	// one honest node to the other is routed through the malicious nodes).
-	accessNodeGroup, accessNodeIds := p2pfixtures.NodesFixture(t, ctx, sporkId, t.Name(), 30,
+	accessNodeGroup, accessNodeIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 30,
 		p2pfixtures.WithRole(flow.RoleAccess),
 		p2pfixtures.WithPeerScoringEnabled(idProvider),
 		p2pfixtures.WithAppSpecificScore(maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id})))
@@ -128,7 +133,8 @@ func testGossipSubPartitionWhenNoHonestPeerScoring(t *testing.T) bool {
 	allNodes := append([]*p2pnode.Node{con1Node, con2Node}, accessNodeGroup...)
 	allIds := append([]*flow.Identity{&con1Id, &con2Id}, accessNodeIds...)
 
-	defer p2pfixtures.StopNodes(t, allNodes)
+	p2pfixtures.StartNodes(t, signalerCtx, allNodes, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, allNodes, cancel, 100*time.Millisecond)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
@@ -163,20 +169,22 @@ func testGossipSubPartitionWhenNoHonestPeerScoring(t *testing.T) bool {
 }
 
 func TestMaliciousAccessNodes_HonestPeerScoring(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
 	sporkId := unittest.IdentifierFixture()
 
 	idProvider := mock.NewIdentityProvider(t)
 
 	// two (honest) consensus nodes but WITH peer scoring enabled!
-	con1Node, con1Id := p2pfixtures.NodeFixture(t, ctx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithPeerScoringEnabled(idProvider))
-	con2Node, con2Id := p2pfixtures.NodeFixture(t, ctx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithPeerScoringEnabled(idProvider))
+	con1Node, con1Id := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithPeerScoringEnabled(idProvider))
+	con2Node, con2Id := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithPeerScoringEnabled(idProvider))
 
 	// create > 2 * 12 malicious access nodes
 	// 12 is the maximum size of default GossipSub mesh.
 	// We want to make sure that it is unlikely for honest nodes to be in the same mesh (hence messages from
 	// one honest node to the other is routed through the malicious nodes).
-	accessNodeGroup, accessNodeIds := p2pfixtures.NodesFixture(t, ctx, sporkId, t.Name(), 30,
+	accessNodeGroup, accessNodeIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 30,
 		p2pfixtures.WithRole(flow.RoleAccess),
 		p2pfixtures.WithPeerScoringEnabled(idProvider),
 		p2pfixtures.WithAppSpecificScore(maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id})))
@@ -194,7 +202,8 @@ func TestMaliciousAccessNodes_HonestPeerScoring(t *testing.T) {
 			return ok
 		})
 
-	defer p2pfixtures.StopNodes(t, allNodes)
+	p2pfixtures.StartNodes(t, signalerCtx, allNodes, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, allNodes, cancel, 100*time.Millisecond)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
