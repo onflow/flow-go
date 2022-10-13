@@ -25,6 +25,7 @@ type TestCase struct {
 	Channel     channels.Channel
 	Message     interface{}
 	MessageStr  string
+	Unicast     bool
 }
 
 func TestIsAuthorizedSender(t *testing.T) {
@@ -58,9 +59,16 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedSen
 			pid, err := unittest.PeerIDFromFlowID(c.Identity)
 			require.NoError(s.T(), err)
 
+			// ensure according to the message auth config, if a message is authorized to be sent via unicast it
+			// is accepted or rejected.
 			msgType, err := authorizedSenderValidator.Validate(pid, c.Message, c.Channel, true)
-			require.NoError(s.T(), err)
-			require.Equal(s.T(), c.MessageStr, msgType)
+			if c.Unicast {
+				require.NoError(s.T(), err)
+				require.Equal(s.T(), c.MessageStr, msgType)
+			} else {
+				require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
+				require.Equal(s.T(), c.MessageStr, msgType)
+			}
 
 			validatePubsub := authorizedSenderValidator.PubSubMessageValidator(c.Channel)
 			pubsubResult := validatePubsub(pid, c.Message)
@@ -81,8 +89,13 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedS
 			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, s.slashingViolationsConsumer, c.GetIdentity)
 
 			msgType, err := authorizedSenderValidator.Validate(pid, c.Message, c.Channel, true)
-			require.ErrorIs(s.T(), err, message.ErrUnauthorizedRole)
-			require.Equal(s.T(), c.MessageStr, msgType)
+			if c.Unicast {
+				require.ErrorIs(s.T(), err, message.ErrUnauthorizedRole)
+				require.Equal(s.T(), c.MessageStr, msgType)
+			} else {
+				require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
+				require.Equal(s.T(), c.MessageStr, msgType)
+			}
 
 			validatePubsub := authorizedSenderValidator.PubSubMessageValidator(c.Channel)
 			pubsubResult := validatePubsub(pid, c.Message)
@@ -125,20 +138,22 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefix
 
 	authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, s.slashingViolationsConsumer, getIdentityFunc)
 
-	// validate collection consensus cluster
+	// ensure ClusterBlockProposal not allowed to be sent on channel via unicast
 	msgType, err := authorizedSenderValidator.Validate(pid, &messages.ClusterBlockProposal{}, channels.ConsensusCluster(clusterID), true)
-	require.NoError(s.T(), err)
+	require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
 	require.Equal(s.T(), message.ClusterBlockProposal, msgType)
 
+	// ensure ClusterBlockProposal is allowed to be sent via pubsub by authorized sender
 	validateCollConsensusPubsub := authorizedSenderValidator.PubSubMessageValidator(channels.ConsensusCluster(clusterID))
 	pubsubResult := validateCollConsensusPubsub(pid, &messages.ClusterBlockProposal{})
 	require.Equal(s.T(), pubsub.ValidationAccept, pubsubResult)
 
-	// validate collection sync cluster
+	// validate collection sync cluster SyncRequest is allowed to be sent on channel via unicast
 	msgType, err = authorizedSenderValidator.Validate(pid, &messages.SyncRequest{}, channels.SyncCluster(clusterID), true)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), message.SyncRequest, msgType)
 
+	// ensure SyncRequest is allowed to be sent via pubsub by authorized sender
 	validateSyncClusterPubsub := authorizedSenderValidator.PubSubMessageValidator(channels.SyncCluster(clusterID))
 	pubsubResult = validateSyncClusterPubsub(pid, &messages.SyncRequest{})
 	require.Equal(s.T(), pubsub.ValidationAccept, pubsubResult)
@@ -222,7 +237,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 // initializeAuthorizationTestCases initializes happy and sad path test cases for checking authorized and unauthorized role message combinations.
 func (s *TestAuthorizedSenderValidatorSuite) initializeAuthorizationTestCases() {
 	for _, c := range message.GetAllMessageAuthConfigs() {
-		for channel, authorizedRoles := range c.Config {
+		for channel, channelAuthConfig := range c.Config {
 			for _, role := range flow.Roles() {
 				identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(role))
 				tc := TestCase{
@@ -231,8 +246,9 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeAuthorizationTestCases() 
 					Channel:     channel,
 					Message:     c.Type(),
 					MessageStr:  c.Name,
+					Unicast:     channelAuthConfig.Unicast,
 				}
-				if authorizedRoles.Contains(role) {
+				if channelAuthConfig.AuthorizedRoles.Contains(role) {
 					// test cases for validation success happy path
 					s.authorizedSenderTestCases = append(s.authorizedSenderTestCases, tc)
 				} else {
@@ -251,8 +267,8 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeInvalidMessageOnChannelTe
 
 	// iterate all channels
 	for _, c := range configs {
-		for channel, authorizedRoles := range c.Config {
-			identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(authorizedRoles[0]))
+		for channel, channelAuthConfig := range c.Config {
+			identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(channelAuthConfig.AuthorizedRoles[0]))
 
 			// iterate all message types
 			for _, config := range configs {
@@ -266,6 +282,7 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeInvalidMessageOnChannelTe
 						Channel:     channel,
 						Message:     config.Type(),
 						MessageStr:  config.Name,
+						Unicast:     channelAuthConfig.Unicast,
 					}
 					s.unauthorizedMessageOnChannelTestCases = append(s.unauthorizedMessageOnChannelTestCases, tc)
 				}

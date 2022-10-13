@@ -8,6 +8,7 @@ import (
 
 	mockery "github.com/stretchr/testify/mock"
 
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/message"
@@ -403,6 +404,65 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 
 	// send message via unicast
 	err := u.senderMW.SendDirect(msg, u.receiverID.NodeID)
+	require.NoError(u.T(), err)
+
+	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
+	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
+}
+
+// TestUnicastAuthorization_UnauthorizedUnicastOnChannel tests that messages sent via unicast that are not authorized for unicast are rejected.
+func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUnicastOnChannel() {
+	// setup mock slashing violations consumer and middlewares
+	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
+	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+
+	// set sender id role to RoleConsensus to avoid unauthorized sender validation error
+	u.senderID.Role = flow.RoleConsensus
+
+	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
+	require.NoError(u.T(), err)
+
+	expectedViolation := &slashing.Violation{
+		Identity:  u.senderID,
+		PeerID:    expectedSenderPeerID.String(),
+		MsgType:   "BlockProposal",
+		Channel:   channels.ConsensusCommittee,
+		IsUnicast: true,
+		Err:       message.ErrUnauthorizedUnicastOnChannel,
+	}
+
+	slashingViolationsConsumer.On(
+		"OnUnauthorizedUnicastOnChannel",
+		expectedViolation,
+	).Once().Run(func(args mockery.Arguments) {
+		close(u.waitCh)
+	})
+
+	defer slashingViolationsConsumer.AssertExpectations(u.T())
+
+	overlay := &mocknetwork.Overlay{}
+	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
+		return u.providers[0].Identities(filter.Any)
+	})
+	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
+		return u.providers[0].Identities(filter.Any)
+	}, nil)
+	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(u.senderID, true)
+
+	// message will be rejected so assert overlay never receives it
+	defer overlay.AssertNotCalled(u.T(), "Receive", u.senderID.NodeID, mock.AnythingOfType("*message.Message"))
+
+	u.startMiddlewares(overlay)
+
+	// messages.BlockProposal is not authorized to be sent via unicast over the ConsensusCommittee channel
+	payload := &messages.BlockProposal{
+		Header:  unittest.BlockHeaderFixture(),
+		Payload: nil,
+	}
+	msg, _ := createMessageWithPayload(u.senderID.NodeID, u.receiverID.NodeID, channels.ConsensusCommittee.String(), payload)
+
+	// send message via unicast
+	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
 	require.NoError(u.T(), err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens

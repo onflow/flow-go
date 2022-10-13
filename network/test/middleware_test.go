@@ -524,7 +524,10 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg strin
 	payload := &libp2pmessage.TestMessage{
 		Text: msg,
 	}
+	return createMessageWithPayload(originID, targetID, testChannel.String(), payload)
+}
 
+func createMessageWithPayload(originID flow.Identifier, targetID flow.Identifier, channel string, payload interface{}) (*message.Message, interface{}) {
 	codec := unittest.NetworkCodec()
 	b, err := codec.Encode(payload)
 	if err != nil {
@@ -532,7 +535,7 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg strin
 	}
 
 	m := &message.Message{
-		ChannelID: testChannel.String(),
+		ChannelID: channel,
 		EventID:   []byte("1"),
 		OriginID:  originID[:],
 		TargetIDs: [][]byte{targetID[:]},
