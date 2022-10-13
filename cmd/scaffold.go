@@ -389,7 +389,6 @@ func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
-	fnb.ConfigManager = updatable_configs.NewManager()
 	if fnb.AdminAddr != NotSet {
 		if (fnb.AdminCert != NotSet || fnb.AdminKey != NotSet || fnb.AdminClientCAs != NotSet) &&
 			!(fnb.AdminCert != NotSet && fnb.AdminKey != NotSet && fnb.AdminClientCAs != NotSet) {
@@ -626,6 +625,11 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 		fnb.BaseConfig.profilerEnabled,
 	)
 	fnb.MustNot(err).Msg("could not initialize profiler")
+
+	// register the enabled state of the profiler for dynamic configuring
+	err = fnb.ConfigManager.RegisterBoolConfig("profiler-enabled", profiler.Enabled, profiler.SetEnabled)
+	fnb.MustNot(err).Msg("could not register profiler config")
+
 	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		return profiler, nil
 	})
@@ -1415,8 +1419,6 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return common.NewGetConfigCommand(config.ConfigManager)
 	}).AdminCommand("set-config", func(config *NodeConfig) commands.AdminCommand {
 		return common.NewSetConfigCommand(config.ConfigManager)
-	}).AdminCommand("set-profiler-enabled", func(config *NodeConfig) commands.AdminCommand {
-		return &common.SetProfilerEnabledCommand{} // TODO make config
 	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
 	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
@@ -1455,6 +1457,7 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	fnb.initLogger()
+	fnb.ConfigManager = updatable_configs.NewManager()
 
 	fnb.initDB()
 	fnb.initSecretsDB()
