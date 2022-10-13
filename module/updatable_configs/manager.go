@@ -76,6 +76,9 @@ type Field struct {
 //
 // The Manager maintains a list of type-agnostic updatable config fields. The
 // typed registration function (Register*Config) is responsible for type conversion.
+// The registration functions must convert input types (as parsed from JSON) to
+// the Go type expected by the config field setter. They must also convert Go types
+// from config field getters to displayable types (see structpb.NewValue for details).
 type Manager struct {
 	mu     sync.Mutex
 	fields map[string]Field
@@ -186,7 +189,8 @@ func (m *Manager) RegisterDurationConfig(name string, get GetDurationConfigFunc,
 		Name:     name,
 		TypeName: "duration",
 		Get: func() any {
-			return get()
+			val := get()
+			return val.String()
 		},
 		Set: func(val any) error {
 			sval, ok := val.(string)

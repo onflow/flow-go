@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestRegisterDuplicateConfig(t *testing.T) {
@@ -36,6 +37,9 @@ func TestManager_RegisterBoolConfig(t *testing.T) {
 	// should be able to get the field
 	field, ok := mgr.GetField("field")
 	assert.True(t, ok)
+	// field must be parseable by structpb (otherwise admin server will error)
+	_, err = structpb.NewValue(field.Get())
+	require.NoError(t, err)
 
 	// should fail to set incorrect type
 	err = field.Set(struct{}{})
@@ -58,6 +62,9 @@ func TestManager_RegisterUintConfig(t *testing.T) {
 	// should be able to get the field
 	field, ok := mgr.GetField("field")
 	assert.True(t, ok)
+	// field must be parseable by structpb (otherwise admin server will error)
+	_, err = structpb.NewValue(field.Get())
+	require.NoError(t, err)
 
 	// should fail to set incorrect type
 	err = field.Set(struct{}{})
@@ -80,6 +87,9 @@ func TestManager_RegisterDurationConfig(t *testing.T) {
 	// should be able to get the field
 	field, ok := mgr.GetField("field")
 	assert.True(t, ok)
+	// field must be parseable by structpb (otherwise admin server will error)
+	_, err = structpb.NewValue(field.Get())
+	require.NoError(t, err)
 
 	// should fail to set incorrect type
 	err = field.Set(struct{}{})
