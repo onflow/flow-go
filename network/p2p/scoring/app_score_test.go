@@ -55,7 +55,7 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 			return ok
 		})
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 2*time.Second)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
@@ -102,21 +102,30 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	}
 }
 
-func TestMaliciousAccessNode_NoHonestPeerScoring(t *testing.T) {
+// TestNetworkPartitionWithNoHonestPeerScoringInFullTopology is part one of testing pushing access nodes to the edges of the network.
+// This test proves that if access nodes are NOT pushed to the edge of network, a malicious majority of them can
+// partition the network by disconnecting honest nodes from each other even when the network topology is a complete graph (i.e., full topology).
+func TestNetworkPartitionWithNoHonestPeerScoringInFullTopology(t *testing.T) {
 	total := 10
-	success := 0
+	partition := 0
 	for i := 0; i < total; i++ {
-		if testGossipSubPartitionWhenNoHonestPeerScoring(t) {
-			success++
+		if testNetworkPartitionWithNoHonestPeerScoringInFullTopology(t) {
+			partition++
 		}
 	}
-	require.Less(t, success, total)
+	require.GreaterOrEqual(t, partition, 1) // at least one partition
 }
 
-func testGossipSubPartitionWhenNoHonestPeerScoring(t *testing.T) bool {
+// testNetworkPartitionWithNoHonestPeerScoringInFullTopology runs a GossipSub network with malicious majority.
+// The malicious nodes mute GossipSub traffic from/to honest nodes.
+// The honest nodes also do not have peer scoring enabled.
+// The test returns true if two honest nodes CANNOT exchange GossipSub publish message despite malicious majority.
+// Note that as the honest nodes do not have peer scoring enabled, there is still a chance that they select each other
+// on their mesh and hence successfully exchange GossipSub mesh.
+// That is why this experiment must be repeated multiple times.
+func testNetworkPartitionWithNoHonestPeerScoringInFullTopology(t *testing.T) bool {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
 	sporkId := unittest.IdentifierFixture()
 
 	idProvider := mock.NewIdentityProvider(t)
@@ -132,13 +141,14 @@ func testGossipSubPartitionWhenNoHonestPeerScoring(t *testing.T) bool {
 	accessNodeGroup, accessNodeIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 30,
 		p2pfixtures.WithRole(flow.RoleAccess),
 		p2pfixtures.WithPeerScoringEnabled(idProvider),
+		// overrides the default peer scoring parameters to mute GossipSub traffic from/to honest nodes.
 		p2pfixtures.WithAppSpecificScore(maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id})))
 
 	allNodes := append([]*p2pnode.Node{con1Node, con2Node}, accessNodeGroup...)
 	allIds := append([]*flow.Identity{&con1Id, &con2Id}, accessNodeIds...)
 
 	p2pfixtures.StartNodes(t, signalerCtx, allNodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, allNodes, cancel, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, allNodes, cancel, 2*time.Second)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
@@ -157,6 +167,7 @@ func testGossipSubPartitionWhenNoHonestPeerScoring(t *testing.T) bool {
 		require.NoError(t, err)
 	}
 
+	// let nodes reside on a full topology, hence no partition is caused by the topology.
 	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, allNodes, allIds)
 
 	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture())
@@ -169,10 +180,28 @@ func testGossipSubPartitionWhenNoHonestPeerScoring(t *testing.T) bool {
 	// Hence, con2Node will not receive the message within a one-second window.
 	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, con2Sub)
+	return !p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, con2Sub)
 }
 
-func TestMaliciousAccessNodes_HonestPeerScoring(t *testing.T) {
+// TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority is part two of testing pushing access nodes to the edges of the network.
+// This test proves that if access nodes are PUSHED to the edge of the network, even their malicious majority cannot partition
+// the network of honest nodes.
+func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testing.T) {
+	total := 10
+	for i := 0; i < total; i++ {
+		if !testFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t) {
+			// even one failure should not happen, as it means that malicious majority can partition the network
+			// with our peer scoring parameters.
+			require.Fail(t, "honest nodes could not exchange message on GossipSub")
+		}
+	}
+}
+
+// testFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority runs a GossipSub network with malicious majority of access nodes.
+// The malicious nodes mute GossipSub traffic from/to honest nodes.
+// The honest nodes push access nodes to the edge of the network.
+// The test returns true if two honest nodes CAN exchange GossipSub publish message despite malicious majority of access nodes.
+func testFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testing.T) bool {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
@@ -181,16 +210,26 @@ func TestMaliciousAccessNodes_HonestPeerScoring(t *testing.T) {
 	idProvider := mock.NewIdentityProvider(t)
 
 	// two (honest) consensus nodes but WITH peer scoring enabled!
-	con1Node, con1Id := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithPeerScoringEnabled(idProvider))
-	con2Node, con2Id := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithPeerScoringEnabled(idProvider))
+	con1Node, con1Id := p2pfixtures.NodeFixture(t,
+		sporkId,
+		t.Name(),
+		p2pfixtures.WithRole(flow.RoleConsensus),
+		p2pfixtures.WithPeerScoringEnabled(idProvider))
+	con2Node, con2Id := p2pfixtures.NodeFixture(t,
+		sporkId,
+		t.Name(),
+		p2pfixtures.WithRole(flow.RoleConsensus),
+		p2pfixtures.WithPeerScoringEnabled(idProvider))
 
 	// create > 2 * 12 malicious access nodes
 	// 12 is the maximum size of default GossipSub mesh.
-	// We want to make sure that it is unlikely for honest nodes to be in the same mesh (hence messages from
-	// one honest node to the other is routed through the malicious nodes).
+	// We want to make sure that it is unlikely for honest nodes to be in the same mesh by chance.
+	// Note that ideally, honest nodes should end up in the same mesh. But this should be done through peer scoring, and
+	// not by chance.
 	accessNodeGroup, accessNodeIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 30,
 		p2pfixtures.WithRole(flow.RoleAccess),
 		p2pfixtures.WithPeerScoringEnabled(idProvider),
+		// overrides the default peer scoring parameters to mute GossipSub traffic from/to honest nodes.
 		p2pfixtures.WithAppSpecificScore(maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id})))
 
 	allNodes := append([]*p2pnode.Node{con1Node, con2Node}, accessNodeGroup...)
@@ -207,7 +246,7 @@ func TestMaliciousAccessNodes_HonestPeerScoring(t *testing.T) {
 		})
 
 	p2pfixtures.StartNodes(t, signalerCtx, allNodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, allNodes, cancel, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, allNodes, cancel, 2*time.Second)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
@@ -231,14 +270,14 @@ func TestMaliciousAccessNodes_HonestPeerScoring(t *testing.T) {
 	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture())
 	require.NoError(t, con1Node.Publish(ctx, blockTopic, proposalMsg))
 
-	// we check that within a one-second window the message is not received by the other honest consensus node.
+	// we check that within a one-second window the message is RECEIVED by the other honest consensus node.
 	// the one-second window is important because it triggers the heartbeat of the con1Node to perform a lazy pull (iHave).
 	// And con1Node may randomly choose con2Node as the peer to perform the lazy pull.
-	// However, when con2Node is not in the mesh of con1Node, it is deprived of the eager push from con1Node.
-	// Hence, con2Node will not receive the message within a one-second window.
+	// However, when con2Node IS IN the mesh of con1Node, it benefits from the eager push from con1Node.
+	// Hence, con2Node should immediately receive the message within a one-second window.
 	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	p2pfixtures.SubMustReceiveMessage(t, ctx1s, proposalMsg, con2Sub)
+	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, con2Sub)
 }
 
 // maliciousAppSpecificScore returns a malicious app specific score function that rewards the malicious node and
