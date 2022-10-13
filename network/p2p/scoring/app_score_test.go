@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -245,17 +244,6 @@ func maliciousAppSpecificScore(honestIds flow.IdentityList) func(peer.ID) float6
 		_, isHonest := honestIdProvider.ByPeerID(p)
 		if isHonest {
 			return scoring.MaxAppSpecificPenalty
-		}
-
-		return scoring.MaxAppSpecificReward
-	}
-}
-
-func pushConsensusNodesToEdge(idProvider module.IdentityProvider) func(peer.ID) float64 {
-	return func(p peer.ID) float64 {
-		identity, _ := idProvider.ByPeerID(p)
-		if identity.Role == flow.RoleConsensus {
-			return scoring.MinAppSpecificReward
 		}
 
 		return scoring.MaxAppSpecificReward
