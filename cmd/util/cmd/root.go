@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/viper"
 
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
-	compare_checkpoint "github.com/onflow/flow-go/cmd/util/cmd/compare-checkpoint"
 	epochs "github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
@@ -73,7 +72,6 @@ func addCommands() {
 	rootCmd.AddCommand(read_execution_state.Cmd)
 	rootCmd.AddCommand(snapshot.Cmd)
 	rootCmd.AddCommand(export_json_transactions.Cmd)
-	rootCmd.AddCommand(compare_checkpoint.Cmd)
 }
 
 func initConfig() {
