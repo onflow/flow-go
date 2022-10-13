@@ -15,6 +15,7 @@ import (
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/rs/zerolog"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
@@ -50,7 +51,6 @@ import (
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -181,6 +181,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
+		Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("execution state", exeNode.LoadExecutionState).
 		Module("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
@@ -584,41 +585,42 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	module.ReadyDoneAware,
 	error,
 ) {
-	// check if the execution database already exists
-	bootstrapper := bootstrap.NewBootstrapper(node.Logger)
-
-	commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.DB)
-	if err != nil {
-		return nil, fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
-	}
-
-	// if the execution database does not exist, then we need to bootstrap the execution database.
-	if !bootstrapped {
-		// when bootstrapping, the bootstrap folder must have a checkpoint file
-		// we need to cover this file to the trie folder to restore the trie to restore the execution state.
-		err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
-		if err != nil {
-			return nil, fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
-		}
-
-		// TODO: check that the checkpoint file contains the root block's statecommit hash
-
-		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
-		if err != nil {
-			return nil, fmt.Errorf("could not bootstrap execution database: %w", err)
-		}
-	} else {
-		// if execution database has been bootstrapped, then the root statecommit must equal to the one
-		// in the bootstrap folder
-		if commit != node.RootSeal.FinalState {
-			return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %x, "+
-				"bootstap has statecommitment: %x",
-				commit, node.RootSeal.FinalState)
-		}
-	}
+	//// check if the execution database already exists
+	//bootstrapper := bootstrap.NewBootstrapper(node.Logger)
+	//
+	//commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.DB)
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
+	//}
+	//
+	//// if the execution database does not exist, then we need to bootstrap the execution database.
+	//if !bootstrapped {
+	//	// when bootstrapping, the bootstrap folder must have a checkpoint file
+	//	// we need to cover this file to the trie folder to restore the trie to restore the execution state.
+	//	err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
+	//	if err != nil {
+	//		return nil, fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
+	//	}
+	//
+	//	// TODO: check that the checkpoint file contains the root block's statecommit hash
+	//
+	//	err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+	//	if err != nil {
+	//		return nil, fmt.Errorf("could not bootstrap execution database: %w", err)
+	//	}
+	//} else {
+	//	// if execution database has been bootstrapped, then the root statecommit must equal to the one
+	//	// in the bootstrap folder
+	//	if commit != node.RootSeal.FinalState {
+	//		return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %x, "+
+	//			"bootstap has statecommitment: %x",
+	//			commit, node.RootSeal.FinalState)
+	//	}
+	//}
 
 	// DiskWal is a dependent component because we need to ensure
 	// that all WAL updates are completed before closing opened WAL segment.
+	var err error
 	exeNode.diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
 		node.MetricsRegisterer, exeNode.collector, exeNode.exeConf.triedir, int(exeNode.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
@@ -937,6 +939,44 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		exeNode.exeConf.apiRatelimits,
 		exeNode.exeConf.apiBurstlimits,
 	), nil
+}
+
+func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
+
+	// check if the execution database already exists
+	bootstrapper := bootstrap.NewBootstrapper(node.Logger)
+
+	commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.DB)
+	if err != nil {
+		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
+	}
+
+	// if the execution database does not exist, then we need to bootstrap the execution database.
+	if !bootstrapped {
+		// when bootstrapping, the bootstrap folder must have a checkpoint file
+		// we need to cover this file to the trie folder to restore the trie to restore the execution state.
+		err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
+		if err != nil {
+			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
+		}
+
+		// TODO: check that the checkpoint file contains the root block's statecommit hash
+
+		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap execution database: %w", err)
+		}
+	} else {
+		// if execution database has been bootstrapped, then the root statecommit must equal to the one
+		// in the bootstrap folder
+		if commit != node.RootSeal.FinalState {
+			return fmt.Errorf("mismatching root statecommitment. database has state commitment: %x, "+
+				"bootstap has statecommitment: %x",
+				commit, node.RootSeal.FinalState)
+		}
+	}
+
+	return nil
 }
 
 // getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the view provided.
