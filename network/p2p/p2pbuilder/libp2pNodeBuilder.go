@@ -117,20 +117,20 @@ type NodeBuilder interface {
 }
 
 type LibP2PNodeBuilder struct {
-	sporkID                   flow.Identifier
-	addr                      string
-	networkKey                fcrypto.PrivateKey
-	logger                    zerolog.Logger
-	basicResolver             madns.BasicResolver
-	subscriptionFilter        pubsub.SubscriptionFilter
-	resourceManager           network.ResourceManager
-	connManager               connmgr.ConnManager
-	connGater                 connmgr.ConnectionGater
-	idProvider                module.IdentityProvider
-	gossipSubPeerScoring      bool // whether to enable gossipsub peer scoring
-	routingFactory            func(context.Context, host.Host) (routing.Routing, error)
-	peerManagerEnablePruning  bool
-	peerManagerUpdateInterval time.Duration
+	sporkID                     flow.Identifier
+	addr                        string
+	networkKey                  fcrypto.PrivateKey
+	logger                      zerolog.Logger
+	basicResolver               madns.BasicResolver
+	subscriptionFilter          pubsub.SubscriptionFilter
+	resourceManager             network.ResourceManager
+	connManager                 connmgr.ConnManager
+	connGater                   connmgr.ConnectionGater
+	idProvider                  module.IdentityProvider
+	gossipSubPeerScoring        bool // whether to enable gossipsub peer scoring
+	routingFactory              func(context.Context, host.Host) (routing.Routing, error)
+	peerManagerEnablePruning    bool
+	peerManagerUpdateInterval   time.Duration
 	peerScoringParameterOptions []scoring.PeerScoreParamsOption
 }
 
@@ -191,7 +191,6 @@ func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.Ide
 	return builder
 }
 
-// SetPeerManagerFactory sets the peer manager factory function.
 func (builder *LibP2PNodeBuilder) SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder {
 	builder.peerManagerEnablePruning = connectionPruning
 	builder.peerManagerUpdateInterval = updateInterval
@@ -253,10 +252,6 @@ func (builder *LibP2PNodeBuilder) Build() (*p2pnode.Node, error) {
 		}
 
 		peerManager = connection.NewPeerManager(builder.logger, builder.peerManagerUpdateInterval, connector)
-	var scoreOpt *scoring.ScoreOption
-	if builder.gossipSubPeerScoring {
-		scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider, builder.peerScoringParameterOptions...)
-		psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
 	}
 
 	node := p2pnode.NewNode(builder.logger, h, pCache, unicastManager, peerManager)
@@ -282,7 +277,7 @@ func (builder *LibP2PNodeBuilder) Build() (*p2pnode.Node, error) {
 
 			var scoreOpt *scoring.ScoreOption
 			if builder.gossipSubPeerScoring {
-				scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider)
+				scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider, builder.peerScoringParameterOptions...)
 				psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
 			}
 
