@@ -6,17 +6,17 @@ import (
 	"strconv"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/insecure/corruptible"
+	"github.com/onflow/flow-go/insecure/corruptnet"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// CorruptibleConduitFactoryPort is the port number that gRPC server of the conduit factory of corrupted nodes is listening on.
-const CorruptibleConduitFactoryPort = 4300
+// CorruptNetworkPort is the port number that gRPC server of the corrupt networking layer of the corrupted nodes is listening on.
+const CorruptNetworkPort = 4300
 
-// CorruptedNodeBuilder creates a general flow node builder with corruptible conduit factory.
+// CorruptedNodeBuilder creates a general flow node builder with corrupt network.
 type CorruptedNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 }
@@ -49,8 +49,8 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			return nil, fmt.Errorf("could not extract host address: %w", err)
 		}
 
-		address := net.JoinHostPort(host, strconv.Itoa(CorruptibleConduitFactoryPort))
-		ccf := corruptible.NewCorruptibleConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
+		address := net.JoinHostPort(host, strconv.Itoa(CorruptNetworkPort))
+		ccf := corruptnet.NewCorruptConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
 
 		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupted conduit factory initiated")
 
@@ -61,7 +61,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 
 		// initializes corruptible network that acts as a wrapper around the original flow network of the node, hence
 		// allowing a remote attacker to control the ingress and egress traffic of the node.
-		corruptibleNetwork, err := corruptible.NewCorruptNetwork(
+		corruptibleNetwork, err := corruptnet.NewCorruptNetwork(
 			cnb.Logger,
 			cnb.RootChainID,
 			address,

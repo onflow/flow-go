@@ -1,4 +1,4 @@
-package corruptible
+package corruptnet
 
 import (
 	"context"
@@ -36,6 +36,11 @@ import (
 // Whenever any corrupt conduit receives an event from its engine, it relays the event to this
 // network, which in turn is relayed to the register attack orchestrator.
 // The attack orchestrator can asynchronously dictate to the network to send messages on behalf of the node.
+// Honest message flow:
+// Engine -> Conduit -> Flow Networking Layer -> Deliver to targets
+//
+// Corrupt message flow:
+// Engine -> Corrupt Conduit -> Corrupt Network -> Attack Orchestrator (corrupts or passes through) -> Corrupt Network -> Flow Networking Layer
 type Network struct {
 	*component.ComponentManager
 	logger                zerolog.Logger
@@ -45,8 +50,8 @@ type Network struct {
 	flowNetwork           flownet.Network // original flow network of the node.
 	server                *grpc.Server    // touch point of orchestrator network to this factory.
 	gRPCListenAddress     net.Addr
-	conduitFactory        insecure.CorruptibleConduitFactory
-	attackerInboundStream insecure.CorruptibleConduitFactory_ConnectAttackerServer // inbound stream to attack orchestrator
+	conduitFactory        insecure.CorruptConduitFactory
+	attackerInboundStream insecure.CorruptNetwork_ConnectAttackerServer // inbound stream to attack orchestrator
 
 	// We keep the original message processor here so that we can directly send messages to it when
 	// attacker dictates to do so.
@@ -61,7 +66,7 @@ type Network struct {
 var _ flownet.Network = &Network{}
 var _ insecure.EgressController = &Network{}
 var _ insecure.IngressController = &Network{}
-var _ insecure.CorruptibleConduitFactoryServer = &Network{}
+var _ insecure.CorruptNetworkServer = &Network{}
 
 func NewCorruptNetwork(
 	logger zerolog.Logger,
@@ -70,7 +75,7 @@ func NewCorruptNetwork(
 	me module.Local,
 	codec flownet.Codec,
 	flowNetwork flownet.Network,
-	conduitFactory insecure.CorruptibleConduitFactory) (*Network, error) {
+	conduitFactory insecure.CorruptConduitFactory) (*Network, error) {
 	if chainId != flow.BftTestnet {
 		panic("illegal chain id for using corrupt network")
 	}
@@ -114,7 +119,8 @@ func NewCorruptNetwork(
 
 // Register serves as the typical network registration of the given message processor on the channel.
 // Except, it first wraps the given processor around a corrupt message processor, and then
-// registers the corrupt message processor to the original flow network.
+// registers the corrupt message processor to the original Flow network.
+// Returns a non nil error if fails to register the corrupt message processor with the original Flow network.
 func (n *Network) Register(channel channels.Channel, messageProcessor flownet.MessageProcessor) (flownet.Conduit, error) {
 	corruptProcessor := NewCorruptMessageProcessor(
 		n.logger.With().Str("module", "corrupted-message-processor").Hex("corrupt_id", logging.ID(n.me.NodeID())).Logger(),
@@ -135,6 +141,7 @@ func (n *Network) Register(channel channels.Channel, messageProcessor flownet.Me
 
 // RegisterBlobService directly invokes the corresponding method on the underlying Flow network instance. It does not perform
 // any corruption and passes everything through as it is.
+// Returns a non nil error if fails to register with original Flow network.
 func (n *Network) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...flownet.BlobServiceOption) (flownet.BlobService,
 	error) {
 	return n.flowNetwork.RegisterBlobService(channel, store, opts...)
@@ -142,18 +149,23 @@ func (n *Network) RegisterBlobService(channel channels.Channel, store datastore.
 
 // RegisterPingService directly invokes the corresponding method on the underlying Flow network instance. It does not perform
 // any corruption and passes everything through as it is.
+// Returns a non nil error if fails to register with original Flow network.
 func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider flownet.PingInfoProvider) (flownet.PingService, error) {
 	return n.flowNetwork.RegisterPingService(pingProtocolID, pingInfoProvider)
 }
 
-// ProcessAttackerMessage is a Client Streaming gRPC end-point that allows a registered attack orchestrator to dictate messages to this corrupt
+// ProcessAttackerMessage is the central place for the corrupt network to process messages from an attacker.
+// The messages coming from an attacker can be destined to this corrupt node (on behalf of another node) (ingress message) or to another node (on behalf of this corrupt node) (egress message).
+// This is a Client Streaming gRPC end-point that allows a registered attack orchestrator to dictate messages to this corrupt
 // network.
 // The first call to this Client Streaming gRPC method creates the "stream" from attack orchestrator (i.e., client) to this corrupt network
 // (i.e., server), where attack orchestrator can send messages through that stream to the corrupt network.
 //
 // Messages sent from attack orchestrator to this corrupt network are considered dictated in the sense that they are sent on behalf
 // of this corrupt network instance on the original Flow network to other Flow nodes.
-func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
+//
+// Returns a fatal error and crashes if message from attacker is invalid (i.e. contains both ingress and egress message or neither ingress nor egress message).
+func (n *Network) ProcessAttackerMessage(stream insecure.CorruptNetwork_ProcessAttackerMessageServer) error {
 	for {
 		select {
 		case <-n.ComponentManager.ShutdownSignal():
@@ -321,7 +333,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 func (n *Network) start(ctx irrecoverable.SignalerContext, gRPCListenAddress string) {
 	// starts up gRPC server of corrupt network at given address.
 	server := grpc.NewServer()
-	insecure.RegisterCorruptibleConduitFactoryServer(server, n)
+	insecure.RegisterCorruptNetworkServer(server, n)
 	ln, err := net.Listen(networkingProtocolTCP, gRPCListenAddress)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
@@ -428,8 +440,8 @@ func (n *Network) AttackerRegistered() bool {
 	return n.attackerInboundStream != nil
 }
 
-// ConnectAttacker is a blocking Server Streaming gRPC end-point for this corrupt network that lets an attack orchestrator register itself to it,
-// so that the attack orchestrator can control its ingress and egress traffic flow.
+// ConnectAttacker is a blocking Server Streaming gRPC end-point for this corrupt network that registers an attacker to the corrupt network,
+// so that the attacker can control its ingress and egress traffic flow.
 //
 // An attack orchestrator (i.e., client) remote call to this function will return immediately on the attack orchestrator's side. However,
 // here on the server (i.e., corrupt network) side, the call remains blocking through the lifecycle of the server.
@@ -442,7 +454,7 @@ func (n *Network) AttackerRegistered() bool {
 //
 // Registering an attack orchestrator on a networking layer is an exactly-once immutable operation,
 // any second attempt after a successful registration returns an error.
-func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_ConnectAttackerServer) error {
+func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptNetwork_ConnectAttackerServer) error {
 	n.mu.Lock()
 	n.logger.Info().Msg("attack orchestrator registration called arrived")
 	if n.attackerInboundStream != nil {
@@ -506,7 +518,12 @@ func (n *Network) HandleOutgoingEvent(
 	return nil
 }
 
-func (n *Network) HandleIncomingEvent(channel channels.Channel, originId flow.Identifier, event interface{}) bool {
+// HandleIncomingEvent is called on the incoming messages to this corrupt node.
+// Returns true if an attacker is registered and false otherwise.
+// Honest node (i.e., not running with a corrupt network) message flow: Flow Networking Layer -> Honest Engine
+// Corrupt node (i.e., running with a corrupt network) message flow (with attacker registered):
+// Flow Networking Layer -> Corrupt Network -> Attack Orchestrator (mute or passthrough) -> Corrupt Network -> Honest / Corrupt Engine
+func (n *Network) HandleIncomingEvent(event interface{}, channel channels.Channel, originId flow.Identifier) bool {
 	lg := n.logger.With().
 		Hex("corrupt_id", logging.ID(n.me.NodeID())).
 		Str("channel", string(channel)).

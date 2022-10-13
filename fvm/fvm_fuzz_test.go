@@ -198,6 +198,12 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			// event indices have to be an increasing uint sequence (0, 1, 2 ...)
+			expectedEventIndex := uint32(0)
+			for _, event := range results.tx.Events {
+				require.Equal(t, expectedEventIndex, event.EventIndex)
+				expectedEventIndex++
+			}
 		},
 	},
 }
