@@ -95,15 +95,26 @@ func TestAccessNodeScore_Integration_HonestANs(t *testing.T) {
 	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, groupTwoSubs)
 }
 
-func TestMaliciousAccessNodes_NoHonestPeerScoring(t *testing.T) {
+func TestMaliciousAccessNode_NoHonestPeerScoring(t *testing.T) {
+	total := 10
+	success := 0
+	for i := 0; i < total; i++ {
+		if testMaliciousAccessNodes_NoHonestPeerScoring(t) {
+			success++
+		}
+	}
+	require.Less(t, success, total)
+}
+
+func testMaliciousAccessNodes_NoHonestPeerScoring(t *testing.T) bool {
 	ctx := context.Background()
 	sporkId := unittest.IdentifierFixture()
 
 	idProvider := mock.NewIdentityProvider(t)
 
 	// two (honest) consensus nodes but with NO peer scoring enabled!
-	con1Node, con1Id := p2pfixtures.NodeFixture(t, ctx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithPeerScoringEnabled(idProvider), p2pfixtures.WithAppSpecificScore(pushConsensusNodesToEdge(idProvider)))
-	con2Node, con2Id := p2pfixtures.NodeFixture(t, ctx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithPeerScoringEnabled(idProvider), p2pfixtures.WithAppSpecificScore(pushConsensusNodesToEdge(idProvider)))
+	con1Node, con1Id := p2pfixtures.NodeFixture(t, ctx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
+	con2Node, con2Id := p2pfixtures.NodeFixture(t, ctx, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
 
 	// create > 2 * 12 malicious access nodes
 	// 12 is the maximum size of default GossipSub mesh.
@@ -117,15 +128,15 @@ func TestMaliciousAccessNodes_NoHonestPeerScoring(t *testing.T) {
 	allNodes := append([]*p2pnode.Node{con1Node, con2Node}, accessNodeGroup...)
 	allIds := append([]*flow.Identity{&con1Id, &con2Id}, accessNodeIds...)
 
-	provider := id.NewFixedIdentityProvider(allIds)
-	idProvider.On("ByPeerID", mocktestify.Anything).Return(
-		func(peerId peer.ID) *flow.Identity {
-			identity, _ := provider.ByPeerID(peerId)
-			return identity
-		}, func(peerId peer.ID) bool {
-			_, ok := provider.ByPeerID(peerId)
-			return ok
-		})
+	//provider := id.NewFixedIdentityProvider(allIds)
+	//idProvider.On("ByPeerID", mocktestify.Anything).Return(
+	//	func(peerId peer.ID) *flow.Identity {
+	//		identity, _ := provider.ByPeerID(peerId)
+	//		return identity
+	//	}, func(peerId peer.ID) bool {
+	//		_, ok := provider.ByPeerID(peerId)
+	//		return ok
+	//	})
 
 	defer p2pfixtures.StopNodes(t, allNodes)
 
@@ -158,7 +169,7 @@ func TestMaliciousAccessNodes_NoHonestPeerScoring(t *testing.T) {
 	// Hence, con2Node will not receive the message within a one-second window.
 	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	p2pfixtures.SubMustNeverReceiveAnyMessage(t, ctx1s, con2Sub)
+	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, con2Sub)
 }
 
 func TestMaliciousAccessNodes_HonestPeerScoring(t *testing.T) {
