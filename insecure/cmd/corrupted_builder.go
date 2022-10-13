@@ -42,7 +42,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
-		libP2PNodeFactory := corruptible.CorruptibleLibP2PNodeFactory(
+		libP2PNodeFactory := corruptnet.NewCorruptLibP2PNodeFactory(
 			cnb.Logger,
 			cnb.RootChainID,
 			myAddr,

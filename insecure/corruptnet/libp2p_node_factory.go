@@ -1,4 +1,4 @@
-package corruptible
+package corruptnet
 
 import (
 	"time"
@@ -14,8 +14,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 )
 
-// CorruptibleLibP2PNodeFactory wrapper around the original DefaultLibP2PNodeFactory. Nodes returned from this factory func will be corrupted libp2p nodes.
-func CorruptibleLibP2PNodeFactory(
+// NewCorruptLibP2PNodeFactory wrapper around the original DefaultLibP2PNodeFactory. Nodes returned from this factory func will be corrupted libp2p nodes.
+func NewCorruptLibP2PNodeFactory(
 	log zerolog.Logger,
 	chainID flow.ChainID,
 	address string,
