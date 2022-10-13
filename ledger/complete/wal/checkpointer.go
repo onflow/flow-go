@@ -463,6 +463,10 @@ func StoreCheckpointV5(dir string, fileName string, logger *zerolog.Logger, trie
 	// included.
 	for _, t := range tries {
 		rootNode := t.RootNode()
+		if !t.IsEmpty() && rootNode.Height() != ledger.NodeMaxHeight {
+			return fmt.Errorf("height of root node must be %d, but is %d",
+				ledger.NodeMaxHeight, rootNode.Height())
+		}
 
 		// Get root node index
 		rootIndex, found := topLevelNodes[rootNode]

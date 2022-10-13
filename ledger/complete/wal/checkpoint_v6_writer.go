@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -357,10 +358,15 @@ func storeSubTrieConcurrently(
 		}
 
 		for root, index := range result.Roots {
-			// the original index is relative to the subtrie file itself.
-			// but we need a global index to be referenced by top level trie,
-			// therefore we need to add the nodeCounter
-			results[root] = index + nodeCounter
+			// nil is always 0
+			if root == nil {
+				results[root] = 0
+			} else {
+				// the original index is relative to the subtrie file itself.
+				// but we need a global index to be referenced by top level trie,
+				// therefore we need to add the nodeCounter
+				results[root] = index + nodeCounter
+			}
 		}
 		nodeCounter += result.NodeCount
 		checksums = append(checksums, result.Checksum)
@@ -523,6 +529,10 @@ func storeTries(
 	writer io.Writer) error {
 	for _, t := range tries {
 		rootNode := t.RootNode()
+		if !t.IsEmpty() && rootNode.Height() != ledger.NodeMaxHeight {
+			return fmt.Errorf("height of root node must be %d, but is %d",
+				ledger.NodeMaxHeight, rootNode.Height())
+		}
 
 		// Get root node index
 		rootIndex, found := topLevelNodes[rootNode]

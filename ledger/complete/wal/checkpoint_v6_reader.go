@@ -69,13 +69,13 @@ func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 
 	if len(tries) > 0 {
 		first, last := tries[0], tries[len(tries)-1]
-		logger.Info().
+		lg.Info().
 			Str("first_hash", first.RootHash().String()).
 			Uint64("first_reg_count", first.AllocatedRegCount()).
 			Str("last_hash", last.RootHash().String()).
 			Uint64("last_reg_count", last.AllocatedRegCount()).
 			Int("version", 6).
-			Msg("checkpoint tries roots")
+			Msg("loaded checkpoint tries roots")
 	}
 
 	return tries, nil

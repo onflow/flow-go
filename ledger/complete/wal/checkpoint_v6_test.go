@@ -80,7 +80,7 @@ func createSimpleTrie(t *testing.T) []*trie.MTrie {
 
 	updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	require.NoError(t, err)
-	tries := []*trie.MTrie{updatedTrie}
+	tries := []*trie.MTrie{emptyTrie, updatedTrie}
 	return tries
 }
 
@@ -201,8 +201,19 @@ func TestGetNodesByIndex(t *testing.T) {
 		require.Equal(t, ns[i-1], node, "got wrong node by index %v", i)
 	}
 }
+func TestWriteAndReadCheckpointV6EmptyTrie(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := []*trie.MTrie{trie.NewEmptyMTrie()}
+		fileName := "checkpoint-empty-trie"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger), "fail to store checkpoint")
+		decoded, err := OpenAndReadCheckpointV6(dir, fileName, &logger)
+		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		requireTriesEqual(t, tries, decoded)
+	})
+}
 
-func TestWriteAndReadCheckpointV6(t *testing.T) {
+func TestWriteAndReadCheckpointV6SimpleTrie(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
@@ -213,6 +224,32 @@ func TestWriteAndReadCheckpointV6(t *testing.T) {
 		requireTriesEqual(t, tries, decoded)
 	})
 }
+
+// func TestWriteAndReadCheckpointV6SimpleTri5(t *testing.T) {
+// 	unittest.RunWithTempDir(t, func(dir string) {
+// 		tries := createSimpleTrie(t)
+// 		fileName := "checkpoint"
+// 		logger := unittest.Logger()
+// 		require.NoErrorf(t, StoreCheckpointV5(dir, fileName, &logger, tries...), "fail to store checkpoint")
+// 		decoded, err := OpenAndReadCheckpointV5(dir, fileName, &logger)
+// 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+// 		requireTriesEqual(t, tries, decoded)
+// 	})
+// }
+
+// func OpenAndReadCheckpointV5(dir string, fileName string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+// 	filepath := filePathCheckpointHeader(dir, fileName)
+//
+// 	f, err := os.Open(filepath)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
+// 	}
+// 	defer func(f *os.File) {
+// 		closeAndMergeError(f, err)
+// 	}(f)
+//
+// 	return readCheckpointV5(f, logger)
+// }
 
 func TestWriteAndReadCheckpointV6MultipleTries(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
