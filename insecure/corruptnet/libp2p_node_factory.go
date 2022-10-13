@@ -35,7 +35,7 @@ func NewCorruptLibP2PNodeFactory(
 		}
 
 		builder := p2pbuilder.DefaultNodeBuilder(log, address, flowKey, sporkId, idProvider, metrics, resolver, role, peerScoringEnabled, connectionPruning, updateInterval)
-		builder.SetCreateNode(NewCorruptibleLibP2PNode)
+		builder.SetCreateNode(NewCorruptLibP2PNode)
 		return builder.Build()
 	}
 }

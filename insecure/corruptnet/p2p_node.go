@@ -22,18 +22,18 @@ func AcceptAllTopicValidator(context.Context, peer.ID, *pubsub.Message) pubsub.V
 	return pubsub.ValidationAccept
 }
 
-// P2PNode is a wrapper around the original LibP2P node.
-type P2PNode struct {
+// CorruptP2PNode is a wrapper around the original LibP2P node.
+type CorruptP2PNode struct {
 	*p2pnode.Node
 }
 
 // Subscribe subscribes the node to the given topic with a noop topic validator.
 // All errors returned from this function can be considered benign.
-func (n *P2PNode) Subscribe(topic channels.Topic, _ pubsub.ValidatorEx) (*pubsub.Subscription, error) {
+func (n *CorruptP2PNode) Subscribe(topic channels.Topic, _ pubsub.ValidatorEx) (*pubsub.Subscription, error) {
 	return n.Node.Subscribe(topic, AcceptAllTopicValidator)
 }
 
-func NewCorruptibleLibP2PNode(logger zerolog.Logger, host host.Host, pCache *p2pnode.ProtocolPeerCache, uniMgr *unicast.Manager, peerManager *connection.PeerManager) p2p.LibP2PNode {
+func NewCorruptLibP2PNode(logger zerolog.Logger, host host.Host, pCache *p2pnode.ProtocolPeerCache, uniMgr *unicast.Manager, peerManager *connection.PeerManager) p2p.LibP2PNode {
 	node := p2pnode.NewNode(logger, host, pCache, uniMgr, peerManager)
-	return &P2PNode{node}
+	return &CorruptP2PNode{node}
 }
