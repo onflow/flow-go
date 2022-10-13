@@ -136,7 +136,7 @@ func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _, _ uint6
 }
 func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _, _ int, _ bool) {
 }
-func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_ time.Duration, _, _ int)        {}
+func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                         {}
 func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64) {}
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                              {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                                {}
