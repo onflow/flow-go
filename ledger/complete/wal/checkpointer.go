@@ -312,7 +312,7 @@ func StoreCheckpointV5(dir string, fileName string, logger *zerolog.Logger, trie
 		return fmt.Errorf("could not create writer: %w", err)
 	}
 	defer func() {
-		errToReturn = closeAndMergeError(writer, err)
+		closeAndMergeError(writer, err)
 	}()
 
 	crc32Writer := NewCRC32Writer(writer)
@@ -628,7 +628,7 @@ func LoadCheckpoint(filepath string, logger *zerolog.Logger) (
 			// No need to return this error because it's possible to continue normal operations.
 		}
 
-		errToReturn = closeAndMergeError(file, err)
+		closeAndMergeError(file, err)
 	}()
 
 	return readCheckpoint(file, logger)

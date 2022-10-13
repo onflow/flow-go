@@ -125,7 +125,7 @@ func storeCheckpointV6(
 		return fmt.Errorf("could not store checkpoint header: %w", err)
 	}
 
-	lg.Info().Msg("checkpoint file has been successfully stored")
+	lg.Info().Uint32("topsum", topTrieChecksum).Msg("checkpoint file has been successfully stored")
 
 	return nil
 }
@@ -153,7 +153,7 @@ func storeCheckpointHeader(
 		return fmt.Errorf("could not store checkpoint header: %w", err)
 	}
 	defer func() {
-		errToReturn = closeAndMergeError(closable, err)
+		closeAndMergeError(closable, err)
 	}()
 
 	writer := NewCRC32Writer(closable)
@@ -220,7 +220,7 @@ func storeTopLevelNodesAndTrieRoots(
 		return 0, fmt.Errorf("could not create writer for top tries: %w", err)
 	}
 	defer func() {
-		errToReturn = closeAndMergeError(closable, err)
+		closeAndMergeError(closable, err)
 	}()
 
 	writer := NewCRC32Writer(closable)
@@ -429,7 +429,7 @@ func storeCheckpointSubTrie(
 	}
 
 	defer func() {
-		errToReturn = closeAndMergeError(closable, err)
+		closeAndMergeError(closable, err)
 	}()
 
 	// create a CRC32 writer, so that any bytes passed to the writer will

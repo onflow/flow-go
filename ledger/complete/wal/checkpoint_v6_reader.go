@@ -57,7 +57,8 @@ func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 		return nil, fmt.Errorf("could not read subtrie from dir: %w", err)
 	}
 
-	lg.Info().Msg("finish reading all v6 subtrie files, start reading top level tries")
+	lg.Info().Uint32("topsum", topTrieChecksum).
+		Msg("finish reading all v6 subtrie files, start reading top level tries")
 
 	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum, &lg)
 	if err != nil {
@@ -65,6 +66,7 @@ func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 	}
 
 	lg.Info().Msgf("finish reading all trie roots, trie root count: %v", len(tries))
+
 	if len(tries) > 0 {
 		first, last := tries[0], tries[len(tries)-1]
 		logger.Info().
@@ -91,7 +93,7 @@ func OpenAndReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func(f *os.File) {
-		errToReturn = closeAndMergeError(f, err)
+		closeAndMergeError(f, err)
 	}(f)
 
 	return ReadCheckpointV6(f, logger)
@@ -151,7 +153,7 @@ func readCheckpointHeader(filepath string, logger *zerolog.Logger) (
 			logger.Warn().Msgf("failed to evict header file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
-		errToReturn = closeAndMergeError(f, err)
+		closeAndMergeError(f, err)
 	}(closable)
 
 	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
@@ -347,7 +349,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 			logger.Warn().Msgf("failed to evict subtrie file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
-		errToReturn = closeAndMergeError(f, err)
+		closeAndMergeError(f, err)
 	}(f)
 
 	// valite the magic bytes and version
@@ -487,7 +489,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 			logger.Warn().Msgf("failed to evict top trie file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
-		errToReturn = closeAndMergeError(file, err)
+		closeAndMergeError(file, err)
 	}()
 
 	// read and validate magic bytes and version
