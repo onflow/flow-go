@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/network/p2p"
 	"sync"
 	"testing"
 	"time"
@@ -62,7 +63,7 @@ type MiddlewareTestSuite struct {
 	suite.Suite
 	sync.RWMutex
 	size      int // used to determine number of middlewares under test
-	nodes     []*p2pnode.Node
+	nodes     []p2p.LibP2PNode
 	mws       []network.Middleware // used to keep track of middlewares under test
 	ov        []*mocknetwork.Overlay
 	obs       chan string // used to keep track of Protect events tagged by pubsub messages

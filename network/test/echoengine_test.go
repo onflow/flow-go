@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/network/p2p"
 	"os"
 	"strings"
 	"sync"
@@ -21,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -55,7 +55,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	// both nodes should be of the same role to get connected on epidemic dissemination
-	var nodes []*p2pnode.Node
+	var nodes []p2p.LibP2PNode
 	suite.ids, nodes, suite.mws, suite.nets, _ = GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,

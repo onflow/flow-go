@@ -1,8 +1,7 @@
-package p2pnode
+package p2p
 
 import (
 	"context"
-
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -10,14 +9,20 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
 type LibP2PNode interface {
+	module.ReadyDoneAware
+	// Start the libp2p node.
+	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
-	Stop() (chan struct{}, error)
+	Stop() error
 	// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it.
 	AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error
 	// RemovePeer closes the connection with the peer.
@@ -42,8 +47,24 @@ type LibP2PNode interface {
 	Host() host.Host
 	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
 	WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []unicast.ProtocolName) error
+	// WithPeersProvider sets the PeersProvider for the peer manager.
+	// If a peer manager factory is set, this method will set the peer manager's PeersProvider.
+	WithPeersProvider(peersProvider PeersProvider)
+	// PeerManagerComponent returns the component interface of the peer manager.
+	PeerManagerComponent() component.Component
+	// RequestPeerUpdate requests an update to the peer connections of this node using the peer manager.
+	RequestPeerUpdate()
 	// IsConnected returns true is address is a direct peer of this node else false.
 	IsConnected(peerID peer.ID) (bool, error)
+	// SetRouting sets the node's routing implementation.
+	// SetRouting may be called at most once.
+	SetRouting(r routing.Routing)
 	// Routing returns node routing object.
 	Routing() routing.Routing
+	// SetPubSub sets the node's pubsub implementation.
+	// SetPubSub may be called at most once.
+	SetPubSub(ps *pubsub.PubSub)
+	// SetComponentManager sets the component manager for the node.
+	// SetComponentManager may be called at most once.
+	SetComponentManager(cm *component.ComponentManager)
 }

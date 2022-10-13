@@ -2,6 +2,7 @@ package scoring_test
 
 import (
 	"context"
+	"github.com/onflow/flow-go/network/p2p"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"math/rand"
 	"regexp"
@@ -22,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -239,7 +239,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 		p2pfixtures.WithRole(flow.RoleVerification))
 
 	ids := flow.IdentityList{&conId, &verId1, &verId2}
-	nodes := []*p2pnode.Node{conNode, verNode1, verNode2}
+	nodes := []p2p.LibP2PNode{conNode, verNode1, verNode2}
 
 	provider := id.NewFixedIdentityProvider(ids)
 	idProvider.On("ByPeerID", mocktestify.Anything).Return(

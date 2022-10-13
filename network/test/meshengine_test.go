@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/network/p2p"
 	"math/rand"
 	"os"
 	"strconv"
@@ -70,7 +71,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	var nodes []*p2pnode.Node
+	var nodes []p2p.LibP2PNode
 	suite.ids, nodes, suite.mws, suite.nets, obs = GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,

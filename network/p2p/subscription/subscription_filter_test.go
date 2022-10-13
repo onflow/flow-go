@@ -2,6 +2,7 @@ package subscription_test
 
 import (
 	"context"
+	"github.com/onflow/flow-go/network/p2p"
 	"sync"
 	"testing"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -78,7 +78,7 @@ func TestFilterSubscribe(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	testPublish := func(wg *sync.WaitGroup, from *p2pnode.Node, sub *pubsub.Subscription) {
+	testPublish := func(wg *sync.WaitGroup, from p2p.LibP2PNode, sub *pubsub.Subscription) {
 		data := []byte("hello")
 
 		err := from.Publish(context.TODO(), badTopic, data)

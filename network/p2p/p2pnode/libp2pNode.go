@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"sync"
 	"time"
 
@@ -83,12 +84,11 @@ func NewNode(
 
 var _ component.Component = (*Node)(nil)
 
+func (n *Node) Start(ctx irrecoverable.SignalerContext) {
+	n.Component.Start(ctx)
+}
+
 // Stop terminates the libp2p node.
-// The following benign errors are expected during normal operations from libP2P:
-//   - node fails to unsubscribe from all topics
-//   - p2p host fails to close
-//   - peer store fails to close
-//
 // All errors returned from this function can be considered benign.
 func (n *Node) Stop() error {
 	var result error
@@ -139,18 +139,12 @@ func (n *Node) Stop() error {
 }
 
 // AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it.
-// The following benign errors are expected during normal operations from libP2P:
-//   - host fails to connect to peer
-//
 // All errors returned from this function can be considered benign.
 func (n *Node) AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
 	return n.host.Connect(ctx, peerInfo)
 }
 
 // RemovePeer closes the connection with the peer.
-// The following benign errors are expected during normal operations from libP2P:
-//   - host fails to close connection to peer
-//
 // All errors returned from this function can be considered benign.
 func (n *Node) RemovePeer(peerID peer.ID) error {
 	err := n.host.Network().ClosePeer(peerID)
@@ -171,9 +165,6 @@ func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 }
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
-// The following benign errors are expected during normal operations from libP2P:
-//   - unicast manager fails to create a stream to the peer
-//
 // All errors returned from this function can be considered benign.
 func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
 	lg := n.logger.With().Str("peer_id", peerID.Pretty()).Logger()
@@ -228,12 +219,6 @@ func (n *Node) ListPeers(topic string) []peer.ID {
 }
 
 // Subscribe subscribes the node to the given topic and returns the subscription
-// Currently only one subscriber is allowed per topic.
-// NOTE: A node will receive its own published messages.
-// The following benign errors are expected during normal operations from libP2P:
-//   - node pubsub fails to register topic validator
-//   - topic cannot be subscribed to
-//
 // All errors returned from this function can be considered benign.
 func (n *Node) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (*pubsub.Subscription, error) {
 	n.Lock()
@@ -279,10 +264,6 @@ func (n *Node) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx
 }
 
 // UnSubscribe cancels the subscriber and closes the topic.
-// The following benign errors are expected during normal operations from libP2P:
-//   - node pubsub fails to unregister topic validator
-//   - topic is not found
-//
 // All errors returned from this function can be considered benign.
 func (n *Node) UnSubscribe(topic channels.Topic) error {
 	n.Lock()
@@ -320,10 +301,6 @@ func (n *Node) UnSubscribe(topic channels.Topic) error {
 }
 
 // Publish publishes the given payload on the topic.
-// The following benign errors are expected during normal operations from libP2P:
-//   - topic is not found
-//   - pubsub fails to publish the data
-//
 // All errors returned from this function can be considered benign.
 func (n *Node) Publish(ctx context.Context, topic channels.Topic, data []byte) error {
 	ps, found := n.topics[topic]
@@ -404,4 +381,14 @@ func (n *Node) SetPubSub(ps *pubsub.PubSub) {
 	}
 
 	n.pubSub = ps
+}
+
+// SetComponentManager sets the component manager for the node.
+// SetComponentManager may be called at most once.
+func (n *Node) SetComponentManager(cm *component.ComponentManager) {
+	if n.Component != nil {
+		n.logger.Fatal().Msg("component already set")
+	}
+
+	n.Component = cm
 }

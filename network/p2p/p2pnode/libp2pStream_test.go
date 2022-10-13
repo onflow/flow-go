@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/network/p2p"
 	"io"
 	"regexp"
 	"sync"
@@ -211,7 +212,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 		p2pfixtures.WithPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
 	otherNode, otherId := p2pfixtures.NodeFixture(t, sporkId, "test_create_stream_fallback")
 
-	nodes := []*p2pnode.Node{thisNode, otherNode}
+	nodes := []p2p.LibP2PNode{thisNode, otherNode}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
@@ -448,7 +449,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 		p2pfixtures.WithPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}),
 	)
 
-	nodes := []*p2pnode.Node{node1, node2}
+	nodes := []p2p.LibP2PNode{node1, node2}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
@@ -462,9 +463,9 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 func testUnicastOverStreamRoundTrip(t *testing.T,
 	ctx context.Context,
 	id1 flow.Identity,
-	node1 *p2pnode.Node,
+	node1 p2p.LibP2PNode,
 	id2 flow.Identity,
-	node2 *p2pnode.Node,
+	node2 p2p.LibP2PNode,
 	ch <-chan string) {
 
 	pInfo1, err := utils.PeerAddressInfo(id1)
@@ -636,7 +637,7 @@ func TestConnectionGating(t *testing.T) {
 		return nil
 	}))
 
-	nodes := []*p2pnode.Node{node1, node2}
+	nodes := []p2p.LibP2PNode{node1, node2}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 

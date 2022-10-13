@@ -61,7 +61,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -161,7 +160,7 @@ type ObserverServiceBuilder struct {
 	*ObserverServiceConfig
 
 	// components
-	LibP2PNode              *p2pnode.Node
+	LibP2PNode              p2p.LibP2PNode
 	FollowerState           stateprotocol.MutableState
 	SyncCore                *chainsync.Core
 	RpcEng                  *rpc.Engine
@@ -820,7 +819,7 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 // * No peer manager
 // * Default libp2p pubsub options
 func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
-	return func() (*p2pnode.Node, error) {
+	return func() (p2p.LibP2PNode, error) {
 		var pis []peer.AddrInfo
 
 		for _, b := range builder.bootstrapIdentities {
@@ -894,7 +893,7 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
 func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
-	var libp2pNode *p2pnode.Node
+	var libp2pNode p2p.LibP2PNode
 	builder.
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			libP2PFactory := builder.initLibP2PFactory(node.NetworkKey)
@@ -1016,7 +1015,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
-	libp2pNode *p2pnode.Node,
+	libp2pNode p2p.LibP2PNode,
 	validators ...network.MessageValidator) network.Middleware {
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
 	builder.Middleware = middleware.NewMiddleware(

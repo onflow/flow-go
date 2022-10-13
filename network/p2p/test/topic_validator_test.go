@@ -3,6 +3,7 @@ package test_test
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/network/p2p"
 	"sync"
 	"testing"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
@@ -41,7 +41,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	sn1, identity1 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
 	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
 
-	nodes := []*p2pnode.Node{sn1, sn2}
+	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
@@ -116,7 +116,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	sn1, _ := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
 	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
 
-	nodes := []*p2pnode.Node{sn1, sn2}
+	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
@@ -178,7 +178,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
 	an1, identity3 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleAccess))
 
-	nodes := []*p2pnode.Node{sn1, sn2, an1}
+	nodes := []p2p.LibP2PNode{sn1, sn2, an1}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
@@ -289,7 +289,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	sn1, identity1 := p2pfixtures.NodeFixture(t, sporkId, "consensus_1", p2pfixtures.WithRole(flow.RoleConsensus))
 	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, "consensus_2", p2pfixtures.WithRole(flow.RoleConsensus))
 
-	nodes := []*p2pnode.Node{sn1, sn2}
+	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
@@ -363,7 +363,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, "consensus_2", p2pfixtures.WithRole(flow.RoleConsensus))
 	an1, identity3 := p2pfixtures.NodeFixture(t, sporkId, "access_1", p2pfixtures.WithRole(flow.RoleAccess))
 
-	nodes := []*p2pnode.Node{sn1, sn2, an1}
+	nodes := []p2p.LibP2PNode{sn1, sn2, an1}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
@@ -458,7 +458,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	ln2, identity2 := p2pfixtures.NodeFixture(t, sporkId, "collection_2", p2pfixtures.WithRole(flow.RoleCollection))
 	ln3, identity3 := p2pfixtures.NodeFixture(t, sporkId, "collection_3", p2pfixtures.WithRole(flow.RoleCollection))
 
-	nodes := []*p2pnode.Node{ln1, ln2, ln3}
+	nodes := []p2p.LibP2PNode{ln1, ln2, ln3}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
