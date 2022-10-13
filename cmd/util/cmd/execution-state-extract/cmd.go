@@ -114,7 +114,7 @@ func run(*cobra.Command, []string) {
 			log.Fatal().Err(err).Msg("invalid state commitment length")
 		}
 
-		log.Info().Msgf("extracting state by state commitment: %v", stateCommitment)
+		log.Info().Msgf("extracting state by state commitment: %x", stateCommitment)
 	}
 
 	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 {
@@ -137,9 +137,10 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	log.Info().Msgf("Extracting state from %s, exporting root checkpoint to %s",
+	log.Info().Msgf("Extracting state from %s, exporting root checkpoint to %s, version: %v",
 		flagExecutionStateDir,
-		path.Join(flagOutputDir, bootstrap.FilenameWALRootCheckpoint))
+		path.Join(flagOutputDir, bootstrap.FilenameWALRootCheckpoint),
+		flagVersion)
 
 	log.Info().Msgf("Block state commitment: %s, output dir: %s", hex.EncodeToString(stateCommitment[:]), flagOutputDir)
 

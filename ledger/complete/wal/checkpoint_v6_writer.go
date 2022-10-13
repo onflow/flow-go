@@ -346,24 +346,26 @@ func storeSubTrieConcurrently(
 			Result: resultCh,
 		}
 	}
+	close(jobs)
 
 	// start nWorker number of goroutine to take the job from the jobs channel concurrently
 	// and work on them, after finish, continue until the jobs channel is drained
 	for i := 0; i < int(nWorker); i++ {
-		go func(i int) {
+		go func() {
 			for job := range jobs {
 				roots, nodeCount, checksum, err := storeCheckpointSubTrie(
 					job.Index, job.Roots, estimatedSubtrieNodeCount, outputDir, outputFile, logger)
 
 				job.Result <- &resultStoringSubTrie{
-					Index:     i,
+					Index:     job.Index,
 					Roots:     roots,
 					NodeCount: nodeCount,
 					Checksum:  checksum,
 					Err:       err,
 				}
+				close(job.Result)
 			}
-		}(i)
+		}()
 	}
 
 	results := make(map[*node.Node]uint64, subAndTopNodeCount)
