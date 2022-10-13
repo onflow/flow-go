@@ -44,6 +44,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 
 		libP2PNodeFactory := corruptible.CorruptibleLibP2PNodeFactory(
 			cnb.Logger,
+			cnb.RootChainID,
 			myAddr,
 			cnb.NetworkKey,
 			cnb.SporkID,
