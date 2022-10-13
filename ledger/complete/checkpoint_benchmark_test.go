@@ -49,6 +49,10 @@ func benchmarkStoreCheckpoint(b *testing.B, version int, concurrent bool) {
 	if err != nil {
 		b.Fatalf("cannot output dir %s: %s", outputDir, err)
 	}
+	defer func() {
+		// Remove output directory and its contents.
+		os.RemoveAll(outputDir)
+	}()
 
 	fmt.Printf("New checkpoint will be created in directory %s\n", outputDir)
 
