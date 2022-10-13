@@ -4,8 +4,6 @@ package mocknetwork
 
 import (
 	flow "github.com/onflow/flow-go/model/flow"
-	channels "github.com/onflow/flow-go/network/channels"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -14,27 +12,20 @@ type Topology struct {
 	mock.Mock
 }
 
-// GenerateFanout provides a mock function with given fields: ids, _a1
-func (_m *Topology) GenerateFanout(ids flow.IdentityList, _a1 channels.ChannelList) (flow.IdentityList, error) {
-	ret := _m.Called(ids, _a1)
+// Fanout provides a mock function with given fields: ids
+func (_m *Topology) Fanout(ids flow.IdentityList) flow.IdentityList {
+	ret := _m.Called(ids)
 
 	var r0 flow.IdentityList
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, channels.ChannelList) flow.IdentityList); ok {
-		r0 = rf(ids, _a1)
+	if rf, ok := ret.Get(0).(func(flow.IdentityList) flow.IdentityList); ok {
+		r0 = rf(ids)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.IdentityList)
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.IdentityList, channels.ChannelList) error); ok {
-		r1 = rf(ids, _a1)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 type mockConstructorTestingTNewTopology interface {

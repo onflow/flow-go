@@ -25,6 +25,20 @@ import (
 // Private keys are scalar in Zr, where r is the group order of G1/G2.
 // Public keys are in G2.
 
+const (
+	// DKG and Threshold Signatures
+
+	// MinimumThreshold is the minimum value of the threshold parameter in all threshold-based protocols.
+	MinimumThreshold = 1
+	// DKGMinSize is the minimum size of a group participating in a DKG protocol
+	DKGMinSize int = MinimumThreshold + 1
+	// DKGMaxSize is the maximum size of a group participating in a DKG protocol
+	DKGMaxSize int = 254
+	// SeedMinLenDKG is the minumum seed length required to participate in a DKG protocol
+	SeedMinLenDKG = securityBits / 8
+	SeedMaxLenDKG = maxRelicPrgSeed
+)
+
 type DKGState interface {
 	// Size returns the size of the DKG group n
 	Size() int
@@ -80,12 +94,37 @@ func IsDKGFailureError(err error) bool {
 	return errors.As(err, &target)
 }
 
+type dkgInvalidStateTransitionError struct {
+	error
+}
+
+func (e dkgInvalidStateTransitionError) Unwrap() error {
+	return e.error
+}
+
+// dkgInvalidStateTransitionErrorf constructs a new dkgInvalidStateTransitionError
+func dkgInvalidStateTransitionErrorf(msg string, args ...interface{}) error {
+	return &dkgInvalidStateTransitionError{
+		error: fmt.Errorf(msg, args...),
+	}
+}
+
+// IsDkgInvalidStateTransitionError checks if the input error is of a dkgInvalidStateTransition type.
+// invalidStateTransition is returned when a caller
+// triggers an invalid state transition in the local DKG instance.
+// Such a failure can only happen if the API is misued by not respecting
+// the state machine conditions.
+func IsDKGInvalidStateTransitionError(err error) bool {
+	var target *dkgInvalidStateTransitionError
+	return errors.As(err, &target)
+}
+
 // index is the node index type used as participants ID
 type index byte
 
 // newDKGCommon initializes the common structure of DKG protocols
 func newDKGCommon(size int, threshold int, myIndex int,
-	processor DKGProcessor, leaderIndex int) (*dkgCommon, error) {
+	processor DKGProcessor, dealerIndex int) (*dkgCommon, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
 		return nil, invalidInputsErrorf(
 			"size should be between %d and %d",
@@ -93,9 +132,9 @@ func newDKGCommon(size int, threshold int, myIndex int,
 			DKGMaxSize)
 	}
 
-	if myIndex >= size || leaderIndex >= size || myIndex < 0 || leaderIndex < 0 {
+	if myIndex >= size || dealerIndex >= size || myIndex < 0 || dealerIndex < 0 {
 		return nil, invalidInputsErrorf(
-			"indices of current and leader nodes must be between 0 and %d, got %d",
+			"indices of current and dealer nodes must be between 0 and %d, got %d",
 			size-1,
 			myIndex)
 	}

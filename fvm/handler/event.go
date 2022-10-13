@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -12,93 +11,34 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type EventHandler interface {
-	EventCollection() *EventCollection
-	EmitEvent(event cadence.Event,
-		txID flow.Identifier,
-		txIndex uint32,
-		payer flow.Address) error
-	Events() []flow.Event
-	ServiceEvents() []flow.Event
-}
-
-type EventEncoder interface {
-	Encode(event cadence.Event) ([]byte, error)
-}
-
-type CadenceEventEncoder struct {
-	buffer  *bytes.Buffer
-	encoder *jsoncdc.Encoder
-}
-
-func NewCadenceEventEncoder() *CadenceEventEncoder {
-	var buf bytes.Buffer
-	return &CadenceEventEncoder{
-		buffer:  &buf,
-		encoder: jsoncdc.NewEncoder(&buf),
-	}
-}
-
-func (e *CadenceEventEncoder) Encode(event cadence.Event) ([]byte, error) {
-	e.buffer.Reset()
-
-	err := e.encoder.Encode(event)
-	if err != nil {
-		return nil, err
-	}
-	b := e.buffer.Bytes()
-	payload := make([]byte, len(b))
-	copy(payload, b)
-
-	return payload, nil
-}
-
-type FlowEventHandlerOption func(feh *FlowEventHandler)
-
-func WithEncoder(encoder EventEncoder) FlowEventHandlerOption {
-	return func(feh *FlowEventHandler) {
-		feh.encoder = encoder
-	}
-}
-
 // EventHandler collect events, separates out service events, and enforces event size limits
-type FlowEventHandler struct {
+type EventHandler struct {
 	chain                         flow.Chain
 	eventCollectionEnabled        bool
 	serviceEventCollectionEnabled bool
 	eventCollectionByteSizeLimit  uint64
 	eventCollection               *EventCollection
-	encoder                       EventEncoder
 }
 
 // NewEventHandler constructs a new EventHandler
-func NewFlowEventHandler(chain flow.Chain,
+func NewEventHandler(chain flow.Chain,
 	eventCollectionEnabled bool,
 	serviceEventCollectionEnabled bool,
-	eventCollectionByteSizeLimit uint64,
-	options ...FlowEventHandlerOption) EventHandler {
-
-	f := &FlowEventHandler{
+	eventCollectionByteSizeLimit uint64) *EventHandler {
+	return &EventHandler{
 		chain:                         chain,
 		eventCollectionEnabled:        eventCollectionEnabled,
 		serviceEventCollectionEnabled: serviceEventCollectionEnabled,
 		eventCollectionByteSizeLimit:  eventCollectionByteSizeLimit,
 		eventCollection:               NewEventCollection(),
-		encoder:                       NewCadenceEventEncoder(),
 	}
-
-	for _, option := range options {
-		option(f)
-	}
-
-	return f
 }
 
-func (h *FlowEventHandler) EventCollection() *EventCollection {
+func (h *EventHandler) EventCollection() *EventCollection {
 	return h.eventCollection
 }
 
-func (h *FlowEventHandler) EmitEvent(event cadence.Event,
+func (h *EventHandler) EmitEvent(event cadence.Event,
 	txID flow.Identifier,
 	txIndex uint32,
 	payer flow.Address) error {
@@ -106,9 +46,9 @@ func (h *FlowEventHandler) EmitEvent(event cadence.Event,
 		return nil
 	}
 
-	payload, err := h.encoder.Encode(event)
+	payload, err := jsoncdc.Encode(event)
 	if err != nil {
-		return errors.NewEventEncodingErrorf("failed to json encode a cadence event: %w", err)
+		return errors.NewEncodingFailuref("failed to json encode a cadence event: %w", err)
 	}
 
 	payloadSize := uint64(len(payload))
@@ -143,11 +83,11 @@ func (h *FlowEventHandler) EmitEvent(event cadence.Event,
 	return nil
 }
 
-func (h *FlowEventHandler) Events() []flow.Event {
+func (h *EventHandler) Events() []flow.Event {
 	return h.eventCollection.events
 }
 
-func (h *FlowEventHandler) ServiceEvents() []flow.Event {
+func (h *EventHandler) ServiceEvents() []flow.Event {
 	return h.eventCollection.serviceEvents
 }
 

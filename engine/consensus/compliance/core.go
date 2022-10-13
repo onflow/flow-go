@@ -109,6 +109,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 
 	header := proposal.Header
 	log := c.log.With().
+		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
@@ -238,7 +239,10 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRa
 	// the block is invalid; log as error as we desire honest participation
 	// ToDo: potential slashing
 	if engine.IsInvalidInputError(err) {
-		c.log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+		c.log.Warn().
+			Err(err).
+			Bool(logging.KeySuspicious, true).
+			Msg("received invalid block from other node (potential slashing evidence?)")
 		return nil
 	}
 	if err != nil {

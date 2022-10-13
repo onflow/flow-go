@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"math/big"
 
-	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
-	lcrypto_pb "github.com/libp2p/go-libp2p-core/crypto/pb"
-	"github.com/libp2p/go-libp2p-core/peer"
+	lcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	lcrypto_pb "github.com/libp2p/go-libp2p/core/crypto/pb"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/crypto"
 	fcrypto "github.com/onflow/flow-go/crypto"
@@ -62,7 +62,7 @@ func PeerIDFromFlowPublicKey(networkPubKey fcrypto.PublicKey) (pid peer.ID, err 
 	return
 }
 
-// PrivKey converts a Flow private key to a LibP2P Private key
+// LibP2PPrivKeyFromFlow converts a Flow private key to a LibP2P Private key
 func LibP2PPrivKeyFromFlow(fpk fcrypto.PrivateKey) (lcrypto.PrivKey, error) {
 	// get the signature algorithm
 	keyType, err := keyType(fpk.Algorithm())
@@ -93,7 +93,7 @@ func LibP2PPrivKeyFromFlow(fpk fcrypto.PrivateKey) (lcrypto.PrivKey, error) {
 	return um(bytes)
 }
 
-// PublicKey converts a Flow public key to a LibP2P public key
+// LibP2PPublicKeyFromFlow converts a Flow public key to a LibP2P public key
 func LibP2PPublicKeyFromFlow(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
 	keyType, err := keyType(fpk.Algorithm())
 	if err != nil {

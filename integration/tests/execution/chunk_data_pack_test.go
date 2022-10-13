@@ -5,6 +5,9 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/ledger"
@@ -13,8 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestExecutionChunkDataPacks(t *testing.T) {
@@ -27,7 +28,8 @@ type ChunkDataPacksSuite struct {
 
 func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	// wait for next height finalized (potentially first height), called blockA
-	blockA := gs.BlockState.WaitForHighestFinalizedProgress(gs.T())
+	currentFinalized := gs.BlockState.HighestFinalizedHeight()
+	blockA := gs.BlockState.WaitForHighestFinalizedProgress(gs.T(), currentFinalized)
 	gs.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// wait for execution receipt for blockA from execution node 1
@@ -67,7 +69,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	// TODO clear messages
 
 	// send a ChunkDataRequest from Ghost node
-	err = gs.Ghost().Send(context.Background(), channels.PushReceipts,
+	err = gs.Ghost().Send(context.Background(), channels.RequestChunks,
 		&messages.ChunkDataRequest{ChunkID: chunkID, Nonce: rand.Uint64()},
 		[]flow.Identifier{gs.exe1ID}...)
 	require.NoError(gs.T(), err)

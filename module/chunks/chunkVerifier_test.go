@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,6 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
@@ -73,7 +73,7 @@ func (s *ChunkVerifierTestSuite) SetupSuite() {
 	vm := new(vmMock)
 	systemOkVm := new(vmSystemOkMock)
 	systemBadVm := new(vmSystemBadMock)
-	vmCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(testChain.Chain()))
+	vmCtx := fvm.NewContext(fvm.WithChain(testChain.Chain()))
 
 	// system chunk runs predefined system transaction, hence we can't distinguish
 	// based on its content and we need separate VMs
@@ -104,7 +104,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
-	//vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
+	// vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
@@ -120,7 +120,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
-	//vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
+	// vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
@@ -217,7 +217,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	vch.EndState = vch.ChunkDataPack.StartState
 	emptyListHash, err := flow.EventsMerkleRootHash(flow.EventsList{})
 	assert.NoError(s.T(), err)
-	vch.Chunk.EventCollection = emptyListHash //empty collection emits no events
+	vch.Chunk.EventCollection = emptyListHash // empty collection emits no events
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
@@ -373,8 +373,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 
 type vmMock struct{}
 
-func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, programs *programs.Programs) error {
-
+func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
 	tx, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
 		return fmt.Errorf("invokable is not a transaction")
@@ -389,7 +388,7 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 	case "failedTx":
 		// add updates to the ledger
 		_ = led.Set("05", "", []byte{'B'})
-		tx.Err = &fvmErrors.CadenceRuntimeError{} // inside the runtime (e.g. div by zero, access account)
+		tx.Err = fvmErrors.NewCadenceRuntimeError(runtime.Error{}) // inside the runtime (e.g. div by zero, access account)
 	case "eventsMismatch":
 		tx.Events = append(eventsList, flow.Event{
 			Type:             "event.Extra",
@@ -409,9 +408,13 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 	return nil
 }
 
+func (vmMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Account, error) {
+	panic("not expected")
+}
+
 type vmSystemOkMock struct{}
 
-func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, programs *programs.Programs) error {
+func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
 	tx, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
 		return fmt.Errorf("invokable is not a transaction")
@@ -428,9 +431,13 @@ func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vie
 	return nil
 }
 
+func (vmSystemOkMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Account, error) {
+	panic("not expected")
+}
+
 type vmSystemBadMock struct{}
 
-func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, programs *programs.Programs) error {
+func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
 	tx, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
 		return fmt.Errorf("invokable is not a transaction")
@@ -439,4 +446,8 @@ func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vi
 	tx.ServiceEvents = []flow.Event{epochCommitEvent}
 
 	return nil
+}
+
+func (vmSystemBadMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Account, error) {
+	panic("not expected")
 }

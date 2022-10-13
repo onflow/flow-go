@@ -16,7 +16,6 @@ import (
 )
 
 type TestnetStateTracker struct {
-	ghostTracking bool
 	BlockState    *BlockState
 	ReceiptState  *ReceiptState
 	ApprovalState *ResultApprovalState
@@ -36,13 +35,14 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 
 	// subscribe to the ghost
 	timeout := time.After(20 * time.Second)
-	ticker := time.Tick(100 * time.Millisecond)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
 	for retry := true; retry; {
 		select {
 		case <-timeout:
 			require.FailNowf(t, "could not subscribe to ghost", "%v", timeout)
 			return
-		case <-ticker:
+		case <-ticker.C:
 			var err error
 			reader, err = ghost.Subscribe(context.Background())
 			if err != nil {

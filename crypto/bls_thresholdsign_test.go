@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestThresholdSignature(t *testing.T) {
+func TestBLSThresholdSignature(t *testing.T) {
 	// stateless API
 	t.Run("centralized_stateless_keygen", testCentralizedStatelessAPI)
 	// stateful API
@@ -83,10 +83,10 @@ func testCentralizedStatefulAPI(t *testing.T) {
 					enough, err := ts.TrustedAdd(i, share)
 					assert.NoError(t, err)
 					assert.False(t, enough)
-					// check HasSignature is true
+					// check HasShare is true
 					ok, err = ts.HasShare(i)
 					assert.NoError(t, err)
-					assert.True(t, verif)
+					assert.True(t, ok)
 					// check EnoughSignature
 					assert.False(t, ts.EnoughShares(), "threshold shouldn't be reached")
 					// check ThresholdSignature
@@ -199,8 +199,9 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			share, err := skShares[index].Sign(thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
 
-			// alter signature - signature is not a valid point
-			share[4] ^= 1
+			// alter signature - invalid serialization
+			tmp := share[0]
+			share[0] = invalidBLSSignatureHeader
 			// VerifyShare
 			verif, err := ts.VerifyShare(index, share)
 			assert.NoError(t, err)
@@ -215,7 +216,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			assert.NoError(t, err)
 			assert.False(t, verif)
 			// restore share
-			share[4] ^= 1
+			share[0] = tmp
 
 			// valid curve point but invalid signature
 			otherIndex := (index + 1) % n // otherIndex is different than index
@@ -234,7 +235,8 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			assert.False(t, verif)
 
 			// trust add one invalid signature and check ThresholdSignature
-			share[4] ^= 1                             // alter the share
+			tmp = share[0]
+			share[0] = invalidBLSSignatureHeader      // alter the share
 			enough, err = ts.TrustedAdd(index, share) // invalid share
 			assert.NoError(t, err)
 			assert.False(t, enough)
@@ -252,9 +254,9 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			}
 			sig, err := ts.ThresholdSignature()
 			assert.Error(t, err)
-			assert.True(t, IsInvalidInputsError(err))
+			assert.True(t, IsInvalidSignatureError(err))
 			assert.Nil(t, sig)
-			share[4] ^= 1 // restore the share
+			share[0] = tmp // restore the share
 		})
 
 		t.Run("constructor errors", func(t *testing.T) {
@@ -275,18 +277,18 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			pkShares[0] = skEcdsa.PublicKey()
 			tsFollower, err = NewBLSThresholdSignatureInspector(pkGroup, pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
 			assert.Error(t, err)
-			assert.True(t, IsInvalidInputsError(err))
+			assert.True(t, IsNotBLSKeyError(err))
 			assert.Nil(t, tsFollower)
 			pkShares[0] = tmp // restore valid keys
 			// non BLS group key
 			tsFollower, err = NewBLSThresholdSignatureInspector(skEcdsa.PublicKey(), pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
 			assert.Error(t, err)
-			assert.True(t, IsInvalidInputsError(err))
+			assert.True(t, IsNotBLSKeyError(err))
 			assert.Nil(t, tsFollower)
 			// non BLS private key
 			tsParticipant, err := NewBLSThresholdSignatureParticipant(pkGroup, pkShares, threshold, index, skEcdsa, thresholdSignatureMessage, thresholdSignatureTag)
 			assert.Error(t, err)
-			assert.True(t, IsInvalidInputsError(err))
+			assert.True(t, IsNotBLSKeyError(err))
 			assert.Nil(t, tsParticipant)
 			// invalid current index
 			tsParticipant, err = NewBLSThresholdSignatureParticipant(pkGroup, pkShares, threshold, len(pkShares)+1, skShares[index], thresholdSignatureMessage, thresholdSignatureTag)
@@ -318,7 +320,7 @@ func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 	gt = t
 	// number of participants to test
 	n := 5
-	lead := mrand.Intn(n) // random leader
+	lead := mrand.Intn(n) // random
 	var sync sync.WaitGroup
 	chans := make([]chan *message, n)
 	processors := make([]testDKGProcessor, 0, n)
@@ -400,7 +402,7 @@ func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 		for i := 0; i < n; i++ {
 			chans[i] = make(chan *message, 2*n)
 		}
-		// start DKG in all participants but the leader
+		// start DKG in all participants but the
 		seed := make([]byte, SeedMinLenDKG)
 		read, err := rand.Read(seed)
 		require.Equal(t, read, SeedMinLenDKG)
@@ -539,67 +541,6 @@ type statelessKeys struct {
 	publicKeyShares []PublicKey
 }
 
-// This is a testing function using the stateless api
-// It simulates processing incoming messages by a participant during TS
-func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
-	n := proc.dkg.Size()
-	// Sign a share and broadcast it
-	kmac := NewExpandMsgXOFKMAC128(thresholdSignatureTag)
-	ownSignShare, _ := proc.keys.myPrivateKey.Sign(thresholdSignatureMessage, kmac)
-	// the local valid signature shares
-	signShares := make([]Signature, 0, n)
-	signers := make([]int, 0, n)
-	// add the participant own share
-	signShares = append(signShares, ownSignShare)
-	signers = append(signers, proc.current)
-	proc.protocol = tsType
-	proc.Broadcast(ownSignShare)
-	for {
-		select {
-		case newMsg := <-proc.chans[proc.current]:
-			log.Debugf("%d Receiving TS from %d:", proc.current, newMsg.orig)
-			verif, err := proc.keys.publicKeyShares[newMsg.orig].Verify(newMsg.data, thresholdSignatureMessage, kmac)
-			require.NoError(t, err)
-			assert.True(t, verif,
-				"the signature share sent from %d to %d is not correct", newMsg.orig,
-				proc.current)
-			// append the received signature share
-			if verif {
-				// check the signer is new
-				isSeen := true
-				for _, i := range signers {
-					if i == newMsg.orig {
-						isSeen = false
-					}
-				}
-				if isSeen {
-					signShares = append(signShares, newMsg.data)
-					signers = append(signers, newMsg.orig)
-				}
-			}
-			threshReached, err := EnoughShares(optimalThreshold(n), len(signShares))
-			assert.NoError(t, err)
-			if threshReached {
-				// Reconstruct the threshold signature
-				thresholdSignature, err := BLSReconstructThresholdSignature(n, optimalThreshold(n), signShares, signers)
-				assert.NoError(t, err)
-				verif, err = proc.keys.groupPublicKey.Verify(thresholdSignature, thresholdSignatureMessage, kmac)
-				require.NoError(t, err)
-				assert.True(t, verif, "the threshold signature is not correct")
-				if verif {
-					log.Infof("%d reconstructed a valid signature: %d\n", proc.current,
-						thresholdSignature)
-				}
-			}
-
-		// if timeout, finalize TS
-		case <-time.After(time.Second):
-			sync.Done()
-			return
-		}
-	}
-}
-
 // Centralized test of threshold signature protocol using the threshold key generation.
 func testCentralizedStatelessAPI(t *testing.T) {
 	n := 10
@@ -645,18 +586,29 @@ func testCentralizedStatelessAPI(t *testing.T) {
 		// check failure with a random redundant signer
 		if threshold > 1 {
 			randomDuplicate := mrand.Intn(int(threshold)) + 1 // 1 <= duplicate <= threshold
+			tmp := signers[randomDuplicate]
 			signers[randomDuplicate] = signers[0]
 			thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
 			assert.Error(t, err)
-			assert.True(t, IsInvalidInputsError(err))
+			assert.True(t, IsDuplicatedSignerError(err))
+			assert.Nil(t, thresholdSignature)
+			signers[randomDuplicate] = tmp
 		}
+
+		// check with an invalid signature (invalid serialization)
+		invalidSig := make([]byte, signatureLengthBLSBLS12381)
+		signShares[0] = invalidSig
+		thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
+		assert.Error(t, err)
+		assert.True(t, IsInvalidSignatureError(err))
+		assert.Nil(t, thresholdSignature)
 	}
 }
 
 func BenchmarkSimpleKeyGen(b *testing.B) {
 	n := 60
 	seed := make([]byte, SeedMinLenDKG)
-	rand.Read(seed)
+	_, _ = rand.Read(seed)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _, _, _ = BLSThresholdKeyGen(n, optimalThreshold(n), seed)

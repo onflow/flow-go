@@ -3,18 +3,15 @@ package test
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ipfs/go-log"
-	swarm "github.com/libp2p/go-libp2p-swarm"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
-
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -26,20 +23,20 @@ import (
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const testChannel = channels.PublicSyncCommittee
+const testChannel = channels.TestNetworkChannel
 
 // libp2p emits a call to `Protect` with a topic-specific tag upon establishing each peering connection in a GossipSUb mesh, see:
 // https://github.com/libp2p/go-libp2p-pubsub/blob/master/tag_tracer.go
 // One way to make sure such a mesh has formed, asynchronously, in unit tests, is to wait for libp2p.GossipSubD such calls,
 // and that's what we do with tagsObserver.
-//
 type tagsObserver struct {
 	tags chan string
 	log  zerolog.Logger
@@ -64,7 +61,8 @@ func (co *tagsObserver) OnComplete() {
 type MiddlewareTestSuite struct {
 	suite.Suite
 	sync.RWMutex
-	size      int                  // used to determine number of middlewares under test
+	size      int // used to determine number of middlewares under test
+	nodes     []*p2pnode.Node
 	mws       []network.Middleware // used to keep track of middlewares under test
 	ov        []*mocknetwork.Overlay
 	obs       chan string // used to keep track of Protect events tagged by pubsub messages
@@ -75,6 +73,8 @@ type MiddlewareTestSuite struct {
 
 	mwCancel context.CancelFunc
 	mwCtx    irrecoverable.SignalerContext
+
+	slashingViolationsConsumer slashing.ViolationsConsumer
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
@@ -85,9 +85,7 @@ func TestMiddlewareTestSuite(t *testing.T) {
 
 // SetupTest initiates the test setups prior to each test
 func (m *MiddlewareTestSuite) SetupTest() {
-	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
-	log.SetAllLoggers(log.LevelError)
-	m.logger = logger
+	m.logger = unittest.Logger()
 
 	m.size = 2 // operates on two middlewares
 	m.metrics = metrics.NewNoopCollector()
@@ -97,10 +95,12 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	peerChannel := make(chan string)
 	ob := tagsObserver{
 		tags: peerChannel,
-		log:  logger,
+		log:  m.logger,
 	}
 
-	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, logger, unittest.NetworkCodec())
+	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
+
+	m.ids, m.nodes, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, m.logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -118,25 +118,16 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.mwCancel = cancel
-	var errChan <-chan error
-	m.mwCtx, errChan = irrecoverable.WithSignaler(ctx)
 
-	mwCtx := m.mwCtx
-	go func() {
-		select {
-		case err := <-errChan:
-			m.T().Error("middlewares encountered fatal error", err)
-		case <-mwCtx.Done():
-			return
-		}
-	}()
+	m.mwCtx = irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
 	for i, mw := range m.mws {
 		mw.SetOverlay(m.ov[i])
 		mw.Start(m.mwCtx)
-		<-mw.Ready()
+		unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, mw)
 	}
 
+	StartNodes(m.mwCtx, m.T(), m.nodes, 100*time.Millisecond)
 }
 
 // TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
@@ -144,7 +135,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
-	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec())
+	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -158,6 +149,10 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	).Return(nil)
 	newMw.SetOverlay(overlay)
 	newMw.Start(m.mwCtx)
+	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
+
+	// start up nodes and peer managers
+	StartNodes(m.mwCtx, m.T(), libP2PNodes, 100*time.Millisecond)
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
@@ -381,12 +376,12 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 	// so the generated payload is 1000 bytes below the maximum unicast message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := networkPayloadFixture(m.T(), uint(p2p.DefaultMaxUnicastMsgSize)+1000)
+	payload := networkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
 
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
@@ -408,7 +403,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	msg, _ := createMessage(sourceNode, targetNode, "")
 
 	// creates a network payload with a size greater than the default max size
-	payload := networkPayloadFixture(m.T(), uint(p2p.DefaultMaxUnicastMsgSize)+1000)
+	payload := networkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
@@ -416,7 +411,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	// set the message type to a known large message type
 	msg.Type = "messages.ChunkDataResponse"
 
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
@@ -458,12 +453,12 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	// so the generated payload is 1000 bytes below the maximum publish message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := networkPayloadFixture(m.T(), uint(p2p.DefaultMaxPubSubMsgSize)+1000)
+	payload := networkPayloadFixture(m.T(), uint(p2pnode.DefaultMaxPubSubMsgSize)+1000)
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
 
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
@@ -552,9 +547,11 @@ func (m *MiddlewareTestSuite) stopMiddlewares() {
 
 	for i := 0; i < m.size; i++ {
 		unittest.RequireCloseBefore(m.T(), m.mws[i].Done(), 100*time.Millisecond, "could not stop middleware on time")
+		unittest.RequireCloseBefore(m.T(), m.nodes[i].Done(), 100*time.Millisecond, "could not stop libp2p node on time")
 	}
 
 	m.mws = nil
+	m.nodes = nil
 	m.ov = nil
 	m.ids = nil
 	m.size = 0

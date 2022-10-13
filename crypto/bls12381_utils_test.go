@@ -36,12 +36,12 @@ func TestPRGseeding(t *testing.T) {
 	// 1st scalar (wrapped in a private key)
 	err = seedRelic(seed)
 	require.Nil(t, err)
-	var sk1 PrKeyBLSBLS12381
+	var sk1 prKeyBLSBLS12381
 	randZr(&sk1.scalar)
 	// 2nd scalar (wrapped in a private key)
 	err = seedRelic(seed)
 	require.Nil(t, err)
-	var sk2 PrKeyBLSBLS12381
+	var sk2 prKeyBLSBLS12381
 	randZr(&sk2.scalar)
 	// compare the 2 scalars (by comparing the private keys)
 	assert.True(t, sk1.Equals(&sk2), "private keys should be equal")
@@ -51,8 +51,8 @@ func TestPRGseeding(t *testing.T) {
 func BenchmarkScalarMult(b *testing.B) {
 	blsInstance.reInit()
 	seed := make([]byte, securityBits/8)
-	rand.Read(seed)
-	seedRelic(seed)
+	_, _ = rand.Read(seed)
+	_ = seedRelic(seed)
 	var expo scalar
 	randZr(&expo)
 
@@ -132,7 +132,6 @@ func BenchmarkMapToG1(b *testing.B) {
 		mapToG1(input)
 	}
 	b.StopTimer()
-	return
 }
 
 // test Bowe subgroup check in G1
@@ -141,8 +140,8 @@ func TestSubgroupCheckG1(t *testing.T) {
 	blsInstance.reInit()
 	// seed Relic PRG
 	seed := make([]byte, securityBits/8)
-	rand.Read(seed)
-	seedRelic(seed)
+	_, _ = rand.Read(seed)
+	_ = seedRelic(seed)
 
 	// tests for simple membership check
 	t.Run("simple check", func(t *testing.T) {
@@ -171,5 +170,4 @@ func BenchmarkCheckG1(b *testing.B) {
 		benchG1Test()
 	}
 	b.StopTimer()
-	return
 }

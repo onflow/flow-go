@@ -11,11 +11,14 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 func TestObserver(t *testing.T) {
@@ -42,9 +45,8 @@ func (suite *ObserverSuite) SetupTest() {
 		"GetLatestBlock":                 {},
 		"GetBlockByID":                   {},
 		"GetBlockByHeight":               {},
-		"GetCollectionByID":              {},
-		"GetNetworkParameters":           {},
 		"GetLatestProtocolStateSnapshot": {},
+		"GetNetworkParameters":           {},
 	}
 
 	nodeConfigs := []testnet.NodeConfig{
@@ -153,7 +155,7 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 				if err == nil {
 					return
 				}
-				code := grpc.Code(err)
+				code := status.Code(err)
 				assert.Equal(t, codes.NotFound, code)
 			})
 		}
@@ -195,7 +197,7 @@ func (suite *ObserverSuite) getObserverClient() (accessproto.AccessAPIClient, er
 
 func (suite *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {
 	// helper func to create an access client
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}

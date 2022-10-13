@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -191,7 +190,7 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 func CreateAccounts(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -201,16 +200,16 @@ func CreateAccounts(
 func CreateAccountsWithSimpleAddresses(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
 	ctx := fvm.NewContext(
-		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
+			fvm.NewTransactionInvoker(),
 		),
+		fvm.WithBlockPrograms(programs),
 	)
 
 	var accounts []flow.Address
@@ -233,7 +232,7 @@ func CreateAccountsWithSimpleAddresses(
 
 	serviceAddress := chain.ServiceAddress()
 
-	for i, privateKey := range privateKeys {
+	for _, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
 		encPublicKey := accountKey.PublicKey.Encode()
 		cadPublicKey := BytesToCadenceArray(encPublicKey)
@@ -253,8 +252,8 @@ func CreateAccountsWithSimpleAddresses(
 			AddArgument(encCadPublicKey).
 			AddAuthorizer(serviceAddress)
 
-		tx := fvm.Transaction(txBody, uint32(i))
-		err := vm.Run(ctx, tx, view, programs)
+		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+		err := vm.Run(ctx, tx, view)
 		if err != nil {
 			return nil, err
 		}
@@ -286,7 +285,6 @@ func CreateAccountsWithSimpleAddresses(
 
 func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalOptions ...fvm.BootstrapProcedureOption) state.View {
 	view := fvmUtils.NewSimpleView()
-	programs := programs.NewEmptyPrograms()
 
 	// set 0 clusters to pass n_collectors >= n_clusters check
 	epochConfig := epochs.DefaultEpochConfig()
@@ -304,13 +302,7 @@ func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalO
 		options...,
 	)
 
-	_ = vm.Run(
-		ctx,
-		bootstrap,
-		view,
-		programs,
-	)
-
+	_ = vm.Run(ctx, bootstrap, view)
 	return view
 }
 
@@ -326,7 +318,7 @@ func BytesToCadenceArray(l []byte) cadence.Array {
 // CreateAccountCreationTransaction creates a transaction which will create a new account.
 //
 // This function returns a randomly generated private key and the transaction.
-func CreateAccountCreationTransaction(t *testing.T, chain flow.Chain) (flow.AccountPrivateKey, *flow.TransactionBody) {
+func CreateAccountCreationTransaction(t testing.TB, chain flow.Chain) (flow.AccountPrivateKey, *flow.TransactionBody) {
 	accountKey, err := GenerateAccountPrivateKey()
 	require.NoError(t, err)
 	encPublicKey := accountKey.PublicKey(1000).PublicKey.Encode()

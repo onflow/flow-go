@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
 var _ commands.AdminCommand = (*ReadExecutionDataCommand)(nil)
@@ -19,13 +19,13 @@ type requestData struct {
 }
 
 type ReadExecutionDataCommand struct {
-	eds state_synchronization.ExecutionDataService
+	executionDataStore execution_data.ExecutionDataStore
 }
 
 func (r *ReadExecutionDataCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*requestData)
 
-	ed, err := r.eds.Get(ctx, data.rootID)
+	ed, err := r.executionDataStore.GetExecutionData(ctx, data.rootID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data: %w", err)
@@ -69,8 +69,8 @@ func (r *ReadExecutionDataCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
 
-func NewReadExecutionDataCommand(eds state_synchronization.ExecutionDataService) commands.AdminCommand {
+func NewReadExecutionDataCommand(store execution_data.ExecutionDataStore) commands.AdminCommand {
 	return &ReadExecutionDataCommand{
-		eds,
+		store,
 	}
 }

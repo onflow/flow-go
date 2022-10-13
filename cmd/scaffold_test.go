@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -51,7 +51,7 @@ func TestLoadSecretsEncryptionKey(t *testing.T) {
 			require.NoError(t, err)
 			key, err := utils.GenerateSecretsDBEncryptionKey()
 			require.NoError(t, err)
-			err = ioutil.WriteFile(path, key, 0700)
+			err = os.WriteFile(path, key, 0700)
 			require.NoError(t, err)
 
 			data, err := loadSecretsEncryptionKey(dir, myID)
@@ -74,13 +74,13 @@ func TestComponentsRunSerially(t *testing.T) {
 	name1 := "component 1"
 	nb.Component(name1, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name1)
-		return newTestReadyDone(logger, name1), nil
+		return newMockReadyDone(logger, name1), nil
 	})
 
 	name2 := "component 2"
 	nb.Component(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name2)
-		c := newTestComponent(logger, name2)
+		c := newMockComponent(logger, name2)
 		c.startFn = func(ctx irrecoverable.SignalerContext, name string) {
 			// add delay to test components are run serially
 			time.Sleep(5 * time.Millisecond)
@@ -91,7 +91,7 @@ func TestComponentsRunSerially(t *testing.T) {
 	name3 := "component 3"
 	nb.Component(name3, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name3)
-		return newTestReadyDone(logger, name3), nil
+		return newMockReadyDone(logger, name3), nil
 	})
 
 	err := nb.handleComponents()
@@ -175,25 +175,25 @@ func TestOverrideComponent(t *testing.T) {
 	name1 := "component 1"
 	nb.Component(name1, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name1)
-		return newTestReadyDone(logger, name1), nil
+		return newMockReadyDone(logger, name1), nil
 	})
 
 	name2 := "component 2"
 	nb.Component(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name2)
-		return newTestReadyDone(logger, name2), nil
+		return newMockReadyDone(logger, name2), nil
 	})
 
 	name3 := "component 3"
 	nb.Component(name3, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name3)
-		return newTestReadyDone(logger, name3), nil
+		return newMockReadyDone(logger, name3), nil
 	})
 
 	// Overrides second component
 	nb.OverrideComponent(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s overridden", name2)
-		return newTestReadyDone(logger, name2), nil
+		return newMockReadyDone(logger, name2), nil
 	})
 
 	err := nb.handleComponents()
@@ -217,6 +217,64 @@ func TestOverrideComponent(t *testing.T) {
 		"component 2 ready",
 		"component 3 initialized",
 		"component 3 ready",
+	}, logs)
+
+	cancel()
+	<-cm.Done()
+}
+
+func TestOverrideModules(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	nb := FlowNode("scaffold test")
+	nb.componentBuilder = component.NewComponentManagerBuilder()
+
+	logger := &testLog{}
+
+	name1 := "module 1"
+	nb.Module(name1, func(nodeConfig *NodeConfig) error {
+		logger.Logf("%s initialized", name1)
+		return nil
+	})
+
+	name2 := "module 2"
+	nb.Module(name2, func(nodeConfig *NodeConfig) error {
+		logger.Logf("%s initialized", name2)
+		return nil
+	})
+
+	name3 := "module 3"
+	nb.Module(name3, func(nodeConfig *NodeConfig) error {
+		logger.Logf("%s initialized", name3)
+		return nil
+	})
+
+	// Overrides second module
+	nb.OverrideModule(name2, func(nodeConfig *NodeConfig) error {
+		logger.Logf("%s overridden", name2)
+		return nil
+	})
+
+	err := nb.handleModules()
+	assert.NoError(t, err)
+
+	cm := nb.componentBuilder.Build()
+	require.NoError(t, err)
+
+	cm.Start(signalerCtx)
+
+	<-cm.Ready()
+
+	logs := logger.logs
+
+	assert.Len(t, logs, 3)
+
+	// components are initialized in a specific order, so check that the order is correct
+	assert.Equal(t, []string{
+		"module 1 initialized",
+		"module 2 overridden", // overridden version of 2 should be initialized.
+		"module 3 initialized",
 	}, logs)
 
 	cancel()
@@ -281,7 +339,7 @@ func TestRestartableRestartsSuccessfully(t *testing.T) {
 	starts := 0
 	factory := func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name)
-		c := newTestComponent(logger, name)
+		c := newMockComponent(logger, name)
 		c.startFn = func(signalCtx irrecoverable.SignalerContext, name string) {
 			go func() {
 				<-c.Ready()
@@ -327,7 +385,7 @@ func TestRestartableStopsSuccessfully(t *testing.T) {
 	starts := 0
 	factory := func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name)
-		c := newTestComponent(logger, name)
+		c := newMockComponent(logger, name)
 		c.startFn = func(signalCtx irrecoverable.SignalerContext, name string) {
 			go func() {
 				<-c.Ready()
@@ -378,7 +436,7 @@ func TestRestartableWithMultipleComponents(t *testing.T) {
 		name := "component 1"
 		factory := func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			logger.Logf("%s initialized", name)
-			c := newTestReadyDone(logger, name)
+			c := newMockReadyDone(logger, name)
 			c.readyFn = func(name string) {
 				// delay to demonstrate that components are started serially
 				time.Sleep(5 * time.Millisecond)
@@ -400,7 +458,7 @@ func TestRestartableWithMultipleComponents(t *testing.T) {
 		factory := func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			defer close(c2Initialized)
 			logger.Logf("%s initialized", name)
-			c := newTestComponent(logger, name)
+			c := newMockComponent(logger, name)
 			c.startFn = func(ctx irrecoverable.SignalerContext, name string) {
 				// delay to demonstrate the RestartableComponent startup is non-blocking
 				time.Sleep(5 * time.Millisecond)
@@ -424,7 +482,7 @@ func TestRestartableWithMultipleComponents(t *testing.T) {
 		starts := 0
 		factory := func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			logger.Logf("%s initialized", name)
-			c := newTestComponent(logger, name)
+			c := newMockComponent(logger, name)
 			c.startFn = func(signalCtx irrecoverable.SignalerContext, name string) {
 				go func() {
 					<-c.Ready()
@@ -527,146 +585,102 @@ func testErrorHandler(logger *testLog, expected error) component.OnError {
 	}
 }
 
-func newTestReadyDone(logger *testLog, name string) *testReadyDone {
-	return &testReadyDone{
-		name:    name,
-		logger:  logger,
-		readyFn: func(string) {},
-		doneFn:  func(string) {},
-		ready:   make(chan struct{}),
-		done:    make(chan struct{}),
+// TestDependableComponentWaitForDependencies tests that dependable components are started after
+// their dependencies are ready
+// In this test:
+// * Components 1 & 2 are DependableComponents
+// * Component 3 is a normal Component
+// * 1 depends on 3
+// * 2 depends on 1
+// * Start order should be 3, 1, 2
+// run test 10 times to ensure order is consistent
+func TestDependableComponentWaitForDependencies(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		testDependableComponentWaitForDependencies(t)
 	}
 }
 
-type testReadyDone struct {
-	name   string
-	logger *testLog
+func testDependableComponentWaitForDependencies(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	readyFn func(string)
-	doneFn  func(string)
+	nb := FlowNode("scaffold test")
+	nb.componentBuilder = component.NewComponentManagerBuilder()
 
-	ready chan struct{}
-	done  chan struct{}
+	logger := &testLog{}
 
-	started bool
-	stopped bool
-	mu      sync.Mutex
-}
+	component1Dependable := module.NewProxiedReadyDoneAware()
+	component3Dependable := module.NewProxiedReadyDoneAware()
 
-func (c *testReadyDone) Ready() <-chan struct{} {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if !c.started {
-		c.started = true
-		go func() {
-			c.readyFn(c.name)
+	name1 := "component 1"
+	nb.DependableComponent(name1, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		logger.Logf("%s initialized", name1)
+		c := newMockComponent(logger, name1)
+		component1Dependable.Init(c)
+		return c, nil
+	}, &DependencyList{[]module.ReadyDoneAware{component3Dependable}})
 
-			c.logger.Logf("%s ready", c.name)
-			close(c.ready)
-		}()
-	}
+	name2 := "component 2"
+	nb.DependableComponent(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		logger.Logf("%s initialized", name2)
+		return newMockComponent(logger, name2), nil
+	}, &DependencyList{[]module.ReadyDoneAware{component1Dependable}})
 
-	return c.ready
-}
+	name3 := "component 3"
+	nb.Component(name3, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		logger.Logf("%s initialized", name3)
+		c := newMockComponent(logger, name3)
+		c.startFn = func(ctx irrecoverable.SignalerContext, name string) {
+			// add delay to test components are run serially
+			time.Sleep(5 * time.Millisecond)
+		}
+		component3Dependable.Init(c)
+		return c, nil
+	})
 
-func (c *testReadyDone) Done() <-chan struct{} {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if !c.stopped {
-		c.stopped = true
-		go func() {
-			c.doneFn(c.name)
+	err := nb.handleComponents()
+	require.NoError(t, err)
 
-			c.logger.Logf("%s done", c.name)
-			close(c.done)
-		}()
-	}
+	cm := nb.componentBuilder.Build()
 
-	return c.done
-}
+	cm.Start(signalerCtx)
+	<-cm.Ready()
 
-func newTestComponent(logger *testLog, name string) *testComponent {
-	return &testComponent{
-		name:    name,
-		logger:  logger,
-		readyFn: func(string) {},
-		doneFn:  func(string) {},
-		startFn: func(irrecoverable.SignalerContext, string) {},
-		ready:   make(chan struct{}),
-		done:    make(chan struct{}),
-	}
-}
+	cancel()
+	<-cm.Done()
 
-type testComponent struct {
-	name   string
-	logger *testLog
+	logs := logger.logs
 
-	readyFn func(string)
-	doneFn  func(string)
-	startFn func(irrecoverable.SignalerContext, string)
+	assert.Len(t, logs, 12)
 
-	ready chan struct{}
-	done  chan struct{}
-}
+	// components are initialized in a specific order, so check that the order is correct
+	startLogs := logs[:len(logs)-3]
+	assert.Equal(t, []string{
+		"component 3 initialized",
+		"component 3 started",
+		"component 3 ready",
+		"component 1 initialized",
+		"component 1 started",
+		"component 1 ready",
+		"component 2 initialized",
+		"component 2 started",
+		"component 2 ready",
+	}, startLogs)
 
-func (c *testComponent) Start(ctx irrecoverable.SignalerContext) {
-	c.startFn(ctx, c.name)
-	c.logger.Logf("%s started", c.name)
-
-	go func() {
-		c.readyFn(c.name)
-		c.logger.Logf("%s ready", c.name)
-		close(c.ready)
-	}()
-
-	go func() {
-		<-ctx.Done()
-
-		c.doneFn(c.name)
-		c.logger.Logf("%s done", c.name)
-		close(c.done)
-	}()
-}
-
-func (c *testComponent) Ready() <-chan struct{} {
-	return c.ready
-}
-
-func (c *testComponent) Done() <-chan struct{} {
-	return c.done
+	// components are stopped via context cancellation, so the specific order is random
+	doneLogs := logs[len(logs)-3:]
+	assert.ElementsMatch(t, []string{
+		"component 1 done",
+		"component 2 done",
+		"component 3 done",
+	}, doneLogs)
 }
 
 func TestCreateUploader(t *testing.T) {
 	t.Parallel()
-
-	t.Run("create defualt uploader", func(t *testing.T) {
+	t.Run("create uploader", func(t *testing.T) {
 		t.Parallel()
 		nb := FlowNode("scaffold_uploader")
-		mockHttp := &http.Client{
-			Transport: &mockRoundTripper{
-				DoFunc: func(req *http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: 403,
-						Body:       ioutil.NopCloser(bytes.NewBufferString("")),
-					}, nil
-				},
-			},
-		}
-		testClient := gcemd.NewClient(mockHttp)
-		uploader, err := nb.createGCEProfileUploader(
-			testClient,
-
-			option.WithoutAuthentication(),
-			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-		)
-		require.ErrorContains(t, err, "403")
-		require.NotNil(t, uploader)
-	})
-
-	t.Run("create mocked uploader", func(t *testing.T) {
-		t.Parallel()
-		nb := FlowNode("scaffold_uploader")
-
 		mockHttp := &http.Client{
 			Transport: &mockRoundTripper{
 				DoFunc: func(req *http.Request) (*http.Response, error) {
@@ -674,12 +688,12 @@ func TestCreateUploader(t *testing.T) {
 					case "/computeMetadata/v1/project/project-id":
 						return &http.Response{
 							StatusCode: 200,
-							Body:       ioutil.NopCloser(bytes.NewBufferString("test-project-id")),
+							Body:       io.NopCloser(bytes.NewBufferString("test-project-id")),
 						}, nil
 					case "/computeMetadata/v1/instance/id":
 						return &http.Response{
 							StatusCode: 200,
-							Body:       ioutil.NopCloser(bytes.NewBufferString("test-instance-id")),
+							Body:       io.NopCloser(bytes.NewBufferString("test-instance-id")),
 						}, nil
 					default:
 						return nil, fmt.Errorf("unexpected request: %s", req.URL.Path)
