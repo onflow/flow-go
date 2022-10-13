@@ -229,7 +229,9 @@ func (s *StopControl) executingBlockHeight(height uint64) {
 		return
 	}
 
-	if height > s.lastExecutingHeight {
+	// updating the highest executing height, which will be used to reject setting stop height that 
+	// is too low. 
+	if height > s.highestExecutingHeight {
 		s.lastExecutingHeight = height
 	}
 }
