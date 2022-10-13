@@ -97,7 +97,7 @@ func OpenAndReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger
 		errToReturn = closeAndMergeError(file, errToReturn)
 	}(f)
 
-	return readCheckpointV5(f, logger)
+	return ReadCheckpointV6(f, logger)
 }
 
 func filePathCheckpointHeader(dir string, fileName string) string {
