@@ -43,7 +43,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 			collection := completeCollection.Collection()
 			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint64(len(completeCollection.Transactions)))
 			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i])
-			metrics.ExecutionChunkDataPackGenerated(len(result.Proofs[i]), len(chdps[i].Collection.Transactions))
+			metrics.ExecutionChunkDataPackGenerated(len(result.Proofs[i]), len(completeCollection.Transactions))
 
 		} else {
 			// system chunk
