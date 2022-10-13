@@ -194,6 +194,9 @@ func TestCompactorCreation(t *testing.T) {
 			dirF, _ := os.Open(dir)
 			files, _ := dirF.Readdir(0)
 
+			find008, err := regexp.Compile("checkpoint.00000008*")
+			require.NoError(t, err)
+
 			for _, fileInfo := range files {
 
 				name := fileInfo.Name()
@@ -205,8 +208,7 @@ func TestCompactorCreation(t *testing.T) {
 				}
 
 				// checkpoint V6 has multiple files
-				matched, _ := regexp.MatchString("checkpoint.00000008*", name)
-				if matched {
+				if find008.MatchString(name) {
 					log.Info().Msgf("keep file %v/%v", dir, name)
 					continue
 				}

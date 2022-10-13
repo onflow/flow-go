@@ -69,13 +69,13 @@ func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 
 	if len(tries) > 0 {
 		first, last := tries[0], tries[len(tries)-1]
-		lg.Info().
+		logger.Info().
 			Str("first_hash", first.RootHash().String()).
 			Uint64("first_reg_count", first.AllocatedRegCount()).
 			Str("last_hash", last.RootHash().String()).
 			Uint64("last_reg_count", last.AllocatedRegCount()).
 			Int("version", 6).
-			Msg("loaded checkpoint tries roots")
+			Msg("checkpoint tries roots")
 	}
 
 	return tries, nil
@@ -93,10 +93,10 @@ func OpenAndReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func(f *os.File) {
-		closeAndMergeError(f, err)
+		_ = closeAndMergeError(f, err)
 	}(f)
 
-	return ReadCheckpointV6(f, logger)
+	return readCheckpointV5(f, logger)
 }
 
 func filePathCheckpointHeader(dir string, fileName string) string {
@@ -153,7 +153,7 @@ func readCheckpointHeader(filepath string, logger *zerolog.Logger) (
 			logger.Warn().Msgf("failed to evict header file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
-		closeAndMergeError(f, err)
+		_ = closeAndMergeError(f, err)
 	}(closable)
 
 	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
@@ -349,7 +349,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 			logger.Warn().Msgf("failed to evict subtrie file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
-		closeAndMergeError(f, err)
+		_ = closeAndMergeError(f, err)
 	}(f)
 
 	// valite the magic bytes and version
@@ -489,7 +489,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 			logger.Warn().Msgf("failed to evict top trie file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
-		closeAndMergeError(file, err)
+		_ = closeAndMergeError(file, err)
 	}()
 
 	// read and validate magic bytes and version
