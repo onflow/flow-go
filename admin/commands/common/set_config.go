@@ -37,10 +37,10 @@ func (s *SetConfigCommand) Handler(_ context.Context, req *admin.CommandRequest)
 	oldValue := validatedReq.field.Get()
 
 	err := validatedReq.field.Set(validatedReq.value)
-	if updatable_configs.IsValidationError(err) {
-		return nil, err
-	}
 	if err != nil {
+		if updatable_configs.IsValidationError(err) {
+			return nil, fmt.Errorf("config update failed due to invalid input: %w", err)
+		}
 		return nil, fmt.Errorf("unexpected error setting config field %s: %w", validatedReq.field.Name, err)
 	}
 

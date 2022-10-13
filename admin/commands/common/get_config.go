@@ -12,6 +12,8 @@ import (
 
 var _ commands.AdminCommand = (*GetConfigCommand)(nil)
 
+// GetConfigCommand is an admin command which retrieves the current value of a
+// dynamically updatable config.
 type GetConfigCommand struct {
 	configs *updatable_configs.Manager
 }

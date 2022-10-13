@@ -37,18 +37,23 @@ type (
 )
 
 // The below are typed setter and getter functions for different config types.
-// If you need to add a new configurable config field with a type not below,
-// add a new setter and getter type below, and a Register*Config method to the
-// Registerer interface and Manager implementation below.
+//
+// ADDING A NEW TYPE:
+// If you need to add a new configurable config field with a type not below:
+//  1. Add a new setter and getter type below
+//  2. Add a Register*Config method to the Registerer interface and Manager implementation below
+//  3. Add a TestManager_Register*Config test to the manager_test.go file.
 
 type (
 	// Set*ConfigFunc is a setter function for a single updatable config field.
 	// Returns ValidationError if the new config value is invalid.
+
 	SetUintConfigFunc     func(uint) error
 	SetBoolConfigFunc     func(bool) error
 	SetDurationConfigFunc func(time.Duration) error
 
 	// Get*ConfigFunc is a getter function for a single updatable config field.
+
 	GetUintConfigFunc     func() uint
 	GetBoolConfigFunc     func() bool
 	GetDurationConfigFunc func() time.Duration
@@ -113,6 +118,9 @@ var _ Registerer = (*Manager)(nil)
 
 // Registerer provides an interface for registering config fields which can be
 // dynamically updated while the node is running.
+// Configs must have globally unique names. Setter functions are responsible for
+// enforcing component-specific validation rules, and returning a ValidationError
+// if the new config value is invalid.
 type Registerer interface {
 	// RegisterBoolConfig registers a new bool config.
 	// Returns ErrAlreadyRegistered if a config is already registered with name.
