@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,8 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"cloud.google.com/go/bigquery"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"cloud.google.com/go/bigquery"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -80,6 +82,7 @@ func main() {
 	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
 	bigQueryTableFlag := flag.String("bigquery-table", "tpsslices", "table name for the bigquery uploader")
+	localDev := flag.Bool("local-dev", false, "whether this script itself is being tested. Turns off submitting data to big query and instead outputs a local results file instead")
 	sliceSize := flag.Duration("slice-size", 2*time.Minute, "the amount of time that each slice covers")
 	flag.Parse()
 
@@ -110,8 +113,10 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
-	defer sp.Stop()
+	if *localDev {
+		sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
+		defer sp.Stop()
+	}
 
 	loadCase := LoadCase{tps: uint(*initialTPSFlag), duration: *durationFlag}
 
@@ -225,10 +230,14 @@ func main() {
 		log.Fatal().Msg("no data slices recorded")
 	}
 
-	log.Info().Msg("Uploading data to BigQuery")
-	err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to send data to bigquery")
+	if *localDev {
+		outputLocalData(dataSlices, log)
+	} else {
+		log.Info().Msg("Uploading data to BigQuery")
+		err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("unable to send data to bigquery")
+		}
 	}
 }
 
@@ -297,6 +306,21 @@ func sendDataToBigQuery(
 		return fmt.Errorf("failed to insert data: %w", err)
 	}
 	return nil
+}
+
+func outputLocalData(slices []dataSlice, log zerolog.Logger) {
+	jsonText, err := json.MarshalIndent(slices, "", "    ")
+	if err != nil {
+		log.Fatal().Msg("Error converting slice data to json")
+	}
+
+	// output human-readable json blob
+	timestamp := time.Now()
+	fileName := fmt.Sprintf("tps-results-%v.json", timestamp.Format("2006-02-01 15:04"))
+	err = os.WriteFile(fileName, jsonText, 0666)
+	if err != nil {
+		log.Fatal().Err(err)
+	}
 }
 
 // adjustTPS tries to find the maximum TPS that the network can handle using a simple AIMD algorithm.
