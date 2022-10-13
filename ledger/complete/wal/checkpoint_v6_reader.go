@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
+// ErrEOFNotReached for indicating end of file not reached error
 var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 
 // ReadCheckpointV6 reads checkpoint file from a main file and 17 file parts.
@@ -92,8 +93,8 @@ func OpenAndReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger
 	if err != nil {
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
-	defer func(f *os.File) {
-		_ = closeAndMergeError(f, err)
+	defer func(file *os.File) {
+		errToReturn = closeAndMergeError(file, errToReturn)
 	}(f)
 
 	return readCheckpointV5(f, logger)
@@ -147,13 +148,13 @@ func readCheckpointHeader(filepath string, logger *zerolog.Logger) (
 		return nil, 0, fmt.Errorf("could not open header file: %w", err)
 	}
 
-	defer func(f *os.File) {
-		evictErr := evictFileFromLinuxPageCache(f, false, logger)
+	defer func(file *os.File) {
+		evictErr := evictFileFromLinuxPageCache(file, false, logger)
 		if evictErr != nil {
 			logger.Warn().Msgf("failed to evict header file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
-		_ = closeAndMergeError(f, err)
+		errToReturn = closeAndMergeError(file, errToReturn)
 	}(closable)
 
 	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
@@ -277,8 +278,6 @@ func findCheckpointPartFiles(dir string, fileName string) ([]string, error) {
 	return parts, nil
 }
 
-var errCheckpointFileExist = errors.New("checkpoint file exists already")
-
 func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32, logger *zerolog.Logger) ([][]*node.Node, error) {
 	numOfSubTries := len(subtrieChecksums)
 	resultChs := make([]chan *resultReadSubTrie, 0, numOfSubTries)
@@ -325,13 +324,13 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 	if err != nil {
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
-	defer func(f *os.File) {
-		evictErr := evictFileFromLinuxPageCache(f, false, logger)
+	defer func(file *os.File) {
+		evictErr := evictFileFromLinuxPageCache(file, false, logger)
 		if evictErr != nil {
 			logger.Warn().Msgf("failed to evict subtrie file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
-		_ = closeAndMergeError(f, err)
+		errToReturn = closeAndMergeError(file, errToReturn)
 	}(f)
 
 	// valite the magic bytes and version
@@ -465,14 +464,14 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	if err != nil {
 		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
-	defer func() {
+	defer func(file *os.File) {
 		evictErr := evictFileFromLinuxPageCache(file, false, logger)
 		if evictErr != nil {
 			logger.Warn().Msgf("failed to evict top trie file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
-		_ = closeAndMergeError(file, err)
-	}()
+		errToReturn = closeAndMergeError(file, errToReturn)
+	}(file)
 
 	// read and validate magic bytes and version
 	err = validateFileHeader(MagicBytesCheckpointToptrie, VersionV6, file)

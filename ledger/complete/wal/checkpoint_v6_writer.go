@@ -99,8 +99,8 @@ func storeCheckpointV6(
 	}
 
 	// no part file found, means noneCheckpointFileExist
-	if len(matched) == 0 {
-		return nil
+	if len(matched) != 0 {
+		return fmt.Errorf("checkpoint part file already exists: %v", matched)
 	}
 
 	subtrieRoots := createSubTrieRoots(tries)
@@ -159,7 +159,7 @@ func storeCheckpointHeader(
 		return fmt.Errorf("could not store checkpoint header: %w", err)
 	}
 	defer func() {
-		closeAndMergeError(closable, err)
+		errToReturn = closeAndMergeError(closable, errToReturn)
 	}()
 
 	writer := NewCRC32Writer(closable)
@@ -226,7 +226,7 @@ func storeTopLevelNodesAndTrieRoots(
 		return 0, fmt.Errorf("could not create writer for top tries: %w", err)
 	}
 	defer func() {
-		closeAndMergeError(closable, err)
+		errToReturn = closeAndMergeError(closable, errToReturn)
 	}()
 
 	writer := NewCRC32Writer(closable)
@@ -442,7 +442,7 @@ func storeCheckpointSubTrie(
 	}
 
 	defer func() {
-		closeAndMergeError(closable, err)
+		errToReturn = closeAndMergeError(closable, errToReturn)
 	}()
 
 	// create a CRC32 writer, so that any bytes passed to the writer will
