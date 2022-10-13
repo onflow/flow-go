@@ -15,12 +15,13 @@ import (
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/rs/zerolog"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 
 	"github.com/onflow/flow-go/network/p2p/blob"
 
@@ -181,8 +182,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
-		Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("execution state", exeNode.LoadExecutionState).
+		Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
