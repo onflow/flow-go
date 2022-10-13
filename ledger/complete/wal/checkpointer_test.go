@@ -222,7 +222,7 @@ func Test_Checkpointing(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("read checkpoint", func(t *testing.T) {
-			wal3, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+			wal3, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize, realWAL.VersionV6)
 			require.NoError(t, err)
 
 			err = wal3.Replay(
