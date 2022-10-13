@@ -1,6 +1,7 @@
 package p2pfixtures
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
@@ -406,6 +407,30 @@ func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub *pubsu
 	// on a happy path the timeout never happens, and short enough to make sure that
 	// the test doesn't take too long in case of a failure.
 	unittest.RequireCloseBefore(t, timeouted, 10*time.Second, "timeout did not happen on receiving expected pubsub message")
+}
+
+// HasSubReceivedMessage checks that the subscription have received the given message within the given timeout by the context.
+// It returns true if the subscription has received the message, false otherwise.
+func HasSubReceivedMessage(t *testing.T, ctx context.Context, expectedMessage []byte, sub *pubsub.Subscription) bool {
+	received := make(chan struct{})
+	go func() {
+		msg, err := sub.Next(ctx)
+		if err != nil {
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+			return
+		}
+		if !bytes.Equal(expectedMessage, msg.Data) {
+			return
+		}
+		close(received)
+	}()
+
+	select {
+	case <-received:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 // SubsMustNeverReceiveAnyMessage checks that all subscriptions never receive any message within the given timeout by the context.
