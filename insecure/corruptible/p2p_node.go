@@ -2,11 +2,13 @@ package corruptible
 
 import (
 	"context"
+
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	"github.com/rs/zerolog"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"

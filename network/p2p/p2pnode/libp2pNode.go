@@ -5,9 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"sync"
 	"time"
+
+	"github.com/onflow/flow-go/module/irrecoverable"
 
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"

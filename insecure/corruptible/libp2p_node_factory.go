@@ -1,8 +1,9 @@
 package corruptible
 
 import (
-	"github.com/onflow/flow-go/network/p2p"
 	"time"
+
+	"github.com/onflow/flow-go/network/p2p"
 
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"

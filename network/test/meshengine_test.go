@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/network/p2p"
 	"math/rand"
 	"os"
 	"strconv"
@@ -11,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/ipfs/go-log"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"

@@ -5,12 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/network/p2p"
 	"io"
 	"regexp"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/libp2p/go-libp2p/core"
 	"github.com/libp2p/go-libp2p/core/network"

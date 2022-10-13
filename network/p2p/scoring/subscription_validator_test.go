@@ -2,12 +2,13 @@ package scoring_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/network/p2p"
-	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"math/rand"
 	"regexp"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/network/p2p"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -177,8 +178,8 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	for _, role := range flow.Roles() {
 		peerId := p2pfixtures.PeerIdFixture(t)
 		unauthorizedChannels := channels.Channels(). // all channels
-			ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
-			ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
+								ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
+								ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
 		sporkID := unittest.IdentifierFixture()
 		unauthorizedTopics := make([]string, 0, len(unauthorizedChannels))
 		for _, channel := range unauthorizedChannels {

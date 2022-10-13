@@ -3,12 +3,13 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/network/p2p"
 	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/ipfs/go-log"
 	"github.com/rs/zerolog"

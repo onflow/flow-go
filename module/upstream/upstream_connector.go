@@ -2,9 +2,10 @@ package upstream
 
 import (
 	"context"
-	"github.com/onflow/flow-go/network/p2p"
 	"sync"
 	"time"
+
+	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
