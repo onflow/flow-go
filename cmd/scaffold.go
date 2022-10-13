@@ -389,7 +389,6 @@ func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
-	fnb.ConfigManager = updatable_configs.NewManager()
 	if fnb.AdminAddr != NotSet {
 		if (fnb.AdminCert != NotSet || fnb.AdminKey != NotSet || fnb.AdminClientCAs != NotSet) &&
 			!(fnb.AdminCert != NotSet && fnb.AdminKey != NotSet && fnb.AdminClientCAs != NotSet) {
@@ -608,28 +607,30 @@ func (fnb *FlowNodeBuilder) createProfileUploader() (profiler.Uploader, error) {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueProfiler() {
+	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
+	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
+
+	uploader, err := fnb.createProfileUploader()
+	if err != nil {
+		fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
+		uploader = &profiler.NoopUploader{}
+	}
+
+	profiler, err := profiler.New(
+		fnb.Logger,
+		uploader,
+		fnb.BaseConfig.profilerDir,
+		fnb.BaseConfig.profilerInterval,
+		fnb.BaseConfig.profilerDuration,
+		fnb.BaseConfig.profilerEnabled,
+	)
+	fnb.MustNot(err).Msg("could not initialize profiler")
+
+	// register the enabled state of the profiler for dynamic configuring
+	err = fnb.ConfigManager.RegisterBoolConfig("profiler-enabled", profiler.Enabled, profiler.SetEnabled)
+	fnb.MustNot(err).Msg("could not register profiler config")
+
 	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
-		runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
-
-		uploader, err := fnb.createProfileUploader()
-		if err != nil {
-			fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
-			uploader = &profiler.NoopUploader{}
-		}
-
-		profiler, err := profiler.New(
-			fnb.Logger,
-			uploader,
-			fnb.BaseConfig.profilerDir,
-			fnb.BaseConfig.profilerInterval,
-			fnb.BaseConfig.profilerDuration,
-			fnb.BaseConfig.profilerEnabled,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize profiler: %w", err)
-		}
-
 		return profiler, nil
 	})
 }
@@ -1429,8 +1430,6 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return common.NewGetConfigCommand(config.ConfigManager)
 	}).AdminCommand("set-config", func(config *NodeConfig) commands.AdminCommand {
 		return common.NewSetConfigCommand(config.ConfigManager)
-	}).AdminCommand("set-profiler-enabled", func(config *NodeConfig) commands.AdminCommand {
-		return &common.SetProfilerEnabledCommand{} // TODO make config
 	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
 	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
@@ -1469,6 +1468,7 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	fnb.initLogger()
+	fnb.ConfigManager = updatable_configs.NewManager()
 
 	fnb.initDB()
 	fnb.initSecretsDB()
