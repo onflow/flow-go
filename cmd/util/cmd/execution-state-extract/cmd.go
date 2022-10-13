@@ -137,7 +137,11 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment[:]))
+	log.Info().Msgf("Extracting state from %s, exporting root checkpoint to %s",
+		flagExecutionStateDir,
+		path.Join(flagOutputDir, bootstrap.FilenameWALRootCheckpoint))
+
+	log.Info().Msgf("Block state commitment: %s, output dir: %s", hex.EncodeToString(stateCommitment[:]), flagOutputDir)
 
 	chain, err := getChain(flagChain)
 	if err != nil {

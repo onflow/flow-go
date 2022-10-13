@@ -33,8 +33,10 @@ func extractExecutionState(
 	report bool,
 ) error {
 
+	log.Info().Msg("init WAL")
+
 	diskWal, err := wal.NewDiskWAL(
-		zerolog.Nop(),
+		log,
 		nil,
 		metrics.NewNoopCollector(),
 		dir,
@@ -45,6 +47,8 @@ func extractExecutionState(
 	if err != nil {
 		return fmt.Errorf("cannot create disk WAL: %w", err)
 	}
+
+	log.Info().Msg("init ledger")
 
 	led, err := complete.NewLedger(
 		diskWal,
@@ -60,6 +64,8 @@ func extractExecutionState(
 		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 		checkpointsToKeep  = 1
 	)
+
+	log.Info().Msg("init compactor")
 
 	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	if err != nil {
