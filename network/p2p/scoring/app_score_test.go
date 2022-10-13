@@ -22,21 +22,23 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestAccessNodeScore_Integration_HonestANs(t *testing.T) {
+// TestFullGossipSubConnectivity tests that when the entire network is running by honest nodes,
+// pushing access nodes to the edges of the network (i.e., the access nodes are not in the mesh of any honest nodes)
+// will not cause the network to partition, i.e., all honest nodes can still communicate with each other through GossipSub.
+func TestFullGossipSubConnectivity(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
 	sporkId := unittest.IdentifierFixture()
-
 	idProvider := mock.NewIdentityProvider(t)
-	// one consensus node.
-	groupOneNodes, groupOneIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 12,
+
+	// two groups of non-access nodes and one group of access nodes.
+	groupOneNodes, groupOneIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 5,
 		p2pfixtures.WithRole(flow.RoleConsensus),
 		p2pfixtures.WithPeerScoringEnabled(idProvider))
-	groupTwoNodes, groupTwoIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 12,
-		p2pfixtures.WithRole(flow.RoleConsensus),
+	groupTwoNodes, groupTwoIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 5,
+		p2pfixtures.WithRole(flow.RoleCollection),
 		p2pfixtures.WithPeerScoringEnabled(idProvider))
-	accessNodeGroup, accessNodeIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 12,
+	accessNodeGroup, accessNodeIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 5,
 		p2pfixtures.WithRole(flow.RoleAccess),
 		p2pfixtures.WithPeerScoringEnabled(idProvider))
 
@@ -84,17 +86,20 @@ func TestAccessNodeScore_Integration_HonestANs(t *testing.T) {
 	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, append(groupOneNodes, accessNodeGroup...), append(groupOneIds, accessNodeIds...))
 	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, append(groupTwoNodes, accessNodeGroup...), append(groupTwoIds, accessNodeIds...))
 
-	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture())
-	require.NoError(t, groupOneNodes[0].Publish(ctx, blockTopic, proposalMsg))
+	// checks end-to-end message delivery works
+	// each node sends a distinct message to all and checks that all nodes receive it.
+	for _, node := range nodes {
+		proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture())
+		require.NoError(t, node.Publish(ctx, blockTopic, proposalMsg))
 
-	time.Sleep(5 * time.Second)
+		// checks that the message is received by all nodes.
+		ctx1s, cancel1s := context.WithTimeout(ctx, 5*time.Second)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, groupOneSubs)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, accessNodeSubs)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, groupTwoSubs)
 
-	// checks that the message is received by all nodes.
-	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel1s()
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, groupOneSubs)
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, accessNodeSubs)
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, groupTwoSubs)
+		cancel1s()
+	}
 }
 
 func TestMaliciousAccessNode_NoHonestPeerScoring(t *testing.T) {
