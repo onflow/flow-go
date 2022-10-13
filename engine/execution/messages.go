@@ -30,6 +30,21 @@ type ComputationResult struct {
 	ExecutionDataID        flow.Identifier
 }
 
+func NewEmptyComputationResult(block *entity.ExecutableBlock) *ComputationResult {
+	numberOfChunks := len(block.CompleteCollections) + 1
+	return &ComputationResult{
+		ExecutableBlock:        block,
+		Events:                 make([]flow.EventsList, numberOfChunks),
+		ServiceEvents:          make(flow.EventsList, 0),
+		TransactionResults:     make([]flow.TransactionResult, 0),
+		TransactionResultIndex: make([]int, 0),
+		StateCommitments:       make([]flow.StateCommitment, 0, numberOfChunks),
+		Proofs:                 make([][]byte, 0, numberOfChunks),
+		TrieUpdates:            make([]*ledger.TrieUpdate, 0, numberOfChunks),
+		EventsHashes:           make([]flow.Identifier, 0, numberOfChunks),
+	}
+}
+
 func (cr *ComputationResult) AddEvents(chunkIndex int, inp []flow.Event) {
 	cr.Events[chunkIndex] = append(cr.Events[chunkIndex], inp...)
 }

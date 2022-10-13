@@ -149,25 +149,14 @@ func (e *blockComputer) executeBlock(
 		fvm.WithBlockPrograms(programs))
 	collections := block.Collections()
 
-	chunksSize := len(collections) + 1 // + 1 system chunk
-
-	res := &execution.ComputationResult{
-		ExecutableBlock:        block,
-		Events:                 make([]flow.EventsList, chunksSize),
-		ServiceEvents:          make(flow.EventsList, 0),
-		TransactionResults:     make([]flow.TransactionResult, 0),
-		TransactionResultIndex: make([]int, 0),
-		StateCommitments:       make([]flow.StateCommitment, 0, chunksSize),
-		Proofs:                 make([][]byte, 0, chunksSize),
-		TrieUpdates:            make([]*ledger.TrieUpdate, 0, chunksSize),
-		EventsHashes:           make([]flow.Identifier, 0, chunksSize),
-	}
+	res := execution.NewEmptyComputationResult(block)
 
 	var txIndex uint32
 	var err error
 	var wg sync.WaitGroup
 	wg.Add(2) // block commiter and event hasher
 
+	chunksSize := len(collections) + 1 // + 1 system chunk
 	bc := blockCommitter{
 		committer: e.committer,
 		blockSpan: blockSpan,
