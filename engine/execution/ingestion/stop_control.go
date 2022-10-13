@@ -108,10 +108,10 @@ func (s *StopControl) SetStopHeight(height uint64, crash bool) (uint64, bool, er
 	}
 
 	s.log.Info().
+		Int8("previous_state", int8(s.state)).Int8("new_state", int8(StopControlSet)).
 		Uint64("height", height).Bool("crash", crash).
 		Uint64("old_height", oldHeight).Bool("old_crash", oldCrash).Msg("new stop height set")
 
-	s.log.Debug().Int8("previous_state", int8(s.state)).Int8("new_state", int8(StopControlSet)).Msg("StopControl state transition")
 	s.state = StopControlSet
 
 	s.height = height
@@ -150,8 +150,7 @@ func (s *StopControl) blockProcessable(b *flow.Header) bool {
 
 	// skips blocks at or above requested stop height
 	if b.Height >= s.height {
-		s.log.Warn().Msgf("Skipping execution of %s at height %d because stop has been requested at height %d", b.ID(), b.Height, s.height)
-		s.log.Debug().Int8("previous_state", int8(s.state)).Int8("new_state", int8(StopControlCommenced)).Msg("StopControl state transition")
+		s.log.Warn().Int8("previous_state", int8(s.state)).Int8("new_state", int8(StopControlCommenced)).Msgf("Skipping execution of %s at height %d because stop has been requested at height %d", b.ID(), b.Height, s.height)
 		s.state = StopControlCommenced // if block was skipped, move into commenced state
 		return false
 	}
