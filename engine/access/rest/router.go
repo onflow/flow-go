@@ -101,4 +101,9 @@ var Routes = []route{{
 	Pattern: "/events",
 	Name:    "getEvents",
 	Handler: GetEvents,
+}, {
+	Method:  http.MethodGet,
+	Pattern: "/network/parameters",
+	Name:    "getNetworkParameters",
+	Handler: GetNetworkParameters,
 }}
