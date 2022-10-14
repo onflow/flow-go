@@ -24,9 +24,9 @@ type Network struct {
 	logger             zerolog.Logger
 	orchestrator       insecure.AttackOrchestrator // the mounted orchestrator that implements certain attack logic.
 	codec              network.Codec
-	corruptNodeIds     flow.IdentityList                                    // identity of the corrupt nodes
-	corruptConnections map[flow.Identifier]insecure.CorruptedNodeConnection // existing connections to the corrupt nodes.
-	corruptConnector   insecure.CorruptedNodeConnector                      // connection generator to corrupt nodes.
+	corruptNodeIds     flow.IdentityList                                  // identity of the corrupt nodes
+	corruptConnections map[flow.Identifier]insecure.CorruptNodeConnection // existing connections to the corrupt nodes.
+	corruptConnector   insecure.CorruptNodeConnector                      // connection generator to corrupt nodes.
 }
 
 var _ insecure.OrchestratorNetwork = &Network{}
@@ -35,7 +35,7 @@ func NewOrchestratorNetwork(
 	logger zerolog.Logger,
 	codec network.Codec,
 	orchestrator insecure.AttackOrchestrator,
-	connector insecure.CorruptedNodeConnector,
+	connector insecure.CorruptNodeConnector,
 	corruptNodeIds flow.IdentityList) (*Network, error) {
 
 	orchestratorNetwork := &Network{
@@ -44,7 +44,7 @@ func NewOrchestratorNetwork(
 		codec:              codec,
 		corruptConnector:   connector,
 		corruptNodeIds:     corruptNodeIds,
-		corruptConnections: make(map[flow.Identifier]insecure.CorruptedNodeConnection),
+		corruptConnections: make(map[flow.Identifier]insecure.CorruptNodeConnection),
 	}
 
 	connector.WithIncomingMessageHandler(orchestratorNetwork.Observe)

@@ -5,8 +5,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// CorruptedNodeConnection abstracts connection from attacker to a corrupt network through the orchestrator network.
-type CorruptedNodeConnection interface {
+// CorruptNodeConnection abstracts connection from attacker to a corrupt network through the orchestrator network.
+type CorruptNodeConnection interface {
 	// SendMessage sends the message from orchestrator to the corrupted conduit factory.
 	SendMessage(*Message) error
 
@@ -14,10 +14,10 @@ type CorruptedNodeConnection interface {
 	CloseConnection() error
 }
 
-// CorruptedNodeConnector establishes a connection to a remote corrupted node.
-type CorruptedNodeConnector interface {
+// CorruptNodeConnector establishes a connection to a remote corrupted node.
+type CorruptNodeConnector interface {
 	// Connect creates a connection the corruptible conduit factory of the given corrupted identity.
-	Connect(irrecoverable.SignalerContext, flow.Identifier) (CorruptedNodeConnection, error)
+	Connect(irrecoverable.SignalerContext, flow.Identifier) (CorruptNodeConnection, error)
 
 	// WithIncomingMessageHandler sets the handler for the incoming messages from remote corrupted nodes.
 	WithIncomingMessageHandler(func(*Message))

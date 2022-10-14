@@ -13,9 +13,9 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// CorruptedNodeConnection abstracts connection between an attack orchestrator to a corrupt network (cn)
+// CorruptNodeConnection abstracts connection between an attack orchestrator to a corrupt network (cn)
 // through the orchestrator network.
-type CorruptedNodeConnection struct {
+type CorruptNodeConnection struct {
 	component.Component
 	cm             *component.ComponentManager
 	logger         zerolog.Logger
@@ -24,15 +24,15 @@ type CorruptedNodeConnection struct {
 	inbound        insecure.CorruptNetwork_ConnectAttackerClient        // from corrupt network to attacker.
 }
 
-var _ insecure.CorruptedNodeConnection = &CorruptedNodeConnection{}
+var _ insecure.CorruptNodeConnection = &CorruptNodeConnection{}
 
-func NewCorruptedNodeConnection(
+func NewCorruptNodeConnection(
 	logger zerolog.Logger,
 	inboundHandler func(message *insecure.Message),
 	outbound insecure.CorruptNetwork_ProcessAttackerMessageClient,
-	inbound insecure.CorruptNetwork_ConnectAttackerClient) *CorruptedNodeConnection {
-	c := &CorruptedNodeConnection{
-		logger:         logger.With().Str("component", "corrupted-connector").Logger(),
+	inbound insecure.CorruptNetwork_ConnectAttackerClient) *CorruptNodeConnection {
+	c := &CorruptNodeConnection{
+		logger:         logger.With().Str("component", "corrupt-connector").Logger(),
 		outbound:       outbound,
 		inbound:        inbound,
 		inboundHandler: inboundHandler,
@@ -55,7 +55,7 @@ func NewCorruptedNodeConnection(
 }
 
 // SendMessage sends the message from orchestrator to the corrupt network.
-func (c *CorruptedNodeConnection) SendMessage(message *insecure.Message) error {
+func (c *CorruptNodeConnection) SendMessage(message *insecure.Message) error {
 	err := c.outbound.Send(message)
 	if err != nil {
 		return fmt.Errorf("could not send message: %w", err)
@@ -66,7 +66,7 @@ func (c *CorruptedNodeConnection) SendMessage(message *insecure.Message) error {
 
 // receiveLoop implements the continuous procedure of reading from inbound stream of this connection, which
 // is established from the remote ccf to the local attack orchestrator.
-func (c *CorruptedNodeConnection) receiveLoop() {
+func (c *CorruptNodeConnection) receiveLoop() {
 	c.logger.Info().Msg("receive loop started")
 
 	for {
@@ -89,7 +89,7 @@ func (c *CorruptedNodeConnection) receiveLoop() {
 }
 
 // CloseConnection closes gRPC client connection to the corrupt network (gRPC server).
-func (c *CorruptedNodeConnection) CloseConnection() error {
+func (c *CorruptNodeConnection) CloseConnection() error {
 	err := c.outbound.CloseSend()
 	if err != nil {
 		return fmt.Errorf("could not close outbound connection: %w", err)

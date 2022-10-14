@@ -25,7 +25,7 @@ type CorruptConnector struct {
 	corruptPortsMap map[flow.Identifier]string
 }
 
-var _ insecure.CorruptedNodeConnector = &CorruptConnector{}
+var _ insecure.CorruptNodeConnector = &CorruptConnector{}
 
 func NewCorruptConnector(
 	logger zerolog.Logger,
@@ -39,7 +39,7 @@ func NewCorruptConnector(
 }
 
 // Connect creates a connection the corrupt network of the given corrupt identity.
-func (c *CorruptConnector) Connect(ctx irrecoverable.SignalerContext, targetId flow.Identifier) (insecure.CorruptedNodeConnection, error) {
+func (c *CorruptConnector) Connect(ctx irrecoverable.SignalerContext, targetId flow.Identifier) (insecure.CorruptNodeConnection, error) {
 	if c.inboundHandler == nil {
 		return nil, fmt.Errorf("inbound handler has not set")
 	}
@@ -71,7 +71,7 @@ func (c *CorruptConnector) Connect(ctx irrecoverable.SignalerContext, targetId f
 		return nil, fmt.Errorf("could not establish an outbound stream to corrupt network: %w", err)
 	}
 
-	connection := NewCorruptedNodeConnection(c.logger, c.inboundHandler, outbound, inbound)
+	connection := NewCorruptNodeConnection(c.logger, c.inboundHandler, outbound, inbound)
 	connection.Start(ctx)
 
 	c.logger.Debug().

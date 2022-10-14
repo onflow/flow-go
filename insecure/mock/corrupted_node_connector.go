@@ -17,15 +17,15 @@ type CorruptedNodeConnector struct {
 }
 
 // Connect provides a mock function with given fields: _a0, _a1
-func (_m *CorruptedNodeConnector) Connect(_a0 irrecoverable.SignalerContext, _a1 flow.Identifier) (insecure.CorruptedNodeConnection, error) {
+func (_m *CorruptedNodeConnector) Connect(_a0 irrecoverable.SignalerContext, _a1 flow.Identifier) (insecure.CorruptNodeConnection, error) {
 	ret := _m.Called(_a0, _a1)
 
-	var r0 insecure.CorruptedNodeConnection
-	if rf, ok := ret.Get(0).(func(irrecoverable.SignalerContext, flow.Identifier) insecure.CorruptedNodeConnection); ok {
+	var r0 insecure.CorruptNodeConnection
+	if rf, ok := ret.Get(0).(func(irrecoverable.SignalerContext, flow.Identifier) insecure.CorruptNodeConnection); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(insecure.CorruptedNodeConnection)
+			r0 = ret.Get(0).(insecure.CorruptNodeConnection)
 		}
 	}
 
