@@ -138,23 +138,13 @@ func (cs *EngineSuite) TestBroadcastProposalWithDelay() {
 	})
 
 	cs.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		// unset chain and height to make sure they are correctly reconstructed
-		headerFromHotstuff := *block.Header // copy header
-		headerFromHotstuff.ChainID = ""
-		headerFromHotstuff.Height = 0
-
-		// keep a duplicate of the correct header to check against leader
-		header := block.Header
-		// make sure chain ID and height were reconstructed and we broadcast to correct nodes
-		header.ChainID = "test"
-		header.Height = 11
 		expectedBroadcastMsg := &messages.BlockProposal{
-			Header:  header,
+			Header:  block.Header,
 			Payload: block.Payload,
 		}
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		cs.hotstuff.On("SubmitProposal", &headerFromHotstuff).
+		cs.hotstuff.On("SubmitProposal", block.Header).
 			Run(func(args mock.Arguments) { close(submitted) }).
 			Once()
 
@@ -166,7 +156,7 @@ func (cs *EngineSuite) TestBroadcastProposalWithDelay() {
 			Once()
 
 		// submit to broadcast proposal
-		err := cs.engine.BroadcastProposalWithDelay(&headerFromHotstuff, 0)
+		err := cs.engine.BroadcastProposalWithDelay(block.Header, 0)
 		require.NoError(cs.T(), err, "header broadcast should pass")
 
 		unittest.AssertClosesBefore(cs.T(), util.AllClosed(broadcasted, submitted), time.Second)
