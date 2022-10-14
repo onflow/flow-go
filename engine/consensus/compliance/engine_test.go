@@ -40,7 +40,7 @@ func (cs *EngineSuite) SetupTest() {
 	cs.hotstuff.On("Ready", mock.Anything).Return(unittest.ClosedChannel()).Maybe()
 	cs.hotstuff.On("Done", mock.Anything).Return(unittest.ClosedChannel()).Maybe()
 
-	e, err := NewEngine(unittest.Logger(), cs.me, cs.prov, cs.core)
+	e, err := NewEngine(unittest.Logger(), cs.me, cs.core)
 	require.NoError(cs.T(), err)
 	e.WithConsensus(cs.hotstuff)
 	cs.engine = e
