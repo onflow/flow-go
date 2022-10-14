@@ -13,14 +13,7 @@ func TestGenerateTestTemplates(t *testing.T) {
 	fmt.Printf("Starting tests")
 	expectedValues := textReader("templates/test_templates/expected_values.yml")
 
-	var nodeConfig = make(map[string]int)
-	nodeConfig["access"] = 1
-	nodeConfig["collection"] = 2
-	nodeConfig["consensus"] = 2
-	nodeConfig["execution"] = 1
-	nodeConfig["verification"] = 1
-
-	GenerateValuesYaml(nodeConfig, "templates/test_templates/sample-infos.pub.json", "templates/test_templates/", "test_values.yml")
+	GenerateValuesYaml("test_files/sample-infos.pub.json", "test_files/", "test_values.yml")
 	actualValues := textReader("test_values.yml")
 
 	require.Equal(t, expectedValues, actualValues)

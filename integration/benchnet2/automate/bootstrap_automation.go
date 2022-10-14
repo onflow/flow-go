@@ -46,7 +46,7 @@ var DEFAULT_CONSENSUS_IMAGE string = "gcr.io/flow-container-registry/consensus:v
 var DEFAULT_EXECUTION_IMAGE string = "gcr.io/flow-container-registry/execution:v0.27.6"
 var DEFAULT_VERIFICATION_IMAGE string = "gcr.io/flow-container-registry/verification:v0.27.6"
 
-func loadNodeJsonData(nodeInfoPath string) map[string]Node {
+func loadNodeJsonData(nodeInfoPath string) (map[string]Node, map[string]int) {
 	jsonFile, err := os.Open(nodeInfoPath)
 	if err != nil {
 		log.Fatal(err)
@@ -59,14 +59,24 @@ func loadNodeJsonData(nodeInfoPath string) map[string]Node {
 	var nodes []Node
 	json.Unmarshal(byteValue, &nodes)
 
+	var nodeConfig = make(map[string]int)
+	nodeConfig["access"] = 0
+	nodeConfig["collection"] = 0
+	nodeConfig["consensus"] = 0
+	nodeConfig["execution"] = 0
+	nodeConfig["verification"] = 0
+
 	nodeMap := map[string]Node{}
-	re := regexp.MustCompile(`\w{6,}\d{1,3}`)
+	nodeNameRe := regexp.MustCompile(`\w{6,}\d{1,3}`)
+	nodeTypeRe := regexp.MustCompile(`\D{6,}`)
 	for _, node := range nodes {
-		name := re.FindStringSubmatch(node.Address)
+		name := nodeNameRe.FindStringSubmatch(node.Address)
+		nodeType := nodeTypeRe.FindStringSubmatch(node.Address)
 		nodeMap[name[0]] = node
+		nodeConfig[nodeType[0]]++
 	}
 
-	return nodeMap
+	return nodeMap, nodeConfig
 }
 
 func textReader(path string) string {
@@ -94,13 +104,14 @@ func createFile(filename string) *os.File {
 	return file
 }
 
-func GenerateValuesYaml(nodeConfig map[string]int, jsonDataFilePath string, templatePath string, outputFilePath string) {
+func GenerateValuesYaml(jsonDataFilePath string, templatePath string, outputFilePath string) {
 	var nodesData map[string]Node
+	var nodeConfig map[string]int
 	var templateFolder string
 	if jsonDataFilePath == "" {
-		nodesData = loadNodeJsonData(DEFAULT_NODE_INFO_PATH)
+		nodesData, nodeConfig = loadNodeJsonData(DEFAULT_NODE_INFO_PATH)
 	} else {
-		nodesData = loadNodeJsonData(jsonDataFilePath)
+		nodesData, nodeConfig = loadNodeJsonData(jsonDataFilePath)
 	}
 
 	if templatePath == "" {
