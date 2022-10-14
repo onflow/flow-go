@@ -7,6 +7,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -42,6 +43,41 @@ type EventEmitter interface {
 	ServiceEvents() []flow.Event
 
 	Reset()
+}
+
+type ParseRestrictedEventEmitter struct {
+	txnState *state.TransactionState
+	impl     EventEmitter
+}
+
+func NewParseRestrictedEventEmitter(
+	txnState *state.TransactionState,
+	impl EventEmitter,
+) EventEmitter {
+	return ParseRestrictedEventEmitter{
+		txnState: txnState,
+		impl:     impl,
+	}
+}
+
+func (emitter ParseRestrictedEventEmitter) EmitEvent(event cadence.Event) error {
+	return parseRestrict1Arg(
+		emitter.txnState,
+		"EmitEvent",
+		emitter.impl.EmitEvent,
+		event)
+}
+
+func (emitter ParseRestrictedEventEmitter) Events() []flow.Event {
+	return emitter.impl.Events()
+}
+
+func (emitter ParseRestrictedEventEmitter) ServiceEvents() []flow.Event {
+	return emitter.impl.ServiceEvents()
+}
+
+func (emitter ParseRestrictedEventEmitter) Reset() {
+	emitter.impl.Reset()
 }
 
 var _ EventEmitter = NoEventEmitter{}
