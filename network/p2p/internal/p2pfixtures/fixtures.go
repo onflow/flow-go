@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
@@ -355,12 +356,13 @@ func PeerIdsFixture(t *testing.T, n int) []peer.ID {
 }
 
 // MustEncodeEvent encodes and returns the given event and fails the test if it faces any issue while encoding.
-func MustEncodeEvent(t *testing.T, v interface{}) []byte {
+func MustEncodeEvent(t *testing.T, v interface{}, channel channels.Channel) []byte {
 	bz, err := unittest.NetworkCodec().Encode(v)
 	require.NoError(t, err)
 
 	msg := message.Message{
-		Payload: bz,
+		ChannelID: channel.String(),
+		Payload:   bz,
 	}
 	data, err := msg.Marshal()
 	require.NoError(t, err)

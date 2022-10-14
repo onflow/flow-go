@@ -89,7 +89,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header}, channel)
 
 	err = sn2.Publish(timedCtx, topic, data1)
 	require.NoError(t, err)
@@ -142,7 +142,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 	// create a dummy sync request to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, &messages.SyncRequest{Nonce: 0, Height: 0})
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.SyncRequest{Nonce: 0, Height: 0}, channel)
 
 	err = sn2.Publish(timedCtx, topic, data1)
 	require.NoError(t, err)
@@ -207,16 +207,7 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
 
-	// encode the block proposal message with an incorrect value for ChannelID
-	bz, err := unittest.NetworkCodec().Encode(&messages.BlockProposal{Header: header})
-	require.NoError(t, err)
-
-	msg := message.Message{
-		ChannelID: "invalid-channel",
-		Payload:   bz,
-	}
-	data1, err := msg.Marshal()
-	require.NoError(t, err)
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header}, channels.Channel("invalid-channel"))
 
 	err = sn2.Publish(timedCtx, topic, data1)
 
@@ -270,7 +261,7 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header}, channels.PushBlocks)
 
 	err = sn2.Publish(timedCtx, topic, data1)
 
@@ -346,7 +337,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header}, channel)
 
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
@@ -365,7 +356,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	timedCtx, cancel2s := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel2s()
 	header = unittest.BlockHeaderFixture()
-	data2 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
+	data2 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header}, channel)
 
 	// the access node now publishes the block proposal message, AN are not authorized to publish block proposals
 	// the message should be rejected by the topic validator on sn1
@@ -451,7 +442,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header}, channel)
 
 	// sn2 publishes the block proposal on the sync committee channel
 	err = sn2.Publish(timedCtx, topic, data1)
@@ -530,7 +521,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
+	data1 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header}, channel)
 
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
@@ -549,7 +540,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	// "eject" sn2 to ensure messages published by ejected nodes get rejected
 	identity2.Ejected = true
 	header = unittest.BlockHeaderFixture()
-	data3 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header})
+	data3 := p2pfixtures.MustEncodeEvent(t, &messages.BlockProposal{Header: header}, channel)
 	timedCtx, cancel2s := context.WithTimeout(ctx, time.Second)
 	defer cancel2s()
 	err = sn2.Publish(timedCtx, topic, data3)
@@ -623,7 +614,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 	// create a dummy sync request to publish from our LN node
-	data := p2pfixtures.MustEncodeEvent(t, &messages.RangeRequest{})
+	data := p2pfixtures.MustEncodeEvent(t, &messages.RangeRequest{}, channel)
 
 	// ln2 publishes the sync request on the cluster channel
 	err = ln2.Publish(timedCtx, topic, data)
