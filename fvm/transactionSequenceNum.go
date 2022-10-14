@@ -48,13 +48,10 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	}
 
 	defer func() {
-		// Skip checking limits when merging the public key sequence number
-		txnState.RunWithAllLimitsDisabled(func() {
-			mergeError := txnState.Commit(nestedTxnId)
-			if mergeError != nil {
-				panic(mergeError)
-			}
-		})
+		commitError := txnState.Commit(nestedTxnId)
+		if commitError != nil {
+			panic(commitError)
+		}
 	}()
 
 	accounts := environment.NewAccounts(txnState)
@@ -93,11 +90,10 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	})
 	if err != nil {
-		// NOTE: we need to disable limits during restart or else restart may
-		// fail on merging.
-		txnState.RunWithAllLimitsDisabled(func() {
-			_ = txnState.RestartNestedTransaction(nestedTxnId)
-		})
+		restartError := txnState.RestartNestedTransaction(nestedTxnId)
+		if restartError != nil {
+			panic(restartError)
+		}
 		return err
 	}
 
