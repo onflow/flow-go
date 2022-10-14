@@ -106,7 +106,7 @@ func NewCompactor(
 		checkpointer:                         checkpointer,
 		wal:                                  w,
 		trieQueue:                            trieQueue,
-		logger:                               logger,
+		logger:                               logger.With().Str("ledger_mod", "compactor").Logger(),
 		stopCh:                               make(chan chan struct{}),
 		trieUpdateCh:                         trieUpdateCh,
 		observers:                            make(map[observable.Observer]struct{}),

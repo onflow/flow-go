@@ -50,7 +50,7 @@ func NewLedger(
 	log zerolog.Logger,
 	pathFinderVer uint8) (*Ledger, error) {
 
-	logger := log.With().Str("ledger", "complete").Logger()
+	logger := log.With().Str("ledger_mod", "complete").Logger()
 
 	forest, err := mtrie.NewForest(capacity, metrics, nil)
 	if err != nil {
