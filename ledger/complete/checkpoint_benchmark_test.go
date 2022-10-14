@@ -24,7 +24,7 @@ func BenchmarkStoreCheckpointV5(b *testing.B) {
 	benchmarkStoreCheckpoint(b, 5, false)
 }
 
-func BenchmarkStoreCheckpointV6(b *testing.B) {
+func BenchmarkStoreCheckpointV6SingleThread(b *testing.B) {
 	benchmarkStoreCheckpoint(b, 6, false)
 }
 
