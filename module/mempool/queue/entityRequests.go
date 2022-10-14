@@ -36,10 +36,16 @@ func NewEntityRequestStore(sizeLimit uint32, logger zerolog.Logger, collector mo
 	}
 }
 
+// Put enqueues the entity request message into the message store.
+//
+// Boolean returned variable determines whether enqueuing was successful, i.e.,
+// put may be dropped if queue is full or already exists.
 func (e *EntityRequestStore) Put(message *engine.Message) bool {
 	return e.push(message.OriginID, message.Payload.(*messages.EntityRequest))
 }
 
+// Get pops the queue, i.e., it returns the head of queue, and updates the head to the next element.
+// Boolean return value determines whether pop is successful, i.e., poping an empty queue returns false.
 func (e *EntityRequestStore) Get() (*engine.Message, bool) {
 	originId, request, ok := e.pop()
 	if !ok {
