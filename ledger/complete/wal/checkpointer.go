@@ -949,6 +949,8 @@ func readCheckpointV5(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error)
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	tries := make([]*trie.MTrie, triesCount)
 
+	logging := logProgress("reading trie nodes", int(nodesCount), logger)
+
 	for i := uint64(1); i <= nodesCount; i++ {
 		n, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= uint64(i) {
@@ -960,6 +962,7 @@ func readCheckpointV5(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error)
 			return nil, fmt.Errorf("cannot read node %d: %w", i, err)
 		}
 		nodes[i] = n
+		logging(i)
 	}
 
 	for i := uint16(0); i < triesCount; i++ {
