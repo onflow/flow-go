@@ -36,7 +36,7 @@ func TestMessageHub(t *testing.T) {
 	suite.Run(t, new(MessageHubSuite))
 }
 
-// MessageHubSuite tests the consensus message hub. Holds mocked dependencies that are used by different test scenarios.
+// MessageHubSuite tests the cluster consensus message hub. Holds mocked dependencies that are used by different test scenarios.
 type MessageHubSuite struct {
 	suite.Suite
 

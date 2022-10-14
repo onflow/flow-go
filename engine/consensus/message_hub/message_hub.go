@@ -47,14 +47,18 @@ type packedVote struct {
 //           vote                     block                  timeout object
 //
 // MessageHub acts as communicator and handles hotstuff.Consumer communication events to send votes, broadcast timeouts
-// and proposals. It implements hotstuff.Consumer interface and needs to be subscribed for notifications via pub/sub.
+// and proposals. It is responsible for communication between consensus participants and broadcasting proposals to non-consensus nodes.
+// It implements hotstuff.Consumer interface and needs to be subscribed for notifications via pub/sub.
 // All communicator events are handled on worker thread to prevent sender from blocking.
 // For outgoing messages processing logic looks like this:
 //
 //    +-------------------+      +------------+      +----------+      +------------------------+
-//    | Consensus-Channel |<-----| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
-//    +-------------------+      +------+-----+      +----------+      +------------------------+
-//                                                      pub/sub          vote, timeout, proposal
+//    | Consensus-Channel |<--+--| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
+//    +-------------------+   |  +------+-----+      +----------+      +------------------------+
+//                            |                         pub/sub          vote, timeout, proposal
+//    +-------------------+   |
+//    | PushBlock-Channel |<--+
+//    +-------------------+
 //
 // MessageHub is safe to use in concurrent environment.
 */
@@ -69,15 +73,15 @@ type MessageHub struct {
 	con                    network.Conduit
 	pushBlocksCon          network.Conduit
 	queuedMessagesNotifier engine.Notifier
-	queuedVotes            *fifoqueue.FifoQueue
-	queuedProposals        *fifoqueue.FifoQueue
-	queuedTimeouts         *fifoqueue.FifoQueue
+	queuedVotes            *fifoqueue.FifoQueue // queue for handling outgoing vote transmissions
+	queuedProposals        *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions
+	queuedTimeouts         *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
 
 	// injected dependencies
-	compliance        network.MessageProcessor
-	hotstuff          module.HotStuff
-	voteAggregator    hotstuff.VoteAggregator
-	timeoutAggregator hotstuff.TimeoutAggregator
+	compliance        network.MessageProcessor   // handler of incoming block proposals
+	hotstuff          module.HotStuff            // used to submit proposals that were previously broadcast
+	voteAggregator    hotstuff.VoteAggregator    // handler of incoming votes
+	timeoutAggregator hotstuff.TimeoutAggregator // handler of incoming timeouts
 }
 
 var _ network.MessageProcessor = (*MessageHub)(nil)
@@ -102,7 +106,7 @@ func NewMessageHub(log zerolog.Logger,
 	}
 	queuedProposals, err := fifoqueue.NewFifoQueue()
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize proposals queue")
+		return nil, fmt.Errorf("could not initialize blocks queue")
 	}
 	queuedTimeouts, err := fifoqueue.NewFifoQueue()
 	if err != nil {

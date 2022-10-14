@@ -28,11 +28,38 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// packedVote is a helper structure to pack recipientID and vote into one structure to pass through fifoqueue.FifoQueue
 type packedVote struct {
 	recipientID flow.Identifier
 	vote        *messages.ClusterBlockVote
 }
 
+// MessageHub is a central module for handling incoming and outgoing messages via cluster consensus channel.
+// It performs message routing for incoming messages by matching them by type and sending to respective engine.
+/* For incoming messages handling processing looks like this:
+//
+//    +-------------------+      +------------+
+// -->|  Cluster-Channel  |----->| MessageHub |
+//    +-------------------+      +------+-----+
+//                          ------------|------------
+//    +------+---------+    |    +------+-----+     |    +------+------------+
+//    | VoteAggregator |----+    | Compliance |     +----| TimeoutAggregator |
+//    +----------------+         +------------+          +------+------------+
+//           vote                     block                  timeout object
+//
+// MessageHub acts as communicator and handles hotstuff.Consumer communication events to send votes, broadcast timeouts
+// and proposals. It is responsible for communication between cluster consensus participants.
+// It implements hotstuff.Consumer interface and needs to be subscribed for notifications via pub/sub.
+// All communicator events are handled on worker thread to prevent sender from blocking.
+// For outgoing messages processing logic looks like this:
+//
+//    +-------------------+      +------------+      +----------+      +------------------------+
+//    |  Cluster-Channel  |<-----| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
+//    +-------------------+      +------+-----+      +----------+      +------------------------+
+//                                                      pub/sub          vote, timeout, proposal
+//
+// MessageHub is safe to use in concurrent environment.
+*/
 type MessageHub struct {
 	*component.ComponentManager
 	notifications.NoopConsumer
@@ -43,21 +70,23 @@ type MessageHub struct {
 	payloads               storage.ClusterPayloads
 	con                    network.Conduit
 	queuedMessagesNotifier engine.Notifier
-	queuedVotes            *fifoqueue.FifoQueue
-	queuedProposals        *fifoqueue.FifoQueue
-	queuedTimeouts         *fifoqueue.FifoQueue
-	cluster                flow.IdentityList // consensus participants in our cluster
+	queuedVotes            *fifoqueue.FifoQueue // queue for handling outgoing vote transmissions
+	queuedProposals        *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions
+	queuedTimeouts         *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
+	cluster                flow.IdentityList    // consensus participants in our cluster
 
 	// injected dependencies
-	compliance        network.MessageProcessor
-	hotstuff          module.HotStuff
-	voteAggregator    hotstuff.VoteAggregator
-	timeoutAggregator hotstuff.TimeoutAggregator
+	compliance        network.MessageProcessor   // handler of incoming block proposals
+	hotstuff          module.HotStuff            // used to submit proposals that were previously broadcast
+	voteAggregator    hotstuff.VoteAggregator    // handler of incoming votes
+	timeoutAggregator hotstuff.TimeoutAggregator // handler of incoming timeouts
 }
 
 var _ network.MessageProcessor = (*MessageHub)(nil)
 var _ hotstuff.CommunicatorConsumer = (*MessageHub)(nil)
 
+// NewMessageHub constructs new instance of message hub
+// No errors are expected during normal operations.
 func NewMessageHub(log zerolog.Logger,
 	net network.Network,
 	me module.Local,
@@ -87,11 +116,11 @@ func NewMessageHub(log zerolog.Logger,
 	}
 	queuedProposals, err := fifoqueue.NewFifoQueue()
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize votes queue")
+		return nil, fmt.Errorf("could not initialize blocks queue")
 	}
 	queuedTimeouts, err := fifoqueue.NewFifoQueue()
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize votes queue")
+		return nil, fmt.Errorf("could not initialize timeouts queue")
 	}
 	hub := &MessageHub{
 		log:                    log.With().Str("engine", "cluster_message_hub").Logger(),
@@ -130,6 +159,7 @@ func NewMessageHub(log zerolog.Logger,
 	return hub, nil
 }
 
+// queuedMessagesProcessingLoop orchestrates dispatching of previously queued messages
 func (h *MessageHub) queuedMessagesProcessingLoop(ctx irrecoverable.SignalerContext) {
 	notifier := h.queuedMessagesNotifier.Channel()
 	for {
@@ -205,6 +235,9 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 	}
 }
 
+// processQueuedTimeout performs actual processing of model.TimeoutObject, as a result of successful invocation
+// broadcasts timeout object to consensus committee.
+// No errors are expected during normal operations.
 func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 	logContext := h.log.With().
 		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
@@ -255,6 +288,9 @@ func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 	return nil
 }
 
+// processQueuedVote performs actual processing of model.Vote, as a result of successful invocation
+// sends vote to designated receiver.
+// No errors are expected during normal operations.
 func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 	log := h.log.With().
 		Hex("collection_id", packed.vote.BlockID[:]).
@@ -277,8 +313,9 @@ func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 	return nil
 }
 
-// processQueuedBlock performs actual processing of queued block proposals, this method is called from multiple
-// concurrent goroutines.
+// processQueuedBlock performs actual processing of model.Proposal, as a result of successful invocation
+// broadcasts block proposal to collection cluster.
+// No errors are expected during normal operations.
 func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
 	// first, check that we are the proposer of the block
 	if header.ProposerID != h.me.NodeID() {
@@ -324,7 +361,7 @@ func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
 		return fmt.Errorf("could not get cluster members for broadcasting collection proposal")
 	}
 
-	// TODO(active-pacemaker):
+	// TODO(active-pacemaker): replace with pub/sub?
 	h.hotstuff.SubmitProposal(header, parent.View) // non-blocking
 
 	// create the proposal message for the collection
@@ -352,6 +389,7 @@ func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
 	return nil
 }
 
+// SendVote queues vote for subsequent sending
 func (h *MessageHub) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	vote := &packedVote{
 		recipientID: recipientID,
@@ -366,12 +404,14 @@ func (h *MessageHub) SendVote(blockID flow.Identifier, view uint64, sigData []by
 	}
 }
 
+// BroadcastTimeout queues timeout for subsequent sending
 func (h *MessageHub) BroadcastTimeout(timeout *model.TimeoutObject) {
 	if ok := h.queuedTimeouts.Push(timeout); ok {
 		h.queuedMessagesNotifier.Notify()
 	}
 }
 
+// BroadcastProposalWithDelay queues proposal for subsequent sending
 func (h *MessageHub) BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) {
 	go func() {
 		select {
@@ -386,6 +426,9 @@ func (h *MessageHub) BroadcastProposalWithDelay(proposal *flow.Header, delay tim
 	}()
 }
 
+// Process handles incoming messages from consensus channel. After matching message by type, sends it to the correct
+// component for handling.
+// No errors are expected during normal operations.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *events.SyncedClusterBlock:
