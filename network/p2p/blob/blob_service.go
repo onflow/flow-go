@@ -238,3 +238,93 @@ func (r *rateLimitedBlockStore) Get(ctx context.Context, c cid.Cid) (blocks.Bloc
 
 	return r.Blockstore.Get(ctx, c)
 }
+
+type Tracer struct {
+	logger zerolog.Logger
+}
+
+func NewTracer(logger zerolog.Logger) *Tracer {
+	return &Tracer{
+		logger,
+	}
+}
+
+func (t *Tracer) MessageReceived(pid peer.ID, msg bsmsg.BitSwapMessage) {
+	if t.logger.Debug().Enabled() {
+		evt := t.logger.Debug()
+
+		wantlist := zerolog.Arr()
+		for _, entry := range msg.Wantlist() {
+			wantlist = wantlist.Interface(entry)
+		}
+		evt.Array("wantlist", wantlist)
+
+		blks := zerolog.Arr()
+		for _, blk := range msg.Blocks() {
+			blks = blks.Str(blk.Cid().String())
+		}
+		evt.Array("blocks", blks)
+
+		blkPresences := zerolog.Arr()
+		for _, blkPresence := range msg.BlockPresences() {
+			blkPresences = blkPresences.Interface(blkPresence)
+		}
+		evt.Array("blocksPresences", blkPresences)
+
+		haves := zerolog.Arr()
+		for _, have := range msg.Haves() {
+			haves = haves.Str(have.String())
+		}
+		evt.Array("haves", haves)
+
+		dontHaves := zerolog.Arr()
+		for _, dontHave := range msg.DontHaves() {
+			dontHaves = dontHaves.Str(dontHave.String())
+		}
+		evt.Array("dontHaves", dontHaves)
+
+		evt.Int32("pendingBytes", msg.PendingBytes())
+
+		evt.Msg("bitswap message received")
+	}
+}
+
+func (t *Tracer) MessageSent(pid peer.ID, msg bsmsg.BitSwapMessage) {
+	if t.logger.Debug().Enabled() {
+		evt := t.logger.Debug()
+
+		wantlist := zerolog.Arr()
+		for _, entry := range msg.Wantlist() {
+			wantlist = wantlist.Interface(entry)
+		}
+		evt.Array("wantlist", wantlist)
+
+		blks := zerolog.Arr()
+		for _, blk := range msg.Blocks() {
+			blks = blks.Str(blk.Cid().String())
+		}
+		evt.Array("blocks", blks)
+
+		blkPresences := zerolog.Arr()
+		for _, blkPresence := range msg.BlockPresences() {
+			blkPresences = blkPresences.Interface(blkPresence)
+		}
+		evt.Array("blocksPresences", blkPresences)
+
+		haves := zerolog.Arr()
+		for _, have := range msg.Haves() {
+			haves = haves.Str(have.String())
+		}
+		evt.Array("haves", haves)
+
+		dontHaves := zerolog.Arr()
+		for _, dontHave := range msg.DontHaves() {
+			dontHaves = dontHaves.Str(dontHave.String())
+		}
+		evt.Array("dontHaves", dontHaves)
+
+		evt.Int32("pendingBytes", msg.PendingBytes())
+
+		evt.Msg("bitswap message sent")
+	}
+}

@@ -287,7 +287,15 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			exeNode.collector,
 		)
 
-		bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore)
+		bs, err := node.Network.RegisterBlobService(
+			channels.ExecutionDataService,
+			exeNode.executionDataDatastore,
+			p2p.WithBitswapOptions(
+				bitswap.WithTracer(
+					p2p.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService).Logger()),
+				),
+			),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not register blob service: %w", err)
 		}
@@ -375,7 +383,13 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
-	opts := []network.BlobServiceOption{}
+	opts := []network.BlobServiceOption{
+		p2p.WithBitswapOptions(
+			bitswap.WithTracer(
+				p2p.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService).Logger()),
+			),
+		),
+	}
 
 	if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
 		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
