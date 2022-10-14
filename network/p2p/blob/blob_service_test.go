@@ -19,28 +19,20 @@ func TestAuthorizedRequester(t *testing.T) {
 	allowList := map[flow.Identifier]bool{}
 
 	// known and on allow list
-	an1, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
-	an1PeerID, err := unittest.PeerIDFromFlowID(an1)
-	require.NoError(t, err)
+	an1, an1PeerID := identityInfo(t, flow.RoleAccess)
 	providerData[an1PeerID] = an1
 	allowList[an1.NodeID] = true
 
 	// known and not on allow list
-	an2, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
-	an2PeerID, err := unittest.PeerIDFromFlowID(an2)
-	require.NoError(t, err)
+	an2, an2PeerID := identityInfo(t, flow.RoleAccess)
 	providerData[an2PeerID] = an2
 
 	// unknown and on the allow list
-	an3, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
-	an3PeerID, err := unittest.PeerIDFromFlowID(an3)
-	require.NoError(t, err)
+	an3, an3PeerID := identityInfo(t, flow.RoleAccess)
 	allowList[an3.NodeID] = true // should be ignored
 
 	// known and on the allow list but not an access node
-	sn1, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn1PeerID, err := unittest.PeerIDFromFlowID(sn1)
-	require.NoError(t, err)
+	sn1, sn1PeerID := identityInfo(t, flow.RoleConsensus)
 	providerData[sn1PeerID] = sn1
 	allowList[sn1.NodeID] = true // should be ignored
 
@@ -104,4 +96,12 @@ func TestAuthorizedRequester(t *testing.T) {
 		authorizer := AuthorizedRequester(allowList, idProvider, unittest.Logger())
 		assert.False(t, authorizer(an3PeerID, cid.Cid{}))
 	})
+}
+
+func identityInfo(t *testing.T, role flow.Role) (*flow.Identity, peer.ID) {
+	identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(role))
+	peerID, err := unittest.PeerIDFromFlowID(identity)
+	require.NoError(t, err)
+
+	return identity, peerID
 }
