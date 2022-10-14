@@ -50,7 +50,7 @@ func (v *TransactionVerifier) verifyTransaction(
 	ctx Context,
 	txnState *state.TransactionState,
 ) error {
-	if ctx.Tracer != nil && proc.TraceSpan != nil {
+	if ctx.Tracer != nil && proc.IsSampled() {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMVerifyTransaction)
 		span.SetAttributes(
 			attribute.String("transaction.ID", proc.ID.String()),

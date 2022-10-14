@@ -37,7 +37,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	txnState *state.TransactionState,
 ) error {
 
-	if ctx.Tracer != nil && proc.TraceSpan != nil {
+	if ctx.Tracer != nil && proc.IsSampled() {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMSeqNumCheckTransaction)
 		defer span.End()
 	}

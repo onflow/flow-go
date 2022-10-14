@@ -35,7 +35,7 @@ func (i TransactionInvoker) Process(
 
 	txIDStr := proc.ID.String()
 	var span otelTrace.Span
-	if ctx.Tracer != nil && proc.TraceSpan != nil {
+	if ctx.Tracer != nil && proc.IsSampled() {
 		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
 		span.SetAttributes(
 			attribute.String("transaction_id", txIDStr),

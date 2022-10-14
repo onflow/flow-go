@@ -48,6 +48,10 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
 	proc.TraceSpan = traceSpan
 }
 
+func (proc *TransactionProcedure) IsSampled() bool {
+	return proc.TraceSpan != nil
+}
+
 func (proc *TransactionProcedure) Run(
 	ctx Context,
 	txnState *state.TransactionState,
