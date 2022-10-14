@@ -14,8 +14,8 @@ type RateLimiterMetadata struct {
 	Limiter *rate.Limiter
 	// LastRateLimit the last timestamp this the peer was rate limited.
 	LastRateLimit time.Time
-	// lastAccessed the last timestamp when the Limiter was used. This is used to cleanup old Limiter data
-	lastAccessed time.Time
+	// LastAccessed the last timestamp when the Limiter was used. This is used to Cleanup old Limiter data
+	LastAccessed time.Time
 }
 
 // RateLimiterMap stores a RateLimiterMetadata for each peer in an underlying map.
@@ -42,7 +42,7 @@ func (r *RateLimiterMap) Get(peerID peer.ID) (*RateLimiterMetadata, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if lmtr, ok := r.limiters[peerID]; ok {
-		lmtr.lastAccessed = time.Now()
+		lmtr.LastAccessed = time.Now()
 		return lmtr, ok
 	}
 	return nil, false
@@ -54,7 +54,7 @@ func (r *RateLimiterMap) Store(peerID peer.ID, lmtr *rate.Limiter) {
 	defer r.mu.Unlock()
 	r.limiters[peerID] = &RateLimiterMetadata{
 		Limiter:       lmtr,
-		lastAccessed:  time.Now(),
+		LastAccessed:  time.Now(),
 		LastRateLimit: time.Time{},
 	}
 }
@@ -78,8 +78,8 @@ func (r *RateLimiterMap) removeUnlocked(peerID peer.ID) {
 	delete(r.limiters, peerID)
 }
 
-// cleanup check the TTL for all keys in map and Remove isExpired keys.
-func (r *RateLimiterMap) cleanup() {
+// Cleanup check the TTL for all keys in map and Remove isExpired keys.
+func (r *RateLimiterMap) Cleanup() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for peerID, item := range r.limiters {
@@ -96,19 +96,19 @@ func (r *RateLimiterMap) CleanupLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			r.cleanup()
+			r.Cleanup()
 		case <-r.done:
 			return
 		}
 	}
 }
 
-// Close will Close the done channel starting the final full cleanup and stopping the cleanup loop.
+// Close will Close the done channel starting the final full Cleanup and stopping the Cleanup loop.
 func (r *RateLimiterMap) Close() {
 	close(r.done)
 }
 
 // isExpired returns true if configured ttl has passed for an item.
 func (r *RateLimiterMap) isExpired(item *RateLimiterMetadata) bool {
-	return time.Since(item.lastAccessed) > r.ttl
+	return time.Since(item.LastAccessed) > r.ttl
 }

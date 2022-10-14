@@ -1,4 +1,4 @@
-package limiter_map
+package limiter_map_test
 
 import (
 	"testing"
@@ -7,13 +7,14 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit/internal/limiter_map"
 	"github.com/stretchr/testify/require"
 )
 
 // TestLimiterMap_get checks true is returned for stored items and false for missing items.
 func TestLimiterMap_get(t *testing.T) {
 	t.Parallel()
-	m := NewLimiterMap(time.Second, time.Second)
+	m := limiter_map.NewLimiterMap(time.Second, time.Second)
 	peerID := peer.ID("id")
 	m.Store(peerID, rate.NewLimiter(0, 0))
 
@@ -26,7 +27,7 @@ func TestLimiterMap_get(t *testing.T) {
 // TestLimiterMap_remove checks the map removes keys as expected.
 func TestLimiterMap_remove(t *testing.T) {
 	t.Parallel()
-	m := NewLimiterMap(time.Second, time.Second)
+	m := limiter_map.NewLimiterMap(time.Second, time.Second)
 	peerID := peer.ID("id")
 	m.Store(peerID, rate.NewLimiter(0, 0))
 
@@ -44,7 +45,7 @@ func TestLimiterMap_cleanup(t *testing.T) {
 
 	// set fake ttl to 10 minutes
 	ttl := 10 * time.Minute
-	m := NewLimiterMap(ttl, time.Second)
+	m := limiter_map.NewLimiterMap(ttl, time.Second)
 
 	start := time.Now()
 
@@ -58,12 +59,15 @@ func TestLimiterMap_cleanup(t *testing.T) {
 	peerID3 := peer.ID("id3")
 	m.Store(peerID3, rate.NewLimiter(0, 0))
 
-	// manually set lastAccessed on 2 items so that they are removed during cleanup
-	m.limiters[peerID2].lastAccessed = start.Add(-10 * time.Minute)
-	m.limiters[peerID3].lastAccessed = start.Add(-20 * time.Minute)
+	// manually set LastAccessed on 2 items so that they are removed during Cleanup
+	limiter, _ := m.Get(peerID2)
+	limiter.LastAccessed = start.Add(-10 * time.Minute)
+
+	limiter, _ = m.Get(peerID3)
+	limiter.LastAccessed = start.Add(-20 * time.Minute)
 
 	// light clean up will only Remove expired keys
-	m.cleanup()
+	m.Cleanup()
 
 	_, ok := m.Get(peerID1)
 	require.True(t, ok)
@@ -73,17 +77,17 @@ func TestLimiterMap_cleanup(t *testing.T) {
 	require.False(t, ok)
 }
 
-// TestLimiterMap_cleanupLoopDone checks that the cleanup loop runs when signal is sent on done channel.
+// TestLimiterMap_cleanupLoopDone checks that the Cleanup loop runs when signal is sent on done channel.
 func TestLimiterMap_cleanupLoopDone(t *testing.T) {
 	t.Parallel()
 
 	// set fake ttl to 10 minutes
 	ttl := 10 * time.Minute
 
-	// set short tick to kick of cleanup
+	// set short tick to kick of Cleanup
 	tick := 10 * time.Millisecond
 
-	m := NewLimiterMap(ttl, tick)
+	m := limiter_map.NewLimiterMap(ttl, tick)
 
 	start := time.Now()
 
@@ -97,10 +101,15 @@ func TestLimiterMap_cleanupLoopDone(t *testing.T) {
 	peerID3 := peer.ID("id3")
 	m.Store(peerID3, rate.NewLimiter(0, 0))
 
-	// manually set lastAccessed on 2 items so that they are removed during cleanup
-	m.limiters[peerID1].lastAccessed = start.Add(-10 * time.Minute)
-	m.limiters[peerID2].lastAccessed = start.Add(-10 * time.Minute)
-	m.limiters[peerID3].lastAccessed = start.Add(-20 * time.Minute)
+	// manually set LastAccessed on 2 items so that they are removed during Cleanup
+	limiter, _ := m.Get(peerID1)
+	limiter.LastAccessed = start.Add(-10 * time.Minute)
+
+	limiter, _ = m.Get(peerID2)
+	limiter.LastAccessed = start.Add(-10 * time.Minute)
+
+	limiter, _ = m.Get(peerID3)
+	limiter.LastAccessed = start.Add(-20 * time.Minute)
 
 	// kick off clean up process, tick should happen immediately
 	go m.CleanupLoop()
