@@ -875,7 +875,7 @@ func HashFixture(size int) hash.Hash {
 	return hash
 }
 
-func IdentifierListFixture(n int) []flow.Identifier {
+func IdentifierListFixture(n int) flow.IdentifierList {
 	list := make([]flow.Identifier, n)
 	for i := 0; i < n; i++ {
 		list[i] = IdentifierFixture()

@@ -655,7 +655,6 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityPr
 // each Flow Identity is initialized with the passed address, the networking key
 // and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
 func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, error) {
-
 	if len(addresses) != len(keys) {
 		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
 	}
@@ -715,19 +714,22 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
-
-		builder.IdentityProvider = idCache
-
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
+
+		// The following wrapper allows to black-list byzantine nodes via an admin command:
+		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
+		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		if err != nil {
+			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+		}
 
 		// use the default identifier provider
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
-				var result flow.IdentifierList
-
 				pids := builder.LibP2PNode.GetPeersForProtocol(unicast.FlowProtocolID(builder.SporkID))
+				result := make(flow.IdentifierList, 0, len(pids))
 
 				for _, pid := range pids {
 					// exclude own Identifier
@@ -736,6 +738,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 					}
 
 					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
+						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
 						builder.Logger.Err(err).Str("peer", pid.String()).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)

@@ -125,76 +125,12 @@ func (i TransactionInvoker) Process(
 
 	env := NewTransactionEnvironment(ctx, txnState, programs, proc.Transaction, proc.TxIndex, span)
 
-	rt := env.BorrowCadenceRuntime()
-	defer env.ReturnCadenceRuntime(rt)
-
-	txError := rt.ExecuteTransaction(
-		runtime.Script{
-			Source:    proc.Transaction.Script,
-			Arguments: proc.Transaction.Arguments,
-		},
-		common.TransactionLocation(proc.ID))
-
-	if txError != nil {
-		txError = fmt.Errorf(
-			"transaction invocation failed when executing transaction: %w",
-			txError)
-
-		if mergeErrorShouldEarlyExit(txError) {
-			return
-		}
-	}
-
-	// read computationUsed from the environment. This will be used to charge fees.
-	computationUsed := env.ComputationUsed()
-	memoryEstimate := env.MemoryEstimate()
-
-	// log te execution intensities here, so tha they do not contain data from storage limit checks and
-	// transaction deduction, because the payer is not charged for those.
-	i.logExecutionIntensities(ctx, txnState, txIDStr)
-
-	if processErr == nil {
-		// disable the limit checks on states
-		txnState.DisableAllLimitEnforcements()
-		// try to deduct fees even if there is an error.
-		// disable the limit checks on states
-		feesError := i.deductTransactionFees(env, proc, txnState, computationUsed)
-		if mergeErrorShouldEarlyExit(feesError) {
-			return
-		}
-
-		txnState.EnableAllLimitEnforcements()
-	}
-
-	// Before checking storage limits, we must applying all pending changes
-	// that may modify storage usage.
-	if processErr == nil {
-		var flushErr error
-		modifiedSets, flushErr = env.FlushPendingUpdates()
-		if flushErr != nil {
-			flushErr = fmt.Errorf(
-				"transaction invocation failed to flush pending changes from "+
-					"environment: %w",
-				flushErr)
-
-			if mergeErrorShouldEarlyExit(flushErr) {
-				return
-			}
-		}
-	}
-
-	// if there is still no error check if all account storage limits are ok
-	if processErr == nil {
-		// disable the computation/memory limit checks on storage checks,
-		// so we don't error from computation/memory limits on this part.
-		// We cannot charge the user for this part, since fee deduction already happened.
-		txnState.DisableAllLimitEnforcements()
-		checkLimitErr := NewTransactionStorageLimiter().CheckLimits(env, txnState.UpdatedAddresses())
-		if mergeErrorShouldEarlyExit(checkLimitErr) {
-			return
-		}
-
-		txnState.EnableAllLimitEnforcements()
+	var computationUsed uint64
+	var memoryEstimate uint64
+	var txError error
+	computationUsed, memoryEstimate, modifiedSets, txError = i.normalExecution(proc, txnState, env)
+	if mergeErrorShouldEarlyExit(txError) {
+		return
 	}
 
 	// it there was any transaction error clear changes and try to deduct fees again
@@ -264,7 +200,7 @@ func (i TransactionInvoker) deductTransactionFees(
 	}
 
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be
-	// dynamic.	Execution effort will be connected to computation used.
+	// dynamic. Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
 	_, err = env.DeductTransactionFees(
 		proc.Transaction.Payer,
@@ -282,25 +218,92 @@ func (i TransactionInvoker) deductTransactionFees(
 
 // logExecutionIntensities logs execution intensities of the transaction
 func (i TransactionInvoker) logExecutionIntensities(
-	ctx Context,
 	txnState *state.TransactionState,
-	txHash string,
+	env environment.Environment,
 ) {
-	if ctx.Logger.Debug().Enabled() {
-		computation := zerolog.Dict()
-		for s, u := range txnState.ComputationIntensities() {
-			computation.Uint(strconv.FormatUint(uint64(s), 10), u)
-		}
-		memory := zerolog.Dict()
-		for s, u := range txnState.MemoryIntensities() {
-			memory.Uint(strconv.FormatUint(uint64(s), 10), u)
-		}
-		ctx.Logger.Info().
-			Uint64("ledgerInteractionUsed", txnState.InteractionUsed()).
-			Uint("computationUsed", txnState.TotalComputationUsed()).
-			Uint64("memoryEstimate", txnState.TotalMemoryEstimate()).
-			Dict("computationIntensities", computation).
-			Dict("memoryIntensities", memory).
-			Msg("transaction execution data")
+	if !env.Logger().Debug().Enabled() {
+		return
 	}
+
+	computation := zerolog.Dict()
+	for s, u := range txnState.ComputationIntensities() {
+		computation.Uint(strconv.FormatUint(uint64(s), 10), u)
+	}
+	memory := zerolog.Dict()
+	for s, u := range txnState.MemoryIntensities() {
+		memory.Uint(strconv.FormatUint(uint64(s), 10), u)
+	}
+	env.Logger().Info().
+		Uint64("ledgerInteractionUsed", txnState.InteractionUsed()).
+		Uint("computationUsed", txnState.TotalComputationUsed()).
+		Uint64("memoryEstimate", txnState.TotalMemoryEstimate()).
+		Dict("computationIntensities", computation).
+		Dict("memoryIntensities", memory).
+		Msg("transaction execution data")
+}
+
+func (i TransactionInvoker) normalExecution(
+	proc *TransactionProcedure,
+	txnState *state.TransactionState,
+	env environment.Environment,
+) (
+	computationUsed uint64,
+	memoryEstimate uint64,
+	modifiedSets programsCache.ModifiedSetsInvalidator,
+	err error,
+) {
+	rt := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(rt)
+
+	err = rt.ExecuteTransaction(
+		runtime.Script{
+			Source:    proc.Transaction.Script,
+			Arguments: proc.Transaction.Arguments,
+		},
+		common.TransactionLocation(proc.ID))
+
+	// This will be used to charge fees.
+	computationUsed = env.ComputationUsed()
+	memoryEstimate = env.MemoryEstimate()
+
+	if err != nil {
+		err = fmt.Errorf(
+			"transaction invocation failed when executing transaction: %w",
+			err)
+		return
+	}
+
+	// log the execution intensities here, so that they do not contain data
+	// from storage limit checks and transaction deduction, because the payer
+	// is not charged for those.
+	i.logExecutionIntensities(txnState, env)
+
+	txnState.RunWithAllLimitsDisabled(func() {
+		err = i.deductTransactionFees(env, proc, txnState, computationUsed)
+	})
+	if err != nil {
+		return
+	}
+
+	// Before checking storage limits, we must applying all pending changes
+	// that may modify storage usage.
+	modifiedSets, err = env.FlushPendingUpdates()
+	if err != nil {
+		err = fmt.Errorf(
+			"transaction invocation failed to flush pending changes from "+
+				"environment: %w",
+			err)
+		return
+	}
+
+	// Check if all account storage limits are ok
+	//
+	// disable the computation/memory limit checks on storage checks,
+	// so we don't error from computation/memory limits on this part.
+	// We cannot charge the user for this part, since fee deduction already happened.
+	txnState.RunWithAllLimitsDisabled(func() {
+		err = NewTransactionStorageLimiter().CheckLimits(env, txnState.UpdatedAddresses())
+	})
+
+	return
 }

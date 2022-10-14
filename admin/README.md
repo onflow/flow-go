@@ -66,3 +66,8 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-enabled": true}}'
 ```
+
+### Set a stop height
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "stop-at-height", "data": { "height": 1111, "crash": false }}'
+```
