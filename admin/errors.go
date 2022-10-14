@@ -7,7 +7,7 @@ import (
 
 // InvalidAdminReqError indicates that an admin request has failed validation, and
 // the request will not be processed. All Validator functions must return this error
-// if the
+// if the request was invalid.
 type InvalidAdminReqError struct {
 	Err error
 }
