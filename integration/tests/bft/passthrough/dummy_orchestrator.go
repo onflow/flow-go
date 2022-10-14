@@ -29,7 +29,7 @@ type dummyOrchestrator struct {
 	eventTracker        map[string]flow.IdentifierList
 }
 
-var _ insecure.AttackOrchestrator = &dummyOrchestrator{}
+var _ insecure.AttackerOrchestrator = &dummyOrchestrator{}
 
 func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 	return &dummyOrchestrator{

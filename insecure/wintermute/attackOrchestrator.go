@@ -41,7 +41,7 @@ type Orchestrator struct {
 	network insecure.OrchestratorNetwork
 }
 
-var _ insecure.AttackOrchestrator = &Orchestrator{}
+var _ insecure.AttackerOrchestrator = &Orchestrator{}
 
 func NewOrchestrator(logger zerolog.Logger, corruptedNodeIds flow.IdentifierList, allIds flow.IdentityList) *Orchestrator {
 	o := &Orchestrator{

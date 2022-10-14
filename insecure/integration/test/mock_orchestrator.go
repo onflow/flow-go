@@ -13,7 +13,7 @@ type mockOrchestrator struct {
 	ingressEventCorrupter func(event *insecure.IngressEvent)
 }
 
-var _ insecure.AttackOrchestrator = &mockOrchestrator{}
+var _ insecure.AttackerOrchestrator = &mockOrchestrator{}
 
 // HandleEgressEvent implements logic of processing the events received from a corrupted node.
 //

@@ -35,7 +35,7 @@ func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
 	withMockOrchestrator(
 		t,
 		corruptedIds,
-		func(orchestratorNetwork *Network, orchestrator *mockinsecure.AttackOrchestrator, corruptNetworks []*mockCorruptNetwork) {
+		func(orchestratorNetwork *Network, orchestrator *mockinsecure.AttackerOrchestrator, corruptNetworks []*mockCorruptNetwork) {
 			// mocks orchestrator to receive each event exactly once.
 			orchestratorWG := mockOrchestratorHandlingEgressEvent(t, orchestrator, egressEvents)
 
@@ -94,7 +94,7 @@ func testOrchestratorNetwork(t *testing.T, protocol insecure.Protocol, concurren
 
 	withMockOrchestrator(t,
 		corruptedIds,
-		func(orchestratorNetwork *Network, _ *mockinsecure.AttackOrchestrator, corruptNetworks []*mockCorruptNetwork) {
+		func(orchestratorNetwork *Network, _ *mockinsecure.AttackerOrchestrator, corruptNetworks []*mockCorruptNetwork) {
 			attackerMsgReceived := &sync.WaitGroup{}
 			attackerMsgReceived.Add(concurrencyDegree)
 
@@ -162,13 +162,13 @@ func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, me
 // Once the orchestrator network, corrupt networks, and mock orchestrator are all ready, it executes the injected "run" function.
 func withMockOrchestrator(t *testing.T,
 	corruptedIds flow.IdentityList,
-	run func(*Network, *mockinsecure.AttackOrchestrator, []*mockCorruptNetwork)) {
+	run func(*Network, *mockinsecure.AttackerOrchestrator, []*mockCorruptNetwork)) {
 
 	withMockCorruptNetworks(t,
 		corruptedIds.NodeIDs(),
 		func(signalerContext irrecoverable.SignalerContext, corruptNetworks []*mockCorruptNetwork, corruptNetworkPorts map[flow.Identifier]string) {
 
-			orchestrator := &mockinsecure.AttackOrchestrator{}
+			orchestrator := &mockinsecure.AttackerOrchestrator{}
 			connector := NewCorruptConnector(unittest.Logger(), corruptedIds, corruptNetworkPorts)
 
 			orchestratorNetwork, err := NewOrchestratorNetwork(
@@ -221,7 +221,7 @@ func withMockOrchestrator(t *testing.T,
 
 // mockOrchestratorHandlingEgressEvent mocks the given orchestrator to receive each of the given egress events exactly once. The returned wait group is
 // released when individual events are seen by orchestrator exactly once.
-func mockOrchestratorHandlingEgressEvent(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, egressEvents []*insecure.EgressEvent) *sync.WaitGroup {
+func mockOrchestratorHandlingEgressEvent(t *testing.T, orchestrator *mockinsecure.AttackerOrchestrator, egressEvents []*insecure.EgressEvent) *sync.WaitGroup {
 	orchestratorWG := &sync.WaitGroup{}
 	orchestratorWG.Add(len(egressEvents)) // keeps track of total egress events that orchestrator receives
 
