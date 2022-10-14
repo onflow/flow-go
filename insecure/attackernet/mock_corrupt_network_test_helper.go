@@ -4,9 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 	"io"
 	"net"
 	"sync"
+	"testing"
+	"time"
 
 	"github.com/onflow/flow-go/module"
 
@@ -132,4 +136,34 @@ func (c *mockCorruptNetwork) ConnectAttacker(_ *empty.Empty, stream insecure.Cor
 	<-c.cm.ShutdownSignal()
 
 	return nil
+}
+
+// withMockCorruptNetwork creates and starts a mock corrupt network. This mock corrupt network only runs the gRPC server part of an
+// actual corrupt network, and then executes the run function on it.
+func withMockCorruptNetwork(t *testing.T, run func(flow.Identity, irrecoverable.SignalerContext, *mockCorruptNetwork)) {
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
+
+	// life-cycle management of corrupt network.
+	ctx, cancel := context.WithCancel(context.Background())
+	cnCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go func() {
+		select {
+		case err := <-errChan:
+			t.Error("mock corrupt network startup encountered fatal error", err)
+		case <-ctx.Done():
+			return
+		}
+	}()
+
+	cn := newMockCorruptNetwork()
+
+	// starts corrupt network
+	cn.Start(cnCtx)
+	unittest.RequireCloseBefore(t, cn.Ready(), 100*time.Millisecond, "could not start corrupt network on time")
+
+	run(*corruptedIdentity, cnCtx, cn)
+
+	// terminates corrupt network
+	cancel()
+	unittest.RequireCloseBefore(t, cn.Done(), 100*time.Millisecond, "could not stop corrupt network on time")
 }
