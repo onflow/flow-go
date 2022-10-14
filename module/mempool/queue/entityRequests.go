@@ -3,11 +3,15 @@ package queue
 import (
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
+	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 )
 
 // EntityRequestStore is a FIFO (first-in-first-out) size-bound queue for maintaining EntityRequests.
@@ -19,6 +23,18 @@ type EntityRequestStore struct {
 }
 
 var _ mempool.EntityRequestStore = (*EntityRequestStore)(nil)
+
+func NewEntityRequestStore(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *EntityRequestStore {
+	return &EntityRequestStore{
+		cache: herocache.NewCache(
+			sizeLimit,
+			herocache.DefaultOversizeFactor,
+			heropool.NoEjection,
+			logger.With().Str("mempool", "entity-request-store").Logger(),
+			collector),
+		sizeLimit: uint(sizeLimit),
+	}
+}
 
 func (e *EntityRequestStore) Put(message *engine.Message) bool {
 	return e.push(message.OriginID, message.Payload.(*messages.EntityRequest))
