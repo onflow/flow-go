@@ -40,7 +40,7 @@ func TestAuthorizedRequester(t *testing.T) {
 	idProvider := modmock.NewIdentityProvider(t)
 	idProvider.On("ByPeerID", mock.AnythingOfType("peer.ID")).Return(
 		func(peerId peer.ID) *flow.Identity {
-			identity, _ := providerData[peerId]
+			identity := providerData[peerId]
 			return identity
 		}, func(peerId peer.ID) bool {
 			_, ok := providerData[peerId]
