@@ -75,7 +75,7 @@ func (meter *meterImpl) MeterComputation(
 }
 
 func (meter *meterImpl) ComputationUsed() uint64 {
-	return uint64(meter.txnState.TotalComputationUsed())
+	return meter.txnState.TotalComputationUsed()
 }
 
 func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
