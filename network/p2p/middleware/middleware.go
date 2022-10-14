@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
@@ -91,7 +92,7 @@ type Middleware struct {
 	previousProtocolStatePeers []peer.AddrInfo
 	codec                      network.Codec
 	slashingViolationsConsumer slashing.ViolationsConsumer
-	unicastRateLimiters        *unicast.RateLimiters
+	unicastRateLimiters        *ratelimit.RateLimiters
 	authorizedSenderValidator  *validator.AuthorizedSenderValidator
 	component.Component
 }
@@ -119,7 +120,7 @@ func WithPeerManagerFilters(peerManagerFilters []p2p.PeerFilter) MiddlewareOptio
 }
 
 // WithUnicastRateLimiters sets the unicast rate limiters.
-func WithUnicastRateLimiters(rateLimiters *unicast.RateLimiters) MiddlewareOption {
+func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.unicastRateLimiters = rateLimiters
 	}
@@ -166,7 +167,7 @@ func NewMiddleware(
 		idTranslator:               idTranslator,
 		codec:                      codec,
 		slashingViolationsConsumer: slashingViolationsConsumer,
-		unicastRateLimiters:        unicast.NoopRateLimiters(),
+		unicastRateLimiters:        ratelimit.NoopRateLimiters(),
 	}
 
 	for _, opt := range opts {

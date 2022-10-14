@@ -44,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -157,7 +158,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 	bitswapmet := metrics.NewNoopCollector()
 	o := &optsConfig{
 		peerUpdateInterval:  connection.DefaultPeerUpdateInterval,
-		unicastRateLimiters: unicast.NoopRateLimiters(),
+		unicastRateLimiters: ratelimit.NoopRateLimiters(),
 		networkMetrics:      metrics.NewNoopCollector(),
 	}
 
@@ -251,7 +252,7 @@ type optsConfig struct {
 	idOpts              []func(*flow.Identity)
 	dhtPrefix           string
 	dhtOpts             []dht.Option
-	unicastRateLimiters *unicast.RateLimiters
+	unicastRateLimiters *ratelimit.RateLimiters
 	peerUpdateInterval  time.Duration
 	networkMetrics      module.NetworkMetrics
 }
@@ -275,7 +276,7 @@ func WithPeerUpdateInterval(interval time.Duration) func(*optsConfig) {
 	}
 }
 
-func WithUnicastRateLimiters(limiters *unicast.RateLimiters) func(*optsConfig) {
+func WithUnicastRateLimiters(limiters *ratelimit.RateLimiters) func(*optsConfig) {
 	return func(o *optsConfig) {
 		o.unicastRateLimiters = limiters
 	}

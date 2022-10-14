@@ -1,4 +1,4 @@
-package unicast
+package limiter_map
 
 import (
 	"testing"
@@ -13,28 +13,28 @@ import (
 // TestLimiterMap_get checks true is returned for stored items and false for missing items.
 func TestLimiterMap_get(t *testing.T) {
 	t.Parallel()
-	m := newLimiterMap(time.Second, time.Second)
+	m := NewLimiterMap(time.Second, time.Second)
 	peerID := peer.ID("id")
-	m.store(peerID, rate.NewLimiter(0, 0))
+	m.Store(peerID, rate.NewLimiter(0, 0))
 
-	_, ok := m.get(peerID)
+	_, ok := m.Get(peerID)
 	require.True(t, ok)
-	_, ok = m.get("fake")
+	_, ok = m.Get("fake")
 	require.False(t, ok)
 }
 
 // TestLimiterMap_remove checks the map removes keys as expected.
 func TestLimiterMap_remove(t *testing.T) {
 	t.Parallel()
-	m := newLimiterMap(time.Second, time.Second)
+	m := NewLimiterMap(time.Second, time.Second)
 	peerID := peer.ID("id")
-	m.store(peerID, rate.NewLimiter(0, 0))
+	m.Store(peerID, rate.NewLimiter(0, 0))
 
-	_, ok := m.get(peerID)
+	_, ok := m.Get(peerID)
 	require.True(t, ok)
 
-	m.remove(peerID)
-	_, ok = m.get(peerID)
+	m.Remove(peerID)
+	_, ok = m.Get(peerID)
 	require.False(t, ok)
 }
 
@@ -44,32 +44,32 @@ func TestLimiterMap_cleanup(t *testing.T) {
 
 	// set fake ttl to 10 minutes
 	ttl := 10 * time.Minute
-	m := newLimiterMap(ttl, time.Second)
+	m := NewLimiterMap(ttl, time.Second)
 
 	start := time.Now()
 
-	// store some peerID's
+	// Store some peerID's
 	peerID1 := peer.ID("id1")
-	m.store(peerID1, rate.NewLimiter(0, 0))
+	m.Store(peerID1, rate.NewLimiter(0, 0))
 
 	peerID2 := peer.ID("id2")
-	m.store(peerID2, rate.NewLimiter(0, 0))
+	m.Store(peerID2, rate.NewLimiter(0, 0))
 
 	peerID3 := peer.ID("id3")
-	m.store(peerID3, rate.NewLimiter(0, 0))
+	m.Store(peerID3, rate.NewLimiter(0, 0))
 
 	// manually set lastAccessed on 2 items so that they are removed during cleanup
 	m.limiters[peerID2].lastAccessed = start.Add(-10 * time.Minute)
 	m.limiters[peerID3].lastAccessed = start.Add(-20 * time.Minute)
 
-	// light clean up will only remove expired keys
+	// light clean up will only Remove expired keys
 	m.cleanup()
 
-	_, ok := m.get(peerID1)
+	_, ok := m.Get(peerID1)
 	require.True(t, ok)
-	_, ok = m.get(peerID2)
+	_, ok = m.Get(peerID2)
 	require.False(t, ok)
-	_, ok = m.get(peerID3)
+	_, ok = m.Get(peerID3)
 	require.False(t, ok)
 }
 
@@ -83,19 +83,19 @@ func TestLimiterMap_cleanupLoopDone(t *testing.T) {
 	// set short tick to kick of cleanup
 	tick := 10 * time.Millisecond
 
-	m := newLimiterMap(ttl, tick)
+	m := NewLimiterMap(ttl, tick)
 
 	start := time.Now()
 
-	// store some peerID's
+	// Store some peerID's
 	peerID1 := peer.ID("id1")
-	m.store(peerID1, rate.NewLimiter(0, 0))
+	m.Store(peerID1, rate.NewLimiter(0, 0))
 
 	peerID2 := peer.ID("id2")
-	m.store(peerID2, rate.NewLimiter(0, 0))
+	m.Store(peerID2, rate.NewLimiter(0, 0))
 
 	peerID3 := peer.ID("id3")
-	m.store(peerID3, rate.NewLimiter(0, 0))
+	m.Store(peerID3, rate.NewLimiter(0, 0))
 
 	// manually set lastAccessed on 2 items so that they are removed during cleanup
 	m.limiters[peerID1].lastAccessed = start.Add(-10 * time.Minute)
@@ -103,14 +103,14 @@ func TestLimiterMap_cleanupLoopDone(t *testing.T) {
 	m.limiters[peerID3].lastAccessed = start.Add(-20 * time.Minute)
 
 	// kick off clean up process, tick should happen immediately
-	go m.cleanupLoop()
+	go m.CleanupLoop()
 	time.Sleep(100 * time.Millisecond)
-	m.close()
+	m.Close()
 
-	_, ok := m.get(peerID1)
+	_, ok := m.Get(peerID1)
 	require.False(t, ok)
-	_, ok = m.get(peerID2)
+	_, ok = m.Get(peerID2)
 	require.False(t, ok)
-	_, ok = m.get(peerID3)
+	_, ok = m.Get(peerID3)
 	require.False(t, ok)
 }

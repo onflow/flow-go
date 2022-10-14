@@ -58,6 +58,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
@@ -278,7 +279,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	peerManagerFilters := make([]p2p.PeerFilter, 0)
 
 	// log and collect metrics for unicast messages that are rate limited
-	onUnicastRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason unicast.RateLimitReason) {
+	onUnicastRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
 		fnb.Logger.Warn().
 			Str("peer_id", peerID.Pretty()).
 			Str("role", role).
@@ -290,11 +291,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}
 
 	// setup default noop unicast rate limiters
-	unicastRateLimiters := unicast.NewRateLimiters(unicast.NewNoopRateLimiter(), unicast.NewNoopRateLimiter(), onUnicastRateLimit, fnb.BaseConfig.UnicastRateLimitDryRun)
+	unicastRateLimiters := ratelimit.NewRateLimiters(ratelimit.NewNoopRateLimiter(), ratelimit.NewNoopRateLimiter(), onUnicastRateLimit, fnb.BaseConfig.UnicastRateLimitDryRun)
 
 	// override noop unicast message rate limiter
 	if fnb.BaseConfig.UnicastMessageRateLimit > 0 && fnb.BaseConfig.UnicastMessageBurstLimit > 0 {
-		unicastMessageRateLimiter := unicast.NewMessageRateLimiter(
+		unicastMessageRateLimiter := ratelimit.NewMessageRateLimiter(
 			rate.Limit(fnb.BaseConfig.UnicastMessageRateLimit),
 			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
 			fnb.BaseConfig.UnicastMessageBurstLimit,
@@ -312,7 +313,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 	// override noop unicast bandwidth rate limiter
 	if fnb.BaseConfig.UnicastBandwidthRateLimit > 0 && fnb.BaseConfig.UnicastBandwidthBurstLimit > 0 {
-		unicastBandwidthRateLimiter := unicast.NewBandWidthRateLimiter(
+		unicastBandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(
 			rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit),
 			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
 			fnb.BaseConfig.UnicastBandwidthBurstLimit,
@@ -379,7 +380,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}, fnb.PeerManagerDependencies)
 }
 
-func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory, unicastRateLimiters *unicast.RateLimiters, peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
+func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory, unicastRateLimiters *ratelimit.RateLimiters, peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
 	var mwOpts []middleware.MiddlewareOption
 	if len(fnb.MsgValidators) > 0 {
 		mwOpts = append(mwOpts, middleware.WithMessageValidators(fnb.MsgValidators...))

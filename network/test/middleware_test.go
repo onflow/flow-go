@@ -18,8 +18,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/time/rate"
 
-	"github.com/onflow/flow-go/network/p2p/unicast"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
@@ -33,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 	testnet "github.com/onflow/flow-go/utils/unittest/network"
@@ -194,14 +193,14 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	testtime := unittest.NewTestTime()
 
 	// setup message rate limiter
-	messageRateLimiter := unicast.NewMessageRateLimiter(limit, burst, 1, p2p.WithGetTimeNowFunc(testtime.Now))
+	messageRateLimiter := ratelimit.NewMessageRateLimiter(limit, burst, 1, p2p.WithGetTimeNowFunc(testtime.Now))
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch. O
 	ch := make(chan struct{})
 	var rateLimits uint64
-	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason unicast.RateLimitReason) {
-		require.Equal(m.T(), reason, unicast.MessageCount)
+	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
+		require.Equal(m.T(), reason, ratelimit.MessageCount)
 
 		// we only expect messages from the first middleware on the test suite
 		expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
@@ -212,7 +211,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		atomic.AddUint64(&rateLimits, 1)
 	}
 
-	rateLimiters := unicast.NewRateLimiters(messageRateLimiter, &unicast.NoopRateLimiter{}, onRateLimit, false)
+	rateLimiters := ratelimit.NewRateLimiters(messageRateLimiter, &ratelimit.NoopRateLimiter{}, onRateLimit, false)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
@@ -292,14 +291,14 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	testtime := unittest.NewTestTime()
 
 	// setup bandwidth rate limiter
-	bandwidthRateLimiter := unicast.NewBandWidthRateLimiter(limit, burst, 1, p2p.WithGetTimeNowFunc(testtime.Now))
+	bandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(limit, burst, 1, p2p.WithGetTimeNowFunc(testtime.Now))
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.
 	ch := make(chan struct{})
 	var rateLimits uint64
-	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason unicast.RateLimitReason) {
-		require.Equal(m.T(), reason, unicast.Bandwidth)
+	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
+		require.Equal(m.T(), reason, ratelimit.Bandwidth)
 
 		// we only expect messages from the first middleware on the test suite
 		expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
@@ -310,7 +309,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		close(ch)
 	}
 
-	rateLimiters := unicast.NewRateLimiters(&unicast.NoopRateLimiter{}, bandwidthRateLimiter, onRateLimit, false)
+	rateLimiters := ratelimit.NewRateLimiters(&ratelimit.NoopRateLimiter{}, bandwidthRateLimiter, onRateLimit, false)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
