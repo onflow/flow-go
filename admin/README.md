@@ -45,24 +45,24 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 
 #### To get a list of all updatable configs
 ```
-curl localhost:3705/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "list-configs"}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "list-configs"}'
 ```
 
 ### To get a config value
 ```
-curl localhost:3705/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-config", "data": "consensus-required-approvals-for-sealing"}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-config", "data": "consensus-required-approvals-for-sealing"}'
 ```
 
 ### To set a config value
 #### Example: require 1 approval for consensus sealing
 ```
-curl localhost:3705/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"consensus-required-approvals-for-sealing": 1}}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"consensus-required-approvals-for-sealing": 1}}'
 ```
 #### Example: set block rate delay to 750ms
 ```
-curl localhost:3705/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"hotstuff-block-rate-delay": "750ms"}}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"hotstuff-block-rate-delay": "750ms"}}'
 ```
 #### Example: enable the auto-profiler
 ```
-curl localhost:3705/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-enabled": true}}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-enabled": true}}'
 ```
