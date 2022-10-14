@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/programs"
@@ -32,6 +33,7 @@ type Environment interface {
 	TransactionInfo
 
 	// ProgramLogger
+	Logger() *zerolog.Logger
 	Logs() []string
 
 	// EventEmitter

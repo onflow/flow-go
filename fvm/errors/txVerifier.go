@@ -7,8 +7,7 @@ import (
 // NewInvalidProposalSignatureError constructs a new CodedError which indicates
 // that no valid signature is provided for the proposal key.
 func NewInvalidProposalSignatureError(
-	address flow.Address,
-	keyIndex uint64,
+	proposal flow.ProposalKey,
 	err error,
 ) CodedError {
 	return WrapCodedError(
@@ -16,8 +15,8 @@ func NewInvalidProposalSignatureError(
 		err,
 		"invalid proposal key: public key %d on account %s does not have a "+
 			"valid signature",
-		keyIndex,
-		address)
+		proposal.KeyIndex,
+		proposal.Address)
 }
 
 // InvalidProposalSeqNumberError indicates that proposal key sequence number does not match the on-chain value.
@@ -30,22 +29,20 @@ type InvalidProposalSeqNumberError struct {
 
 // NewInvalidProposalSeqNumberError constructs a new InvalidProposalSeqNumberError
 func NewInvalidProposalSeqNumberError(
-	address flow.Address,
-	keyIndex uint64,
+	proposal flow.ProposalKey,
 	currentSeqNumber uint64,
-	providedSeqNumber uint64,
 ) CodedError {
 	return InvalidProposalSeqNumberError{
 		currentSeqNumber:  currentSeqNumber,
-		providedSeqNumber: providedSeqNumber,
+		providedSeqNumber: proposal.SequenceNumber,
 		CodedError: NewCodedError(
 			ErrCodeInvalidProposalSeqNumberError,
 			"invalid proposal key: public key %d on account %s has sequence "+
 				"number %d, but given %d",
-			keyIndex,
-			address.String(),
+			proposal.KeyIndex,
+			proposal.Address,
 			currentSeqNumber,
-			providedSeqNumber),
+			proposal.SequenceNumber),
 	}
 }
 
@@ -66,8 +63,7 @@ func (e InvalidProposalSeqNumberError) ProvidedSeqNumber() uint64 {
 // - signature size or format is invalid
 // - signature verification failed
 func NewInvalidPayloadSignatureError(
-	address flow.Address,
-	keyIndex uint64,
+	txnSig flow.TransactionSignature,
 	err error,
 ) CodedError {
 	return WrapCodedError(
@@ -75,8 +71,8 @@ func NewInvalidPayloadSignatureError(
 		err,
 		"invalid payload signature: public key %d on account %s does not have"+
 			" a valid signature",
-		keyIndex,
-		address)
+		txnSig.KeyIndex,
+		txnSig.Address)
 }
 
 func IsInvalidPayloadSignatureError(err error) bool {
@@ -91,8 +87,7 @@ func IsInvalidPayloadSignatureError(err error) bool {
 // - signature size or format is invalid
 // - signature verification failed
 func NewInvalidEnvelopeSignatureError(
-	address flow.Address,
-	keyIndex uint64,
+	txnSig flow.TransactionSignature,
 	err error,
 ) CodedError {
 	return WrapCodedError(
@@ -100,8 +95,8 @@ func NewInvalidEnvelopeSignatureError(
 		err,
 		"invalid envelope key: public key %d on account %s does not have a "+
 			"valid signature",
-		keyIndex,
-		address)
+		txnSig.KeyIndex,
+		txnSig.Address)
 }
 
 func IsInvalidEnvelopeSignatureError(err error) bool {

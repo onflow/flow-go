@@ -81,6 +81,8 @@ const (
 	ColNodeAPIPort = "col-ingress-port"
 	// ExeNodeAPIPort is the name used for the execution node API port.
 	ExeNodeAPIPort = "exe-api-port"
+	// ExeNodeAdminPort is the name used for the execution node Admin API port.
+	ExeNodeAdminPort = "exe-admin-port"
 	// ObserverNodeAPIPort is the name used for the observer node API port.
 	ObserverNodeAPIPort = "observer-api-port"
 	// ObserverNodeAPISecurePort is the name used for the secure observer API port.
@@ -1007,7 +1009,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			hostPort := testingdock.RandomPort(t)
 			containerPort := "9000/tcp"
 
+			hostAdminPort := testingdock.RandomPort(t)
+			containerAdminPort := "9002/tcp"
+
 			nodeContainer.bindPort(hostPort, containerPort)
+			nodeContainer.bindPort(hostAdminPort, containerAdminPort)
 
 			// hostMetricsPort := testingdock.RandomPort(t)
 			// containerMetricsPort := "8080/tcp"
@@ -1019,6 +1025,10 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 			net.AccessPorts[ExeNodeAPIPort] = hostPort
+
+			nodeContainer.AddFlag("admin-addr", fmt.Sprintf("%s:9002", nodeContainer.Name()))
+			nodeContainer.Ports[ExeNodeAdminPort] = hostAdminPort
+			net.AccessPorts[ExeNodeAdminPort] = hostAdminPort
 
 			// nodeContainer.Ports[ExeNodeMetricsPort] = hostMetricsPort
 			// net.AccessPorts[ExeNodeMetricsPort] = hostMetricsPort
@@ -1137,7 +1147,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		// corrupted nodes are running with a Corrupted Conduit Factory (CCF), hence need to bind their
 		// CCF port to local host, so they can be accessible by the orchestrator network.
 		hostPort := testingdock.RandomPort(t)
-		nodeContainer.bindPort(hostPort, strconv.Itoa(cmd.CorruptibleConduitFactoryPort))
+		nodeContainer.bindPort(hostPort, strconv.Itoa(cmd.CorruptNetworkPort))
 		net.CorruptedPortMapping[nodeConf.NodeID] = hostPort
 	}
 

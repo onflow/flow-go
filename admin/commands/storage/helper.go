@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -23,8 +22,6 @@ const (
 	FINAL  = "final"
 	SEALED = "sealed"
 )
-
-var ErrValidatorReqDataFormat error = errors.New("wrong input format: expected JSON")
 
 type blocksRequest struct {
 	requestType blocksRequestType

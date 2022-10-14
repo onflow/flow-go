@@ -23,6 +23,8 @@ CADENCE_TRACING=false
 COMMIT=$(shell git rev-parse HEAD)
 VERSION=localnetbuild
 
+CURRENT_DIRECTORY=$(shell pwd)
+
 .PHONY: init
 init:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
@@ -68,6 +70,12 @@ init-short-epochs:
 .PHONY: start
 start:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
+	$(MAKE) start-thin
+
+# Starts a version of localnet without metrics services. This prevents port collision and consumption
+# when these services are not needed.
+.PHONY: start-thin
+start-thin:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
 
@@ -85,11 +93,17 @@ tps-test:
 
 .PHONY: tps-ci-smoke
 tps-ci-smoke:
-	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps 10 -max-tps 20 -duration 2m -slice-size 10s
+	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps 10 -max-tps 20 -duration 2m -slice-size 10s -local-dev
 
 .PHONY: tps-test-ci
 tps-test-ci:
 	$(MAKE) -e COLLECTION=5 VERIFICATION=5 NCLUSTERS=5 init
-	$(MAKE) start
+	$(MAKE) start-thin
 	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps 25 -max-tps 500 -duration 30m
 	$(MAKE) stop
+
+.PHONY: clean-data
+clean-data:
+	DOCKER_BUILDKIT=1 docker build -t environment-clean ../../cmd
+	docker run --mount=type=bind,source="$(CURRENT_DIRECTORY)"/data,target=/data environment-clean chmod -R 777 /data
+	rm -rf ./data

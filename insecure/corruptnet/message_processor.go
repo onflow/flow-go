@@ -1,4 +1,4 @@
-package corruptible
+package corruptnet
 
 import (
 	"fmt"
@@ -27,6 +27,9 @@ func NewCorruptMessageProcessor(logger zerolog.Logger, originalProcessor flownet
 	}
 }
 
+// Process implements handling ingress (incoming) messages from the honest Flow network (via network.MessageProcessor interface).
+// If an Attacker is registered on the Corrupt Network, then these ingress messages are passed to the Attacker (by the Corrupt Network).
+// If an Attacker is not registered on the Corrupt Network, then these ingress messages are passed to the original (honest) Message Processor.
 func (m *MessageProcessor) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	// Relay message to the attack orchestrator.
 	lg := m.logger.With().
@@ -34,7 +37,7 @@ func (m *MessageProcessor) Process(channel channels.Channel, originID flow.Ident
 		Str("origin_id", fmt.Sprintf("%v", originID)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
 	lg.Debug().Msg("processing new incoming event")
-	attackerRegistered := m.ingressController.HandleIncomingEvent(channel, originID, event)
+	attackerRegistered := m.ingressController.HandleIncomingEvent(event, channel, originID)
 	if !attackerRegistered {
 		// No attack orchestrator registered yet, hence pass the ingress message back to the original processor.
 		err := m.originalProcessor.Process(channel, originID, event)

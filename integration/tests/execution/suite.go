@@ -1,8 +1,11 @@
 package execution
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -48,6 +51,56 @@ func (s *Suite) ExecutionClient() *testnet.Client {
 	client, err := testnet.NewClient(fmt.Sprintf(":%s", execNode.Ports[testnet.ExeNodeAPIPort]), chain)
 	require.NoError(s.T(), err, "could not get execution client")
 	return client
+}
+
+type AdminCommandRequest struct {
+	CommandName string `json:"commandName"`
+	Data        any    `json:"data"`
+}
+
+type AdminCommandResponse struct {
+	Output any `json:"output"`
+}
+
+// SendExecutionAdminCommand sends admin command to EN. data will be serialized to JSON and sent as data part of the command request.
+// Response will be deserialized into output object.
+// It bubbles up errors from (un)marshalling of data and handling the request
+func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, data any, output any) error {
+	enContainer := s.net.ContainerByID(s.exe1ID)
+
+	request := AdminCommandRequest{
+		CommandName: command,
+		Data:        data,
+	}
+
+	marshal, err := json.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("error while marshalling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST",
+		fmt.Sprintf("http://localhost:%s/admin/run_command", enContainer.Ports[testnet.ExeNodeAdminPort]),
+		bytes.NewBuffer(marshal),
+	)
+	if err != nil {
+		return fmt.Errorf("error while building request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error while sending request: %w", err)
+	}
+
+	adminCommandResponse := AdminCommandResponse{
+		Output: output,
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&adminCommandResponse)
+	if err != nil {
+		return fmt.Errorf("error while reading/decoding response: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Suite) AccessPort() string {
