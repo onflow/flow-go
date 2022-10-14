@@ -22,6 +22,8 @@ func (s *SetLogLevelCommand) Handler(_ context.Context, req *admin.CommandReques
 	return "ok", nil
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (s *SetLogLevelCommand) Validator(req *admin.CommandRequest) error {
 	level, ok := req.Data.(string)
 	if !ok {

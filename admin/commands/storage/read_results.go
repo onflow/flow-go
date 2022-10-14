@@ -64,6 +64,8 @@ func (r *ReadResultsCommand) Handler(ctx context.Context, req *admin.CommandRequ
 	return commands.ConvertToInterfaceList(results)
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadResultsCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {

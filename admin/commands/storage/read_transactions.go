@@ -74,6 +74,8 @@ func findUint64(input map[string]interface{}, field string) (uint64, error) {
 	return uint64(val), nil
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (c *GetTransactionsCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {

@@ -121,6 +121,8 @@ func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandReques
 	return commands.ConvertToInterfaceList(result)
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadSealsCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {

@@ -28,7 +28,8 @@ type blocksRequest struct {
 	value       interface{}
 }
 
-// pareN verifies that the input is an integral float64 value >=1.
+// parseN verifies that the input is an integral float64 value >=1.
+// All generic errors indicate a benign validation failure, and should be wrapped by the caller.
 func parseN(m interface{}) (uint64, error) {
 	n, ok := m.(float64)
 	if !ok {
@@ -43,6 +44,8 @@ func parseN(m interface{}) (uint64, error) {
 	return uint64(n), nil
 }
 
+// parseBlocksRequest parses the block field of an admin request.
+// All generic errors indicate a benign validation failure, and should be wrapped by the caller.
 func parseBlocksRequest(block interface{}) (*blocksRequest, error) {
 	errInvalidBlockValue := fmt.Errorf("invalid value for \"block\": expected %q, %q, block ID, or block height, but got: %v", FINAL, SEALED, block)
 	req := &blocksRequest{}

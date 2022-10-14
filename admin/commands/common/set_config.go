@@ -51,6 +51,8 @@ func (s *SetConfigCommand) Handler(_ context.Context, req *admin.CommandRequest)
 	return res, nil
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (s *SetConfigCommand) Validator(req *admin.CommandRequest) error {
 	mval, ok := req.Data.(map[string]any)
 	if !ok {

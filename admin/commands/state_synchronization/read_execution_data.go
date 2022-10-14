@@ -33,6 +33,8 @@ func (r *ReadExecutionDataCommand) Handler(ctx context.Context, req *admin.Comma
 	return commands.ConvertToMap(ed)
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadExecutionDataCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {

@@ -50,6 +50,8 @@ func (r *GetIdentityCommand) Handler(ctx context.Context, req *admin.CommandRequ
 	}
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *GetIdentityCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {

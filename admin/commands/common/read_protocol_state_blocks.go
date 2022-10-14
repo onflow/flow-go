@@ -142,6 +142,8 @@ func (r *ReadProtocolStateBlocksCommand) Handler(_ context.Context, req *admin.C
 	return resultList, err
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadProtocolStateBlocksCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
