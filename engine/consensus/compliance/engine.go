@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
@@ -40,7 +39,6 @@ type Engine struct {
 	payloads       storage.Payloads
 	tracer         module.Tracer
 	state          protocol.State
-	prov           consensus.ProposalProvider
 	core           *Core
 	// queues for inbound messsages
 	pendingBlocks  engine.MessageStore
@@ -59,7 +57,6 @@ var _ component.Component = (*Engine)(nil)
 func NewEngine(
 	log zerolog.Logger,
 	me module.Local,
-	prov consensus.ProposalProvider,
 	core *Core,
 ) (*Engine, error) {
 
@@ -120,7 +117,6 @@ func NewEngine(
 		pendingBlocks:              pendingBlocks,
 		state:                      core.state,
 		tracer:                     core.tracer,
-		prov:                       prov,
 		core:                       core,
 		messageHandler:             handler,
 		finalizationEventsNotifier: engine.NewNotifier(),

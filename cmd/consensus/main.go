@@ -38,7 +38,6 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/message_hub"
-	"github.com/onflow/flow-go/engine/consensus/provider"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -109,7 +108,6 @@ func main() {
 		receipts                     mempool.ExecutionTree
 		seals                        mempool.IncorporatedResultSeals
 		pendingReceipts              mempool.PendingReceipts
-		prov                         *provider.Engine
 		receiptRequester             *requester.Engine
 		syncCore                     *chainsync.Core
 		comp                         *compliance.Engine
@@ -498,17 +496,6 @@ func main() {
 
 			return e, err
 		}).
-		Component("provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			prov, err = provider.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Tracer,
-				node.Network,
-				node.State,
-				node.Me,
-			)
-			return prov, err
-		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			core := ingestion.NewCore(
 				node.Logger,
@@ -713,7 +700,6 @@ func main() {
 			comp, err = compliance.NewEngine(
 				node.Logger,
 				node.Me,
-				prov,
 				complianceCore,
 			)
 			if err != nil {
@@ -745,7 +731,6 @@ func main() {
 				node.Network,
 				node.Me,
 				comp,
-				prov,
 				hot,
 				hotstuffModules.VoteAggregator,
 				hotstuffModules.TimeoutAggregator,

@@ -32,7 +32,6 @@ import (
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/engine/consensus/message_hub"
-	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -457,9 +456,6 @@ func createNode(
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
 
-	prov := &mockconsensus.ProposalProvider{}
-	prov.On("ProvideProposal", mock.Anything).Maybe()
-
 	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector)
 	require.NoError(t, err)
 
@@ -546,7 +542,7 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	comp, err := compliance.NewEngine(log, me, prov, compCore)
+	comp, err := compliance.NewEngine(log, me, compCore)
 	require.NoError(t, err)
 
 	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
@@ -592,7 +588,6 @@ func createNode(
 		net,
 		me,
 		comp,
-		prov,
 		hot,
 		voteAggregator,
 		timeoutAggregator,
