@@ -6,6 +6,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/onflow/flow-go/network/message"
 )
@@ -17,13 +18,13 @@ type MessageRateLimiterImpl struct {
 	limiters                 *rateLimiterMap
 	limit                    rate.Limit
 	burst                    int
-	now                      GetTimeNow
+	now                      p2p.GetTimeNow
 	rateLimitLockoutDuration time.Duration // the amount of time that has to pass before a peer is allowed to connect
 }
 
 // NewMessageRateLimiter returns a new MessageRateLimiterImpl. The cleanup loop will be started in a
 // separate goroutine and should be stopped by calling Close.
-func NewMessageRateLimiter(limit rate.Limit, burst, lockoutDuration int, opts ...RateLimiterOpt) *MessageRateLimiterImpl {
+func NewMessageRateLimiter(limit rate.Limit, burst, lockoutDuration int, opts ...p2p.RateLimiterOpt) *MessageRateLimiterImpl {
 	l := &MessageRateLimiterImpl{
 		limiters:                 newLimiterMap(rateLimiterTTL, cleanUpTickInterval),
 		limit:                    limit,
@@ -72,7 +73,7 @@ func (s *MessageRateLimiterImpl) Stop() {
 }
 
 // SetTimeNowFunc overrides the default time.Now func with the GetTimeNow func provided.
-func (s *MessageRateLimiterImpl) SetTimeNowFunc(now GetTimeNow) {
+func (s *MessageRateLimiterImpl) SetTimeNowFunc(now p2p.GetTimeNow) {
 	s.now = now
 }
 

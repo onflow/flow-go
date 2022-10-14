@@ -1648,7 +1648,7 @@ func loadSecretsEncryptionKey(dir string, myID flow.Identifier) ([]byte, error) 
 	return data, nil
 }
 
-func rateLimiterPeerFilter(rateLimiter unicast.RateLimiter) p2p.PeerFilter {
+func rateLimiterPeerFilter(rateLimiter p2p.RateLimiter) p2p.PeerFilter {
 	return func(p peer.ID) error {
 		if rateLimiter.IsRateLimited(p) {
 			return fmt.Errorf("peer is rate limited")

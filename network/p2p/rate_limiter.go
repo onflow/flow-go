@@ -1,4 +1,4 @@
-package unicast
+package p2p
 
 import (
 	"time"
@@ -6,11 +6,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/network/message"
-)
-
-const (
-	cleanUpTickInterval = 10 * time.Minute
-	rateLimiterTTL      = 10 * time.Minute
 )
 
 // RateLimiter unicast rate limiter interface

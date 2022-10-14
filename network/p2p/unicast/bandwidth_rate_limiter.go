@@ -6,6 +6,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/onflow/flow-go/network/message"
 )
@@ -16,13 +17,13 @@ type BandWidthRateLimiterImpl struct {
 	limiters                 *rateLimiterMap
 	limit                    rate.Limit
 	burst                    int
-	now                      GetTimeNow
+	now                      p2p.GetTimeNow
 	rateLimitLockoutDuration time.Duration // the amount of time that has to pass before a peer is allowed to connect
 }
 
 // NewBandWidthRateLimiter returns a new BandWidthRateLimiterImpl. The cleanup loop will be started in a
 // separate goroutine and should be stopped by calling Close.
-func NewBandWidthRateLimiter(limit rate.Limit, burst, lockoutDuration int, opts ...RateLimiterOpt) *BandWidthRateLimiterImpl {
+func NewBandWidthRateLimiter(limit rate.Limit, burst, lockoutDuration int, opts ...p2p.RateLimiterOpt) *BandWidthRateLimiterImpl {
 	l := &BandWidthRateLimiterImpl{
 		limiters:                 newLimiterMap(rateLimiterTTL, cleanUpTickInterval),
 		limit:                    limit,
@@ -61,7 +62,7 @@ func (b *BandWidthRateLimiterImpl) IsRateLimited(peerID peer.ID) bool {
 }
 
 // SetTimeNowFunc overrides the default time.Now func with the GetTimeNow func provided.
-func (b *BandWidthRateLimiterImpl) SetTimeNowFunc(now GetTimeNow) {
+func (b *BandWidthRateLimiterImpl) SetTimeNowFunc(now p2p.GetTimeNow) {
 	b.now = now
 }
 

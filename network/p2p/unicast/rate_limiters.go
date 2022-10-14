@@ -1,10 +1,18 @@
 package unicast
 
 import (
+	"time"
+
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
+)
+
+const (
+	cleanUpTickInterval = 10 * time.Minute
+	rateLimiterTTL      = 10 * time.Minute
 )
 
 var (
@@ -22,14 +30,14 @@ type OnRateLimitedPeerFunc func(pid peer.ID, role, msgType string, topic channel
 
 // RateLimiters used to manage stream and bandwidth rate limiters
 type RateLimiters struct {
-	MessageRateLimiter   RateLimiter
-	BandWidthRateLimiter RateLimiter
+	MessageRateLimiter   p2p.RateLimiter
+	BandWidthRateLimiter p2p.RateLimiter
 	OnRateLimitedPeer    OnRateLimitedPeerFunc // the callback called each time a peer is rate limited
 	dryRun               bool
 }
 
 // NewRateLimiters returns *RateLimiters
-func NewRateLimiters(messageLimiter, bandwidthLimiter RateLimiter, onRateLimitedPeer OnRateLimitedPeerFunc, dryRun bool) *RateLimiters {
+func NewRateLimiters(messageLimiter, bandwidthLimiter p2p.RateLimiter, onRateLimitedPeer OnRateLimitedPeerFunc, dryRun bool) *RateLimiters {
 	return &RateLimiters{
 		MessageRateLimiter:   messageLimiter,
 		BandWidthRateLimiter: bandwidthLimiter,

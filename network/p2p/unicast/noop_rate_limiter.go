@@ -2,6 +2,7 @@ package unicast
 
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/onflow/flow-go/network/message"
 )
@@ -16,7 +17,7 @@ func (n *NoopRateLimiter) IsRateLimited(_ peer.ID) bool {
 	return false
 }
 
-func (n *NoopRateLimiter) SetTimeNowFunc(_ GetTimeNow) {}
+func (n *NoopRateLimiter) SetTimeNowFunc(_ p2p.GetTimeNow) {}
 
 func (n *NoopRateLimiter) Stop() {}
 
