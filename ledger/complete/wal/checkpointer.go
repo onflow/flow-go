@@ -100,12 +100,17 @@ func NewCheckpointer(wal *DiskWAL, keyByteSize int, forestCapacity int, outputVe
 
 // listCheckpoints returns all the numbers (unsorted) of the checkpoint files, and the number of the last checkpoint.
 func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
+	return ListCheckpoints(c.dir)
+}
 
+// ListCheckpoints returns all the numbers of the checkpoint files, and the number of the last checkpoint.
+// note, it doesn't include the root checkpoint file
+func ListCheckpoints(dir string) ([]int, int, error) {
 	list := make([]int, 0)
 
-	files, err := os.ReadDir(c.dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, -1, fmt.Errorf("cannot list directory [%s] content: %w", c.dir, err)
+		return nil, -1, fmt.Errorf("cannot list directory [%s] content: %w", dir, err)
 	}
 	last := -1
 	for _, fn := range files {
@@ -130,9 +135,15 @@ func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
 	return list, last, nil
 }
 
-// Checkpoints returns all the checkpoint numbers in asc order
+// Checkpoints returns all the numbers of the checkpoint files in asc order.
+// note, it doesn't include the root checkpoint file
 func (c *Checkpointer) Checkpoints() ([]int, error) {
-	list, _, err := c.listCheckpoints()
+	return Checkpoints(c.dir)
+}
+
+// Checkpoints returns all the checkpoint numbers in asc order
+func Checkpoints(dir string) ([]int, error) {
+	list, _, err := ListCheckpoints(dir)
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch all checkpoints: %w", err)
 	}
@@ -620,7 +631,11 @@ func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
-	if _, err := os.Stat(path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)); err == nil {
+	return HasRootCheckpoint(c.dir)
+}
+
+func HasRootCheckpoint(dir string) (bool, error) {
+	if _, err := os.Stat(path.Join(dir, bootstrap.FilenameWALRootCheckpoint)); err == nil {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil
@@ -964,6 +979,8 @@ func readCheckpointV5(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error)
 		nodes[i] = n
 		logging(i)
 	}
+
+	logger.Info().Msgf("finished loading %v trie nodes, start loading %v tries", nodesCount, triesCount)
 
 	for i := uint16(0); i < triesCount; i++ {
 		trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {

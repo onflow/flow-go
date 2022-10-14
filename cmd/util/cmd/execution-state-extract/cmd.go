@@ -99,7 +99,7 @@ func run(*cobra.Command, []string) {
 
 		stateCommitment, err = getStateCommitment(commits, blockID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("cannot get state commitment for block")
+			log.Fatal().Err(err).Msgf("cannot get state commitment for block %v", blockID)
 		}
 	}
 
@@ -142,7 +142,15 @@ func run(*cobra.Command, []string) {
 		path.Join(flagOutputDir, bootstrap.FilenameWALRootCheckpoint),
 		flagVersion)
 
-	log.Info().Msgf("Block state commitment: %s, output dir: %s", hex.EncodeToString(stateCommitment[:]), flagOutputDir)
+	log.Info().Msgf("Block state commitment: %s from %v, output dir: %s",
+		hex.EncodeToString(stateCommitment[:]),
+		flagExecutionStateDir,
+		flagOutputDir)
+
+	err := ensureCheckpointFileExist(flagExecutionStateDir)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
+	}
 
 	chain, err := getChain(flagChain)
 	if err != nil {
@@ -163,4 +171,28 @@ func run(*cobra.Command, []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}
+}
+
+func ensureCheckpointFileExist(dir string) error {
+	checkpoints, err := wal.Checkpoints(dir)
+	if err != nil {
+		return fmt.Errorf("could not find checkpoint files: %v", err)
+	}
+
+	if len(checkpoints) != 0 {
+		log.Info().Msgf("found checkpoint %v files: %v", len(checkpoints), checkpoints)
+		return nil
+	}
+
+	has, err := wal.HasRootCheckpoint(dir)
+	if err != nil {
+		return fmt.Errorf("could not check has root checkpoint: %w", err)
+	}
+
+	if has {
+		log.Info().Msg("found root checkpoint file")
+		return nil
+	}
+
+	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found")
 }
