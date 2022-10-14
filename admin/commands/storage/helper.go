@@ -28,6 +28,7 @@ type blocksRequest struct {
 	value       interface{}
 }
 
+// pareN verifies that the input is an integral float64 value >=1.
 func parseN(m interface{}) (uint64, error) {
 	n, ok := m.(float64)
 	if !ok {

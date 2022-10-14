@@ -5,11 +5,6 @@ import (
 	"fmt"
 )
 
-// ErrValidatorReqDataFormat is returned when an admin request is not in the expected format.
-// For example, if the input is a JSON number, but the command expects a map, type conversion
-// of the input will fail.
-var ErrValidatorReqDataFormat = NewInvalidAdminReqErrorf("invalid request format")
-
 // InvalidAdminReqError indicates that an admin request has failed validation, and
 // the request will not be processed. All Validator functions must return this error
 // if the
@@ -26,7 +21,13 @@ func NewInvalidAdminReqErrorf(msg string, args ...any) InvalidAdminReqError {
 // NewInvalidAdminReqParameterError returns an InvalidAdminReqError indicating that
 // a field of the request has an invalid value.
 func NewInvalidAdminReqParameterError(field string, msg string, actualVal any) InvalidAdminReqError {
-	return NewInvalidAdminReqErrorf("invalid value for '%s': %s. Got: %v", field, msg, actualVal)
+	return NewInvalidAdminReqErrorf("invalid value for field '%s': %s. Got: %v", field, msg, actualVal)
+}
+
+// NewInvalidAdminReqFormatError returns an InvalidAdminReqError indicating that
+// the request data format is invalid.
+func NewInvalidAdminReqFormatError(msg string, args ...any) InvalidAdminReqError {
+	return NewInvalidAdminReqErrorf("invalid request data format: "+msg, args...)
 }
 
 func IsInvalidAdminParameterError(err error) bool {

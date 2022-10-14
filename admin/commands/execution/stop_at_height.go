@@ -33,7 +33,7 @@ type StopAtHeightReq struct {
 // Handler method sets the stop height parameters.
 // Errors only if setting of stop height parameters fails.
 // Returns "ok" if successful.
-func (s *StopAtHeightCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	sah := req.ValidatorData.(StopAtHeightReq)
 
 	oldHeight, oldCrash, err := s.stopControl.SetStopHeight(sah.height, sah.crash)
@@ -54,34 +54,29 @@ func (s *StopAtHeightCommand) Handler(ctx context.Context, req *admin.CommandReq
 //
 // Additionally, height must be a positive integer. If a float value is provided, only the integer part is used.
 // The following sentinel errors are expected during normal operations:
-// * `commands.ErrValidatorReqDataFormat` if `req` is not a key-value map
-// * `InvalidAdminParameterError` if any required field is missing or in a wrong format
+// * `InvalidAdminReqError` if any required field is missing or in a wrong format
 func (s *StopAtHeightCommand) Validator(req *admin.CommandRequest) error {
 
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return admin.ErrValidatorReqDataFormat
+		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}
 	result, ok := input["height"]
-	errInvalidHeightValue := admin.NewInvalidAdminParameterError("height", "expected a positive integer", result)
-
 	if !ok {
-		return errInvalidHeightValue
+		return admin.NewInvalidAdminReqErrorf("missing required field: 'height'")
 	}
-
 	height, ok := result.(float64)
 	if !ok || height <= 0 {
-		return errInvalidHeightValue
+		return admin.NewInvalidAdminReqParameterError("height", "must be number >=0", result)
 	}
 
 	result, ok = input["crash"]
-	errInvalidCrashValue := admin.NewInvalidAdminParameterError("crash", "expected a boolean", result)
 	if !ok {
-		return errInvalidCrashValue
+		return admin.NewInvalidAdminReqErrorf("missing required field: 'crash'")
 	}
 	crash, ok := result.(bool)
 	if !ok {
-		return errInvalidCrashValue
+		return admin.NewInvalidAdminReqParameterError("crash", "must be bool", result)
 	}
 
 	req.ValidatorData = StopAtHeightReq{

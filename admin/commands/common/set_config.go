@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/admin"
@@ -55,11 +54,11 @@ func (s *SetConfigCommand) Handler(_ context.Context, req *admin.CommandRequest)
 func (s *SetConfigCommand) Validator(req *admin.CommandRequest) error {
 	mval, ok := req.Data.(map[string]any)
 	if !ok {
-		return errors.New("the data field must be a map[string]any")
+		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}
 
 	if len(mval) != 1 {
-		return fmt.Errorf("data field must have 1 entry, got %d", len(mval))
+		return admin.NewInvalidAdminReqErrorf("data field must have 1 entry, got %d", len(mval))
 	}
 
 	var (
@@ -75,7 +74,7 @@ func (s *SetConfigCommand) Validator(req *admin.CommandRequest) error {
 
 	field, ok := s.configs.GetField(configName)
 	if !ok {
-		return fmt.Errorf("unknown config field: %s", configName)
+		return admin.NewInvalidAdminReqErrorf("unknown config field: %s", configName)
 	}
 
 	// we have found a corresponding updatable config field, set it in the ValidatorData
