@@ -15,6 +15,9 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 )
 
+// To benchmark with local data, using this command:
+// $ go test -c -o benchmark
+// $ GOARCH=amd64 GOOS=linux ./benchmark -test.bench=. -test.benchmem --checkpointFile ./root.checkpoint
 var checkpointFile = flag.String("checkpointFile", "", "input checkpoint filename")
 
 func BenchmarkStoreCheckpointV5(b *testing.B) {
