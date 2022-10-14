@@ -274,14 +274,15 @@ func AuthorizedRequester(
 			Logger()
 
 		// TODO: when execution data verification is enabled, add verification nodes here
-		if id.Role != flow.RoleAccess || id.Ejected {
+		if (id.Role != flow.RoleExecution && id.Role != flow.RoleAccess) || id.Ejected {
 			lg.Warn().
 				Bool(logging.KeySuspicious, true).
 				Msg("rejecting request from peer: unauthorized")
 			return false
 		}
 
-		if len(allowedNodes) > 0 && !allowedNodes[id.NodeID] {
+		// allow list is only for Access nodes
+		if id.Role == flow.RoleAccess && len(allowedNodes) > 0 && !allowedNodes[id.NodeID] {
 			lg.Warn().
 				Bool(logging.KeySuspicious, true).
 				Msg("rejecting request from peer: not in allowed list")
