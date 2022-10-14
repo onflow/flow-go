@@ -277,7 +277,7 @@ func AuthorizedRequester(
 		if id.Role != flow.RoleAccess || id.Ejected {
 			lg.Warn().
 				Bool(logging.KeySuspicious, true).
-				Msg("rejecting request from peer: unauthorized role")
+				Msg("rejecting request from peer: unauthorized")
 			return false
 		}
 
