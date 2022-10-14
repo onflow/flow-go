@@ -169,7 +169,7 @@ func withMockOrchestrator(t *testing.T,
 		func(signalerContext irrecoverable.SignalerContext, corruptNetworks []*mockCorruptNetwork, corruptNetworkPorts map[flow.Identifier]string) {
 
 			orchestrator := &mockinsecure.AttackOrchestrator{}
-			connector := NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptNetworkPorts)
+			connector := NewCorruptConnector(unittest.Logger(), corruptedIds, corruptNetworkPorts)
 
 			orchestratorNetwork, err := NewOrchestratorNetwork(
 				unittest.Logger(),

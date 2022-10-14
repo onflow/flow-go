@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestConnectorHappy_Send checks that a CorruptedConnector can successfully create a connection to a remote corrupt network (CN).
+// TestConnectorHappy_Send checks that a CorruptConnector can successfully create a connection to a remote corrupt network (CN).
 // Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from attacker to corrupt network.
 func TestConnectorHappyPath_Send(t *testing.T) {
 	withMockCorruptNetwork(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
@@ -24,7 +24,7 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 		_, cnPortStr, err := net.SplitHostPort(cn.ServerAddress())
 		require.NoError(t, err)
 
-		connector := NewCorruptedConnector(unittest.Logger(),
+		connector := NewCorruptConnector(unittest.Logger(),
 			flow.IdentityList{&corruptedId},
 			map[flow.Identifier]string{corruptedId.NodeID: cnPortStr})
 		// empty incoming handler, as this test does not evaluate receive path
@@ -76,7 +76,7 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 	})
 }
 
-// TestConnectorHappy_Receive checks that a CorruptedConnector can successfully create a connection to a remote corrupt network (CN).
+// TestConnectorHappy_Receive checks that a CorruptConnector can successfully create a connection to a remote corrupt network (CN).
 // Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from CN to attacker.
 func TestConnectorHappyPath_Receive(t *testing.T) {
 	withMockCorruptNetwork(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
@@ -89,7 +89,7 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 		})
 
 		sentMsgReceived := make(chan struct{})
-		connector := NewCorruptedConnector(unittest.Logger(),
+		connector := NewCorruptConnector(unittest.Logger(),
 			flow.IdentityList{&corruptedId},
 			map[flow.Identifier]string{corruptedId.NodeID: cnPortStr})
 		connector.WithIncomingMessageHandler(

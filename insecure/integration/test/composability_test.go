@@ -187,7 +187,7 @@ func withAttackOrchestrator(
 		egressEventCorrupter:  egressEventCorrupter,
 		ingressEventCorrupter: ingressEventCorrupter,
 	}
-	connector := attackernet.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
+	connector := attackernet.NewCorruptConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
 
 	orchestratorNetwork, err := attackernet.NewOrchestratorNetwork(
 		unittest.Logger(),

@@ -14,49 +14,49 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-type CorruptedConnector struct {
-	logger           zerolog.Logger
-	inboundHandler   func(*insecure.Message)
-	corruptedNodeIds flow.IdentityList // identifier of the corrupted nodes
+type CorruptConnector struct {
+	logger         zerolog.Logger
+	inboundHandler func(*insecure.Message)
+	corruptNodeIds flow.IdentityList // identifier of the corrupt nodes
 
-	// ports on which each corrupted node's corrupt network is running.
-	// corrupted nodes are running on docker containers, while the orchestrator network is on local host.
+	// ports on which each corrupt node's corrupt network is running.
+	// each corrupt node is running a gRPC server in a docker container, while the orchestrator network is running a gRPC client on local host.
 	// hence, each container comes with a port binding on local host.
-	corruptedPortMapping map[flow.Identifier]string
+	corruptPortsMap map[flow.Identifier]string
 }
 
-var _ insecure.CorruptedNodeConnector = &CorruptedConnector{}
+var _ insecure.CorruptedNodeConnector = &CorruptConnector{}
 
-func NewCorruptedConnector(
+func NewCorruptConnector(
 	logger zerolog.Logger,
-	corruptedNodeIds flow.IdentityList,
-	corruptedPortMapping map[flow.Identifier]string) *CorruptedConnector {
-	return &CorruptedConnector{
-		logger:               logger.With().Str("component", "corrupted-connector").Logger(),
-		corruptedNodeIds:     corruptedNodeIds,
-		corruptedPortMapping: corruptedPortMapping,
+	corruptNodeIds flow.IdentityList,
+	corruptPortsMap map[flow.Identifier]string) *CorruptConnector {
+	return &CorruptConnector{
+		logger:          logger.With().Str("component", "corrupt-connector").Logger(),
+		corruptNodeIds:  corruptNodeIds,
+		corruptPortsMap: corruptPortsMap,
 	}
 }
 
-// Connect creates a connection the corrupt network of the given corrupted identity.
-func (c *CorruptedConnector) Connect(ctx irrecoverable.SignalerContext, targetId flow.Identifier) (insecure.CorruptedNodeConnection, error) {
+// Connect creates a connection the corrupt network of the given corrupt identity.
+func (c *CorruptConnector) Connect(ctx irrecoverable.SignalerContext, targetId flow.Identifier) (insecure.CorruptedNodeConnection, error) {
 	if c.inboundHandler == nil {
 		return nil, fmt.Errorf("inbound handler has not set")
 	}
 
-	port, ok := c.corruptedPortMapping[targetId]
+	port, ok := c.corruptPortsMap[targetId]
 	if !ok {
-		return nil, fmt.Errorf("could not find port mapping for corrupted id: %x", targetId)
+		return nil, fmt.Errorf("could not find port mapping for corrupt id: %x", targetId)
 	}
 
 	// corrupt nodes are running on docker containers, while the orchestrator network is on local host.
 	// hence, each container is accessible on local host through port binding.
-	corruptedAddress := fmt.Sprintf("localhost:%s", port)
+	corruptAddress := fmt.Sprintf("localhost:%s", port)
 	gRpcClient, err := grpc.Dial(
-		corruptedAddress,
+		corruptAddress,
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	if err != nil {
-		return nil, fmt.Errorf("could not dial corrupt network %s: %w", corruptedAddress, err)
+		return nil, fmt.Errorf("could not dial corrupt network %s: %w", corruptAddress, err)
 	}
 
 	client := insecure.NewCorruptNetworkClient(gRpcClient)
@@ -76,18 +76,18 @@ func (c *CorruptedConnector) Connect(ctx irrecoverable.SignalerContext, targetId
 
 	c.logger.Debug().
 		Hex("target_id", logging.ID(targetId)).
-		Msg("starting a corrupted connector")
+		Msg("starting corrupt connector")
 
 	<-connection.Ready()
 
 	c.logger.Info().
 		Hex("target_id", logging.ID(targetId)).
-		Msg("corrupted connection started and established")
+		Msg("corrupt connection started and established")
 
 	return connection, nil
 }
 
-// WithIncomingMessageHandler sets the handler for the incoming messages from remote corrupted nodes.
-func (c *CorruptedConnector) WithIncomingMessageHandler(handler func(*insecure.Message)) {
+// WithIncomingMessageHandler sets the handler for the incoming messages from remote corrupt nodes.
+func (c *CorruptConnector) WithIncomingMessageHandler(handler func(*insecure.Message)) {
 	c.inboundHandler = handler
 }
