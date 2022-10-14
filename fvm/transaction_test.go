@@ -554,10 +554,21 @@ func TestAccountFreezing(t *testing.T) {
 			require.NoError(t, err)
 			require.Error(t, frozenProc.Err)
 
+			require.Equal(
+				t,
+				errors.ErrCodeFrozenAccountError,
+				frozenProc.Err.Code())
+
+			// The outer most coded error is a wrapper, not the actual
+			// FrozenAccountError itself.
+			_, ok := frozenProc.Err.(errors.FrozenAccountError)
+			require.False(t, ok)
+
 			// find frozen account specific error
-			require.IsType(t, errors.FrozenAccountError{}, frozenProc.Err)
-			accountFrozenError := frozenProc.Err.(errors.FrozenAccountError)
-			require.Equal(t, frozenAddress, accountFrozenError.Address())
+			var accountFrozenErr errors.FrozenAccountError
+			ok = errors.As(frozenProc.Err, &accountFrozenErr)
+			require.True(t, ok)
+			require.Equal(t, frozenAddress, accountFrozenErr.Address())
 		})
 
 		t.Run("proposal", func(t *testing.T) {
@@ -588,10 +599,21 @@ func TestAccountFreezing(t *testing.T) {
 			require.NoError(t, err)
 			require.Error(t, frozenProc.Err)
 
+			require.Equal(
+				t,
+				errors.ErrCodeFrozenAccountError,
+				frozenProc.Err.Code())
+
+			// The outer most coded error is a wrapper, not the actual
+			// FrozenAccountError itself.
+			_, ok := frozenProc.Err.(errors.FrozenAccountError)
+			require.False(t, ok)
+
 			// find frozen account specific error
-			require.IsType(t, errors.FrozenAccountError{}, frozenProc.Err)
-			accountFrozenError := frozenProc.Err.(errors.FrozenAccountError)
-			require.Equal(t, frozenAddress, accountFrozenError.Address())
+			var accountFrozenErr errors.FrozenAccountError
+			ok = errors.As(frozenProc.Err, &accountFrozenErr)
+			require.True(t, ok)
+			require.Equal(t, frozenAddress, accountFrozenErr.Address())
 		})
 
 		t.Run("payer", func(t *testing.T) {
@@ -622,11 +644,21 @@ func TestAccountFreezing(t *testing.T) {
 			require.NoError(t, err)
 			require.Error(t, frozenProc.Err)
 
-			// find frozen account specific error
-			require.IsType(t, errors.FrozenAccountError{}, frozenProc.Err)
-			accountFrozenError := frozenProc.Err.(errors.FrozenAccountError)
-			require.Equal(t, frozenAddress, accountFrozenError.Address())
-		})
+			require.Equal(
+				t,
+				errors.ErrCodeFrozenAccountError,
+				frozenProc.Err.Code())
 
+			// The outer most coded error is a wrapper, not the actual
+			// FrozenAccountError itself.
+			_, ok := frozenProc.Err.(errors.FrozenAccountError)
+			require.False(t, ok)
+
+			// find frozen account specific error
+			var accountFrozenErr errors.FrozenAccountError
+			ok = errors.As(frozenProc.Err, &accountFrozenErr)
+			require.True(t, ok)
+			require.Equal(t, frozenAddress, accountFrozenErr.Address())
+		})
 	})
 }
