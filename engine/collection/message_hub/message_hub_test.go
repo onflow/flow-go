@@ -2,9 +2,6 @@ package message_hub
 
 import (
 	"context"
-	"github.com/onflow/flow-go/model/cluster"
-	clusterint "github.com/onflow/flow-go/state/cluster"
-	clusterstate "github.com/onflow/flow-go/state/cluster/mock"
 	"math/rand"
 	"sync"
 	"testing"
@@ -17,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -26,6 +24,8 @@ import (
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	clusterint "github.com/onflow/flow-go/state/cluster"
+	clusterstate "github.com/onflow/flow-go/state/cluster/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
