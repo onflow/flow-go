@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 	"io"
 	"net"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/module"
 
