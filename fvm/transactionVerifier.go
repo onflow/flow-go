@@ -50,13 +50,11 @@ func (v *TransactionVerifier) verifyTransaction(
 	ctx Context,
 	txnState *state.TransactionState,
 ) error {
-	if ctx.Tracer != nil && proc.IsSampled() {
-		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMVerifyTransaction)
-		span.SetAttributes(
-			attribute.String("transaction.ID", proc.ID.String()),
-		)
-		defer span.End()
-	}
+	span := proc.StartSpanFromProcTraceSpan(ctx.Tracer, trace.FVMVerifyTransaction)
+	span.SetAttributes(
+		attribute.String("transaction.ID", proc.ID.String()),
+	)
+	defer span.End()
 
 	tx := proc.Transaction
 	accounts := environment.NewAccounts(txnState)

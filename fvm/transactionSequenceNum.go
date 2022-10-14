@@ -37,10 +37,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	txnState *state.TransactionState,
 ) error {
 
-	if ctx.Tracer != nil && proc.IsSampled() {
-		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMSeqNumCheckTransaction)
-		defer span.End()
-	}
+	defer proc.StartSpanFromProcTraceSpan(ctx.Tracer, trace.FVMSeqNumCheckTransaction).End()
 
 	nestedTxnId, err := txnState.BeginNestedTransaction()
 	if err != nil {

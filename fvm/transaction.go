@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 // TODO(patrick): pass in initial snapshot time when we start supporting
@@ -50,6 +52,15 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
 
 func (proc *TransactionProcedure) IsSampled() bool {
 	return proc.TraceSpan != nil
+}
+
+func (proc *TransactionProcedure) StartSpanFromProcTraceSpan(
+	tracer module.Tracer,
+	spanName trace.SpanName) otelTrace.Span {
+	if tracer != nil && proc.IsSampled() {
+		return tracer.StartSpanFromParent(proc.TraceSpan, spanName)
+	}
+	return trace.NoopSpan
 }
 
 func (proc *TransactionProcedure) Run(
