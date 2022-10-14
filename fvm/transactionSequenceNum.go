@@ -23,7 +23,12 @@ func (c *TransactionSequenceNumberChecker) Process(
 	txnState *state.TransactionState,
 	_ *programs.TransactionPrograms,
 ) error {
-	return c.checkAndIncrementSequenceNumber(proc, ctx, txnState)
+	err := c.checkAndIncrementSequenceNumber(proc, ctx, txnState)
+	if err != nil {
+		return fmt.Errorf("checking sequence number failed: %w", err)
+	}
+
+	return nil
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
@@ -65,21 +70,20 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		accountKey, err = accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	})
 	if err != nil {
-		err = errors.NewInvalidProposalSignatureError(proposalKey.Address, proposalKey.KeyIndex, err)
-		return fmt.Errorf("checking sequence number failed: %w", err)
+		return errors.NewInvalidProposalSignatureError(proposalKey, err)
 	}
 
 	if accountKey.Revoked {
-		err = fmt.Errorf("proposal key has been revoked")
-		err = errors.NewInvalidProposalSignatureError(proposalKey.Address, proposalKey.KeyIndex, err)
-		return fmt.Errorf("checking sequence number failed: %w", err)
+		return errors.NewInvalidProposalSignatureError(
+			proposalKey,
+			fmt.Errorf("proposal key has been revoked"))
 	}
 
 	// Note that proposal key verification happens at the txVerifier and not here.
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
-		return errors.NewInvalidProposalSeqNumberError(proposalKey.Address, proposalKey.KeyIndex, accountKey.SeqNumber, proposalKey.SequenceNumber)
+		return errors.NewInvalidProposalSeqNumberError(proposalKey, accountKey.SeqNumber)
 	}
 
 	accountKey.SeqNumber++
@@ -94,7 +98,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		txnState.RunWithAllLimitsDisabled(func() {
 			_ = txnState.RestartNestedTransaction(nestedTxnId)
 		})
-		return fmt.Errorf("checking sequence number failed: %w", err)
+		return err
 	}
 
 	return nil
