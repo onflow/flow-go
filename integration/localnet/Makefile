@@ -24,6 +24,11 @@ COMMIT=$(shell git rev-parse HEAD)
 VERSION=localnetbuild
 
 CURRENT_DIRECTORY=$(shell pwd)
+
+# These vars set the default TPS values for tps-test-ci
+# These can be overwritten at the time make is called on tps-test-ci
+# by setting these as arguments at the time the make target is called
+# e.g. "make tps-test-ci TPS_INIT=5 TPS_MAX=30"
 TPS_INIT=25
 TPS_MAX=500
 
