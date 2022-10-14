@@ -94,7 +94,7 @@ func NewMessageHub(log zerolog.Logger,
 		return nil, fmt.Errorf("could not initialize votes queue")
 	}
 	hub := &MessageHub{
-		log:                    log,
+		log:                    log.With().Str("engine", "cluster_message_hub").Logger(),
 		me:                     me,
 		state:                  state,
 		headers:                headers,

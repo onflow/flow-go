@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -68,6 +67,7 @@ type MessageHub struct {
 	headers                storage.Headers
 	payloads               storage.Payloads
 	con                    network.Conduit
+	pushBlocksCon          network.Conduit
 	queuedMessagesNotifier engine.Notifier
 	queuedVotes            *fifoqueue.FifoQueue
 	queuedProposals        *fifoqueue.FifoQueue
@@ -75,7 +75,6 @@ type MessageHub struct {
 
 	// injected dependencies
 	compliance        network.MessageProcessor
-	prov              consensus.ProposalProvider
 	hotstuff          module.HotStuff
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
@@ -90,7 +89,6 @@ func NewMessageHub(log zerolog.Logger,
 	net network.Network,
 	me module.Local,
 	compliance network.MessageProcessor,
-	prov consensus.ProposalProvider,
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
@@ -111,13 +109,12 @@ func NewMessageHub(log zerolog.Logger,
 		return nil, fmt.Errorf("could not initialize timeouts queue")
 	}
 	hub := &MessageHub{
-		log:                    log,
+		log:                    log.With().Str("engine", "message_hub").Logger(),
 		me:                     me,
 		state:                  state,
 		headers:                headers,
 		payloads:               payloads,
 		compliance:             compliance,
-		prov:                   prov,
 		hotstuff:               hotstuff,
 		voteAggregator:         voteAggregator,
 		timeoutAggregator:      timeoutAggregator,
@@ -127,10 +124,16 @@ func NewMessageHub(log zerolog.Logger,
 		queuedTimeouts:         queuedTimeouts,
 	}
 
-	// register the core with the network layer and store the conduit
+	// register with the network layer and store the conduit
 	hub.con, err = net.Register(channels.ConsensusCommittee, hub)
 	if err != nil {
 		return nil, fmt.Errorf("could not register core: %w", err)
+	}
+
+	// register with the network layer and store the conduit
+	hub.pushBlocksCon, err = net.Register(channels.PushBlocks, hub)
+	if err != nil {
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
 	componentBuilder := component.NewComponentManagerBuilder()
@@ -335,13 +338,14 @@ func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
 	// Note: retrieving the final state requires a time-intensive database read.
 	//       Therefore, we execute this in a separate routine, because
 	//       `BroadcastTimeout` is directly called by the consensus core logic.
-	recipients, err := h.state.AtBlockID(header.ParentID).Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
+	allIdentities, err := h.state.AtBlockID(header.ParentID).Identities(filter.And(
 		filter.Not(filter.HasNodeID(h.me.NodeID())),
 	))
 	if err != nil {
-		return fmt.Errorf("could not get consensus recipient for broadcasting proposal: %w", err)
+		return fmt.Errorf("could not get identities for broadcasting proposal: %w", err)
 	}
+
+	recipients := allIdentities.Filter(filter.HasRole(flow.RoleConsensus))
 
 	// TODO(active-pacemaker): replace with pub/sub?
 	h.hotstuff.SubmitProposal(header, parent.View) // non-blocking
@@ -369,9 +373,37 @@ func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
 
 	log.Info().Msg("block proposal was broadcast")
 
-	// submit the proposal to the provider engine to forward it to other node roles
-	h.prov.ProvideProposal(proposal)
+	// submit proposal to non-consensus nodes
+	h.provideProposal(proposal, allIdentities.Filter(filter.And(
+		filter.Not(filter.Ejected),
+		filter.Not(filter.HasRole(flow.RoleConsensus)),
+	)))
+
 	return nil
+}
+
+// provideProposal is used when we want to broadcast a local block to the rest  of the
+// network (non-consensus nodes).
+func (h *MessageHub) provideProposal(proposal *messages.BlockProposal, recipients flow.IdentityList) {
+
+	blockID := proposal.Header.ID()
+	log := h.log.With().
+		Uint64("block_view", proposal.Header.View).
+		Hex("block_id", blockID[:]).
+		Hex("parent_id", proposal.Header.ParentID[:]).
+		Logger()
+	log.Info().Msg("block proposal submitted for propagation")
+
+	// submit the block to the targets
+	err := h.pushBlocksCon.Publish(proposal, recipients.NodeIDs()...)
+	if err != nil {
+		h.log.Err(err).Msg("failed to broadcast block")
+		return
+	}
+
+	// TODO(active-pacemaker): update metrics
+	//h.message.MessageSent(metrics.EngineConsensusProvider, metrics.MessageBlockProposal)
+	log.Info().Msg("block proposal propagated to non-consensus nodes")
 }
 
 // SendVote queues vote for subsequent sending

@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
-	consensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -51,7 +50,7 @@ type MessageHubSuite struct {
 	state             *protocol.MutableState
 	net               *mocknetwork.Network
 	con               *mocknetwork.Conduit
-	prov              *consensus.ProposalProvider
+	pushBlocksCon     *mocknetwork.Conduit
 	hotstuff          *module.HotStuff
 	voteAggregator    *hotstuff.VoteAggregator
 	timeoutAggregator *hotstuff.TimeoutAggregator
@@ -83,7 +82,7 @@ func (s *MessageHubSuite) SetupTest() {
 	s.state = protocol.NewMutableState(s.T())
 	s.net = mocknetwork.NewNetwork(s.T())
 	s.con = mocknetwork.NewConduit(s.T())
-	s.prov = consensus.NewProposalProvider(s.T())
+	s.pushBlocksCon = mocknetwork.NewConduit(s.T())
 	s.hotstuff = module.NewHotStuff(s.T())
 	s.voteAggregator = hotstuff.NewVoteAggregator(s.T())
 	s.timeoutAggregator = hotstuff.NewTimeoutAggregator(s.T())
@@ -112,7 +111,14 @@ func (s *MessageHubSuite) SetupTest() {
 	// set up network module mock
 	s.net.On("Register", mock.Anything, mock.Anything).Return(
 		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
-			return s.con
+			if channel == channels.ConsensusCommittee {
+				return s.con
+			} else if channel == channels.PushBlocks {
+				return s.pushBlocksCon
+			} else {
+				s.T().Fail()
+			}
+			return nil
 		},
 		nil,
 	)
@@ -137,7 +143,6 @@ func (s *MessageHubSuite) SetupTest() {
 		s.net,
 		s.me,
 		s.compliance,
-		s.prov,
 		s.hotstuff,
 		s.voteAggregator,
 		s.timeoutAggregator,
@@ -282,13 +287,14 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 		s.hotstuff.On("SubmitProposal", &headerFromHotstuff, parent.View).
 			Run(func(args mock.Arguments) { close(submitted) }).
 			Once()
-		s.prov.On("ProvideProposal", expectedBroadcastMsg).Return()
 
 		broadcast := make(chan struct{}) // closed when proposal is broadcast
 		s.con.On("Publish", expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
 			Run(func(_ mock.Arguments) { close(broadcast) }).
 			Return(nil).
 			Once()
+
+		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit to broadcast proposal
 		err := s.hub.processQueuedBlock(&headerFromHotstuff)
@@ -302,6 +308,9 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 // asserting that expected message transmissions happened as expected.
 func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 	var wg sync.WaitGroup
+
+	// add execution node to participants to make sure we exclude them from broadcast
+	s.participants = append(s.participants, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))
 
 	s.Run("vote", func() {
 		wg.Add(1)
@@ -347,7 +356,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.con.On("Publish", expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
-		s.prov.On("ProvideProposal", expectedBroadcastMsg).Return()
+		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit proposal
 		s.hub.BroadcastProposalWithDelay(proposal.Header, 0)
