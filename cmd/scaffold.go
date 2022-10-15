@@ -193,7 +193,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 
 	// unicast stream handler rate limits
-	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageRateLimit, "unicast-message-rate-limit", 0, "amount of unicast messages that sent by a peer per second")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageRateLimit, "unicast-message-rate-limit", 0, "maximum number of unicast messages that a peer can send per second")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageBurstLimit, "unicast-message-burst-limit", 1, "amount of unicast messages that can be sent by a peer at one time")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthRateLimit, "unicast-bandwidth-rate-limit", 0, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", middleware.LargeMsgMaxUnicastMsgSize, "bandwidth size in bytes a peer is allowed to send at one time")
