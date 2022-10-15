@@ -2,6 +2,7 @@ package messageutils
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/message"
