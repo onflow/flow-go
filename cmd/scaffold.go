@@ -285,6 +285,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			Str("message_type", msgType).
 			Str("topic", topic.String()).
 			Str("reason", reason.String()).
+			Bool(logging.KeySuspicious, true).
 			Msg("unicast peer rate limited")
 		fnb.Metrics.Network.OnRateLimitedUnicastMessage(role, msgType, topic.String(), reason.String())
 	}
