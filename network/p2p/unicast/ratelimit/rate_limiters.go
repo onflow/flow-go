@@ -17,8 +17,8 @@ const (
 )
 
 var (
-	MessageCount RateLimitReason = "messagecount"
-	Bandwidth    RateLimitReason = "bandwidth"
+	ReasonMessageCount RateLimitReason = "messagecount"
+	ReasonBandwidth    RateLimitReason = "bandwidth"
 )
 
 type RateLimitReason string
@@ -69,7 +69,7 @@ func (r *RateLimiters) MessageAllowed(peerID peer.ID) bool {
 	}
 
 	if !r.MessageRateLimiter.Allow(peerID, nil) {
-		r.onRateLimitedPeer(peerID, "", "", "", MessageCount)
+		r.onRateLimitedPeer(peerID, "", "", "", ReasonMessageCount)
 
 		// avoid rate limiting during dry run
 		return r.disabled
@@ -86,7 +86,7 @@ func (r *RateLimiters) BandwidthAllowed(peerID peer.ID, role string, msg *messag
 	}
 
 	if !r.BandWidthRateLimiter.Allow(peerID, msg) {
-		r.onRateLimitedPeer(peerID, role, msg.Type, channels.Topic(msg.ChannelID), Bandwidth)
+		r.onRateLimitedPeer(peerID, role, msg.Type, channels.Topic(msg.ChannelID), ReasonBandwidth)
 
 		// avoid rate limiting during dry runs if disabled set to false
 		return r.disabled

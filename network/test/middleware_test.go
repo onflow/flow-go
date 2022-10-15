@@ -199,7 +199,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	ch := make(chan struct{})
 	var rateLimits uint64
 	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
-		require.Equal(m.T(), reason, ratelimit.MessageCount)
+		require.Equal(m.T(), reason, ratelimit.ReasonMessageCount)
 
 		// we only expect messages from the first middleware on the test suite
 		expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
@@ -296,7 +296,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	ch := make(chan struct{})
 	var rateLimits uint64
 	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
-		require.Equal(m.T(), reason, ratelimit.Bandwidth)
+		require.Equal(m.T(), reason, ratelimit.ReasonBandwidth)
 
 		// we only expect messages from the first middleware on the test suite
 		expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
