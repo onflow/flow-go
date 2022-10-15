@@ -83,7 +83,7 @@ func (r *RateLimiterMap) Cleanup() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for peerID, item := range r.limiters {
-		if r.isExpired(item) {
+		if time.Since(item.LastAccessed) > r.ttl {
 			r.removeUnlocked(peerID)
 		}
 	}
@@ -106,9 +106,4 @@ func (r *RateLimiterMap) CleanupLoop() {
 // Close will Close the done channel starting the final full Cleanup and stopping the Cleanup loop.
 func (r *RateLimiterMap) Close() {
 	close(r.done)
-}
-
-// isExpired returns true if configured ttl has passed for an item.
-func (r *RateLimiterMap) isExpired(item *RateLimiterMetadata) bool {
-	return time.Since(item.LastAccessed) > r.ttl
 }
