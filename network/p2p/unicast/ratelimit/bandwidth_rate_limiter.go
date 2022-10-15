@@ -6,6 +6,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit/internal/limiter_map"
 

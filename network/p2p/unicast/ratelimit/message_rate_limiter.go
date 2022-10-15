@@ -1,15 +1,15 @@
 package ratelimit
 
 import (
-	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit/internal/limiter_map"
 	"time"
 
 	"golang.org/x/time/rate"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit/internal/limiter_map"
 )
 
 // MessageRateLimiterImpl unicast rate limiter that limits the amount of streams that can

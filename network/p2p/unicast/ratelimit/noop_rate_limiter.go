@@ -2,6 +2,7 @@ package ratelimit
 
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 )

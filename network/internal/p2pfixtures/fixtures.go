@@ -24,17 +24,17 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/internal/p2putils"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/utils"
-	"github.com/onflow/flow-go/network/test"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -83,7 +83,7 @@ func NodeFixture(
 
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := connection.NewConnManager(logger, noopMetrics)
-	resourceManager := test.NewResourceManager(t)
+	resourceManager := testutils.NewResourceManager(t)
 
 	builder := p2pbuilder.NewNodeBuilder(logger, parameters.Address, parameters.Key, sporkID).
 		SetConnectionManager(connManager).
@@ -299,7 +299,7 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
-		SetResourceManager(test.NewResourceManager(t))
+		SetResourceManager(testutils.NewResourceManager(t))
 
 	for _, opt := range opts {
 		opt(builder)

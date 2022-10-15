@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
@@ -44,7 +45,7 @@ type UnicastAuthorizationTestSuite struct {
 	// receiverID the identity on the mw sending the message
 	receiverID *flow.Identity
 	// providers id providers generated at beginning of a test run
-	providers []*UpdatableIDProvider
+	providers []*testutils.UpdatableIDProvider
 	// cancel is the cancel func from the context that was used to start the middlewares in a test run
 	cancel context.CancelFunc
 	// waitCh is the channel used to wait for the middleware to perform authorization and invoke the slashing
@@ -70,8 +71,8 @@ func (u *UnicastAuthorizationTestSuite) TearDownTest() {
 
 // setupMiddlewaresAndProviders will setup 2 middlewares that will be used as a sender and receiver in each suite test.
 func (u *UnicastAuthorizationTestSuite) setupMiddlewaresAndProviders(slashingViolationsConsumer slashing.ViolationsConsumer) {
-	ids, libP2PNodes, _ := GenerateIDs(u.T(), u.logger, 2)
-	mws, providers := GenerateMiddlewares(u.T(), u.logger, ids, libP2PNodes, unittest.NetworkCodec(), slashingViolationsConsumer)
+	ids, libP2PNodes, _ := testutils.GenerateIDs(u.T(), u.logger, 2)
+	mws, providers := testutils.GenerateMiddlewares(u.T(), u.logger, ids, libP2PNodes, unittest.NetworkCodec(), slashingViolationsConsumer)
 	require.Len(u.T(), ids, 2)
 	require.Len(u.T(), providers, 2)
 	require.Len(u.T(), mws, 2)

@@ -1,4 +1,4 @@
-package test
+package testutils
 
 import (
 	"context"
@@ -52,8 +52,8 @@ import (
 var sporkID = unittest.IdentifierFixture()
 
 type PeerTag struct {
-	peer peer.ID
-	tag  string
+	Peer peer.ID
+	Tag  string
 }
 
 type TagWatchingConnManager struct {
@@ -80,7 +80,7 @@ func (cwcm *TagWatchingConnManager) Protect(id peer.ID, tag string) {
 	defer cwcm.obsLock.RUnlock()
 	cwcm.ConnManager.Protect(id, tag)
 	for obs := range cwcm.observers {
-		go obs.OnNext(PeerTag{peer: id, tag: tag})
+		go obs.OnNext(PeerTag{Peer: id, Tag: tag})
 	}
 }
 
@@ -89,7 +89,7 @@ func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 	defer cwcm.obsLock.RUnlock()
 	res := cwcm.ConnManager.Unprotect(id, tag)
 	for obs := range cwcm.observers {
-		go obs.OnNext(PeerTag{peer: id, tag: tag})
+		go obs.OnNext(PeerTag{Peer: id, Tag: tag})
 	}
 	return res
 }
@@ -314,7 +314,7 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	return engs
 }
 
-// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel
+// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error Channel
 func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []*p2pnode.Node, nets []network.Network, duration time.Duration) {
 	// start up networks (this will implicitly start middlewares)
 	for _, net := range nets {
@@ -322,11 +322,11 @@ func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, node
 		unittest.RequireComponentsReadyBefore(t, duration, net)
 	}
 
-	// start up nodes and peer managers
+	// start up nodes and Peer managers
 	StartNodes(ctx, t, nodes, duration)
 }
 
-// StartNodes starts the provided nodes and their peer managers using the provided irrecoverable context
+// StartNodes starts the provided nodes and their Peer managers using the provided irrecoverable context
 func StartNodes(ctx irrecoverable.SignalerContext, t *testing.T, nodes []*p2pnode.Node, duration time.Duration) {
 	for _, node := range nodes {
 		node.Start(ctx)
@@ -387,7 +387,7 @@ func generateLibP2PNode(
 }
 
 // OptionalSleep introduces a sleep to allow nodes to heartbeat and discover each other (only needed when using PubSub)
-func optionalSleep(send ConduitSendWrapperFunc) {
+func OptionalSleep(send ConduitSendWrapperFunc) {
 	sendFuncName := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
 	if strings.Contains(sendFuncName, "Multicast") || strings.Contains(sendFuncName, "Publish") {
 		time.Sleep(2 * time.Second)
@@ -412,9 +412,9 @@ func GenerateSubscriptionManagers(t *testing.T, mws []network.Middleware) []netw
 	return sms
 }
 
-// stopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
+// StopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
 // duration.
-func stopNetworks(t *testing.T, nets []network.Network, duration time.Duration) {
+func StopNetworks(t *testing.T, nets []network.Network, duration time.Duration) {
 	// casts nets instances into ReadyDoneAware components
 	comps := make([]module.ReadyDoneAware, 0, len(nets))
 	for _, net := range nets {
@@ -424,7 +424,7 @@ func stopNetworks(t *testing.T, nets []network.Network, duration time.Duration) 
 	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
-func stopMiddlewares(t *testing.T, mws []network.Middleware, duration time.Duration) {
+func StopMiddlewares(t *testing.T, mws []network.Middleware, duration time.Duration) {
 	// casts mws instances into ReadyDoneAware components
 	comps := make([]module.ReadyDoneAware, 0, len(mws))
 	for _, net := range mws {
@@ -434,10 +434,10 @@ func stopMiddlewares(t *testing.T, mws []network.Middleware, duration time.Durat
 	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
-// networkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.
+// NetworkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.
 // The primary goal of utilizing this helper function is to apply stress tests on the network layer by
 // sending large messages to transmit.
-func networkPayloadFixture(t *testing.T, size uint) []byte {
+func NetworkPayloadFixture(t *testing.T, size uint) []byte {
 	// reserves 1000 bytes for the message headers, encoding overhead, and libp2p message overhead.
 	overhead := 1000
 	require.Greater(t, int(size), overhead, "could not generate message below size threshold")
@@ -461,7 +461,7 @@ func networkPayloadFixture(t *testing.T, size uint) []byte {
 
 	event := emptyEvent
 	event.Text = string(payload)
-	// encode event the way the network would encode it to get the size of the message
+	// encode Event the way the network would encode it to get the size of the message
 	// just to do the size check
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(t, err)

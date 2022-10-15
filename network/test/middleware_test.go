@@ -10,7 +10,6 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
@@ -27,14 +26,15 @@ import (
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
-	testnet "github.com/onflow/flow-go/utils/unittest/network"
 )
 
 const testChannel = channels.TestNetworkChannel
@@ -49,10 +49,10 @@ type tagsObserver struct {
 }
 
 func (co *tagsObserver) OnNext(peertag interface{}) {
-	pt, ok := peertag.(PeerTag)
+	pt, ok := peertag.(testutils.PeerTag)
 
 	if ok {
-		co.tags <- fmt.Sprintf("peer: %v tag: %v", pt.peer, pt.tag)
+		co.tags <- fmt.Sprintf("peer: %v tag: %v", pt.Peer, pt.Tag)
 	}
 
 }
@@ -75,7 +75,7 @@ type MiddlewareTestSuite struct {
 	ids       []*flow.Identity
 	metrics   *metrics.NoopCollector // no-op performance monitoring simulation
 	logger    zerolog.Logger
-	providers []*UpdatableIDProvider
+	providers []*testutils.UpdatableIDProvider
 
 	mwCancel context.CancelFunc
 	mwCtx    irrecoverable.SignalerContext
@@ -106,7 +106,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
 
-	m.ids, m.nodes, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, m.logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
+	m.ids, m.nodes, m.mws, obs, m.providers = testutils.GenerateIDsAndMiddlewares(m.T(), m.size, m.logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -133,17 +133,16 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, mw)
 	}
 
-	StartNodes(m.mwCtx, m.T(), m.nodes, 100*time.Millisecond)
+	testutils.StartNodes(m.mwCtx, m.T(), m.nodes, 100*time.Millisecond)
 }
 
 // TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
 // the addresses of the staked network participants.
 func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// create a new staked identity
-	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
-	defer testnet.StopNodes(m.T(), libP2PNodes)
+	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
 
-	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer)
+	mws, providers := testutils.GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -160,7 +159,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
 
 	// start up nodes and peer managers
-	StartNodes(m.mwCtx, m.T(), libP2PNodes, 100*time.Millisecond)
+	testutils.StartNodes(m.mwCtx, m.T(), libP2PNodes, 100*time.Millisecond)
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
@@ -214,8 +213,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	rateLimiters := ratelimit.NewRateLimiters(messageRateLimiter, &ratelimit.NoopRateLimiter{}, onRateLimit, false)
 
 	// create a new staked identity
-	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
-	defer testnet.StopNodes(m.T(), libP2PNodes)
+	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
 
 	// create middleware
 	netmet := mock.NewNetworkMetrics(m.T())
@@ -229,7 +227,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// we expect 5 messages to be processed the rest will be rate limited
 	defer netmet.AssertNumberOfCalls(m.T(), "NetworkMessageReceived", 5)
 
-	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer, WithUnicastRateLimiters(rateLimiters), WithNetworkMetrics(netmet))
+	mws, providers := testutils.GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer, testutils.WithUnicastRateLimiters(rateLimiters), testutils.WithNetworkMetrics(netmet))
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -312,12 +310,11 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	rateLimiters := ratelimit.NewRateLimiters(&ratelimit.NoopRateLimiter{}, bandwidthRateLimiter, onRateLimit, false)
 
 	// create a new staked identity
-	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
-	defer testnet.StopNodes(m.T(), libP2PNodes)
+	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
 
 	// create middleware
-	opts := WithUnicastRateLimiters(rateLimiters)
-	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer, opts)
+	opts := testutils.WithUnicastRateLimiters(rateLimiters)
+	mws, providers := testutils.GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer, opts)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -376,7 +373,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	require.Equal(m.T(), uint64(1), rateLimits)
 }
 
-func (m *MiddlewareTestSuite) createOverlay(provider *UpdatableIDProvider) *mocknetwork.Overlay {
+func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvider) *mocknetwork.Overlay {
 	overlay := &mocknetwork.Overlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return provider.Identities(filter.Any)
@@ -578,7 +575,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 	// so the generated payload is 1000 bytes below the maximum unicast message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := networkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
+	payload := testutils.NetworkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
@@ -605,7 +602,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	msg, _ := createMessage(sourceNode, targetNode, "")
 
 	// creates a network payload with a size greater than the default max size
-	payload := networkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
+	payload := testutils.NetworkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
@@ -655,7 +652,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	// so the generated payload is 1000 bytes below the maximum publish message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := networkPayloadFixture(m.T(), uint(p2pnode.DefaultMaxPubSubMsgSize)+1000)
+	payload := testutils.NetworkPayloadFixture(m.T(), uint(p2pnode.DefaultMaxPubSubMsgSize)+1000)
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
