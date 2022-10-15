@@ -326,7 +326,8 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 		for _, filter := range m.peerManagerFilters {
 			if err := filter(id); err != nil {
 				m.log.Debug().
-					Str("peer_id", id.Pretty()).
+					Err(err).
+					Str("peer_id", id.String()).
 					Msg("filtering topology peer")
 
 				peerAllowed = false
@@ -468,6 +469,8 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// check if peer is currently rate limited before continuing to process stream.
 	if m.unicastRateLimiters.MessageRateLimiter.IsRateLimited(remotePeer) || m.unicastRateLimiters.BandWidthRateLimiter.IsRateLimited(remotePeer) {
+		fmt.Println("here")
+
 		log.Debug().
 			Msg("dropping unicast stream from rate limited peer")
 		return
