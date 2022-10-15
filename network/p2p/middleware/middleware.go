@@ -472,6 +472,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		fmt.Println("here")
 
 		log.Debug().
+			Bool(logging.KeySuspicious, true).
 			Msg("dropping unicast stream from rate limited peer")
 		return
 	}
