@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
 	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -197,7 +197,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch. O
 	ch := make(chan struct{})
-	var rateLimits uint64
+	rateLimits := atomic.NewUint64(0)
 	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
 		require.Equal(m.T(), reason, ratelimit.ReasonMessageCount)
 
@@ -207,7 +207,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		require.Equal(m.T(), expectedPID, peerID)
 
 		// update hook calls
-		atomic.AddUint64(&rateLimits, 1)
+		rateLimits.Inc()
 	}
 
 	rateLimiters := ratelimit.NewRateLimiters(messageRateLimiter, &ratelimit.NoopRateLimiter{}, onRateLimit, ratelimit.WithDisabledRateLimiting(false))
@@ -275,7 +275,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 
 	// expect our rate limited peer callback to be invoked once
-	require.Equal(m.T(), uint64(1), rateLimits)
+	require.Equal(m.T(), uint64(1), rateLimits.Load())
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
@@ -294,7 +294,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.
 	ch := make(chan struct{})
-	var rateLimits uint64
+	rateLimits := atomic.NewUint64(0)
 	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
 		require.Equal(m.T(), reason, ratelimit.ReasonBandwidth)
 
@@ -303,7 +303,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		require.NoError(m.T(), err)
 		require.Equal(m.T(), expectedPID, peerID)
 		// update hook calls
-		atomic.AddUint64(&rateLimits, 1)
+		rateLimits.Inc()
 		close(ch)
 	}
 
@@ -370,7 +370,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 
 	// expect our rate limited peer callback to be invoked once
-	require.Equal(m.T(), uint64(1), rateLimits)
+	require.Equal(m.T(), uint64(1), rateLimits.Load())
 }
 
 func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvider) *mocknetwork.Overlay {
