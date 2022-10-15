@@ -194,7 +194,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	// unicast stream handler rate limits
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageRateLimit, "unicast-message-rate-limit", 0, "amount of unicast messages that sent by a peer per second")
-	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageBurstLimit, "unicast-message-burst-limit", 1, "amount of unicast messages that can be sent by a peer at one time")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthRateLimit, "unicast-bandwidth-rate-limit", 0, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", middleware.LargeMsgMaxUnicastMsgSize, "bandwidth size in bytes a peer is allowed to send at one time")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastRateLimitLockoutDuration, "unicast-rate-limit-lockout-duration", 10, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
@@ -294,11 +293,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	unicastRateLimiters := ratelimit.NewRateLimiters(ratelimit.NewNoopRateLimiter(), ratelimit.NewNoopRateLimiter(), onUnicastRateLimit, ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.UnicastRateLimitDryRun))
 
 	// override noop unicast message rate limiter
-	if fnb.BaseConfig.UnicastMessageRateLimit > 0 && fnb.BaseConfig.UnicastMessageBurstLimit > 0 {
+	if fnb.BaseConfig.UnicastMessageRateLimit > 0 {
 		unicastMessageRateLimiter := ratelimit.NewMessageRateLimiter(
 			rate.Limit(fnb.BaseConfig.UnicastMessageRateLimit),
-			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
-			fnb.BaseConfig.UnicastMessageBurstLimit,
+			fnb.BaseConfig.UnicastMessageRateLimit,
+			time.Duration(fnb.BaseConfig.UnicastRateLimitLockoutDuration),
 		)
 		unicastRateLimiters.MessageRateLimiter = unicastMessageRateLimiter
 

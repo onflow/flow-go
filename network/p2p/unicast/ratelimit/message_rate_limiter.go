@@ -25,13 +25,13 @@ type MessageRateLimiter struct {
 
 // NewMessageRateLimiter returns a new MessageRateLimiter. The cleanup loop will be started in a
 // separate goroutine and should be stopped by calling Close.
-func NewMessageRateLimiter(limit rate.Limit, burst, lockoutDuration int, opts ...p2p.RateLimiterOpt) *MessageRateLimiter {
+func NewMessageRateLimiter(limit rate.Limit, burst int, lockoutDuration time.Duration, opts ...p2p.RateLimiterOpt) *MessageRateLimiter {
 	l := &MessageRateLimiter{
 		limiters:                 limiter_map.NewLimiterMap(rateLimiterTTL, cleanUpTickInterval),
 		limit:                    limit,
 		burst:                    burst,
 		now:                      time.Now,
-		rateLimitLockoutDuration: time.Duration(lockoutDuration) * time.Second,
+		rateLimitLockoutDuration: lockoutDuration * time.Second,
 	}
 
 	for _, opt := range opts {

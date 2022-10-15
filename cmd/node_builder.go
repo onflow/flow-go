@@ -201,8 +201,6 @@ type NetworkConfig struct {
 	UnicastRateLimitLockoutDuration int
 	// UnicastMessageRateLimit amount of unicast messages that can be sent by a peer per second.
 	UnicastMessageRateLimit int
-	// UnicastMessageBurstLimit amount of unicast messages that can be sent by a peer at once.
-	UnicastMessageBurstLimit int
 	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
 	UnicastBandwidthRateLimit int
 	// UnicastBandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
