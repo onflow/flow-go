@@ -53,6 +53,8 @@ type Engine struct {
 	verifier              network.Engine            // used to push verifiable chunk down the verification pipeline.
 	requester             ChunkDataPackRequester    // used to request chunk data packs from network.
 	chunkConsumerNotifier module.ProcessingNotifier // used to notify chunk consumer that it is done processing a chunk.
+
+	stopAtHeight uint64
 }
 
 func New(
@@ -67,6 +69,7 @@ func New(
 	results storage.ExecutionResults,
 	receipts storage.ExecutionReceipts,
 	requester ChunkDataPackRequester,
+	stopAtHeight uint64,
 ) *Engine {
 	e := &Engine{
 		unit:          engine.NewUnit(),
@@ -81,6 +84,7 @@ func New(
 		results:       results,
 		receipts:      receipts,
 		requester:     requester,
+		stopAtHeight:  stopAtHeight,
 	}
 
 	e.requester.WithChunkDataPackHandler(e)
@@ -186,6 +190,13 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 		return false, 0, fmt.Errorf("could not determine whether block has been sealed: %w", err)
 	}
 	if sealed {
+		e.chunkConsumerNotifier.Notify(chunkLocatorID) // tells consumer that we are done with this chunk.
+		return false, blockHeight, nil
+	}
+
+	// skip chunk if it verifies a block at or above stop height
+	if e.stopAtHeight > 0 && blockHeight >= e.stopAtHeight {
+		e.log.Warn().Msgf("Skipping chunk %s - height  %d at or above stop height requested (%d)", chunkID, blockHeight, e.stopAtHeight)
 		e.chunkConsumerNotifier.Notify(chunkLocatorID) // tells consumer that we are done with this chunk.
 		return false, blockHeight, nil
 	}

@@ -29,92 +29,51 @@ import (
 // TestSubscriptionProvider_GetSubscribedTopics tests that when a peer has not subscribed to
 // any topic, the subscription validator returns no error.
 func TestSubscriptionValidator_NoSubscribedTopic(t *testing.T) {
-	idProvider := mock.NewIdentityProvider(t)
 	sp := mockp2p.NewSubscriptionProvider(t)
 
-	sv := scoring.NewSubscriptionValidator(idProvider)
+	sv := scoring.NewSubscriptionValidator()
 	sv.RegisterSubscriptionProvider(sp)
 
 	// mocks peer 1 not subscribed to any topic.
 	peer1 := p2pfixtures.PeerIdFixture(t)
-	idProvider.On("ByPeerID", peer1).Return(unittest.IdentityFixture(), true)
 	sp.On("GetSubscribedTopics", peer1).Return([]string{})
 
-	// as peer 1 has not subscribed to any topic, the subscription validator should return no error.
-	require.NoError(t, sv.CheckSubscribedToAllowedTopics(peer1))
-}
-
-// TestSubscriptionValidator_UnknownIdentity tests that when a peer does not have an authorized identity,
-// the subscription validator returns an error.
-func TestSubscriptionValidator_UnknownIdentity(t *testing.T) {
-	idProvider := mock.NewIdentityProvider(t)
-	sp := mockp2p.NewSubscriptionProvider(t)
-
-	sv := scoring.NewSubscriptionValidator(idProvider)
-	sv.RegisterSubscriptionProvider(sp)
-
-	peer := p2pfixtures.PeerIdFixture(t)
-	idProvider.On("ByPeerID", peer).Return(nil, false)
-	sp.On("GetSubscribedTopics", peer).Return([]string{})
-
-	err := sv.CheckSubscribedToAllowedTopics(peer)
-	require.Error(t, err)
-	require.True(t, scoring.IsInvalidPeerIDError(err))
-	require.Contains(t, err.Error(), scoring.PeerIdStatusUnknown)
-}
-
-// TestSubscriptionValidator_EjectedIdentity tests that when a peer has been ejected, the subscription
-// validator returns an error.
-func TestSubscriptionValidator_EjectedIdentity(t *testing.T) {
-	idProvider := mock.NewIdentityProvider(t)
-	sp := mockp2p.NewSubscriptionProvider(t)
-
-	sv := scoring.NewSubscriptionValidator(idProvider)
-	sv.RegisterSubscriptionProvider(sp)
-
-	ejectedIdentity := unittest.IdentityFixture()
-	ejectedIdentity.Ejected = true
-	peer := p2pfixtures.PeerIdFixture(t)
-	idProvider.On("ByPeerID", peer).Return(ejectedIdentity, true)
-	sp.On("GetSubscribedTopics", peer).Return([]string{})
-
-	err := sv.CheckSubscribedToAllowedTopics(peer)
-	require.Error(t, err)
-	require.True(t, scoring.IsInvalidPeerIDError(err))
-	require.Contains(t, err.Error(), scoring.PeerIdStatusEjected)
+	// as peer 1 has not subscribed to any topic, the subscription validator should return no error regardless of the
+	// role.
+	for _, role := range flow.Roles() {
+		require.NoError(t, sv.CheckSubscribedToAllowedTopics(peer1, role))
+	}
 }
 
 // TestSubscriptionValidator_UnknownChannel tests that when a peer has subscribed to an unknown
 // topic, the subscription validator returns an error.
 func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
-	idProvider := mock.NewIdentityProvider(t)
 	sp := mockp2p.NewSubscriptionProvider(t)
-
-	sv := scoring.NewSubscriptionValidator(idProvider)
+	sv := scoring.NewSubscriptionValidator()
 	sv.RegisterSubscriptionProvider(sp)
 
 	// mocks peer 1 not subscribed to an unknown topic.
 	peer1 := p2pfixtures.PeerIdFixture(t)
-	idProvider.On("ByPeerID", peer1).Return(unittest.IdentityFixture(), true)
 	sp.On("GetSubscribedTopics", peer1).Return([]string{"unknown-topic-1", "unknown-topic-2"})
 
-	// as peer 1 has subscribed to unknown topics, the subscription validator should return an error.
-	err := sv.CheckSubscribedToAllowedTopics(peer1)
-	require.Error(t, err)
-	require.True(t, scoring.IsInvalidSubscriptionError(err))
+	// as peer 1 has subscribed to unknown topics, the subscription validator should return an error
+	// regardless of the role.
+	for _, role := range flow.Roles() {
+		err := sv.CheckSubscribedToAllowedTopics(peer1, role)
+		require.Error(t, err)
+		require.True(t, scoring.IsInvalidSubscriptionError(err))
+	}
 }
 
 // TestSubscriptionValidator_ValidSubscription tests that when a peer has subscribed to valid
 // topics based on its Flow protocol role, the subscription validator returns no error.
 func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
-	idProvider := mock.NewIdentityProvider(t)
 	sp := mockp2p.NewSubscriptionProvider(t)
-
-	sv := scoring.NewSubscriptionValidator(idProvider)
+	sv := scoring.NewSubscriptionValidator()
 	sv.RegisterSubscriptionProvider(sp)
 
 	for _, role := range flow.Roles() {
-		peer := p2pfixtures.PeerIdFixture(t)
+		peerId := p2pfixtures.PeerIdFixture(t)
 		// allowed channels for the role excluding the test channels.
 		allowedChannels := channels.ChannelsByRole(role).ExcludePattern(regexp.MustCompile("^(test).*"))
 		sporkID := unittest.IdentifierFixture()
@@ -126,9 +85,8 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 
 		// peer should pass the subscription validator as it has subscribed to any subset of its allowed topics.
 		for i := range allowedTopics {
-			idProvider.On("ByPeerID", peer).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
-			sp.On("GetSubscribedTopics", peer).Return(allowedTopics[:i+1])
-			require.NoError(t, sv.CheckSubscribedToAllowedTopics(peer))
+			sp.On("GetSubscribedTopics", peerId).Return(allowedTopics[:i+1])
+			require.NoError(t, sv.CheckSubscribedToAllowedTopics(peerId, role))
 		}
 	}
 }
@@ -141,10 +99,8 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 // If this assumption is not true, this test will fail. Hence, the test should be updated accordingly if the assumption
 // is no longer true.
 func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
-	idProvider := mock.NewIdentityProvider(t)
 	sp := mockp2p.NewSubscriptionProvider(t)
-
-	sv := scoring.NewSubscriptionValidator(idProvider)
+	sv := scoring.NewSubscriptionValidator()
 	sv.RegisterSubscriptionProvider(sp)
 
 	allChannels := channels.Channels().ExcludePattern(regexp.MustCompile("^(test).*"))
@@ -156,9 +112,8 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 
 	for _, role := range flow.Roles() {
 		peerId := p2pfixtures.PeerIdFixture(t)
-		idProvider.On("ByPeerID", peerId).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
 		sp.On("GetSubscribedTopics", peerId).Return(allTopics)
-		err := sv.CheckSubscribedToAllowedTopics(peerId)
+		err := sv.CheckSubscribedToAllowedTopics(peerId, role)
 		require.Error(t, err, role)
 		require.True(t, scoring.IsInvalidSubscriptionError(err), role)
 	}
@@ -167,10 +122,8 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 // TestSubscriptionValidator_InvalidSubscription tests that when a peer has subscribed to invalid
 // topics based on its Flow protocol role, the subscription validator returns an error.
 func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
-	idProvider := mock.NewIdentityProvider(t)
 	sp := mockp2p.NewSubscriptionProvider(t)
-
-	sv := scoring.NewSubscriptionValidator(idProvider)
+	sv := scoring.NewSubscriptionValidator()
 	sv.RegisterSubscriptionProvider(sp)
 
 	for _, role := range flow.Roles() {
@@ -184,11 +137,11 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 			unauthorizedTopics = append(unauthorizedTopics, channels.TopicFromChannel(channel, sporkID).String())
 		}
 
-		// peer should NOT pass subscription validator as it has subscribed to any subset of its unauthorized topics.
+		// peer should NOT pass subscription validator as it has subscribed to any subset of its unauthorized topics,
+		// regardless of the role.
 		for i := range unauthorizedTopics {
-			idProvider.On("ByPeerID", peerId).Return(unittest.IdentityFixture(unittest.WithRole(role)), true)
 			sp.On("GetSubscribedTopics", peerId).Return(unauthorizedTopics[:i+1])
-			err := sv.CheckSubscribedToAllowedTopics(peerId)
+			err := sv.CheckSubscribedToAllowedTopics(peerId, role)
 			require.Error(t, err, role)
 			require.True(t, scoring.IsInvalidSubscriptionError(err), role)
 		}
