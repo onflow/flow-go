@@ -108,13 +108,17 @@ func filePathSubTries(dir string, fileName string, index int) (string, string, e
 	if index < 0 || index > (subtrieCount-1) {
 		return "", "", fmt.Errorf("index must be between 0 to %v, but got %v", subtrieCount-1, index)
 	}
-	subTrieFileName := fmt.Sprintf("%s.%03d", fileName, index)
+	subTrieFileName := partFileName(fileName, index)
 	return path.Join(dir, subTrieFileName), subTrieFileName, nil
 }
 
 func filePathTopTries(dir string, fileName string) (string, string) {
-	topTriesFileName := fmt.Sprintf("%v.%03d", fileName, subtrieCount)
+	topTriesFileName := partFileName(fileName, subtrieCount)
 	return path.Join(dir, topTriesFileName), topTriesFileName
+}
+
+func partFileName(fileName string, index int) string {
+	return fmt.Sprintf("%v.%03d", fileName, index)
 }
 
 func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
@@ -124,7 +128,8 @@ func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
 
 	subtrieCount := subtrieCountByLevel(subtrieLevel)
 	for i := 0; i < subtrieCount; i++ {
-		paths = append(paths, path.Join(dir, fmt.Sprintf("%s.%03d", fileName, i)))
+		partFile := partFileName(fileName, i)
+		paths = append(paths, path.Join(dir, partFile))
 	}
 
 	p, _ := filePathTopTries(dir, fileName)
