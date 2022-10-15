@@ -33,9 +33,9 @@ func StoreCheckpointV6SingleThread(tries []*trie.MTrie, outputDir string, output
 	return StoreCheckpointV6(tries, outputDir, outputFile, logger, 1)
 }
 
-// StoreCheckpointV6Concurrent stores checkpoint file in v6 in max workers,
+// StoreCheckpointV6Concurrently stores checkpoint file in v6 in max workers,
 // useful during state extraction
-func StoreCheckpointV6Concurrent(tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
+func StoreCheckpointV6Concurrently(tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
 	return StoreCheckpointV6(tries, outputDir, outputFile, logger, 16)
 }
 
@@ -90,7 +90,7 @@ func storeCheckpointV6(
 		return fmt.Errorf("fail to check if checkpoint file already exist: %w", err)
 	}
 
-	// no part file found, means noneCheckpointFileExist
+	// found checkpoint file with the same checkpoint number
 	if len(matched) != 0 {
 		return fmt.Errorf("checkpoint part file already exists: %v", matched)
 	}
@@ -474,8 +474,9 @@ func storeCheckpointSubTrie(
 		return nil, 0, 0, fmt.Errorf("cannot write version into checkpoint subtrie file: %w", err)
 	}
 
-	// subtrieRootNodes contains given subtrie root nodes and their index.
-	subtrieRootNodes := make(map[*node.Node]uint64, subtrieCount)
+	// subtrieRootNodes unique subtrie root nodes, the uint64 value is the index of each root node
+	// stored in the part file.
+	subtrieRootNodes := make(map[*node.Node]uint64, len(roots))
 
 	// nodeCounter is counter for all unique nodes.
 	// It starts from 1, as 0 marks nil node.
@@ -577,8 +578,7 @@ func storeTries(
 	return nil
 }
 
-// remove any temporary files when checkpointing encountered error
-// any error returned are exception
+// deleteCheckpointFiles removes any checkpoint files with given checkpoint prefix in the outputDir.
 func deleteCheckpointFiles(outputDir string, outputFile string) error {
 	pattern := filePathPattern(outputDir, outputFile)
 	filesToRemove, err := filepath.Glob(pattern)
@@ -650,9 +650,9 @@ func decodeTopLevelNodesAndTriesFooter(footer []byte) (uint64, uint16, error) {
 }
 
 func encodeNodeCount(nodeCount uint64) []byte {
-	footer := make([]byte, encNodeCountSize)
-	binary.BigEndian.PutUint64(footer, nodeCount)
-	return footer
+	buf := make([]byte, encNodeCountSize)
+	binary.BigEndian.PutUint64(buf, nodeCount)
+	return buf
 }
 
 func decodeNodeCount(encoded []byte) (uint64, error) {

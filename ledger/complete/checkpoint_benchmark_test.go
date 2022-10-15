@@ -17,18 +17,18 @@ import (
 
 // To benchmark with local data, using this command:
 // $ go test -c -o benchmark
-// $ GOARCH=amd64 GOOS=linux ./benchmark -test.bench=. -test.benchmem --checkpointFile ./root.checkpoint
+// $ GOARCH=amd64 GOOS=linux ./benchmark -test.bench=BenchmarkStoreCheckpointV6Concurrently -test.benchmem --checkpointFile ./root.checkpoint
 var checkpointFile = flag.String("checkpointFile", "", "input checkpoint filename")
 
 func BenchmarkStoreCheckpointV5(b *testing.B) {
 	benchmarkStoreCheckpoint(b, 5, false)
 }
 
-func BenchmarkStoreCheckpointV6SingleThread(b *testing.B) {
+func BenchmarkStoreCheckpointV6(b *testing.B) {
 	benchmarkStoreCheckpoint(b, 6, false)
 }
 
-func BenchmarkStoreCheckpointV6Concurrent(b *testing.B) {
+func BenchmarkStoreCheckpointV6Concurrently(b *testing.B) {
 	benchmarkStoreCheckpoint(b, 6, true)
 }
 
@@ -72,7 +72,7 @@ func benchmarkStoreCheckpoint(b *testing.B, version int, concurrent bool) {
 		err = wal.StoreCheckpointV5(outputDir, fileName, &log, tries...)
 	case 6:
 		if concurrent {
-			err = wal.StoreCheckpointV6Concurrent(tries, outputDir, fileName, &log)
+			err = wal.StoreCheckpointV6Concurrently(tries, outputDir, fileName, &log)
 		} else {
 			err = wal.StoreCheckpointV6SingleThread(tries, outputDir, fileName, &log)
 		}

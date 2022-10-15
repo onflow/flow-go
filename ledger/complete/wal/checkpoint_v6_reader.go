@@ -19,7 +19,7 @@ import (
 // ErrEOFNotReached for indicating end of file not reached error
 var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 
-// ReadCheckpointV6 reads checkpoint file from a main file and 17 file parts.
+// readCheckpointV6 reads checkpoint file from a main file and 17 file parts.
 // the main file stores:
 //   - version
 //   - checksum of each part file (17 in total)
@@ -31,7 +31,7 @@ var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 // it returns (nil, os.ErrNotExist) if a certain file is missing, use (os.IsNotExist to check)
 // it returns (nil, ErrEOFNotReached) if a certain part file is malformed
 // it returns (nil, err) if running into any exception
-func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func readCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	// the full path of header file
 	headerPath := headerFile.Name()
 	dir, fileName := filepath.Split(headerPath)
@@ -82,7 +82,7 @@ func ReadCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 	return tries, nil
 }
 
-// OpenAndReadCheckpointV6 open the checkpoint file and read it with ReadCheckpointV6
+// OpenAndReadCheckpointV6 open the checkpoint file and read it with readCheckpointV6
 func OpenAndReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) (
 	tries []*trie.MTrie,
 	errToReturn error,
@@ -97,7 +97,7 @@ func OpenAndReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger
 		errToReturn = closeAndMergeError(file, errToReturn)
 	}(f)
 
-	return ReadCheckpointV6(f, logger)
+	return readCheckpointV6(f, logger)
 }
 
 func filePathCheckpointHeader(dir string, fileName string) string {
@@ -154,7 +154,7 @@ func readCheckpointHeader(filepath string, logger *zerolog.Logger) (
 		return nil, 0, err
 	}
 
-	// read the subtrie level
+	// read the subtrie count
 	subtrieCount, err := readSubtrieCount(reader)
 	if err != nil {
 		return nil, 0, err
@@ -221,8 +221,7 @@ func allPartFileExist(dir string, fileName string, totalSubtrieFiles int) error 
 // - it return the matching part files, note it might not contains all the part files.
 // - it return error if running any exception
 func findCheckpointPartFiles(dir string, fileName string) ([]string, error) {
-	headerPath := filePathCheckpointHeader(dir, fileName)
-	pattern := headerPath + "*"
+	pattern := filePathPattern(dir, fileName)
 	matched, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("could not find checkpoint files: %w", err)
@@ -234,6 +233,7 @@ func findCheckpointPartFiles(dir string, fileName string) ([]string, error) {
 		lookup[match] = struct{}{}
 	}
 
+	headerPath := filePathCheckpointHeader(dir, fileName)
 	parts := make([]string, 0)
 	// check header exists
 	_, ok := lookup[headerPath]

@@ -170,9 +170,8 @@ func (w *DiskWAL) replay(
 		return fmt.Errorf("cannot create checkpointer: %w", err)
 	}
 
-	var allCheckpoints []int
 	if useCheckpoints {
-		allCheckpoints, err = checkpointer.Checkpoints()
+		allCheckpoints, err := checkpointer.Checkpoints()
 		if err != nil {
 			return fmt.Errorf("cannot get list of checkpoints: %w", err)
 		}

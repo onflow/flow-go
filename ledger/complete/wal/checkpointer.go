@@ -303,13 +303,15 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 }
 
 func StoreCheckpointByVersion(outputVersion uint16, tries []*trie.MTrie, dir string, fileName string, logger *zerolog.Logger) error {
-	if outputVersion == VersionV5 {
+	switch outputVersion {
+	case VersionV5:
 		return StoreCheckpointV5(dir, fileName, logger, tries...)
-	} else if outputVersion == VersionV6 {
+	case VersionV6:
 		// during normal operation,  single thread is used in order to minimize the memory footprint,
 		return StoreCheckpointV6SingleThread(tries, dir, fileName, logger)
+	default:
+		return fmt.Errorf("only support output checkpoint version VersionV5 and VersionV6, but got :%v", outputVersion)
 	}
-	return fmt.Errorf("only support output checkpoint version VersionV5 and VersionV6, but got :%v", outputVersion)
 }
 
 // StoreCheckpointV5 writes the given tries to checkpoint file, and also appends
@@ -700,7 +702,7 @@ func readCheckpoint(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	case VersionV5:
 		return readCheckpointV5(f, logger)
 	case VersionV6:
-		return ReadCheckpointV6(f, logger)
+		return readCheckpointV6(f, logger)
 	default:
 		return nil, fmt.Errorf("unsupported file version %x", version)
 	}

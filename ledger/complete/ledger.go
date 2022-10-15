@@ -443,11 +443,12 @@ func (l *Ledger) ExportCheckpointAt(
 		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %s: %w", outputDir, err)
 	}
 
-	if version == 6 {
-		err = realWAL.StoreCheckpointV6Concurrent([]*trie.MTrie{newTrie}, outputDir, outputFile, &l.logger)
-	} else if version == 5 {
+	switch version {
+	case 5:
 		err = realWAL.StoreCheckpointV5(outputDir, outputFile, &l.logger, newTrie)
-	} else {
+	case 6:
+		err = realWAL.StoreCheckpointV6Concurrently([]*trie.MTrie{newTrie}, outputDir, outputFile, &l.logger)
+	default:
 		return ledger.State(hash.DummyHash), fmt.Errorf("invalid version:%v", version)
 	}
 
