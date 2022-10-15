@@ -23,7 +23,12 @@ func (c *TransactionSequenceNumberChecker) Process(
 	txnState *state.TransactionState,
 	_ *programs.TransactionPrograms,
 ) error {
-	return c.checkAndIncrementSequenceNumber(proc, ctx, txnState)
+	err := c.checkAndIncrementSequenceNumber(proc, ctx, txnState)
+	if err != nil {
+		return fmt.Errorf("checking sequence number failed: %w", err)
+	}
+
+	return nil
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
@@ -43,13 +48,10 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	}
 
 	defer func() {
-		// Skip checking limits when merging the public key sequence number
-		txnState.RunWithAllLimitsDisabled(func() {
-			mergeError := txnState.Commit(nestedTxnId)
-			if mergeError != nil {
-				panic(mergeError)
-			}
-		})
+		commitError := txnState.Commit(nestedTxnId)
+		if commitError != nil {
+			panic(commitError)
+		}
 	}()
 
 	accounts := environment.NewAccounts(txnState)
@@ -65,21 +67,20 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		accountKey, err = accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	})
 	if err != nil {
-		err = errors.NewInvalidProposalSignatureError(proposalKey.Address, proposalKey.KeyIndex, err)
-		return fmt.Errorf("checking sequence number failed: %w", err)
+		return errors.NewInvalidProposalSignatureError(proposalKey, err)
 	}
 
 	if accountKey.Revoked {
-		err = fmt.Errorf("proposal key has been revoked")
-		err = errors.NewInvalidProposalSignatureError(proposalKey.Address, proposalKey.KeyIndex, err)
-		return fmt.Errorf("checking sequence number failed: %w", err)
+		return errors.NewInvalidProposalSignatureError(
+			proposalKey,
+			fmt.Errorf("proposal key has been revoked"))
 	}
 
 	// Note that proposal key verification happens at the txVerifier and not here.
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
-		return errors.NewInvalidProposalSeqNumberError(proposalKey.Address, proposalKey.KeyIndex, accountKey.SeqNumber, proposalKey.SequenceNumber)
+		return errors.NewInvalidProposalSeqNumberError(proposalKey, accountKey.SeqNumber)
 	}
 
 	accountKey.SeqNumber++
@@ -89,12 +90,11 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	})
 	if err != nil {
-		// NOTE: we need to disable limits during restart or else restart may
-		// fail on merging.
-		txnState.RunWithAllLimitsDisabled(func() {
-			_ = txnState.RestartNestedTransaction(nestedTxnId)
-		})
-		return fmt.Errorf("checking sequence number failed: %w", err)
+		restartError := txnState.RestartNestedTransaction(nestedTxnId)
+		if restartError != nil {
+			panic(restartError)
+		}
+		return err
 	}
 
 	return nil
