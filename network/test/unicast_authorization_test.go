@@ -149,7 +149,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := createMessage(u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	msg, _ := testutils.CreateMessage(u.senderID.NodeID, u.receiverID.NodeID, testChannel.String(), "hello")
 
 	// send message via unicast
 	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
@@ -201,7 +201,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := createMessage(u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	msg, _ := testutils.CreateMessage(u.senderID.NodeID, u.receiverID.NodeID, testChannel.String(), "hello")
 
 	// send message via unicast
 	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
@@ -251,7 +251,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := createMessage(u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	msg, _ := testutils.CreateMessage(u.senderID.NodeID, u.receiverID.NodeID, testChannel.String(), "hello")
 	// set channel ID to an unauthorized channel for TestMessage
 	msg.ChannelID = channels.ConsensusCommittee.String()
 
@@ -307,7 +307,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := createMessage(u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	msg, _ := testutils.CreateMessage(u.senderID.NodeID, u.receiverID.NodeID, testChannel.String(), "hello")
 	// manipulate message code byte
 	msg.Payload[0] = invalidMessageCode
 
@@ -364,7 +364,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := createMessage(u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	msg, _ := testutils.CreateMessage(u.senderID.NodeID, u.receiverID.NodeID, testChannel.String(), "hello")
 	// manipulate message code byte
 	msg.Payload[0] = modifiedMessageCode
 
@@ -382,7 +382,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
 
-	msg, payload := createMessage(u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	msg, payload := testutils.CreateMessage(u.senderID.NodeID, u.receiverID.NodeID, testChannel.String(), "hello")
 
 	overlay := &mocknetwork.Overlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {

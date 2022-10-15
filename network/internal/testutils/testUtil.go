@@ -24,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/libp2p/message"
+	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -441,7 +441,7 @@ func NetworkPayloadFixture(t *testing.T, size uint) []byte {
 	// reserves 1000 bytes for the message headers, encoding overhead, and libp2p message overhead.
 	overhead := 1000
 	require.Greater(t, int(size), overhead, "could not generate message below size threshold")
-	emptyEvent := &message.TestMessage{
+	emptyEvent := &libp2pmessage.TestMessage{
 		Text: "",
 	}
 
