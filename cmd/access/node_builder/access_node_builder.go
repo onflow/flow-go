@@ -444,9 +444,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 			bs, err = node.Network.RegisterBlobService(channels.ExecutionDataService, ds,
-				p2p.WithBitswapOptions(
+				blob.WithBitswapOptions(
 					bitswap.WithTracer(
-						p2p.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService).Logger()),
+						blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService).Logger()),
 					),
 				),
 			)

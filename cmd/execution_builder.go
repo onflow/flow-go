@@ -290,9 +290,9 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 		bs, err := node.Network.RegisterBlobService(
 			channels.ExecutionDataService,
 			exeNode.executionDataDatastore,
-			p2p.WithBitswapOptions(
+			blob.WithBitswapOptions(
 				bitswap.WithTracer(
-					p2p.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService).Logger()),
+					blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService).Logger()),
 				),
 			),
 		)
@@ -384,9 +384,9 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	error,
 ) {
 	opts := []network.BlobServiceOption{
-		p2p.WithBitswapOptions(
+		blob.WithBitswapOptions(
 			bitswap.WithTracer(
-				p2p.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService).Logger()),
+				blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService).Logger()),
 			),
 		),
 	}
