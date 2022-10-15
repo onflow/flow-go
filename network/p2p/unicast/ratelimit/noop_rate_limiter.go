@@ -33,6 +33,6 @@ func NoopRateLimiters() *RateLimiters {
 		MessageRateLimiter:   &NoopRateLimiter{},
 		BandWidthRateLimiter: &NoopRateLimiter{},
 		OnRateLimitedPeer:    nil,
-		dryRun:               true,
+		disabled:             true,
 	}
 }

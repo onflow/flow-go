@@ -29,22 +29,36 @@ func (r RateLimitReason) String() string {
 
 type OnRateLimitedPeerFunc func(pid peer.ID, role, msgType string, topic channels.Topic, reason RateLimitReason) // the callback called each time a peer is rate limited
 
+type RateLimitersOption func(*RateLimiters)
+
+func WithDisabledRateLimiting(disabled bool) RateLimitersOption {
+	return func(r *RateLimiters) {
+		r.disabled = disabled
+	}
+}
+
 // RateLimiters used to manage stream and bandwidth rate limiters
 type RateLimiters struct {
 	MessageRateLimiter   p2p.RateLimiter
 	BandWidthRateLimiter p2p.RateLimiter
 	OnRateLimitedPeer    OnRateLimitedPeerFunc // the callback called each time a peer is rate limited
-	dryRun               bool
+	disabled             bool                  // flag allows rate limiter to collect metrics without rate limiting if set to false
 }
 
 // NewRateLimiters returns *RateLimiters
-func NewRateLimiters(messageLimiter, bandwidthLimiter p2p.RateLimiter, onRateLimitedPeer OnRateLimitedPeerFunc, dryRun bool) *RateLimiters {
-	return &RateLimiters{
+func NewRateLimiters(messageLimiter, bandwidthLimiter p2p.RateLimiter, onRateLimitedPeer OnRateLimitedPeerFunc, opts ...RateLimitersOption) *RateLimiters {
+	r := &RateLimiters{
 		MessageRateLimiter:   messageLimiter,
 		BandWidthRateLimiter: bandwidthLimiter,
 		OnRateLimitedPeer:    onRateLimitedPeer,
-		dryRun:               dryRun,
+		disabled:             true,
 	}
+
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
 // MessageAllowed will return result from MessageRateLimiter.Allow. It will invoke the OnRateLimitedPeerFunc
@@ -58,7 +72,7 @@ func (r *RateLimiters) MessageAllowed(peerID peer.ID) bool {
 		r.onRateLimitedPeer(peerID, "", "", "", MessageCount)
 
 		// avoid rate limiting during dry run
-		return r.dryRun
+		return r.disabled
 	}
 
 	return true
@@ -74,8 +88,8 @@ func (r *RateLimiters) BandwidthAllowed(peerID peer.ID, role string, msg *messag
 	if !r.BandWidthRateLimiter.Allow(peerID, msg) {
 		r.onRateLimitedPeer(peerID, role, msg.Type, channels.Topic(msg.ChannelID), Bandwidth)
 
-		// avoid rate limiting during dry run
-		return r.dryRun
+		// avoid rate limiting during dry runs if disabled set to false
+		return r.disabled
 	}
 
 	return true

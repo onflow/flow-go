@@ -291,7 +291,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}
 
 	// setup default noop unicast rate limiters
-	unicastRateLimiters := ratelimit.NewRateLimiters(ratelimit.NewNoopRateLimiter(), ratelimit.NewNoopRateLimiter(), onUnicastRateLimit, fnb.BaseConfig.UnicastRateLimitDryRun)
+	unicastRateLimiters := ratelimit.NewRateLimiters(ratelimit.NewNoopRateLimiter(), ratelimit.NewNoopRateLimiter(), onUnicastRateLimit, ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.UnicastRateLimitDryRun))
 
 	// override noop unicast message rate limiter
 	if fnb.BaseConfig.UnicastMessageRateLimit > 0 && fnb.BaseConfig.UnicastMessageBurstLimit > 0 {
