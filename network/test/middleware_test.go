@@ -254,7 +254,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
-	// for the duration of a simulated second we will send 10 messages. The 10th message will be
+	// for the duration of a simulated second we will send 6 messages. The 6th message will be
 	// rate limited.
 	start := testtime.Now()
 	end := start.Add(time.Second)
