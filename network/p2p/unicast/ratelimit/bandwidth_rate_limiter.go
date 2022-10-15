@@ -25,13 +25,13 @@ type BandWidthRateLimiterImpl struct {
 
 // NewBandWidthRateLimiter returns a new BandWidthRateLimiterImpl. The cleanup loop will be started in a
 // separate goroutine and should be stopped by calling Close.
-func NewBandWidthRateLimiter(limit rate.Limit, burst, lockoutDuration int, opts ...p2p.RateLimiterOpt) *BandWidthRateLimiterImpl {
+func NewBandWidthRateLimiter(limit rate.Limit, burst int, lockout time.Duration, opts ...p2p.RateLimiterOpt) *BandWidthRateLimiterImpl {
 	l := &BandWidthRateLimiterImpl{
 		limiters:                 limiter_map.NewLimiterMap(rateLimiterTTL, cleanUpTickInterval),
 		limit:                    limit,
 		burst:                    burst,
 		now:                      time.Now,
-		rateLimitLockoutDuration: time.Duration(lockoutDuration) * time.Second,
+		rateLimitLockoutDuration: lockout * time.Second,
 	}
 
 	for _, opt := range opts {

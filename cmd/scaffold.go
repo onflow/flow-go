@@ -315,8 +315,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	if fnb.BaseConfig.UnicastBandwidthRateLimit > 0 && fnb.BaseConfig.UnicastBandwidthBurstLimit > 0 {
 		unicastBandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(
 			rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit),
-			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
 			fnb.BaseConfig.UnicastBandwidthBurstLimit,
+			time.Duration(fnb.BaseConfig.UnicastRateLimitLockoutDuration),
 		)
 		unicastRateLimiters.BandWidthRateLimiter = unicastBandwidthRateLimiter
 
