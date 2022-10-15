@@ -306,7 +306,9 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
 			f := rateLimiterPeerFilter(unicastMessageRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
+			// don't allow rate limited peers to establishing incoming connections
 			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, f)
+			// don't create outbound connections to rate limited peers
 			peerManagerFilters = append(peerManagerFilters, f)
 		}
 	}
