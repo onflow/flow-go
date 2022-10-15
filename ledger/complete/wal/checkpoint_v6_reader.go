@@ -121,22 +121,6 @@ func partFileName(fileName string, index int) string {
 	return fmt.Sprintf("%v.%03d", fileName, index)
 }
 
-func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
-	paths := make([]string, 0)
-
-	paths = append(paths, filePathCheckpointHeader(dir, fileName))
-
-	subtrieCount := subtrieCountByLevel(subtrieLevel)
-	for i := 0; i < subtrieCount; i++ {
-		partFile := partFileName(fileName, i)
-		paths = append(paths, path.Join(dir, partFile))
-	}
-
-	p, _ := filePathTopTries(dir, fileName)
-	paths = append(paths, p)
-	return paths
-}
-
 func filePathPattern(dir string, fileName string) string {
 	return fmt.Sprintf("%v*", filePathCheckpointHeader(dir, fileName))
 }

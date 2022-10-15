@@ -449,3 +449,19 @@ func TestCannotStoreTwice(t *testing.T) {
 		require.Error(t, StoreCheckpointV6Concurrent(tries, dir, fileName, &logger))
 	})
 }
+
+func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
+	paths := make([]string, 0)
+
+	paths = append(paths, filePathCheckpointHeader(dir, fileName))
+
+	subtrieCount := subtrieCountByLevel(subtrieLevel)
+	for i := 0; i < subtrieCount; i++ {
+		partFile := partFileName(fileName, i)
+		paths = append(paths, path.Join(dir, partFile))
+	}
+
+	p, _ := filePathTopTries(dir, fileName)
+	paths = append(paths, p)
+	return paths
+}
