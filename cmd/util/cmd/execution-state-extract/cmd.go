@@ -147,10 +147,10 @@ func run(*cobra.Command, []string) {
 		flagExecutionStateDir,
 		flagOutputDir)
 
-	err := ensureCheckpointFileExist(flagExecutionStateDir)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
-	}
+	// err := ensureCheckpointFileExist(flagExecutionStateDir)
+	// if err != nil {
+	// 	log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
+	// }
 
 	chain, err := getChain(flagChain)
 	if err != nil {
@@ -173,26 +173,26 @@ func run(*cobra.Command, []string) {
 	}
 }
 
-func ensureCheckpointFileExist(dir string) error {
-	checkpoints, err := wal.Checkpoints(dir)
-	if err != nil {
-		return fmt.Errorf("could not find checkpoint files: %v", err)
-	}
-
-	if len(checkpoints) != 0 {
-		log.Info().Msgf("found checkpoint %v files: %v", len(checkpoints), checkpoints)
-		return nil
-	}
-
-	has, err := wal.HasRootCheckpoint(dir)
-	if err != nil {
-		return fmt.Errorf("could not check has root checkpoint: %w", err)
-	}
-
-	if has {
-		log.Info().Msg("found root checkpoint file")
-		return nil
-	}
-
-	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found")
-}
+// func ensureCheckpointFileExist(dir string) error {
+// 	checkpoints, err := wal.Checkpoints(dir)
+// 	if err != nil {
+// 		return fmt.Errorf("could not find checkpoint files: %v", err)
+// 	}
+//
+// 	if len(checkpoints) != 0 {
+// 		log.Info().Msgf("found checkpoint %v files: %v", len(checkpoints), checkpoints)
+// 		return nil
+// 	}
+//
+// 	has, err := wal.HasRootCheckpoint(dir)
+// 	if err != nil {
+// 		return fmt.Errorf("could not check has root checkpoint: %w", err)
+// 	}
+//
+// 	if has {
+// 		log.Info().Msg("found root checkpoint file")
+// 		return nil
+// 	}
+//
+// 	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found")
+// }
