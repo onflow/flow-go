@@ -251,82 +251,46 @@ func NewTracer(logger zerolog.Logger) *Tracer {
 	}
 }
 
+func (t *Tracer) logMsg(msg bsmsg.BitswapMessage, s string) {
+	evt := t.logger.Debug()
+
+	wantlist := zerolog.Arr()
+	for _, entry := range msg.Wantlist() {
+		wantlist = wantlist.Interface(entry)
+	}
+	evt.Array("wantlist", wantlist)
+
+	blks := zerolog.Arr()
+	for _, blk := range msg.Blocks() {
+		blks = blks.Str(blk.Cid().String())
+	}
+	evt.Array("blocks", blks)
+
+	haves := zerolog.Arr()
+	for _, have := range msg.Haves() {
+		haves = haves.Str(have.String())
+	}
+	evt.Array("haves", haves)
+
+	dontHaves := zerolog.Arr()
+	for _, dontHave := range msg.DontHaves() {
+		dontHaves = dontHaves.Str(dontHave.String())
+	}
+	evt.Array("dontHaves", dontHaves)
+
+	evt.Int32("pendingBytes", msg.PendingBytes())
+
+	evt.Msg(s)
+}
+
 func (t *Tracer) MessageReceived(pid peer.ID, msg bsmsg.BitSwapMessage) {
 	if t.logger.Debug().Enabled() {
-		evt := t.logger.Debug()
-
-		wantlist := zerolog.Arr()
-		for _, entry := range msg.Wantlist() {
-			wantlist = wantlist.Interface(entry)
-		}
-		evt.Array("wantlist", wantlist)
-
-		blks := zerolog.Arr()
-		for _, blk := range msg.Blocks() {
-			blks = blks.Str(blk.Cid().String())
-		}
-		evt.Array("blocks", blks)
-
-		blkPresences := zerolog.Arr()
-		for _, blkPresence := range msg.BlockPresences() {
-			blkPresences = blkPresences.Interface(blkPresence)
-		}
-		evt.Array("blocksPresences", blkPresences)
-
-		haves := zerolog.Arr()
-		for _, have := range msg.Haves() {
-			haves = haves.Str(have.String())
-		}
-		evt.Array("haves", haves)
-
-		dontHaves := zerolog.Arr()
-		for _, dontHave := range msg.DontHaves() {
-			dontHaves = dontHaves.Str(dontHave.String())
-		}
-		evt.Array("dontHaves", dontHaves)
-
-		evt.Int32("pendingBytes", msg.PendingBytes())
-
-		evt.Msg("bitswap message received")
+		t.logMsg(msg, "bitswap message received")
 	}
 }
 
 func (t *Tracer) MessageSent(pid peer.ID, msg bsmsg.BitSwapMessage) {
 	if t.logger.Debug().Enabled() {
-		evt := t.logger.Debug()
-
-		wantlist := zerolog.Arr()
-		for _, entry := range msg.Wantlist() {
-			wantlist = wantlist.Interface(entry)
-		}
-		evt.Array("wantlist", wantlist)
-
-		blks := zerolog.Arr()
-		for _, blk := range msg.Blocks() {
-			blks = blks.Str(blk.Cid().String())
-		}
-		evt.Array("blocks", blks)
-
-		blkPresences := zerolog.Arr()
-		for _, blkPresence := range msg.BlockPresences() {
-			blkPresences = blkPresences.Interface(blkPresence)
-		}
-		evt.Array("blocksPresences", blkPresences)
-
-		haves := zerolog.Arr()
-		for _, have := range msg.Haves() {
-			haves = haves.Str(have.String())
-		}
-		evt.Array("haves", haves)
-
-		dontHaves := zerolog.Arr()
-		for _, dontHave := range msg.DontHaves() {
-			dontHaves = dontHaves.Str(dontHave.String())
-		}
-		evt.Array("dontHaves", dontHaves)
-
-		evt.Int32("pendingBytes", msg.PendingBytes())
-
-		evt.Msg("bitswap message sent")
+		t.logMsg(msg, "bitswap message sent")
 	}
 }
