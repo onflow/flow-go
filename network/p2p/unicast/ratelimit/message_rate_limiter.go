@@ -48,9 +48,9 @@ func (s *MessageRateLimiter) Allow(peerID peer.ID, _ *message.Message) bool {
 	if !limiter.AllowN(s.now(), 1) {
 		s.limiters.UpdateLastRateLimit(peerID, s.now())
 		return false
-	} else {
-		return true
 	}
+
+	return true
 }
 
 // IsRateLimited returns true is a peer is currently rate limited.
