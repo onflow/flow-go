@@ -21,18 +21,18 @@ const (
 	TypeResultApproval    = "type-result-approval"
 )
 
-// dummyOrchestrator represents a simple orchestrator that passes through all incoming events.
-type dummyOrchestrator struct {
+// Orchestrator represents a simple orchestrator that passes through all incoming events.
+type Orchestrator struct {
 	sync.Mutex
 	logger              zerolog.Logger
 	orchestratorNetwork insecure.AttackerNetwork
 	eventTracker        map[string]flow.IdentifierList
 }
 
-var _ insecure.AttackerOrchestrator = &dummyOrchestrator{}
+var _ insecure.AttackerOrchestrator = &Orchestrator{}
 
-func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
-	return &dummyOrchestrator{
+func NewDummyOrchestrator(logger zerolog.Logger) *Orchestrator {
+	return &Orchestrator{
 		logger: logger.With().Str("component", "dummy-orchestrator").Logger(),
 		eventTracker: map[string]flow.IdentifierList{
 			TypeExecutionReceipt:  {},
@@ -51,7 +51,7 @@ func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 // In this dummy orchestrator, the incoming event is passed through without any changes.
 // Passing through means that the orchestrator returns the events as they are to the original corrupted nodes so they
 // dispatch them on the Flow network.
-func (d *dummyOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
+func (d *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 	lg := d.logger.With().
 		Hex("corrupt_origin_id", logging.ID(event.CorruptOriginId)).
 		Str("channel", event.Channel.String()).
@@ -82,7 +82,7 @@ func (d *dummyOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error
 }
 
 // HandleIngressEvent implements logic of processing the incoming (ingress) events to a corrupt node.
-func (d *dummyOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
+func (d *Orchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 	lg := d.logger.With().
 		Hex("origin_id", logging.ID(event.OriginID)).
 		Str("channel", event.Channel.String()).
@@ -100,13 +100,13 @@ func (d *dummyOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) err
 	return nil
 }
 
-func (d *dummyOrchestrator) Register(orchestratorNetwork insecure.AttackerNetwork) {
+func (d *Orchestrator) Register(orchestratorNetwork insecure.AttackerNetwork) {
 	d.orchestratorNetwork = orchestratorNetwork
 }
 
 // MustSeenFlowProtocolEvent checks the dummy orchestrator has passed through the flow protocol events with given ids. It fails
 // if any entity is gone missing from sight of the orchestrator.
-func (d *dummyOrchestrator) MustSeenFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
+func (d *Orchestrator) MustSeenFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
 	events, ok := d.eventTracker[eventType]
 	require.Truef(t, ok, "unknown type: %s", eventType)
 
