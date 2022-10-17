@@ -34,6 +34,11 @@ func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, compUsed u
 	_m.Called(dur, compUsed, txCounts, colCounts)
 }
 
+// ExecutionBlockExecutionEffortVectorComponent provides a mock function with given fields: _a0, _a1
+func (_m *ExecutionMetrics) ExecutionBlockExecutionEffortVectorComponent(_a0 string, _a1 uint) {
+	_m.Called(_a0, _a1)
+}
+
 // ExecutionCollectionExecuted provides a mock function with given fields: dur, compUsed, txCounts
 func (_m *ExecutionMetrics) ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int) {
 	_m.Called(dur, compUsed, txCounts)
