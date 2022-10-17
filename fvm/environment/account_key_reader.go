@@ -7,12 +7,58 @@ import (
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
 // AccountKeyReader provide read access to account keys.
-type AccountKeyReader struct {
+type AccountKeyReader interface {
+	// GetAccountKey retrieves a public key by index from an existing account.
+	//
+	// This function returns a nil key with no errors, if a key doesn't exist at
+	// the given index. An error is returned if the specified account does not
+	// exist, the provided index is not valid, or if the key retrieval fails.
+	GetAccountKey(
+		address runtime.Address,
+		keyIndex int,
+	) (
+		*runtime.AccountKey,
+		error,
+	)
+}
+
+type ParseRestrictedAccountKeyReader struct {
+	txnState *state.TransactionState
+	impl     AccountKeyReader
+}
+
+func NewParseRestrictedAccountKeyReader(
+	txnState *state.TransactionState,
+	impl AccountKeyReader,
+) AccountKeyReader {
+	return ParseRestrictedAccountKeyReader{
+		txnState: txnState,
+		impl:     impl,
+	}
+}
+
+func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
+	address runtime.Address,
+	keyIndex int,
+) (
+	*runtime.AccountKey,
+	error,
+) {
+	return parseRestrict2Arg1Ret(
+		reader.txnState,
+		"GetAccountKey",
+		reader.impl.GetAccountKey,
+		address,
+		keyIndex)
+}
+
+type accountKeyReader struct {
 	tracer *Tracer
 	meter  Meter
 
@@ -23,20 +69,15 @@ func NewAccountKeyReader(
 	tracer *Tracer,
 	meter Meter,
 	accounts Accounts,
-) *AccountKeyReader {
-	return &AccountKeyReader{
+) AccountKeyReader {
+	return &accountKeyReader{
 		tracer:   tracer,
 		meter:    meter,
 		accounts: accounts,
 	}
 }
 
-// GetAccountKey retrieves a public key by index from an existing account.
-//
-// This function returns a nil key with no errors, if a key doesn't exist at
-// the given index. An error is returned if the specified account does not
-// exist, the provided index is not valid, or if the key retrieval fails.
-func (reader *AccountKeyReader) GetAccountKey(
+func (reader *accountKeyReader) GetAccountKey(
 	address runtime.Address,
 	keyIndex int,
 ) (
