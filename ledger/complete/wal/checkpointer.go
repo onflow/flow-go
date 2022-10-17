@@ -1139,7 +1139,10 @@ func evictFileFromLinuxPageCache(f *os.File, fsync bool, logger *zerolog.Logger)
 // the `to` directory
 // it returns the path of all the copied files
 // any error returned are exceptions
-func CopyCheckpointFile(filename string, from string, to string) ([]string, error) {
+func CopyCheckpointFile(filename string, from string, to string) (
+	copied []string,
+	errToReturn error,
+) {
 	// It's possible that the trie dir does not yet exist. If not this will create the the required path
 	err := os.MkdirAll(to, 0700)
 	if err != nil {
@@ -1157,9 +1160,11 @@ func CopyCheckpointFile(filename string, from string, to string) ([]string, erro
 	for i, match := range matched {
 		in, err := os.Open(match)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("can not open file %v to copy: %w", match, err)
 		}
-		defer in.Close()
+		defer func() {
+			errToReturn = closeAndMergeError(in, errToReturn)
+		}()
 
 		_, partfile := filepath.Split(match)
 		newPath := filepath.Join(to, partfile)
@@ -1167,17 +1172,15 @@ func CopyCheckpointFile(filename string, from string, to string) ([]string, erro
 		if err != nil {
 			return nil, err
 		}
-		defer out.Close()
+		defer func() {
+			errToReturn = closeAndMergeError(out, errToReturn)
+		}()
 
 		_, err = io.Copy(out, in)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("can not copy file %v: %w", match, err)
 		}
 
-		err = out.Close()
-		if err != nil {
-			return nil, fmt.Errorf("fail to close file: %w", err)
-		}
 		newPaths[i] = newPath
 	}
 
