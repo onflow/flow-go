@@ -1,7 +1,6 @@
 package automate
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -10,7 +9,6 @@ import (
 )
 
 func TestGenerateTestTemplates(t *testing.T) {
-	fmt.Printf("Starting tests")
 	outputFilePath := "test_values.yml"
 	expectedValues := textReader("templates/test_templates/expected_values.yml")
 
@@ -24,8 +22,6 @@ func TestGenerateTestTemplates(t *testing.T) {
 }
 
 func TestSubString(t *testing.T) {
-	fmt.Println("Starting templates test")
-
 	expectedMatched := "templates_test:\nreplacement1: 1\nreplacement2: 2"
 	expectedUndermatched := "templates_test:\nreplacement1: 1"
 	// expectedOvermatched := "templates_test:\nreplacement1: 1\nreplacement2: 2\nreplacement3: {{.ReplaceThree}}"

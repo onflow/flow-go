@@ -112,16 +112,14 @@ func createFile(filename string) *os.File {
 func GenerateValuesYaml(jsonDataFilePath string, templatePath string, outputFilePath string) {
 	var nodesData map[string]Node
 	var nodeConfig map[string]int
-	var templateFolder string
+	templateFolder := TEMPLATE_PATH
 	if jsonDataFilePath == "" {
 		nodesData, nodeConfig = loadNodeJsonData(DEFAULT_NODE_INFO_PATH)
 	} else {
 		nodesData, nodeConfig = loadNodeJsonData(jsonDataFilePath)
 	}
 
-	if templatePath == "" {
-		templateFolder = TEMPLATE_PATH
-	} else {
+	if templatePath != "" {
 		templateFolder = templatePath
 	}
 
