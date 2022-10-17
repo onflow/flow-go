@@ -79,7 +79,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusCommittee: {
 				AuthorizedRoles: flow.RoleList{flow.RoleConsensus},
-				Unicast:         false,
+				Unicast:         true,
 			},
 		},
 	}
@@ -93,11 +93,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
 				AuthorizedRoles: flow.Roles(),
-				Unicast:         true,
+				Unicast:         false,
 			},
 			channels.SyncClusterPrefix: {
 				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
-				Unicast:         true,
+				Unicast:         false,
 			},
 		},
 	}
@@ -125,11 +125,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
 				AuthorizedRoles: flow.Roles(),
-				Unicast:         true,
+				Unicast:         false,
 			},
 			channels.SyncClusterPrefix: {
 				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
-				Unicast:         true,
+				Unicast:         false,
 			},
 		},
 	}
@@ -141,11 +141,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
 				AuthorizedRoles: flow.Roles(),
-				Unicast:         true,
+				Unicast:         false,
 			},
 			channels.SyncClusterPrefix: {
 				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
-				Unicast:         true,
+				Unicast:         false,
 			},
 		},
 	}
@@ -195,7 +195,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncClusterPrefix: {
 				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
-				Unicast:         false,
+				Unicast:         true,
 			},
 		},
 	}
@@ -261,7 +261,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.RequestChunks: {
 				AuthorizedRoles: flow.RoleList{flow.RoleVerification},
-				Unicast:         true,
+				Unicast:         false,
 			}, // channel alias RequestChunks = ProvideChunks
 		},
 	}

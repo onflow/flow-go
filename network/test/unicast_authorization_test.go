@@ -132,8 +132,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 		close(u.waitCh)
 	})
 
-	defer slashingViolationsConsumer.AssertExpectations(u.T())
-
 	overlay := &mocknetwork.Overlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return u.providers[0].Identities(filter.Any)
@@ -185,8 +183,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 		close(u.waitCh)
 	})
 
-	defer slashingViolationsConsumer.AssertExpectations(u.T())
-
 	overlay := &mocknetwork.Overlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return u.providers[0].Identities(filter.Any)
@@ -235,8 +231,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 	).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
-
-	defer slashingViolationsConsumer.AssertExpectations(u.T())
 
 	overlay := &mocknetwork.Overlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
@@ -290,8 +284,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 	).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
-
-	defer slashingViolationsConsumer.AssertExpectations(u.T())
 
 	overlay := &mocknetwork.Overlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
@@ -347,8 +339,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 	).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
-
-	defer slashingViolationsConsumer.AssertExpectations(u.T())
 
 	overlay := &mocknetwork.Overlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
@@ -437,8 +427,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
-
-	defer slashingViolationsConsumer.AssertExpectations(u.T())
 
 	overlay := &mocknetwork.Overlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
