@@ -3,7 +3,7 @@ package passthrough
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/insecure/orchesrators/passthrough"
+	"github.com/onflow/flow-go/insecure/orchestrators/passthrough"
 	"time"
 
 	"github.com/rs/zerolog"
