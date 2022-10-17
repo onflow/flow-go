@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -1036,53 +1035,14 @@ func copyBootstrapState(dir, trie string) error {
 
 	// copy from the bootstrap folder to the execution state folder
 	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
-	err := copyCheckpointFile(filename, from, to)
+	copiedFiles, err := wal.CopyCheckpointFile(filename, from, to)
 	if err != nil {
 		return fmt.Errorf("can not copy checkpoint file %s, from %s to %s",
 			filename, from, to)
 	}
-	return nil
-}
 
-// copy the checkpoint file including the part files from the given `from` to
-// the `to` directory
-func copyCheckpointFile(filename string, from string, to string) error {
-	// It's possible that the trie dir does not yet exist. If not this will create the the required path
-	err := os.MkdirAll(to, 0700)
-	if err != nil {
-		return err
-	}
-
-	// checkpoint V6 produces multiple checkpoint part files that need to be copied over
-	pattern := wal.FilePathPattern(from, filename)
-	matched, err := filepath.Glob(pattern)
-	if err != nil {
-		return fmt.Errorf("could not glob checkpoint file with pattern %v: %w", pattern, err)
-	}
-
-	for _, match := range matched {
-		in, err := os.Open(match)
-		if err != nil {
-			return err
-		}
-		defer in.Close()
-
-		_, partfile := filepath.Split(match)
-		newPath := filepath.Join(to, partfile)
-		out, err := os.Create(newPath)
-		if err != nil {
-			return err
-		}
-		defer out.Close()
-
-		_, err = io.Copy(out, in)
-		if err != nil {
-			return err
-		}
-
-		fmt.Printf("copied bootstrap state file from: %v, to: %v\n", matched, newPath)
-
-		return out.Close()
+	for _, newPath := range copiedFiles {
+		fmt.Printf("copied root checkpoint file from directory: %v, to: %v\n", from, newPath)
 	}
 
 	return nil

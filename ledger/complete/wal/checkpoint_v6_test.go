@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
@@ -444,4 +445,20 @@ func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
 	p, _ := filePathTopTries(dir, fileName)
 	paths = append(paths, p)
 	return paths
+}
+
+func TestCopyCheckpointFileV6(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimpleTrie(t)
+		fileName := "checkpoint"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		to := filepath.Join(dir, "newfolder")
+		newPaths, err := CopyCheckpointFile(fileName, dir, to)
+		require.NoError(t, err)
+		log.Info().Msgf("copied to :%v", newPaths)
+		decoded, err := OpenAndReadCheckpointV6(to, fileName, &logger)
+		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		requireTriesEqual(t, tries, decoded)
+	})
 }
