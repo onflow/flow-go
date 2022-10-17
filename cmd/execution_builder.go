@@ -404,7 +404,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	opts := []network.BlobServiceOption{
 		blob.WithBitswapOptions(
-			// Only allow block requests from staked ANs on the allowedANs list (if set)
+			// Only allow block requests from staked ENs and ANs on the allowedANs list (if set)
 			bitswap.WithPeerBlockRequestFilter(
 				blob.AuthorizedRequester(allowedANs, exeNode.builder.IdentityProvider, exeNode.builder.Logger),
 			),

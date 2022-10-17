@@ -447,7 +447,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 
 			opts := []network.BlobServiceOption{
 				blob.WithBitswapOptions(
-					// Only allow block requests from staked ANs
+					// Only allow block requests from staked ENs and ANs
 					bitswap.WithPeerBlockRequestFilter(
 						blob.AuthorizedRequester(nil, builder.IdentityProvider, builder.Logger),
 					),
