@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/insecure/attackernet"
-	"github.com/onflow/flow-go/insecure/wintermute"
+	"github.com/onflow/flow-go/insecure/orchesrators/wintermute"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
