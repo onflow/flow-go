@@ -11,25 +11,16 @@ import (
 
 func TestGenerateTestTemplates(t *testing.T) {
 	fmt.Printf("Starting tests")
+	outputFilePath := "test_values.yml"
 	expectedValues := textReader("templates/test_templates/expected_values.yml")
 
-	GenerateValuesYaml("test_files/sample-infos.pub.json", "test_files/", "test_values.yml")
-	actualValues := textReader("test_values.yml")
+	GenerateValuesYaml("test_files/sample-infos.pub.json", "test_files/", outputFilePath)
+	actualValues := textReader(outputFilePath)
 
 	require.Equal(t, expectedValues, actualValues)
 
 	// cleanup
-	err := os.Remove("test_values.yml")
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func TestLoadString(t *testing.T) {
-	actual := textReader("bootstrap_test.txt")
-	expected := "Test string 123"
-
-	require.Equal(t, expected, actual, "Mismatching strings")
+	deleteFile(outputFilePath)
 }
 
 func TestSubString(t *testing.T) {
@@ -52,4 +43,24 @@ func TestSubString(t *testing.T) {
 	require.Equal(t, expectedMatched, matchedString)
 	require.Equal(t, expectedUndermatched, undermatchedString)
 	// require.Equal(t, expectedOvermatched, overmatchedString)
+}
+
+func TestCreateWriteReadYaml(t *testing.T) {
+	filepath := "testYaml.yml"
+	testString := "Test String 123@"
+	file := createFile(filepath)
+	yamlWriter(file, "Test String 123@")
+
+	file.Close()
+
+	actualString := textReader(filepath)
+	require.Equal(t, actualString, testString)
+	deleteFile(filepath)
+}
+
+func deleteFile(filepath string) {
+	err := os.Remove(filepath)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

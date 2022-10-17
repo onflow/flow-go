@@ -11,8 +11,7 @@ import (
 	"regexp"
 )
 
-// User struct which contains a name
-// a type and a list of social links
+// Node struct which to unmarshal the node-info into
 type Node struct {
 	Role          string `json:"Role"`
 	Address       string `json:"Address"`
@@ -22,6 +21,7 @@ type Node struct {
 	StakingPubKey string `json:"StakingPubKey"`
 }
 
+// ReplacementData struct which contains all data replacements for templates
 type ReplacementData struct {
 	NodeID   string
 	ImageTag string
@@ -46,6 +46,7 @@ var DEFAULT_CONSENSUS_IMAGE string = "gcr.io/flow-container-registry/consensus:v
 var DEFAULT_EXECUTION_IMAGE string = "gcr.io/flow-container-registry/execution:v0.27.6"
 var DEFAULT_VERIFICATION_IMAGE string = "gcr.io/flow-container-registry/verification:v0.27.6"
 
+// Loads node info json file and returns unmarshaled struct and node counts
 func loadNodeJsonData(nodeInfoPath string) (map[string]Node, map[string]int) {
 	jsonFile, err := os.Open(nodeInfoPath)
 	if err != nil {
@@ -104,6 +105,10 @@ func createFile(filename string) *os.File {
 	return file
 }
 
+// Takes params
+// jsonDataFilePath - file path to node info json file
+// templatePath - folder path that contains all templates
+// outputFilePath - path and filename to save the generated yml file
 func GenerateValuesYaml(jsonDataFilePath string, templatePath string, outputFilePath string) {
 	var nodesData map[string]Node
 	var nodeConfig map[string]int
