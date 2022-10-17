@@ -18,7 +18,7 @@ import (
 
 // TestConnectorHappy_Send checks that a CorruptConnector can successfully create a connection to a remote corrupt network (CN).
 // Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from attacker to corrupt network.
-func TestConnectorHappyPath_Send(t *testing.T) {
+func TestConnectorHappyPath_Send_EgressMsg(t *testing.T) {
 	withMockCorruptNetwork(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
 		// extracting port that CN gRPC server is running on.
 		_, cnPortStr, err := net.SplitHostPort(cn.ServerAddress())
@@ -78,7 +78,7 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 
 // TestConnectorHappy_Receive checks that a CorruptConnector can successfully create a connection to a remote corrupt network (CN).
 // Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from CN to attacker.
-func TestConnectorHappyPath_Receive(t *testing.T) {
+func TestConnectorHappyPath_Receive_EgressMsg(t *testing.T) {
 	withMockCorruptNetwork(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
 		// extracting port that CN gRPC server is running on
 		_, cnPortStr, err := net.SplitHostPort(cn.ServerAddress())

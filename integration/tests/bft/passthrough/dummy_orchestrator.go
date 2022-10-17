@@ -25,7 +25,7 @@ const (
 type dummyOrchestrator struct {
 	sync.Mutex
 	logger              zerolog.Logger
-	orchestratorNetwork insecure.OrchestratorNetwork
+	orchestratorNetwork insecure.AttackerNetwork
 	eventTracker        map[string]flow.IdentifierList
 }
 
@@ -100,7 +100,7 @@ func (d *dummyOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) err
 	return nil
 }
 
-func (d *dummyOrchestrator) Register(orchestratorNetwork insecure.OrchestratorNetwork) {
+func (d *dummyOrchestrator) Register(orchestratorNetwork insecure.AttackerNetwork) {
 	d.orchestratorNetwork = orchestratorNetwork
 }
 

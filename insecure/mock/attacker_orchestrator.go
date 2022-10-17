@@ -41,7 +41,7 @@ func (_m *AttackerOrchestrator) HandleIngressEvent(_a0 *insecure.IngressEvent) e
 }
 
 // Register provides a mock function with given fields: _a0
-func (_m *AttackerOrchestrator) Register(_a0 insecure.OrchestratorNetwork) {
+func (_m *AttackerOrchestrator) Register(_a0 insecure.AttackerNetwork) {
 	_m.Called(_a0)
 }
 

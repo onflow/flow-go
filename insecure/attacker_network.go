@@ -4,10 +4,10 @@ import (
 	"github.com/onflow/flow-go/module/component"
 )
 
-// OrchestratorNetwork represents the networking interface that is available to the attack orchestrator for sending messages "through"
+// AttackerNetwork represents the networking interface that is available to the attack orchestrator for sending messages "through"
 // the corrupt network and corrupt nodes "to" the rest of the network.
 // This interface is used by attack orchestrators to communicate with the corrupt network.
-type OrchestratorNetwork interface {
+type AttackerNetwork interface {
 	component.Component
 	// SendEgress is called when the attack orchestrator sends an egress message to another node (corrupt or honest) via the corrupt flow network.
 	SendEgress(*EgressEvent) error
