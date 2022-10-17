@@ -1,8 +1,9 @@
 package passthrough
 
 import (
-	"github.com/onflow/flow-go/insecure/orchestrators/passthrough"
 	"testing"
+
+	"github.com/onflow/flow-go/insecure/orchestrators/passthrough"
 
 	"github.com/stretchr/testify/suite"
 
