@@ -283,9 +283,9 @@ func AuthorizedRequester(
 
 		// allow list is only for Access nodes
 		if id.Role == flow.RoleAccess && len(allowedNodes) > 0 && !allowedNodes[id.NodeID] {
-			lg.Warn().
-				Bool(logging.KeySuspicious, true).
-				Msg("rejecting request from peer: not in allowed list")
+			// honest peers not on the allowed list have no way to know and will continue to request
+			// blobs. therefore, these requests do not indicate suspicious behavior
+			lg.Debug().Msg("rejecting request from peer: not in allowed list")
 			return false
 		}
 
