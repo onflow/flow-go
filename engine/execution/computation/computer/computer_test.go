@@ -447,7 +447,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// make sure event index sequence are valid
 		for _, eventsList := range result.Events {
-			ensureEventsIndexSeq(t, eventsList, execCtx.Chain.ChainID())
+			unittest.EnsureEventsIndexSeq(t, eventsList, execCtx.Chain.ChainID())
 		}
 
 		// all events should have been collected
@@ -951,16 +951,4 @@ func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 		events[i] = event
 	}
 	return events
-}
-
-func ensureEventsIndexSeq(t *testing.T, events []flow.Event, chainID flow.ChainID) {
-	expectedEventIndex := uint32(0)
-	for _, event := range events {
-		require.Equal(t, expectedEventIndex, event.EventIndex)
-		if testutil.IsServiceEvent(event, chainID) {
-			expectedEventIndex += 2
-		} else {
-			expectedEventIndex++
-		}
-	}
 }

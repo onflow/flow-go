@@ -3,7 +3,6 @@ package testutil
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -46,14 +45,4 @@ func CreateEmitEventTransaction(contractAccount, signer flow.Address) *flow.Tran
 			}`, contractAccount)),
 		).
 		AddAuthorizer(signer)
-}
-
-func IsServiceEvent(event flow.Event, chainID flow.ChainID) bool {
-	serviceEvents, _ := systemcontracts.ServiceEventsForChain(chainID)
-	for _, serviceEvent := range serviceEvents.All() {
-		if serviceEvent.EventType() == event.Type {
-			return true
-		}
-	}
-	return false
 }

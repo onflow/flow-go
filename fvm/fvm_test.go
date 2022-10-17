@@ -598,7 +598,7 @@ func TestEventLimits(t *testing.T) {
 		err := vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
-		ensureEventsIndexSeq(t, tx.Events, chain.ChainID())
+		unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 
 		// transaction should not fail due to event size limit
 		assert.NoError(t, tx.Err)
@@ -710,7 +710,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					}
 				}
 
-				ensureEventsIndexSeq(t, tx.Events, chain.ChainID())
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.Len(t, deposits, 2)
 				require.Len(t, withdraws, 2)
 			},
@@ -739,7 +739,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 						break
 					}
 				}
-				ensureEventsIndexSeq(t, tx.Events, chain.ChainID())
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.NotEmpty(t, feeDeduction.Payload)
 
 				payload, err := jsoncdc.Decode(nil, feeDeduction.Payload)
@@ -805,7 +805,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					}
 				}
 
-				ensureEventsIndexSeq(t, tx.Events, chain.ChainID())
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 1)
 			},
@@ -832,7 +832,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					}
 				}
 
-				ensureEventsIndexSeq(t, tx.Events, chain.ChainID())
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 1)
 			},
@@ -870,7 +870,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					}
 				}
 
-				ensureEventsIndexSeq(t, tx.Events, chain.ChainID())
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.Len(t, deposits, 2)
 				require.Len(t, withdraws, 2)
 			},
@@ -923,7 +923,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					}
 				}
 
-				ensureEventsIndexSeq(t, tx.Events, chain.ChainID())
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 1)
 			},
@@ -950,7 +950,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					}
 				}
 
-				ensureEventsIndexSeq(t, tx.Events, chain.ChainID())
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 1)
 			},
@@ -973,7 +973,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			assert.NoError(t, tx.Err)
 
 			assert.Len(t, tx.Events, 10)
-			ensureEventsIndexSeq(t, tx.Events, chain.ChainID())
+			unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 
 			accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
 
@@ -1447,7 +1447,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					assert.Equal(t, maxExecutionEffort, ev.(cadence.Event).Fields[2].ToGoValue().(uint64))
 				}
 			}
-			ensureEventsIndexSeq(t, tx.Events, chain.ChainID())
+			unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 		},
 	))
 }
@@ -1973,7 +1973,7 @@ func TestInteractionLimit(t *testing.T) {
 			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
 				require.Len(t, tx.Events, 5)
-				ensureEventsIndexSeq(t, tx.Events, flow.Testnet.Chain().ChainID())
+				unittest.EnsureEventsIndexSeq(t, tx.Events, flow.Testnet.Chain().ChainID())
 			},
 		},
 		{
@@ -1982,7 +1982,7 @@ func TestInteractionLimit(t *testing.T) {
 			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
 				require.Len(t, tx.Events, 5)
-				ensureEventsIndexSeq(t, tx.Events, flow.Testnet.Chain().ChainID())
+				unittest.EnsureEventsIndexSeq(t, tx.Events, flow.Testnet.Chain().ChainID())
 			},
 		},
 		{
@@ -1991,7 +1991,7 @@ func TestInteractionLimit(t *testing.T) {
 			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.Error(t, tx.Err)
 				require.Len(t, tx.Events, 3)
-				ensureEventsIndexSeq(t, tx.Events, flow.Testnet.Chain().ChainID())
+				unittest.EnsureEventsIndexSeq(t, tx.Events, flow.Testnet.Chain().ChainID())
 			},
 		},
 	}
