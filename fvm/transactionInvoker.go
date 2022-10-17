@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
-	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -34,14 +33,11 @@ func (i TransactionInvoker) Process(
 ) (processErr error) {
 
 	txIDStr := proc.ID.String()
-	var span otelTrace.Span
-	if ctx.Tracer != nil && proc.TraceSpan != nil {
-		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
-		span.SetAttributes(
-			attribute.String("transaction_id", txIDStr),
-		)
-		defer span.End()
-	}
+	span := proc.StartSpanFromProcTraceSpan(ctx.Tracer, trace.FVMExecuteTransaction)
+	span.SetAttributes(
+		attribute.String("transaction_id", txIDStr),
+	)
+	defer span.End()
 
 	nestedTxnId, beginErr := txnState.BeginNestedTransaction()
 	if beginErr != nil {
