@@ -34,7 +34,7 @@ type Suite struct {
 	exe2ID                  flow.Identifier      // corrupted execution node 2
 	verID                   flow.Identifier      // corrupted verification node
 	PreferredUnicasts       string               // preferred unicast protocols between execution and verification nodes.
-	Orchestrator            *passthrough.dummyOrchestrator
+	Orchestrator            *passthrough.Orchestrator
 	attackerNetwork         *attackernet.Network
 }
 
