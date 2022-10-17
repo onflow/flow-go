@@ -121,10 +121,8 @@ func (i TransactionInvoker) Process(
 
 	env := NewTransactionEnvironment(ctx, txnState, programs, proc.Transaction, proc.TxIndex, span)
 
-	var computationUsed uint64
-	var memoryEstimate uint64
 	var txError error
-	computationUsed, memoryEstimate, modifiedSets, txError = i.normalExecution(proc, txnState, env)
+	modifiedSets, txError = i.normalExecution(proc, txnState, env)
 	if mergeErrorShouldEarlyExit(txError) {
 		return
 	}
@@ -153,7 +151,7 @@ func (i TransactionInvoker) Process(
 		}
 
 		// try to deduct fees again, to get the fee deduction events
-		feesError := i.deductTransactionFees(env, proc, txnState, computationUsed)
+		feesError := i.deductTransactionFees(proc, txnState, env)
 
 		// if fee deduction fails just do clean up and exit
 		if feesError != nil {
@@ -171,8 +169,8 @@ func (i TransactionInvoker) Process(
 
 	// if tx failed this will only contain fee deduction logs
 	proc.Logs = append(proc.Logs, env.Logs()...)
-	proc.ComputationUsed = proc.ComputationUsed + computationUsed
-	proc.MemoryEstimate = proc.MemoryEstimate + memoryEstimate
+	proc.ComputationUsed = proc.ComputationUsed + env.ComputationUsed()
+	proc.MemoryEstimate = proc.MemoryEstimate + env.MemoryEstimate()
 
 	// if tx failed this will only contain fee deduction events
 	proc.Events = append(proc.Events, env.Events()...)
@@ -182,15 +180,15 @@ func (i TransactionInvoker) Process(
 }
 
 func (i TransactionInvoker) deductTransactionFees(
-	env environment.Environment,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	computationUsed uint64,
+	env environment.Environment,
 ) (err error) {
 	if !env.TransactionFeesEnabled() {
 		return nil
 	}
 
+	computationUsed := env.ComputationUsed()
 	if computationUsed > uint64(txnState.TotalComputationLimit()) {
 		computationUsed = uint64(txnState.TotalComputationLimit())
 	}
@@ -243,8 +241,6 @@ func (i TransactionInvoker) normalExecution(
 	txnState *state.TransactionState,
 	env environment.Environment,
 ) (
-	computationUsed uint64,
-	memoryEstimate uint64,
 	modifiedSets programsCache.ModifiedSetsInvalidator,
 	err error,
 ) {
@@ -258,26 +254,10 @@ func (i TransactionInvoker) normalExecution(
 		},
 		common.TransactionLocation(proc.ID))
 
-	// This will be used to charge fees.
-	computationUsed = env.ComputationUsed()
-	memoryEstimate = env.MemoryEstimate()
-
 	if err != nil {
 		err = fmt.Errorf(
 			"transaction invocation failed when executing transaction: %w",
 			err)
-		return
-	}
-
-	// log the execution intensities here, so that they do not contain data
-	// from storage limit checks and transaction deduction, because the payer
-	// is not charged for those.
-	i.logExecutionIntensities(txnState, env)
-
-	txnState.RunWithAllLimitsDisabled(func() {
-		err = i.deductTransactionFees(env, proc, txnState, computationUsed)
-	})
-	if err != nil {
 		return
 	}
 
@@ -289,6 +269,18 @@ func (i TransactionInvoker) normalExecution(
 			"transaction invocation failed to flush pending changes from "+
 				"environment: %w",
 			err)
+		return
+	}
+
+	// log the execution intensities here, so that they do not contain data
+	// from storage limit checks and transaction deduction, because the payer
+	// is not charged for those.
+	i.logExecutionIntensities(txnState, env)
+
+	txnState.RunWithAllLimitsDisabled(func() {
+		err = i.deductTransactionFees(proc, txnState, env)
+	})
+	if err != nil {
 		return
 	}
 
