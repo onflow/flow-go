@@ -121,7 +121,7 @@ func partFileName(fileName string, index int) string {
 	return fmt.Sprintf("%v.%03d", fileName, index)
 }
 
-func filePathPattern(dir string, fileName string) string {
+func FilePathPattern(dir string, fileName string) string {
 	return fmt.Sprintf("%v*", filePathCheckpointHeader(dir, fileName))
 }
 
@@ -221,7 +221,7 @@ func allPartFileExist(dir string, fileName string, totalSubtrieFiles int) error 
 // - it return the matching part files, note it might not contains all the part files.
 // - it return error if running any exception
 func findCheckpointPartFiles(dir string, fileName string) ([]string, error) {
-	pattern := filePathPattern(dir, fileName)
+	pattern := FilePathPattern(dir, fileName)
 	matched, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("could not find checkpoint files: %w", err)

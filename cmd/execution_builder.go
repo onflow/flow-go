@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	goruntime "runtime"
 	"time"
@@ -1034,35 +1035,57 @@ func copyBootstrapState(dir, trie string) error {
 	}
 
 	// copy from the bootstrap folder to the execution state folder
-	src := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, filename)
-	dst := filepath.Join(trie, filename)
-
-	in, err := os.Open(src)
+	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
+	err := copyCheckpointFile(filename, from, to)
 	if err != nil {
-		return err
+		return fmt.Errorf("can not copy checkpoint file %s, from %s to %s",
+			filename, from, to)
 	}
-	defer in.Close()
+	return nil
+}
 
+// copy the checkpoint file including the part files from the given `from` to
+// the `to` directory
+func copyCheckpointFile(filename string, from string, to string) error {
 	// It's possible that the trie dir does not yet exist. If not this will create the the required path
-	err = os.MkdirAll(trie, 0700)
+	err := os.MkdirAll(to, 0700)
 	if err != nil {
 		return err
 	}
 
-	out, err := os.Create(dst)
+	// checkpoint V6 produces multiple checkpoint part files that need to be copied over
+	pattern := wal.FilePathPattern(from, filename)
+	matched, err := filepath.Glob(pattern)
 	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
+		return fmt.Errorf("could not glob checkpoint file with pattern %v: %w", pattern, err)
 	}
 
-	fmt.Printf("copied bootstrap state file from: %v, to: %v\n", src, dst)
+	for _, match := range matched {
+		in, err := os.Open(match)
+		if err != nil {
+			return err
+		}
+		defer in.Close()
 
-	return out.Close()
+		_, partfile := filepath.Split(match)
+		newPath := filepath.Join(to, partfile)
+		out, err := os.Create(newPath)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		_, err = io.Copy(out, in)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("copied bootstrap state file from: %v, to: %v\n", matched, newPath)
+
+		return out.Close()
+	}
+
+	return nil
 }
 
 func logSysInfo(logger zerolog.Logger) error {

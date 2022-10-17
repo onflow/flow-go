@@ -580,7 +580,7 @@ func storeTries(
 
 // deleteCheckpointFiles removes any checkpoint files with given checkpoint prefix in the outputDir.
 func deleteCheckpointFiles(outputDir string, outputFile string) error {
-	pattern := filePathPattern(outputDir, outputFile)
+	pattern := FilePathPattern(outputDir, outputFile)
 	filesToRemove, err := filepath.Glob(pattern)
 	if err != nil {
 		return fmt.Errorf("could not glob checkpoint files to delete with pattern %v: %w",
