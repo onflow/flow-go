@@ -37,7 +37,7 @@ var accountCreationBatchSize = 750 // a higher number would hit max gRPC message
 const tokensPerTransfer = 0.01     // flow testnets only have 10e6 total supply, so we choose a small amount here
 
 // ConstExecParam hosts all parameters for const-exec load type
-type ConstExecParam struct {
+type ConstExecParams struct {
 	MaxTxSizeInByte uint
 	AuthAccountNum  uint
 	ArgSizeInByte   uint
@@ -47,66 +47,78 @@ type ConstExecParam struct {
 // ContLoadGenerator creates a continuous load of transactions to the network
 // by creating many accounts and transfer flow tokens between them
 type ContLoadGenerator struct {
-	log                  zerolog.Logger
-	loaderMetrics        *metrics.LoaderCollector
-	tps                  int
-	numberOfAccounts     int
-	flowClient           access.Client
-	serviceAccount       *flowAccount
-	flowTokenAddress     *flowsdk.Address
-	fungibleTokenAddress *flowsdk.Address
-	favContractAddress   *flowsdk.Address
-	accounts             []*flowAccount
-	availableAccounts    chan *flowAccount // queue with accounts available for workers
-	workerStatsTracker   *WorkerStatsTracker
-	workers              []*Worker
-	stopped              bool
-	loadType             LoadType
-	follower             TxFollower
-	availableAccountsLo  int
-	constExecParam       ConstExecParam
+	log                 zerolog.Logger
+	loaderMetrics       *metrics.LoaderCollector
+	loadParams          LoadParams
+	networkParams       NetworkParams
+	constExecParams     ConstExecParams
+	flowClient          access.Client
+	serviceAccount      *flowAccount
+	favContractAddress  *flowsdk.Address
+	accounts            []*flowAccount
+	availableAccounts   chan *flowAccount // queue with accounts available for workers
+	workerStatsTracker  *WorkerStatsTracker
+	stoppedChannel      chan struct{}
+	follower            TxFollower
+	availableAccountsLo int
+	workFunc            workFunc
+
+	workersMutex sync.Mutex
+	workers      []*Worker
 }
 
-// NewContLoadGenerator returns a new ContLoadGenerator
-func NewContLoadGenerator(
+type NetworkParams struct {
+	ServAccPrivKeyHex     string
+	ServiceAccountAddress *flowsdk.Address
+	FungibleTokenAddress  *flowsdk.Address
+	FlowTokenAddress      *flowsdk.Address
+}
+
+type LoadParams struct {
+	NumberOfAccounts int
+	LoadType         LoadType
+
+	// TODO(rbtz): inject a TxFollower
+	FeedbackEnabled bool
+}
+
+// New returns a new load generator
+func New(
+	// TODO(rbtz): use context
+	ctx context.Context,
 	log zerolog.Logger,
 	loaderMetrics *metrics.LoaderCollector,
-	flowClient access.Client,
-	supervisorClient access.Client,
-	loadedAccessAddr string,
-	servAccPrivKeyHex string,
-	serviceAccountAddress *flowsdk.Address,
-	fungibleTokenAddress *flowsdk.Address,
-	flowTokenAddress *flowsdk.Address,
-	tps int,
-	accountMultiplier int,
-	loadType LoadType,
-	feedbackEnabled bool,
-	constExecParam ConstExecParam,
+	flowClients []access.Client,
+	networkParams NetworkParams,
+	loadParams LoadParams,
+	constExecParams ConstExecParams,
 ) (*ContLoadGenerator, error) {
-	// Create "enough" accounts to prevent sequence number collisions.
-	numberOfAccounts := tps * accountMultiplier
+	if len(flowClients) == 0 {
+		return nil, errors.New("no flow clients available")
+	}
+	// TODO(rbtz): add loadbalancing between multiple clients
+	flowClient := flowClients[0]
 
-	servAcc, err := loadServiceAccount(flowClient, serviceAccountAddress, servAccPrivKeyHex)
+	servAcc, err := loadServiceAccount(flowClient, networkParams.ServiceAccountAddress, networkParams.ServAccPrivKeyHex)
 	if err != nil {
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
 
 	var follower TxFollower
-	if feedbackEnabled {
-		follower, err = NewTxFollower(context.TODO(), supervisorClient, WithLogger(log), WithMetrics(loaderMetrics))
+	if loadParams.FeedbackEnabled {
+		follower, err = NewTxFollower(context.TODO(), flowClient, WithLogger(log), WithMetrics(loaderMetrics))
 	} else {
-		follower, err = NewNopTxFollower(context.TODO(), supervisorClient)
+		follower, err = NewNopTxFollower(context.TODO(), flowClient)
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	// check and cap params for const-exec mode
-	if loadType == ConstExecCostLoadType {
-		if constExecParam.MaxTxSizeInByte > flow.DefaultMaxTransactionByteSize {
+	if loadParams.LoadType == ConstExecCostLoadType {
+		if constExecParams.MaxTxSizeInByte > flow.DefaultMaxTransactionByteSize {
 			errMsg := fmt.Sprintf("MaxTxSizeInByte(%d) is larger than DefaultMaxTransactionByteSize(%d).",
-				constExecParam.MaxTxSizeInByte,
+				constExecParams.MaxTxSizeInByte,
 				flow.DefaultMaxTransactionByteSize)
 			log.Error().Msg(errMsg)
 
@@ -114,63 +126,87 @@ func NewContLoadGenerator(
 		}
 
 		// accounts[0] will be used as the proposer\payer
-		if constExecParam.AuthAccountNum > uint(numberOfAccounts-1) {
+		if constExecParams.AuthAccountNum > uint(loadParams.NumberOfAccounts-1) {
 			errMsg := fmt.Sprintf("Number of authorizer(%d) is larger than max possible(%d).",
-				constExecParam.AuthAccountNum,
-				numberOfAccounts-1)
+				constExecParams.AuthAccountNum,
+				loadParams.NumberOfAccounts-1)
 			log.Error().Msg(errMsg)
 
 			return nil, errors.New(errMsg)
 		}
 
-		if constExecParam.ArgSizeInByte > flow.DefaultMaxTransactionByteSize {
+		if constExecParams.ArgSizeInByte > flow.DefaultMaxTransactionByteSize {
 			errMsg := fmt.Sprintf("ArgSizeInByte(%d) is larger than DefaultMaxTransactionByteSize(%d).",
-				constExecParam.ArgSizeInByte,
+				constExecParams.ArgSizeInByte,
 				flow.DefaultMaxTransactionByteSize)
 			log.Error().Msg(errMsg)
 			return nil, errors.New(errMsg)
 		}
 	}
 
-	lGen := &ContLoadGenerator{
-		log:                  log,
-		loaderMetrics:        loaderMetrics,
-		tps:                  tps,
-		numberOfAccounts:     numberOfAccounts,
-		flowClient:           flowClient,
-		serviceAccount:       servAcc,
-		fungibleTokenAddress: fungibleTokenAddress,
-		flowTokenAddress:     flowTokenAddress,
-		accounts:             make([]*flowAccount, 0),
-		availableAccounts:    make(chan *flowAccount, numberOfAccounts),
-		workerStatsTracker:   NewWorkerStatsTracker(),
-		follower:             follower,
-		loadType:             loadType,
-		availableAccountsLo:  numberOfAccounts,
-		constExecParam:       constExecParam,
+	lg := &ContLoadGenerator{
+		log:                 log,
+		loaderMetrics:       loaderMetrics,
+		loadParams:          loadParams,
+		networkParams:       networkParams,
+		constExecParams:     constExecParams,
+		flowClient:          flowClient,
+		serviceAccount:      servAcc,
+		accounts:            make([]*flowAccount, 0),
+		availableAccounts:   make(chan *flowAccount, loadParams.NumberOfAccounts),
+		workerStatsTracker:  NewWorkerStatsTracker(),
+		follower:            follower,
+		availableAccountsLo: loadParams.NumberOfAccounts,
+		stoppedChannel:      make(chan struct{}),
 	}
 
-	return lGen, nil
+	// TODO(rbtz): hide load implementation behind an interface
+	switch loadParams.LoadType {
+	case TokenTransferLoadType:
+		lg.workFunc = lg.sendTokenTransferTx
+	case TokenAddKeysLoadType:
+		lg.workFunc = lg.sendAddKeyTx
+	case ConstExecCostLoadType:
+		lg.workFunc = lg.sendConstExecCostTx
+	case CompHeavyLoadType, EventHeavyLoadType, LedgerHeavyLoadType:
+		lg.workFunc = lg.sendFavContractTx
+	default:
+		return nil, fmt.Errorf("unknown load type: %s", loadParams.LoadType)
+	}
+
+	return lg, nil
 }
 
+func (lg *ContLoadGenerator) stopped() bool {
+	select {
+	case <-lg.stoppedChannel:
+		return true
+	default:
+		return false
+	}
+}
+
+// TODO(rbtz): make part of New
 func (lg *ContLoadGenerator) Init() error {
-	for i := 0; i < lg.numberOfAccounts; i += accountCreationBatchSize {
-		if lg.stopped {
+	for i := 0; i < lg.loadParams.NumberOfAccounts; i += accountCreationBatchSize {
+		if lg.stopped() {
 			return nil
 		}
 
-		num := lg.numberOfAccounts - i
+		num := lg.loadParams.NumberOfAccounts - i
 		if num > accountCreationBatchSize {
 			num = accountCreationBatchSize
 		}
 
-		lg.log.Info().Int("cumulative", i).Int("num", num).Int("numberOfAccounts", lg.numberOfAccounts).Msg("creating accounts")
+		lg.log.Info().Int("cumulative", i).Int("num", num).Int("numberOfAccounts", lg.loadParams.NumberOfAccounts).Msg("creating accounts")
 		err := lg.createAccounts(num)
 		if err != nil {
 			return err
 		}
 	}
-	if lg.loadType != ConstExecCostLoadType {
+
+	// TODO(rbtz): create an interface for different load types: Setup()
+	if lg.loadParams.LoadType != ConstExecCostLoadType {
 		err := lg.setupFavContract()
 		if err != nil {
 			lg.log.Error().Err(err).Msg("failed to setup fav contract")
@@ -187,6 +223,8 @@ func (lg *ContLoadGenerator) Init() error {
 			return err
 		}
 	}
+
+	lg.workerStatsTracker.StartPrinting(1 * time.Second)
 
 	return nil
 }
@@ -223,57 +261,109 @@ func (lg *ContLoadGenerator) setupFavContract() error {
 		return err
 	}
 	<-ch
+	lg.workerStatsTracker.IncTxExecuted()
 
 	lg.favContractAddress = acc.address
 	return nil
 }
 
-func (lg *ContLoadGenerator) Start() {
-	// spawn workers
-	for i := 0; i < lg.tps; i++ {
-		var worker Worker
-
-		switch lg.loadType {
-		case TokenTransferLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.sendTokenTransferTx)
-		case TokenAddKeysLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.sendAddKeyTx)
-		case ConstExecCostLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.sendConstExecCostTx)
-		// other types
-		default:
-			worker = NewWorker(i, 1*time.Second, lg.sendFavContractTx)
-		}
-
+func (lg *ContLoadGenerator) startWorkers(num int) error {
+	for i := 0; i < num; i++ {
+		worker := NewWorker(len(lg.workers), 1*time.Second, lg.workFunc)
 		worker.Start()
-		lg.workerStatsTracker.AddWorker()
+		lg.workers = append(lg.workers, worker)
+	}
+	lg.workerStatsTracker.AddWorkers(num)
+	return nil
+}
 
-		lg.workers = append(lg.workers, &worker)
+func (lg *ContLoadGenerator) stopWorkers(num int) error {
+	if num > len(lg.workers) {
+		return fmt.Errorf("can't stop %d workers, only %d available", num, len(lg.workers))
 	}
 
-	lg.workerStatsTracker.StartPrinting(1 * time.Second)
+	wg := sync.WaitGroup{}
+	wg.Add(num)
+
+	idx := len(lg.workers) - num
+	toRemove := lg.workers[idx:]
+	lg.workers = lg.workers[:idx]
+
+	for _, w := range toRemove {
+		go func(w *Worker) {
+			defer wg.Done()
+			lg.log.Debug().Int("workerID", w.workerID).Msg("stopping worker")
+			w.Stop()
+		}(w)
+	}
+	wg.Wait()
+	lg.workerStatsTracker.AddWorkers(-num)
+
+	return nil
+}
+
+// SetTPS compares the given TPS to the current TPS to determine whether to increase
+// or decrease the load.
+// It increases/decreases the load by adjusting the number of workers, since each worker
+// is responsible for sending the load at 1 TPS.
+func (lg *ContLoadGenerator) SetTPS(desired uint) error {
+	lg.workersMutex.Lock()
+	defer lg.workersMutex.Unlock()
+
+	if lg.stopped() {
+		return fmt.Errorf("SetTPS called after loader is stopped: %w", context.Canceled)
+	}
+
+	return lg.unsafeSetTPS(desired)
+}
+
+func (lg *ContLoadGenerator) unsafeSetTPS(desired uint) error {
+	currentTPS := len(lg.workers)
+	diff := int(desired) - currentTPS
+
+	var err error
+	switch {
+	case diff > 0:
+		err = lg.startWorkers(diff)
+	case diff < 0:
+		err = lg.stopWorkers(-diff)
+	}
+
+	if err == nil {
+		lg.loaderMetrics.SetTPSConfigured(desired)
+	}
+	return err
 }
 
 func (lg *ContLoadGenerator) Stop() {
+	lg.workersMutex.Lock()
+	defer lg.workersMutex.Unlock()
+
+	if lg.stopped() {
+		lg.log.Warn().Msg("Stop() called on generator when already stopped")
+		return
+	}
+
 	defer lg.log.Debug().Msg("stopped generator")
 
-	lg.stopped = true
-	wg := sync.WaitGroup{}
-	wg.Add(len(lg.workers))
-	for _, w := range lg.workers {
-		w := w
-
-		go func() {
-			defer wg.Done()
-
-			lg.log.Debug().Int("workerID", w.workerID).Msg("stopping worker")
-			w.Stop()
-		}()
-	}
-	wg.Wait()
-	lg.workerStatsTracker.StopPrinting()
 	lg.log.Debug().Msg("stopping follower")
 	lg.follower.Stop()
+	lg.log.Debug().Msg("stopping workers")
+	_ = lg.unsafeSetTPS(0)
+	lg.workerStatsTracker.StopPrinting()
+	close(lg.stoppedChannel)
+}
+
+func (lg *ContLoadGenerator) Done() <-chan struct{} {
+	return lg.stoppedChannel
+}
+
+func (lg *ContLoadGenerator) GetTxSent() int {
+	return lg.workerStatsTracker.GetTxSent()
+}
+
+func (lg *ContLoadGenerator) GetTxExecuted() int {
+	return lg.workerStatsTracker.GetTxExecuted()
 }
 
 func (lg *ContLoadGenerator) AvgTpsBetween(start, stop time.Time) float64 {
@@ -289,7 +379,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 
 	// Generate an account creation script
 	createAccountTx := flowsdk.NewTransaction().
-		SetScript(CreateAccountsScript(*lg.fungibleTokenAddress, *lg.flowTokenAddress)).
+		SetScript(CreateAccountsScript(*lg.networkParams.FungibleTokenAddress, *lg.networkParams.FlowTokenAddress)).
 		SetReferenceBlockID(lg.follower.BlockID()).
 		SetGasLimit(999999).
 		SetProposalKey(
@@ -336,6 +426,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		return err
 	}
 	<-ch
+	lg.workerStatsTracker.IncTxExecuted()
 
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
 	result, err := WaitForTransactionResult(context.Background(), lg.flowClient, createAccountTx.ID())
@@ -452,6 +543,7 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 		return
 	}
 	<-ch
+	lg.workerStatsTracker.IncTxExecuted()
 }
 
 func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *flowAccount) error {
@@ -459,7 +551,7 @@ func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *flow
 		return errors.New("proposerPayerAccount is nil")
 	}
 
-	addKeysToPayerTx, err := lg.createAddKeyTx(*lg.accounts[0].address, lg.constExecParam.PayerKeyCount)
+	addKeysToPayerTx, err := lg.createAddKeyTx(*lg.accounts[0].address, lg.constExecParams.PayerKeyCount)
 	if err != nil {
 		lg.log.Error().Msg("failed to create add-key transaction for const-exec")
 		return err
@@ -481,6 +573,7 @@ func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *flow
 		return err
 	}
 	<-ch
+	lg.workerStatsTracker.IncTxExecuted()
 
 	lg.log.Info().Msg("the add-key transaction for const-exec is done")
 	return nil
@@ -489,7 +582,7 @@ func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *flow
 func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 	log := lg.log.With().Int("workerID", workerID).Logger()
 
-	txScriptNoComment := ConstExecCostTransaction(lg.constExecParam.AuthAccountNum, 0)
+	txScriptNoComment := ConstExecCostTransaction(lg.constExecParams.AuthAccountNum, 0)
 
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(lg.follower.BlockID()).
@@ -499,7 +592,7 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 		SetPayer(*lg.accounts[0].address)
 	lg.accounts[0].seqNumber += 1
 
-	txArgStr := generateRandomStringWithLen(lg.constExecParam.ArgSizeInByte)
+	txArgStr := generateRandomStringWithLen(lg.constExecParams.ArgSizeInByte)
 	txArg, err := cadence.NewString(txArgStr)
 	if err != nil {
 		log.Trace().Msg("Failed to generate cadence String parameter. Using empty string.")
@@ -511,12 +604,12 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 
 	// Add authorizers. lg.accounts[0] used as proposer\payer
 	log.Trace().Msg("Adding tx authorizers")
-	for i := uint(1); i < lg.constExecParam.AuthAccountNum+1; i++ {
+	for i := uint(1); i < lg.constExecParams.AuthAccountNum+1; i++ {
 		tx = tx.AddAuthorizer(*lg.accounts[i].address)
 	}
 
 	log.Trace().Msg("Authorizers signing tx")
-	for i := uint(1); i < lg.constExecParam.AuthAccountNum+1; i++ {
+	for i := uint(1); i < lg.constExecParams.AuthAccountNum+1; i++ {
 		err := lg.accounts[i].signPayload(tx, 0)
 		if err != nil {
 			log.Error().Err(err).Msg("error signing payload")
@@ -525,7 +618,7 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 	}
 
 	log.Trace().Msg("Payer signing tx")
-	for i := uint(0); i < lg.constExecParam.PayerKeyCount; i++ {
+	for i := uint(0); i < lg.constExecParams.PayerKeyCount; i++ {
 		err = lg.accounts[0].signTx(tx, int(i))
 		if err != nil {
 			log.Error().Err(err).Msg("error signing transaction")
@@ -535,24 +628,24 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 
 	// calculate RLP-encoded binary size of the transaction without comment
 	txSizeWithoutComment := uint(len(tx.Encode()))
-	if txSizeWithoutComment > lg.constExecParam.MaxTxSizeInByte {
+	if txSizeWithoutComment > lg.constExecParams.MaxTxSizeInByte {
 		log.Error().Msg(fmt.Sprintf("current tx size(%d) without comment "+
 			"is larger than max tx size configured(%d)",
-			txSizeWithoutComment, lg.constExecParam.MaxTxSizeInByte))
+			txSizeWithoutComment, lg.constExecParams.MaxTxSizeInByte))
 		return
 	}
 
 	// now adding comment to fulfill the final transaction size
-	commentSizeInByte := lg.constExecParam.MaxTxSizeInByte - txSizeWithoutComment
-	txScriptWithComment := ConstExecCostTransaction(lg.constExecParam.AuthAccountNum, commentSizeInByte)
+	commentSizeInByte := lg.constExecParams.MaxTxSizeInByte - txSizeWithoutComment
+	txScriptWithComment := ConstExecCostTransaction(lg.constExecParams.AuthAccountNum, commentSizeInByte)
 	tx = tx.SetScript(txScriptWithComment)
 
 	txSizeWithComment := uint(len(tx.Encode()))
-	log.Trace().Uint("Max Tx Size", lg.constExecParam.MaxTxSizeInByte).
+	log.Trace().Uint("Max Tx Size", lg.constExecParams.MaxTxSizeInByte).
 		Uint("Actual Tx Size", txSizeWithComment).
-		Uint("Tx Arg Size", lg.constExecParam.ArgSizeInByte).
-		Uint("Num of Authorizers", lg.constExecParam.AuthAccountNum).
-		Uint("Num of payer keys", lg.constExecParam.PayerKeyCount).
+		Uint("Tx Arg Size", lg.constExecParams.ArgSizeInByte).
+		Uint("Num of Authorizers", lg.constExecParams.AuthAccountNum).
+		Uint("Num of payer keys", lg.constExecParams.PayerKeyCount).
 		Uint("Script comment length", commentSizeInByte).
 		Msg("Generating one const-exec transaction")
 
@@ -563,6 +656,7 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 		return
 	}
 	<-ch
+	lg.workerStatsTracker.IncTxExecuted()
 
 	log.Trace().Msg("const-exec tx suceeded")
 }
@@ -578,7 +672,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 		l := len(lg.availableAccounts)
 		if l < lg.availableAccountsLo {
 			lg.availableAccountsLo = l
-			log.Debug().Int("availableAccountsLo", l).Int("numberOfAccounts", lg.numberOfAccounts).Msg("discovered new account low")
+			log.Debug().Int("availableAccountsLo", l).Int("numberOfAccounts", lg.loadParams.NumberOfAccounts).Msg("discovered new account low")
 		}
 	}
 
@@ -601,8 +695,8 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 		Msg("creating transfer script")
 
 	transferTx, err := TokenTransferTransaction(
-		lg.fungibleTokenAddress,
-		lg.flowTokenAddress,
+		lg.networkParams.FungibleTokenAddress,
+		lg.networkParams.FlowTokenAddress,
 		nextAcc.address,
 		tokensPerTransfer)
 	if err != nil {
@@ -640,9 +734,11 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 				Hex("txID", transferTx.ID().Bytes()).
 				Dur("duration", time.Since(startTime)).
 				Msg("transaction confirmed")
+			lg.workerStatsTracker.IncTxExecuted()
 			return
 		case <-time.After(slowTransactionThreshold):
-			log.Warn().
+			// TODO(rbtz): add a counter for slow transactions
+			log.Trace().
 				Hex("txID", transferTx.ID().Bytes()).
 				Dur("duration", time.Since(startTime)).
 				Int("availableAccounts", len(lg.availableAccounts)).
@@ -660,13 +756,16 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 	defer func() { lg.availableAccounts <- acc }()
 	var txScript []byte
 
-	switch lg.loadType {
+	switch lg.loadParams.LoadType {
 	case CompHeavyLoadType:
 		txScript = ComputationHeavyScript(*lg.favContractAddress)
 	case EventHeavyLoadType:
 		txScript = EventHeavyScript(*lg.favContractAddress)
 	case LedgerHeavyLoadType:
 		txScript = LedgerHeavyScript(*lg.favContractAddress)
+	default:
+		log.Error().Msg("unknown load type")
+		return
 	}
 
 	log.Trace().Msg("creating transaction")

@@ -1,36 +1,35 @@
-package environment_test
+package environment
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
 func TestUUIDs_GetAndSetUUID(t *testing.T) {
 	view := utils.NewSimpleView()
-	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	uuidsA := environment.NewUUIDGenerator(
-		environment.NewTracer(nil, nil, false),
-		environment.NewMeter(stTxn),
-		stTxn)
+	txnState := state.NewTransactionState(view, state.DefaultParameters())
+	uuidsA := NewUUIDGenerator(
+		NewTracer(DefaultTracerParams()),
+		NewMeter(txnState),
+		txnState)
 
-	uuid, err := uuidsA.GetUUID() // start from zero
+	uuid, err := uuidsA.getUUID() // start from zero
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), uuid)
 
-	err = uuidsA.SetUUID(5)
+	err = uuidsA.setUUID(5)
 	require.NoError(t, err)
 
 	// create new UUIDs instance
-	uuidsB := environment.NewUUIDGenerator(
-		environment.NewTracer(nil, nil, false),
-		environment.NewMeter(stTxn),
-		stTxn)
-	uuid, err = uuidsB.GetUUID() // should read saved value
+	uuidsB := NewUUIDGenerator(
+		NewTracer(DefaultTracerParams()),
+		NewMeter(txnState),
+		txnState)
+	uuid, err = uuidsB.getUUID() // should read saved value
 	require.NoError(t, err)
 
 	require.Equal(t, uint64(5), uuid)
@@ -38,11 +37,11 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 
 func Test_GenerateUUID(t *testing.T) {
 	view := utils.NewSimpleView()
-	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	genA := environment.NewUUIDGenerator(
-		environment.NewTracer(nil, nil, false),
-		environment.NewMeter(stTxn),
-		stTxn)
+	txnState := state.NewTransactionState(view, state.DefaultParameters())
+	genA := NewUUIDGenerator(
+		NewTracer(DefaultTracerParams()),
+		NewMeter(txnState),
+		txnState)
 
 	uuidA, err := genA.GenerateUUID()
 	require.NoError(t, err)
@@ -56,10 +55,10 @@ func Test_GenerateUUID(t *testing.T) {
 	require.Equal(t, uint64(2), uuidC)
 
 	// Create new generator instance from same ledger
-	genB := environment.NewUUIDGenerator(
-		environment.NewTracer(nil, nil, false),
-		environment.NewMeter(stTxn),
-		stTxn)
+	genB := NewUUIDGenerator(
+		NewTracer(DefaultTracerParams()),
+		NewMeter(txnState),
+		txnState)
 
 	uuidD, err := genB.GenerateUUID()
 	require.NoError(t, err)

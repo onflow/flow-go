@@ -2,7 +2,7 @@ package chainsync
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"testing"
 	"time"
@@ -30,7 +30,7 @@ type SyncSuite struct {
 func (ss *SyncSuite) SetupTest() {
 	var err error
 
-	ss.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig(), metrics.NewNoopCollector())
+	ss.core, err = New(zerolog.New(io.Discard), DefaultConfig(), metrics.NewNoopCollector())
 	ss.Require().Nil(err)
 }
 

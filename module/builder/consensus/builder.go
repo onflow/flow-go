@@ -343,14 +343,16 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 // Specifically, the result is incorporated in the block that contains a receipt committing
 // to a result for the _first time_ in the respective fork.
 // We can seal a result if and only if _all_ of the following conditions are satisfied:
-//  (0) We have collected a sufficient number of approvals for each of the result's chunks.
-//  (1) The result must have been previously incorporated in the fork, which we are extending.
-//      Note: The protocol dictates that all incorporated results must be for ancestor blocks
-//            in the respective fork. Hence, a result being incorporated in the fork, implies
-//            that the result must be for a block in this fork.
-//  (2) The result must be for an _unsealed_ block.
-//  (3) The result's parent must have been previously sealed (either by a seal in an ancestor
-//      block or by a seal included earlier in the block that we are constructing).
+//
+//   - (0) We have collected a sufficient number of approvals for each of the result's chunks.
+//   - (1) The result must have been previously incorporated in the fork, which we are extending.
+//     Note: The protocol dictates that all incorporated results must be for ancestor blocks
+//     in the respective fork. Hence, a result being incorporated in the fork, implies
+//     that the result must be for a block in this fork.
+//   - (2) The result must be for an _unsealed_ block.
+//   - (3) The result's parent must have been previously sealed (either by a seal in an ancestor
+//     block or by a seal included earlier in the block that we are constructing).
+//
 // To limit block size, we cap the number of seals to maxSealCount.
 func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, error) {
 	// get the latest seal in the fork, which we are extending and
@@ -486,10 +488,11 @@ type InsertableReceipts struct {
 }
 
 // getInsertableReceipts constructs:
-//  (i)  the meta information of the ExecutionReceipts (i.e. ExecutionReceiptMeta)
-//       that should be inserted in the next payload
-//  (ii) the ExecutionResults the receipts from step (i) commit to
-//       (deduplicated w.r.t. the block under construction as well as ancestor blocks)
+//   - (i)  the meta information of the ExecutionReceipts (i.e. ExecutionReceiptMeta)
+//     that should be inserted in the next payload
+//   - (ii) the ExecutionResults the receipts from step (i) commit to
+//     (deduplicated w.r.t. the block under construction as well as ancestor blocks)
+//
 // It looks in the receipts mempool and applies the following filter:
 //
 // 1) If it doesn't correspond to an unsealed block on the fork, skip it.

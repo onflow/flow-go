@@ -225,7 +225,7 @@ Loop:
 			}
 
 			// listen to signals from admin tool in order to trigger a checkpoint when the current segment file is finished
-			if c.triggerCheckpointOnNextSegmentFinish.CAS(true, false) {
+			if c.triggerCheckpointOnNextSegmentFinish.CompareAndSwap(true, false) {
 				// sanity checking, usually the nextCheckpointNum is a segment number in the future that when the activeSegmentNum
 				// finishes and reaches the nextCheckpointNum, then checkpoint will be triggered.
 				if nextCheckpointNum >= activeSegmentNum {

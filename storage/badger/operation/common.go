@@ -16,7 +16,8 @@ import (
 
 // batchWrite will encode the given entity using msgpack and will upsert the resulting
 // binary data in the badger wrote batch under the provided key - if the value already exists
-// in the database it will be overridden
+// in the database it will be overridden.
+// No errors are expected during normal operation.
 func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBatch) error {
 	return func(writeBatch *badger.WriteBatch) error {
 
@@ -47,6 +48,10 @@ func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBat
 // insert will encode the given entity using msgpack and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
+// Error returns:
+//   - storage.ErrAlreadyExists if the key already exists in the database.
+//   - generic error in case of unexpected failure from the database layer or
+//     encoding failure.
 func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -85,8 +90,11 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 }
 
 // update will encode the given entity with MsgPack and update the binary data
-// under the given key in the badger DB. It will error if the key does not exist
-// yet.
+// under the given key in the badger DB. The key must already exist.
+// Error returns:
+//   - storage.ErrNotFound if the key does not already exist in the database.
+//   - generic error in case of unexpected failure from the database layer or
+//     encoding failure.
 func update(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -146,6 +154,9 @@ func upsert(key []byte, entity interface{}) func(*badger.Txn) error {
 
 // remove removes the entity with the given key, if it exists. If it doesn't
 // exist, this is a no-op.
+// Error returns:
+// * storage.ErrNotFound if the key to delete does not exist.
+// * generic error in case of unexpected database error
 func remove(key []byte) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the item from the key-value store
@@ -164,6 +175,7 @@ func remove(key []byte) func(*badger.Txn) error {
 
 // removeByPrefix removes all the entities if the prefix of the key matches the given prefix.
 // if no key matches, this is a no-op
+// No errors are expected during normal operation.
 func removeByPrefix(prefix []byte) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
@@ -187,6 +199,10 @@ func removeByPrefix(prefix []byte) func(*badger.Txn) error {
 // retrieve will retrieve the binary data under the given key from the badger DB
 // and decode it into the given entity. The provided entity needs to be a
 // pointer to an initialized entity of the correct type.
+// Error returns:
+//   - storage.ErrNotFound if the key does not exist in the database
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
 func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -225,6 +241,7 @@ type createFunc func() interface{}
 // handleFunc is a function that starts the processing of the current key-value
 // pair during a badger iteration. It should be called after the key was checked
 // and the entity was decoded.
+// No errors are expected during normal operation. Any errors will halt the iteration.
 type handleFunc func() error
 
 // iterationFunc is a function provided to our low-level iteration function that
@@ -269,15 +286,17 @@ func withPrefetchValuesFalse(options *badger.IteratorOptions) {
 //
 // The iteration range uses prefix-wise semantics. Specifically, all keys that
 // meet ANY of the following conditions are included in the iteration:
-//   * have a prefix equal to the start key OR
-//   * have a prefix equal to the end key OR
-//   * have a prefix that is lexicographically between start and end
+//   - have a prefix equal to the start key OR
+//   - have a prefix equal to the end key OR
+//   - have a prefix that is lexicographically between start and end
 //
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
 //
 // TODO: this function is unbounded – pass context.Context to this or calling
 // functions to allow timing functions out.
+// No errors are expected during normal operation. Any errors returned by the
+// provided handleFunc will be propagated back to the caller of iterate.
 func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*badger.IteratorOptions)) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 

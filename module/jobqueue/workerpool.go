@@ -21,14 +21,14 @@ type WorkerPool struct {
 // JobProcessor is called by the worker to execute each job. It should only return when the job has
 // completed, either successfully or after performing any failure handling.
 // It takes 3 arguments:
-// - irrecoverable.SignalerContext: this is used to signal shutdown to the worker and throw any
-//   irrecoverable errors back to the parent. The signaller context is passed in from consumer's
-//   Start method
-// - module.Job: the job to be processed. The processor is responsible for decoding into the
-//   expected format.
-// - func(): Call this closure after the job is considered complete. This is a convenience method
-//   that avoid needing to a separate ProcessingNotifier for simple usecases. If a different method
-//   is used to signal jobs are done to the consumer, this function can be ignored.
+//   - irrecoverable.SignalerContext: this is used to signal shutdown to the worker and throw any
+//     irrecoverable errors back to the parent. The signaller context is passed in from consumer's
+//     Start method
+//   - module.Job: the job to be processed. The processor is responsible for decoding into the
+//     expected format.
+//   - func(): Call this closure after the job is considered complete. This is a convenience method
+//     that avoid needing to a separate ProcessingNotifier for simple usecases. If a different method
+//     is used to signal jobs are done to the consumer, this function can be ignored.
 type JobProcessor func(irrecoverable.SignalerContext, module.Job, func())
 
 // NotifyDone should be the consumer's NotifyJobIsDone method, or a wrapper for that method. It is

@@ -22,12 +22,13 @@ const (
 // Pruner is a component responsible for pruning data from
 // execution data storage. It is configured with the following
 // parameters:
-// * Height range target: The target number of most recent blocks
-//   to store data for. This controls the total amount of data
-//   stored on disk.
-// * Threshold: The number of block heights that we can exceed
-//   the height range target by before pruning is triggered. This
-//   controls the frequency of pruning.
+//   - Height range target: The target number of most recent blocks
+//     to store data for. This controls the total amount of data
+//     stored on disk.
+//   - Threshold: The number of block heights that we can exceed
+//     the height range target by before pruning is triggered. This
+//     controls the frequency of pruning.
+//
 // The Pruner consumes a stream of tracked height notifications,
 // and triggers pruning once the difference between the tracked
 // height and the last pruned height reaches the height range

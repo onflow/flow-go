@@ -2,8 +2,8 @@ package unittest
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"math"
+	"math/rand"
 	"os"
 	"os/exec"
 	"regexp"
@@ -13,8 +13,11 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/network/slashing"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -303,7 +306,7 @@ func AssertErrSubstringMatch(t testing.TB, expected, actual error) {
 }
 
 func TempDir(t testing.TB) string {
-	dir, err := ioutil.TempDir("", "flow-testing-temp-")
+	dir, err := os.MkdirTemp("", "flow-testing-temp-")
 	require.NoError(t, err)
 	return dir
 }
@@ -426,4 +429,19 @@ func CrashTestWithExpectedStatus(
 	// expect logger.Fatal() message to be pushed to stdout
 	outStr := string(outBytes)
 	require.Contains(t, outStr, expectedErrorMsg)
+}
+
+// GenerateRandomStringWithLen returns a string of random alpha characters of the provided length
+func GenerateRandomStringWithLen(commentLen uint) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	bytes := make([]byte, commentLen)
+	for i := range bytes {
+		bytes[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(bytes)
+}
+
+// NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware
+func NetworkSlashingViolationsConsumer(logger zerolog.Logger, metrics module.NetworkSecurityMetrics) slashing.ViolationsConsumer {
+	return slashing.NewSlashingViolationsConsumer(logger, metrics)
 }

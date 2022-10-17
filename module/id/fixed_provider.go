@@ -1,9 +1,10 @@
 package id
 
 import (
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
@@ -26,6 +27,8 @@ func (p *FixedIdentifierProvider) Identifiers() flow.IdentifierList {
 type FixedIdentityProvider struct {
 	identities flow.IdentityList
 }
+
+var _ module.IdentityProvider = (*FixedIdentityProvider)(nil)
 
 func NewFixedIdentityProvider(identities flow.IdentityList) *FixedIdentityProvider {
 	return &FixedIdentityProvider{identities}

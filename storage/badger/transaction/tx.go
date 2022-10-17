@@ -2,6 +2,8 @@ package transaction
 
 import (
 	dbbadger "github.com/dgraph-io/badger/v2"
+
+	ioutils "github.com/onflow/flow-go/utils/io"
 )
 
 type Tx struct {
@@ -32,7 +34,7 @@ func Update(db *dbbadger.DB, f func(*Tx) error) error {
 
 	err = dbTxn.Commit()
 	if err != nil {
-		return err
+		return ioutils.TerminateOnFullDisk(err)
 	}
 
 	for _, callback := range tx.callbacks {

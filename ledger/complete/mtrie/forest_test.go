@@ -68,8 +68,9 @@ func TestTrieUpdate(t *testing.T) {
 }
 
 // TestLeftEmptyInsert tests inserting a new value into an empty sub-trie:
-//   1. we first construct a baseTrie holding a couple of values on the right branch [~]
-//   2. we update a previously non-existent register on the left branch (X)
+//  1. we first construct a baseTrie holding a couple of values on the right branch [~]
+//  2. we update a previously non-existent register on the left branch (X)
+//
 // We verify that values for _all_ paths in the updated Trie have correct payloads
 func TestLeftEmptyInsert(t *testing.T) {
 	//////////////////////
@@ -125,8 +126,9 @@ func TestLeftEmptyInsert(t *testing.T) {
 }
 
 // TestRightEmptyInsert tests inserting a new value into an empty sub-trie:
-//   1. we first construct a baseTrie holding a couple of values on the left branch [~]
-//   2. we update a previously non-existent register on the right branch (X)
+//  1. we first construct a baseTrie holding a couple of values on the left branch [~]
+//  2. we update a previously non-existent register on the right branch (X)
+//
 // We verify that values for _all_ paths in the updated Trie have correct payloads
 func TestRightEmptyInsert(t *testing.T) {
 	///////////////////////
@@ -184,8 +186,9 @@ func TestRightEmptyInsert(t *testing.T) {
 
 // TestExpansionInsert tests inserting a new value into a populated sub-trie, where a
 // leaf (holding a single value) would be replaced by an expanded sub-trie holding multiple value
-//   1. we first construct a baseTrie holding a couple of values on the right branch [~]
-//   2. we update a previously non-existent register on the right branch turning [~] to [~']
+//  1. we first construct a baseTrie holding a couple of values on the right branch [~]
+//  2. we update a previously non-existent register on the right branch turning [~] to [~']
+//
 // We verify that values for _all_ paths in the updated Trie have correct payloads
 func TestExpansionInsert(t *testing.T) {
 	////////////////////////
@@ -241,8 +244,9 @@ func TestExpansionInsert(t *testing.T) {
 // TestFullHouseInsert tests inserting a new value into a populated sub-trie, where a
 // leaf's value is overridden _and_ further values are added which all fall into a subtree that
 // replaces the leaf:
-//   1. we first construct a baseTrie holding a couple of values on the right branch [~]
-//   2. we update a previously non-existent register on the right branch turning [~] to [~']
+//  1. we first construct a baseTrie holding a couple of values on the right branch [~]
+//  2. we update a previously non-existent register on the right branch turning [~] to [~']
+//
 // We verify that values for _all_ paths in the updated Trie have correct payloads
 func TestFullHouseInsert(t *testing.T) {
 	///////////////////////

@@ -19,22 +19,22 @@ import (
 //
 // • The channel for the CURRENTLY ACTIVE timeout is returned by PaceMaker.TimeoutChannel()
 //
-// • Each time the EventHandler processes an event, the EventHandler might call into PaceMaker
-//   potentially resulting in a state transition and the PaceMaker starting a new timeout
+//   - Each time the EventHandler processes an event, the EventHandler might call into PaceMaker
+//     potentially resulting in a state transition and the PaceMaker starting a new timeout
 //
-// • Hence, after processing any event, EventHandler should retrieve the current TimeoutChannel
-//   from the PaceMaker.
+//   - Hence, after processing any event, EventHandler should retrieve the current TimeoutChannel
+//     from the PaceMaker.
 //
 // For Example:
 //
-// for {
+//	for {
 //		timeoutChannel := el.eventHandler.TimeoutChannel()
 //		select {
 //		   case <-timeoutChannel:
 //		    	el.eventHandler.OnLocalTimeout()
 //		   case <other events>
 //		}
-// }
+//	}
 type PaceMaker interface {
 
 	// CurView returns the current view.

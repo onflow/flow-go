@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"flag"
 	"net"
 	"os"
@@ -16,9 +15,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/access"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/benchmark"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -26,7 +25,7 @@ import (
 )
 
 type LoadCase struct {
-	tps      int
+	tps      uint
 	duration time.Duration
 }
 
@@ -36,14 +35,14 @@ func main() {
 	tpsFlag := flag.String("tps", "1", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
 	tpsDurationsFlag := flag.String("tps-durations", "0", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	chainIDStr := flag.String("chain", string(flowsdk.Emulator), "chain ID")
-	access := flag.String("access", net.JoinHostPort("127.0.0.1", "3569"), "access node address")
+	accessNodes := flag.String("access", net.JoinHostPort("127.0.0.1", "3569"), "access node address")
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 	logLvl := flag.String("log-level", "info", "set log level")
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	pushgateway := flag.String("pushgateway", "127.0.0.1:9091", "host:port for pushgateway")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
 	_ = flag.Bool("track-txs", false, "deprecated")
-	accountMultiplierFlag := flag.Int("account-multiplier", 50, "number of accounts to create per load tps")
+	accountMultiplierFlag := flag.Int("account-multiplier", 100, "number of accounts to create per load tps")
 	feedbackEnabled := flag.Bool("feedback-enabled", true, "wait for trannsaction execution before submitting new transaction")
 	maxConstExecTxSizeInBytes := flag.Uint("const-exec-max-tx-size", flow.DefaultMaxTransactionByteSize/10, "max byte size of constant exec transaction size to generate")
 	authAccNumInConstExecTx := flag.Uint("const-exec-num-authorizer", 1, "num of authorizer for each constant exec transaction to generate")
@@ -69,11 +68,7 @@ func main() {
 	defer cancel()
 
 	sp := benchmark.NewStatsPusher(ctx, log, *pushgateway, "loader", prometheus.DefaultGatherer)
-	defer sp.Close()
-
-	accessNodeAddrs := strings.Split(*access, ",")
-
-	cases := parseLoadCases(log, tpsFlag, tpsDurationsFlag)
+	defer sp.Stop()
 
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
@@ -83,97 +78,89 @@ func main() {
 	flowTokenAddress := addressGen.NextAddress()
 	log.Info().Msgf("Flow Token Address: %v", flowTokenAddress)
 
-	serviceAccountPrivateKeyBytes, err := hex.DecodeString(*serviceAccountPrivateKeyHex)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("error while hex decoding hardcoded root key")
-	}
-
-	ServiceAccountPrivateKey := flow.AccountPrivateKey{
-		SignAlgo: unittest.ServiceAccountPrivateKeySignAlgo,
-		HashAlgo: unittest.ServiceAccountPrivateKeyHashAlgo,
-	}
-	ServiceAccountPrivateKey.PrivateKey, err = crypto.DecodePrivateKey(
-		ServiceAccountPrivateKey.SignAlgo, serviceAccountPrivateKeyBytes)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("error while decoding hardcoded root key bytes")
-	}
-
-	// get the private key string
-	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
-
 	// sleep in order to ensure the testnet is up and running
 	if *sleep > 0 {
 		log.Info().Msgf("Sleeping for %v before starting benchmark", sleep)
 		time.Sleep(*sleep)
 	}
 
-	loadedAccessAddr := accessNodeAddrs[0]
-	flowClient, err := client.NewClient(loadedAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	accessNodeAddrs := strings.Split(*accessNodes, ",")
+	clients := make([]access.Client, 0, len(accessNodeAddrs))
+	for _, addr := range accessNodeAddrs {
+		client, err := client.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatal().Str("addr", addr).Err(err).Msgf("unable to initialize flow client")
+		}
+		clients = append(clients, client)
+	}
+
+	// run load cases and compute max tps
+	var maxTPS uint
+	loadCases := parseLoadCases(log, tpsFlag, tpsDurationsFlag)
+	for _, c := range loadCases {
+		if c.tps > maxTPS {
+			maxTPS = c.tps
+		}
+	}
+
+	lg, err := benchmark.New(
+		ctx,
+		log,
+		loaderMetrics,
+		clients,
+		benchmark.NetworkParams{
+			ServAccPrivKeyHex:     *serviceAccountPrivateKeyHex,
+			ServiceAccountAddress: &serviceAccountAddress,
+			FungibleTokenAddress:  &fungibleTokenAddress,
+			FlowTokenAddress:      &flowTokenAddress,
+		},
+		benchmark.LoadParams{
+			NumberOfAccounts: int(maxTPS) * *accountMultiplierFlag,
+			LoadType:         benchmark.LoadType(*loadTypeFlag),
+			FeedbackEnabled:  *feedbackEnabled,
+		},
+		benchmark.ConstExecParams{
+			MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
+			AuthAccountNum:  *authAccNumInConstExecTx,
+			ArgSizeInByte:   *argSizeInByteInConstExecTx,
+			PayerKeyCount:   *payerKeyCountInConstExecTx,
+		},
+	)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
+		log.Fatal().Err(err).Msg("unable to create new cont load generator")
 	}
+	defer lg.Stop()
 
-	supervisorAccessAddr := accessNodeAddrs[0]
-	if len(accessNodeAddrs) > 1 {
-		supervisorAccessAddr = accessNodeAddrs[1]
-	}
-	supervisorClient, err := client.NewClient(supervisorAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	err = lg.Init()
 	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
+		log.Fatal().Err(err).Msg("unable to init loader")
 	}
 
-	// run load cases
-	for i, c := range cases {
-		log.Info().Str("load_type", *loadTypeFlag).Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
+	for i, c := range loadCases {
+		log.Info().
+			Str("load_type", *loadTypeFlag).
+			Int("number", i).
+			Uint("tps", c.tps).
+			Dur("duration", c.duration).
+			Msg("running load case")
 
-		loaderMetrics.SetTPSConfigured(c.tps)
-
-		var lg *benchmark.ContLoadGenerator
-		if c.tps > 0 {
-			var err error
-			lg, err = benchmark.NewContLoadGenerator(
-				log,
-				loaderMetrics,
-				flowClient,
-				supervisorClient,
-				loadedAccessAddr,
-				priv,
-				&serviceAccountAddress,
-				&fungibleTokenAddress,
-				&flowTokenAddress,
-				c.tps,
-				*accountMultiplierFlag,
-				benchmark.LoadType(*loadTypeFlag),
-				*feedbackEnabled,
-				benchmark.ConstExecParam{
-					MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
-					AuthAccountNum:  *authAccNumInConstExecTx,
-					ArgSizeInByte:   *argSizeInByteInConstExecTx,
-					PayerKeyCount:   *payerKeyCountInConstExecTx,
-				},
-			)
-			if err != nil {
-				log.Fatal().Err(err).Msgf("unable to create new cont load generator")
-			}
-
-			err = lg.Init()
-			if err != nil {
-				log.Fatal().Err(err).Msgf("unable to init loader")
-			}
-			lg.Start()
+		err = lg.SetTPS(c.tps)
+		if err != nil {
+			log.Fatal().Err(err).Msg("unable to set tps")
 		}
 
 		// if the duration is 0, we run this case forever
-		if c.duration.Nanoseconds() == 0 {
-			for {
-				time.Sleep(time.Minute)
-			}
+		waitC := make(<-chan time.Time)
+		if c.duration != 0 {
+			waitC = time.After(c.duration)
 		}
 
-		time.Sleep(c.duration)
-
-		if lg != nil {
-			lg.Stop()
+		select {
+		case <-ctx.Done():
+			log.Info().Err(ctx.Err()).Msg("context cancelled")
+			return
+		case <-waitC:
+			log.Info().Msg("finished load case")
 		}
 	}
 }
@@ -187,7 +174,7 @@ func parseLoadCases(log zerolog.Logger, tpsFlag, tpsDurationsFlag *string) []Loa
 			log.Fatal().Err(err).Str("value", s).
 				Msg("could not parse tps flag, expected comma separated list of integers")
 		}
-		cases = append(cases, LoadCase{tps: int(t)})
+		cases = append(cases, LoadCase{tps: uint(t)})
 	}
 
 	tpsDurationsStrings := strings.Split(*tpsDurationsFlag, ",")

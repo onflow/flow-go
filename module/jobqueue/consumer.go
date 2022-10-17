@@ -166,7 +166,7 @@ func (c *Consumer) NotifyJobIsDone(jobID module.JobID) uint64 {
 // since multiple checks at the same time are unnecessary, we could only keep one check by checking.
 // an atomic isChecking value.
 func (c *Consumer) Check() {
-	if !c.isChecking.CAS(false, true) {
+	if !c.isChecking.CompareAndSwap(false, true) {
 		// other process is checking, we could exit and rely on that process to check
 		// processable jobs
 		return

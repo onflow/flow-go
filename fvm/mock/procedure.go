@@ -30,6 +30,34 @@ func (_m *Procedure) ComputationLimit(ctx fvm.Context) uint64 {
 	return r0
 }
 
+// ExecutionTime provides a mock function with given fields:
+func (_m *Procedure) ExecutionTime() programs.LogicalTime {
+	ret := _m.Called()
+
+	var r0 programs.LogicalTime
+	if rf, ok := ret.Get(0).(func() programs.LogicalTime); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(programs.LogicalTime)
+	}
+
+	return r0
+}
+
+// InitialSnapshotTime provides a mock function with given fields:
+func (_m *Procedure) InitialSnapshotTime() programs.LogicalTime {
+	ret := _m.Called()
+
+	var r0 programs.LogicalTime
+	if rf, ok := ret.Get(0).(func() programs.LogicalTime); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(programs.LogicalTime)
+	}
+
+	return r0
+}
+
 // MemoryLimit provides a mock function with given fields: ctx
 func (_m *Procedure) MemoryLimit(ctx fvm.Context) uint64 {
 	ret := _m.Called(ctx)
@@ -44,15 +72,43 @@ func (_m *Procedure) MemoryLimit(ctx fvm.Context) uint64 {
 	return r0
 }
 
-// Run provides a mock function with given fields: vm, ctx, sth, _a3
-func (_m *Procedure) Run(vm *fvm.VirtualMachine, ctx fvm.Context, sth *state.StateHolder, _a3 *programs.Programs) error {
-	ret := _m.Called(vm, ctx, sth, _a3)
+// Run provides a mock function with given fields: ctx, txnState, _a2
+func (_m *Procedure) Run(ctx fvm.Context, txnState *state.TransactionState, _a2 *programs.TransactionPrograms) error {
+	ret := _m.Called(ctx, txnState, _a2)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, *state.StateHolder, *programs.Programs) error); ok {
-		r0 = rf(vm, ctx, sth, _a3)
+	if rf, ok := ret.Get(0).(func(fvm.Context, *state.TransactionState, *programs.TransactionPrograms) error); ok {
+		r0 = rf(ctx, txnState, _a2)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ShouldDisableMemoryAndInteractionLimits provides a mock function with given fields: ctx
+func (_m *Procedure) ShouldDisableMemoryAndInteractionLimits(ctx fvm.Context) bool {
+	ret := _m.Called(ctx)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(fvm.Context) bool); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// Type provides a mock function with given fields:
+func (_m *Procedure) Type() fvm.ProcedureType {
+	ret := _m.Called()
+
+	var r0 fvm.ProcedureType
+	if rf, ok := ret.Get(0).(func() fvm.ProcedureType); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(fvm.ProcedureType)
 	}
 
 	return r0

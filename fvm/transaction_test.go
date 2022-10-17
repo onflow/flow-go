@@ -8,11 +8,11 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -21,9 +21,17 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []flow.AccountPublicKey) (flow.Address, flow.Address, *state.StateHolder) {
+func makeTwoAccounts(
+	t *testing.T,
+	aPubKeys []flow.AccountPublicKey,
+	bPubKeys []flow.AccountPublicKey,
+) (
+	flow.Address,
+	flow.Address,
+	*state.TransactionState,
+) {
 
-	stTxn := state.NewStateTransaction(
+	txnState := state.NewTransactionState(
 		utils.NewSimpleView(),
 		state.DefaultParameters(),
 	)
@@ -31,14 +39,14 @@ func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []
 	a := flow.HexToAddress("1234")
 	b := flow.HexToAddress("5678")
 
-	//create accounts
-	accounts := state.NewAccounts(stTxn)
+	// create accounts
+	accounts := environment.NewAccounts(txnState)
 	err := accounts.Create(aPubKeys, a)
 	require.NoError(t, err)
 	err = accounts.Create(bPubKeys, b)
 	require.NoError(t, err)
 
-	return a, b, stTxn
+	return a, b, txnState
 }
 
 func TestAccountFreezing(t *testing.T) {
@@ -49,18 +57,15 @@ func TestAccountFreezing(t *testing.T) {
 	t.Run("setFrozenAccount can be enabled", func(t *testing.T) {
 
 		address, _, st := makeTwoAccounts(t, nil, nil)
-		accounts := state.NewAccounts(st)
-		programsStorage := programs.NewEmptyPrograms()
+		accounts := environment.NewAccounts(st)
+		blockPrograms := programs.NewEmptyBlockPrograms()
 
 		// account should no be frozen
 		frozen, err := accounts.GetAccountFrozen(address)
 		require.NoError(t, err)
 		require.False(t, frozen)
 
-		rt := fvm.NewInterpreterRuntime()
-		log := zerolog.Nop()
-		vm := fvm.NewVirtualMachine(rt)
-		txInvoker := fvm.NewTransactionInvoker(log)
+		txInvoker := fvm.NewTransactionInvoker()
 
 		code := fmt.Sprintf(`
 			transaction {
@@ -72,11 +77,17 @@ func TestAccountFreezing(t *testing.T) {
 
 		tx := flow.TransactionBody{Script: []byte(code)}
 		tx.AddAuthorizer(chain.ServiceAddress())
-		proc := fvm.Transaction(&tx, 0)
+		proc := fvm.Transaction(&tx, blockPrograms.NextTxIndexForTestingOnly())
 
-		context := fvm.NewContext(log, fvm.WithChain(chain))
+		context := fvm.NewContext(
+			fvm.WithChain(chain),
+			fvm.WithBlockPrograms(blockPrograms))
 
-		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
+		blockPrograms = programs.NewEmptyBlockPrograms()
+		txnPrograms, err := blockPrograms.NewTransactionPrograms(0, 0)
+		require.NoError(t, err)
+
+		err = txInvoker.Process(context, proc, st, txnPrograms)
 		require.NoError(t, err)
 
 		// account should be frozen now
@@ -87,16 +98,15 @@ func TestAccountFreezing(t *testing.T) {
 
 	t.Run("freezing account triggers program cache eviction", func(t *testing.T) {
 		address, _, st := makeTwoAccounts(t, nil, nil)
-		accounts := state.NewAccounts(st)
-		programsStorage := programs.NewEmptyPrograms()
+		accounts := environment.NewAccounts(st)
+		programsStorage := programs.NewEmptyBlockPrograms()
 
 		// account should no be frozen
 		frozen, err := accounts.GetAccountFrozen(address)
 		require.NoError(t, err)
 		require.False(t, frozen)
 
-		rt := fvm.NewInterpreterRuntime()
-		vm := fvm.NewVirtualMachine(rt)
+		vm := fvm.NewVirtualMachine()
 
 		// deploy code to account
 
@@ -118,15 +128,18 @@ func TestAccountFreezing(t *testing.T) {
 	   `, hex.EncodeToString([]byte(whateverContractCode)),
 		))
 
-		proc := fvm.Transaction(&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{address}, Payer: address}, 0)
-		context := fvm.NewContext(zerolog.Nop(),
+		proc := fvm.Transaction(
+			&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{address}, Payer: address},
+			programsStorage.NextTxIndexForTestingOnly())
+		context := fvm.NewContext(
 			fvm.WithServiceAccount(false),
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
-				fvm.NewTransactionInvoker(zerolog.Nop())))
+				fvm.NewTransactionInvoker()),
+			fvm.WithBlockPrograms(programsStorage))
 
-		err = vm.Run(context, proc, st.State().View(), programsStorage)
+		err = vm.Run(context, proc, st.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 
@@ -144,8 +157,10 @@ func TestAccountFreezing(t *testing.T) {
 			`, a.String()))
 		}
 
-		proc = fvm.Transaction(&flow.TransactionBody{Script: code(address)}, 0)
-		err = vm.Run(context, proc, st.State().View(), programsStorage)
+		proc = fvm.Transaction(
+			&flow.TransactionBody{Script: code(address)},
+			programsStorage.NextTxIndexForTestingOnly())
+		err = vm.Run(context, proc, st.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 		require.Len(t, proc.Logs, 1)
@@ -157,7 +172,7 @@ func TestAccountFreezing(t *testing.T) {
 			Address: common.MustBytesToAddress(address[:]),
 			Name:    "Whatever",
 		}
-		_, _, found := programsStorage.Get(cadenceAddr)
+		_, _, found := programsStorage.GetForTestingOnly(cadenceAddr)
 		require.True(t, found)
 
 		// freeze account
@@ -173,30 +188,33 @@ func TestAccountFreezing(t *testing.T) {
 		tx := &flow.TransactionBody{Script: []byte(freezeTx)}
 		tx.AddAuthorizer(chain.ServiceAddress())
 
-		proc = fvm.Transaction(tx, 0)
-		err = vm.Run(context, proc, st.State().View(), programsStorage)
+		proc = fvm.Transaction(tx, programsStorage.NextTxIndexForTestingOnly())
+		err = vm.Run(context, proc, st.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 
 		// verify cache is evicted
 
-		_, _, found = programsStorage.Get(cadenceAddr)
+		_, _, found = programsStorage.GetForTestingOnly(cadenceAddr)
 		require.False(t, found)
 
 		// loading code from frozen account triggers error
 
-		proc = fvm.Transaction(&flow.TransactionBody{Script: code(address)}, 0)
+		proc = fvm.Transaction(
+			&flow.TransactionBody{Script: code(address)},
+			programsStorage.NextTxIndexForTestingOnly())
 
-		err = vm.Run(context, proc, st.State().View(), programsStorage)
+		err = vm.Run(context, proc, st.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.Error(t, proc.Err)
 
 		// find frozen account specific error
-		require.IsType(t, &errors.CadenceRuntimeError{}, proc.Err)
-		err = proc.Err.(*errors.CadenceRuntimeError).Unwrap()
+		require.True(t, errors.IsCadenceRuntimeError(proc.Err))
 
-		require.IsType(t, &runtime.Error{}, err)
-		err = err.(*runtime.Error).Err
+		var rtErr runtime.Error
+		require.True(t, errors.As(proc.Err, &rtErr))
+
+		err = rtErr.Err
 
 		require.IsType(t, &runtime.ParsingCheckingError{}, err)
 		err = err.(*runtime.ParsingCheckingError).Err
@@ -210,7 +228,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.IsType(t, &sema.ImportedProgramError{}, checkerErrors[0])
 
 		importedCheckerError := checkerErrors[0].(*sema.ImportedProgramError).Err
-		accountFrozenError := &errors.FrozenAccountError{}
+		accountFrozenError := errors.FrozenAccountError{}
 
 		require.True(t, errors.As(importedCheckerError, &accountFrozenError))
 		require.Equal(t, address, accountFrozenError.Address())
@@ -219,12 +237,10 @@ func TestAccountFreezing(t *testing.T) {
 	t.Run("code from frozen account cannot be loaded", func(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
-		accounts := state.NewAccounts(st)
-		programsStorage := programs.NewEmptyPrograms()
+		accounts := environment.NewAccounts(st)
+		programsStorage := programs.NewEmptyBlockPrograms()
 
-		rt := fvm.NewInterpreterRuntime()
-
-		vm := fvm.NewVirtualMachine(rt)
+		vm := fvm.NewVirtualMachine()
 
 		// deploy code to accounts
 		whateverContractCode := `
@@ -245,20 +261,25 @@ func TestAccountFreezing(t *testing.T) {
 	   `, hex.EncodeToString([]byte(whateverContractCode)),
 		))
 
-		procFrozen := fvm.Transaction(&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{frozenAddress}, Payer: frozenAddress}, 0)
-		procNotFrozen := fvm.Transaction(&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{notFrozenAddress}, Payer: notFrozenAddress}, 0)
-		context := fvm.NewContext(zerolog.Nop(),
+		procFrozen := fvm.Transaction(
+			&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{frozenAddress}, Payer: frozenAddress},
+			programsStorage.NextTxIndexForTestingOnly())
+		context := fvm.NewContext(
 			fvm.WithServiceAccount(false),
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
-				fvm.NewTransactionInvoker(zerolog.Nop())))
+				fvm.NewTransactionInvoker()),
+			fvm.WithBlockPrograms(programsStorage))
 
-		err := vm.Run(context, procFrozen, st.ViewForTestingOnly(), programsStorage)
+		err := vm.Run(context, procFrozen, st.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, procFrozen.Err)
 
-		err = vm.Run(context, procNotFrozen, st.ViewForTestingOnly(), programsStorage)
+		procNotFrozen := fvm.Transaction(
+			&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{notFrozenAddress}, Payer: notFrozenAddress},
+			programsStorage.NextTxIndexForTestingOnly())
+		err = vm.Run(context, procNotFrozen, st.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, procNotFrozen.Err)
 
@@ -277,16 +298,20 @@ func TestAccountFreezing(t *testing.T) {
 		}
 
 		// code from not frozen loads fine
-		proc := fvm.Transaction(&flow.TransactionBody{Script: code(frozenAddress), Payer: serviceAddress}, 0)
+		proc := fvm.Transaction(
+			&flow.TransactionBody{Script: code(frozenAddress), Payer: serviceAddress},
+			programsStorage.NextTxIndexForTestingOnly())
 
-		err = vm.Run(context, proc, st.ViewForTestingOnly(), programsStorage)
+		err = vm.Run(context, proc, st.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 		require.Len(t, proc.Logs, 1)
 		require.Contains(t, proc.Logs[0], "\"D\\u{fc}sseldorf\"")
 
-		proc = fvm.Transaction(&flow.TransactionBody{Script: code(notFrozenAddress)}, 0)
-		err = vm.Run(context, proc, st.ViewForTestingOnly(), programsStorage)
+		proc = fvm.Transaction(
+			&flow.TransactionBody{Script: code(notFrozenAddress)},
+			programsStorage.NextTxIndexForTestingOnly())
+		err = vm.Run(context, proc, st.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 		require.Len(t, proc.Logs, 1)
@@ -305,8 +330,8 @@ func TestAccountFreezing(t *testing.T) {
 		tx := &flow.TransactionBody{Script: []byte(freezeTx)}
 		tx.AddAuthorizer(chain.ServiceAddress())
 
-		proc = fvm.Transaction(tx, 0)
-		err = vm.Run(context, proc, st.State().View(), programsStorage)
+		proc = fvm.Transaction(tx, programsStorage.NextTxIndexForTestingOnly())
+		err = vm.Run(context, proc, st.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 
@@ -320,18 +345,21 @@ func TestAccountFreezing(t *testing.T) {
 		require.False(t, frozen)
 
 		// loading code from frozen account triggers error
-		proc = fvm.Transaction(&flow.TransactionBody{Script: code(frozenAddress)}, 0)
+		proc = fvm.Transaction(
+			&flow.TransactionBody{Script: code(frozenAddress)},
+			programsStorage.NextTxIndexForTestingOnly())
 
-		err = vm.Run(context, proc, st.ViewForTestingOnly(), programsStorage)
+		err = vm.Run(context, proc, st.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.Error(t, proc.Err)
 
 		// find frozen account specific error
-		require.IsType(t, &errors.CadenceRuntimeError{}, proc.Err)
-		err = proc.Err.(*errors.CadenceRuntimeError).Unwrap()
+		require.True(t, errors.IsCadenceRuntimeError(proc.Err))
 
-		require.IsType(t, &runtime.Error{}, err)
-		err = err.(*runtime.Error).Err
+		var rtErr runtime.Error
+		require.True(t, errors.As(proc.Err, &rtErr))
+
+		err = rtErr.Err
 
 		require.IsType(t, &runtime.ParsingCheckingError{}, err)
 		err = err.(*runtime.ParsingCheckingError).Err
@@ -345,7 +373,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.IsType(t, &sema.ImportedProgramError{}, checkerErrors[0])
 
 		importedCheckerError := checkerErrors[0].(*sema.ImportedProgramError).Err
-		accountFrozenError := &errors.FrozenAccountError{}
+		accountFrozenError := errors.FrozenAccountError{}
 
 		require.True(t, errors.As(importedCheckerError, &accountFrozenError))
 		require.Equal(t, frozenAddress, accountFrozenError.Address())
@@ -353,12 +381,11 @@ func TestAccountFreezing(t *testing.T) {
 
 	t.Run("service account cannot freeze itself", func(t *testing.T) {
 
-		rt := fvm.NewInterpreterRuntime()
-		log := zerolog.Nop()
-		vm := fvm.NewVirtualMachine(rt)
+		vm := fvm.NewVirtualMachine()
 		// create default context
-		context := fvm.NewContext(log)
-		programsStorage := programs.NewEmptyPrograms()
+		programsStorage := programs.NewEmptyBlockPrograms()
+		context := fvm.NewContext(
+			fvm.WithBlockPrograms(programsStorage))
 
 		ledger := testutil.RootBootstrappedLedger(vm, context)
 
@@ -398,12 +425,12 @@ func TestAccountFreezing(t *testing.T) {
 		err = testutil.SignEnvelope(txBody, serviceAddress, unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		tx := fvm.Transaction(txBody, 0)
-		err = vm.Run(context, tx, ledger, programsStorage)
+		tx := fvm.Transaction(txBody, programsStorage.NextTxIndexForTestingOnly())
+		err = vm.Run(context, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
-		accountsService := state.NewAccounts(state.NewStateTransaction(
+		accountsService := environment.NewAccounts(state.NewTransactionState(
 			ledger,
 			state.DefaultParameters(),
 		))
@@ -429,12 +456,12 @@ func TestAccountFreezing(t *testing.T) {
 		err = testutil.SignEnvelope(txBody, serviceAddress, unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		tx = fvm.Transaction(txBody, 0)
-		err = vm.Run(context, tx, ledger, programsStorage)
+		tx = fvm.Transaction(txBody, programsStorage.NextTxIndexForTestingOnly())
+		err = vm.Run(context, tx, ledger)
 		require.NoError(t, err)
 		require.Error(t, tx.Err)
 
-		accountsService = state.NewAccounts(state.NewStateTransaction(
+		accountsService = environment.NewAccounts(state.NewTransactionState(
 			ledger,
 			state.DefaultParameters(),
 		))
@@ -447,11 +474,9 @@ func TestAccountFreezing(t *testing.T) {
 	t.Run("frozen account fail just tx, not execution", func(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
-		accounts := state.NewAccounts(st)
-		programsStorage := programs.NewEmptyPrograms()
+		accounts := environment.NewAccounts(st)
 
-		rt := fvm.NewInterpreterRuntime()
-		vm := fvm.NewVirtualMachine(rt)
+		vm := fvm.NewVirtualMachine()
 
 		// deploy code to accounts
 		whateverCode := []byte(`
@@ -462,13 +487,15 @@ func TestAccountFreezing(t *testing.T) {
 			}
 		`)
 
-		context := fvm.NewContext(zerolog.Nop(),
+		blockPrograms := programs.NewEmptyBlockPrograms()
+		context := fvm.NewContext(
 			fvm.WithServiceAccount(false),
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
 				fvm.NewTransactionVerifier(-1),
-				fvm.NewTransactionInvoker(zerolog.Nop())))
+				fvm.NewTransactionInvoker()),
+			fvm.WithBlockPrograms(blockPrograms))
 
 		// freeze account
 
@@ -483,15 +510,18 @@ func TestAccountFreezing(t *testing.T) {
 		tx := &flow.TransactionBody{Script: []byte(freezeTx)}
 		tx.AddAuthorizer(chain.ServiceAddress())
 
-		proc := fvm.Transaction(tx, 0)
+		proc := fvm.Transaction(tx, blockPrograms.NextTxIndexForTestingOnly())
 
-		log := zerolog.Nop()
-		txInvoker := fvm.NewTransactionInvoker(log)
-		err := txInvoker.Process(vm, &context, proc, st, programsStorage)
+		txnPrograms, err := blockPrograms.NewTransactionPrograms(0, 0)
+		require.NoError(t, err)
+
+		txInvoker := fvm.NewTransactionInvoker()
+		err = txInvoker.Process(context, proc, st, txnPrograms)
 		require.NoError(t, err)
 
 		// make sure freeze status is correct
-		frozen, err := accounts.GetAccountFrozen(frozenAddress)
+		var frozen bool
+		frozen, err = accounts.GetAccountFrozen(frozenAddress)
 		require.NoError(t, err)
 		require.True(t, frozen)
 
@@ -501,92 +531,134 @@ func TestAccountFreezing(t *testing.T) {
 
 		t.Run("authorizer", func(t *testing.T) {
 
-			notFrozenProc := fvm.Transaction(&flow.TransactionBody{
-				Script:      whateverCode,
-				Authorizers: []flow.Address{notFrozenAddress},
-				ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
-				Payer:       notFrozenAddress},
-				0)
-			frozenProc := fvm.Transaction(&flow.TransactionBody{
-				Script:      whateverCode,
-				Authorizers: []flow.Address{frozenAddress},
-				ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
-				Payer:       notFrozenAddress},
-				0)
+			notFrozenProc := fvm.Transaction(
+				&flow.TransactionBody{
+					Script:      whateverCode,
+					Authorizers: []flow.Address{notFrozenAddress},
+					ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
+					Payer:       notFrozenAddress},
+				blockPrograms.NextTxIndexForTestingOnly())
 			// tx run OK by nonfrozen account
-			err = vm.Run(context, notFrozenProc, st.ViewForTestingOnly(), programsStorage)
+			err = vm.Run(context, notFrozenProc, st.ViewForTestingOnly())
 			require.NoError(t, err)
 			require.NoError(t, notFrozenProc.Err)
 
-			err = vm.Run(context, frozenProc, st.ViewForTestingOnly(), programsStorage)
+			frozenProc := fvm.Transaction(
+				&flow.TransactionBody{
+					Script:      whateverCode,
+					Authorizers: []flow.Address{frozenAddress},
+					ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
+					Payer:       notFrozenAddress},
+				blockPrograms.NextTxIndexForTestingOnly())
+			err = vm.Run(context, frozenProc, st.ViewForTestingOnly())
 			require.NoError(t, err)
 			require.Error(t, frozenProc.Err)
 
+			require.Equal(
+				t,
+				errors.ErrCodeFrozenAccountError,
+				frozenProc.Err.Code())
+
+			// The outer most coded error is a wrapper, not the actual
+			// FrozenAccountError itself.
+			_, ok := frozenProc.Err.(errors.FrozenAccountError)
+			require.False(t, ok)
+
 			// find frozen account specific error
-			require.IsType(t, &errors.FrozenAccountError{}, frozenProc.Err)
-			accountFrozenError := frozenProc.Err.(*errors.FrozenAccountError)
-			require.Equal(t, frozenAddress, accountFrozenError.Address())
+			var accountFrozenErr errors.FrozenAccountError
+			ok = errors.As(frozenProc.Err, &accountFrozenErr)
+			require.True(t, ok)
+			require.Equal(t, frozenAddress, accountFrozenErr.Address())
 		})
 
 		t.Run("proposal", func(t *testing.T) {
 
-			notFrozenProc := fvm.Transaction(&flow.TransactionBody{
-				Script:      whateverCode,
-				Authorizers: []flow.Address{notFrozenAddress},
-				ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
-				Payer:       notFrozenAddress,
-			}, 0)
-			frozenProc := fvm.Transaction(&flow.TransactionBody{
-				Script:      whateverCode,
-				Authorizers: []flow.Address{notFrozenAddress},
-				ProposalKey: flow.ProposalKey{Address: frozenAddress},
-				Payer:       notFrozenAddress,
-			}, 0)
+			notFrozenProc := fvm.Transaction(
+				&flow.TransactionBody{
+					Script:      whateverCode,
+					Authorizers: []flow.Address{notFrozenAddress},
+					ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
+					Payer:       notFrozenAddress,
+				},
+				blockPrograms.NextTxIndexForTestingOnly())
 
 			// tx run OK by nonfrozen account
-			err = vm.Run(context, notFrozenProc, st.ViewForTestingOnly(), programsStorage)
+			err = vm.Run(context, notFrozenProc, st.ViewForTestingOnly())
 			require.NoError(t, err)
 			require.NoError(t, notFrozenProc.Err)
 
-			err = vm.Run(context, frozenProc, st.ViewForTestingOnly(), programsStorage)
+			frozenProc := fvm.Transaction(
+				&flow.TransactionBody{
+					Script:      whateverCode,
+					Authorizers: []flow.Address{notFrozenAddress},
+					ProposalKey: flow.ProposalKey{Address: frozenAddress},
+					Payer:       notFrozenAddress,
+				},
+				blockPrograms.NextTxIndexForTestingOnly())
+			err = vm.Run(context, frozenProc, st.ViewForTestingOnly())
 			require.NoError(t, err)
 			require.Error(t, frozenProc.Err)
 
+			require.Equal(
+				t,
+				errors.ErrCodeFrozenAccountError,
+				frozenProc.Err.Code())
+
+			// The outer most coded error is a wrapper, not the actual
+			// FrozenAccountError itself.
+			_, ok := frozenProc.Err.(errors.FrozenAccountError)
+			require.False(t, ok)
+
 			// find frozen account specific error
-			require.IsType(t, &errors.FrozenAccountError{}, frozenProc.Err)
-			accountFrozenError := frozenProc.Err.(*errors.FrozenAccountError)
-			require.Equal(t, frozenAddress, accountFrozenError.Address())
+			var accountFrozenErr errors.FrozenAccountError
+			ok = errors.As(frozenProc.Err, &accountFrozenErr)
+			require.True(t, ok)
+			require.Equal(t, frozenAddress, accountFrozenErr.Address())
 		})
 
 		t.Run("payer", func(t *testing.T) {
 
-			notFrozenProc := fvm.Transaction(&flow.TransactionBody{
-				Script:      whateverCode,
-				Authorizers: []flow.Address{notFrozenAddress},
-				ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
-				Payer:       notFrozenAddress,
-			}, 0)
-			frozenProc := fvm.Transaction(&flow.TransactionBody{
-				Script:      whateverCode,
-				Authorizers: []flow.Address{notFrozenAddress},
-				ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
-				Payer:       frozenAddress,
-			}, 0)
+			notFrozenProc := fvm.Transaction(
+				&flow.TransactionBody{
+					Script:      whateverCode,
+					Authorizers: []flow.Address{notFrozenAddress},
+					ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
+					Payer:       notFrozenAddress,
+				},
+				blockPrograms.NextTxIndexForTestingOnly())
 
 			// tx run OK by nonfrozen account
-			err = vm.Run(context, notFrozenProc, st.ViewForTestingOnly(), programsStorage)
+			err = vm.Run(context, notFrozenProc, st.ViewForTestingOnly())
 			require.NoError(t, err)
 			require.NoError(t, notFrozenProc.Err)
 
-			err = vm.Run(context, frozenProc, st.ViewForTestingOnly(), programsStorage)
+			frozenProc := fvm.Transaction(
+				&flow.TransactionBody{
+					Script:      whateverCode,
+					Authorizers: []flow.Address{notFrozenAddress},
+					ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
+					Payer:       frozenAddress,
+				},
+				blockPrograms.NextTxIndexForTestingOnly())
+			err = vm.Run(context, frozenProc, st.ViewForTestingOnly())
 			require.NoError(t, err)
 			require.Error(t, frozenProc.Err)
 
-			// find frozen account specific error
-			require.IsType(t, &errors.FrozenAccountError{}, frozenProc.Err)
-			accountFrozenError := frozenProc.Err.(*errors.FrozenAccountError)
-			require.Equal(t, frozenAddress, accountFrozenError.Address())
-		})
+			require.Equal(
+				t,
+				errors.ErrCodeFrozenAccountError,
+				frozenProc.Err.Code())
 
+			// The outer most coded error is a wrapper, not the actual
+			// FrozenAccountError itself.
+			_, ok := frozenProc.Err.(errors.FrozenAccountError)
+			require.False(t, ok)
+
+			// find frozen account specific error
+			var accountFrozenErr errors.FrozenAccountError
+			ok = errors.As(frozenProc.Err, &accountFrozenErr)
+			require.True(t, ok)
+			require.Equal(t, frozenAddress, accountFrozenErr.Address())
+		})
 	})
 }

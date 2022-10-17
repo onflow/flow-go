@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // defaultSyncRequestQueueCapacity maximum capacity of sync requests queue
@@ -94,8 +95,8 @@ func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identif
 
 // process processes events for the synchronization request handler engine.
 // Error returns:
-//  * IncompatibleInputTypeError if input has unexpected type
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+//   - IncompatibleInputTypeError if input has unexpected type
+//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (r *RequestHandler) process(originID flow.Identifier, event interface{}) error {
 	return r.requestMessageHandler.Process(originID, event)
 }
@@ -149,8 +150,9 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 // we have a lower height, we add the difference to our own download queue.
 func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
 	final := r.finalizedHeader.Get()
-	r.log.Debug().
-		Str("origin_id", originID.String()).
+
+	logger := r.log.With().Str("origin_id", originID.String()).Logger()
+	logger.Debug().
 		Uint64("origin_height", req.Height).
 		Uint64("local_height", final.Height).
 		Msg("received new sync request")
@@ -173,7 +175,7 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.S
 	}
 	err := r.responseSender.SendResponse(res, originID)
 	if err != nil {
-		r.log.Warn().Err(err).Msg("sending sync response failed")
+		logger.Warn().Err(err).Msg("sending sync response failed")
 		return nil
 	}
 	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncResponse)
@@ -183,7 +185,9 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.S
 
 // onRangeRequest processes a request for a range of blocks by height.
 func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
-	r.log.Debug().Str("origin_id", originID.String()).Msg("received new range request")
+	logger := r.log.With().Str("origin_id", originID.String()).Logger()
+	logger.Debug().Msg("received new range request")
+
 	// get the latest final state to know if we can fulfill the request
 	head := r.finalizedHeader.Get()
 
@@ -202,11 +206,12 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	}
 	maxHeight := req.FromHeight + uint64(maxSize)
 	if maxHeight < req.ToHeight {
-		r.log.Warn().
+		logger.Warn().
 			Uint64("from", req.FromHeight).
-			Uint64("to", req.FromHeight).
+			Uint64("to", req.ToHeight).
 			Uint64("size", (req.ToHeight-req.FromHeight)+1).
 			Uint("max_size", maxSize).
+			Bool(logging.KeySuspicious, true).
 			Msg("range request is too large")
 
 		req.ToHeight = maxHeight
@@ -217,7 +222,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		block, err := r.blocks.ByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
-			r.log.Error().Uint64("height", height).Msg("skipping unknown heights")
+			logger.Error().Uint64("height", height).Msg("skipping unknown heights")
 			break
 		}
 		if err != nil {
@@ -228,7 +233,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 
 	// if there are no blocks to send, skip network message
 	if len(blocks) == 0 {
-		r.log.Debug().Msg("skipping empty range response")
+		logger.Debug().Msg("skipping empty range response")
 		return nil
 	}
 
@@ -239,7 +244,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	}
 	err := r.responseSender.SendResponse(res, originID)
 	if err != nil {
-		r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending range response failed")
+		logger.Warn().Err(err).Msg("sending range response failed")
 		return nil
 	}
 	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
@@ -249,7 +254,9 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 
 // onBatchRequest processes a request for a specific block by block ID.
 func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
-	r.log.Debug().Str("origin_id", originID.String()).Msg("received new batch request")
+	logger := r.log.With().Str("origin_id", originID.String()).Logger()
+	logger.Debug().Msg("received new batch request")
+
 	// we should bail and send nothing on empty request
 	if len(req.BlockIDs) == 0 {
 		return nil
@@ -264,9 +271,10 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 	}
 
 	if len(req.BlockIDs) > int(maxSize) {
-		r.log.Warn().
+		logger.Warn().
 			Int("size", len(req.BlockIDs)).
 			Uint("max_size", maxSize).
+			Bool(logging.KeySuspicious, true).
 			Msg("batch request is too large")
 	}
 
@@ -286,7 +294,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 	for blockID := range blockIDs {
 		block, err := r.blocks.ByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
-			r.log.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
+			logger.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
 			continue
 		}
 		if err != nil {
@@ -297,7 +305,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 
 	// if there are no blocks to send, skip network message
 	if len(blocks) == 0 {
-		r.log.Debug().Msg("skipping empty batch response")
+		logger.Debug().Msg("skipping empty batch response")
 		return nil
 	}
 
@@ -308,7 +316,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 	}
 	err := r.responseSender.SendResponse(res, originID)
 	if err != nil {
-		r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending batch response failed")
+		logger.Warn().Err(err).Msg("sending batch response failed")
 		return nil
 	}
 	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)

@@ -26,6 +26,8 @@ func TestTxFollower(t *testing.T) {
 
 	nextBlockID := flowsdk.Identifier{0x6}
 	nextBlockHeight := blockHeight + 1
+	client.On("GetLatestBlockHeader", mock.Anything, mock.Anything).Return(&flowsdk.BlockHeader{ID: nextBlockID, Height: nextBlockHeight}, nil)
+
 	collectionID := flowsdk.Identifier{0x3}
 	client.On("GetBlockByHeight", mock.Anything, nextBlockHeight).Return(
 		&flowsdk.Block{

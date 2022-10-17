@@ -43,11 +43,7 @@ func (is *InclusionSuite) Collection() *client.GhostClient {
 }
 
 func (is *InclusionSuite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "inclusion.go").
-		Str("testcase", is.T().Name()).
-		Logger()
-	is.log = logger
+	is.log = unittest.LoggerForTest(is.Suite.T(), zerolog.InfoLevel)
 	is.log.Info().Msgf("================> SetupTest")
 
 	// seed random generator
