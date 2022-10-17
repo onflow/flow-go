@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	typeExecutionReceipt  = "type-execution-receipt"
-	typeChunkDataRequest  = "type-chunk-data-request"
-	typeChunkDataResponse = "type-chunk-data-response"
-	typeResultApproval    = "type-result-approval"
+	TypeExecutionReceipt  = "type-execution-receipt"
+	TypeChunkDataRequest  = "type-chunk-data-request"
+	TypeChunkDataResponse = "type-chunk-data-response"
+	TypeResultApproval    = "type-result-approval"
 )
 
 // dummyOrchestrator represents a simple orchestrator that passes through all incoming events.
@@ -35,10 +35,10 @@ func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 	return &dummyOrchestrator{
 		logger: logger.With().Str("component", "dummy-orchestrator").Logger(),
 		eventTracker: map[string]flow.IdentifierList{
-			typeExecutionReceipt:  {},
-			typeChunkDataRequest:  {},
-			typeChunkDataResponse: {},
-			typeResultApproval:    {},
+			TypeExecutionReceipt:  {},
+			TypeChunkDataRequest:  {},
+			TypeChunkDataResponse: {},
+			TypeResultApproval:    {},
 		},
 	}
 }
@@ -62,13 +62,13 @@ func (d *dummyOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error
 
 	switch e := event.FlowProtocolEvent.(type) {
 	case *flow.ExecutionReceipt:
-		d.eventTracker[typeExecutionReceipt] = append(d.eventTracker[typeExecutionReceipt], e.ID())
+		d.eventTracker[TypeExecutionReceipt] = append(d.eventTracker[TypeExecutionReceipt], e.ID())
 	case *messages.ChunkDataRequest:
-		d.eventTracker[typeChunkDataRequest] = append(d.eventTracker[typeChunkDataRequest], e.ChunkID)
+		d.eventTracker[TypeChunkDataRequest] = append(d.eventTracker[TypeChunkDataRequest], e.ChunkID)
 	case *messages.ChunkDataResponse:
-		d.eventTracker[typeChunkDataResponse] = append(d.eventTracker[typeChunkDataResponse], e.ChunkDataPack.ChunkID)
+		d.eventTracker[TypeChunkDataResponse] = append(d.eventTracker[TypeChunkDataResponse], e.ChunkDataPack.ChunkID)
 	case *flow.ResultApproval:
-		d.eventTracker[typeResultApproval] = append(d.eventTracker[typeResultApproval], e.ID())
+		d.eventTracker[TypeResultApproval] = append(d.eventTracker[TypeResultApproval], e.ID())
 	}
 
 	err := d.orchestratorNetwork.SendEgress(event)
@@ -104,9 +104,9 @@ func (d *dummyOrchestrator) Register(orchestratorNetwork insecure.AttackerNetwor
 	d.orchestratorNetwork = orchestratorNetwork
 }
 
-// mustSeenFlowProtocolEvent checks the dummy orchestrator has passed through the flow protocol events with given ids. It fails
+// MustSeenFlowProtocolEvent checks the dummy orchestrator has passed through the flow protocol events with given ids. It fails
 // if any entity is gone missing from sight of the orchestrator.
-func (d *dummyOrchestrator) mustSeenFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
+func (d *dummyOrchestrator) MustSeenFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
 	events, ok := d.eventTracker[eventType]
 	require.Truef(t, ok, "unknown type: %s", eventType)
 

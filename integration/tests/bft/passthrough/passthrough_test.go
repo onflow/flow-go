@@ -1,6 +1,7 @@
 package passthrough
 
 import (
+	"github.com/onflow/flow-go/insecure/orchesrators/passthrough"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -43,8 +44,8 @@ func (p *PassThroughTestSuite) TestSealingAndVerificationPassThrough() {
 
 	// as orchestrator controls the corrupted execution and verification nodes, it must see
 	// the execution receipts, chunk data pack requests and responses, as well as result approvals emitted by these nodes.
-	p.Orchestrator.mustSeenFlowProtocolEvent(p.T(), typeExecutionReceipt, flow.GetIDs(receipts)...)
-	p.Orchestrator.mustSeenFlowProtocolEvent(p.T(), typeChunkDataRequest, chunkIds...)
-	p.Orchestrator.mustSeenFlowProtocolEvent(p.T(), typeChunkDataResponse, chunkIds...)
-	p.Orchestrator.mustSeenFlowProtocolEvent(p.T(), typeResultApproval, flow.GetIDs(approvals)...)
+	p.Orchestrator.MustSeenFlowProtocolEvent(p.T(), passthrough.TypeExecutionReceipt, flow.GetIDs(receipts)...)
+	p.Orchestrator.MustSeenFlowProtocolEvent(p.T(), passthrough.TypeChunkDataRequest, chunkIds...)
+	p.Orchestrator.MustSeenFlowProtocolEvent(p.T(), passthrough.TypeChunkDataResponse, chunkIds...)
+	p.Orchestrator.MustSeenFlowProtocolEvent(p.T(), passthrough.TypeResultApproval, flow.GetIDs(approvals)...)
 }

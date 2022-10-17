@@ -3,6 +3,7 @@ package passthrough
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/insecure/orchesrators/passthrough"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -33,7 +34,7 @@ type Suite struct {
 	exe2ID                  flow.Identifier      // corrupted execution node 2
 	verID                   flow.Identifier      // corrupted verification node
 	PreferredUnicasts       string               // preferred unicast protocols between execution and verification nodes.
-	Orchestrator            *dummyOrchestrator
+	Orchestrator            *passthrough.dummyOrchestrator
 	attackerNetwork         *attackernet.Network
 }
 
@@ -142,7 +143,7 @@ func (s *Suite) SetupSuite() {
 	// starts tracking blocks by the ghost node
 	s.Track(s.T(), ctx, s.Ghost())
 
-	s.Orchestrator = NewDummyOrchestrator(s.log)
+	s.Orchestrator = passthrough.NewDummyOrchestrator(s.log)
 
 	// start orchestrator network
 	codec := unittest.NetworkCodec()
