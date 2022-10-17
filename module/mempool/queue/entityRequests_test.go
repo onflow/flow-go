@@ -1,7 +1,6 @@
 package queue
 
 import (
-	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -9,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/mempool/queue/internal"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -29,25 +28,19 @@ func TestEntityRequestQueue_Sequential(t *testing.T) {
 	require.Nil(t, request)
 
 	requests := entityRequestListFixture(sizeLimit)
-	originIds := unittest.IdentifierListFixture(sizeLimit)
 	// pushing requests sequentially.
 	for i, req := range requests {
-		require.True(t, q.push(originIds[i], req))
+		require.True(t, q.push(requests[i].OriginId, req.EntityIDs))
 
 		// duplicate push should fail
-		require.False(t, q.push(originIds[i], req))
-
-		// duplicate push with different nonce should fail
-		req.Nonce = rand.Uint64()
-		require.False(t, q.push(originIds[i], req))
-
+		require.False(t, q.push(requests[i].OriginId, req.EntityIDs))
 		require.Equal(t, q.Size(), uint(i+1))
 	}
 
 	// once queue meets the size limit, any extra push should fail.
 	extraRequests := entityRequestListFixture(100)
 	for i := 0; i < 100; i++ {
-		require.False(t, q.push(unittest.IdentifierFixture(), extraRequests[i]))
+		require.False(t, q.push(extraRequests[i].OriginId, extraRequests[i].EntityIDs))
 
 		// size should not change
 		require.Equal(t, q.Size(), uint(sizeLimit))
@@ -57,8 +50,8 @@ func TestEntityRequestQueue_Sequential(t *testing.T) {
 	for i, req := range requests {
 		popedOriginId, popedReq, ok := q.pop()
 		require.True(t, ok)
-		require.Equal(t, popedReq.EntityIDs, req.EntityIDs)
-		require.Equal(t, originIds[i], popedOriginId)
+		require.Equal(t, req.EntityIDs, popedReq)
+		require.Equal(t, req.OriginId, popedOriginId)
 
 		require.Equal(t, q.Size(), uint(len(requests)-i-1))
 	}
@@ -82,13 +75,11 @@ func TestEntityRequestsQueue_Concurrent(t *testing.T) {
 	pushWG.Add(sizeLimit)
 
 	requests := entityRequestListFixture(sizeLimit)
-	originIds := unittest.IdentifierListFixture(sizeLimit)
 	// pushing requests concurrently.
-	for i, req := range requests {
+	for _, req := range requests {
 		req := req // suppress loop variable
-		i := i
 		go func() {
-			require.True(t, q.push(originIds[i], req))
+			require.True(t, q.push(req.OriginId, req.EntityIDs))
 			pushWG.Done()
 		}()
 	}
@@ -98,7 +89,8 @@ func TestEntityRequestsQueue_Concurrent(t *testing.T) {
 	pushWG.Add(sizeLimit)
 	for i := 0; i < sizeLimit; i++ {
 		go func() {
-			require.False(t, q.push(unittest.IdentifierFixture(), entityRequestFixture()))
+			req := entityRequestFixture()
+			require.False(t, q.push(req.OriginId, req.EntityIDs))
 			pushWG.Done()
 		}()
 	}
@@ -114,11 +106,8 @@ func TestEntityRequestsQueue_Concurrent(t *testing.T) {
 			popedOriginId, popedReq, ok := q.pop()
 			require.True(t, ok)
 
-			// poped request should have a normalized nonce to zero.
-			require.Equal(t, popedReq.Nonce, uint64(0))
-
 			matchLock.Lock()
-			matchAndRemoveEntityRequest(t, requests, originIds, popedReq, popedOriginId)
+			matchAndRemoveEntityRequest(t, requests, popedOriginId, popedReq)
 			matchLock.Unlock()
 
 			popWG.Done()
@@ -130,8 +119,8 @@ func TestEntityRequestsQueue_Concurrent(t *testing.T) {
 	require.Zero(t, q.Size())
 }
 
-func entityRequestListFixture(count int) []*messages.EntityRequest {
-	list := make([]*messages.EntityRequest, count)
+func entityRequestListFixture(count int) []*internal.RequestEntity {
+	list := make([]*internal.RequestEntity, count)
 	for i := 0; i < count; i++ {
 		list[i] = entityRequestFixture()
 	}
@@ -139,27 +128,23 @@ func entityRequestListFixture(count int) []*messages.EntityRequest {
 	return list
 }
 
-func entityRequestFixture() *messages.EntityRequest {
-	return &messages.EntityRequest{
-		Nonce:     rand.Uint64(),
-		EntityIDs: unittest.IdentifierListFixture(10),
-	}
+func entityRequestFixture() *internal.RequestEntity {
+	req := internal.NewRequestEntity(unittest.IdentifierFixture(), unittest.IdentifierListFixture(10))
+	return &req
 }
 
 // matchAndRemoveEntityRequest checks existence of the request in the "requests" array and "originId" in the corresponding place of "originIds" array.
 // If a match is found, it is removed.
 // If no match is found for a request, it fails the test.
-func matchAndRemoveEntityRequest(t *testing.T, requests []*messages.EntityRequest, originIds flow.IdentifierList, request *messages.EntityRequest, originId flow.Identifier) {
+func matchAndRemoveEntityRequest(t *testing.T, requests []*internal.RequestEntity, originId flow.Identifier, entityIds []flow.Identifier) {
 	for i, r := range requests {
-		if originIds[i] == originId {
-			require.ElementsMatch(t, r.EntityIDs, request.EntityIDs)
+		if r.OriginId == originId {
+			require.ElementsMatch(t, r.EntityIDs, entityIds)
 			// removes the matched request from the list
 			if i == len(requests)-1 {
 				requests = requests[:i]
-				originIds = originIds[:i]
 			} else {
 				requests = append(requests[:i], requests[i+1:]...)
-				originIds = append(originIds[:i], originIds[i+1:]...)
 			}
 
 			return

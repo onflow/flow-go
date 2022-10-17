@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
+	"github.com/onflow/flow-go/module/mempool/queue/internal"
 )
 
 // EntityRequestStore is a FIFO (first-in-first-out) size-bound queue for maintaining EntityRequests.
@@ -41,7 +42,8 @@ func NewEntityRequestStore(sizeLimit uint32, logger zerolog.Logger, collector mo
 // Boolean returned variable determines whether enqueuing was successful, i.e.,
 // put may be dropped if queue is full or already exists.
 func (e *EntityRequestStore) Put(message *engine.Message) bool {
-	return e.push(message.OriginID, message.Payload.(*messages.EntityRequest))
+	request := message.Payload.(*messages.EntityRequest)
+	return e.push(message.OriginID, request.EntityIDs)
 }
 
 // Get pops the queue, i.e., it returns the head of queue, and updates the head to the next element.
@@ -68,7 +70,7 @@ func (e *EntityRequestStore) Size() uint {
 // push stores request into the queue.
 // Boolean returned variable determines whether push was successful, i.e.,
 // push may be dropped if queue is full or already exists.
-func (e *EntityRequestStore) push(originId flow.Identifier, request *messages.EntityRequest) bool {
+func (e *EntityRequestStore) push(originId flow.Identifier, entityIds []flow.Identifier) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -79,22 +81,13 @@ func (e *EntityRequestStore) push(originId flow.Identifier, request *messages.En
 		return false
 	}
 
-	// we normalize the nonce to 0, as we don't use it for anything once we receive the request.
-	// this also helps us to avoid storing the same request multiple times.
-	request.Nonce = 0
-
-	req := requestEntity{
-		EntityRequest: *request, // hero cache does not support pointer types for sake of heap optimization.
-		originId:      originId,
-		id:            identifierOfRequest(originId, request),
-	}
-
-	return e.cache.Add(req.id, req)
+	req := internal.NewRequestEntity(originId, entityIds)
+	return e.cache.Add(req.ID(), req)
 }
 
 // pop removes and returns the head of queue, and updates the head to the next element.
 // Boolean return value determines whether pop is successful, i.e., poping an empty queue returns false.
-func (e *EntityRequestStore) pop() (flow.Identifier, *messages.EntityRequest, bool) {
+func (e *EntityRequestStore) pop() (flow.Identifier, []flow.Identifier, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -105,31 +98,6 @@ func (e *EntityRequestStore) pop() (flow.Identifier, *messages.EntityRequest, bo
 	}
 
 	e.cache.Remove(head.ID())
-	request := head.(requestEntity)
-	return request.originId, &request.EntityRequest, true
-}
-
-// requestEntity is a wrapper around EntityRequest that implements Entity interface for it, and
-// also internally caches its identifier.
-type requestEntity struct {
-	messages.EntityRequest
-
-	// identifier of the requester.
-	originId flow.Identifier
-
-	// caching identifier to avoid cpu overhead per query.
-	id flow.Identifier
-}
-
-func (r requestEntity) ID() flow.Identifier {
-	return r.id
-}
-
-func (r requestEntity) Checksum() flow.Identifier {
-	return r.id
-}
-
-func identifierOfRequest(originId flow.Identifier, request *messages.EntityRequest) flow.Identifier {
-	requestIds := flow.MakeID(request.EntityIDs)
-	return flow.MakeID(append(originId[:], requestIds[:]...))
+	request := head.(internal.RequestEntity)
+	return request.OriginId, request.EntityIDs, true
 }
