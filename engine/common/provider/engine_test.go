@@ -212,76 +212,95 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 }
 
-//
-//func TestOnEntityRequestDuplicates(t *testing.T) {
-//
-//	entities := make(map[flow.Identifier]flow.Entity)
-//
-//	identities := unittest.IdentityListFixture(8)
-//	selector := filter.HasNodeID(identities.NodeIDs()...)
-//	originID := identities[0].NodeID
-//
-//	coll1 := unittest.CollectionFixture(1)
-//	coll2 := unittest.CollectionFixture(2)
-//	coll3 := unittest.CollectionFixture(3)
-//
-//	entities[coll1.ID()] = coll1
-//	entities[coll2.ID()] = coll2
-//	entities[coll3.ID()] = coll3
-//
-//	retrieve := func(entityID flow.Identifier) (flow.Entity, error) {
-//		entity, ok := entities[entityID]
-//		if !ok {
-//			return nil, storage.ErrNotFound
-//		}
-//		return entity, nil
-//	}
-//
-//	final := protocol.NewSnapshot(t)
-//	final.On("Identities", mock.Anything).Return(
-//		func(selector flow.IdentityFilter) flow.IdentityList {
-//			return identities.Filter(selector)
-//		},
-//		nil,
-//	)
-//
-//	state := &protocol.State{}
-//	state.On("Final").Return(final, nil)
-//
-//	con := &mocknetwork.Conduit{}
-//	con.On("Unicast", mock.Anything, mock.Anything).Run(
-//		func(args mock.Arguments) {
-//			response := args.Get(0).(*messages.EntityResponse)
-//			nodeID := args.Get(1).(flow.Identifier)
-//			assert.Equal(t, nodeID, originID)
-//			var entities []flow.Entity
-//			for _, blob := range response.Blobs {
-//				coll := &flow.Collection{}
-//				_ = msgpack.Unmarshal(blob, &coll)
-//				entities = append(entities, coll)
-//			}
-//			assert.ElementsMatch(t, entities, []flow.Entity{&coll1, &coll2, &coll3})
-//		},
-//	).Return(nil)
-//
-//	provide := Engine{
-//		metrics:  metrics.NewNoopCollector(),
-//		state:    state,
-//		con:      con,
-//		selector: selector,
-//		retrieve: retrieve,
-//	}
-//
-//	// create entity requests with some duplicate entity IDs
-//	request := &messages.EntityRequest{
-//		Nonce:     rand.Uint64(),
-//		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll3.ID(), coll2.ID(), coll1.ID()},
-//	}
-//	err := provide.onEntityRequest(originID, request)
-//	assert.NoError(t, err)
-//
-//	con.AssertExpectations(t)
-//}
+func TestOnEntityRequestDuplicates(t *testing.T) {
+	entities := make(map[flow.Identifier]flow.Entity)
+
+	identities := unittest.IdentityListFixture(8)
+	selector := filter.HasNodeID(identities.NodeIDs()...)
+	originID := identities[0].NodeID
+
+	coll1 := unittest.CollectionFixture(1)
+	coll2 := unittest.CollectionFixture(2)
+	coll3 := unittest.CollectionFixture(3)
+
+	entities[coll1.ID()] = coll1
+	entities[coll2.ID()] = coll2
+	entities[coll3.ID()] = coll3
+
+	retrieve := func(entityID flow.Identifier) (flow.Entity, error) {
+		entity, ok := entities[entityID]
+		if !ok {
+			return nil, storage.ErrNotFound
+		}
+		return entity, nil
+	}
+
+	final := protocol.NewSnapshot(t)
+	final.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			return identities.Filter(selector)
+		},
+		nil,
+	)
+
+	state := protocol.NewState(t)
+	state.On("Final").Return(final, nil)
+
+	net := mocknetwork.NewNetwork(t)
+	con := mocknetwork.NewConduit(t)
+	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
+	con.On("Unicast", mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			response := args.Get(0).(*messages.EntityResponse)
+			nodeID := args.Get(1).(flow.Identifier)
+			assert.Equal(t, nodeID, originID)
+			var entities []flow.Entity
+			for _, blob := range response.Blobs {
+				coll := &flow.Collection{}
+				_ = msgpack.Unmarshal(blob, &coll)
+				entities = append(entities, coll)
+			}
+			assert.ElementsMatch(t, entities, []flow.Entity{&coll1, &coll2, &coll3})
+		},
+	).Return(nil)
+
+	me := mockmodule.NewLocal(t)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
+	requestQueue := queue.NewEntityRequestStore(10, unittest.Logger(), metrics.NewNoopCollector())
+
+	e, err := provider.New(
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+		net,
+		me,
+		state,
+		requestQueue,
+		provider.DefaultRequestProviderWorkers,
+		channels.TestNetworkChannel,
+		selector,
+		retrieve)
+	require.NoError(t, err)
+
+	// create entity requests with some duplicate entity IDs
+	request := &messages.EntityRequest{
+		Nonce:     rand.Uint64(),
+		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll3.ID(), coll2.ID(), coll1.ID()},
+	}
+
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
+	e.Start(ctx)
+
+	unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
+
+	err = e.Process(channels.TestNetworkChannel, originID, request)
+	require.NoError(t, err, "should not error on full response")
+
+	cancel()
+	unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
+}
+
 //
 //func TestOnEntityRequestEmpty(t *testing.T) {
 //
