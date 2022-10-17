@@ -79,6 +79,10 @@ func (e *EntityRequestStore) push(originId flow.Identifier, request *messages.En
 		return false
 	}
 
+	// we normalize the nonce to 0, as we don't use it for anything once we receive the request.
+	// this also helps us to avoid storing the same request multiple times.
+	request.Nonce = 0
+
 	req := requestEntity{
 		EntityRequest: *request, // hero cache does not support pointer types for sake of heap optimization.
 		originId:      originId,

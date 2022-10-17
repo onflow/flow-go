@@ -37,6 +37,10 @@ func TestEntityRequestQueue_Sequential(t *testing.T) {
 		// duplicate push should fail
 		require.False(t, q.push(originIds[i], req))
 
+		// duplicate push with different nonce should fail
+		req.Nonce = rand.Uint64()
+		require.False(t, q.push(originIds[i], req))
+
 		require.Equal(t, q.Size(), uint(i+1))
 	}
 
@@ -109,6 +113,9 @@ func TestEntityRequestsQueue_Concurrent(t *testing.T) {
 		go func() {
 			popedOriginId, popedReq, ok := q.pop()
 			require.True(t, ok)
+
+			// poped request should have a normalized nonce to zero.
+			require.Equal(t, popedReq.Nonce, uint64(0))
 
 			matchLock.Lock()
 			matchAndRemoveEntityRequest(t, requests, originIds, popedReq, popedOriginId)
