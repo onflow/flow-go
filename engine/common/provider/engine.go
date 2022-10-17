@@ -3,21 +3,30 @@ package provider
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 
 	"github.com/rs/zerolog"
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/provider/internal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
+
+// DefaultRequestProviderWorkers is the default number of workers used to process entity requests.
+const DefaultRequestProviderWorkers = uint(100)
 
 // RetrieveFunc is a function provided to the provider engine upon construction.
 // It is used by the engine when receiving requests in order to retrieve the
@@ -30,40 +39,81 @@ type RetrieveFunc func(flow.Identifier) (flow.Entity, error)
 // requests on the flow network. It is the `reply` part of the request-reply
 // pattern provided by the pair of generic exchange engines.
 type Engine struct {
-	unit     *engine.Unit
-	log      zerolog.Logger
-	metrics  module.EngineMetrics
-	me       module.Local
-	state    protocol.State
-	con      network.Conduit
-	channel  channels.Channel
-	selector flow.IdentityFilter
-	retrieve RetrieveFunc
+	component.Component
+	cm             *component.ComponentManager
+	log            zerolog.Logger
+	metrics        module.EngineMetrics
+	state          protocol.State
+	con            network.Conduit
+	channel        channels.Channel
+	requestHandler *engine.MessageHandler
+	requestQueue   mempool.EntityRequestStore
+	selector       flow.IdentityFilter
+	retrieve       RetrieveFunc
+	// buffered channel for EntityRequest workers to pick and process.
+	requestChannel chan *internal.EntityRequest
 }
+
+var _ network.MessageProcessor = (*Engine)(nil)
 
 // New creates a new provider engine, operating on the provided network channel, and accepting requests for entities
 // from a node within the set obtained by applying the provided selector filter. It uses the injected retrieve function
 // to manage the fullfilment of these requests.
-func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, me module.Local, state protocol.State,
-	channel channels.Channel, selector flow.IdentityFilter, retrieve RetrieveFunc) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	metrics module.EngineMetrics,
+	net network.Network,
+	me module.Local,
+	state protocol.State,
+	requestQueue mempool.EntityRequestStore,
+	requestWorkers uint,
+	channel channels.Channel,
+	selector flow.IdentityFilter,
+	retrieve RetrieveFunc) (*Engine, error) {
 
-	// make sure we don't respond to requests sent by self or unauthorized nodes
+	// make sure we don't respond to request sent by self or unauthorized nodes
 	selector = filter.And(
 		selector,
 		filter.HasWeight(true),
 		filter.Not(filter.HasNodeID(me.NodeID())),
 	)
 
+	handler := engine.NewMessageHandler(
+		log,
+		engine.NewNotifier(),
+		engine.Pattern{
+			// Match is called on every new message coming to this engine.
+			// Provider engine only expects EntityRequest.
+			// Other message types are discarded by Match.
+			Match: func(message *engine.Message) bool {
+				request, ok := message.Payload.(*messages.EntityRequest)
+				if ok {
+					log.Info().
+						Str("entity_ids", fmt.Sprintf("%v", request.EntityIDs)).
+						Hex("requester_id", logging.ID(message.OriginID)).
+						Msg("entity request received")
+				}
+				return ok
+			},
+			// Map is called on messages that are Match(ed) successfully, i.e.,
+			// EntityRequest.
+			Map: func(message *engine.Message) (*engine.Message, bool) {
+				return message, true
+			},
+			Store: requestQueue,
+		})
+
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "provider").Logger(),
-		metrics:  metrics,
-		me:       me,
-		state:    state,
-		channel:  channel,
-		selector: selector,
-		retrieve: retrieve,
+		log:            log.With().Str("engine", "provider").Logger(),
+		metrics:        metrics,
+		state:          state,
+		channel:        channel,
+		selector:       selector,
+		retrieve:       retrieve,
+		requestHandler: handler,
+		requestQueue:   requestQueue,
+		requestChannel: make(chan *internal.EntityRequest, requestWorkers),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -73,81 +123,54 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 	}
 	e.con = con
 
+	cm := component.NewComponentManagerBuilder()
+	cm.AddWorker(e.processQueuedRequestsShovellerWorker)
+	for i := uint(0); i < requestWorkers; i++ {
+		cm.AddWorker(e.processEntityRequestWorker)
+	}
+
+	e.cm = cm.Build()
+	e.Component = e.cm
+
 	return e, nil
-}
-
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For consensus engine, this is true once the underlying consensus
-// algorithm has started.
-func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-// For the consensus engine, we wait for hotstuff to finish.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
-}
-
-// SubmitLocal submits an message originating on the local node.
-func (e *Engine) SubmitLocal(message interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(e.me.NodeID(), message)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// Submit submits the given message from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, message interface{}) {
-	e.unit.Launch(func() {
-		err := e.Process(channel, originID, message)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// ProcessLocal processes an message originating on the local node.
-func (e *Engine) ProcessLocal(message interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(e.me.NodeID(), message)
-	})
 }
 
 // Process processes the given message from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, message)
-	})
-}
-
-// process processes events for the propagation engine on the consensus node.
-func (e *Engine) process(originID flow.Identifier, message interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+	select {
+	case <-e.cm.ShutdownSignal():
+		e.log.Warn().
+			Hex("origin_id", logging.ID(originID)).
+			Msgf("received message after shutdown")
+		return nil
+	default:
+	}
 
 	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityRequest)
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
 
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
-	switch msg := message.(type) {
-	case *messages.EntityRequest:
-		return e.onEntityRequest(originID, msg)
-	default:
-		return engine.NewInvalidInputErrorf("invalid message type (%T)", message)
+	err := e.requestHandler.Process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str("channel", channel.String()).
+				Str("event", fmt.Sprintf("%+v", event)).
+				Msgf("received unsupported message type")
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine event: %w", err)
 	}
+
+	return nil
 }
 
-func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityRequest) error {
-	lg := e.log.With().Uint64("nonce", req.Nonce).Str("origin_id", originID.String()).Logger()
+func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []flow.Identifier) error {
+	lg := e.log.With().Str("origin_id", originID.String()).Logger()
 
 	lg.Debug().
-		Strs("entity_ids", flow.IdentifierList(req.EntityIDs).Strings()).
+		Strs("entity_ids", flow.IdentifierList(requestedEntityIds).Strings()).
 		Msg("entity request received")
 
 	// TODO: add reputation system to punish nodes for malicious behaviour (spam / repeated requests)
@@ -166,10 +189,10 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 	}
 
 	// try to retrieve each entity and skip missing ones
-	entities := make([]flow.Entity, 0, len(req.EntityIDs))
-	entityIDs := make([]flow.Identifier, 0, len(req.EntityIDs))
+	entities := make([]flow.Entity, 0, len(requestedEntityIds))
+	entityIDs := make([]flow.Identifier, 0, len(requestedEntityIds))
 	seen := make(map[flow.Identifier]struct{})
-	for _, entityID := range req.EntityIDs {
+	for _, entityID := range requestedEntityIds {
 		// skip requesting duplicate entity IDs
 		if _, ok := seen[entityID]; ok {
 			lg.Warn().
@@ -210,7 +233,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 
 	// send back the response
 	res := &messages.EntityResponse{
-		Nonce:     req.Nonce,
+		Nonce:     rand.Uint64(),
 		EntityIDs: entityIDs,
 		Blobs:     blobs,
 	}
@@ -223,4 +246,67 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 	lg.Debug().Msg("entity response sent")
 
 	return nil
+}
+
+func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	e.log.Debug().Msg("process chunk data pack request shovller worker started")
+
+	for {
+		select {
+		case <-e.requestHandler.GetNotifier():
+			// there is at least a single request in the queue, so we try to process it.
+			e.shovelEntityRequests()
+		case <-ctx.Done():
+			// close the internal channel, the workers will drain the channel before exiting
+			close(e.requestChannel)
+			e.log.Trace().Msg("processing chunk data pack request worker terminated")
+			return
+		}
+	}
+}
+
+func (e *Engine) shovelEntityRequests() {
+	for {
+		msg, ok := e.requestQueue.Get()
+		if !ok {
+			// no more requests, return
+			return
+		}
+
+		req := &internal.EntityRequest{
+			OriginId:  msg.OriginID,
+			EntityIds: msg.Payload.([]flow.Identifier),
+		}
+
+		lg := e.log.With().
+			Hex("origin_id", logging.ID(req.OriginId)).
+			Str("requested_entity_ids", fmt.Sprintf("%v", req.EntityIds)).Logger()
+
+		lg.Trace().Msg("shoveller is queuing entity request for processing")
+		e.requestChannel <- req
+		lg.Trace().Msg("shoveller queued up entity request for processing")
+	}
+}
+
+func (e *Engine) processEntityRequestWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	for {
+		request, ok := <-e.requestChannel
+		if !ok {
+			e.log.Trace().Msg("processing entity request worker terminated")
+			return
+		}
+		lg := e.log.With().
+			Hex("origin_id", logging.ID(request.OriginId)).
+			Str("requested_entity_ids", fmt.Sprintf("%v", request.EntityIds)).Logger()
+		lg.Trace().Msg("worker picked up entity request for processing")
+		err := e.onEntityRequest(request.OriginId, request.EntityIds)
+		if err != nil {
+			lg.Error().Err(err).Msg("worker could not process entity request")
+		}
+		lg.Trace().Msg("worker finished entity request processing")
+	}
 }
