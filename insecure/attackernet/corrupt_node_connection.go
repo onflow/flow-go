@@ -13,8 +13,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// CorruptNodeConnection abstracts connection between an attack orchestrator to a corrupt network (cn)
-// through the orchestrator network.
+// CorruptNodeConnection abstracts connection between an attacker to a corrupt network (cn)
+// through the attacker network.
 type CorruptNodeConnection struct {
 	component.Component
 	cm             *component.ComponentManager
