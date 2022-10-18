@@ -505,6 +505,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 				lg.Error().
 					Hex("stated_entity_id", logging.ID(entityID)).
 					Hex("provided_entity", logging.ID(actualEntityID)).
+					Bool(logging.KeySuspicious, true).
 					Msg("provided entity does not match stated ID")
 				continue
 			}
