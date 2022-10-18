@@ -14,7 +14,7 @@ import (
 
 func TestRateLimit(t *testing.T) {
 	bs := blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore()))
-	rateLimitedBs := newRateLimitedBlockStore(bs, 1, 1) // 1 event per second, burst of 1
+	rateLimitedBs := newRateLimitedBlockStore(bs, 4, 4) // 4 bytes per second, burst of 4
 
 	data := make([]byte, 4)
 	rand.Read(data)
@@ -26,4 +26,20 @@ func TestRateLimit(t *testing.T) {
 
 	_, err = rateLimitedBs.Get(context.Background(), blk.Cid())
 	assert.ErrorIs(t, err, rateLimitedError) // second request should be rate limited
+}
+
+func TestBurstLimit(t *testing.T) {
+	bs := blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore()))
+	rateLimitedBs := newRateLimitedBlockStore(bs, 4, 8) // 4 bytes per second, burst of 8
+
+	data := make([]byte, 4)
+	rand.Read(data)
+	blk := blocks.NewBlock(data)
+	rateLimitedBs.Put(context.Background(), blk)
+
+	_, err := rateLimitedBs.Get(context.Background(), blk.Cid())
+	assert.NoError(t, err)
+
+	_, err = rateLimitedBs.Get(context.Background(), blk.Cid())
+	assert.NoError(t, err) // second request is allowed due to burst limit
 }
