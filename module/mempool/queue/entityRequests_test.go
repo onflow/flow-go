@@ -136,7 +136,7 @@ func entityRequestFixture() *internal.RequestEntity {
 // matchAndRemoveEntityRequest checks existence of the request in the "requests" array and "originId" in the corresponding place of "originIds" array.
 // If a match is found, it is removed.
 // If no match is found for a request, it fails the test.
-func matchAndRemoveEntityRequest(t *testing.T, requests []*internal.RequestEntity, originId flow.Identifier, entityIds []flow.Identifier) {
+func matchAndRemoveEntityRequest(t *testing.T, requests []*internal.RequestEntity, originId flow.Identifier, entityIds []flow.Identifier) []*internal.RequestEntity {
 	for i, r := range requests {
 		if r.OriginId == originId {
 			require.ElementsMatch(t, r.EntityIDs, entityIds)
@@ -147,7 +147,7 @@ func matchAndRemoveEntityRequest(t *testing.T, requests []*internal.RequestEntit
 				requests = append(requests[:i], requests[i+1:]...)
 			}
 
-			return
+			return requests
 		}
 	}
 
