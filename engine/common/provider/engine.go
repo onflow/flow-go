@@ -171,7 +171,8 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 				Hex("origin_id", logging.ID(originID)).
 				Str("channel", channel.String()).
 				Str("event", fmt.Sprintf("%+v", event)).
-				Msgf("received unsupported message type")
+				Bool(logging.KeySuspicious, true).
+				Msg("received unsupported message type")
 			return nil
 		}
 		return fmt.Errorf("unexpected error while processing engine event: %w", err)
