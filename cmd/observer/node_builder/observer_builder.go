@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	bitswap "github.com/ipfs/go-bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -56,6 +57,7 @@ import (
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
