@@ -1,0 +1,11 @@
+namespace checkpoint;
+
+table CheckpointHeader {
+  // TODO: no magic number for now
+  version:uint16;
+  subtrie_count:uint16;
+  subtrie_checksums:[uint32];
+  top_level_trie_checksum: uint32;
+}
+
+root_type CheckpointHeader;

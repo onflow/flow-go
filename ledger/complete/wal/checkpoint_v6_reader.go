@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"os"
 	"path"
@@ -14,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/wal/fbs/checkpoint"
 )
 
 // ErrEOFNotReached for indicating end of file not reached error
@@ -147,51 +149,48 @@ func readCheckpointHeader(filepath string, logger *zerolog.Logger) (
 	}(closable)
 
 	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
-	reader := NewCRC32Reader(bufReader)
-	// read the magic bytes and check version
-	err = validateFileHeader(MagicBytesCheckpointHeader, VersionV6, reader)
+	buf, err := io.ReadAll(bufReader)
 	if err != nil {
 		return nil, 0, err
+	}
+
+	checkpointHeaderBuf, checkpointHeaderCrc32Buf := buf[0:len(buf)-4], buf[len(buf)-4:]
+	checkpointHeader := checkpoint.GetRootAsCheckpointHeader(checkpointHeaderBuf, 0)
+	if checkpointHeader == nil {
+		return nil, 0, fmt.Errorf("failed to decode CheckpointHeader")
+	}
+
+	// read the magic bytes and check version
+	// TODO: skipping the magic number for now
+	if checkpointHeader.Version() != VersionV6 {
+		return nil, 0, fmt.Errorf("version mismatch - not VersionV6")
 	}
 
 	// read the subtrie count
-	subtrieCount, err := readSubtrieCount(reader)
-	if err != nil {
-		return nil, 0, err
-	}
+	subtrieCount := checkpointHeader.SubtrieCount()
 
 	subtrieChecksums := make([]uint32, subtrieCount)
 	for i := uint16(0); i < subtrieCount; i++ {
-		sum, err := readCRC32Sum(reader)
-		if err != nil {
-			return nil, 0, fmt.Errorf("could not read %v-th subtrie checksum from checkpoint header: %w", i, err)
-		}
-		subtrieChecksums[i] = sum
+		subtrieChecksums[i] = checkpointHeader.SubtrieChecksums(int(i))
 	}
 
 	// read top level trie checksum
-	topTrieChecksum, err := readCRC32Sum(reader)
-	if err != nil {
-		return nil, 0, fmt.Errorf("could not read checkpoint top level trie checksum in chechpoint summary: %w", err)
-	}
+	topTrieChecksum := checkpointHeader.TopLevelTrieChecksum()
 
 	// calculate the actual checksum
-	actualSum := reader.Crc32()
+	hasher := crc32.New(crc32.MakeTable(crc32.Castagnoli))
+	hasher.Write(checkpointHeaderBuf)
+	actualSum := hasher.Sum32()
 
 	// read the stored checksum, and compare with the actual sum
-	expectedSum, err := readCRC32Sum(reader)
+	expectedSum, err := decodeCRC32Sum(checkpointHeaderCrc32Buf)
 	if err != nil {
-		return nil, 0, fmt.Errorf("could not read checkpoint header checksum: %w", err)
+		return nil, 0, fmt.Errorf("failed to decode CheckpointHeaderCrc32")
 	}
 
 	if actualSum != expectedSum {
 		return nil, 0, fmt.Errorf("invalid checksum in checkpoint header, expected %v, actual %v",
 			expectedSum, actualSum)
-	}
-
-	err = ensureReachedEOF(reader)
-	if err != nil {
-		return nil, 0, fmt.Errorf("fail to read checkpoint header file: %w", err)
 	}
 
 	return subtrieChecksums, topTrieChecksum, nil
@@ -625,15 +624,6 @@ func validateFileHeader(expectedMagic uint16, expectedVersion uint16, reader io.
 	}
 
 	return nil
-}
-
-func readSubtrieCount(reader io.Reader) (uint16, error) {
-	bytes := make([]byte, encSubtrieCountSize)
-	_, err := io.ReadFull(reader, bytes)
-	if err != nil {
-		return 0, err
-	}
-	return decodeSubtrieCount(bytes)
 }
 
 func readCRC32Sum(reader io.Reader) (uint32, error) {

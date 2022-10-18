@@ -99,6 +99,8 @@ require (
 	pgregory.net/rapid v0.4.7
 )
 
+require github.com/google/flatbuffers v22.9.29+incompatible
+
 require (
 	cloud.google.com/go v0.100.2 // indirect
 	cloud.google.com/go/iam v0.3.0 // indirect

@@ -13,10 +13,13 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
+	flatbuffers "github.com/google/flatbuffers/go"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	checkpoint "github.com/onflow/flow-go/ledger/complete/wal/fbs/checkpoint"
 	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
@@ -156,30 +159,27 @@ func storeCheckpointHeader(
 
 	writer := NewCRC32Writer(closable)
 
-	// write version
-	_, err = writer.Write(encodeVersion(MagicBytesCheckpointHeader, VersionV6))
-	if err != nil {
-		return fmt.Errorf("cannot write version into checkpoint header: %w", err)
-	}
+	builder := flatbuffers.NewBuilder(1024)
 
-	// encode subtrieCount
-	_, err = writer.Write(encodeSubtrieCount(subtrieCount))
-	if err != nil {
-		return fmt.Errorf("cannot write subtrie level into checkpoint header: %w", err)
+	checkpoint.CheckpointHeaderStartSubtrieChecksumsVector(builder, 16)
+	for i := len(subTrieChecksums) - 1; i >= 0; i-- {
+		builder.PrependUint32(subTrieChecksums[i])
 	}
+	subtrieChecksums := builder.EndVector(16)
 
-	//  write subtrie checksums
-	for i, subtrieSum := range subTrieChecksums {
-		_, err = writer.Write(encodeCRC32Sum(subtrieSum))
-		if err != nil {
-			return fmt.Errorf("cannot write %v-th subtriechecksum into checkpoint header: %w", i, err)
-		}
-	}
+	checkpoint.CheckpointHeaderStart(builder)
+	checkpoint.CheckpointHeaderAddVersion(builder, VersionV6)
+	checkpoint.CheckpointHeaderAddSubtrieCount(builder, subtrieCount)
+	checkpoint.CheckpointHeaderAddSubtrieChecksums(builder, subtrieChecksums)
+	checkpoint.CheckpointHeaderAddTopLevelTrieChecksum(builder, topTrieChecksum)
+	checkpointHeader := checkpoint.CheckpointHeaderEnd(builder)
 
-	// write top level trie checksum
-	_, err = writer.Write(encodeCRC32Sum(topTrieChecksum))
+	builder.Finish(checkpointHeader)
+	buf := builder.FinishedBytes()
+
+	_, err = writer.Write(buf)
 	if err != nil {
-		return fmt.Errorf("cannot write top level trie checksum into checkpoint header: %w", err)
+		return fmt.Errorf("cannot write checkpoint header: %w", err)
 	}
 
 	// write checksum to the end of the file
@@ -690,19 +690,6 @@ func decodeVersion(encoded []byte) (uint16, uint16, error) {
 	magicBytes := binary.BigEndian.Uint16(encoded)
 	version := binary.BigEndian.Uint16(encoded[encMagicSize:])
 	return magicBytes, version, nil
-}
-
-func encodeSubtrieCount(level uint16) []byte {
-	bytes := make([]byte, encSubtrieCountSize)
-	binary.BigEndian.PutUint16(bytes, level)
-	return bytes
-}
-
-func decodeSubtrieCount(encoded []byte) (uint16, error) {
-	if len(encoded) != encSubtrieCountSize {
-		return 0, fmt.Errorf("wrong subtrie level size, expect %v, got %v", encSubtrieCountSize, len(encoded))
-	}
-	return binary.BigEndian.Uint16(encoded), nil
 }
 
 // closeAndMergeError close the closable and merge the closeErr with the given err into a multierror
