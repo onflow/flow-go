@@ -35,6 +35,7 @@ type dkgInfo struct {
 // ReactorEngine is an engine that reacts to chain events to start new DKG runs,
 // and manage subsequent phase transitions. Any unexpected error triggers a
 // panic as it would undermine the security of the protocol.
+// TODO replace engine.Unit with component.Component
 type ReactorEngine struct {
 	events.Noop
 	unit              *engine.Unit
@@ -86,18 +87,21 @@ func (e *ReactorEngine) Ready() <-chan struct{} {
 		phase, err := snap.Phase()
 		if err != nil {
 			// unexpected storage-level error
+			// TODO use irrecoverable context
 			e.log.Fatal().Err(err).Msg("failed to check epoch phase when starting DKG reactor engine")
 			return
 		}
 		currentCounter, err := snap.Epochs().Current().Counter()
 		if err != nil {
 			// unexpected storage-level error
+			// TODO use irrecoverable context
 			e.log.Fatal().Err(err).Msg("failed to retrieve current epoch counter when starting DKG reactor engine")
 			return
 		}
 		first, err := snap.Head()
 		if err != nil {
 			// unexpected storage-level error
+			// TODO use irrecoverable context
 			e.log.Fatal().Err(err).Msg("failed to retrieve finalized header when starting DKG reactor engine")
 			return
 		}
@@ -154,6 +158,7 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 	started, err := e.dkgState.GetDKGStarted(nextEpochCounter)
 	if err != nil {
 		// unexpected storage-level error
+		// TODO use irrecoverable context
 		log.Fatal().Err(err).Msg("could not check whether DKG is started")
 	}
 	if started {
@@ -165,12 +170,14 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 	err = e.dkgState.SetDKGStarted(nextEpochCounter)
 	if err != nil {
 		// unexpected storage-level error
+		// TODO use irrecoverable context
 		log.Fatal().Err(err).Msg("could not set dkg started")
 	}
 
 	curDKGInfo, err := e.getDKGInfo(firstID)
 	if err != nil {
 		// unexpected storage-level error
+		// TODO use irrecoverable context
 		log.Fatal().Err(err).Msg("could not retrieve epoch info")
 	}
 
@@ -195,6 +202,7 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 	)
 	if err != nil {
 		// no expected errors in controller factory
+		// TODO use irrecoverable context
 		log.Fatal().Err(err).Msg("could not create DKG controller")
 	}
 	e.controller = controller
@@ -276,6 +284,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	nextDKG, err := e.State.AtBlockID(firstBlock.ID()).Epochs().Next().DKG()
 	if err != nil {
 		// CAUTION: this should never happen, indicates a storage failure or corruption
+		// TODO use irrecoverable context
 		log.Fatal().Err(err).Msg("checking beacon key consistency: could not retrieve next DKG info")
 		return
 	}
@@ -284,19 +293,20 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	if errors.Is(err, storage.ErrNotFound) {
 		log.Warn().Msg("checking beacon key consistency: no key found")
 		err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateNoKey)
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			log.Warn().Err(err).Msg("failed to set dkg end state - already set")
-		} else if err != nil {
+		if err != nil {
+			// TODO use irrecoverable context
 			log.Fatal().Err(err).Msg("failed to set dkg end state")
 		}
 		return
 	} else if err != nil {
+		// TODO use irrecoverable context
 		log.Fatal().Err(err).Msg("checking beacon key consistency: could not retrieve beacon private key for next epoch")
 		return
 	}
 
 	nextDKGPubKey, err := nextDKG.KeyShare(e.me.NodeID())
 	if err != nil {
+		// TODO use irrecoverable context
 		log.Fatal().Err(err).Msg("checking beacon key consistency: could not retrieve my beacon public key for next epoch")
 		return
 	}
@@ -310,19 +320,17 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 			Str("canonical_beacon_pub_key", nextDKGPubKey.String()).
 			Msg("checking beacon key consistency: locally computed beacon public key does not match beacon public key for next epoch")
 		err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateInconsistentKey)
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			log.Warn().Err(err).Msg("failed to set dkg end state - already set")
-		} else if err != nil {
+		if err != nil {
+			// TODO use irrecoverable context
 			log.Fatal().Err(err).Msg("failed to set dkg end state")
 		}
 		return
 	}
 
 	err = e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateSuccess)
-	if errors.Is(err, storage.ErrAlreadyExists) {
-		e.log.Warn().Err(err).Msg("failed to set dkg end state - already set")
-	} else if err != nil {
-		e.log.Fatal().Err(err).Msg("failed to set dkg")
+	if err != nil {
+		// TODO use irrecoverable context
+		e.log.Fatal().Err(err).Msg("failed to set dkg end state")
 	}
 	log.Info().Msgf("successfully ended DKG, my beacon pub key for epoch %d is %s", nextEpochCounter, localPubKey)
 }
@@ -397,6 +405,7 @@ func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule
 			log.Info().Msgf("ending %s...", fromState)
 			err := phaseTransition()
 			if err != nil {
+				// TODO use irrecoverable context
 				log.Fatal().Err(err).Msgf("node failed to end %s", fromState)
 			}
 			log.Info().Msgf("ended %s successfully", fromState)
