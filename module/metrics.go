@@ -448,6 +448,9 @@ type ExecutionMetrics interface {
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
 	ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int)
 
+	// ExecutionBlockExecutionEffortVectorComponent reports the unweighted effort of given ComputationKind at block level
+	ExecutionBlockExecutionEffortVectorComponent(string, uint)
+
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
 	ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int)
 
