@@ -27,7 +27,7 @@ func newMockAttacker() *mockAttacker {
 	}
 }
 
-// mockAttacker must implement CorruptibleConduitFactory_ProcessAttackerMessageClient interface.
+// mockAttacker must implement CorruptNetwork_ProcessAttackerMessageClient interface.
 var _ insecure.CorruptNetwork_ProcessAttackerMessageClient = &mockAttacker{}
 
 // SetHeader is only added to satisfy the interface implementation.

@@ -5,13 +5,13 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 )
 
-// EgressController defines part of the behavior of a corruptible networking layer that controls outbound traffic of its engines.
+// EgressController defines part of the behavior of a corrupt networking layer that controls outbound traffic of its engines.
 // By the outbound traffic, we mean the traffic from engine to networking layer that passes through conduits, i.e., egress traffic of the engine.
 type EgressController interface {
-	// HandleOutgoingEvent sends an outgoing event (of an engine) to the corruptible networking layer.
+	// HandleOutgoingEvent sends an outgoing event (of an engine) to the corrupt networking layer.
 	HandleOutgoingEvent(interface{}, channels.Channel, Protocol, uint32, ...flow.Identifier) error
 
-	// EngineClosingChannel informs the corruptible networking layer that the corresponding engine of the given channel is not going to
+	// EngineClosingChannel informs the corrupt networking layer that the corresponding engine of the given channel is not going to
 	// use it anymore, hence the channel can be closed.
 	EngineClosingChannel(channels.Channel) error
 }

@@ -61,7 +61,7 @@ func (o *Orchestrator) Register(network insecure.AttackerNetwork) {
 
 // HandleEgressEvent implements logic of processing the events received from a corrupt node.
 //
-// In Corruptible Conduit Framework for BFT testing, corrupt nodes relay their outgoing events to
+// In Corrupt Network Framework for BFT testing, corrupt nodes relay their outgoing events to
 // the attack Orchestrator instead of dispatching them directly to the network.
 // The Orchestrator completely determines what the corrupt conduit should send to the network.
 func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {

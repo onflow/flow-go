@@ -57,9 +57,9 @@ func (cnb *CorruptNodeBuilder) enqueueNetworkingLayer() {
 			return nil, fmt.Errorf("could not initiate flow network: %w", err)
 		}
 
-		// initializes corruptible network that acts as a wrapper around the original flow network of the node, hence
+		// initializes corrupt network that acts as a wrapper around the original flow network of the node, hence
 		// allowing a remote attacker to control the ingress and egress traffic of the node.
-		corruptibleNetwork, err := corruptnet.NewCorruptNetwork(
+		corruptNetwork, err := corruptnet.NewCorruptNetwork(
 			cnb.Logger,
 			cnb.RootChainID,
 			address,
@@ -68,9 +68,9 @@ func (cnb *CorruptNodeBuilder) enqueueNetworkingLayer() {
 			flowNetwork,
 			ccf)
 		if err != nil {
-			return nil, fmt.Errorf("could not create corruptible network: %w", err)
+			return nil, fmt.Errorf("could not create corrupt network: %w", err)
 		}
-		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", address).Msg("corruptible network initiated")
-		return corruptibleNetwork, nil
+		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", address).Msg("corrupt network initiated")
+		return corruptNetwork, nil
 	})
 }

@@ -19,7 +19,7 @@ type CorruptNodeConnection struct {
 	component.Component
 	cm             *component.ComponentManager
 	logger         zerolog.Logger
-	inboundHandler func(*insecure.Message)                              // handler for incoming messages from corruptible conduit factories.
+	inboundHandler func(*insecure.Message)                              // handler for incoming messages from corrupt network.
 	outbound       insecure.CorruptNetwork_ProcessAttackerMessageClient // from attacker to corrupt network.
 	inbound        insecure.CorruptNetwork_ConnectAttackerClient        // from corrupt network to attacker.
 }

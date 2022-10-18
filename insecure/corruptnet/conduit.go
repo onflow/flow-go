@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 )
 
-// Conduit implements a corruptible conduit that sends all incoming events to its registered controller (i.e., factory)
+// Conduit implements a corrupt conduit that sends all incoming events to its registered controller (i.e., factory)
 // without dispatching them to the networking layer.
 type Conduit struct {
 	ctx              context.Context

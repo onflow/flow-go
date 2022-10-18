@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestConduitRelayMessage_Publish evaluates that corruptible conduit relays all incoming publish events to its controller.
+// TestConduitRelayMessage_Publish evaluates that corrupt conduit relays all incoming publish events to its controller.
 func TestConduitRelayMessage_Publish(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
@@ -43,7 +43,7 @@ func TestConduitRelayMessage_Publish(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestConduitRelayMessage_Multicast evaluates that corruptible conduit relays all incoming multicast events to its controller.
+// TestConduitRelayMessage_Multicast evaluates that corrupt conduit relays all incoming multicast events to its controller.
 func TestConduitRelayMessage_Multicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
@@ -72,7 +72,7 @@ func TestConduitRelayMessage_Multicast(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestConduitRelayMessage_Unicast evaluates that corruptible conduit relays all incoming unicast events to its controller.
+// TestConduitRelayMessage_Unicast evaluates that corrupt conduit relays all incoming unicast events to its controller.
 func TestConduitRelayMessage_Unicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
@@ -96,8 +96,8 @@ func TestConduitRelayMessage_Unicast(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestConduitReflectError_Unicast evaluates that if controller returns an error when the corruptible conduit sends relays a unicast to it,
-// the error is reflected to the invoker of the corruptible conduit unicast.
+// TestConduitReflectError_Unicast evaluates that if controller returns an error when the corrupt conduit sends relays a unicast to it,
+// the error is reflected to the invoker of the corrupt conduit unicast.
 func TestConduitReflectError_Unicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
@@ -121,8 +121,8 @@ func TestConduitReflectError_Unicast(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestConduitReflectError_Multicast evaluates that if controller returns an error when the corruptible conduit sends relays a multicast to it,
-// the error is reflected to the invoker of the corruptible conduit multicast.
+// TestConduitReflectError_Multicast evaluates that if controller returns an error when the corrupt conduit sends relays a multicast to it,
+// the error is reflected to the invoker of the corrupt conduit multicast.
 func TestConduitReflectError_Multicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
@@ -151,8 +151,8 @@ func TestConduitReflectError_Multicast(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestConduitReflectError_Publish evaluates that if controller returns an error when the corruptible conduit sends relays a multicast to it,
-// the error is reflected to the invoker of the corruptible conduit multicast.
+// TestConduitReflectError_Publish evaluates that if controller returns an error when the corrupt conduit sends relays a multicast to it,
+// the error is reflected to the invoker of the corrupt conduit multicast.
 func TestConduitReflectError_Publish(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
@@ -180,7 +180,7 @@ func TestConduitReflectError_Publish(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestConduitClose_HappyPath checks that when an engine closing a corruptible conduit, the closing action is relayed to the controller (i.e.,
+// TestConduitClose_HappyPath checks that when an engine closing a corrupt conduit, the closing action is relayed to the controller (i.e.,
 // factory) of the conduit for processing further.
 func TestConduitClose_HappyPath(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -205,9 +205,9 @@ func TestConduitClose_HappyPath(t *testing.T) {
 	unittest.RequireCloseBefore(t, ctx.Done(), 10*time.Millisecond, "could not cancel context on time")
 }
 
-// TestConduitClose_Error checks that when an engine closing a corruptible conduit, the closing action is relayed to the controller (i.e., factory)
+// TestConduitClose_Error checks that when an engine closing a corrupt conduit, the closing action is relayed to the controller (i.e., factory)
 // of the conduit for processing further, and if the controller returns an error for closing the conduit,
-// the error is reflected to original invoker of the corruptible conduit close method.
+// the error is reflected to original invoker of the corrupt conduit close method.
 func TestConduitClose_Error(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}

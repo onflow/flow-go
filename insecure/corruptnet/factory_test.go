@@ -27,7 +27,7 @@ func TestNewConduit_HappyPath(t *testing.T) {
 	require.NotNil(t, c)
 }
 
-// TestRegisterAdapter_FailDoubleRegistration checks that CorruptibleConduitFactory can be registered with only one adapter.
+// TestRegisterAdapter_FailDoubleRegistration checks that CorruptConduitFactory can be registered with only one adapter.
 func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
 	ccf := NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	adapter := mocknetwork.NewAdapter(t)
@@ -39,7 +39,7 @@ func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
 	require.ErrorContains(t, ccf.RegisterAdapter(adapter), "network adapter, one already exists")
 }
 
-// TestRegisterEgressController_FailDoubleRegistration checks that CorruptibleConduitFactory can be registered with only one egress controller.
+// TestRegisterEgressController_FailDoubleRegistration checks that CorruptConduitFactory can be registered with only one egress controller.
 func TestRegisterEgressController_FailDoubleRegistration(t *testing.T) {
 	ccf := NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	egressController := &mockinsecure.EgressController{}

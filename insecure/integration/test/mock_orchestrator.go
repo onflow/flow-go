@@ -17,7 +17,7 @@ var _ insecure.AttackerOrchestrator = &mockOrchestrator{}
 
 // HandleEgressEvent implements logic of processing the events received from a corrupt node.
 //
-// In Corruptible Conduit Framework for BFT testing, corrupt nodes relay their outgoing events to
+// In Corrupt Network Framework for BFT testing, corrupt nodes relay their outgoing events to
 // the attacker instead of dispatching them to the network.
 //
 // In this mock orchestrator, the event corrupter is invoked on the event, and the altered event is sent back to
