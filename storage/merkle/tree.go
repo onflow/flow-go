@@ -45,6 +45,11 @@ func init() {
 type Tree struct {
 	keyLength int
 	root      node
+	// if nodes should cache hash values (false by default)
+	hashValueCachingEnabled bool
+	// maximum depth that has been reached while updating the trie,
+	//the actual depth of the trie might be smaller in case some paths are deleted.
+	maxDepthTouched int
 }
 
 // NewTree creates a new empty patricia merkle tree, with keys of the given
@@ -59,6 +64,16 @@ func NewTree(keyLength int) (*Tree, error) {
 		keyLength: keyLength,
 		root:      nil,
 	}, nil
+}
+
+// SetHashValueCachingEnabled sets flag if hash values of the nodes should be cached
+func (t *Tree) SetHashValueCachingEnabled(enabled bool) {
+	t.hashValueCachingEnabled = enabled
+}
+
+// MaxDepthTouched returns the maximum depth that has been reached while updating the trie
+func (t *Tree) MaxDepthTouched() int {
+	return t.maxDepthTouched
 }
 
 // Put stores the given value in the trie under the given key. If the key
@@ -94,6 +109,9 @@ func (t *Tree) unsafePut(key []byte, val []byte) bool {
 	// we use an index to keep track of the bit we are currently looking at
 	index := 0
 
+	// captures max depth when we insert a value (for short nodes its only incremented by 1)
+	depth := 0
+
 	// the for statement keeps running until we reach a leaf in the merkle tree
 	// if the leaf is nil, it was empty and we insert a new value
 	// if the leaf is a valid pointer, we overwrite the previous value
@@ -113,6 +131,7 @@ PutLoop:
 
 			// we forward the index by one to look at the next bit
 			index++
+			depth++
 
 			continue PutLoop
 
@@ -133,6 +152,7 @@ PutLoop:
 			if commonCount == n.count {
 				cur = &n.child
 				index += commonCount
+				depth++
 				continue PutLoop
 			}
 
@@ -147,6 +167,7 @@ PutLoop:
 				*cur = commonNode
 				cur = &commonNode.child
 				index += commonCount
+				depth++
 			}
 
 			// we then insert a full node that splits the tree after the shared
@@ -163,6 +184,7 @@ PutLoop:
 				remain = &splitNode.left
 			}
 			index++
+			depth++
 
 			// we can continue our insertion at this point, but we should first
 			// insert the correct node on the other side of the created full
@@ -185,6 +207,7 @@ PutLoop:
 		// if we have a leaf node, we reached a non-empty leaf
 		case *leaf:
 			n.val = append(make([]byte, 0, len(val)), val...)
+			n.cachedHashValue = nil
 			return true // return true to indicate that we overwrote
 
 		// if we have nil, we reached the end of any shared path
@@ -196,6 +219,10 @@ PutLoop:
 				// to protect the slices from external modification.
 				*cur = &leaf{
 					val: append(make([]byte, 0, len(val)), val...),
+				}
+
+				if depth > t.maxDepthTouched {
+					t.maxDepthTouched = depth
 				}
 				return false
 			}
@@ -210,6 +237,7 @@ PutLoop:
 			*cur = finalNode
 			cur = &finalNode.child
 			index += finalCount
+			depth++
 
 			continue PutLoop
 		}
@@ -323,7 +351,7 @@ ProveLoop:
 			}
 
 			index++
-			siblingHashes = append(siblingHashes, sibling.Hash())
+			siblingHashes = append(siblingHashes, sibling.Hash(t.hashValueCachingEnabled))
 			shortNodeVisited = append(shortNodeVisited, false)
 			steps++
 
@@ -512,7 +540,7 @@ func (t *Tree) Hash() []byte {
 	if t.root == nil {
 		return EmptyTreeRootHash
 	}
-	return t.root.Hash()
+	return t.root.Hash(t.hashValueCachingEnabled)
 }
 
 // merge will merge a child short node into a parent short node.
