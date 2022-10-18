@@ -232,6 +232,23 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	}
 }
 
+const identityBLSSignatureHeader = byte(0xC0)
+
+func IsBLSSignatureIdentity(s Signature) bool {
+	if len(s) != signatureLengthBLSBLS12381 {
+		return false
+	}
+	if s[0] != identityBLSSignatureHeader {
+		return false
+	}
+	for _, b := range s[1:] {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // generatePrivateKey generates a private key for BLS on BLS12-381 curve.
 // The minimum size of the input seed is 48 bytes.
 //
