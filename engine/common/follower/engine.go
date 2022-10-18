@@ -412,6 +412,7 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 			//      -> in this case, the network has encountered a critical failure
 			//  - we assume in general that Case 2 will not happen, therefore we can discard this proposal
 			log.Err(err).Msg("unable to validate proposal with view from unknown epoch")
+			return nil
 		}
 		return fmt.Errorf("unexpected error validating proposal: %w", err)
 	}
@@ -425,6 +426,7 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 	// check whether the block is a valid extension of the chain.
 	// it only checks the block header, since checking block body is expensive.
 	// The full block check is done by the consensus participants.
+	// TODO: CAUTION we write a block to disk, without validating its payload yet. This is vulnerable to malicious primaries.
 	err = e.state.Extend(ctx, block)
 	if err != nil {
 		// block is outdated by the time we started processing it
