@@ -195,13 +195,12 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 }
 
 // processBlockAndDescendants is a recursive function that processes a block and
-// its pending proposals for its children. By induction, any children connected
-// to a valid proposal are validly connected to the finalized state and can be
+// its pending descendants. By induction, any child block of a  
+// valid proposal is itself connected to the finalized state and can be
 // processed as well.
 // No errors are expected during normal operation.
 func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposal, parent *flow.Header) error {
 	blockID := proposal.Header.ID()
-
 	log := c.log.With().
 		Str("block_id", blockID.String()).
 		Uint64("block_height", proposal.Header.Height).
@@ -300,11 +299,11 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
 			// We have received a proposal, but we don't know the epoch its view is within.
 			// We know:
-			//  - the parent of this block is valid and inserted (ie. we knew the epoch for it)
+			//  - the parent of this block is valid and was appended to the state (ie. we knew the epoch for it)
 			//  - if we then see this for the child, one of two things must have happened:
 			//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
 			//      -> in this case we can disregard the block
-			//    2. no blocks have been finalized the epoch commitment deadline, and the epoch end
+			//    2. no blocks have been finalized within the epoch commitment deadline, and the epoch ended
 			//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
 			//      -> in this case, the network has encountered a critical failure
 			//  - we assume in general that Case 2 will not happen, however we cannot prove Case 1, therefore we can discard this proposal
