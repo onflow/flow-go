@@ -28,7 +28,7 @@ const (
 	// DefaultRequestProviderWorkers is the default number of workers used to process entity requests.
 	DefaultRequestProviderWorkers = uint(100)
 
-	DefaultEntityRequestCacheSize = 100_000
+	DefaultEntityRequestCacheSize = 1000
 )
 
 // RetrieveFunc is a function provided to the provider engine upon construction.
