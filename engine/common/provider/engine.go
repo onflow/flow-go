@@ -254,7 +254,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []
 func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
-	e.log.Debug().Msg("process entity request shovller worker started")
+	e.log.Debug().Msg("process entity request shoveller worker started")
 
 	for {
 		select {
