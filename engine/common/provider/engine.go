@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -25,8 +24,12 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// DefaultRequestProviderWorkers is the default number of workers used to process entity requests.
-const DefaultRequestProviderWorkers = uint(100)
+const (
+	// DefaultRequestProviderWorkers is the default number of workers used to process entity requests.
+	DefaultRequestProviderWorkers = uint(100)
+
+	DefaultEntityRequestCacheSize = 100_000
+)
 
 // RetrieveFunc is a function provided to the provider engine upon construction.
 // It is used by the engine when receiving requests in order to retrieve the
@@ -47,7 +50,7 @@ type Engine struct {
 	con            network.Conduit
 	channel        channels.Channel
 	requestHandler *engine.MessageHandler
-	requestQueue   mempool.EntityRequestStore
+	requestQueue   engine.MessageStore
 	selector       flow.IdentityFilter
 	retrieve       RetrieveFunc
 	// buffered channel for EntityRequest workers to pick and process.
@@ -65,7 +68,7 @@ func New(
 	net network.Network,
 	me module.Local,
 	state protocol.State,
-	requestQueue mempool.EntityRequestStore,
+	requestQueue engine.MessageStore,
 	requestWorkers uint,
 	channel channels.Channel,
 	selector flow.IdentityFilter,
@@ -98,6 +101,18 @@ func New(
 			// Map is called on messages that are Match(ed) successfully, i.e.,
 			// EntityRequest.
 			Map: func(message *engine.Message) (*engine.Message, bool) {
+				request, ok := message.Payload.(*messages.EntityRequest)
+				if !ok {
+					// should never happen, unless there is a bug.
+					log.Warn().
+						Str("entity_ids", fmt.Sprintf("%v", request.EntityIDs)).
+						Hex("requester_id", logging.ID(message.OriginID)).
+						Msg("cannot match the payload to entity request")
+					return nil, false
+				}
+
+				message.Payload = *request // de-reference the pointer as HeroCache works with value.
+
 				return message, true
 			},
 			Store: requestQueue,
@@ -278,9 +293,17 @@ func (e *Engine) shovelEntityRequests() {
 			return
 		}
 
+		requestEvent, ok := msg.Payload.(messages.EntityRequest)
+		if !ok {
+			// should never happen, as we only put EntityRequest in the queue,
+			// if it does happen, it means there is a bug in the queue implementation.
+			e.log.Fatal().Msg("invalid entity request type")
+		}
+
 		req := &internal.EntityRequest{
 			OriginId:  msg.OriginID,
-			EntityIds: msg.Payload.([]flow.Identifier),
+			EntityIds: requestEvent.EntityIDs,
+			Nonce:     requestEvent.Nonce,
 		}
 
 		lg := e.log.With().

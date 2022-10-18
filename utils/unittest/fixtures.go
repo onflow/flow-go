@@ -18,6 +18,7 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -2122,4 +2123,19 @@ func PeerIDFromFlowID(identity *flow.Identity) (peer.ID, error) {
 	}
 
 	return peerID, nil
+}
+
+func EngineMessageFixture() *engine.Message {
+	return &engine.Message{
+		OriginID: IdentifierFixture(),
+		Payload:  RandomBytes(10),
+	}
+}
+
+func EngineMessageFixtures(count int) []*engine.Message {
+	messages := make([]*engine.Message, 0, count)
+	for i := 0; i < count; i++ {
+		messages = append(messages, EngineMessageFixture())
+	}
+	return messages
 }

@@ -461,7 +461,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	if node.HeroCacheMetricsEnable {
 		chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
 	}
-	chdpReqQueue := queue.NewChunkDataPackRequestQueue(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
+	chdpReqQueue := queue.NewHeroStore(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
 	exeNode.providerEngine, err = exeprovider.New(
 		node.Logger,
 		node.Tracer,
@@ -889,7 +889,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 	if node.HeroCacheMetricsEnable {
 		receiptRequestQueueMetric = metrics.ReceiptRequestsQueueMetricFactory(node.MetricsRegisterer)
 	}
-	receiptRequestQueue := queue.NewEntityRequestStore(exeNode.exeConf.receiptRequestsCacheSize, node.Logger, receiptRequestQueueMetric)
+	receiptRequestQueue := queue.NewHeroStore(exeNode.exeConf.receiptRequestsCacheSize, node.Logger, receiptRequestQueueMetric)
 
 	eng, err := provider.New(
 		node.Logger,

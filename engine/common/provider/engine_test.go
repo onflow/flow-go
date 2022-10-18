@@ -85,7 +85,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 
 	me := mockmodule.NewLocal(t)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	requestQueue := queue.NewEntityRequestStore(10, unittest.Logger(), metrics.NewNoopCollector())
+	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	e, err := provider.New(
 		unittest.Logger(),
@@ -178,7 +178,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 
 	me := mockmodule.NewLocal(t)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	requestQueue := queue.NewEntityRequestStore(10, unittest.Logger(), metrics.NewNoopCollector())
+	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	e, err := provider.New(
 		unittest.Logger(),
@@ -266,7 +266,7 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 
 	me := mockmodule.NewLocal(t)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	requestQueue := queue.NewEntityRequestStore(10, unittest.Logger(), metrics.NewNoopCollector())
+	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	e, err := provider.New(
 		unittest.Logger(),
@@ -348,7 +348,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 
 	me := mockmodule.NewLocal(t)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	requestQueue := queue.NewEntityRequestStore(10, unittest.Logger(), metrics.NewNoopCollector())
+	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	e, err := provider.New(
 		unittest.Logger(),
@@ -426,7 +426,7 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 	me := mockmodule.NewLocal(t)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	requestQueue := queue.NewEntityRequestStore(10, unittest.Logger(), metrics.NewNoopCollector())
+	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	e, err := provider.New(
 		unittest.Logger(),

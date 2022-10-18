@@ -58,7 +58,7 @@ type Engine struct {
 	metrics                module.ExecutionMetrics
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	chdpRequestHandler     *engine.MessageHandler
-	chdpRequestQueue       mempool.ChunkDataPackMessageStore
+	chdpRequestQueue       engine.MessageStore
 
 	// buffered channel for ChunkDataRequest workers to pick
 	// requests and process.
@@ -78,7 +78,7 @@ func New(
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
-	chunkDataPackRequestQueue mempool.ChunkDataPackMessageStore,
+	chunkDataPackRequestQueue engine.MessageStore,
 	chdpRequestWorkers uint,
 	chunkDataPackQueryTimeout time.Duration,
 	chunkDataPackDeliveryTimeout time.Duration,

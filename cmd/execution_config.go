@@ -78,7 +78,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&exeConf.computationConfig.CadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
 	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
-	flags.Uint32Var(&exeConf.receiptRequestsCacheSize, "receipt-request-cache", mempool.DefaultEntityRequestCacheSize, "queue size for entity requests at common provider engine")
+	flags.Uint32Var(&exeConf.receiptRequestsCacheSize, "receipt-request-cache", provider.DefaultEntityRequestCacheSize, "queue size for entity requests at common provider engine")
 	flags.UintVar(&exeConf.receiptRequestWorkers, "receipt-request-workers", provider.DefaultRequestProviderWorkers, "number of workers for entity requests at common provider engine")
 
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")

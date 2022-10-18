@@ -150,7 +150,7 @@ func main() {
 		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
 			"cluster-compliance-skip-proposals-threshold", modulecompliance.DefaultConfig().SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height (cluster compliance engine)")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g (e.g 1996-04-24T15:04:05-07:00))")
-		flags.Uint32Var(&maxCollectionRequestCacheSize, "max-collection-provider-cache-size", mempool.DefaultEntityRequestCacheSize, "maximum number of collection requests to cache for collection provider")
+		flags.Uint32Var(&maxCollectionRequestCacheSize, "max-collection-provider-cache-size", provider.DefaultEntityRequestCacheSize, "maximum number of collection requests to cache for collection provider")
 		flags.UintVar(&collectionProviderWorkers, "collection-provider-workers", provider.DefaultRequestProviderWorkers, "number of workers to use for collection provider")
 		// epoch qc contract flags
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
@@ -390,7 +390,7 @@ func main() {
 			if node.HeroCacheMetricsEnable {
 				collectionRequestMetrics = metrics.CollectionRequestsQueueMetricFactory(node.MetricsRegisterer)
 			}
-			collectionRequestQueue := queue.NewEntityRequestStore(maxCollectionRequestCacheSize, node.Logger, collectionRequestMetrics)
+			collectionRequestQueue := queue.NewHeroStore(maxCollectionRequestCacheSize, node.Logger, collectionRequestMetrics)
 
 			return provider.New(
 				node.Logger,
