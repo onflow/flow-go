@@ -2,8 +2,9 @@ package internal
 
 import "github.com/onflow/flow-go/model/flow"
 
-// RequestEntity is a wrapper around EntityRequest that implements Entity interface for it, and
-// also internally caches its identifier.
+var _ flow.Entity = (*RequestEntity)(nil)
+
+// RequestEntity is an internal data structure for storing entity requests.
 type RequestEntity struct {
 	// requested entity ids
 	EntityIDs []flow.Identifier
