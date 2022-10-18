@@ -87,6 +87,7 @@ func NewCore(
 }
 
 // OnBlockProposal handles incoming block proposals.
+// No errors are expected during normal operation.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 	header := proposal.Header
 	blockID := header.ID()
@@ -155,7 +156,6 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	// syncing with range requests for finalized blocks will request for the blocks.
 	_, found := c.pending.ByID(header.ParentID)
 	if found {
-
 		// add the block to the cache
 		_ = c.pending.Add(originID, proposal)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
@@ -168,15 +168,11 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	// and request the parent
 	parent, err := c.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
-
 		_ = c.pending.Add(originID, proposal)
-
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
-		log.Debug().Msg("requesting missing parent for proposal")
-
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
-
+		log.Debug().Msg("requesting missing parent for proposal")
 		return nil
 	}
 	if err != nil {
@@ -202,6 +198,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 // its pending proposals for its children. By induction, any children connected
 // to a valid proposal are validly connected to the finalized state and can be
 // processed as well.
+// No errors are expected during normal operation.
 func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposal, parent *flow.Header) error {
 	blockID := proposal.Header.ID()
 
@@ -237,9 +234,8 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 				if mempool.IsBelowPrunedThresholdError(err) {
 					log.Warn().Msg("received invalid block, but is below pruned threshold")
 					return nil
-				} else {
-					return fmt.Errorf("unexpected error notifying vote aggregator about invalid block: %w", err)
 				}
+				return fmt.Errorf("unexpected error notifying vote aggregator about invalid block: %w", err)
 			}
 
 			return nil
@@ -300,7 +296,8 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 	if err != nil {
 		if model.IsInvalidBlockError(err) {
 			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
-		} else if errors.Is(err, model.ErrViewForUnknownEpoch) {
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
 			// We have received a proposal, but we don't know the epoch its view is within.
 			// We know:
 			//  - the parent of this block is valid and inserted (ie. we knew the epoch for it)
@@ -327,7 +324,8 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 			// if the block proposes an invalid extension of the cluster state, then the block is invalid
 			// TODO: we should slash the block proposer
 			return engine.NewInvalidInputErrorf("invalid extension of cluster state (block: %x, height: %d): %w", blockID, header.Height, err)
-		} else if state.IsOutdatedExtensionError(err) {
+		}
+		if state.IsOutdatedExtensionError(err) {
 			// cluster state aborted processing of block as it is on an abandoned fork: block is outdated
 			return engine.NewOutdatedInputErrorf("outdated extension of cluster state: %w", err)
 		}
@@ -344,9 +342,8 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 }
 
 // OnBlockVote handles votes for blocks by passing them to the core consensus
-// algorithm
+// algorithm. No errors are expected during normal operation.
 func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
-
 	c.log.Debug().
 		Hex("origin_id", originID[:]).
 		Hex("block_id", vote.BlockID[:]).
@@ -362,6 +359,8 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlock
 	return nil
 }
 
+// OnTimeoutObject forwards incoming TimeoutObjects to the `hotstuff.TimeoutAggregator`.
+// No errors are expected during normal operation.
 func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.ClusterTimeoutObject) error {
 	t := &model.TimeoutObject{
 		View:       timeout.View,

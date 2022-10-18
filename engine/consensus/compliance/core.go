@@ -101,22 +101,9 @@ func NewCore(
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
-
-	var traceID string
-
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONCompOnBlockProposal)
-	if isSampled {
-		span.SetAttributes(
-			attribute.Int64("view", int64(proposal.Header.View)),
-			attribute.String("origin_id", originID.String()),
-			attribute.String("proposer", proposal.Header.ProposerID.String()),
-		)
-		traceID = span.SpanContext().TraceID().String()
-	}
-	defer span.End()
-
 	header := proposal.Header
 	blockID := header.ID()
+
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
@@ -128,8 +115,18 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
-		Str("traceID", traceID). // traceID is used to connect logs to traces
 		Logger()
+	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), blockID, trace.CONCompOnBlockProposal)
+	if isSampled {
+		span.SetAttributes(
+			attribute.Int64("view", int64(proposal.Header.View)),
+			attribute.String("origin_id", originID.String()),
+			attribute.String("proposer", proposal.Header.ProposerID.String()),
+		)
+		traceID := span.SpanContext().TraceID().String()
+		log = log.With().Str("traceID", traceID).Logger() // traceID is used to connect logs to traces
+	}
+	defer span.End()
 	log.Info().Msg("block proposal received")
 
 	// first, we reject all blocks that we don't need to process:
@@ -198,7 +195,6 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
 		log.Debug().Msg("requesting missing parent for proposal")
-
 		return nil
 	}
 	if err != nil {
@@ -267,9 +263,8 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, pare
 				if mempool.IsBelowPrunedThresholdError(err) {
 					log.Warn().Msg("received invalid block, but is below pruned threshold")
 					return nil
-				} else {
-					return fmt.Errorf("unexpected error notifying vote aggregator about invalid block: %w", err)
 				}
+				return fmt.Errorf("unexpected error notifying vote aggregator about invalid block: %w", err)
 			}
 
 			return nil
@@ -389,7 +384,6 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal, parent *fl
 // OnBlockVote forwards incoming block votes to the `hotstuff.VoteAggregator`
 // No errors are expected during normal operation.
 func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
-
 	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), vote.BlockID, trace.CONCompOnBlockVote)
 	if isSampled {
 		span.SetAttributes(
