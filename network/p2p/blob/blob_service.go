@@ -2,6 +2,7 @@ package blob
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -234,7 +235,7 @@ func (r *rateLimitedBlockStore) Get(ctx context.Context, c cid.Cid) (blocks.Bloc
 		return nil, err
 	}
 
-	allowed = r.limiter.AllowN(time.Now(), size)
+	allowed := r.limiter.AllowN(time.Now(), size)
 	if !allowed {
 		return nil, rateLimitedError
 	}
