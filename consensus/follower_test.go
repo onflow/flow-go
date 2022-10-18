@@ -111,7 +111,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 		Timestamp:  time.Now().UTC(),
 		Height:     21053,
 		View:       52078,
-		ParentView: 52078,
+		ParentView: 52077,
 	}
 
 	signerIndices, err := signature.EncodeSignersToIndices(identities.NodeIDs(), identities.NodeIDs()[:3])
