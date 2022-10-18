@@ -54,7 +54,7 @@ func NewCorruptNodeConnection(
 	return c
 }
 
-// SendMessage sends the message from orchestrator to the corrupt network.
+// SendMessage sends the message from attacker to corrupt network.
 func (c *CorruptNodeConnection) SendMessage(message *insecure.Message) error {
 	err := c.outbound.Send(message)
 	if err != nil {
@@ -65,7 +65,7 @@ func (c *CorruptNodeConnection) SendMessage(message *insecure.Message) error {
 }
 
 // receiveLoop implements the continuous procedure of reading from inbound stream of this connection, which
-// is established from the remote ccf to the local attack orchestrator.
+// is established from the remote corrupt network to the local attacker.
 func (c *CorruptNodeConnection) receiveLoop() {
 	c.logger.Info().Msg("receive loop started")
 
@@ -88,7 +88,7 @@ func (c *CorruptNodeConnection) receiveLoop() {
 	}
 }
 
-// CloseConnection closes gRPC client connection to the corrupt network (gRPC server).
+// CloseConnection closes gRPC client connection to corrupt network (gRPC server).
 func (c *CorruptNodeConnection) CloseConnection() error {
 	err := c.outbound.CloseSend()
 	if err != nil {

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	mock2 "github.com/onflow/flow-go/insecure/orchestrators/mock"
+
 	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -183,9 +185,9 @@ func withAttackOrchestrator(
 	ingressEventCorrupter func(*insecure.IngressEvent),
 	run func(t *testing.T)) {
 	codec := unittest.NetworkCodec()
-	o := &mockOrchestrator{
-		egressEventCorrupter:  egressEventCorrupter,
-		ingressEventCorrupter: ingressEventCorrupter,
+	o := &mock2.Orchestrator{
+		EgressEventCorrupter:  egressEventCorrupter,
+		IngressEventCorrupter: ingressEventCorrupter,
 	}
 	connector := attackernet.NewCorruptConnector(unittest.Logger(), corruptIds, corruptPortMap)
 
