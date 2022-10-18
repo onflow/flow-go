@@ -35,10 +35,16 @@ func doneChan() <-chan struct{} {
 }
 
 func TestComplianceCore(t *testing.T) {
-	suite.Run(t, new(ComplianceCoreSuite))
+	suite.Run(t, new(CoreSuite))
 }
 
-type ComplianceCoreSuite struct {
+// CoreSuite tests the compliance core logic.
+type CoreSuite struct {
+	CommonSuite
+}
+
+// CommonSuite is shared between compliance core and engine testing.
+type CommonSuite struct {
 	suite.Suite
 
 	head *cluster.Block
@@ -63,7 +69,7 @@ type ComplianceCoreSuite struct {
 	core *Core
 }
 
-func (cs *ComplianceCoreSuite) SetupTest() {
+func (cs *CommonSuite) SetupTest() {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
 
@@ -184,7 +190,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.core.sync = cs.sync
 }
 
-func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
+func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 
 	// create a proposal that directly descends from the latest finalized header
 	originID := unittest.IdentifierFixture()
@@ -208,7 +214,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	cs.hotstuff.AssertExpectations(cs.T())
 }
 
-func (cs *ComplianceCoreSuite) TestOnBlockProposalSkipProposalThreshold() {
+func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 
 	// create a proposal which is far enough ahead to be dropped
 	originID := unittest.IdentifierFixture()
@@ -224,7 +230,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	cs.pending.AssertNotCalled(cs.T(), "Add", originID, mock.Anything)
 }
 
-func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
+func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
@@ -253,7 +259,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.hotstuff.AssertExpectations(cs.T())
 }
 
-func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
+func (cs *CoreSuite) TestOnBlockProposalInvalidExtension() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
@@ -289,7 +295,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 	cs.hotstuff.AssertExpectations(cs.T())
 }
 
-func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
+func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
 	parent := unittest.ClusterBlockWithParent(cs.head)
@@ -339,7 +345,7 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header.ID())
 }
 
-func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
+func (cs *CoreSuite) TestOnSubmitVote() {
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	vote := messages.ClusterBlockVote{
@@ -365,7 +371,7 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 
 // TestOnSubmitTimeout tests that submitting messages.ClusterTimeoutObject adds model.TimeoutObject into
 // TimeoutAggregator.
-func (cs *ComplianceCoreSuite) TestOnSubmitTimeout() {
+func (cs *CoreSuite) TestOnSubmitTimeout() {
 	// create a timeout
 	originID := unittest.IdentifierFixture()
 	timeout := messages.ClusterTimeoutObject{
@@ -388,7 +394,7 @@ func (cs *ComplianceCoreSuite) TestOnSubmitTimeout() {
 	require.NoError(cs.T(), err, "timeout object should pass")
 }
 
-func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
+func (cs *CoreSuite) TestProposalBufferingOrder() {
 
 	// create a proposal that we will not submit until the end
 	originID := unittest.IdentifierFixture()

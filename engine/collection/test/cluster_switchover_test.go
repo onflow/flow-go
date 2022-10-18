@@ -208,6 +208,7 @@ func (tc *ClusterSwitchoverTestCase) StartNodes() {
 	// start all node components
 	nodes := make([]module.ReadyDoneAware, 0, len(tc.nodes))
 	for _, node := range tc.nodes {
+		node.Start(tc.T())
 		nodes = append(nodes, node)
 	}
 	unittest.RequireCloseBefore(tc.T(), util.AllReady(nodes...), time.Second, "could not start nodes")
