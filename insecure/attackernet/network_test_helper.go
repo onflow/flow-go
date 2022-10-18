@@ -22,11 +22,11 @@ import (
 // decodes the messages into events and relays them to its registered orchestrator.
 func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
-	messages, egressEvents, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
+	messages, egressEvents, corruptIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
 
 	withMockOrchestrator(
 		t,
-		corruptedIds,
+		corruptIds,
 		func(orchestratorNetwork *Network, orchestrator *mockinsecure.AttackerOrchestrator, corruptNetworks []*mockCorruptNetwork) {
 			// mocks orchestrator to receive each event exactly once.
 			orchestratorWG := mockOrchestratorHandlingEgressEvent(t, orchestrator, egressEvents)
@@ -54,26 +54,26 @@ func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
 		})
 }
 
-// testOrchestratorNetwork evaluates that the orchestrator can successfully route an event to a corrupted node through the orchestrator network.
-// By a corrupted node here, we mean a node that runs with a corrupt network.
+// testOrchestratorNetwork evaluates that the orchestrator can successfully route an event to a corrupt node through the attacker network.
+// By a corrupt node here, we mean a node that runs with a corrupt network.
 func testOrchestratorNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
-	_, egressEvents, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), protocol, concurrencyDegree)
+	_, egressEvents, corruptIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), protocol, concurrencyDegree)
 
 	withMockOrchestrator(t,
-		corruptedIds,
+		corruptIds,
 		func(orchestratorNetwork *Network, _ *mockinsecure.AttackerOrchestrator, corruptNetworks []*mockCorruptNetwork) {
 			attackerMsgReceived := &sync.WaitGroup{}
 			attackerMsgReceived.Add(concurrencyDegree)
 
-			for i, corruptedId := range corruptedIds {
-				corruptedId := corruptedId
+			for i, corruptId := range corruptIds {
+				corruptId := corruptId
 				corruptNetwork := corruptNetworks[i]
 
 				// testing message delivery from orchestrator network to corruptNetworks
 				go func() {
 					msg := <-corruptNetwork.attackerMsg
-					matchEventForMessage(t, egressEvents, msg, corruptedId.NodeID)
+					matchEventForMessage(t, egressEvents, msg, corruptId.NodeID)
 					attackerMsgReceived.Done()
 				}()
 			}
@@ -98,15 +98,15 @@ func testOrchestratorNetwork(t *testing.T, protocol insecure.Protocol, concurren
 		})
 }
 
-// matchEgressEventForMessage fails the test if given message is not meant to be sent on behalf of the corrupted id, or it does not correspond to any
+// matchEgressEventForMessage fails the test if given message is not meant to be sent on behalf of the corrupt id, or it does not correspond to any
 // of the given events.
-func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, message *insecure.Message, corruptedId flow.Identifier) {
+func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, message *insecure.Message, corruptId flow.Identifier) {
 	codec := unittest.NetworkCodec()
 
-	require.Equal(t, corruptedId[:], message.Egress.CorruptOriginID[:])
+	require.Equal(t, corruptId[:], message.Egress.CorruptOriginID[:])
 
 	for _, egressEvent := range egressEvents {
-		if egressEvent.CorruptOriginId == corruptedId {
+		if egressEvent.CorruptOriginId == corruptId {
 			require.Equal(t, egressEvent.Channel.String(), message.Egress.ChannelID)
 			require.Equal(t, egressEvent.Protocol, message.Egress.Protocol)
 			require.Equal(t, flow.IdsToBytes(egressEvent.TargetIds), message.Egress.TargetIDs)
@@ -124,27 +124,27 @@ func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, me
 	require.Fail(t, fmt.Sprintf("could not find any matching egressEvent for the message: %v", message))
 }
 
-// withMockOrchestrator creates a corrupt network for each given corrupted identity.
+// withMockOrchestrator creates a corrupt network for each given corrupt identity.
 // It then creates an orchestrator network, establishes a connection to each corrupt network, and then registers a mock orchestrator
 // on top of the orchestrator network.
 // Once the orchestrator network, corrupt networks, and mock orchestrator are all ready, it executes the injected "run" function.
 func withMockOrchestrator(t *testing.T,
-	corruptedIds flow.IdentityList,
+	corruptIds flow.IdentityList,
 	run func(*Network, *mockinsecure.AttackerOrchestrator, []*mockCorruptNetwork)) {
 
 	withMockCorruptNetworks(t,
-		corruptedIds.NodeIDs(),
+		corruptIds.NodeIDs(),
 		func(signalerContext irrecoverable.SignalerContext, corruptNetworks []*mockCorruptNetwork, corruptNetworkPorts map[flow.Identifier]string) {
 
 			orchestrator := &mockinsecure.AttackerOrchestrator{}
-			connector := NewCorruptConnector(unittest.Logger(), corruptedIds, corruptNetworkPorts)
+			connector := NewCorruptConnector(unittest.Logger(), corruptIds, corruptNetworkPorts)
 
 			orchestratorNetwork, err := NewOrchestratorNetwork(
 				unittest.Logger(),
 				unittest.NetworkCodec(),
 				orchestrator,
 				connector,
-				corruptedIds)
+				corruptIds)
 			require.NoError(t, err)
 
 			// mocks registering orchestratorNetwork as the orchestrator network functionality for orchestrator.
@@ -216,14 +216,14 @@ func mockOrchestratorHandlingEgressEvent(t *testing.T, orchestrator *mockinsecur
 	return orchestratorWG
 }
 
-// withMockCorruptNetworks creates and starts mock corrupt networks for each given corrupted identity.
+// withMockCorruptNetworks creates and starts mock corrupt networks for each given corrupt identity.
 // These mock corrupt networks only run the gRPC part of an actual corrupt network. Once all corrupt networks are up and running, the injected "run" function is executed.
 func withMockCorruptNetworks(
 	t *testing.T,
-	corruptedIds flow.IdentifierList,
+	corruptIds flow.IdentifierList,
 	run func(irrecoverable.SignalerContext, []*mockCorruptNetwork, map[flow.Identifier]string)) {
 
-	count := len(corruptedIds)
+	count := len(corruptIds)
 
 	// life-cycle management of corrupt network.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -250,7 +250,7 @@ func withMockCorruptNetworks(
 		_, corruptNetworkPortStr, err := net.SplitHostPort(corruptNetwork.ServerAddress())
 		require.NoError(t, err)
 
-		corruptNetworkId := corruptedIds[i]
+		corruptNetworkId := corruptIds[i]
 		corruptNetworkPorts[corruptNetworkId] = corruptNetworkPortStr
 	}
 
