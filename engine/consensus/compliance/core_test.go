@@ -336,12 +336,12 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	cs.pending.AssertNotCalled(cs.T(), "Add", originID, mock.Anything)
 }
 
-// TestOnBlockProposal_InvalidProposal tests that a proposal which fails HotStuff validation.
-//   - should not go through compliance checks
+// TestOnBlockProposal_FailsHotStuffValidation tests that a proposal which fails HotStuff validation.
+//   - should not go through protocol state validation
 //   - should not be added to the state
 //   - we should not attempt to process its children
 //   - we should notify VoteAggregator, for known errors
-func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
+func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := cs.participants[1].NodeID
@@ -404,12 +404,12 @@ func (cs *CoreSuite) TestOnBlockProposal_InvalidProposal() {
 	})
 }
 
-// TestOnBlockProposal_InvalidExtension tests processing a proposal which passes HotStuff validation,
-// but fails compliance checks.
+// TestOnBlockProposal_FailsProtocolStateValidation tests processing a proposal which passes HotStuff validation,
+// but fails protocol state validation
 //   - should not be added to the state
 //   - we should not attempt to process its children
 //   - we should notify VoteAggregator, for known errors
-func (cs *CoreSuite) TestOnBlockProposal_InvalidExtension() {
+func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := cs.participants[1].NodeID
