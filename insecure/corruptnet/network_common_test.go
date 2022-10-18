@@ -26,7 +26,7 @@ import (
 func TestEngineClosingChannel(t *testing.T) {
 	runCorruptNetworkTest(t, unittest.Logger(),
 		func(
-			corruptedId flow.Identity, // identity of ccf
+			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
@@ -56,15 +56,15 @@ func processAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 
 	runCorruptNetworkTest(t, logger,
 		func(
-			corruptedId flow.Identity, // identity of ccf
+			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
-			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
-			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			corruptEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptEventDispatchedOnFlowNetWg.Add(1)
 			adapter.On("MulticastOnChannel", mock.Anything).Run(func(args mock.Arguments) {
-				corruptedEventDispatchedOnFlowNetWg.Done()
+				corruptEventDispatchedOnFlowNetWg.Done()
 			}).Return(nil).Once()
 
 			// create empty wrapper message with no ingress or egress message - this should never happen
@@ -77,7 +77,7 @@ func processAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 
 			unittest.RequireReturnsBefore(
 				t,
-				corruptedEventDispatchedOnFlowNetWg.Wait,
+				corruptEventDispatchedOnFlowNetWg.Wait,
 				1*time.Second,
 				"attacker's message was not dispatched on flow network on time")
 		})
@@ -97,13 +97,13 @@ func processAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
 
 	runCorruptNetworkTest(t, logger,
 		func(
-			corruptedId flow.Identity, // identity of ccf
+			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
-			// creates a corrupted event that attacker is sending on the flow network through the
-			// corrupted conduit factory.
+			// creates a corrupt event that attacker is sending on the flow network through the
+			// corrupt conduit factory.
 			doubleMsg, egressEvent, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 			})
@@ -119,10 +119,10 @@ func processAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
 			for _, id := range targetIds {
 				params = append(params, id)
 			}
-			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
-			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			corruptEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptEventDispatchedOnFlowNetWg.Add(1)
 			adapter.On("MulticastOnChannel", params...).Run(func(args mock.Arguments) {
-				corruptedEventDispatchedOnFlowNetWg.Done()
+				corruptEventDispatchedOnFlowNetWg.Done()
 			}).Return(nil).Once()
 
 			// set both message types to not nil to force the error and exit - this should never happen
@@ -135,7 +135,7 @@ func processAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
 
 			unittest.RequireReturnsBefore(
 				t,
-				corruptedEventDispatchedOnFlowNetWg.Wait,
+				corruptEventDispatchedOnFlowNetWg.Wait,
 				1*time.Second,
 				"attacker's message was not dispatched on flow network on time")
 		})

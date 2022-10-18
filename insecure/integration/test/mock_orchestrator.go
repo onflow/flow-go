@@ -7,17 +7,17 @@ import (
 // mockOrchestrator represents a mock orchestrator that is utilized for composability testing.
 type mockOrchestrator struct {
 	orchestratorNetwork insecure.AttackerNetwork
-	// egressEventCorrupter is an injectable function that tampers with the egress events received from the corrupted nodes.
+	// egressEventCorrupter is an injectable function that tampers with the egress events received from the corrupt nodes.
 	egressEventCorrupter func(event *insecure.EgressEvent)
-	// ingressEventCorrupter is an injectable function that tampers with the ingress events received from the corrupted nodes.
+	// ingressEventCorrupter is an injectable function that tampers with the ingress events received from the corrupt nodes.
 	ingressEventCorrupter func(event *insecure.IngressEvent)
 }
 
 var _ insecure.AttackerOrchestrator = &mockOrchestrator{}
 
-// HandleEgressEvent implements logic of processing the events received from a corrupted node.
+// HandleEgressEvent implements logic of processing the events received from a corrupt node.
 //
-// In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
+// In Corruptible Conduit Framework for BFT testing, corrupt nodes relay their outgoing events to
 // the attacker instead of dispatching them to the network.
 //
 // In this mock orchestrator, the event corrupter is invoked on the event, and the altered event is sent back to

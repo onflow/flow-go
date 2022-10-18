@@ -21,9 +21,9 @@ import (
 func chunkDataPackRequestForReceipts(
 	_ *testing.T, // emphasizing this is a test helper.
 	receipts []*flow.ExecutionReceipt, // set of receipts for which chunk data pack requests are created.
-	corVnIds flow.IdentifierList, // identifier of corrupted verification nodes.
+	corVnIds flow.IdentifierList, // identifier of corrupt verification nodes.
 	// returns:
-	// map of chunk ids -> chunk data pack requests from each of corrupted verification nodes.
+	// map of chunk ids -> chunk data pack requests from each of corrupt verification nodes.
 	// list of chunk ids in the receipt.
 ) (map[flow.Identifier][]*insecure.EgressEvent, flow.IdentifierList) {
 
@@ -166,14 +166,14 @@ func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds 
 }
 
 // bootstrapWintermuteFlowSystem bootstraps flow network with following setup:
-// verification nodes: 3 corrupted + 1 honest
-// execution nodes: 2 corrupted + 1 honest
+// verification nodes: 3 corrupt + 1 honest
+// execution nodes: 2 corrupt + 1 honest
 // other roles at the minimum required number and all honest.
 func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow.IdentityList, flow.IdentifierList) {
 	// creates identities to bootstrap system with
-	corruptedVnIds := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleVerification))
-	corruptedEnIds := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-	identities := unittest.CompleteIdentitySet(append(corruptedVnIds, corruptedEnIds...)...)
+	corruptVnIds := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleVerification))
+	corruptEnIds := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	identities := unittest.CompleteIdentitySet(append(corruptVnIds, corruptEnIds...)...)
 	identities = append(identities, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))    // one honest execution node
 	identities = append(identities, unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))) // one honest verification node
 
@@ -181,24 +181,24 @@ func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	stateFixture := testutil.CompleteStateFixture(t, metrics.NewNoopCollector(), trace.NewNoopTracer(), rootSnapshot)
 
-	return stateFixture, identities, append(corruptedEnIds, corruptedVnIds...).NodeIDs()
+	return stateFixture, identities, append(corruptEnIds, corruptVnIds...).NodeIDs()
 }
 
-// orchestratorOutputSanityCheck performs a sanity check on the output events dictated by the wintermute orchestrator to the corrupted nodes.
-// It checks that: (1) exactly one execution result is dictated to ALL corrupted execution nodes. (2) except that one execution result, all other
-// incoming execution receipts are bounced back to corrupted execution node who sent it originally.
+// orchestratorOutputSanityCheck performs a sanity check on the output events dictated by the wintermute orchestrator to the corrupt nodes.
+// It checks that: (1) exactly one execution result is dictated to ALL corrupt execution nodes. (2) except that one execution result, all other
+// incoming execution receipts are bounced back to corrupt execution node who sent it originally.
 //
 // An execution result is "dictated" when orchestrator corrupts a given result.
 // An execution receipt is "bounced" back when orchestrator doesn't tamper with it, and let it go to the flow network as it is.
 func orchestratorOutputSanityCheck(
 	t *testing.T,
 	outputEvents []*insecure.EgressEvent, // list of all output events of the wintermute orchestrator.
-	corrEnIds flow.IdentifierList, // list of all corrupted execution node ids.
+	corrEnIds flow.IdentifierList, // list of all corrupt execution node ids.
 	orgReceiptIds flow.IdentifierList, // list of all execution receipt ids originally sent to orchestrator.
 	expBouncedReceiptCount int, // expected number of execution receipts that must remain uncorrupted.
 ) {
 
-	// keeps a map of (corrupted results ids -> execution node ids)
+	// keeps a map of (corrupt results ids -> execution node ids)
 	dictatedResults := make(map[flow.Identifier]flow.IdentifierList)
 
 	// keeps a list of all pass through receipts.
@@ -209,14 +209,14 @@ func orchestratorOutputSanityCheck(
 		case *flow.ExecutionReceipt:
 			if len(event.ExecutorSignature.Bytes()) != 0 {
 				// a receipt with a non-empty signature is a pass-through receipt.
-				// makes sure sender is a corrupted execution node.
+				// makes sure sender is a corrupt execution node.
 				ok := corrEnIds.Contains(outputEvent.CorruptOriginId)
 				require.True(t, ok)
 				// uses union to avoid adding duplicate.
 				passThroughReceipts = passThroughReceipts.Union(flow.IdentifierList{event.ID()})
 			} else {
 				// a receipt with an empty signature contains a dictated result from wintermute orchestrator.
-				// the rest of receipt will be filled by the corrupted node
+				// the rest of receipt will be filled by the corrupt node
 				resultId := event.ExecutionResult.ID()
 				if dictatedResults[resultId] == nil {
 					dictatedResults[resultId] = flow.IdentifierList{}
@@ -227,8 +227,8 @@ func orchestratorOutputSanityCheck(
 		}
 	}
 
-	// there must be only one corrupted result during a wintermute attack, and
-	// that corrupted result must be dictated to all corrupted execution ids.
+	// there must be only one corrupt result during a wintermute attack, and
+	// that corrupt result must be dictated to all corrupt execution ids.
 	require.Len(t, dictatedResults, 1)
 	for _, actualCorrEnIds := range dictatedResults {
 		require.ElementsMatch(t, corrEnIds, actualCorrEnIds)

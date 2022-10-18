@@ -18,68 +18,68 @@ import (
 )
 
 // TestSingleExecutionReceipt tests that the orchestrator corrupts the execution receipt if the receipt is
-// from a corrupted execution node.
+// from a corrupt execution node.
 // If an execution receipt is coming from a corrupt execution node,
 // then orchestrator tampers with the receipt and generates a counterfeit receipt, and then
-// enforces all corrupted execution nodes to send that counterfeit receipt on their behalf in the flow network.
+// enforces all corrupt execution nodes to send that counterfeit receipt on their behalf in the flow network.
 func TestSingleExecutionReceipt(t *testing.T) {
-	rootStateFixture, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
+	rootStateFixture, allIds, corruptIds := bootstrapWintermuteFlowSystem(t)
 
 	// identities of nodes who are expected targets of an execution receipt.
 	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
-	corruptedExecutionIds := flow.IdentifierList(
+	corruptExecutionIds := flow.IdentifierList(
 		allIds.Filter(
 			filter.And(filter.HasRole(flow.RoleExecution),
-				filter.HasNodeID(corruptedIds...)),
+				filter.HasNodeID(corruptIds...)),
 		).NodeIDs())
-	eventMap, receipts := receiptsWithSameResultFixture(t, 1, corruptedExecutionIds[0:1], receiptTargetIds.NodeIDs())
+	eventMap, receipts := receiptsWithSameResultFixture(t, 1, corruptExecutionIds[0:1], receiptTargetIds.NodeIDs())
 
 	mockAttackerNetwork := &mockinsecure.AttackerNetwork{}
-	corruptedReceiptsSentWG := mockAttackerNetworkForCorruptedExecutionResult(t,
+	corruptReceiptsSentWG := mockAttackerNetworkForCorruptExecutionResult(t,
 		mockAttackerNetwork,
 		receipts[0],
 		receiptTargetIds.NodeIDs(),
-		corruptedExecutionIds)
+		corruptExecutionIds)
 
-	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptIds, allIds)
 
 	// register mock network with orchestrator
 	wintermuteOrchestrator.Register(mockAttackerNetwork)
 	err = wintermuteOrchestrator.HandleEgressEvent(eventMap[receipts[0].ID()])
 	require.NoError(t, err)
 
-	// waits till corrupted receipts dictated to all execution nodes.
+	// waits till corrupt receipts dictated to all execution nodes.
 	unittest.RequireReturnsBefore(t,
-		corruptedReceiptsSentWG.Wait,
+		corruptReceiptsSentWG.Wait,
 		1*time.Second,
-		"orchestrator could not send corrupted receipts on time")
+		"orchestrator could not send corrupt receipts on time")
 }
 
 // TestMultipleExecutionReceipts_DistinctResult evaluates the following scenario:
-// Orchestrator receives two receipts with distinct results from distinct corrupted execution nodes.
+// Orchestrator receives two receipts with distinct results from distinct corrupt execution nodes.
 // Each receipt has a distinct result.
 // The receipts are coming concurrently.
 // Orchestrator only corrupts one of them (whichever it receives first), while passing through the other.
-// Orchestrator sends the corrupted one to both corrupted execution nodes.
+// Orchestrator sends the corrupt one to both corrupt execution nodes.
 func TestTwoConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 	testConcurrentExecutionReceipts(
 		t,
 		1,     // two receipts one per execution node.
 		false, // receipts have contradicting results.
-		3,     // one corrupted execution result sent to two execution node (total 2) + 1 is passed through.
+		3,     // one corrupt execution result sent to two execution node (total 2) + 1 is passed through.
 		1,     // one receipt is passed through.
 	)
 }
 
 // TestMultipleConcurrentExecutionReceipts_DistinctResult evaluates the following scenario:
-// Orchestrator receives multiple receipts from corrupted execution nodes (5 from each).
+// Orchestrator receives multiple receipts from corrupt execution nodes (5 from each).
 // The receipts are coming concurrently.
 // Each receipt has a distinct result.
 // Orchestrator corrupts result of first receipt (whichever it receives first).
-// Orchestrator sends the corrupted one to both corrupted execution nodes.
-// When the receipt (with the same result) arrives since it has the same result, and the corrupted version of that already sent to both
+// Orchestrator sends the corrupt one to both corrupt execution nodes.
+// When the receipt (with the same result) arrives since it has the same result, and the corrupt version of that already sent to both
 // execution node, the orchestrator does nothing.
 // For the result of receipts, orchestrator simply passes them through them (since already conducted a corruption).
 func TestMultipleConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
@@ -87,21 +87,21 @@ func TestMultipleConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 		t,
 		5,     // 5 receipts per execution node.
 		false, // receipts have distinct results.
-		11,    // one corrupted result is sent back to two execution nodes (total 2) + 9 pass through.
+		11,    // one corrupt result is sent back to two execution nodes (total 2) + 9 pass through.
 		9)     // 9 receipts is passed through.
 }
 
 // TestTwoConcurrentExecutionReceipts_SameResult evaluates the following scenario:
-// Orchestrator receives two receipts the same result from distinct corrupted execution nodes.
+// Orchestrator receives two receipts the same result from distinct corrupt execution nodes.
 // The receipts are coming concurrently.
 // Orchestrator corrupts result of first receipt (whichever it receives first).
-// Orchestrator sends the corrupted one to both corrupted execution nodes.
-// When the second receipt arrives since it has the same result, and the corrupted version of that already sent to both
+// Orchestrator sends the corrupt one to both corrupt execution nodes.
+// When the second receipt arrives since it has the same result, and the corrupt version of that already sent to both
 // execution node, the orchestrator does nothing.
 func TestTwoConcurrentExecutionReceipts_SameResult(t *testing.T) {
 	testConcurrentExecutionReceipts(
 		t,
-		1,    // one receipt per corrupted execution node.
+		1,    // one receipt per corrupt execution node.
 		true, // both execution receipts have same results.
 		2,    // orchestrator is supposed send two events
 		0,    // no receipts is passed through.
@@ -109,11 +109,11 @@ func TestTwoConcurrentExecutionReceipts_SameResult(t *testing.T) {
 }
 
 // TestMultipleConcurrentExecutionReceipts_SameResult evaluates the following scenario:
-// Orchestrator receives multiple receipts from corrupted execution nodes (5 from each), where pairs of receipts have the same result.
+// Orchestrator receives multiple receipts from corrupt execution nodes (5 from each), where pairs of receipts have the same result.
 // The receipts are coming concurrently.
 // Orchestrator corrupts result of first receipt (whichever it receives first).
-// Orchestrator sends the corrupted one to both corrupted execution nodes.
-// When the receipt (with the same result) arrives since it has the same result, and the corrupted version of that already sent to both
+// Orchestrator sends the corrupt one to both corrupt execution nodes.
+// When the receipt (with the same result) arrives since it has the same result, and the corrupt version of that already sent to both
 // execution node, the orchestrator does nothing.
 // For the result of receipts, orchestrator simply passes them through (since already conducted a corruption).
 func TestMultipleConcurrentExecutionReceipts_SameResult(t *testing.T) {
@@ -121,7 +121,7 @@ func TestMultipleConcurrentExecutionReceipts_SameResult(t *testing.T) {
 		t,
 		5,    // 5 receipts one per execution node.
 		true, // pairwise receipts of execution nodes have same results.
-		10,   // one corrupted execution result sent to each execution nodes (total 2) + 8 pass through.
+		10,   // one corrupt execution result sent to each execution nodes (total 2) + 8 pass through.
 		8,    // 4 receipts are passed through per execution nodes (4 * 2 = 8)
 	)
 }
@@ -136,11 +136,11 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	expectedOrchestratorOutputEvents int,
 	passThroughReceipts int) {
 
-	rootStateFixture, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
-	corruptedExecutionIds := flow.IdentifierList(
+	rootStateFixture, allIds, corruptIds := bootstrapWintermuteFlowSystem(t)
+	corruptExecutionIds := flow.IdentifierList(
 		allIds.Filter(
 			filter.And(filter.HasRole(flow.RoleExecution),
-				filter.HasNodeID(corruptedIds...)),
+				filter.HasNodeID(corruptIds...)),
 		).NodeIDs())
 	// identities of nodes who are expected targets of an execution receipt.
 	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
@@ -150,12 +150,12 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	var receipts []*flow.ExecutionReceipt
 
 	if sameResult {
-		eventMap, receipts = receiptsWithSameResultFixture(t, count, corruptedExecutionIds, receiptTargetIds.NodeIDs())
+		eventMap, receipts = receiptsWithSameResultFixture(t, count, corruptExecutionIds, receiptTargetIds.NodeIDs())
 	} else {
-		eventMap, receipts = receiptsWithDistinctResultFixture(t, count, corruptedExecutionIds, receiptTargetIds.NodeIDs())
+		eventMap, receipts = receiptsWithDistinctResultFixture(t, count, corruptExecutionIds, receiptTargetIds.NodeIDs())
 	}
 
-	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptIds, allIds)
 
 	// keeps list of output events sent by orchestrator to the orchestrator network.
 	orchestratorOutputEvents := make([]*insecure.EgressEvent, 0)
@@ -179,53 +179,53 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	// registers mock network with orchestrator
 	wintermuteOrchestrator.Register(mockAttackerNetwork)
 
-	// imitates sending events from corrupted execution nodes to the attacker orchestrator.
-	corruptedEnEventSendWG := &sync.WaitGroup{}
+	// imitates sending events from corrupt execution nodes to the attacker orchestrator.
+	corruptEnEventSendWG := &sync.WaitGroup{}
 	l := len(eventMap)
-	corruptedEnEventSendWG.Add(l)
+	corruptEnEventSendWG.Add(l)
 	for _, event := range eventMap {
 		event := event // suppress loop variable
 
 		go func() {
 			err := wintermuteOrchestrator.HandleEgressEvent(event)
 			require.NoError(t, err)
-			corruptedEnEventSendWG.Done()
+			corruptEnEventSendWG.Done()
 		}()
 	}
 
-	// waits till corrupted nodes send their protocol layer events to orchestrator.
+	// waits till corrupt nodes send their protocol layer events to orchestrator.
 	unittest.RequireReturnsBefore(t,
-		corruptedEnEventSendWG.Wait,
+		corruptEnEventSendWG.Wait,
 		1*time.Second,
-		"orchestrator could not send corrupted receipts on time")
+		"orchestrator could not send corrupt receipts on time")
 
-	// waits till corrupted receipts dictated to all execution nodes.
+	// waits till corrupt receipts dictated to all execution nodes.
 	unittest.RequireReturnsBefore(t,
 		orchestratorSentAllEventsWg.Wait,
 		1*time.Second,
-		"orchestrator could not receive corrupted receipts on time")
+		"orchestrator could not receive corrupt receipts on time")
 
 	// executes post-attack scenario
 	orchestratorOutputSanityCheck(
 		t,
 		orchestratorOutputEvents,
-		corruptedExecutionIds,
+		corruptExecutionIds,
 		flow.GetIDs(receipts),
 		passThroughReceipts,
 	)
 }
 
-func mockAttackerNetworkForCorruptedExecutionResult(
+func mockAttackerNetworkForCorruptExecutionResult(
 	t *testing.T,
 	attackerNetwork *mockinsecure.AttackerNetwork,
 	receipt *flow.ExecutionReceipt,
 	receiptTargetIds flow.IdentifierList,
-	corruptedExecutionIds flow.IdentifierList) *sync.WaitGroup {
+	corruptExecutionIds flow.IdentifierList) *sync.WaitGroup {
 
 	wg := &sync.WaitGroup{}
 
-	// expecting to receive a corrupted receipt from each of corrupted execution nodes.
-	wg.Add(corruptedExecutionIds.Len())
+	// expecting to receive a corrupt receipt from each of corrupt execution nodes.
+	wg.Add(corruptExecutionIds.Len())
 	seen := make(map[flow.Identifier]struct{})
 
 	attackerNetwork.
@@ -237,8 +237,8 @@ func mockAttackerNetworkForCorruptedExecutionResult(
 			event, ok := args[0].(*insecure.EgressEvent)
 			require.True(t, ok)
 
-			// make sure sender is a corrupted execution node.
-			ok = corruptedExecutionIds.Contains(event.CorruptOriginId)
+			// make sure sender is a corrupt execution node.
+			ok = corruptExecutionIds.Contains(event.CorruptOriginId)
 			require.True(t, ok)
 
 			// makes sure sender is unique
@@ -249,11 +249,11 @@ func mockAttackerNetworkForCorruptedExecutionResult(
 			// make sure message being sent on correct channel
 			require.Equal(t, channels.PushReceipts, event.Channel)
 
-			corruptedResult, ok := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
+			corruptResult, ok := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
 			require.True(t, ok)
 
-			// make sure the original uncorrupted execution receipt is NOT sent to orchestrator
-			require.NotEqual(t, receipt.ExecutionResult, corruptedResult)
+			// make sure the original uncorrupt execution receipt is NOT sent to orchestrator
+			require.NotEqual(t, receipt.ExecutionResult, corruptResult)
 			require.ElementsMatch(t, receiptTargetIds, event.TargetIds)
 
 			wg.Done()
@@ -262,27 +262,27 @@ func mockAttackerNetworkForCorruptedExecutionResult(
 	return wg
 }
 
-// TestRespondingWithCorruptedAttestation evaluates when the Wintermute orchestrator receives a chunk data pack request from a CORRUPTED
-// verification node for a CORRUPTED chunk, it replies that with a result approval attestation.
-func TestRespondingWithCorruptedAttestation(t *testing.T) {
+// TestRespondingWithCorruptAttestation evaluates when the Wintermute orchestrator receives a chunk data pack request from a CORRUPT
+// verification node for a CORRUPT chunk, it replies that with a result approval attestation.
+func TestRespondingWithCorruptAttestation(t *testing.T) {
 	totalChunks := 10
-	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
-	corruptedVerIds := flow.IdentifierList(
+	_, allIds, corruptIds := bootstrapWintermuteFlowSystem(t)
+	corruptVerIds := flow.IdentifierList(
 		allIds.Filter(
 			filter.And(filter.HasRole(flow.RoleVerification),
-				filter.HasNodeID(corruptedIds...)),
+				filter.HasNodeID(corruptIds...)),
 		).NodeIDs())
-	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptIds, allIds)
 
 	originalResult := unittest.ExecutionResultFixture()
-	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(uint(totalChunks)))
+	corruptResult := unittest.ExecutionResultFixture(unittest.WithChunks(uint(totalChunks)))
 	wintermuteOrchestrator.state = &attackState{
-		originalResult:  originalResult,
-		corruptedResult: corruptedResult,
+		originalResult: originalResult,
+		corruptResult:  corruptResult,
 	}
 
-	corruptedAttestationWG := &sync.WaitGroup{}
-	corruptedAttestationWG.Add(totalChunks * len(corruptedVerIds))
+	corruptAttestationWG := &sync.WaitGroup{}
+	corruptAttestationWG.Add(totalChunks * len(corruptVerIds))
 	// mocks orchestrator network to record and keep the output events of orchestrator
 	mockAttackerNetwork := &mockinsecure.AttackerNetwork{}
 	mockAttackerNetwork.On("SendEgress", mock.Anything).
@@ -292,19 +292,19 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 			event, ok := args[0].(*insecure.EgressEvent)
 			require.True(t, ok)
 
-			// output of orchestrator for a corrupted chunk request from a corrupted verification node
+			// output of orchestrator for a corrupt chunk request from a corrupt verification node
 			// should be a result approval containing a dictated attestation.
 			approval, ok := event.FlowProtocolEvent.(*flow.ResultApproval)
 			require.True(t, ok)
 			attestation := approval.Body.Attestation
 
 			// checking content of attestation
-			require.Equal(t, attestation.BlockID, wintermuteOrchestrator.state.corruptedResult.BlockID)
-			require.Equal(t, attestation.ExecutionResultID, wintermuteOrchestrator.state.corruptedResult.ID())
-			chunk := wintermuteOrchestrator.state.corruptedResult.Chunks[attestation.ChunkIndex]
-			require.True(t, wintermuteOrchestrator.state.containsCorruptedChunkId(chunk.ID())) // attestation must be for a corrupted chunk
+			require.Equal(t, attestation.BlockID, wintermuteOrchestrator.state.corruptResult.BlockID)
+			require.Equal(t, attestation.ExecutionResultID, wintermuteOrchestrator.state.corruptResult.ID())
+			chunk := wintermuteOrchestrator.state.corruptResult.Chunks[attestation.ChunkIndex]
+			require.True(t, wintermuteOrchestrator.state.containsCorruptChunkId(chunk.ID())) // attestation must be for a corrupt chunk
 
-			corruptedAttestationWG.Done()
+			corruptAttestationWG.Done()
 		}).Return(nil)
 
 	// registers mock network with orchestrator
@@ -312,11 +312,11 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 
 	// chunk data pack request event for original receipt
 	cdpReqs, _ := chunkDataPackRequestForReceipts(t,
-		[]*flow.ExecutionReceipt{unittest.ExecutionReceiptFixture(unittest.WithResult(corruptedResult))},
-		corruptedVerIds)
+		[]*flow.ExecutionReceipt{unittest.ExecutionReceiptFixture(unittest.WithResult(corruptResult))},
+		corruptVerIds)
 
-	corruptedChunkRequestWG := &sync.WaitGroup{}
-	corruptedChunkRequestWG.Add(totalChunks * len(corruptedVerIds))
+	corruptChunkRequestWG := &sync.WaitGroup{}
+	corruptChunkRequestWG.Add(totalChunks * len(corruptVerIds))
 	for _, cdpReqList := range cdpReqs {
 		for _, cdpReq := range cdpReqList {
 			cdpReq := cdpReq // suppress loop variable
@@ -325,35 +325,35 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 				err := wintermuteOrchestrator.HandleEgressEvent(cdpReq)
 				require.NoError(t, err)
 
-				corruptedChunkRequestWG.Done()
+				corruptChunkRequestWG.Done()
 			}()
 		}
 	}
 
 	// waits till all chunk data pack requests are sent to orchestrator
 	unittest.RequireReturnsBefore(t,
-		corruptedChunkRequestWG.Wait,
+		corruptChunkRequestWG.Wait,
 		1*time.Second,
 		"could not send all chunk data pack requests on time")
 
-	// waits till all chunk data pack requests replied with corrupted attestation.
+	// waits till all chunk data pack requests replied with corrupt attestation.
 	unittest.RequireReturnsBefore(t,
-		corruptedAttestationWG.Wait,
+		corruptAttestationWG.Wait,
 		1*time.Second,
-		"orchestrator could not send corrupted attestations on time")
+		"orchestrator could not send corrupt attestations on time")
 }
 
-// TestPassingThroughChunkDataRequests evaluates when no attacks yet conducted, all chunk data pack requests from corrupted
+// TestPassingThroughChunkDataRequests evaluates when no attacks yet conducted, all chunk data pack requests from corrupt
 // verification nodes are passed through.
 func TestPassingThroughChunkDataRequests(t *testing.T) {
 	totalChunks := 10
-	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
-	corruptedVerIds := flow.IdentifierList(
+	_, allIds, corruptIds := bootstrapWintermuteFlowSystem(t)
+	corruptVerIds := flow.IdentifierList(
 		allIds.Filter(
 			filter.And(filter.HasRole(flow.RoleVerification),
-				filter.HasNodeID(corruptedIds...)),
+				filter.HasNodeID(corruptIds...)),
 		).NodeIDs())
-	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptIds, allIds)
 
 	wintermuteOrchestrator.state = nil // no attack yet conducted
 
@@ -361,10 +361,10 @@ func TestPassingThroughChunkDataRequests(t *testing.T) {
 		unittest.WithResult(
 			unittest.ExecutionResultFixture(
 				unittest.WithChunks(uint(totalChunks)))))
-	cdpReqs, chunkIds := chunkDataPackRequestForReceipts(t, []*flow.ExecutionReceipt{receipt}, corruptedVerIds)
+	cdpReqs, chunkIds := chunkDataPackRequestForReceipts(t, []*flow.ExecutionReceipt{receipt}, corruptVerIds)
 
 	chunkRequestPassThrough := &sync.WaitGroup{}
-	chunkRequestPassThrough.Add(totalChunks * len(corruptedVerIds))
+	chunkRequestPassThrough.Add(totalChunks * len(corruptVerIds))
 	// mocks orchestrator network to record and keep the output events of orchestrator
 	mockAttackerNetwork := &mockinsecure.AttackerNetwork{}
 	mockAttackerNetwork.On("SendEgress", mock.Anything).
@@ -387,8 +387,8 @@ func TestPassingThroughChunkDataRequests(t *testing.T) {
 	// registers mock network with orchestrator
 	wintermuteOrchestrator.Register(mockAttackerNetwork)
 
-	corruptedChunkRequestWG := &sync.WaitGroup{}
-	corruptedChunkRequestWG.Add(totalChunks * len(corruptedVerIds))
+	corruptChunkRequestWG := &sync.WaitGroup{}
+	corruptChunkRequestWG.Add(totalChunks * len(corruptVerIds))
 	for _, cdpReqList := range cdpReqs {
 		for _, cdpReq := range cdpReqList {
 			cdpReq := cdpReq // suppress loop variable
@@ -397,50 +397,50 @@ func TestPassingThroughChunkDataRequests(t *testing.T) {
 				err := wintermuteOrchestrator.HandleEgressEvent(cdpReq)
 				require.NoError(t, err)
 
-				corruptedChunkRequestWG.Done()
+				corruptChunkRequestWG.Done()
 			}()
 		}
 	}
 
 	// waits till all chunk data pack requests are sent to orchestrator
 	unittest.RequireReturnsBefore(t,
-		corruptedChunkRequestWG.Wait,
+		corruptChunkRequestWG.Wait,
 		1*time.Second,
 		"could not send all chunk data pack requests on time")
 
-	// waits till all chunk data pack requests replied with corrupted attestation.
+	// waits till all chunk data pack requests replied with corrupt attestation.
 	unittest.RequireReturnsBefore(t,
 		chunkRequestPassThrough.Wait,
 		1*time.Second,
-		"orchestrator could not send corrupted attestations on time")
+		"orchestrator could not send corrupt attestations on time")
 }
 
-// TestPassingThroughChunkDataResponse_NoAttack evaluates all chunk data pack responses that do not match the corrupted chunk are passed through by
+// TestPassingThroughChunkDataResponse_NoAttack evaluates all chunk data pack responses that do not match the corrupt chunk are passed through by
 // orchestrator. In this test, the state of orchestrator is set to nil meaning no attack has been conducted yet.
 func TestPassingThroughChunkDataResponse_NoAttack(t *testing.T) {
 	testPassingThroughChunkDataResponse(t, nil)
 }
 
-// TestPassingThroughChunkDataResponse_WithAttack evaluates all chunk data pack responses that do not match the corrupted chunk are passed through by
+// TestPassingThroughChunkDataResponse_WithAttack evaluates all chunk data pack responses that do not match the corrupt chunk are passed through by
 // orchestrator. In this test, the state of orchestrator is set, meaning an attack has already been conducted.
 func TestPassingThroughChunkDataResponse_WithAttack(t *testing.T) {
 	originalResult := unittest.ExecutionResultFixture()
-	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(1))
+	corruptResult := unittest.ExecutionResultFixture(unittest.WithChunks(1))
 	state := &attackState{
-		originalResult:  originalResult,
-		corruptedResult: corruptedResult,
+		originalResult: originalResult,
+		corruptResult:  corruptResult,
 	}
 
 	testPassingThroughChunkDataResponse(t, state)
 }
 
-// testPassingThroughChunkDataResponse evaluates all chunk data pack responses that do not match the corrupted chunk are passed through by
+// testPassingThroughChunkDataResponse evaluates all chunk data pack responses that do not match the corrupt chunk are passed through by
 // orchestrator.
 func testPassingThroughChunkDataResponse(t *testing.T, state *attackState) {
 	totalChunks := 10
-	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
+	_, allIds, corruptIds := bootstrapWintermuteFlowSystem(t)
 	verIds := flow.IdentifierList(allIds.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs())
-	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptIds, allIds)
 
 	wintermuteOrchestrator.state = state
 
@@ -476,8 +476,8 @@ func testPassingThroughChunkDataResponse(t *testing.T, state *attackState) {
 	wintermuteOrchestrator.Register(mockAttackerNetwork)
 
 	// sends responses to the orchestrator
-	corruptedChunkResponseWG := &sync.WaitGroup{}
-	corruptedChunkResponseWG.Add(totalChunks * len(verIds))
+	corruptChunkResponseWG := &sync.WaitGroup{}
+	corruptChunkResponseWG.Add(totalChunks * len(verIds))
 	for _, cdpRep := range cdpReps {
 		cdpRep := cdpRep // suppress loop variable
 
@@ -485,13 +485,13 @@ func testPassingThroughChunkDataResponse(t *testing.T, state *attackState) {
 			err := wintermuteOrchestrator.HandleEgressEvent(cdpRep)
 			require.NoError(t, err)
 
-			corruptedChunkResponseWG.Done()
+			corruptChunkResponseWG.Done()
 		}()
 	}
 
 	// waits till all chunk data pack responses are sent to orchestrator
 	unittest.RequireReturnsBefore(t,
-		corruptedChunkResponseWG.Wait,
+		corruptChunkResponseWG.Wait,
 		1*time.Second,
 		"could not send all chunk data pack responses on time")
 
@@ -502,33 +502,33 @@ func testPassingThroughChunkDataResponse(t *testing.T, state *attackState) {
 		"orchestrator could not pass through chunk data responses on time")
 }
 
-// TestWintermuteChunkResponseForCorruptedChunks evaluates that chunk data responses for corrupted chunks that are sent by corrupted execution nodes
+// TestWintermuteChunkResponseForCorruptChunks evaluates that chunk data responses for corrupt chunks that are sent by corrupt execution nodes
 // to HONEST verification nodes are wintermuted (i.e., dropped) by orchestrator.
-func TestWintermuteChunkResponseForCorruptedChunks(t *testing.T) {
+func TestWintermuteChunkResponseForCorruptChunks(t *testing.T) {
 	totalChunks := 10
-	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
+	_, allIds, corruptIds := bootstrapWintermuteFlowSystem(t)
 	honestVnIds := flow.IdentifierList(
 		allIds.Filter(filter.And(
 			filter.HasRole(flow.RoleVerification),
-			filter.Not(filter.HasNodeID(corruptedIds...)))).NodeIDs())
-	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
+			filter.Not(filter.HasNodeID(corruptIds...)))).NodeIDs())
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptIds, allIds)
 
 	originalResult := unittest.ExecutionResultFixture()
-	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(uint(totalChunks)))
+	corruptResult := unittest.ExecutionResultFixture(unittest.WithChunks(uint(totalChunks)))
 	state := &attackState{
-		originalResult:  originalResult,
-		corruptedResult: corruptedResult,
+		originalResult: originalResult,
+		corruptResult:  corruptResult,
 	}
 	wintermuteOrchestrator.state = state
 
-	// creates chunk data pack response of corrupted chunks for HONEST verification nodes
+	// creates chunk data pack response of corrupt chunks for HONEST verification nodes
 	cdpReps, _ := chunkDataPackResponseForReceipts(
-		[]*flow.ExecutionReceipt{unittest.ExecutionReceiptFixture(unittest.WithResult(corruptedResult))},
+		[]*flow.ExecutionReceipt{unittest.ExecutionReceiptFixture(unittest.WithResult(corruptResult))},
 		honestVnIds)
 
 	// sends responses to the orchestrator
-	corruptedChunkResponseWG := &sync.WaitGroup{}
-	corruptedChunkResponseWG.Add(totalChunks * len(honestVnIds))
+	corruptChunkResponseWG := &sync.WaitGroup{}
+	corruptChunkResponseWG.Add(totalChunks * len(honestVnIds))
 	for _, cdpRep := range cdpReps {
 		cdpRep := cdpRep // suppress loop variable
 
@@ -536,28 +536,28 @@ func TestWintermuteChunkResponseForCorruptedChunks(t *testing.T) {
 			err := wintermuteOrchestrator.HandleEgressEvent(cdpRep)
 			require.NoError(t, err)
 
-			corruptedChunkResponseWG.Done()
+			corruptChunkResponseWG.Done()
 		}()
 	}
 
 	// waits till all chunk data pack responses are sent to orchestrator
 	unittest.RequireReturnsBefore(t,
-		corruptedChunkResponseWG.Wait,
+		corruptChunkResponseWG.Wait,
 		1*time.Second,
 		"could not send all chunk data pack responses on time")
 }
 
-// TestPassingThroughMiscellaneousEvents checks that any incoming event from corrupted nodes that
+// TestPassingThroughMiscellaneousEvents checks that any incoming event from corrupt nodes that
 // is not relevant to the context of wintermute attack will be passed through by the orchestrator.
 // The only events related to the context of wintermute attack are: execution receipt, result approval,
 // chunk data pack request, and chunk data pack response.
 func TestPassingThroughMiscellaneousEvents(t *testing.T) {
-	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
+	_, allIds, corruptIds := bootstrapWintermuteFlowSystem(t)
 
 	// creates a block event fixture that is out of the context of
 	// the wintermute attack.
 	miscellaneousEvent := &insecure.EgressEvent{
-		CorruptOriginId:   corruptedIds.Sample(1)[0],
+		CorruptOriginId:   corruptIds.Sample(1)[0],
 		Channel:           channels.TestNetworkChannel,
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
@@ -586,7 +586,7 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 		}).Return(nil)
 
 	// creates orchestrator
-	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptIds, allIds)
 	wintermuteOrchestrator.Register(mockAttackerNetwork)
 
 	// sends miscellaneous event to orchestrator.
@@ -616,22 +616,22 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 // TestPassingThrough_ResultApproval evaluates that wintermute attack orchestrator is passing through
 // incoming result approvals if they do not belong to original execution result.
 func TestPassingThrough_ResultApproval(t *testing.T) {
-	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
-	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
+	_, allIds, corruptIds := bootstrapWintermuteFlowSystem(t)
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptIds, allIds)
 
 	originalResult := unittest.ExecutionResultFixture()
-	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(1))
+	corruptResult := unittest.ExecutionResultFixture(unittest.WithChunks(1))
 	wintermuteOrchestrator.state = &attackState{
-		originalResult:  originalResult,
-		corruptedResult: corruptedResult,
+		originalResult: originalResult,
+		corruptResult:  corruptResult,
 	}
 
 	// generates a test result approval that does not belong to original result.
 	approval := unittest.ResultApprovalFixture()
 	require.NotEqual(t, wintermuteOrchestrator.state.originalResult.ID(), approval.ID())
-	require.NotEqual(t, wintermuteOrchestrator.state.corruptedResult.ID(), approval.ID())
+	require.NotEqual(t, wintermuteOrchestrator.state.corruptResult.ID(), approval.ID())
 	approvalEvent := &insecure.EgressEvent{
-		CorruptOriginId:   corruptedIds.Sample(1)[0],
+		CorruptOriginId:   corruptIds.Sample(1)[0],
 		Channel:           channels.TestNetworkChannel,
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
@@ -689,21 +689,21 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 
 // TestWintermute_ResultApproval evaluates that wintermute attack orchestrator is dropping (i.e., wintermuting)
 // incoming result approvals if they belong to original execution result (i.e., the conflicting result with one that is
-// corrupted).
+// corrupt).
 func TestWintermute_ResultApproval(t *testing.T) {
-	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
-	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
+	_, allIds, corruptIds := bootstrapWintermuteFlowSystem(t)
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptIds, allIds)
 
 	originalResult := unittest.ExecutionResultFixture()
-	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(1))
+	corruptResult := unittest.ExecutionResultFixture(unittest.WithChunks(1))
 	wintermuteOrchestrator.state = &attackState{
-		originalResult:  originalResult,
-		corruptedResult: corruptedResult,
+		originalResult: originalResult,
+		corruptResult:  corruptResult,
 	}
 
 	// generates a result approval event for one of the chunks of the original result.
 	approvalEvent := &insecure.EgressEvent{
-		CorruptOriginId: corruptedIds.Sample(1)[0],
+		CorruptOriginId: corruptIds.Sample(1)[0],
 		Channel:         channels.TestNetworkChannel,
 		Protocol:        insecure.Protocol_MULTICAST,
 		TargetNum:       3,

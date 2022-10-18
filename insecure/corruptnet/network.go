@@ -123,7 +123,7 @@ func NewCorruptNetwork(
 // Returns a non nil error if fails to register the corrupt message processor with the original Flow network.
 func (n *Network) Register(channel channels.Channel, messageProcessor flownet.MessageProcessor) (flownet.Conduit, error) {
 	corruptProcessor := NewCorruptMessageProcessor(
-		n.logger.With().Str("module", "corrupted-message-processor").Hex("corrupt_id", logging.ID(n.me.NodeID())).Logger(),
+		n.logger.With().Str("module", "corrupt-message-processor").Hex("corrupt_id", logging.ID(n.me.NodeID())).Logger(),
 		messageProcessor,
 		n)
 	// TODO: we can dissolve CCF and instead have a decorator pattern to turn a conduit into
@@ -228,12 +228,12 @@ func (n *Network) processAttackerIngressMessage(msg *insecure.IngressMessage) er
 
 	targetId, err := flow.ByteSliceToId(msg.CorruptTargetID)
 	if err != nil {
-		return fmt.Errorf("could not convert corrupted target id to flow identifier: %w", err)
+		return fmt.Errorf("could not convert corrupt target id to flow identifier: %w", err)
 	}
 
 	lg = n.logger.With().
 		Hex("sender_id", logging.ID(senderId)).
-		Hex("corrupted_target_id", logging.ID(targetId)).
+		Hex("corrupt_target_id", logging.ID(targetId)).
 		Str("flow_protocol_event_type", fmt.Sprintf("%T", event)).Logger()
 
 	if targetId != n.me.NodeID() {

@@ -26,7 +26,7 @@ import (
 // The attacker is mocked out in this test.
 func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 	codec := unittest.NetworkCodec()
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
+	corruptIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 	flowNetwork := mocknetwork.NewNetwork(t)
 	ccf := mockinsecure.NewCorruptConduitFactory(t)
 	ccf.On("RegisterEgressController", mock.Anything).Return(nil)
@@ -35,7 +35,7 @@ func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 		unittest.Logger(),
 		flow.BftTestnet,
 		insecure.DefaultAddress,
-		testutil.LocalFixture(t, corruptedIdentity),
+		testutil.LocalFixture(t, corruptIdentity),
 		codec,
 		flowNetwork,
 		ccf)
@@ -81,12 +81,12 @@ func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, ccf)
 }
 
-// TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork checks that outgoing unicast events to the corrupted network
+// TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork checks that outgoing unicast events to the corrupt network
 // are routed to the network adapter when no attacker is registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
 	runCorruptNetworkTest(t, unittest.Logger(),
 		func(
-			corruptedId flow.Identity, // identity of ccf
+			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
@@ -104,12 +104,12 @@ func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
 		})
 }
 
-// TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork checks that the outgoing publish events to the corrupted network
+// TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork checks that the outgoing publish events to the corrupt network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
 	runCorruptNetworkTest(t, unittest.Logger(),
 		func(
-			corruptedId flow.Identity, // identity of ccf
+			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
@@ -131,12 +131,12 @@ func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
 		})
 }
 
-// TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork checks that the outgoing multicast events to the corrupted network
+// TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork checks that the outgoing multicast events to the corrupt network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
 	runCorruptNetworkTest(t, unittest.Logger(),
 		func(
-			corruptedId flow.Identity, // identity of ccf
+			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
@@ -158,17 +158,17 @@ func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
 		})
 }
 
-// TestProcessAttackerMessage checks that a corrupted network relays the messages to its underlying flow network.
+// TestProcessAttackerMessage checks that a corrupt network relays the messages to its underlying flow network.
 func TestProcessAttackerMessage_MessageSentOnFlowNetwork(t *testing.T) {
 	runCorruptNetworkTest(t, unittest.Logger(),
 		func(
-			corruptedId flow.Identity, // identity of ccf
+			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
-			// creates a corrupted event that attacker is sending on the flow network through the
-			// corrupted conduit factory.
+			// creates a corrupt event that attacker is sending on the flow network through the
+			// corrupt conduit factory.
 			msg, event, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 			})
@@ -180,10 +180,10 @@ func TestProcessAttackerMessage_MessageSentOnFlowNetwork(t *testing.T) {
 			for _, id := range targetIds {
 				params = append(params, id)
 			}
-			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
-			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			corruptEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptEventDispatchedOnFlowNetWg.Add(1)
 			adapter.On("MulticastOnChannel", params...).Run(func(args mock.Arguments) {
-				corruptedEventDispatchedOnFlowNetWg.Done()
+				corruptEventDispatchedOnFlowNetWg.Done()
 			}).Return(nil).Once()
 
 			// imitates a gRPC call from orchestrator to ccf through orchestrator network
@@ -191,7 +191,7 @@ func TestProcessAttackerMessage_MessageSentOnFlowNetwork(t *testing.T) {
 
 			unittest.RequireReturnsBefore(
 				t,
-				corruptedEventDispatchedOnFlowNetWg.Wait,
+				corruptEventDispatchedOnFlowNetWg.Wait,
 				100*time.Millisecond,
 				"attacker's message was not dispatched on flow network on time")
 		})
@@ -202,14 +202,14 @@ func TestProcessAttackerMessage_MessageSentOnFlowNetwork(t *testing.T) {
 func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 	runCorruptNetworkTest(t, unittest.Logger(),
 		func(
-			corruptedId flow.Identity, // identity of ccf
+			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
-			// creates a corrupted result approval that attacker is sending on the flow network through the
-			// corrupted network.
-			// corrupted result approval dictated by attacker needs to only have the attestation field, as the rest will be
+			// creates a corrupt result approval that attacker is sending on the flow network through the
+			// corrupt network.
+			// corrupt result approval dictated by attacker needs to only have the attestation field, as the rest will be
 			// filled up by the CCF.
 			dictatedAttestation := *unittest.AttestationFixture()
 			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &flow.ResultApproval{
@@ -225,8 +225,8 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 				params = append(params, id)
 			}
 
-			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
-			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			corruptEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptEventDispatchedOnFlowNetWg.Add(1)
 			adapter.On("PublishOnChannel", params...).Run(func(args mock.Arguments) {
 				approval, ok := args[1].(*flow.ResultApproval)
 				require.True(t, ok)
@@ -234,12 +234,12 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 				// attestation part of the approval must be the same as attacker dictates.
 				require.Equal(t, dictatedAttestation, approval.Body.Attestation)
 
-				// corrupted node should set the approver as its own id
-				require.Equal(t, corruptedId.NodeID, approval.Body.ApproverID)
+				// corrupt node should set the approver as its own id
+				require.Equal(t, corruptId.NodeID, approval.Body.ApproverID)
 
-				// approval should have a valid attestation signature from corrupted node
+				// approval should have a valid attestation signature from corrupt node
 				id := approval.Body.Attestation.ID()
-				valid, err := corruptedId.StakingPubKey.Verify(approval.Body.AttestationSignature, id[:], corruptNetwork.approvalHasher)
+				valid, err := corruptId.StakingPubKey.Verify(approval.Body.AttestationSignature, id[:], corruptNetwork.approvalHasher)
 
 				require.NoError(t, err)
 				require.True(t, valid)
@@ -248,13 +248,13 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 				// TODO: check correctness of spock
 				require.NotEmpty(t, approval.Body.Spock)
 
-				// approval body should have a valid signature from corrupted node
+				// approval body should have a valid signature from corrupt node
 				bodyId := approval.Body.ID()
-				valid, err = corruptedId.StakingPubKey.Verify(approval.VerifierSignature, bodyId[:], corruptNetwork.approvalHasher)
+				valid, err = corruptId.StakingPubKey.Verify(approval.VerifierSignature, bodyId[:], corruptNetwork.approvalHasher)
 				require.NoError(t, err)
 				require.True(t, valid)
 
-				corruptedEventDispatchedOnFlowNetWg.Done()
+				corruptEventDispatchedOnFlowNetWg.Done()
 				//}).Return(nil).Once()
 			}).Return(nil).Once()
 			// imitates a gRPC call from orchestrator to ccf through orchestrator network
@@ -262,19 +262,19 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 
 			unittest.RequireReturnsBefore(
 				t,
-				corruptedEventDispatchedOnFlowNetWg.Wait,
+				corruptEventDispatchedOnFlowNetWg.Wait,
 				100*time.Millisecond,
 				"attacker's message was not dispatched on flow network on time")
 		})
 }
 
-// TestProcessAttackerMessage_ResultApproval_PassThrough checks that when a corrupted network
+// TestProcessAttackerMessage_ResultApproval_PassThrough checks that when a corrupt network
 // receives a completely filled result approval,
 // it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 	runCorruptNetworkTest(t, unittest.Logger(),
 		func(
-			corruptedId flow.Identity, // identity of ccf
+			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
@@ -290,8 +290,8 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 				params = append(params, id)
 			}
 
-			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
-			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			corruptEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptEventDispatchedOnFlowNetWg.Add(1)
 			adapter.On("PublishOnChannel", params...).Run(func(args mock.Arguments) {
 				approval, ok := args[1].(*flow.ResultApproval)
 				require.True(t, ok)
@@ -299,7 +299,7 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 				// attestation part of the approval must be the same as attacker dictates.
 				require.Equal(t, passThroughApproval, approval)
 
-				corruptedEventDispatchedOnFlowNetWg.Done()
+				corruptEventDispatchedOnFlowNetWg.Done()
 			}).Return(nil).Once()
 
 			// imitates a gRPC call from orchestrator to ccf through orchestrator network
@@ -307,25 +307,25 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 
 			unittest.RequireReturnsBefore(
 				t,
-				corruptedEventDispatchedOnFlowNetWg.Wait,
+				corruptEventDispatchedOnFlowNetWg.Wait,
 				100*time.Millisecond,
 				"attacker's message was not dispatched on flow network on time")
 		})
 }
 
-// TestProcessAttackerMessage_ExecutionReceipt_Dictated checks that when a corrupted network receives an execution receipt with
+// TestProcessAttackerMessage_ExecutionReceipt_Dictated checks that when a corrupt network receives an execution receipt with
 // empty signature field, it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 	runCorruptNetworkTest(t, unittest.Logger(),
 		func(
-			corruptedId flow.Identity, // identity of ccf
+			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
-			// creates a corrupted execution receipt that attacker is sending on the flow network through the
-			// corrupted conduit factory.
-			// corrupted execution receipt dictated by attacker needs to only have the result field, as the rest will be
+			// creates a corrupt execution receipt that attacker is sending on the flow network through the
+			// corrupt conduit factory.
+			// corrupt execution receipt dictated by attacker needs to only have the result field, as the rest will be
 			// filled up by the CCF.
 			dictatedResult := *unittest.ExecutionResultFixture()
 			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &flow.ExecutionReceipt{
@@ -339,8 +339,8 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 				params = append(params, id)
 			}
 
-			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
-			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			corruptEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptEventDispatchedOnFlowNetWg.Add(1)
 			adapter.On("PublishOnChannel", params...).Run(func(args mock.Arguments) {
 				receipt, ok := args[1].(*flow.ExecutionReceipt)
 				require.True(t, ok)
@@ -348,18 +348,18 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 				// result part of the receipt must be the same as attacker dictates.
 				require.Equal(t, dictatedResult, receipt.ExecutionResult)
 
-				// corrupted node should set itself as the executor
-				require.Equal(t, corruptedId.NodeID, receipt.ExecutorID)
+				// corrupt node should set itself as the executor
+				require.Equal(t, corruptId.NodeID, receipt.ExecutorID)
 
-				// receipt should have a valid signature from corrupted node
+				// receipt should have a valid signature from corrupt node
 				id := receipt.ID()
-				valid, err := corruptedId.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], corruptNetwork.receiptHasher)
+				valid, err := corruptId.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], corruptNetwork.receiptHasher)
 				require.NoError(t, err)
 				require.True(t, valid)
 
 				// TODO: check correctness of spock
 
-				corruptedEventDispatchedOnFlowNetWg.Done()
+				corruptEventDispatchedOnFlowNetWg.Done()
 			}).Return(nil).Once()
 
 			// imitates a gRPC call from orchestrator to ccf through orchestrator network
@@ -367,18 +367,18 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 
 			unittest.RequireReturnsBefore(
 				t,
-				corruptedEventDispatchedOnFlowNetWg.Wait,
+				corruptEventDispatchedOnFlowNetWg.Wait,
 				100*time.Millisecond,
 				"attacker's message was not dispatched on flow network on time")
 		})
 }
 
-// TestProcessAttackerMessage_ExecutionReceipt_PassThrough checks that when a corrupted network
+// TestProcessAttackerMessage_ExecutionReceipt_PassThrough checks that when a corrupt network
 // receives a completely filled execution receipt, it treats it as a pass-through event and passes it as it is on the Flow network.
 func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 	runCorruptNetworkTest(t, unittest.Logger(),
 		func(
-			corruptedId flow.Identity, // identity of ccf
+			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to the corrupt network.
@@ -394,8 +394,8 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 				params = append(params, id)
 			}
 
-			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
-			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			corruptEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptEventDispatchedOnFlowNetWg.Add(1)
 			adapter.On("PublishOnChannel", params...).Run(func(args mock.Arguments) {
 				receipt, ok := args[1].(*flow.ExecutionReceipt)
 				require.True(t, ok)
@@ -403,7 +403,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 				// receipt should be completely intact.
 				require.Equal(t, passThroughReceipt, receipt)
 
-				corruptedEventDispatchedOnFlowNetWg.Done()
+				corruptEventDispatchedOnFlowNetWg.Done()
 			}).Return(nil).Once()
 
 			// imitates a gRPC call from orchestrator to ccf through orchestrator network
@@ -411,7 +411,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 
 			unittest.RequireReturnsBefore(
 				t,
-				corruptedEventDispatchedOnFlowNetWg.Wait,
+				corruptEventDispatchedOnFlowNetWg.Wait,
 				100*time.Millisecond,
 				"attacker's message was not dispatched on flow network on time")
 		})

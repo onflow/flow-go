@@ -16,13 +16,13 @@ type EgressController interface {
 	EngineClosingChannel(channels.Channel) error
 }
 
-// IngressController defines part of behavior of a corrupted networking layer that controls the inbound traffic of
+// IngressController defines part of behavior of a corrupt networking layer that controls the inbound traffic of
 // the engines registered to it.
 // By the inbound traffic, we mean the traffic from networking layer to the engine that carries on the
 // messages from remote nodes to this engine.
 type IngressController interface {
-	// HandleIncomingEvent sends an incoming event (to an engine) to the corrupted networking layer to process.
-	// Boolean return type represents whether attacker is registered with the corrupted network.
+	// HandleIncomingEvent sends an incoming event (to an engine) to the corrupt networking layer to process.
+	// Boolean return type represents whether attacker is registered with the corrupt network.
 	// Returns true if it is, false otherwise.
 	HandleIncomingEvent(interface{}, channels.Channel, flow.Identifier) bool
 }
