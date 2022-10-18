@@ -93,7 +93,7 @@ func New(
 				if ok {
 					log.Info().
 						Str("entity_ids", fmt.Sprintf("%v", request.EntityIDs)).
-						Hex("requester_id", logging.ID(message.OriginID)).
+						Hex("origin_id", logging.ID(message.OriginID)).
 						Msg("entity request received")
 				}
 				return ok
