@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/slashing"
@@ -159,7 +160,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// needed to enable ID translation
 	m.providers[0].SetIdentities(idList)
 
-	msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
+	msg, _ := createMessage(m.T(), m.ids[0].NodeID, newId.NodeID, "hello")
 
 	// message should fail to send because no address is known yet
 	// for the new identity
@@ -211,14 +212,14 @@ func (m *MiddlewareTestSuite) TestPingTypeReception() {
 // and content of the payload of the event upon reception at the receiver side
 // it does not evaluate the actual value of the sender ID
 func (m *MiddlewareTestSuite) TestPingIDType() {
-	msg, decodedPayload := createMessage(m.ids[0].NodeID, m.ids[1].NodeID, "hello")
+	msg, decodedPayload := createMessage(m.T(), m.ids[0].NodeID, m.ids[1].NodeID, "hello")
 	m.Ping(mockery.AnythingOfType("flow.Identifier"), msg, decodedPayload)
 }
 
 // TestPingContentReception tests the middleware against both
 // the payload and sender ID of the event upon reception at the receiver side
 func (m *MiddlewareTestSuite) TestPingContentReception() {
-	msg, decodedPayload := createMessage(m.ids[0].NodeID, m.ids[1].NodeID, "hello")
+	msg, decodedPayload := createMessage(m.T(), m.ids[0].NodeID, m.ids[1].NodeID, "hello")
 	m.Ping(m.ids[0].NodeID, msg, decodedPayload)
 }
 
@@ -251,7 +252,7 @@ func (m *MiddlewareTestSuite) Ping(expectID, expectedMessage, expectedPayload in
 			ch <- struct{}{}
 		})
 
-	msg, _ := createMessage(m.ids[firstNode].NodeID, m.ids[lastNode].NodeID, "hello")
+	msg, _ := createMessage(m.T(), m.ids[firstNode].NodeID, m.ids[lastNode].NodeID, "hello")
 
 	// sends a direct message from first node to the last node
 	err = m.mws[firstNode].SendDirect(msg, m.ids[lastNode].NodeID)
@@ -282,7 +283,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 	for i := 0; i < count; i++ {
 		receiveWG.Add(1)
 		sendWG.Add(1)
-		msg, expectedPayload := createMessage(m.ids[firstNode].NodeID, m.ids[lastNode].NodeID, fmt.Sprintf("hello from: %d", i))
+		msg, expectedPayload := createMessage(m.T(), m.ids[firstNode].NodeID, m.ids[lastNode].NodeID, fmt.Sprintf("hello from: %d", i))
 		m.ov[lastNode].On("Receive", m.ids[firstNode].NodeID, msg, expectedPayload).Return(nil).Once().
 			Run(func(args mockery.Arguments) {
 				payload := args.Get(2).(*libp2pmessage.TestMessage)
@@ -323,10 +324,10 @@ func (m *MiddlewareTestSuite) TestEcho() {
 	firstNode := m.ids[first].NodeID
 	lastNode := m.ids[last].NodeID
 
-	sendMsg, sendPayload := createMessage(firstNode, lastNode, "hello")
+	sendMsg, sendPayload := createMessage(m.T(), firstNode, lastNode, "hello")
 	expectedSendPayload := sendPayload.(*libp2pmessage.TestMessage)
 
-	replyMsg, replyPayload := createMessage(lastNode, firstNode, "hello back")
+	replyMsg, replyPayload := createMessage(m.T(), lastNode, firstNode, "hello back")
 	expectedReplyPayload := replyPayload.(*libp2pmessage.TestMessage)
 
 	// last node
@@ -369,7 +370,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 	firstNode := m.ids[first].NodeID
 	lastNode := m.ids[last].NodeID
 
-	msg, _ := createMessage(firstNode, lastNode, "")
+	msg, _ := createMessage(m.T(), firstNode, lastNode, "")
 
 	// creates a network payload beyond the maximum message size
 	// Note: networkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
@@ -400,7 +401,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	sourceNode := m.ids[sourceIndex].NodeID
 	targetNode := m.ids[targetIndex].NodeID
 
-	msg, _ := createMessage(sourceNode, targetNode, "")
+	msg, _ := createMessage(m.T(), sourceNode, targetNode, "")
 
 	// creates a network payload with a size greater than the default max size
 	payload := networkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
@@ -417,11 +418,22 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 
 	// set the message payload as the large message
 	msg.Payload = encodedEvent
+	msg.EventID, err = p2p.EventId(channels.Channel(msg.ChannelID), encodedEvent)
+	require.NoError(m.T(), err)
 
 	// expect one message to be received by the target
 	ch := make(chan struct{})
-	m.ov[targetIndex].On("Receive", sourceNode, msg, event).Return(nil).Once().
+	m.ov[targetIndex].On("Receive", sourceNode, mock.AnythingOfType("*message.Message"), event).Return(nil).Once().
 		Run(func(args mockery.Arguments) {
+			// Everything should match except msg.Type since we actually sent a TestMessage
+			received := args[1].(*message.Message)
+			assert.Equal(m.T(), msg.ChannelID, received.ChannelID)
+			assert.Equal(m.T(), msg.OriginID, received.OriginID)
+			assert.Equal(m.T(), msg.TargetIDs, received.TargetIDs)
+			assert.Equal(m.T(), msg.EventID, received.EventID)
+			assert.Equal(m.T(), msg.Payload, received.Payload)
+			assert.Equal(m.T(), "message.TestMessage", received.Type)
+
 			close(ch)
 		})
 
@@ -444,7 +456,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	firstNode := m.ids[first].NodeID
 	lastNode := m.ids[last].NodeID
 
-	msg, _ := createMessage(firstNode, lastNode, "")
+	msg, _ := createMessage(m.T(), firstNode, lastNode, "")
 	// adds another node as the target id to imitate publishing
 	msg.TargetIDs = append(msg.TargetIDs, lastNode[:])
 
@@ -496,7 +508,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	msgRcvdFun := func() {
 		<-msgRcvd
 	}
-	message1, _ := createMessage(firstNode, lastNode, "hello1")
+	message1, _ := createMessage(m.T(), firstNode, lastNode, "hello1")
 	m.ov[last].On("Receive", firstNode, mockery.Anything, mockery.Anything).Return(nil).Run(func(_ mockery.Arguments) {
 		msgRcvd <- struct{}{}
 	})
@@ -512,7 +524,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	assert.NoError(m.T(), err)
 
 	// create and send a new message on the channel from the origin node
-	message2, _ := createMessage(firstNode, lastNode, "hello2")
+	message2, _ := createMessage(m.T(), firstNode, lastNode, "hello2")
 	err = m.mws[first].Publish(message2, testChannel)
 	assert.NoError(m.T(), err)
 
@@ -520,23 +532,25 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	unittest.RequireNeverReturnBefore(m.T(), msgRcvdFun, 2*time.Second, "message received unexpectedly")
 }
 
-func createMessage(originID flow.Identifier, targetID flow.Identifier, msg string) (*message.Message, interface{}) {
+func createMessage(t *testing.T, originID flow.Identifier, targetID flow.Identifier, msg string) (*message.Message, interface{}) {
 	payload := &libp2pmessage.TestMessage{
 		Text: msg,
 	}
 
 	codec := unittest.NetworkCodec()
 	b, err := codec.Encode(payload)
-	if err != nil {
-		fmt.Println(err)
-	}
+	assert.NoError(t, err)
+
+	eventID, err := p2p.EventId(testChannel, b)
+	assert.NoError(t, err)
 
 	m := &message.Message{
 		ChannelID: testChannel.String(),
-		EventID:   []byte("1"),
+		EventID:   eventID,
 		OriginID:  originID[:],
 		TargetIDs: [][]byte{targetID[:]},
 		Payload:   b,
+		Type:      p2p.MessageType(payload),
 	}
 
 	return m, payload

@@ -443,6 +443,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			return
 		}
 
+		// Note: message fields must not be trusted until explicitly validated
 		var msg message.Message
 
 		// read the next message (blocking call)
@@ -453,23 +454,9 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 				break
 			}
 
-			m.log.Err(err).Msg("failed to read message")
-			return
-		}
-
-		// TODO: once we've implemented per topic message size limits per the TODO above,
-		// we can remove this check
-		maxSize := unicastMaxMsgSize(&msg)
-		if msg.Size() > maxSize {
-			// message size exceeded
-			m.log.Error().
-				Hex("sender", msg.OriginID).
-				Hex("event_id", msg.EventID).
-				Str("event_type", msg.Type).
-				Str("channel", msg.ChannelID).
-				Int("maxSize", maxSize).
-				Bool(logging.KeySuspicious, true).
-				Msg("received message exceeded permissible message maxSize")
+			m.log.Err(err).
+				Str("peer_id", remotePeer.String()).
+				Msg("failed to read message")
 			return
 		}
 
@@ -567,12 +554,27 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 		m.log.
 			Error().
 			Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
-			Hex("sender", msg.OriginID).
-			Hex("event_id", msg.EventID).
-			Str("event_type", msg.Type).
+			Str("peer_id", remotePeer.String()).
 			Str("channel", msg.ChannelID).
 			Bool(logging.KeySuspicious, true).
 			Msg("failed to decode message payload")
+		return
+	}
+
+	msg.Type = p2p.MessageType(decodedMsgPayload)
+
+	// TODO: once we've implemented per topic message size limits per the TODO above,
+	// we can remove this check
+	maxSize := unicastMaxMsgSize(msg)
+	if msg.Size() > maxSize {
+		// message size exceeded
+		m.log.Error().
+			Str("peer_id", remotePeer.String()).
+			Str("channel", msg.ChannelID).
+			Int("max_size", maxSize).
+			Int("size", msg.Size()).
+			Bool(logging.KeySuspicious, true).
+			Msg("received message exceeded permissible message maxSize")
 		return
 	}
 
@@ -583,9 +585,8 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 			m.log.
 				Error().
 				Err(err).
-				Hex("sender", msg.OriginID).
-				Hex("event_id", msg.EventID).
-				Str("event_type", msg.Type).
+				Str("peer_id", remotePeer.String()).
+				Str("type", msg.Type).
 				Str("channel", msg.ChannelID).
 				Msg("unicast authorized sender validation failed")
 			return
@@ -604,11 +605,30 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID) {
 	flowID, err := m.idTranslator.GetFlowID(peerID)
 	if err != nil {
-		m.log.Warn().Err(err).Msgf("received message from unknown peer %v, and was dropped", peerID.String())
+		// this error should never happen. by the time the message gets here, the peer should be
+		// authenticated which means it must be known
+		m.log.Warn().
+			Err(err).
+			Str("peer_id", peerID.String()).
+			Bool(logging.KeySuspicious, true).
+			Msg("dropped message from unknown peer")
+		return
+	}
+
+	channel := channels.Channel(msg.ChannelID)
+	eventID, err := p2p.EventId(channel, msg.GetPayload())
+	if err != nil {
+		m.log.Error().
+			Err(err).
+			Str("peer_id", peerID.String()).
+			Bool(logging.KeySuspicious, true).
+			Msgf("could not generate event ID for message")
 		return
 	}
 
 	msg.OriginID = flowID[:]
+	msg.EventID = eventID
+	msg.Type = p2p.MessageType(decodedMsgPayload)
 
 	m.processMessage(msg, decodedMsgPayload)
 }
