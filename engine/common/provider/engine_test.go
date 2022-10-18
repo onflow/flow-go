@@ -107,7 +107,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	e.Start(ctx)
 
 	unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
@@ -200,7 +200,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	e.Start(ctx)
 
 	unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
