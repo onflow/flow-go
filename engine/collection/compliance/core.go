@@ -341,8 +341,8 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 	return nil
 }
 
-// OnBlockVote handles votes for blocks by passing them to the core consensus
-// algorithm. No errors are expected during normal operation.
+// OnBlockVote handles votes for blocks by passing them to the core consensus algorithm.
+// No errors are expected during normal operation.
 func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
 	c.log.Debug().
 		Hex("origin_id", originID[:]).
