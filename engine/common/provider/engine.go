@@ -215,6 +215,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []
 		if _, ok := seen[entityID]; ok {
 			lg.Warn().
 				Str("entity_id", entityID.String()).
+				Bool(logging.KeySuspicious, true).
 				Msg("duplicate entity ID in entity request")
 			continue
 		}
