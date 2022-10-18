@@ -89,6 +89,10 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 //   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
+	if len(data) == 0 {
+		return nil, fmt.Errorf("invalid encoded message")
+	}
+
 	// decode the envelope
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":wire>3(cbor)payload2envelope")
 
