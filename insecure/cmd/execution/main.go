@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	corruptedBuilder := insecmd.NewCorruptedNodeBuilder(flow.RoleExecution.String())
+	corruptedBuilder := insecmd.NewCorruptNodeBuilder(flow.RoleExecution.String())
 	corruptedExecutionBuilder := cmd.NewExecutionNodeBuilder(corruptedBuilder.FlowNodeBuilder)
 	corruptedExecutionBuilder.LoadFlags()
 

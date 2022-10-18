@@ -11,31 +11,31 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// CorruptNetworkPort is the port number that gRPC server of the corrupt networking layer of the corrupted nodes is listening on.
+// CorruptNetworkPort is the port number that gRPC server of the corrupt networking layer of the corrupt nodes is listening on.
 const CorruptNetworkPort = 4300
 
-// CorruptedNodeBuilder creates a general flow node builder with corrupt network.
-type CorruptedNodeBuilder struct {
+// CorruptNodeBuilder creates a general flow node builder with corrupt network.
+type CorruptNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 }
 
-func NewCorruptedNodeBuilder(role string) *CorruptedNodeBuilder {
-	return &CorruptedNodeBuilder{
+func NewCorruptNodeBuilder(role string) *CorruptNodeBuilder {
+	return &CorruptNodeBuilder{
 		FlowNodeBuilder: cmd.FlowNode(role),
 	}
 }
 
-func (cnb *CorruptedNodeBuilder) Initialize() error {
+func (cnb *CorruptNodeBuilder) Initialize() error {
 	if err := cnb.FlowNodeBuilder.Initialize(); err != nil {
 		return fmt.Errorf("could not initilized flow node builder: %w", err)
 	}
 
-	cnb.enqueueNetworkingLayer() // initializes corrupted networking layer.
+	cnb.enqueueNetworkingLayer() // initializes corrupt networking layer.
 
 	return nil
 }
 
-func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
+func (cnb *CorruptNodeBuilder) enqueueNetworkingLayer() {
 	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()
 		if cnb.FlowNodeBuilder.BaseConfig.BindAddr != cmd.NotSet {
@@ -50,7 +50,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		address := net.JoinHostPort(host, strconv.Itoa(CorruptNetworkPort))
 		ccf := corruptnet.NewCorruptConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
 
-		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupted conduit factory initiated")
+		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupt conduit factory initiated")
 
 		flowNetwork, err := cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, ccf)
 		if err != nil {

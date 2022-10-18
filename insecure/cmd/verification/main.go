@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	corruptedBuilder := insecmd.NewCorruptedNodeBuilder(flow.RoleVerification.String())
+	corruptedBuilder := insecmd.NewCorruptNodeBuilder(flow.RoleVerification.String())
 	corruptedVerificationBuilder := cmd.NewVerificationNodeBuilder(corruptedBuilder.FlowNodeBuilder)
 	corruptedVerificationBuilder.LoadFlags()
 
