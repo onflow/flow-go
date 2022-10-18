@@ -148,7 +148,6 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 	}
 
 	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityRequest)
-	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
 
 	err := e.requestHandler.Process(originID, event)
 	if err != nil {
@@ -169,6 +168,8 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 // onEntityRequest processes an entity request message from a remote node.
 // All errors returned by this function are benign and should not cause the engine to crash.
 func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []flow.Identifier) error {
+	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
+	
 	lg := e.log.With().Str("origin_id", originID.String()).Logger()
 
 	lg.Debug().
