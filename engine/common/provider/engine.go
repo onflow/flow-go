@@ -166,6 +166,8 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 	return nil
 }
 
+// onEntityRequest processes an entity request message from a remote node.
+// All errors returned by this function are benign and should not cause the engine to crash.
 func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []flow.Identifier) error {
 	lg := e.log.With().Str("origin_id", originID.String()).Logger()
 
@@ -290,7 +292,7 @@ func (e *Engine) shovelEntityRequests() {
 	}
 }
 
-func (e *Engine) processEntityRequestWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (e *Engine) processEntityRequestWorker(_ irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	for {
