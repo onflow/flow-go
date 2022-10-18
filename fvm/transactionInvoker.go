@@ -156,6 +156,7 @@ func (i TransactionInvoker) Process(
 		// if fee deduction fails just do clean up and exit
 		if feesError != nil {
 			ctx.Logger.Info().
+				Err(feesError).
 				Msg("transaction fee deduction executed with error")
 
 			if mergeErrorShouldEarlyExit(feesError) {
