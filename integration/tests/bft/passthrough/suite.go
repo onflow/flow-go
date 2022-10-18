@@ -21,7 +21,7 @@ import (
 )
 
 // Suite represents a test suite evaluating the integration of the testnet against
-// happy path of Corrupted Conduit Framework (CCF) for BFT testing.
+// happy path of Corrupt Network framework (CN) for BFT testing.
 type Suite struct {
 	suite.Suite
 	log                     zerolog.Logger
@@ -31,9 +31,9 @@ type Suite struct {
 	nodeConfigs             []testnet.NodeConfig // used to keep configuration of nodes in testnet
 	nodeIDs                 []flow.Identifier    // used to keep identifier of nodes in testnet
 	ghostID                 flow.Identifier      // represents id of ghost node
-	exe1ID                  flow.Identifier      // corrupted execution node 1
-	exe2ID                  flow.Identifier      // corrupted execution node 2
-	verID                   flow.Identifier      // corrupted verification node
+	exe1ID                  flow.Identifier      // corrupt execution node 1
+	exe2ID                  flow.Identifier      // corrupt execution node 2
+	verID                   flow.Identifier      // corrupt verification node
 	PreferredUnicasts       string               // preferred unicast protocols between execution and verification nodes.
 	Orchestrator            *passthrough.Orchestrator
 	attackerNetwork         *attackernet.Network
@@ -58,8 +58,8 @@ func (s *Suite) AccessClient() *testnet.Client {
 // SetupSuite runs a bare minimum Flow network to function correctly with the following roles:
 // - Two collector nodes
 // - Four consensus nodes
-// - two corrupted execution node
-// - One corrupted verification node
+// - two corrupt execution node
+// - One corrupt verification node
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
@@ -81,27 +81,27 @@ func (s *Suite) SetupSuite() {
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
 
-	// generates one corrupted verification node
+	// generates one corrupt verification node
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.AsCorrupted())
+		testnet.AsCorrupt())
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
-	// generates two corrupted execution nodes
+	// generates two corrupt execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.AsCorrupted())
+		testnet.AsCorrupt())
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.AsCorrupted())
+		testnet.AsCorrupt())
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
@@ -148,12 +148,12 @@ func (s *Suite) SetupSuite() {
 
 	// start orchestrator network
 	codec := unittest.NetworkCodec()
-	connector := attackernet.NewCorruptConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
+	connector := attackernet.NewCorruptConnector(s.log, s.net.CorruptIdentities(), s.net.CorruptPortMapping)
 	orchestratorNetwork, err := attackernet.NewOrchestratorNetwork(s.log,
 		codec,
 		s.Orchestrator,
 		connector,
-		s.net.CorruptedIdentities())
+		s.net.CorruptIdentities())
 	require.NoError(s.T(), err)
 	s.attackerNetwork = orchestratorNetwork
 

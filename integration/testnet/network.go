@@ -151,7 +151,7 @@ type FlowNetwork struct {
 	network                     *testingdock.Network
 	Containers                  map[string]*Container
 	ConsensusFollowers          map[flow.Identifier]consensus_follower.ConsensusFollower
-	CorruptedPortMapping        map[flow.Identifier]string // port binding for corrupted containers.
+	CorruptPortMapping          map[flow.Identifier]string // port binding for corrupt containers.
 	ObserverPorts               map[string]string
 	AccessPorts                 map[string]string
 	AccessPortsByContainerName  map[string]string
@@ -164,24 +164,24 @@ type FlowNetwork struct {
 	BootstrapData               *BootstrapData
 }
 
-// CorruptedIdentities returns the identities of corrupted nodes in testnet (for BFT testing).
-func (net *FlowNetwork) CorruptedIdentities() flow.IdentityList {
-	// lists up the corrupted identifiers
-	corruptedIdentifiers := flow.IdentifierList{}
+// CorruptIdentities returns the identities of corrupt nodes in testnet (for BFT testing).
+func (net *FlowNetwork) CorruptIdentities() flow.IdentityList {
+	// lists up the corrupt identifiers
+	corruptIdentifiers := flow.IdentifierList{}
 	for _, c := range net.config.Nodes {
-		if c.Corrupted {
-			corruptedIdentifiers = append(corruptedIdentifiers, c.Identifier)
+		if c.Corrupt {
+			corruptIdentifiers = append(corruptIdentifiers, c.Identifier)
 		}
 	}
 
-	// extracts corrupted identities to corrupted identifiers
-	corruptedIdentities := flow.IdentityList{}
+	// extracts corrupt identities to corrupt identifiers
+	corruptIdentities := flow.IdentityList{}
 	for _, c := range net.Containers {
-		if corruptedIdentifiers.Contains(c.Config.Identity().NodeID) {
-			corruptedIdentities = append(corruptedIdentities, c.Config.Identity())
+		if corruptIdentifiers.Contains(c.Config.Identity().NodeID) {
+			corruptIdentities = append(corruptIdentities, c.Config.Identity())
 		}
 	}
-	return corruptedIdentities
+	return corruptIdentities
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -468,7 +468,7 @@ func (n *NetworkConfig) Swap(i, j int) {
 // to network creation.
 type NodeConfig struct {
 	Role                  flow.Role
-	Corrupted             bool
+	Corrupt               bool
 	Weight                uint64
 	Identifier            flow.Identifier
 	LogLevel              zerolog.Level
@@ -545,23 +545,23 @@ func WithDebugImage(debug bool) func(config *NodeConfig) {
 	}
 }
 
-// AsCorrupted sets the configuration of a node as corrupted, hence the node is pulling
-// the corrupted image of its role at the build time.
-// A corrupted image is running with Corruptible Conduit Factory hence enabling BFT testing
+// AsCorrupt sets the configuration of a node as corrupt, hence the node is pulling
+// the corrupt image of its role at the build time.
+// A corrupt image is running with Corrupt Network hence enabling BFT testing
 // on the node.
-func AsCorrupted() func(config *NodeConfig) {
+func AsCorrupt() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		if config.Ghost {
-			panic("a node cannot be both corrupted and ghost at the same time")
+			panic("a node cannot be both corrupt and ghost at the same time")
 		}
-		config.Corrupted = true
+		config.Corrupt = true
 	}
 }
 
 func AsGhost() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
-		if config.Corrupted {
-			panic("a node cannot be both corrupted and ghost at the same time")
+		if config.Corrupt {
+			panic("a node cannot be both corrupt and ghost at the same time")
 		}
 		config.Ghost = true
 	}
@@ -643,7 +643,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 		AccessPorts:                 make(map[string]string),
 		AccessPortsByContainerName:  make(map[string]string),
 		MetricsPortsByContainerName: make(map[string]string),
-		CorruptedPortMapping:        make(map[flow.Identifier]string),
+		CorruptPortMapping:          make(map[flow.Identifier]string),
 		root:                        root,
 		seal:                        seal,
 		result:                      result,
@@ -1143,12 +1143,12 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		nodeContainer.bindPort(hostPort, containerPort)
 	}
 
-	if nodeConf.Corrupted {
-		// corrupted nodes are running with a Corrupted Conduit Factory (CCF), hence need to bind their
+	if nodeConf.Corrupt {
+		// corrupt nodes are running with a Corrupt Network (CN), hence need to bind their
 		// CCF port to local host, so they can be accessible by the orchestrator network.
 		hostPort := testingdock.RandomPort(t)
 		nodeContainer.bindPort(hostPort, strconv.Itoa(cmd.CorruptNetworkPort))
-		net.CorruptedPortMapping[nodeConf.NodeID] = hostPort
+		net.CorruptPortMapping[nodeConf.NodeID] = hostPort
 	}
 
 	suiteContainer := net.suite.Container(*opts)
@@ -1469,7 +1469,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			AdditionalFlags:       conf.AdditionalFlags,
 			Debug:                 conf.Debug,
 			SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
-			Corrupted:             conf.Corrupted,
+			Corrupt:               conf.Corrupt,
 		}
 
 		confs = append(confs, containerConf)

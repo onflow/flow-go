@@ -20,7 +20,7 @@ import (
 )
 
 // Suite represents a test suite evaluating the integration of the testnet against
-// happy path of Corrupted Conduit Framework (CCF) for BFT testing.
+// happy path of Corrupt Conduit Framework (CCF) for BFT testing.
 type Suite struct {
 	suite.Suite
 	log                     zerolog.Logger
@@ -31,14 +31,14 @@ type Suite struct {
 	nodeIDs                 []flow.Identifier    // used to keep identifier of nodes in testnet
 	ghostID                 flow.Identifier      // represents id of ghost node
 
-	// execution nodes: 2 corrupted, one honest
-	corruptedEN1Id flow.Identifier // corrupted execution node 1
-	corruptedEN2Id flow.Identifier // corrupted execution node 2
-	honestENId     flow.Identifier // honest execution node
+	// execution nodes: 2 corrupt, one honest
+	corruptEN1Id flow.Identifier // corrupt execution node 1
+	corruptEN2Id flow.Identifier // corrupt execution node 2
+	honestENId   flow.Identifier // honest execution node
 
-	// verification nodes: 3 corrupted, one honest
-	corruptedVnIds flow.IdentifierList
-	honestVN       flow.Identifier // honest verification node
+	// verification nodes: 3 corrupt, one honest
+	corruptVnIds flow.IdentifierList
+	honestVN     flow.Identifier // honest verification node
 
 	PreferredUnicasts string // preferred unicast protocols between execution and verification nodes.
 	Orchestrator      *wintermute.Orchestrator
@@ -64,13 +64,13 @@ func (s *Suite) AccessClient() *testnet.Client {
 // SetupSuite runs a bare minimum Flow network to function correctly with the following roles:
 // - Two collector nodes.
 // - Four consensus nodes.
-// - Three execution nodes (two corrupted).
-// - Four verification nodes (three corrupted).
+// - Three execution nodes (two corrupt).
+// - Four verification nodes (three corrupt).
 // - One ghost node (as an execution node).
 //
 // Moreover, chunk alpha is set to 3, meaning each chunk is assigned to three-out-of-four verification nodes.
 // However, each chunk is sealed with two approvals.
-// This guarantees that each chunk is assigned to at least two corrupted verification nodes, and they are
+// This guarantees that each chunk is assigned to at least two corrupt verification nodes, and they are
 // enough to approve and seal the chunk.
 func (s *Suite) SetupSuite() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
@@ -94,14 +94,14 @@ func (s *Suite) SetupSuite() {
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
 
-	// generates four verification nodes: three corrupted, one honest
-	s.corruptedVnIds = unittest.IdentifierListFixture(3)
-	for _, nodeID := range s.corruptedVnIds {
+	// generates four verification nodes: three corrupt, one honest
+	s.corruptVnIds = unittest.IdentifierListFixture(3)
+	for _, nodeID := range s.corruptVnIds {
 		verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 			testnet.WithID(nodeID),
 			testnet.WithAdditionalFlag(chunkAlpha),
 			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.AsCorrupted())
+			testnet.AsCorrupt())
 		s.nodeConfigs = append(s.nodeConfigs, verConfig)
 	}
 
@@ -113,21 +113,21 @@ func (s *Suite) SetupSuite() {
 		testnet.WithLogLevel(zerolog.FatalLevel))
 	s.nodeConfigs = append(s.nodeConfigs, ver4Config)
 
-	// generates three execution nodes: two corrupted and one honest
-	// corrupted EN1
-	s.corruptedEN1Id = unittest.IdentifierFixture()
+	// generates three execution nodes: two corrupt and one honest
+	// corrupt EN1
+	s.corruptEN1Id = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
-		testnet.WithID(s.corruptedEN1Id),
+		testnet.WithID(s.corruptEN1Id),
 		testnet.WithLogLevel(zerolog.ErrorLevel),
-		testnet.AsCorrupted())
+		testnet.AsCorrupt())
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
-	// corrupted EN2
-	s.corruptedEN2Id = unittest.IdentifierFixture()
+	// corrupt EN2
+	s.corruptEN2Id = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
-		testnet.WithID(s.corruptedEN2Id),
+		testnet.WithID(s.corruptEN2Id),
 		testnet.WithLogLevel(zerolog.ErrorLevel),
-		testnet.AsCorrupted())
+		testnet.AsCorrupt())
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// honest EN
@@ -172,16 +172,16 @@ func (s *Suite) SetupSuite() {
 	s.cancel = cancel
 	s.net.Start(ctx)
 
-	s.Orchestrator = wintermute.NewOrchestrator(s.log, s.net.CorruptedIdentities().NodeIDs(), s.net.Identities())
+	s.Orchestrator = wintermute.NewOrchestrator(s.log, s.net.CorruptIdentities().NodeIDs(), s.net.Identities())
 
 	// start orchestrator network
 	codec := unittest.NetworkCodec()
-	connector := attackernet.NewCorruptConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
+	connector := attackernet.NewCorruptConnector(s.log, s.net.CorruptIdentities(), s.net.CorruptPortMapping)
 	orchestratorNetwork, err := attackernet.NewOrchestratorNetwork(s.log,
 		codec,
 		s.Orchestrator,
 		connector,
-		s.net.CorruptedIdentities())
+		s.net.CorruptIdentities())
 	require.NoError(s.T(), err)
 	s.attackerNetwork = orchestratorNetwork
 
