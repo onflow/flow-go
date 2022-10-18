@@ -153,4 +153,6 @@ func matchAndRemoveEntityRequest(t *testing.T, requests []*internal.RequestEntit
 
 	// no request found in the list to match
 	require.Fail(t, "could not find a match for request")
+
+	return requests
 }
