@@ -285,7 +285,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 		log.Warn().Msg("checking beacon key consistency: no key found")
 		err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateNoKey)
 		if errors.Is(err, storage.ErrAlreadyExists) {
-			e.log.Warn().Err(err).Msg("failed to set dkg end state - already set")
+			log.Warn().Err(err).Msg("failed to set dkg end state - already set")
 		} else if err != nil {
 			log.Fatal().Err(err).Msg("failed to set dkg end state")
 		}
@@ -311,7 +311,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 			Msg("checking beacon key consistency: locally computed beacon public key does not match beacon public key for next epoch")
 		err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateInconsistentKey)
 		if errors.Is(err, storage.ErrAlreadyExists) {
-			e.log.Warn().Err(err).Msg("failed to set dkg end state - already set")
+			log.Warn().Err(err).Msg("failed to set dkg end state - already set")
 		} else if err != nil {
 			log.Fatal().Err(err).Msg("failed to set dkg end state")
 		}
