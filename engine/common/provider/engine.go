@@ -181,7 +181,9 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 }
 
 // onEntityRequest processes an entity request message from a remote node.
-// All errors returned by this function are benign and should not cause the engine to crash.
+// Error returns:
+// * InvalidInputError if the list of requested entities is invalid (empty)
+// * generic error in case of unexpected failure or implementation bug
 func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []flow.Identifier) error {
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
 
