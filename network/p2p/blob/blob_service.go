@@ -35,6 +35,7 @@ import (
 )
 
 type blobService struct {
+	prefix string
 	component.Component
 	blockService blockservice.BlockService
 	blockStore   blockstore.Blockstore
@@ -80,7 +81,7 @@ func WithHashOnRead(enabled bool) network.BlobServiceOption {
 func WithRateLimit(r float64, b int) network.BlobServiceOption {
 	return func(bs network.BlobService) {
 		blobService := bs.(*blobService)
-		blobService.blockStore = newRateLimitedBlockStore(blobService.blockStore, r, b)
+		blobService.blockStore = newRateLimitedBlockStore(blobService.blockStore, blobService.prefix, r, b)
 	}
 }
 
@@ -96,6 +97,7 @@ func NewBlobService(
 ) *blobService {
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
 	bs := &blobService{
+		prefix: prefix,
 		config: &BlobServiceConfig{
 			ReprovideInterval: 12 * time.Hour,
 		},
@@ -221,11 +223,11 @@ type rateLimitedBlockStore struct {
 
 var rateLimitedError = errors.New("rate limited")
 
-func newRateLimitedBlockStore(bs blockstore.Blockstore, r float64, b int) *rateLimitedBlockStore {
+func newRateLimitedBlockStore(bs blockstore.Blockstore, prefix string, r float64, b int) *rateLimitedBlockStore {
 	return &rateLimitedBlockStore{
 		Blockstore: bs,
 		limiter:    rate.NewLimiter(rate.Limit(r), b),
-		metrics:    metrics.NewRateLimitedBlockstoreCollector(),
+		metrics:    metrics.NewRateLimitedBlockstoreCollector(prefix),
 	}
 }
 

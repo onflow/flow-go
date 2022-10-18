@@ -14,7 +14,7 @@ import (
 
 func TestRateLimit(t *testing.T) {
 	bs := blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore()))
-	rateLimitedBs := newRateLimitedBlockStore(bs, 4, 4) // 4 bytes per second, burst of 4
+	rateLimitedBs := newRateLimitedBlockStore(bs, "rate_test", 4, 4) // 4 bytes per second, burst of 4
 
 	data := make([]byte, 4)
 	rand.Read(data)
@@ -30,7 +30,7 @@ func TestRateLimit(t *testing.T) {
 
 func TestBurstLimit(t *testing.T) {
 	bs := blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore()))
-	rateLimitedBs := newRateLimitedBlockStore(bs, 4, 8) // 4 bytes per second, burst of 8
+	rateLimitedBs := newRateLimitedBlockStore(bs, "burst_test", 4, 8) // 4 bytes per second, burst of 8
 
 	data := make([]byte, 4)
 	rand.Read(data)
