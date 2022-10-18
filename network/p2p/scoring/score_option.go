@@ -192,6 +192,7 @@ func defaultAppSpecificScoreFunction(logger zerolog.Logger, idProvider module.Id
 		if err != nil {
 			lg.Error().
 				Err(err).
+				Bool(logging.KeySuspicious, true).
 				Msg("invalid peer identity, penalizing peer")
 			return MaxAppSpecificPenalty
 		}
@@ -204,6 +205,7 @@ func defaultAppSpecificScoreFunction(logger zerolog.Logger, idProvider module.Id
 		// checks if peer has any subscription violation.
 		if err := validator.CheckSubscribedToAllowedTopics(pid, flowId.Role); err != nil {
 			lg.Err(err).
+				Bool(logging.KeySuspicious, true).
 				Msg("invalid subscription detected, penalizing peer")
 			return MaxAppSpecificPenalty
 		}
