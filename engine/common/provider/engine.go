@@ -26,7 +26,7 @@ import (
 
 const (
 	// DefaultRequestProviderWorkers is the default number of workers used to process entity requests.
-	DefaultRequestProviderWorkers = uint(100)
+	DefaultRequestProviderWorkers = uint(5)
 
 	DefaultEntityRequestCacheSize = 1000
 )
