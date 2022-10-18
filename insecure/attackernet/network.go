@@ -31,7 +31,7 @@ type Network struct {
 
 var _ insecure.AttackerNetwork = &Network{}
 
-func NewOrchestratorNetwork(
+func NewAttackerNetwork(
 	logger zerolog.Logger,
 	codec network.Codec,
 	orchestrator insecure.AttackerOrchestrator,

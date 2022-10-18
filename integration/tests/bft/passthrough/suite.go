@@ -146,16 +146,16 @@ func (s *Suite) SetupSuite() {
 
 	s.Orchestrator = passthrough.NewDummyOrchestrator(s.log)
 
-	// start orchestrator network
+	// start attacker network
 	codec := unittest.NetworkCodec()
 	connector := attackernet.NewCorruptConnector(s.log, s.net.CorruptIdentities(), s.net.CorruptPortMapping)
-	orchestratorNetwork, err := attackernet.NewOrchestratorNetwork(s.log,
+	attackerNetwork, err := attackernet.NewAttackerNetwork(s.log,
 		codec,
 		s.Orchestrator,
 		connector,
 		s.net.CorruptIdentities())
 	require.NoError(s.T(), err)
-	s.attackerNetwork = orchestratorNetwork
+	s.attackerNetwork = attackerNetwork
 
 	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
@@ -167,11 +167,11 @@ func (s *Suite) SetupSuite() {
 		}
 	}()
 
-	orchestratorNetwork.Start(attackCtx)
-	unittest.RequireCloseBefore(s.T(), orchestratorNetwork.Ready(), 1*time.Second, "could not start orchestrator network on time")
+	attackerNetwork.Start(attackCtx)
+	unittest.RequireCloseBefore(s.T(), attackerNetwork.Ready(), 1*time.Second, "could not start orchestrator network on time")
 }
 
-// TearDownSuite tears down the test network of Flow as well as the BFT testing orchestrator network.
+// TearDownSuite tears down the test network of Flow as well as the BFT testing attacker network.
 func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	s.cancel()

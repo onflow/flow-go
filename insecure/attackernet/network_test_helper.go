@@ -139,7 +139,7 @@ func withMockOrchestrator(t *testing.T,
 			orchestrator := &mockinsecure.AttackerOrchestrator{}
 			connector := NewCorruptConnector(unittest.Logger(), corruptIds, corruptNetworkPorts)
 
-			orchestratorNetwork, err := NewOrchestratorNetwork(
+			attackerNetwork, err := NewAttackerNetwork(
 				unittest.Logger(),
 				unittest.NetworkCodec(),
 				orchestrator,
@@ -147,24 +147,24 @@ func withMockOrchestrator(t *testing.T,
 				corruptIds)
 			require.NoError(t, err)
 
-			// mocks registering orchestratorNetwork as the orchestrator network functionality for orchestrator.
-			orchestrator.On("Register", orchestratorNetwork).Return().Once()
+			// mocks registering attackerNetwork as the orchestrator network functionality for orchestrator.
+			orchestrator.On("Register", attackerNetwork).Return().Once()
 
-			// life-cycle management of orchestratorNetwork.
+			// life-cycle management of attackerNetwork.
 			ctx, cancel := context.WithCancel(context.Background())
 			attackCtx, errChan := irrecoverable.WithSignaler(ctx)
 			go func() {
 				select {
 				case err := <-errChan:
-					t.Error("orchestratorNetwork startup encountered fatal error", err)
+					t.Error("attackerNetwork startup encountered fatal error", err)
 				case <-ctx.Done():
 					return
 				}
 			}()
 
-			// starts orchestratorNetwork
-			orchestratorNetwork.Start(attackCtx)
-			unittest.RequireCloseBefore(t, orchestratorNetwork.Ready(), 100*time.Millisecond, "could not start orchestratorNetwork on time")
+			// starts attackerNetwork
+			attackerNetwork.Start(attackCtx)
+			unittest.RequireCloseBefore(t, attackerNetwork.Ready(), 100*time.Millisecond, "could not start attackerNetwork on time")
 
 			attackerRegisteredOnAllCNs := &sync.WaitGroup{}
 			attackerRegisteredOnAllCNs.Add(len(corruptNetworks))
@@ -179,11 +179,11 @@ func withMockOrchestrator(t *testing.T,
 
 			unittest.RequireReturnsBefore(t, attackerRegisteredOnAllCNs.Wait, 100*time.Millisecond, "could not register attacker on all corruptNetworks on time")
 
-			run(orchestratorNetwork, orchestrator, corruptNetworks)
+			run(attackerNetwork, orchestrator, corruptNetworks)
 
-			// terminates orchestratorNetwork
+			// terminates attackerNetwork
 			cancel()
-			unittest.RequireCloseBefore(t, orchestratorNetwork.Done(), 100*time.Millisecond, "could not stop orchestratorNetwork on time")
+			unittest.RequireCloseBefore(t, attackerNetwork.Done(), 100*time.Millisecond, "could not stop attackerNetwork on time")
 		})
 }
 

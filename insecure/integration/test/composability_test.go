@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	mock2 "github.com/onflow/flow-go/insecure/orchestrators/mock"
+	"github.com/onflow/flow-go/insecure/orchestrators/mock"
 
-	"github.com/stretchr/testify/mock"
+	mocktestify "github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/network/mocknetwork"
 
@@ -34,13 +34,13 @@ type Channel string
 // and one with a corrupt conduit factory (ccf).
 //
 // The engine running on corrupt network is sending a message to the honest engine.
-// The message goes through the corrupt network to the orchestrator network and reaches the attack orchestrator.
+// The message goes through the corrupt network to the attacker network and reaches the attack orchestrator.
 // The orchestrator corrupts the message and sends it back to the corrupt network to be dispatched on the flow network.
 // The test passes if the honest engine receives the corrupt message in a timely fashion (and also never gets the
 // original messages).
 func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
-	// We first start ccf and then the orchestrator network, since the order of startup matters, i.e., on startup, the orchestrator network tries
-	// to connect to all ccfs.
+	// We first start corrupt network and then the attacker network, since the order of startup matters, i.e., on startup, the attacker network tries
+	// to connect to all corrupt nodes (each one has a corrupt network).
 	withCorruptNetwork(t, func(t *testing.T, corruptIdentity flow.Identity, corruptNetwork *corruptnet.Network, hub *stub.Hub) {
 		// these are the events which orchestrator will send instead of the original ingress and egress events coming to and from
 		// the corrupt engine, respectively.
@@ -92,7 +92,7 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 				// event must arrive at the channel set by orchestrator.
 				// origin id of the message must be the corrupt node.
 				// content of event must be swapped with corrupt event.
-				honestEngine.On("Process", testChannel, corruptIdentity.NodeID, corruptEgressEvent).Return(nil).Run(func(args mock.Arguments) {
+				honestEngine.On("Process", testChannel, corruptIdentity.NodeID, corruptEgressEvent).Return(nil).Run(func(args mocktestify.Arguments) {
 					wg.Done()
 				})
 
@@ -100,7 +100,7 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 				// event must arrive at the channel set by orchestrator.
 				// origin id of the message must be the honest node.
 				// content of event must be swapped with corrupt event.
-				corruptEngine.On("Process", testChannel, honestIdentity.NodeID, corruptIngressEvent).Return(nil).Run(func(args mock.Arguments) {
+				corruptEngine.On("Process", testChannel, honestIdentity.NodeID, corruptIngressEvent).Return(nil).Run(func(args mocktestify.Arguments) {
 					// simulate the Process logic of the corrupt engine on reception of message from underlying network.
 					wg.Done()
 				})
@@ -126,13 +126,13 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corru
 	codec := unittest.NetworkCodec()
 	corruptIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
-	// life-cycle management of orchestratorNetwork.
+	// life-cycle management of corrupt network.
 	ctx, cancel := context.WithCancel(context.Background())
 	ccfCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
 		case err := <-errChan:
-			t.Error("orchestratorNetwork startup encountered fatal error", err)
+			t.Error("corrupt network startup encountered fatal error", err)
 		case <-ctx.Done():
 			return
 		}
@@ -165,7 +165,7 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corru
 
 	run(t, *corruptIdentity, corruptNetwork, hub)
 
-	// terminates orchestratorNetwork
+	// terminates corrupt network
 	cancel()
 	unittest.RequireCloseBefore(t, corruptNetwork.Done(), 100*time.Millisecond, "could not stop corrupt network on time")
 
@@ -175,8 +175,8 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corru
 	}, 100*time.Millisecond, "failed to stop verification network")
 }
 
-// withAttackOrchestrator creates a mock orchestrator with the injected "corrupter" function, which entirely runs on top of a real orchestrator network.
-// It then starts the orchestrator network, executes the "run" function, and stops the orchestrator network afterwards.
+// withAttackOrchestrator creates a mock orchestrator with the injected "corrupter" function, which entirely runs on top of a real attacker network.
+// It then starts the attacker network, executes the "run" function, and stops the attacker network afterwards.
 func withAttackOrchestrator(
 	t *testing.T,
 	corruptIds flow.IdentityList,
@@ -185,13 +185,13 @@ func withAttackOrchestrator(
 	ingressEventCorrupter func(*insecure.IngressEvent),
 	run func(t *testing.T)) {
 	codec := unittest.NetworkCodec()
-	o := &mock2.Orchestrator{
+	o := &mock.Orchestrator{
 		EgressEventCorrupter:  egressEventCorrupter,
 		IngressEventCorrupter: ingressEventCorrupter,
 	}
 	connector := attackernet.NewCorruptConnector(unittest.Logger(), corruptIds, corruptPortMap)
 
-	orchestratorNetwork, err := attackernet.NewOrchestratorNetwork(
+	attackerNetwork, err := attackernet.NewAttackerNetwork(
 		unittest.Logger(),
 		codec,
 		o,
@@ -199,24 +199,24 @@ func withAttackOrchestrator(
 		corruptIds)
 	require.NoError(t, err)
 
-	// life-cycle management of orchestratorNetwork.
+	// life-cycle management of attackerNetwork.
 	ctx, cancel := context.WithCancel(context.Background())
-	orchestratorNetworkCtx, errChan := irrecoverable.WithSignaler(ctx)
+	attackerNetworkCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
 		case err := <-errChan:
-			t.Error("orchestratorNetwork startup encountered fatal error", err)
+			t.Error("attackerNetwork startup encountered fatal error", err)
 		case <-ctx.Done():
 			return
 		}
 	}()
 
-	// starts orchestrator network
-	orchestratorNetwork.Start(orchestratorNetworkCtx)
-	unittest.RequireCloseBefore(t, orchestratorNetwork.Ready(), 100*time.Millisecond, "could not start orchestrator network on time")
+	// starts attacker network
+	attackerNetwork.Start(attackerNetworkCtx)
+	unittest.RequireCloseBefore(t, attackerNetwork.Ready(), 100*time.Millisecond, "could not start attacker network on time")
 	run(t)
 
-	// terminates orchestratorNetwork
+	// terminates attackerNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, orchestratorNetwork.Done(), 100*time.Millisecond, "could not stop orchestrator network on time")
+	unittest.RequireCloseBefore(t, attackerNetwork.Done(), 100*time.Millisecond, "could not stop attacker network on time")
 }

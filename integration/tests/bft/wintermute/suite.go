@@ -174,16 +174,16 @@ func (s *Suite) SetupSuite() {
 
 	s.Orchestrator = wintermute.NewOrchestrator(s.log, s.net.CorruptIdentities().NodeIDs(), s.net.Identities())
 
-	// start orchestrator network
+	// start attacker network
 	codec := unittest.NetworkCodec()
 	connector := attackernet.NewCorruptConnector(s.log, s.net.CorruptIdentities(), s.net.CorruptPortMapping)
-	orchestratorNetwork, err := attackernet.NewOrchestratorNetwork(s.log,
+	attackerNetwork, err := attackernet.NewAttackerNetwork(s.log,
 		codec,
 		s.Orchestrator,
 		connector,
 		s.net.CorruptIdentities())
 	require.NoError(s.T(), err)
-	s.attackerNetwork = orchestratorNetwork
+	s.attackerNetwork = attackerNetwork
 
 	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
@@ -195,16 +195,16 @@ func (s *Suite) SetupSuite() {
 		}
 	}()
 
-	orchestratorNetwork.Start(attackCtx)
-	unittest.RequireCloseBefore(s.T(), orchestratorNetwork.Ready(), 1*time.Second, "could not start orchestrator network on time")
+	attackerNetwork.Start(attackCtx)
+	unittest.RequireCloseBefore(s.T(), attackerNetwork.Ready(), 1*time.Second, "could not start attacker network on time")
 
 	// starts tracking blocks by the ghost node
 	s.Track(s.T(), ctx, s.Ghost())
 }
 
-// TearDownSuite tears down the test network of Flow as well as the BFT testing orchestrator network.
+// TearDownSuite tears down the test network of Flow as well as the BFT testing attacker network.
 func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	s.cancel()
-	unittest.RequireCloseBefore(s.T(), s.attackerNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
+	unittest.RequireCloseBefore(s.T(), s.attackerNetwork.Done(), 1*time.Second, "could not stop attacker network on time")
 }
