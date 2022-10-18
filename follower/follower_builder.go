@@ -97,7 +97,7 @@ func DefaultFollowerServiceConfig() *FollowerServiceConfig {
 	}
 }
 
-// ObserverServiceBuilder provides the common functionality needed to bootstrap a Flow staked and observer
+// FollowerServiceBuilder provides the common functionality needed to bootstrap a Flow staked and observer
 // It is composed of the FlowNodeBuilder, the FollowerServiceConfig and contains all the components and modules needed for the
 // staked and observers
 type FollowerServiceBuilder struct {
@@ -125,6 +125,8 @@ type FollowerServiceBuilder struct {
 
 	peerID peer.ID
 }
+
+var _ cmd.NodeBuilder = &FollowerServiceBuilder{}
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
 // These are the identities of the staked and observers also acting as the DHT bootstrap server

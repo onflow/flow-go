@@ -19,6 +19,8 @@ type CorruptNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 }
 
+var _ cmd.NodeBuilder = &CorruptNodeBuilder{}
+
 func NewCorruptNodeBuilder(role string) *CorruptNodeBuilder {
 	return &CorruptNodeBuilder{
 		FlowNodeBuilder: cmd.FlowNode(role),

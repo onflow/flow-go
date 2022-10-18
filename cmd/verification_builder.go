@@ -58,6 +58,8 @@ type VerificationNodeBuilder struct {
 	verConf VerificationConfig
 }
 
+var _ NodeBuilder = &VerificationNodeBuilder{}
+
 func NewVerificationNodeBuilder(nodeBuilder *FlowNodeBuilder) *VerificationNodeBuilder {
 	return &VerificationNodeBuilder{
 		FlowNodeBuilder: nodeBuilder,

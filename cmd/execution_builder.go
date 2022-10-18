@@ -90,6 +90,8 @@ type ExecutionNodeBuilder struct {
 	exeConf          *ExecutionConfig // the configs and flags specific for execution node
 }
 
+var _ NodeBuilder = &ExecutionNodeBuilder{}
+
 func NewExecutionNodeBuilder(nodeBuilder *FlowNodeBuilder) *ExecutionNodeBuilder {
 	return &ExecutionNodeBuilder{
 		FlowNodeBuilder: nodeBuilder,

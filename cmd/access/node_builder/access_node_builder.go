@@ -218,6 +218,8 @@ type FlowAccessNodeBuilder struct {
 	SyncEng     *synceng.Engine
 }
 
+var _ cmd.NodeBuilder = &FlowAccessNodeBuilder{}
+
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
 	builder.Module("mutable follower state", func(node *cmd.NodeConfig) error {
 		// For now, we only support state implementations from package badger.

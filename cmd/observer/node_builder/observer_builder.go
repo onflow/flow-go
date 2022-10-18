@@ -185,6 +185,8 @@ type ObserverServiceBuilder struct {
 	peerID peer.ID
 }
 
+var _ cmd.NodeBuilder = &ObserverServiceBuilder{}
+
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
 // These are the identities of the observers also acting as the DHT bootstrap server
 func (builder *ObserverServiceBuilder) deriveBootstrapPeerIdentities() error {
