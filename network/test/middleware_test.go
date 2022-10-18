@@ -445,6 +445,43 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	m.ov[targetIndex].AssertExpectations(m.T())
 }
 
+// TestMessageFieldsOverriden_SendDirect asserts that OriginID, EventID and Type fields are
+// overridden in the message received over unicast
+func (m *MiddlewareTestSuite) TestMessageFieldsOverriden_SendDirect() {
+	first := 0
+	last := m.size - 1
+	firstNode := m.ids[first].NodeID
+	lastNode := m.ids[last].NodeID
+
+	expected, event := createMessage(m.T(), firstNode, lastNode, "test message")
+
+	fakeID := unittest.IdentifierFixture()
+	msg := &message.Message{
+		OriginID:  fakeID[:],
+		EventID:   fakeID[:],
+		Type:      "messages.ChunkDataResponse",
+		ChannelID: expected.ChannelID,
+		Payload:   expected.Payload,
+		TargetIDs: expected.TargetIDs,
+	}
+
+	// should receive the expected message, not msg
+	ch := make(chan struct{})
+	m.ov[last].On("Receive", firstNode, expected, event).Return(nil).Once().
+		Run(func(args mockery.Arguments) {
+			close(ch)
+		})
+
+	// sends a direct message from first node to the last node with the modified fields
+	err := m.mws[first].SendDirect(msg, lastNode)
+	assert.NoError(m.Suite.T(), err)
+
+	// check message reception on target
+	unittest.RequireCloseBefore(m.T(), ch, 60*time.Second, "source node failed to send overridden message to target")
+
+	m.ov[last].AssertExpectations(m.T())
+}
+
 // TestMaxMessageSize_Publish evaluates that invoking Publish method of the middleware on a message
 // size beyond the permissible publish message size returns an error.
 func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
@@ -476,6 +513,60 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	// sends a direct message from first node to the last node
 	err = m.mws[first].Publish(msg, testChannel)
 	require.Error(m.Suite.T(), err)
+}
+
+// TestMessageFieldsOverriden_Publish asserts that OriginID, EventID and Type fields are
+// overridden in the message received over pubsub
+func (m *MiddlewareTestSuite) TestMessageFieldsOverriden_Publish() {
+	first := 0
+	last := m.size - 1
+	firstNode := m.ids[first].NodeID
+	lastNode := m.ids[last].NodeID
+
+	expected, event := createMessage(m.T(), firstNode, lastNode, "test message")
+	// adds another node as the target id to imitate publishing
+	expected.TargetIDs = append(expected.TargetIDs, lastNode[:])
+
+	fakeID := unittest.IdentifierFixture()
+	msg := &message.Message{
+		OriginID:  fakeID[:],
+		EventID:   fakeID[:],
+		Type:      "messages.ChunkDataResponse",
+		ChannelID: expected.ChannelID,
+		Payload:   expected.Payload,
+		TargetIDs: expected.TargetIDs,
+	}
+
+	// should receive the expected message, not msg
+	ch := make(chan struct{})
+	m.ov[last].On("Receive", firstNode, expected, event).Return(nil).Once().
+		Run(func(args mockery.Arguments) {
+			close(ch)
+		})
+
+	// initially subscribe the nodes to the channel
+	for _, mw := range m.mws {
+		err := mw.Subscribe(testChannel)
+		require.NoError(m.Suite.T(), err)
+	}
+
+	// set up waiting for m.size pubsub tags indicating a mesh has formed
+	for i := 0; i < m.size; i++ {
+		select {
+		case <-m.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(m.T(), "could not receive pubsub tag indicating mesh formed")
+		}
+	}
+
+	// sends a direct message from first node to the last node with the modified fields
+	err := m.mws[first].Publish(msg, testChannel)
+	assert.NoError(m.Suite.T(), err)
+
+	// check message reception on target
+	unittest.RequireCloseBefore(m.T(), ch, 2*time.Second, "source node failed to send overridden message to target")
+
+	m.ov[last].AssertExpectations(m.T())
 }
 
 // TestUnsubscribe tests that an engine can unsubscribe from a topic it was earlier subscribed to and stop receiving

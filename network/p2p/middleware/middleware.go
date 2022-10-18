@@ -607,7 +607,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 	if err != nil {
 		// this error should never happen. by the time the message gets here, the peer should be
 		// authenticated which means it must be known
-		m.log.Warn().
+		m.log.Error().
 			Err(err).
 			Str("peer_id", peerID.String()).
 			Bool(logging.KeySuspicious, true).
@@ -626,6 +626,8 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 		return
 	}
 
+	// Override values in message since they can't be trusted as-is
+	// TODO: remove these from the message struct entirely since they must be explicitly validated
 	msg.OriginID = flowID[:]
 	msg.EventID = eventID
 	msg.Type = p2p.MessageType(decodedMsgPayload)
