@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
+	"path"
 	"path/filepath"
 	goruntime "runtime"
 	"time"
@@ -609,6 +609,10 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 		return nil, fmt.Errorf("failed to initialize wal: %w", err)
 	}
 
+	if exeNode.exeConf.outputCheckpointV5 {
+		exeNode.diskWAL.UseCheckpointVersion5()
+	}
+
 	exeNode.ledgerStorage, err = ledger.NewLedger(exeNode.diskWAL, int(exeNode.exeConf.mTrieCacheSize), exeNode.collector, node.Logger.With().Str("subcomponent",
 		"ledger").Logger(), ledger.DefaultPathFinderVersion)
 	return exeNode.ledgerStorage, err
@@ -1030,35 +1034,18 @@ func copyBootstrapState(dir, trie string) error {
 	}
 
 	// copy from the bootstrap folder to the execution state folder
-	src := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, filename)
-	dst := filepath.Join(trie, filename)
-
-	in, err := os.Open(src)
+	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
+	copiedFiles, err := wal.CopyCheckpointFile(filename, from, to)
 	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	// It's possible that the trie dir does not yet exist. If not this will create the the required path
-	err = os.MkdirAll(trie, 0700)
-	if err != nil {
-		return err
+		return fmt.Errorf("can not copy checkpoint file %s, from %s to %s",
+			filename, from, to)
 	}
 
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
+	for _, newPath := range copiedFiles {
+		fmt.Printf("copied root checkpoint file from directory: %v, to: %v\n", from, newPath)
 	}
 
-	fmt.Printf("copied bootstrap state file from: %v, to: %v\n", src, dst)
-
-	return out.Close()
+	return nil
 }
 
 func logSysInfo(logger zerolog.Logger) error {

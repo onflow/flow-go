@@ -133,6 +133,7 @@ func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)              
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                          {}
 func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                       {}
 func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ uint64, _ int, _ int)       {}
+func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint)        {}
 func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ uint64, _ int)         {}
 func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _ int, _ bool) {
 }
