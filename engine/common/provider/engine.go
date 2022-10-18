@@ -251,7 +251,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []
 func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
-	e.log.Debug().Msg("process chunk data pack request shovller worker started")
+	e.log.Debug().Msg("process entity request shovller worker started")
 
 	for {
 		select {
@@ -261,7 +261,7 @@ func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.Signaler
 		case <-ctx.Done():
 			// close the internal channel, the workers will drain the channel before exiting
 			close(e.requestChannel)
-			e.log.Trace().Msg("processing chunk data pack request worker terminated")
+			e.log.Trace().Msg("processing entity request worker terminated")
 			return
 		}
 	}

@@ -7,6 +7,6 @@ import "github.com/onflow/flow-go/engine"
 type EntityRequestStore interface {
 	engine.MessageStore
 
-	// Size returns total chunk data pack requests stored in queue.
+	// Size returns total requests stored in queue.
 	Size() uint
 }
