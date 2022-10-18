@@ -305,7 +305,7 @@ func NewTracer(logger zerolog.Logger) *Tracer {
 	}
 }
 
-func (t *Tracer) logMsg(msg bsmsg.BitswapMessage, s string) {
+func (t *Tracer) logMsg(msg bsmsg.BitSwapMessage, s string) {
 	evt := t.logger.Debug()
 
 	wantlist := zerolog.Arr()
