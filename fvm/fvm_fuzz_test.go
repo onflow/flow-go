@@ -102,6 +102,7 @@ var fuzzTransactionTypes = []transactionType{
 			// if there is an error, it should be computation exceeded
 			if results.tx.Err != nil {
 				require.Len(t, results.tx.Events, 3)
+				unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
@@ -114,6 +115,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -133,6 +135,7 @@ var fuzzTransactionTypes = []transactionType{
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.tx.Err)
 			require.Len(t, results.tx.Events, 3)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the failed transfer
@@ -144,6 +147,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -160,6 +164,7 @@ var fuzzTransactionTypes = []transactionType{
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.tx.Err)
 			require.Len(t, results.tx.Events, 3)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the panic
@@ -171,6 +176,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -186,6 +192,7 @@ var fuzzTransactionTypes = []transactionType{
 			// if there is an error, it should be computation exceeded
 			if results.tx.Err != nil {
 				require.Len(t, results.tx.Events, 3)
+				unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
@@ -198,12 +205,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
-			// event indices have to be an increasing uint sequence (0, 1, 2 ...)
-			expectedEventIndex := uint32(0)
-			for _, event := range results.tx.Events {
-				require.Equal(t, expectedEventIndex, event.EventIndex)
-				expectedEventIndex++
-			}
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 }
