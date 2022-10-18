@@ -291,7 +291,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			exeNode.executionDataDatastore,
 			blob.WithBitswapOptions(
 				bitswap.WithTracer(
-					blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService).Logger()),
+					blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
 				),
 			),
 		)
@@ -417,7 +417,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 				blob.AuthorizedRequester(allowedANs, exeNode.builder.IdentityProvider, exeNode.builder.Logger),
 			),
 			bitswap.WithTracer(
-				blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService).Logger()),
+				blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
 			),
 		),
 	}
