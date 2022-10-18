@@ -182,6 +182,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 
 // onEntityRequest processes an entity request message from a remote node.
 // Error returns:
+// * NetworkTransmissionError if there is a network error happens on transmitting the requested entities.
 // * InvalidInputError if the list of requested entities is invalid (empty).
 // * generic error in case of unexpected failure or implementation bug.
 func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []flow.Identifier) error {
@@ -260,10 +261,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []
 	}
 	err = e.con.Unicast(res, originID)
 	if err != nil {
-		// we don't return an error here, as the requester will retry
-		// the request anyway. We just log the error.
-		lg.Warn().Err(err).Msg("could not send entity response")
-		return nil
+		return engine.NewNetworkTransmissionErrorf("could not send entity response: %w", err)
 	}
 
 	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityResponse)
@@ -337,7 +335,7 @@ func (e *Engine) processEntityRequestWorker(ctx irrecoverable.SignalerContext, r
 		lg.Trace().Msg("worker picked up entity request for processing")
 		err := e.onEntityRequest(request.OriginId, request.EntityIds)
 		if err != nil {
-			if engine.IsInvalidInputError(err) {
+			if engine.IsInvalidInputError(err) || engine.IsNetworkTransmissionError(err) {
 				lg.Error().Err(err).Msg("worker could not process entity request")
 			} else {
 				// this is an unexpected error, we crash the node.
