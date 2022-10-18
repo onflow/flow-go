@@ -195,7 +195,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 }
 
 // processBlockAndDescendants is a recursive function that processes a block and
-// its pending descendants. By induction, any child block of a  
+// its pending descendants. By induction, any child block of a
 // valid proposal is itself connected to the finalized state and can be
 // processed as well.
 // No errors are expected during normal operation.
@@ -211,23 +211,11 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 	// process block itself
 	err := c.processBlockProposal(proposal, parent)
 	if err != nil {
-		if engine.IsOutdatedInputError(err) {
-			// child is outdated by the time we started processing it
-			// => node was probably behind and is catching up. Log as warning
-			log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
+		if checkForAndLogOutdatedInputError(err, log) {
 			return nil
-		} else if engine.IsInvalidInputError(err) || engine.IsUnverifiableInputError(err) {
-			// log a message for either input case
-			if engine.IsInvalidInputError(err) {
-				// the block is invalid; log as error as we desire honest participation
-				log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
-			}
-			if engine.IsUnverifiableInputError(err) {
-				// the block cannot be validated
-				log.Err(err).Msg("received unverifiable block proposal; this is an indicator of an invalid (slashable) proposal or an epoch failure")
-			}
-
-			// in both cases, notify VoteAggregator
+		}
+		if checkForAndLogInvalidInputError(err, log) || checkForAndLogUnverifiableInputError(err, log) {
+			// in both cases, notify VoteAggregator about the invalid block
 			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header, parent.View))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
@@ -236,7 +224,6 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 				}
 				return fmt.Errorf("unexpected error notifying vote aggregator about invalid block: %w", err)
 			}
-
 			return nil
 		}
 		// unexpected error: potentially corrupted internal state => abort processing and escalate error
@@ -389,4 +376,44 @@ func (c *Core) ProcessFinalizedView(finalizedView uint64) {
 
 	// always record the metric
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
+}
+
+// checkForAndLogOutdatedInputError checks whether error is an `engine.OutdatedInputError`.
+// If this is the case, we emit a log message and return true.
+// For any error other than `engine.OutdatedInputError`, this function is a no-op
+// and returns false.
+func checkForAndLogOutdatedInputError(err error, log zerolog.Logger) bool {
+	if engine.IsOutdatedInputError(err) {
+		// child is outdated by the time we started processing it
+		// => node was probably behind and is catching up. Log as warning
+		log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
+		return true
+	}
+	return false
+}
+
+// checkForAndLogInvalidInputError checks whether error is an `engine.InvalidInputError`.
+// If this is the case, we emit a log message and return true.
+// For any error other than `engine.InvalidInputError`, this function is a no-op
+// and returns false.
+func checkForAndLogInvalidInputError(err error, log zerolog.Logger) bool {
+	if engine.IsInvalidInputError(err) {
+		// the block is invalid; log as error as we desire honest participation
+		log.Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+		return true
+	}
+	return false
+}
+
+// checkForAndLogUnverifiableInputError checks whether error is an `engine.UnverifiableInputError`.
+// If this is the case, we emit a log message and return true.
+// For any error other than `engine.UnverifiableInputError`, this function is a no-op
+// and returns false.
+func checkForAndLogUnverifiableInputError(err error, log zerolog.Logger) bool {
+	if engine.IsUnverifiableInputError(err) {
+		// the block cannot be validated
+		log.Err(err).Msg("received unverifiable block proposal; this is an indicator of an invalid (slashable) proposal or an epoch failure")
+		return true
+	}
+	return false
 }
