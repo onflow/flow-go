@@ -169,7 +169,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 // All errors returned by this function are benign and should not cause the engine to crash.
 func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []flow.Identifier) error {
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
-	
+
 	lg := e.log.With().Str("origin_id", originID.String()).Logger()
 
 	lg.Debug().

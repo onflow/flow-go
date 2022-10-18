@@ -45,6 +45,14 @@ func ChunkDataPackRequestQueueMetricsFactory(registrar prometheus.Registerer) *H
 	return NewHeroCacheCollector(namespaceExecution, ResourceChunkDataPackRequests, registrar)
 }
 
+func ReceiptRequestsQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceExecution, ResourceReceipt, registrar)
+}
+
+func CollectionRequestsQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceCollection, ResourceCollection, registrar)
+}
+
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer, epoch uint64) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceCollection, fmt.Sprintf("%s_%d", ResourceTransaction, epoch), registrar)
 }

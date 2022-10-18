@@ -274,7 +274,17 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		coll, err := collections.ByID(collID)
 		return coll, err
 	}
-	providerEngine, err := provider.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.ProvideCollections, selector, retrieve)
+	providerEngine, err := provider.New(
+		node.Log,
+		node.Metrics,
+		node.Net,
+		node.Me,
+		node.State,
+		queue.NewEntityRequestStore(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
+		uint(1000),
+		channels.ProvideCollections,
+		selector,
+		retrieve)
 	require.NoError(t, err)
 
 	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)

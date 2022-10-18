@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/engine/common/provider"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/module/mempool"
 
@@ -50,7 +51,9 @@ type ExecutionConfig struct {
 	blobstoreBurstLimit                  int
 	chunkDataPackRequestWorkers          uint
 
-	computationConfig computation.ComputationConfig
+	computationConfig        computation.ComputationConfig
+	receiptRequestWorkers    uint   // common provider engine workers
+	receiptRequestsCacheSize uint32 // common provider engine cache size
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -72,6 +75,9 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&exeConf.computationConfig.CadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
 	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
+	flags.Uint32Var(&exeConf.receiptRequestsCacheSize, "receipt-request-cache", mempool.DefaultEntityRequestCacheSize, "queue size for entity requests at common provider engine")
+	flags.UintVar(&exeConf.receiptRequestWorkers, "receipt-request-workers", provider.DefaultRequestProviderWorkers, "number of workers for entity requests at common provider engine")
+
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 	flags.DurationVar(&exeConf.computationConfig.ScriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
 		"threshold for logging script execution")
