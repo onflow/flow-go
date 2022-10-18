@@ -182,8 +182,8 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 
 // onEntityRequest processes an entity request message from a remote node.
 // Error returns:
-// * InvalidInputError if the list of requested entities is invalid (empty)
-// * generic error in case of unexpected failure or implementation bug
+// * InvalidInputError if the list of requested entities is invalid (empty).
+// * generic error in case of unexpected failure or implementation bug.
 func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []flow.Identifier) error {
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
 
@@ -260,7 +260,10 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []
 	}
 	err = e.con.Unicast(res, originID)
 	if err != nil {
-		return fmt.Errorf("could not send response: %w", err)
+		// we don't return an error here, as the requester will retry
+		// the request anyway. We just log the error.
+		lg.Warn().Err(err).Msg("could not send entity response")
+		return nil
 	}
 
 	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityResponse)
@@ -319,7 +322,7 @@ func (e *Engine) shovelEntityRequests() {
 	}
 }
 
-func (e *Engine) processEntityRequestWorker(_ irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (e *Engine) processEntityRequestWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	for {
@@ -334,7 +337,12 @@ func (e *Engine) processEntityRequestWorker(_ irrecoverable.SignalerContext, rea
 		lg.Trace().Msg("worker picked up entity request for processing")
 		err := e.onEntityRequest(request.OriginId, request.EntityIds)
 		if err != nil {
-			lg.Error().Err(err).Msg("worker could not process entity request")
+			if engine.IsInvalidInputError(err) {
+				lg.Error().Err(err).Msg("worker could not process entity request")
+			} else {
+				// this is an unexpected error, we crash the node.
+				ctx.Throw(err)
+			}
 		}
 		lg.Trace().Msg("worker finished entity request processing")
 	}
