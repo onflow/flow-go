@@ -19,14 +19,14 @@ import (
 // TestConnectorHappy_Send checks that a CorruptConnector can successfully create a connection to a remote corrupt network (CN).
 // Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from attacker to corrupt network.
 func TestConnectorHappyPath_Send_EgressMsg(t *testing.T) {
-	withMockCorruptNetwork(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
+	withMockCorruptNetwork(t, func(corruptId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
 		// extracting port that CN gRPC server is running on.
 		_, cnPortStr, err := net.SplitHostPort(cn.ServerAddress())
 		require.NoError(t, err)
 
 		connector := NewCorruptConnector(unittest.Logger(),
-			flow.IdentityList{&corruptedId},
-			map[flow.Identifier]string{corruptedId.NodeID: cnPortStr})
+			flow.IdentityList{&corruptId},
+			map[flow.Identifier]string{corruptId.NodeID: cnPortStr})
 		// empty incoming handler, as this test does not evaluate receive path
 		connector.WithIncomingMessageHandler(func(i *insecure.Message) {})
 
@@ -62,7 +62,7 @@ func TestConnectorHappyPath_Send_EgressMsg(t *testing.T) {
 		}()
 
 		// creates a connection to the corrupt network.
-		connection, err := connector.Connect(ctx, corruptedId.NodeID)
+		connection, err := connector.Connect(ctx, corruptId.NodeID)
 		require.NoError(t, err)
 		defer func() {
 			require.NoError(t, connection.CloseConnection())
@@ -71,22 +71,22 @@ func TestConnectorHappyPath_Send_EgressMsg(t *testing.T) {
 		// sends a message to cn
 		require.NoError(t, connection.SendMessage(sentMsg))
 
-		// checks a timely arrival of the registration and sent message at the cn.
+		// checks a timely arrival of the registration and sent message at the corrupt network.
 		unittest.RequireCloseBefore(t, attackerRegistered, 100*time.Millisecond, "cn could not receive attacker registration on time")
-		// imitates sending a message from cn to attacker through corrupted connection.
+		// imitates sending a message from corrupt network to attacker through corrupt connection.
 		unittest.RequireCloseBefore(t, sentMsgReceived, 100*time.Millisecond, "cn could not receive message sent on connection on time")
 	})
 }
 
 func TestConnectorHappyPath_Send_IngressMsg(t *testing.T) {
-	withMockCorruptNetwork(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
+	withMockCorruptNetwork(t, func(corruptId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
 		// extracting port that CN gRPC server is running on.
 		_, cnPortStr, err := net.SplitHostPort(cn.ServerAddress())
 		require.NoError(t, err)
 
 		connector := NewCorruptConnector(unittest.Logger(),
-			flow.IdentityList{&corruptedId},
-			map[flow.Identifier]string{corruptedId.NodeID: cnPortStr})
+			flow.IdentityList{&corruptId},
+			map[flow.Identifier]string{corruptId.NodeID: cnPortStr})
 
 		// empty incoming handler, as this test does not evaluate receive path
 		connector.WithIncomingMessageHandler(func(i *insecure.Message) {
@@ -121,7 +121,7 @@ func TestConnectorHappyPath_Send_IngressMsg(t *testing.T) {
 		}()
 
 		// creates a connection to the corrupt network.
-		connection, err := connector.Connect(ctx, corruptedId.NodeID)
+		connection, err := connector.Connect(ctx, corruptId.NodeID)
 		require.NoError(t, err)
 		defer func() {
 			require.NoError(t, connection.CloseConnection())
@@ -130,9 +130,9 @@ func TestConnectorHappyPath_Send_IngressMsg(t *testing.T) {
 		// sends a message to cn
 		require.NoError(t, connection.SendMessage(sentMsg))
 
-		// checks a timely arrival of the registration and sent message at the cn.
+		// checks a timely arrival of the registration and sent message at the corrupt network.
 		unittest.RequireCloseBefore(t, attackerRegistered, 100*time.Millisecond, "cn could not receive attacker registration on time")
-		// imitates sending a message from cn to attacker through corrupted connection.
+		// imitates sending a message from corrupt network to attacker through corrupt connection.
 		unittest.RequireCloseBefore(t, sentMsgReceived, 100*time.Millisecond, "cn could not receive message sent on connection on time")
 	})
 
@@ -141,7 +141,7 @@ func TestConnectorHappyPath_Send_IngressMsg(t *testing.T) {
 // TestConnectorHappy_Receive checks that a CorruptConnector can successfully create a connection to a remote corrupt network (CN).
 // Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from CN to attacker.
 func TestConnectorHappyPath_Receive_EgressMsg(t *testing.T) {
-	withMockCorruptNetwork(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
+	withMockCorruptNetwork(t, func(corruptId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
 		// extracting port that CN gRPC server is running on
 		_, cnPortStr, err := net.SplitHostPort(cn.ServerAddress())
 		require.NoError(t, err)
@@ -152,8 +152,8 @@ func TestConnectorHappyPath_Receive_EgressMsg(t *testing.T) {
 
 		sentMsgReceived := make(chan struct{})
 		connector := NewCorruptConnector(unittest.Logger(),
-			flow.IdentityList{&corruptedId},
-			map[flow.Identifier]string{corruptedId.NodeID: cnPortStr})
+			flow.IdentityList{&corruptId},
+			map[flow.Identifier]string{corruptId.NodeID: cnPortStr})
 		connector.WithIncomingMessageHandler(
 			func(receivedMsg *insecure.Message) {
 				// received message by attacker should have an exact match on the relevant fields as sent by cn.
@@ -178,15 +178,15 @@ func TestConnectorHappyPath_Receive_EgressMsg(t *testing.T) {
 		}()
 
 		// creates a connection to cn.
-		_, err = connector.Connect(ctx, corruptedId.NodeID)
+		_, err = connector.Connect(ctx, corruptId.NodeID)
 		require.NoError(t, err)
 
-		// checks a timely attacker registration as well as arrival of the sent message by cn to corrupted connection
+		// checks a timely attacker registration as well as arrival of the sent message by corrupt network to corrupt connection
 		unittest.RequireCloseBefore(t, registerMsgReceived, 100*time.Millisecond, "cn could not receive attacker registration on time")
 
-		// imitates sending a message from cn to attacker through corrupted connection.
+		// imitates sending a message from corrupt network to attacker through corrupt connection.
 		require.NoError(t, cn.attackerObserveStream.Send(msg))
 
-		unittest.RequireCloseBefore(t, sentMsgReceived, 100*time.Millisecond, "corrupted connection could not receive cn message on time")
+		unittest.RequireCloseBefore(t, sentMsgReceived, 100*time.Millisecond, "corrupt connection could not receive cn message on time")
 	})
 }
