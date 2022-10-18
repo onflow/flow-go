@@ -19,7 +19,7 @@ func TestPassThrough(t *testing.T) {
 	suite.Run(t, new(PassThroughTestSuite))
 }
 
-// TestSealingAndVerificationPassThrough evaluates the health of Corrupt Network (CN) for BFT testing.
+// TestSealingAndVerificationPassThrough evaluates the health of Corrupt Network Framework (CNF) for BFT testing.
 // It runs with two corrupt execution nodes and one corrupt verification node.
 // The corrupt nodes are controlled by a dummy orchestrator that lets all incoming events passing through.
 // The test deploys a transaction into the testnet hence causing an execution result with more than

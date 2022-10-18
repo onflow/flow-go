@@ -21,7 +21,7 @@ import (
 )
 
 // Suite represents a test suite evaluating the integration of the testnet against
-// happy path of Corrupt Network framework (CN) for BFT testing.
+// happy path of Corrupt Network Framework (CNF) for BFT testing.
 type Suite struct {
 	suite.Suite
 	log                     zerolog.Logger

@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestConnectorHappy_Send checks that a CorruptConnector can successfully create a connection to a remote corrupt network (CN).
+// TestConnectorHappy_Send checks that a CorruptConnector can successfully create a connection to a remote corrupt network (cn).
 // Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from attacker to corrupt network.
 func TestConnectorHappyPath_Send_EgressMsg(t *testing.T) {
 	withMockCorruptNetwork(t, func(corruptId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
@@ -138,7 +138,7 @@ func TestConnectorHappyPath_Send_IngressMsg(t *testing.T) {
 
 }
 
-// TestConnectorHappy_Receive checks that a CorruptConnector can successfully create a connection to a remote corrupt network (CN).
+// TestConnectorHappy_Receive checks that a CorruptConnector can successfully create a connection to a remote corrupt network (cn).
 // Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from CN to attacker.
 func TestConnectorHappyPath_Receive_EgressMsg(t *testing.T) {
 	withMockCorruptNetwork(t, func(corruptId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {

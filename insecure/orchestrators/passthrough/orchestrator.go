@@ -45,7 +45,7 @@ func NewDummyOrchestrator(logger zerolog.Logger) *Orchestrator {
 
 // HandleEgressEvent implements logic of processing the outgoing (egress) events received from a corrupt node.
 //
-// In Corrupt Network framework for BFT testing, corrupt nodes relay their outgoing events to
+// In Corrupt Network Framework for BFT testing, corrupt nodes relay their outgoing events to
 // the attacker instead of dispatching them to the network.
 //
 // In this dummy orchestrator, the incoming event is passed through without any changes.

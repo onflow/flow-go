@@ -1,8 +1,8 @@
 # Corrupt Network Framework
 
-Corrupt Network Framework is an integration testing framework for Byzantine Fault Tolerant (BFT) setups.
-A Corrupt Network (CN) is configured on each node that is meant to play _malicious_ during the test scenario. 
-The CN utilizes Corrupt Conduits (CC)s to connect the engines of its node to the networking adaptor.
+Corrupt Network Framework (CNF) is an integration testing framework for Byzantine Fault Tolerant (BFT) setups.
+A corrupt network (cn) is configured on each node that is meant to play _malicious_ during the test scenario. 
+The CN utilizes corrupt conduits (cc)s to connect the engines of its node to the networking adaptor.
 In contrast to the normal conduits, the CCs do not relay the events from their engine to the network adaptor. 
 Instead, they relay the events from their engine to the CN. On receiving an event from a CC, the CN forwards 
 the message to a remote attacker. The attacker is in charge of orchestrating specific attacks through its 
