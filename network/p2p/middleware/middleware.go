@@ -640,6 +640,7 @@ func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload inte
 	logger := m.log.With().
 		Str("channel", msg.ChannelID).
 		Str("type", msg.Type).
+		Int("msg_size", msg.Size()).
 		Str("origin_id", originID.String()).
 		Logger()
 

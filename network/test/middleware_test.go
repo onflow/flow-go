@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -101,7 +102,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
 
-	m.ids, m.nodes, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, m.logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
+	m.ids, m.nodes, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, m.logger, unittest.NetworkCodec(), m.slashingViolationsConsumer, WithIdentityOpts(unittest.WithRole(flow.RoleExecution)))
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -183,9 +184,17 @@ func (m *MiddlewareTestSuite) createOverlay(provider *UpdatableIDProvider) *mock
 	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
 		return provider.Identities(filter.Any)
 	}, nil)
-	// this test is not testing the topic validator, especially in spoofing,
-	// so we always return a valid identity
-	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(), true)
+
+	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Maybe().Return(
+		func(p peer.ID) *flow.Identity {
+			id, _ := provider.ByPeerID(p)
+			return id
+		},
+		func(p peer.ID) bool {
+			_, ok := provider.ByPeerID(p)
+			return ok
+		},
+	)
 	return overlay
 }
 
@@ -403,14 +412,11 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 
 	msg, _ := createMessage(m.T(), sourceNode, targetNode, "")
 
-	// creates a network payload with a size greater than the default max size
-	payload := networkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
-	event := &libp2pmessage.TestMessage{
-		Text: string(payload),
-	}
-
-	// set the message type to a known large message type
+	// creates a network payload with a size greater than the default max size using a known large message type
+	targetSize := uint64(middleware.DefaultMaxUnicastMsgSize) + 1000
+	event := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture(), unittest.WithApproximateSize(targetSize))
 	msg.Type = "messages.ChunkDataResponse"
+	msg.ChannelID = channels.ProvideChunks.String()
 
 	codec := unittest.NetworkCodec()
 	encodedEvent, err := codec.Encode(event)
@@ -423,17 +429,8 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 
 	// expect one message to be received by the target
 	ch := make(chan struct{})
-	m.ov[targetIndex].On("Receive", sourceNode, mock.AnythingOfType("*message.Message"), event).Return(nil).Once().
+	m.ov[targetIndex].On("Receive", sourceNode, msg, event).Return(nil).Once().
 		Run(func(args mockery.Arguments) {
-			// Everything should match except msg.Type since we actually sent a TestMessage
-			received := args[1].(*message.Message)
-			assert.Equal(m.T(), msg.ChannelID, received.ChannelID)
-			assert.Equal(m.T(), msg.OriginID, received.OriginID)
-			assert.Equal(m.T(), msg.TargetIDs, received.TargetIDs)
-			assert.Equal(m.T(), msg.EventID, received.EventID)
-			assert.Equal(m.T(), msg.Payload, received.Payload)
-			assert.Equal(m.T(), "message.TestMessage", received.Type)
-
 			close(ch)
 		})
 
@@ -539,10 +536,10 @@ func createMessage(t *testing.T, originID flow.Identifier, targetID flow.Identif
 
 	codec := unittest.NetworkCodec()
 	b, err := codec.Encode(payload)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	eventID, err := p2p.EventId(testChannel, b)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m := &message.Message{
 		ChannelID: testChannel.String(),
