@@ -528,7 +528,7 @@ func (in *Instance) Run() error {
 	<-util.AllReady(in.voteAggregator, in.timeoutAggregator)
 
 	// start the event handler
-	err := in.handler.Start()
+	err := in.handler.Start(ctx)
 	if err != nil {
 		return fmt.Errorf("could not start event handler: %w", err)
 	}

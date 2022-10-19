@@ -3,6 +3,8 @@
 package mocks
 
 import (
+	context "context"
+
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff"
 	flow "github.com/onflow/flow-go/model/flow"
 
@@ -88,13 +90,13 @@ func (_m *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 	return r0
 }
 
-// Start provides a mock function with given fields:
-func (_m *EventHandler) Start() error {
-	ret := _m.Called()
+// Start provides a mock function with given fields: ctx
+func (_m *EventHandler) Start(ctx context.Context) error {
+	ret := _m.Called(ctx)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
 	} else {
 		r0 = ret.Error(0)
 	}

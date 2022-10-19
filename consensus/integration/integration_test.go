@@ -49,13 +49,11 @@ func Test3Nodes(t *testing.T) {
 	stopper := NewStopper(5, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	start()
-
-	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
+	runFor(30 * time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -70,13 +68,11 @@ func Test5Nodes(t *testing.T) {
 	stopper := NewStopper(2, 1)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockNodes(nodes[0]))
 
-	start()
-
-	unittest.RequireCloseBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
+	runFor(30 * time.Second)
 
 	header, err := nodes[0].state.Final().Head()
 	require.NoError(t, err)
@@ -132,7 +128,7 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 		require.NoError(t, err)
 	}
 
-	// reverse all views to start from lower view to higher view
+	// reverse all views to runFor from lower view to higher view
 	low2high := make([]uint64, 0)
 	for i := len(views) - 1; i >= 0; i-- {
 		low2high = append(low2high, views[i])

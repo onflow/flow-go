@@ -22,7 +22,8 @@ func initTimeoutController(t *testing.T) *Controller {
 		time.Duration(maxRepTimeout*1e6),
 		timeoutAdjustmentFactor,
 		happyPathMaxRoundFailures,
-		0)
+		0,
+		time.Duration(maxRepTimeout*1e6))
 	if err != nil {
 		t.Fail()
 	}
@@ -158,7 +159,8 @@ func Test_BlockRateDelay(t *testing.T) {
 		time.Duration(maxRepTimeout*float64(time.Millisecond)),
 		timeoutAdjustmentFactor,
 		happyPathMaxRoundFailures,
-		time.Second)
+		time.Second,
+		time.Duration(maxRepTimeout*float64(time.Millisecond)))
 	if err != nil {
 		t.Fail()
 	}

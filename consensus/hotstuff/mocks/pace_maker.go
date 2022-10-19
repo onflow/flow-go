@@ -3,6 +3,8 @@
 package mocks
 
 import (
+	context "context"
+
 	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
@@ -123,9 +125,9 @@ func (_m *PaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent
 	return r0, r1
 }
 
-// Start provides a mock function with given fields:
-func (_m *PaceMaker) Start() {
-	_m.Called()
+// Start provides a mock function with given fields: ctx
+func (_m *PaceMaker) Start(ctx context.Context) {
+	_m.Called(ctx)
 }
 
 // TimeoutChannel provides a mock function with given fields:

@@ -15,17 +15,8 @@ type VoteAggregator struct {
 }
 
 // AddBlock provides a mock function with given fields: block
-func (_m *VoteAggregator) AddBlock(block *model.Proposal) error {
-	ret := _m.Called(block)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*model.Proposal) error); ok {
-		r0 = rf(block)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *VoteAggregator) AddBlock(block *model.Proposal) {
+	_m.Called(block)
 }
 
 // AddVote provides a mock function with given fields: vote

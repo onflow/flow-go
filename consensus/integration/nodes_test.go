@@ -61,7 +61,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const hotstuffTimeout = 50 * time.Millisecond
+const hotstuffTimeout = 500 * time.Millisecond
 
 // RandomBeaconNodeInfo stores information about participation in DKG process for consensus node
 // contains private + public keys and participant index
@@ -186,7 +186,7 @@ func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
 // stopping condition is reached.
 // The list of created nodes, the common network hub, and a function which starts
 // all the nodes together, is returned.
-func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot protocol.Snapshot, stopper *Stopper) (nodes []*Node, hub *Hub, startNodes func()) {
+func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot protocol.Snapshot, stopper *Stopper) (nodes []*Node, hub *Hub, runFor func(time.Duration)) {
 	consensus, err := rootSnapshot.Identities(filter.HasRole(flow.RoleConsensus))
 	require.NoError(t, err)
 
@@ -223,17 +223,19 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	// create a function to return which the test case can use to start the nodes
-	startNodes = func() {
+	// create a function to return which the test case can use to run the nodes for some maximum duration
+	// and gracefully stop after.
+	runFor = func(maxDuration time.Duration) {
 		runNodes(signalerCtx, nodes)
+		unittest.RequireCloseBefore(t, stopper.stopped, maxDuration, "expect to get signal from stopper before timeout")
+		stopNodes(t, cancel, nodes)
 	}
 
-	// register a function to stop all nodes once the Stopper determines the test is safe to stop
 	stopper.WithStopFunc(func() {
-		stopNodes(t, cancel, nodes)
+
 	})
 
-	return nodes, hub, startNodes
+	return nodes, hub, runFor
 }
 
 func createRootQC(t *testing.T, root *flow.Block, participantData *run.ParticipantData) *flow.QuorumCertificate {
@@ -578,6 +580,9 @@ func createNode(
 		[]*flow.Header{},
 		hotstuffModules,
 		consensus.WithMinTimeout(hotstuffTimeout),
+		func(cfg *consensus.ParticipantConfig) {
+			cfg.MaxTimeoutObjectRebroadcastInterval = hotstuffTimeout
+		},
 	)
 	require.NoError(t, err)
 
