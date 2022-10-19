@@ -404,6 +404,9 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			bitswap.WithPeerBlockRequestFilter(
 				blob.AuthorizedRequester(allowedANs, exeNode.builder.IdentityProvider, exeNode.builder.Logger),
 			),
+			bitswap.WithTracer(
+				blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
+			),
 		),
 	}
 
