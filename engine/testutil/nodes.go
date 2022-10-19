@@ -250,7 +250,7 @@ func CompleteStateFixture(
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
+func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.Hub, identity bootstrap.NodeInfo, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
 
 	node := GenericNode(t, hub, identity.Identity(), rootSnapshot)
 	privKeys, err := identity.PrivateKeys()
@@ -286,6 +286,8 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		selector,
 		retrieve)
 	require.NoError(t, err)
+	// TODO: move this start logic to a more generalized test utility (we need all engines to be startable).
+	providerEngine.Start(ctx)
 
 	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
 	require.NoError(t, err)
