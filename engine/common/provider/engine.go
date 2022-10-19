@@ -279,7 +279,7 @@ func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.Signaler
 		select {
 		case <-e.requestHandler.GetNotifier():
 			// there is at least a single request in the queue, so we try to process it.
-			e.shovelEntityRequests()
+			e.processAvailableMessages()
 		case <-ctx.Done():
 			// close the internal channel, the workers will drain the channel before exiting
 			close(e.requestChannel)
@@ -289,7 +289,7 @@ func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.Signaler
 	}
 }
 
-func (e *Engine) shovelEntityRequests() {
+func (e *Engine) processAvailableMessages() {
 	for {
 		msg, ok := e.requestQueue.Get()
 		if !ok {
@@ -314,9 +314,9 @@ func (e *Engine) shovelEntityRequests() {
 			Hex("origin_id", logging.ID(req.OriginId)).
 			Str("requested_entity_ids", fmt.Sprintf("%v", req.EntityIds)).Logger()
 
-		lg.Trace().Msg("shoveller is queuing entity request for processing")
+		lg.Trace().Msg("processor is queuing entity request for processing")
 		e.requestChannel <- req
-		lg.Trace().Msg("shoveller queued up entity request for processing")
+		lg.Trace().Msg("processor queued up entity request for processing")
 	}
 }
 
