@@ -24,6 +24,10 @@ func TestConstructor(t *testing.T) {
 	c, err = NewConfig(-1200*time.Millisecond, 2000*time.Millisecond, 1.5, 3, time.Second, 2000*time.Millisecond)
 	require.True(t, model.IsConfigurationError(err))
 
+	// should not allow 0 minReplicaTimeout
+	c, err = NewConfig(0, 2000*time.Millisecond, 1.5, 3, time.Second, 2000*time.Millisecond)
+	require.True(t, model.IsConfigurationError(err))
+
 	// should not allow maxReplicaTimeout < minReplicaTimeout
 	c, err = NewConfig(1200*time.Millisecond, 1000*time.Millisecond, 1.5, 3, time.Second, 2000*time.Millisecond)
 	require.True(t, model.IsConfigurationError(err))
