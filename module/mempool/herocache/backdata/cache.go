@@ -165,6 +165,7 @@ func (c *Cache) Remove(entityID flow.Identifier) (flow.Entity, bool) {
 	// frees up slot
 	c.unuseSlot(bucketIndex, sliceIndex)
 
+	c.collector.OnKeyRemoved()
 	return entity, true
 }
 
@@ -270,11 +271,13 @@ func (c *Cache) Hash() flow.Identifier {
 // determines whether the write operation was successful. A write operation fails when there is already
 // a duplicate entityId exists in the BackData, and that entityId is linked to a valid entity.
 func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
+	c.collector.OnKeyPutAttempt()
+
 	entityId32of256, b := c.entityId32of256AndBucketIndex(entityId)
 	slotToUse, unique := c.slotIndexInBucket(b, entityId32of256, entityId)
 	if !unique {
 		// entityId already exists
-		c.collector.OnKeyPutFailure()
+		c.collector.OnKeyPutDeduplicated()
 		return false
 	}
 
@@ -292,6 +295,7 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	c.slotCount++
 	entityIndex, slotAvailable, ejectionHappened := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
 	if !slotAvailable {
+		c.collector.OnKeyPutDrop()
 		return false
 	}
 

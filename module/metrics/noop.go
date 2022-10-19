@@ -11,6 +11,8 @@ import (
 
 type NoopCollector struct{}
 
+var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
+
 func NewNoopCollector() *NoopCollector {
 	nc := &NoopCollector{}
 	return nc
@@ -191,9 +193,12 @@ func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                   
 func (nc *NoopCollector) OnKeyPutSuccess()                                                      {}
 func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity()                                    {}
 func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                                       {}
-func (nc *NoopCollector) OnKeyPutFailure()                                                      {}
 func (nc *NoopCollector) OnKeyGetSuccess()                                                      {}
 func (nc *NoopCollector) OnKeyGetFailure()                                                      {}
+func (nc *NoopCollector) OnKeyPutAttempt()                                                      {}
+func (nc *NoopCollector) OnKeyPutDrop()                                                         {}
+func (nc *NoopCollector) OnKeyPutDeduplicated()                                                 {}
+func (nc *NoopCollector) OnKeyRemoved()                                                         {}
 func (nc *NoopCollector) ExecutionDataFetchStarted()                                            {}
 func (nc *NoopCollector) ExecutionDataFetchFinished(_ time.Duration, _ bool, _ uint64)          {}
 func (nc *NoopCollector) NotificationSent(height uint64)                                        {}
