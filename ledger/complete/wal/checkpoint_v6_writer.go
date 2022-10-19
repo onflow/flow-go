@@ -23,8 +23,8 @@ import (
 	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
-const subtrieLevel = 4
-const subtrieCount = 1 << subtrieLevel // 16
+const subtrieLevel = 6
+const subtrieCount = 1 << subtrieLevel // 64
 
 func subtrieCountByLevel(level uint16) int {
 	return 1 << level
@@ -39,7 +39,7 @@ func StoreCheckpointV6SingleThread(tries []*trie.MTrie, outputDir string, output
 // StoreCheckpointV6Concurrently stores checkpoint file in v6 in max workers,
 // useful during state extraction
 func StoreCheckpointV6Concurrently(tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
-	return StoreCheckpointV6(tries, outputDir, outputFile, logger, 16)
+	return StoreCheckpointV6(tries, outputDir, outputFile, logger, 64)
 }
 
 // StoreCheckpointV6 stores checkpoint file into a main file and 17 file parts.
