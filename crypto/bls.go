@@ -297,7 +297,7 @@ func BLSInvalidSignature() Signature {
 }
 
 // decodePrivateKey decodes a slice of bytes into a private key.
-// This function checks the scalar is less than the group order
+// It checks the scalar is non-zero and is less than the group order.
 func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
 	if len(privateKeyBytes) != prKeyLengthBLSBLS12381 {
 		return nil, invalidInputsErrorf("input length must be %d, got %d",
@@ -306,7 +306,7 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 	sk := newPrKeyBLSBLS12381(nil)
 
 	readScalar(&sk.scalar, privateKeyBytes)
-	if C.check_membership_Zr((*C.bn_st)(&sk.scalar)) == valid {
+	if C.check_membership_Zr_star((*C.bn_st)(&sk.scalar)) == valid {
 		return sk, nil
 	}
 
@@ -315,6 +315,7 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 
 // decodePublicKey decodes a slice of bytes into a public key.
 // This function includes a membership check in G2.
+//
 // Note the function does not reject the infinity point (identity element of G2).
 // However, the comparison to identity is cached in the `PublicKey` structure for
 // a faster check during signature verifications. Any verification against an identity
