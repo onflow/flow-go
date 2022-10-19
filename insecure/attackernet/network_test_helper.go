@@ -18,23 +18,23 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// testOrchestratorNetworkObserve evaluates that upon receiving concurrent messages from corrupt network, the attacker network
+// testAttackerNetworkObserve evaluates that upon receiving concurrent messages from corrupt network, the attacker network
 // decodes the messages into events and relays them to its registered orchestrator.
-func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
+func testAttackerNetworkObserve(t *testing.T, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
 	messages, egressEvents, corruptIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
 
 	withMockOrchestrator(
 		t,
 		corruptIds,
-		func(orchestratorNetwork *Network, orchestrator *mockinsecure.AttackerOrchestrator, corruptNetworks []*mockCorruptNetwork) {
+		func(attackerNetwork *Network, orchestrator *mockinsecure.AttackerOrchestrator, corruptNetworks []*mockCorruptNetwork) {
 			// mocks orchestrator to receive each event exactly once.
 			orchestratorWG := mockOrchestratorHandlingEgressEvent(t, orchestrator, egressEvents)
 
 			// sends all messages concurrently to the attacker network (imitating corrupt networks sending
 			// messages concurrently to attacker network).
-			orchestratorNetworkSendWG := sync.WaitGroup{}
-			orchestratorNetworkSendWG.Add(concurrencyDegree)
+			attackerNetworkSendWG := sync.WaitGroup{}
+			attackerNetworkSendWG.Add(concurrencyDegree)
 
 			for i, msg := range messages {
 				msg := msg
@@ -43,26 +43,26 @@ func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
 				go func() {
 					err := corruptNetwork.attackerObserveStream.Send(msg) // pretends the ith corruptNetwork is sending message to attacker for observe
 					require.NoError(t, err)
-					orchestratorNetworkSendWG.Done()
+					attackerNetworkSendWG.Done()
 				}()
 			}
 
 			// all messages should be sent to attacker network in a timely fashion.
-			unittest.RequireReturnsBefore(t, orchestratorNetworkSendWG.Wait, 1*time.Second, "could not send all messages to attack orchestratorNetwork on time")
+			unittest.RequireReturnsBefore(t, attackerNetworkSendWG.Wait, 1*time.Second, "could not send all messages to attack attackerNetwork on time")
 			// all events should be relayed to the orchestrator by the attacker network in a timely fashion.
 			unittest.RequireReturnsBefore(t, orchestratorWG.Wait, 1*time.Second, "orchestrator could not receive messages on time")
 		})
 }
 
-// testOrchestratorNetwork evaluates that the orchestrator can successfully route an event to a corrupt node through the attacker network.
+// testAttackerNetwork evaluates that the orchestrator can successfully route an event to a corrupt node through the attacker network.
 // By a corrupt node here, we mean a node that runs with a corrupt network.
-func testOrchestratorNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
+func testAttackerNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
 	_, egressEvents, corruptIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), protocol, concurrencyDegree)
 
 	withMockOrchestrator(t,
 		corruptIds,
-		func(orchestratorNetwork *Network, _ *mockinsecure.AttackerOrchestrator, corruptNetworks []*mockCorruptNetwork) {
+		func(attackerNetwork *Network, _ *mockinsecure.AttackerOrchestrator, corruptNetworks []*mockCorruptNetwork) {
 			attackerMsgReceived := &sync.WaitGroup{}
 			attackerMsgReceived.Add(concurrencyDegree)
 
@@ -78,22 +78,22 @@ func testOrchestratorNetwork(t *testing.T, protocol insecure.Protocol, concurren
 				}()
 			}
 
-			orchestratorNetworkSendWG := &sync.WaitGroup{}
-			orchestratorNetworkSendWG.Add(concurrencyDegree)
+			attackerNetworkSendWG := &sync.WaitGroup{}
+			attackerNetworkSendWG.Add(concurrencyDegree)
 
 			for _, event := range egressEvents {
 				event := event
 				go func() {
-					err := orchestratorNetwork.SendEgress(event)
+					err := attackerNetwork.SendEgress(event)
 					require.NoError(t, err)
 
-					orchestratorNetworkSendWG.Done()
+					attackerNetworkSendWG.Done()
 				}()
 			}
 
-			// all events should be sent to orchestratorNetwork in a timely fashion.
-			unittest.RequireReturnsBefore(t, orchestratorNetworkSendWG.Wait, 100*time.Millisecond, "could not send all events to orchestratorNetwork on time")
-			// all events should be relayed to the connections by the orchestratorNetwork in a timely fashion.
+			// all events should be sent to attackerNetwork in a timely fashion.
+			unittest.RequireReturnsBefore(t, attackerNetworkSendWG.Wait, 100*time.Millisecond, "could not send all events to attackerNetwork on time")
+			// all events should be relayed to the connections by the attackerNetwork in a timely fashion.
 			unittest.RequireReturnsBefore(t, attackerMsgReceived.Wait, 100*time.Millisecond, "connections could not receive messages on time")
 		})
 }
@@ -256,7 +256,7 @@ func withMockCorruptNetworks(
 
 	run(corruptNetworkCtx, corruptNetworks, corruptNetworkPorts)
 
-	// terminates orchestratorNetwork
+	// terminates all corrupt networks
 	cancel()
 
 	// stop all corruptNetworks

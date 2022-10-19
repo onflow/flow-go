@@ -24,9 +24,9 @@ const (
 // Orchestrator represents a simple orchestrator that passes through all incoming events.
 type Orchestrator struct {
 	sync.Mutex
-	logger              zerolog.Logger
-	orchestratorNetwork insecure.AttackerNetwork
-	eventTracker        map[string]flow.IdentifierList
+	logger          zerolog.Logger
+	attackerNetwork insecure.AttackerNetwork
+	eventTracker    map[string]flow.IdentifierList
 }
 
 var _ insecure.AttackOrchestrator = &Orchestrator{}
@@ -71,7 +71,7 @@ func (d *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 		d.eventTracker[TypeResultApproval] = append(d.eventTracker[TypeResultApproval], e.ID())
 	}
 
-	err := d.orchestratorNetwork.SendEgress(event)
+	err := d.attackerNetwork.SendEgress(event)
 	if err != nil {
 		// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
 		lg.Fatal().Err(err).Msg("could not pass through egress event")
@@ -89,7 +89,7 @@ func (d *Orchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
 
-	err := d.orchestratorNetwork.SendIngress(event)
+	err := d.attackerNetwork.SendIngress(event)
 
 	if err != nil {
 		// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
@@ -100,8 +100,8 @@ func (d *Orchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 	return nil
 }
 
-func (d *Orchestrator) Register(orchestratorNetwork insecure.AttackerNetwork) {
-	d.orchestratorNetwork = orchestratorNetwork
+func (d *Orchestrator) Register(attackerNetwork insecure.AttackerNetwork) {
+	d.attackerNetwork = attackerNetwork
 }
 
 // MustSeenFlowProtocolEvent checks the dummy orchestrator has passed through the flow protocol events with given ids. It fails

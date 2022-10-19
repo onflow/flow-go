@@ -126,7 +126,7 @@ func runCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
 
 	run(*corruptIdentity, corruptNetwork, adapter, stream)
 
-	// terminates orchestratorNetwork
+	// terminates corrupt network
 	cancel()
 	unittest.RequireCloseBefore(t, corruptNetwork.Done(), 100*time.Millisecond, "could not stop corrupt conduit on time")
 }

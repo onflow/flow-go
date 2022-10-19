@@ -38,7 +38,7 @@ func NewAttackerNetwork(
 	connector insecure.CorruptNodeConnector,
 	corruptNodeIds flow.IdentityList) (*Network, error) {
 
-	orchestratorNetwork := &Network{
+	attackerNetwork := &Network{
 		orchestrator:       orchestrator,
 		logger:             logger,
 		codec:              codec,
@@ -47,30 +47,30 @@ func NewAttackerNetwork(
 		corruptConnections: make(map[flow.Identifier]insecure.CorruptNodeConnection),
 	}
 
-	connector.WithIncomingMessageHandler(orchestratorNetwork.Observe)
+	connector.WithIncomingMessageHandler(attackerNetwork.Observe)
 
 	// setting lifecycle management module.
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			err := orchestratorNetwork.start(ctx)
+			err := attackerNetwork.start(ctx)
 			if err != nil {
-				ctx.Throw(fmt.Errorf("could not start orchestratorNetwork: %w", err))
+				ctx.Throw(fmt.Errorf("could not start attackerNetwork: %w", err))
 			}
 
 			ready()
 
 			<-ctx.Done()
 
-			err = orchestratorNetwork.stop()
+			err = attackerNetwork.stop()
 			if err != nil {
-				ctx.Throw(fmt.Errorf("could not stop orchestratorNetwork: %w", err))
+				ctx.Throw(fmt.Errorf("could not stop attackerNetwork: %w", err))
 			}
 		}).Build()
 
-	orchestratorNetwork.Component = cm
-	orchestratorNetwork.cm = cm
+	attackerNetwork.Component = cm
+	attackerNetwork.cm = cm
 
-	return orchestratorNetwork, nil
+	return attackerNetwork, nil
 }
 
 // start triggers the sub-modules of attacker network.
