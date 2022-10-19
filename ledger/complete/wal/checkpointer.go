@@ -1134,3 +1134,55 @@ func evictFileFromLinuxPageCache(f *os.File, fsync bool, logger *zerolog.Logger)
 	}
 	return nil
 }
+
+// Copy the checkpoint file including the part files from the given `from` to
+// the `to` directory
+// it returns the path of all the copied files
+// any error returned are exceptions
+func CopyCheckpointFile(filename string, from string, to string) (
+	copied []string,
+	errToReturn error,
+) {
+	// It's possible that the trie dir does not yet exist. If not this will create the the required path
+	err := os.MkdirAll(to, 0700)
+	if err != nil {
+		return nil, err
+	}
+
+	// checkpoint V6 produces multiple checkpoint part files that need to be copied over
+	pattern := filePathPattern(from, filename)
+	matched, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("could not glob checkpoint file with pattern %v: %w", pattern, err)
+	}
+
+	newPaths := make([]string, len(matched))
+	for i, match := range matched {
+		in, err := os.Open(match)
+		if err != nil {
+			return nil, fmt.Errorf("can not open file %v to copy: %w", match, err)
+		}
+		defer func() {
+			errToReturn = closeAndMergeError(in, errToReturn)
+		}()
+
+		_, partfile := filepath.Split(match)
+		newPath := filepath.Join(to, partfile)
+		out, err := os.Create(newPath)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			errToReturn = closeAndMergeError(out, errToReturn)
+		}()
+
+		_, err = io.Copy(out, in)
+		if err != nil {
+			return nil, fmt.Errorf("can not copy file %v: %w", match, err)
+		}
+
+		newPaths[i] = newPath
+	}
+
+	return newPaths, nil
+}

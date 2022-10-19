@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
+	"path"
 	"path/filepath"
 	goruntime "runtime"
+	"strings"
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -15,17 +16,12 @@ import (
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/atomic"
-
-	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
-
-	"github.com/onflow/flow-go/network/p2p/blob"
-
-	"github.com/onflow/flow-go/module/mempool/queue"
 
 	"github.com/onflow/flow-go/admin/commands"
 	executionCommands "github.com/onflow/flow-go/admin/commands/execution"
@@ -52,6 +48,7 @@ import (
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -71,9 +68,11 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -375,7 +374,42 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
-	opts := []network.BlobServiceOption{}
+	// build list of Access nodes that are allowed to request execution data from this node
+	var allowedANs map[flow.Identifier]bool
+	if exeNode.exeConf.executionDataAllowedPeers != "" {
+		ids := strings.Split(exeNode.exeConf.executionDataAllowedPeers, ",")
+		allowedANs = make(map[flow.Identifier]bool, len(ids))
+		for _, idHex := range ids {
+			anID, err := flow.HexStringToIdentifier(idHex)
+			if err != nil {
+				return nil, fmt.Errorf("invalid node ID %s: %w", idHex, err)
+			}
+
+			id, ok := exeNode.builder.IdentityProvider.ByNodeID(anID)
+			if !ok {
+				return nil, fmt.Errorf("allowed node ID %s is not in identity list", idHex)
+			}
+
+			if id.Role != flow.RoleAccess {
+				return nil, fmt.Errorf("allowed node ID %s is not an access node", id.NodeID.String())
+			}
+
+			if id.Ejected {
+				return nil, fmt.Errorf("allowed node ID %s is ejected", id.NodeID.String())
+			}
+
+			allowedANs[anID] = true
+		}
+	}
+
+	opts := []network.BlobServiceOption{
+		blob.WithBitswapOptions(
+			// Only allow block requests from staked ENs and ANs on the allowedANs list (if set)
+			bitswap.WithPeerBlockRequestFilter(
+				blob.AuthorizedRequester(allowedANs, exeNode.builder.IdentityProvider, exeNode.builder.Logger),
+			),
+		),
+	}
 
 	if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
 		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
@@ -453,7 +487,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	}
 	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get the state comitment at latest executed block id %s: %w", blockID.String(), err)
+		return nil, fmt.Errorf("cannot get the state commitment at latest executed block id %s: %w", blockID.String(), err)
 	}
 	blockView := exeNode.executionState.NewView(stateCommit)
 
@@ -1034,35 +1068,18 @@ func copyBootstrapState(dir, trie string) error {
 	}
 
 	// copy from the bootstrap folder to the execution state folder
-	src := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, filename)
-	dst := filepath.Join(trie, filename)
-
-	in, err := os.Open(src)
+	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
+	copiedFiles, err := wal.CopyCheckpointFile(filename, from, to)
 	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	// It's possible that the trie dir does not yet exist. If not this will create the the required path
-	err = os.MkdirAll(trie, 0700)
-	if err != nil {
-		return err
+		return fmt.Errorf("can not copy checkpoint file %s, from %s to %s",
+			filename, from, to)
 	}
 
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
+	for _, newPath := range copiedFiles {
+		fmt.Printf("copied root checkpoint file from directory: %v, to: %v\n", from, newPath)
 	}
 
-	fmt.Printf("copied bootstrap state file from: %v, to: %v\n", src, dst)
-
-	return out.Close()
+	return nil
 }
 
 func logSysInfo(logger zerolog.Logger) error {
