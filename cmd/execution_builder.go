@@ -143,6 +143,7 @@ type ExecutionNode struct {
 	executionDataPruner           *pruner.Pruner
 	executionDataBlobstore        blobs.Blobstore
 	executionDataTracker          tracker.Storage
+	blobService                   network.BlobService
 	blobserviceDependable         *module.ProxiedReadyDoneAware
 }
 
@@ -194,9 +195,9 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
+		Component("provider engine", exeNode.LoadProviderEngine).
 		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
 		Component("S3 block data uploader", exeNode.LoadS3BlockDataUploader).
-		Component("provider engine", exeNode.LoadProviderEngine).
 		Component("checker engine", exeNode.LoadCheckerEngine).
 		Component("ingestion engine", exeNode.LoadIngestionEngine).
 		Component("follower engine", exeNode.LoadFollowerEngine).
@@ -286,11 +287,6 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			exeNode.collector,
 		)
 
-		bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore)
-		if err != nil {
-			return nil, fmt.Errorf("could not register blob service: %w", err)
-		}
-
 		exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
 		exeNode.commits = storage.NewCommits(node.Metrics.Cache, node.DB)
 		exeNode.computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
@@ -308,7 +304,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			exeNode.results,
 			exeNode.txResults,
 			exeNode.computationResultUploadStatus,
-			execution_data.NewDownloader(bs),
+			execution_data.NewDownloader(exeNode.blobService),
 			exeNode.collector)
 		if retryableUploader == nil {
 			return nil, errors.New("failed to create ComputationResult upload status store")
@@ -422,6 +418,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	if err != nil {
 		return nil, fmt.Errorf("failed to register blob service: %w", err)
 	}
+	exeNode.blobService = bs
 
 	// add blobservice into ReadyDoneAware dependency passed to peer manager
 	// this configures peer manager to wait for the blobservice to be ready before starting
@@ -746,8 +743,11 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		channels.RequestCollections,
 		filter.Any,
 		func() flow.Entity { return &flow.Collection{} },
-		// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
+		// we are manually triggering batches in execution, but lets still send off a batch once a in a while, as a safety net for the sake of retries.
 		requester.WithBatchInterval(exeNode.exeConf.requestInterval),
+		requester.WithRetryFunction(requester.RetryLinear(exeNode.exeConf.requestRetryIncrementalDelay)),
+		requester.WithRetryInitial(exeNode.exeConf.requestRetryInitialDelay),
+		requester.WithRetryMaximum(exeNode.exeConf.requestRetryMaximumDelay),
 		// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
 		// hence we not need to check origin
 		requester.WithValidateStaking(false),
