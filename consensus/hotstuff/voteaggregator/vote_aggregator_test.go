@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -29,6 +30,7 @@ type VoteAggregatorTestSuite struct {
 	collectors     *mocks.VoteCollectors
 	consumer       *mocks.Consumer
 	stopAggregator context.CancelFunc
+	errs           <-chan error
 }
 
 func (s *VoteAggregatorTestSuite) SetupTest() {
@@ -56,15 +58,16 @@ func (s *VoteAggregatorTestSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx, errs := irrecoverable.WithSignaler(ctx)
 	s.stopAggregator = cancel
+	s.errs = errs
 	s.aggregator.Start(signalerCtx)
 	unittest.RequireCloseBefore(s.T(), s.aggregator.Ready(), 100*time.Millisecond, "should close before timeout")
 }
 
 func (s *VoteAggregatorTestSuite) TearDownTest() {
 	s.stopAggregator()
-	unittest.RequireCloseBefore(s.T(), s.aggregator.Done(), time.Second, "should close before timeout")
+	unittest.RequireCloseBefore(s.T(), s.aggregator.Done(), 10*time.Second, "should close before timeout")
 }
 
 // TestOnFinalizedBlock tests if finalized block gets processed when send through `VoteAggregator`.
@@ -77,4 +80,36 @@ func (s *VoteAggregatorTestSuite) TestOnFinalizedBlock() {
 	}).Once()
 	s.aggregator.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
+}
+
+// TestProcessInvalidBlock tests that processing invalid block results in exception, when given as
+// an input to AddBlock (only expects _valid_ blocks per API contract).
+// The exception should be propagated to the VoteAggregator's internal `ComponentManager`.
+func (s *VoteAggregatorTestSuite) TestProcessInvalidBlock() {
+	block := helper.MakeProposal(
+		helper.WithBlock(
+			helper.MakeBlock(
+				helper.WithBlockView(100),
+			),
+		),
+	)
+	processed := make(chan struct{})
+	collector := mocks.NewVoteCollector(s.T())
+	collector.On("ProcessBlock", block).Run(func(_ mock.Arguments) {
+		close(processed)
+	}).Return(model.InvalidBlockError{})
+	s.collectors.On("GetOrCreateCollector", block.Block.View).Return(collector, true, nil).Once()
+
+	// submit block for processing
+	s.aggregator.AddBlock(block)
+	unittest.RequireCloseBefore(s.T(), processed, 100*time.Millisecond, "should close before timeout")
+
+	// expect a thrown error
+	select {
+	case err := <-s.errs:
+		require.Error(s.T(), err)
+		require.False(s.T(), model.IsInvalidBlockError(err))
+	case <-time.After(100 * time.Millisecond):
+		s.T().Fatalf("expected error but haven't received anything")
+	}
 }

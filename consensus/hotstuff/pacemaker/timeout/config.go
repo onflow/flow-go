@@ -24,6 +24,8 @@ type Config struct {
 	HappyPathMaxRoundFailures uint64
 	// BlockRateDelayMS is a delay to broadcast the proposal in order to control block production rate [MILLISECONDS]
 	BlockRateDelayMS float64
+	// MaxTimeoutObjectRebroadcastInterval is the maximum value for timeout object rebroadcast interval [MILLISECONDS]
+	MaxTimeoutObjectRebroadcastInterval float64
 }
 
 var DefaultConfig = NewDefaultConfig()
@@ -42,6 +44,7 @@ func NewDefaultConfig() Config {
 	// after 6 successively failed rounds, the pacemaker leaves the hot path and starts increasing timeouts (recovery mode)
 	happyPathMaxRoundFailures := uint64(6)
 	blockRateDelay := 0 * time.Millisecond
+	maxRebroadcastInterval := 5 * time.Second
 
 	conf, err := NewConfig(
 		minReplicaTimeout+blockRateDelay,
@@ -49,6 +52,7 @@ func NewDefaultConfig() Config {
 		timeoutAdjustmentFactorFactor,
 		happyPathMaxRoundFailures,
 		blockRateDelay,
+		maxRebroadcastInterval,
 	)
 	if err != nil {
 		// we check in a unit test that this does not happen
@@ -76,9 +80,10 @@ func NewConfig(
 	timeoutAdjustmentFactor float64,
 	happyPathMaxRoundFailures uint64,
 	blockRateDelay time.Duration,
+	maxRebroadcastInterval time.Duration,
 ) (Config, error) {
-	if minReplicaTimeout < 0 {
-		return Config{}, model.NewConfigurationErrorf("minReplicaTimeout must non-negative")
+	if minReplicaTimeout <= 0 {
+		return Config{}, model.NewConfigurationErrorf("minReplicaTimeout must be a positive number[milliseconds]")
 	}
 	if maxReplicaTimeout < minReplicaTimeout {
 		return Config{}, model.NewConfigurationErrorf("maxReplicaTimeout cannot be smaller than minReplicaTimeout")
@@ -89,13 +94,17 @@ func NewConfig(
 	if blockRateDelay < 0 {
 		return Config{}, model.NewConfigurationErrorf("blockRateDelay must be must be non-negative")
 	}
+	if maxRebroadcastInterval <= 0 {
+		return Config{}, model.NewConfigurationErrorf("maxRebroadcastInterval must be a positive number [milliseconds]")
+	}
 
 	tc := Config{
-		MinReplicaTimeout:         float64(minReplicaTimeout.Milliseconds()),
-		MaxReplicaTimeout:         float64(maxReplicaTimeout.Milliseconds()),
-		TimeoutAdjustmentFactor:   timeoutAdjustmentFactor,
-		HappyPathMaxRoundFailures: happyPathMaxRoundFailures,
-		BlockRateDelayMS:          float64(blockRateDelay.Milliseconds()),
+		MinReplicaTimeout:                   float64(minReplicaTimeout.Milliseconds()),
+		MaxReplicaTimeout:                   float64(maxReplicaTimeout.Milliseconds()),
+		TimeoutAdjustmentFactor:             timeoutAdjustmentFactor,
+		HappyPathMaxRoundFailures:           happyPathMaxRoundFailures,
+		BlockRateDelayMS:                    float64(blockRateDelay.Milliseconds()),
+		MaxTimeoutObjectRebroadcastInterval: float64(maxRebroadcastInterval.Milliseconds()),
 	}
 	return tc, nil
 }
