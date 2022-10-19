@@ -179,7 +179,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	// registers mock network with orchestrator
 	wintermuteOrchestrator.Register(mockAttackerNetwork)
 
-	// imitates sending events from corrupt execution nodes to the attacker orchestrator.
+	// imitates sending events from corrupt execution nodes to the attack orchestrator.
 	corruptEnEventSendWG := &sync.WaitGroup{}
 	l := len(eventMap)
 	corruptEnEventSendWG.Add(l)

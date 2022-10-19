@@ -13,7 +13,7 @@ type Orchestrator struct {
 	IngressEventCorrupter func(event *insecure.IngressEvent)
 }
 
-var _ insecure.AttackerOrchestrator = &Orchestrator{}
+var _ insecure.AttackOrchestrator = &Orchestrator{}
 
 // HandleEgressEvent implements logic of processing the events received from a corrupt node.
 //

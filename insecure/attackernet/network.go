@@ -22,7 +22,7 @@ type Network struct {
 	cm                 *component.ComponentManager
 	orchestratorMutex  sync.Mutex // to ensure thread-safe calls into orchestrator.
 	logger             zerolog.Logger
-	orchestrator       insecure.AttackerOrchestrator // the mounted orchestrator that implements certain attack logic.
+	orchestrator       insecure.AttackOrchestrator // the mounted orchestrator that implements certain attack logic.
 	codec              network.Codec
 	corruptNodeIds     flow.IdentityList                                  // identity of the corrupt nodes
 	corruptConnections map[flow.Identifier]insecure.CorruptNodeConnection // existing connections to the corrupt nodes.
@@ -34,7 +34,7 @@ var _ insecure.AttackerNetwork = &Network{}
 func NewAttackerNetwork(
 	logger zerolog.Logger,
 	codec network.Codec,
-	orchestrator insecure.AttackerOrchestrator,
+	orchestrator insecure.AttackOrchestrator,
 	connector insecure.CorruptNodeConnector,
 	corruptNodeIds flow.IdentityList) (*Network, error) {
 
