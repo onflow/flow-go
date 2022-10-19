@@ -165,7 +165,7 @@ func (c *Cache) Remove(entityID flow.Identifier) (flow.Entity, bool) {
 	// frees up slot
 	c.unuseSlot(bucketIndex, sliceIndex)
 
-	c.collector.OnKeyRemoved()
+	c.collector.OnKeyRemoved(c.entities.Size())
 	return entity, true
 }
 
@@ -271,7 +271,7 @@ func (c *Cache) Hash() flow.Identifier {
 // determines whether the write operation was successful. A write operation fails when there is already
 // a duplicate entityId exists in the BackData, and that entityId is linked to a valid entity.
 func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
-	c.collector.OnKeyPutAttempt()
+	c.collector.OnKeyPutAttempt(c.entities.Size())
 
 	entityId32of256, b := c.entityId32of256AndBucketIndex(entityId)
 	slotToUse, unique := c.slotIndexInBucket(b, entityId32of256, entityId)
@@ -307,7 +307,7 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	c.buckets[b].slots[slotToUse].slotAge = c.slotCount
 	c.buckets[b].slots[slotToUse].entityIndex = entityIndex
 	c.buckets[b].slots[slotToUse].entityId32of256 = entityId32of256
-	c.collector.OnKeyPutSuccess()
+	c.collector.OnKeyPutSuccess(c.entities.Size())
 	return true
 }
 

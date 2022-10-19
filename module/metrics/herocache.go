@@ -24,6 +24,8 @@ type HeroCacheCollector struct {
 	countKeyPutAttempt      prometheus.Counter
 	countKeyRemoved         prometheus.Counter
 
+	size prometheus.Gauge
+
 	countKeyEjectionDueToFullCapacity prometheus.Counter
 	countKeyEjectionDueToEmergency    prometheus.Counter
 }
@@ -85,6 +87,13 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 		Buckets: []float64{0, 0.1, 0.25, 0.5, 0.75, 1},
 		Name:    cacheName + "_" + "normalized_bucket_available_slot_count",
 		Help:    "normalized histogram of available slots across all buckets",
+	})
+
+	size := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: nameSpace,
+		Subsystem: subsystemHeroCache,
+		Name:      cacheName + "_" + "items_total",
+		Help:      "total number of items in the cache",
 	})
 
 	countKeyGetSuccess := prometheus.NewCounter(prometheus.CounterOpts{
@@ -154,6 +163,9 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 		// available slot distribution
 		histogramNormalizedBucketSlotAvailable,
 
+		// size
+		size,
+
 		// read
 		countKeyGetSuccess,
 		countKeyGetFailure,
@@ -173,9 +185,9 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 
 	return &HeroCacheCollector{
 		histogramNormalizedBucketSlotAvailable: histogramNormalizedBucketSlotAvailable,
-
-		countKeyGetSuccess: countKeyGetSuccess,
-		countKeyGetFailure: countKeyGetFailure,
+		size:                                   size,
+		countKeyGetSuccess:                     countKeyGetSuccess,
+		countKeyGetFailure:                     countKeyGetFailure,
 
 		countKeyPutAttempt:      countKeyPutAttempt,
 		countKeyPutSuccess:      countKeyPutSuccess,
@@ -196,8 +208,10 @@ func (h *HeroCacheCollector) BucketAvailableSlots(availableSlots uint64, totalSl
 }
 
 // OnKeyPutSuccess is called whenever a new (key, entity) pair is successfully added to the cache.
-func (h *HeroCacheCollector) OnKeyPutSuccess() {
+// size parameter is the current size of the cache post insertion.
+func (h *HeroCacheCollector) OnKeyPutSuccess(size uint32) {
 	h.countKeyPutSuccess.Inc()
+	h.size.Set(float64(size))
 }
 
 // OnKeyPutDeduplicated is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
@@ -225,8 +239,10 @@ func (h *HeroCacheCollector) OnKeyGetFailure() {
 // OnKeyPutAttempt is called whenever a new (key, value) pair is attempted to be put in cache.
 // It does not reflect whether the put was successful or not.
 // A (key, value) pair put attempt may fail if the cache is full, or the key already exists.
-func (h *HeroCacheCollector) OnKeyPutAttempt() {
+// size parameter is the current size of the cache prior to the put attempt.
+func (h *HeroCacheCollector) OnKeyPutAttempt(size uint32) {
 	h.countKeyPutAttempt.Inc()
+	h.size.Set(float64(size))
 }
 
 // OnKeyPutDrop is called whenever a new (key, entity) pair is dropped from the cache due to full cache.
@@ -235,8 +251,10 @@ func (h *HeroCacheCollector) OnKeyPutDrop() {
 }
 
 // OnKeyRemoved is called whenever a (key, entity) pair is removed from the cache.
-func (h *HeroCacheCollector) OnKeyRemoved() {
+// size parameter is the current size of the cache.
+func (h *HeroCacheCollector) OnKeyRemoved(size uint32) {
 	h.countKeyRemoved.Inc()
+	h.size.Set(float64(size))
 }
 
 // OnEntityEjectionDueToFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.

@@ -34,9 +34,9 @@ func (_m *HeroCacheMetrics) OnKeyGetSuccess() {
 	_m.Called()
 }
 
-// OnKeyPutAttempt provides a mock function with given fields:
-func (_m *HeroCacheMetrics) OnKeyPutAttempt() {
-	_m.Called()
+// OnKeyPutAttempt provides a mock function with given fields: size
+func (_m *HeroCacheMetrics) OnKeyPutAttempt(size uint32) {
+	_m.Called(size)
 }
 
 // OnKeyPutDeduplicated provides a mock function with given fields:
@@ -49,14 +49,14 @@ func (_m *HeroCacheMetrics) OnKeyPutDrop() {
 	_m.Called()
 }
 
-// OnKeyPutSuccess provides a mock function with given fields:
-func (_m *HeroCacheMetrics) OnKeyPutSuccess() {
-	_m.Called()
+// OnKeyPutSuccess provides a mock function with given fields: size
+func (_m *HeroCacheMetrics) OnKeyPutSuccess(size uint32) {
+	_m.Called(size)
 }
 
-// OnKeyRemoved provides a mock function with given fields:
-func (_m *HeroCacheMetrics) OnKeyRemoved() {
-	_m.Called()
+// OnKeyRemoved provides a mock function with given fields: size
+func (_m *HeroCacheMetrics) OnKeyRemoved(size uint32) {
+	_m.Called(size)
 }
 
 type mockConstructorTestingTNewHeroCacheMetrics interface {

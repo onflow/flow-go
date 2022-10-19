@@ -526,10 +526,10 @@ type HeroCacheMetrics interface {
 	// OnKeyPutAttempt is called whenever a new (key, value) pair is attempted to be put in cache.
 	// It does not reflect whether the put was successful or not.
 	// A (key, value) pair put attempt may fail if the cache is full, or the key already exists.
-	OnKeyPutAttempt()
+	OnKeyPutAttempt(size uint32)
 
 	// OnKeyPutSuccess is called whenever a new (key, entity) pair is successfully added to the cache.
-	OnKeyPutSuccess()
+	OnKeyPutSuccess(size uint32)
 
 	// OnKeyPutDrop is called whenever a new (key, entity) pair is dropped from the cache due to full cache.
 	OnKeyPutDrop()
@@ -541,7 +541,7 @@ type HeroCacheMetrics interface {
 	OnKeyPutDeduplicated()
 
 	// OnKeyRemoved is called whenever a (key, entity) pair is removed from the cache.
-	OnKeyRemoved()
+	OnKeyRemoved(size uint32)
 
 	// OnKeyGetSuccess tracks total number of successful read queries.
 	// A read query is successful if the entity corresponding to its key is available in the cache.
