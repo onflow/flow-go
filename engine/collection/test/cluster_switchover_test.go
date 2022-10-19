@@ -343,9 +343,9 @@ func (tc *ClusterSwitchoverTestCase) BlockInEpoch(epochCounter uint64) *flow.Hea
 // the given epoch and marks the transaction as expected for inclusion in
 // the corresponding cluster state.
 func (tc *ClusterSwitchoverTestCase) SubmitTransactionToCluster(
-	epochCounter uint64,         // the epoch we are submitting the transacting w.r.t.
+	epochCounter uint64, // the epoch we are submitting the transacting w.r.t.
 	clustering flow.ClusterList, // the clustering for the epoch
-	clusterIndex uint,           // the index of the cluster we are targetting
+	clusterIndex uint, // the index of the cluster we are targetting
 ) {
 
 	clusterMembers := clustering[int(clusterIndex)]
