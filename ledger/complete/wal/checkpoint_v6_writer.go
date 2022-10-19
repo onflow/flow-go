@@ -100,6 +100,7 @@ func storeCheckpointV6(
 
 	subtrieRoots := createSubTrieRoots(tries)
 
+	// TODO
 	subTrieRootIndices, subTriesNodeCount, subTrieChecksums, err := storeSubTrieConcurrently(
 		subtrieRoots,
 		estimateSubtrieNodeCount(last), // considering the last trie most likely have more registers than others
@@ -115,12 +116,14 @@ func storeCheckpointV6(
 
 	lg.Info().Msgf("subtrie have been stored. sub trie node count: %v", subTriesNodeCount)
 
+	// DONE
 	topTrieChecksum, err := storeTopLevelNodesAndTrieRoots(
 		tries, subTrieRootIndices, subTriesNodeCount, outputDir, outputFile, &lg)
 	if err != nil {
 		return fmt.Errorf("could not store top level tries: %w", err)
 	}
 
+	// DONE
 	err = storeCheckpointHeader(subTrieChecksums, topTrieChecksum, outputDir, outputFile, &lg)
 	if err != nil {
 		return fmt.Errorf("could not store checkpoint header: %w", err)
@@ -221,46 +224,65 @@ func storeTopLevelNodesAndTrieRoots(
 		errToReturn = closeAndMergeError(closable, errToReturn)
 	}()
 
-	writer := NewCRC32Writer(closable)
-
-	// write version
-	_, err = writer.Write(encodeVersion(MagicBytesCheckpointToptrie, VersionV6))
-	if err != nil {
-		return 0, fmt.Errorf("cannot write version into checkpoint header: %w", err)
-	}
-
-	// write subTriesNodeCount
-	_, err = writer.Write(encodeNodeCount(subTriesNodeCount))
-	if err != nil {
-		return 0, fmt.Errorf("could not write subtrie node count: %w", err)
-	}
+	builder := flatbuffers.NewBuilder(1024)
 
 	scratch := make([]byte, 1024*4)
 
 	// write top level nodes
-	topLevelNodeIndices, topLevelNodesCount, err := storeTopLevelNodes(
+	nodeOffsetsT, topLevelNodeIndices, topLevelNodesCount, err := buildTopLevelNodes(
+		builder,
 		scratch,
 		tries,
 		subTrieRootIndices,
-		subTriesNodeCount+1, // the counter is 1 more than the node count, because the first item is nil
-		writer)
+		subTriesNodeCount+1) // the counter is 1 more than the node count, because the first item is nil
 
 	if err != nil {
 		return 0, fmt.Errorf("could not store top level nodes: %w", err)
 	}
 
+	checkpoint.CheckpointTopLevelStartTopLevelNodesVector(builder, len(nodeOffsetsT))
+	for i := len(nodeOffsetsT) - 1; i >= 0; i-- {
+		builder.PrependUOffsetT(nodeOffsetsT[i])
+	}
+	nodesDataObj := builder.EndVector(len(nodeOffsetsT))
+
 	logger.Info().Msgf("top level nodes have been stored. top level node count: %v", topLevelNodesCount)
 
 	// write tries
-	err = storeTries(scratch, tries, topLevelNodeIndices, writer)
+	trieOffsetsT, err := buildTries(builder, scratch, tries, topLevelNodeIndices)
 	if err != nil {
 		return 0, fmt.Errorf("could not store trie root nodes: %w", err)
 	}
+	checkpoint.CheckpointTopLevelStartTrieRootsVector(builder, len(trieOffsetsT))
+	for i := len(trieOffsetsT) - 1; i >= 0; i-- {
+		builder.PrependUOffsetT(trieOffsetsT[i])
+	}
+	triesDataObj := builder.EndVector(len(trieOffsetsT))
 
-	// write checksum
-	checksum, err := storeTopLevelTrieFooter(topLevelNodesCount, uint16(len(tries)), writer)
+	// compose final obj
+	checkpoint.CheckpointTopLevelStart(builder)
+	checkpoint.CheckpointTopLevelAddVersion(builder, VersionV6) // TODO: no magic # for now
+	checkpoint.CheckpointTopLevelAddSubtrieNodeCount(builder, subTriesNodeCount)
+	checkpoint.CheckpointTopLevelAddTopLevelNodes(builder, nodesDataObj)
+	checkpoint.CheckpointTopLevelAddTrieRoots(builder, triesDataObj)
+	checkpoint.CheckpointTopLevelAddNodeCount(builder, topLevelNodesCount)
+	checkpoint.CheckpointTopLevelAddTrieCount(builder, uint16(len(tries)))
+	topLevelObj := checkpoint.CheckpointTopLevelEnd(builder)
+
+	builder.Finish(topLevelObj)
+	buf := builder.FinishedBytes()
+
+	// write checksum to the end of the file
+	writer := NewCRC32Writer(closable)
+	_, err = writer.Write(buf)
 	if err != nil {
-		return 0, fmt.Errorf("could not store footer: %w", err)
+		return 0, fmt.Errorf("cannot write checkpoint crc32: %w", err)
+	}
+
+	checksum := writer.Crc32()
+	_, err = closable.Write(encodeCRC32Sum(checksum))
+	if err != nil {
+		return 0, fmt.Errorf("cannot write CRC32 checksum to top level part file: %w", err)
 	}
 
 	return checksum, nil
@@ -519,17 +541,19 @@ func storeCheckpointSubTrie(
 	return subtrieRootNodes, totalNodeCount, checksum, nil
 }
 
-func storeTopLevelNodes(
+func buildTopLevelNodes(
+	builder *flatbuffers.Builder,
 	scratch []byte,
 	tries []*trie.MTrie,
 	subTrieRootIndices map[*node.Node]uint64,
-	initNodeCounter uint64,
-	writer io.Writer) (
+	initNodeCounter uint64) (
+	[]flatbuffers.UOffsetT,
 	map[*node.Node]uint64,
 	uint64,
 	error) {
 	nodeCounter := initNodeCounter
 	var err error
+	retUOffsetT := make([]flatbuffers.UOffsetT, 0)
 	for _, t := range tries {
 		root := t.RootNode()
 		if root == nil {
@@ -539,25 +563,28 @@ func storeTopLevelNodes(
 		// all nodes at all levels. In order to skip the nodes above subtrieLevel, since they have been seralized in step 1,
 		// we will need to pass in a visited nodes map that contains all the subtrie root nodes, which is the topLevelNodes.
 		// The topLevelNodes was built in step 1, when seralizing each subtrie root nodes.
-		nodeCounter, err = storeUniqueNodes(root, subTrieRootIndices, nodeCounter, scratch, writer, func(uint64) {})
+		var nodesUOffsets []flatbuffers.UOffsetT
+		nodesUOffsets, nodeCounter, err = buildUniqueNodes(builder, root, subTrieRootIndices, nodeCounter, scratch, func(uint64) {})
 		if err != nil {
-			return nil, 0, fmt.Errorf("fail to store nodes in step 2 for root trie %v: %w", root.Hash(), err)
+			return nil, nil, 0, fmt.Errorf("fail to store nodes in step 2 for root trie %v: %w", root.Hash(), err)
 		}
+		retUOffsetT = append(retUOffsetT, nodesUOffsets...)
 	}
 
 	topLevelNodesCount := nodeCounter - initNodeCounter
-	return subTrieRootIndices, topLevelNodesCount, nil
+	return retUOffsetT, subTrieRootIndices, topLevelNodesCount, nil
 }
 
-func storeTries(
+func buildTries(
+	builder *flatbuffers.Builder,
 	scratch []byte,
 	tries []*trie.MTrie,
-	topLevelNodes map[*node.Node]uint64,
-	writer io.Writer) error {
+	topLevelNodes map[*node.Node]uint64) ([]flatbuffers.UOffsetT, error) {
+	retUOffsetT := make([]flatbuffers.UOffsetT, 0)
 	for _, t := range tries {
 		rootNode := t.RootNode()
 		if !t.IsEmpty() && rootNode.Height() != ledger.NodeMaxHeight {
-			return fmt.Errorf("height of root node must be %d, but is %d",
+			return nil, fmt.Errorf("height of root node must be %d, but is %d",
 				ledger.NodeMaxHeight, rootNode.Height())
 		}
 
@@ -565,17 +592,20 @@ func storeTries(
 		rootIndex, found := topLevelNodes[rootNode]
 		if !found {
 			rootHash := t.RootHash()
-			return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(rootHash[:]))
+			return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(rootHash[:]))
 		}
 
 		encTrie := flattener.EncodeTrie(t, rootIndex, scratch)
-		_, err := writer.Write(encTrie)
-		if err != nil {
-			return fmt.Errorf("cannot serialize trie: %w", err)
-		}
+		r := builder.CreateByteVector(encTrie)
+		checkpoint.TrieStart(builder)
+		checkpoint.TrieAddData(builder, r)
+		currTrie := checkpoint.TrieEnd(builder)
+		builder.Finish(currTrie)
+
+		retUOffsetT = append(retUOffsetT, currTrie)
 	}
 
-	return nil
+	return retUOffsetT, nil
 }
 
 // deleteCheckpointFiles removes any checkpoint files with given checkpoint prefix in the outputDir.
@@ -597,23 +627,6 @@ func deleteCheckpointFiles(outputDir string, outputFile string) error {
 	}
 
 	return merror.ErrorOrNil()
-}
-
-func storeTopLevelTrieFooter(topLevelNodesCount uint64, rootTrieCount uint16, writer *Crc32Writer) (uint32, error) {
-	footer := encodeTopLevelNodesAndTriesFooter(topLevelNodesCount, rootTrieCount)
-	_, err := writer.Write(footer)
-	if err != nil {
-		return 0, fmt.Errorf("cannot write checkpoint footer: %w", err)
-	}
-
-	// write checksum to the end of the file
-	checksum := writer.Crc32()
-	_, err = writer.Write(encodeCRC32Sum(checksum))
-	if err != nil {
-		return 0, fmt.Errorf("cannot write CRC32 checksum to top level part file: %w", err)
-	}
-
-	return checksum, nil
 }
 
 func storeSubtrieFooter(nodeCount uint64, writer *Crc32Writer) (uint32, error) {

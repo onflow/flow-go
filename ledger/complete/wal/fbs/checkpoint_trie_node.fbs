@@ -1,0 +1,9 @@
+namespace checkpoint;
+
+table Trie {
+    data: [ubyte];
+}
+
+table Node {
+    data: [ubyte];
+}

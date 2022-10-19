@@ -1,0 +1,14 @@
+include "checkpoint_trie_node.fbs";
+
+namespace checkpoint;
+
+table CheckpointTopLevel {
+    version: uint16;
+    subtrie_node_count: uint64;
+    top_level_nodes: [Node];
+    trie_roots: [Trie];
+    node_count: uint64;
+    trie_count: uint16;
+}
+
+root_type CheckpointTopLevel;

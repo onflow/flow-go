@@ -2,6 +2,7 @@ package wal
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"hash/crc32"
@@ -41,6 +42,7 @@ func readCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 	lg := logger.With().Str("checkpoint_file", headerPath).Logger()
 	lg.Info().Msgf("reading v6 checkpoint file")
 
+	// DONE
 	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not read header: %w", err)
@@ -53,6 +55,7 @@ func readCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 		return nil, fmt.Errorf("fail to check all checkpoint part file exist: %w", err)
 	}
 
+	// TODO
 	// TODO making number of goroutine configable for reading subtries, which can help us
 	// test the code on machines that don't have as much RAM as EN by using fewer goroutines.
 	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums, &lg)
@@ -63,6 +66,7 @@ func readCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 	lg.Info().Uint32("topsum", topTrieChecksum).
 		Msg("finish reading all v6 subtrie files, start reading top level tries")
 
+	// DONE
 	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum, &lg)
 	if err != nil {
 		return nil, fmt.Errorf("could not read top level nodes or tries: %w", err)
@@ -485,16 +489,27 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 		errToReturn = closeAndMergeError(file, errToReturn)
 	}(file)
 
-	// read and validate magic bytes and version
-	err = validateFileHeader(MagicBytesCheckpointToptrie, VersionV6, file)
+	bufAll, err := io.ReadAll(file)
 	if err != nil {
 		return nil, err
 	}
 
+	checkpointTopLevelBuf, checkpointTopLevelCrc32Buf := bufAll[0:len(bufAll)-4], bufAll[len(bufAll)-4:]
+	checkpointTopLevel := checkpoint.GetRootAsCheckpointTopLevel(checkpointTopLevelBuf, 0)
+	if checkpointTopLevel == nil {
+		return nil, fmt.Errorf("failed to decode CheckpointTopLevel")
+	}
+
+	// read and validate magic bytes and version
+	if VersionV6 != checkpointTopLevel.Version() { // TODO: no magic #
+		return nil, fmt.Errorf("wrong version")
+	}
+
 	// read subtrie Node count and validate
-	topLevelNodesCount, triesCount, expectedSum, err := readTopTriesFooter(file)
+	topLevelNodesCount, triesCount := checkpointTopLevel.NodeCount(), checkpointTopLevel.TrieCount()
+	expectedSum, err := decodeCRC32Sum(checkpointTopLevelCrc32Buf)
 	if err != nil {
-		return nil, fmt.Errorf("could not read top tries footer: %w", err)
+		return nil, fmt.Errorf("failed to decode CheckpointTopLevelCrc32")
 	}
 
 	if topTrieChecksum != expectedSum {
@@ -502,31 +517,8 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 			topTrieChecksum, expectedSum)
 	}
 
-	// restart from the beginning of the file, make sure CRC32Reader has seen all the bytes
-	// in order to compute the correct checksum
-	_, err = file.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, fmt.Errorf("could not seek to 0: %w", err)
-	}
-
-	reader := NewCRC32Reader(bufio.NewReaderSize(file, defaultBufioReadSize))
-
-	// read version again for calculating checksum
-	_, _, err = readFileHeader(reader)
-	if err != nil {
-		return nil, fmt.Errorf("could not read version for top trie: %w", err)
-	}
-
 	// read subtrie count and validate
-	buf := make([]byte, encNodeCountSize)
-	_, err = io.ReadFull(reader, buf)
-	if err != nil {
-		return nil, fmt.Errorf("could not read subtrie node count: %w", err)
-	}
-	readSubtrieNodeCount, err := decodeNodeCount(buf)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode node count: %w", err)
-	}
+	readSubtrieNodeCount := checkpointTopLevel.SubtrieNodeCount()
 
 	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
 
@@ -547,7 +539,14 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 
 	// read the nodes from subtrie level to the root level
 	for i := uint64(1); i <= topLevelNodesCount; i++ {
-		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+		var currNode checkpoint.Node
+		ok := checkpointTopLevel.TopLevelNodes(&currNode, int(i-1))
+		if !ok {
+			return nil, fmt.Errorf("failed to load node")
+		}
+		data := currNode.DataBytes()
+		currReader := bytes.NewReader(data)
+		node, err := flattener.ReadNode(currReader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= i+uint64(totalSubTrieNodeCount) {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}
@@ -563,7 +562,10 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 
 	// read the trie root nodes
 	for i := uint16(0); i < triesCount; i++ {
-		trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+		var currTrie checkpoint.Trie
+		checkpointTopLevel.TrieRoots(&currTrie, int(i))
+		currReader := bytes.NewReader(currTrie.DataBytes())
+		trie, err := flattener.ReadTrie(currReader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			return getNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, nodeIndex)
 		})
 
@@ -573,28 +575,14 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 		tries[i] = trie
 	}
 
-	// read footer and discard, since we only care about checksum
-	_, err = io.ReadFull(reader, scratch[:encNodeCountSize+encTrieCountSize])
-	if err != nil {
-		return nil, fmt.Errorf("cannot read footer: %w", err)
-	}
-
-	actualSum := reader.Crc32()
+	// calculate the actual checksum
+	hasher := crc32.New(crc32.MakeTable(crc32.Castagnoli))
+	hasher.Write(checkpointTopLevelBuf)
+	actualSum := hasher.Sum32()
 
 	if actualSum != expectedSum {
 		return nil, fmt.Errorf("invalid checksum in top level trie, expected %v, actual %v",
 			expectedSum, actualSum)
-	}
-
-	// read the checksum and discard, since we only care about whether ensureReachedEOF
-	_, err = io.ReadFull(reader, scratch[:crc32SumSize])
-	if err != nil {
-		return nil, fmt.Errorf("could not read checksum from top trie file: %w", err)
-	}
-
-	err = ensureReachedEOF(reader)
-	if err != nil {
-		return nil, fmt.Errorf("fail to read top trie file: %w", err)
 	}
 
 	return tries, nil
@@ -633,33 +621,6 @@ func readCRC32Sum(reader io.Reader) (uint32, error) {
 		return 0, err
 	}
 	return decodeCRC32Sum(bytes)
-}
-
-func readTopTriesFooter(f *os.File) (uint64, uint16, uint32, error) {
-	// footer offset: nodes count (8 bytes) + tries count (2 bytes) + CRC32 sum (4 bytes)
-	const footerOffset = encNodeCountSize + encTrieCountSize + crc32SumSize
-	const footerSize = encNodeCountSize + encTrieCountSize // footer doesn't include crc32 sum
-	// Seek to footer
-	_, err := f.Seek(-footerOffset, io.SeekEnd)
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("cannot seek to footer: %w", err)
-	}
-	footer := make([]byte, footerSize)
-	_, err = io.ReadFull(f, footer)
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("cannot read footer: %w", err)
-	}
-
-	nodeCount, trieCount, err := decodeTopLevelNodesAndTriesFooter(footer)
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("could not decode top trie footer: %w", err)
-	}
-
-	checksum, err := readCRC32Sum(f)
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("cannot read checksum for top trie file: %w", err)
-	}
-	return nodeCount, trieCount, checksum, nil
 }
 
 func computeTotalSubTrieNodeCount(groups [][]*node.Node) uint64 {

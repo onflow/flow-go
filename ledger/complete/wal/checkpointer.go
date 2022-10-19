@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/wal/fbs/checkpoint"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
 	utilsio "github.com/onflow/flow-go/utils/io"
@@ -592,6 +594,55 @@ func storeUniqueNodes(
 	}
 
 	return nodeCounter, nil
+}
+
+func buildUniqueNodes(
+	builder *flatbuffers.Builder,
+	root *node.Node,
+	visitedNodes map[*node.Node]uint64,
+	nodeCounter uint64,
+	scratch []byte,
+	nodeCounterUpdated func(nodeCounter uint64), // for logging estimated progress
+) ([]flatbuffers.UOffsetT, uint64, error) {
+	retUOffsetT := make([]flatbuffers.UOffsetT, 0)
+	for itr := flattener.NewUniqueNodeIterator(root, visitedNodes); itr.Next(); {
+		n := itr.Value()
+
+		visitedNodes[n] = nodeCounter
+		nodeCounter++
+		nodeCounterUpdated(nodeCounter)
+
+		var lchildIndex, rchildIndex uint64
+
+		if lchild := n.LeftChild(); lchild != nil {
+			var found bool
+			lchildIndex, found = visitedNodes[lchild]
+			if !found {
+				hash := lchild.Hash()
+				return nil, 0, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
+			}
+		}
+		if rchild := n.RightChild(); rchild != nil {
+			var found bool
+			rchildIndex, found = visitedNodes[rchild]
+			if !found {
+				hash := rchild.Hash()
+				return nil, 0, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
+			}
+		}
+
+		encNode := flattener.EncodeNode(n, lchildIndex, rchildIndex, scratch)
+		//
+		r := builder.CreateByteVector(encNode)
+		checkpoint.NodeStart(builder)
+		checkpoint.NodeAddData(builder, r)
+		currNode := checkpoint.NodeEnd(builder)
+		builder.Finish(currNode)
+
+		retUOffsetT = append(retUOffsetT, currNode)
+	}
+
+	return retUOffsetT, nodeCounter, nil
 }
 
 // getNodesAtLevel returns 2^level nodes at given level in breadth-first order.
