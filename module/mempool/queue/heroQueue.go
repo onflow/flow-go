@@ -49,7 +49,7 @@ func (c *HeroQueue) Push(entity flow.Entity) bool {
 }
 
 // Pop removes and returns the head of queue, and updates the head to the next element.
-// Boolean return value determines whether pop is successful, i.e., poping an empty queue returns false.
+// Boolean return value determines whether pop is successful, i.e., popping an empty queue returns false.
 func (c *HeroQueue) Pop() (flow.Entity, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
