@@ -23,33 +23,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestVersion(t *testing.T) {
-	m, v, err := decodeVersion(encodeVersion(MagicBytesCheckpointHeader, VersionV6))
-	require.NoError(t, err)
-	require.Equal(t, MagicBytesCheckpointHeader, m)
-	require.Equal(t, VersionV6, v)
-}
-
 func TestCRC32SumEncoding(t *testing.T) {
 	v := uint32(3)
 	s, err := decodeCRC32Sum(encodeCRC32Sum(v))
 	require.NoError(t, err)
 	require.Equal(t, v, s)
-}
-
-func TestSubtrieNodeCountEncoding(t *testing.T) {
-	v := uint64(10000)
-	s, err := decodeNodeCount(encodeNodeCount(v))
-	require.NoError(t, err)
-	require.Equal(t, v, s)
-}
-
-func TestFooterEncoding(t *testing.T) {
-	n1, r1 := uint64(40), uint16(500)
-	n2, r2, err := decodeTopLevelNodesAndTriesFooter(encodeTopLevelNodesAndTriesFooter(n1, r1))
-	require.NoError(t, err)
-	require.Equal(t, n1, n2)
-	require.Equal(t, r1, r2)
 }
 
 func requireTriesEqual(t *testing.T, tries1, tries2 []*trie.MTrie) {

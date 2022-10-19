@@ -486,15 +486,7 @@ func storeCheckpointSubTrie(
 		errToReturn = closeAndMergeError(closable, errToReturn)
 	}()
 
-	// create a CRC32 writer, so that any bytes passed to the writer will
-	// be used to calculate CRC32 checksum
-	writer := NewCRC32Writer(closable)
-
-	// write version
-	_, err = writer.Write(encodeVersion(MagicBytesCheckpointSubtrie, VersionV6))
-	if err != nil {
-		return nil, 0, 0, fmt.Errorf("cannot write version into checkpoint subtrie file: %w", err)
-	}
+	builder := flatbuffers.NewBuilder(1024)
 
 	// subtrieRootNodes unique subtrie root nodes, the uint64 value is the index of each root node
 	// stored in the part file.
@@ -513,15 +505,19 @@ func storeCheckpointSubTrie(
 	traversedSubtrieNodes[nil] = 0
 
 	scratch := make([]byte, 1024*4)
+	retUOffsetT := make([]flatbuffers.UOffsetT, 0)
 	for _, root := range roots {
 		// Note: nodeCounter is to assign an global index to each node in the order of it being seralized
 		// into the checkpoint file. Therefore, it has to be reused when iterating each subtrie.
 		// storeUniqueNodes will add the unique visited node into traversedSubtrieNodes with key as the node
 		// itself, and value as n-th node being seralized in the checkpoint file.
-		nodeCounter, err = storeUniqueNodes(root, traversedSubtrieNodes, nodeCounter, scratch, writer, logging)
+		var nodesUOffsets []flatbuffers.UOffsetT
+		nodesUOffsets, nodeCounter, err = buildUniqueNodes(builder, root, traversedSubtrieNodes, nodeCounter, scratch, logging)
 		if err != nil {
 			return nil, 0, 0, fmt.Errorf("fail to store nodes in step 1 for subtrie root %v: %w", root.Hash(), err)
 		}
+		retUOffsetT = append(retUOffsetT, nodesUOffsets...)
+
 		// Save subtrie root node index in topLevelNodes,
 		// so when traversing top level tries
 		// (from level 0 to subtrieLevel) using topLevelNodes,
@@ -529,13 +525,34 @@ func storeCheckpointSubTrie(
 		subtrieRootNodes[root] = traversedSubtrieNodes[root]
 	}
 
+	checkpoint.CheckpointSubtrieStartNodesVector(builder, len(retUOffsetT))
+	for i := len(retUOffsetT) - 1; i >= 0; i-- {
+		builder.PrependUOffsetT(retUOffsetT[i])
+	}
+	nodesDataObj := builder.EndVector(len(retUOffsetT))
+
 	// -1 to account for 0 node meaning nil
 	totalNodeCount := nodeCounter - 1
 
-	// write total number of node as footer
-	checksum, err := storeSubtrieFooter(totalNodeCount, writer)
+	checkpoint.CheckpointSubtrieStart(builder)
+	checkpoint.CheckpointSubtrieAddVersion(builder, VersionV6)
+	checkpoint.CheckpointSubtrieAddNodeCount(builder, totalNodeCount)
+	checkpoint.CheckpointSubtrieAddNodes(builder, nodesDataObj)
+	subtrieObj := checkpoint.CheckpointSubtrieEnd(builder)
+	builder.Finish(subtrieObj)
+	buf := builder.FinishedBytes()
+
+	// write checksum to the end of the file
+	writer := NewCRC32Writer(closable)
+	_, err = writer.Write(buf)
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("could not store subtrie footer %w", err)
+		return nil, 0, 0, fmt.Errorf("cannot write CheckpointSubtrie: %w", err)
+	}
+
+	checksum := writer.Crc32()
+	_, err = closable.Write(encodeCRC32Sum(checksum))
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("cannot write CheckpointSubtrie crc32: %w", err)
 	}
 
 	return subtrieRootNodes, totalNodeCount, checksum, nil
@@ -629,52 +646,6 @@ func deleteCheckpointFiles(outputDir string, outputFile string) error {
 	return merror.ErrorOrNil()
 }
 
-func storeSubtrieFooter(nodeCount uint64, writer *Crc32Writer) (uint32, error) {
-	footer := encodeNodeCount(nodeCount)
-	_, err := writer.Write(footer)
-	if err != nil {
-		return 0, fmt.Errorf("cannot write checkpoint subtrie footer: %w", err)
-	}
-
-	// write checksum to the end of the file
-	crc32Sum := writer.Crc32()
-	_, err = writer.Write(encodeCRC32Sum(crc32Sum))
-	if err != nil {
-		return 0, fmt.Errorf("cannot write CRC32 checksum %v", err)
-	}
-	return crc32Sum, nil
-}
-
-func encodeTopLevelNodesAndTriesFooter(topLevelNodesCount uint64, rootTrieCount uint16) []byte {
-	footer := make([]byte, encNodeCountSize+encTrieCountSize)
-	binary.BigEndian.PutUint64(footer, topLevelNodesCount)
-	binary.BigEndian.PutUint16(footer[encNodeCountSize:], rootTrieCount)
-	return footer
-}
-
-func decodeTopLevelNodesAndTriesFooter(footer []byte) (uint64, uint16, error) {
-	const footerSize = encNodeCountSize + encTrieCountSize // footer doesn't include crc32 sum
-	if len(footer) != footerSize {
-		return 0, 0, fmt.Errorf("wrong footer size, expect %v, got %v", footerSize, len(footer))
-	}
-	nodesCount := binary.BigEndian.Uint64(footer)
-	triesCount := binary.BigEndian.Uint16(footer[encNodeCountSize:])
-	return nodesCount, triesCount, nil
-}
-
-func encodeNodeCount(nodeCount uint64) []byte {
-	buf := make([]byte, encNodeCountSize)
-	binary.BigEndian.PutUint64(buf, nodeCount)
-	return buf
-}
-
-func decodeNodeCount(encoded []byte) (uint64, error) {
-	if len(encoded) != encNodeCountSize {
-		return 0, fmt.Errorf("wrong subtrie node count size, expect %v, got %v", encNodeCountSize, len(encoded))
-	}
-	return binary.BigEndian.Uint64(encoded), nil
-}
-
 func encodeCRC32Sum(checksum uint32) []byte {
 	buf := make([]byte, crc32SumSize)
 	binary.BigEndian.PutUint32(buf, checksum)
@@ -686,23 +657,6 @@ func decodeCRC32Sum(encoded []byte) (uint32, error) {
 		return 0, fmt.Errorf("wrong crc32sum size, expect %v, got %v", crc32SumSize, len(encoded))
 	}
 	return binary.BigEndian.Uint32(encoded), nil
-}
-
-func encodeVersion(magic uint16, version uint16) []byte {
-	// Write header: magic (2 bytes) + version (2 bytes)
-	header := make([]byte, encMagicSize+encVersionSize)
-	binary.BigEndian.PutUint16(header, magic)
-	binary.BigEndian.PutUint16(header[encMagicSize:], version)
-	return header
-}
-
-func decodeVersion(encoded []byte) (uint16, uint16, error) {
-	if len(encoded) != encMagicSize+encVersionSize {
-		return 0, 0, fmt.Errorf("wrong version size, expect %v, got %v", encMagicSize+encVersionSize, len(encoded))
-	}
-	magicBytes := binary.BigEndian.Uint16(encoded)
-	version := binary.BigEndian.Uint16(encoded[encMagicSize:])
-	return magicBytes, version, nil
 }
 
 // closeAndMergeError close the closable and merge the closeErr with the given err into a multierror

@@ -354,35 +354,28 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		errToReturn = closeAndMergeError(file, errToReturn)
 	}(f)
 
-	// valite the magic bytes and version
-	err = validateFileHeader(MagicBytesCheckpointSubtrie, VersionV6, f)
+	bufAll, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}
 
-	nodesCount, expectedSum, err := readSubTriesFooter(f)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read sub trie node count: %w", err)
+	checkpointSubtrieBuf, checkpointSubtrieCrc32Buf := bufAll[0:len(bufAll)-4], bufAll[len(bufAll)-4:]
+	checkpointSubtrie := checkpoint.GetRootAsCheckpointSubtrie(checkpointSubtrieBuf, 0)
+	if checkpointSubtrie == nil {
+		return nil, fmt.Errorf("failed to decode checkpointSubtrieBuf")
 	}
+
+	// valite the magic bytes and version
+	if VersionV6 != checkpointSubtrie.Version() {
+		return nil, fmt.Errorf("version mismatch")
+	}
+
+	nodesCount := checkpointSubtrie.NodeCount()
+	expectedSum, _ := decodeCRC32Sum(checkpointSubtrieCrc32Buf)
 
 	if checksum != expectedSum {
 		return nil, fmt.Errorf("mismatch checksum in subtrie file. checksum from checkpoint header %v does not "+
 			"match with the checksum in subtrie file %v", checksum, expectedSum)
-	}
-
-	// restart from the beginning of the file, make sure CRC32Reader has seen all the bytes
-	// in order to compute the correct checksum
-	_, err = f.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
-	}
-
-	reader := NewCRC32Reader(bufio.NewReaderSize(f, defaultBufioReadSize))
-
-	// read version again for calculating checksum
-	_, _, err = readFileHeader(reader)
-	if err != nil {
-		return nil, fmt.Errorf("could not read version again for subtrie: %w", err)
 	}
 
 	// read file part index and verify
@@ -391,7 +384,14 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	for i := uint64(1); i <= nodesCount; i++ {
-		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+		var currNode checkpoint.Node
+		ok := checkpointSubtrie.Nodes(&currNode, int(i-1))
+		if !ok {
+			return nil, fmt.Errorf("failed to load node")
+		}
+		data := currNode.DataBytes()
+		currReader := bytes.NewReader(data)
+		node, err := flattener.ReadNode(currReader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= i {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}
@@ -404,63 +404,19 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 		logging(i)
 	}
 
-	// read footer and discard, since we only care about checksum
-	_, err = io.ReadFull(reader, scratch[:encNodeCountSize])
-	if err != nil {
-		return nil, fmt.Errorf("cannot read footer: %w", err)
-	}
-
 	// calculate the actual checksum
-	actualSum := reader.Crc32()
+	hasher := crc32.New(crc32.MakeTable(crc32.Castagnoli))
+	hasher.Write(checkpointSubtrieBuf)
+	actualSum := hasher.Sum32()
 
 	if actualSum != expectedSum {
 		return nil, fmt.Errorf("invalid checksum in subtrie checkpoint, expected %v, actual %v",
 			expectedSum, actualSum)
 	}
 
-	// read the checksum and discard, since we only care about whether ensureReachedEOF
-	_, err = io.ReadFull(reader, scratch[:crc32SumSize])
-	if err != nil {
-		return nil, fmt.Errorf("could not read subtrie file's checksum: %w", err)
-	}
-
-	err = ensureReachedEOF(reader)
-	if err != nil {
-		return nil, fmt.Errorf("fail to read %v-th sutrie file: %w", index, err)
-	}
-
 	// since nodes[0] is always `nil`, returning a slice without nodes[0] could simplify the
 	// implementation of getNodeByIndex
 	return nodes[1:], nil
-}
-
-func readSubTriesFooter(f *os.File) (uint64, uint32, error) {
-	const footerSize = encNodeCountSize // footer doesn't include crc32 sum
-	const footerOffset = footerSize + crc32SumSize
-	_, err := f.Seek(-footerOffset, io.SeekEnd)
-	if err != nil {
-		return 0, 0, fmt.Errorf("cannot seek to footer: %w", err)
-	}
-
-	footer := make([]byte, footerSize)
-	_, err = io.ReadFull(f, footer)
-	if err != nil {
-		return 0, 0, fmt.Errorf("could not read footer: %w", err)
-	}
-
-	nodeCount, err := decodeNodeCount(footer)
-	if err != nil {
-		return 0, 0, fmt.Errorf("could not decode subtrie node count: %w", err)
-	}
-
-	// the subtrie checksum from the checkpoint header file must be same
-	// as the checksum included in the subtrie file
-	expectedSum, err := readCRC32Sum(f)
-	if err != nil {
-		return 0, 0, fmt.Errorf("cannot read checksum for sub trie file: %w", err)
-	}
-
-	return nodeCount, expectedSum, nil
 }
 
 // 17th part file contains:
@@ -588,41 +544,6 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	return tries, nil
 }
 
-func readFileHeader(reader io.Reader) (uint16, uint16, error) {
-	bytes := make([]byte, encMagicSize+encVersionSize)
-	_, err := io.ReadFull(reader, bytes)
-	if err != nil {
-		return 0, 0, fmt.Errorf("cannot read magic ID and version: %w", err)
-	}
-	return decodeVersion(bytes)
-}
-
-func validateFileHeader(expectedMagic uint16, expectedVersion uint16, reader io.Reader) error {
-	magic, version, err := readFileHeader(reader)
-	if err != nil {
-		return err
-	}
-
-	if magic != expectedMagic {
-		return fmt.Errorf("wrong magic bytes, expect %v, bot got: %v", expectedMagic, magic)
-	}
-
-	if version != expectedVersion {
-		return fmt.Errorf("wrong version, expect %v, bot got: %v", expectedVersion, version)
-	}
-
-	return nil
-}
-
-func readCRC32Sum(reader io.Reader) (uint32, error) {
-	bytes := make([]byte, crc32SumSize)
-	_, err := io.ReadFull(reader, bytes)
-	if err != nil {
-		return 0, err
-	}
-	return decodeCRC32Sum(bytes)
-}
-
 func computeTotalSubTrieNodeCount(groups [][]*node.Node) uint64 {
 	total := 0
 	for _, group := range groups {
@@ -667,22 +588,4 @@ func getTopNodeByIndex(totalSubTrieNodeCount uint64, topLevelNodes []*node.Node,
 	}
 
 	return topLevelNodes[nodePos], nil
-}
-
-// ensureReachedEOF checks if the reader has reached end of file
-// it returns nil if reached EOF
-// it returns ErrEOFNotReached if didn't reach end of file
-// any error returned are exception
-func ensureReachedEOF(reader io.Reader) error {
-	b := make([]byte, 1)
-	_, err := reader.Read(b)
-	if errors.Is(err, io.EOF) {
-		return nil
-	}
-
-	if err == nil {
-		return ErrEOFNotReached
-	}
-
-	return fmt.Errorf("fail to check if reached EOF: %w", err)
 }

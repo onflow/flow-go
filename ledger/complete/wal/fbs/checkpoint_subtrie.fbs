@@ -1,0 +1,11 @@
+include "checkpoint_trie_node.fbs";
+
+namespace checkpoint;
+
+table CheckpointSubtrie {
+    version: uint16;
+    nodes: [Node];
+    node_count: uint64;
+}
+
+root_type CheckpointSubtrie;
