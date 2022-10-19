@@ -1026,6 +1026,6 @@ func TestBLSIdentity(t *testing.T) {
 
 		valid, err = BLSVerifyPOP(idPk, identitySig)
 		assert.NoError(t, err)
-		assert.False(t, validSlice[0])
+		assert.False(t, valid)
 	})
 }
