@@ -47,6 +47,8 @@ type LivenessData struct {
 //		   case <other events>
 //		}
 //	}
+//
+// Not concurrency safe.
 type PaceMaker interface {
 
 	// CurView returns the current view.
@@ -75,6 +77,9 @@ type PaceMaker interface {
 	TimeoutChannel() <-chan time.Time
 
 	// Start starts the PaceMaker (i.e. the timeout for the configured starting value for view).
+	// CAUTION: EventHandler is not concurrency safe. The Start method must
+	// be executed by the same goroutine that also calls the other business logic
+	// methods, or concurrency safety has to be implemented externally.
 	Start(ctx context.Context)
 
 	// BlockRateDelay

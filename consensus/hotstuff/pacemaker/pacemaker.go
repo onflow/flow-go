@@ -3,7 +3,6 @@ package pacemaker
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -24,13 +23,15 @@ import (
 // A local timeout for a view `v` causes a node to:
 // * never produce a vote for any proposal with view ≤ `v`, after the timeout
 // * produce and broadcast a timeout object, which can form a part of the TC for the timed out view
+//
+// Not concurrency safe.
 type ActivePaceMaker struct {
 	ctx            context.Context
 	timeoutControl *timeout.Controller
 	notifier       hotstuff.Consumer
 	persist        hotstuff.Persister
 	livenessData   *hotstuff.LivenessData
-	started        sync.Once
+	started        bool
 }
 
 var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
@@ -59,6 +60,7 @@ func New(timeoutController *timeout.Controller,
 		timeoutControl: timeoutController,
 		notifier:       notifier,
 		persist:        persist,
+		started:        false,
 	}
 	return &pm, nil
 }
@@ -205,12 +207,17 @@ func (p *ActivePaceMaker) LastViewTC() *flow.TimeoutCertificate {
 
 // Start starts the pacemaker by starting the initial timer for the current view.
 // Start should only be called once - subsequent calls are a no-op.
+// CAUTION: ActivePaceMaker is not concurrency safe. The Start method must
+// be executed by the same goroutine that also calls the other business logic
+// methods, or concurrency safety has to be implemented externally.
 func (p *ActivePaceMaker) Start(ctx context.Context) {
-	p.started.Do(func() {
-		p.ctx = ctx
-		timerInfo := p.timeoutControl.StartTimeout(ctx, p.CurView())
-		p.notifier.OnStartingTimeout(timerInfo)
-	})
+	if p.started {
+		return
+	}
+	p.started = true
+	p.ctx = ctx
+	timerInfo := p.timeoutControl.StartTimeout(ctx, p.CurView())
+	p.notifier.OnStartingTimeout(timerInfo)
 }
 
 // BlockRateDelay returns the delay for broadcasting its own proposals.

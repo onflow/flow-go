@@ -21,6 +21,7 @@ type PartialTcCreated struct {
 }
 
 // EventHandler runs a state machine to process proposals, QC and local timeouts.
+// Not concurrency safe.
 type EventHandler interface {
 
 	// OnReceiveQc processes a valid qc constructed by internal vote aggregator or discovered in TimeoutObject.
@@ -54,5 +55,8 @@ type EventHandler interface {
 
 	// Start starts the event handler.
 	// No errors are expected during normal operation.
+	// CAUTION: EventHandler is not concurrency safe. The Start method must
+	// be executed by the same goroutine that also calls the other business logic
+	// methods, or concurrency safety has to be implemented externally.
 	Start(ctx context.Context) error
 }

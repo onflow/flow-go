@@ -33,6 +33,8 @@ import (
 //     as well, but only when receiving proposal for view lower than active view.
 //     To summarize, to make a valid proposal for view N we need to have a QC or TC for N-1 and know the proposal with blockID
 //     NewestQC.BlockID.
+//
+// Not concurrency safe.
 type EventHandler struct {
 	log               zerolog.Logger
 	paceMaker         hotstuff.PaceMaker
@@ -250,6 +252,9 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 
 // Start starts the event handler.
 // No errors are expected during normal operation.
+// CAUTION: EventHandler is not concurrency safe. The Start method must
+// be executed by the same goroutine that also calls the other business logic
+// methods, or concurrency safety has to be implemented externally.
 func (e *EventHandler) Start(ctx context.Context) error {
 	err := e.processPendingBlocks()
 	if err != nil {

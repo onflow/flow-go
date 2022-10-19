@@ -87,8 +87,7 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 }
 
 func (el *EventLoop) loop(ctx context.Context) error {
-
-	err := el.eventHandler.Start(ctx)
+	err := el.eventHandler.Start(ctx) // must be called by the same go-routine that also executes the business logic!
 	if err != nil {
 		return fmt.Errorf("could not start event handler: %w", err)
 	}
