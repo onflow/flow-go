@@ -10,6 +10,7 @@ import (
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRateLimit(t *testing.T) {
@@ -17,11 +18,12 @@ func TestRateLimit(t *testing.T) {
 	rateLimitedBs := newRateLimitedBlockStore(bs, "rate_test", 4, 4) // 4 bytes per second, burst of 4
 
 	data := make([]byte, 4)
-	rand.Read(data)
+	_ = rand.Read(data)
 	blk := blocks.NewBlock(data)
-	rateLimitedBs.Put(context.Background(), blk)
+	err := rateLimitedBs.Put(context.Background(), blk)
+	require.NoError(t, err)
 
-	_, err := rateLimitedBs.Get(context.Background(), blk.Cid())
+	_, err = rateLimitedBs.Get(context.Background(), blk.Cid())
 	assert.NoError(t, err)
 
 	_, err = rateLimitedBs.Get(context.Background(), blk.Cid())
@@ -33,11 +35,12 @@ func TestBurstLimit(t *testing.T) {
 	rateLimitedBs := newRateLimitedBlockStore(bs, "burst_test", 4, 8) // 4 bytes per second, burst of 8
 
 	data := make([]byte, 4)
-	rand.Read(data)
+	_ = rand.Read(data)
 	blk := blocks.NewBlock(data)
-	rateLimitedBs.Put(context.Background(), blk)
+	err := rateLimitedBs.Put(context.Background(), blk)
+	require.NoError(t, err)
 
-	_, err := rateLimitedBs.Get(context.Background(), blk.Cid())
+	_, err = rateLimitedBs.Get(context.Background(), blk.Cid())
 	assert.NoError(t, err)
 
 	_, err = rateLimitedBs.Get(context.Background(), blk.Cid())
