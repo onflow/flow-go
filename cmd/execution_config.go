@@ -33,9 +33,9 @@ type ExecutionConfig struct {
 	chunkDataPackCacheSize               uint
 	chunkDataPackRequestsCacheSize       uint32
 	requestInterval                      time.Duration
-	requestRetryDelay                    time.Duration
-	requestRetryInitial                  time.Duration
-	requestRetryMaximum                  time.Duration
+	requestRetryInitialDelay             time.Duration
+	requestRetryIncrementalDelay         time.Duration
+	requestRetryMaximumDelay             time.Duration
 	preferredExeNodeIDStr                string
 	syncByBlocks                         bool
 	syncFast                             bool
@@ -79,9 +79,9 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 10*time.Second, "the interval between requests for the requester engine")
-	flags.DurationVar(&exeConf.requestRetryDelay, "request-retry-delay", 1*time.Second, "linear delay increase between retries for the requester engine")
-	flags.DurationVar(&exeConf.requestRetryInitial, "request-retry-initial", 1*time.Second, "initial retry delay for the requester engine")
-	flags.DurationVar(&exeConf.requestRetryMaximum, "request-retry-maximum", 5*time.Second, "maximum retry delay for the requester engine")
+	flags.DurationVar(&exeConf.requestRetryInitialDelay, "request-retry-initial-delay", 1*time.Second, "initial retry delay for the requester engine")
+	flags.DurationVar(&exeConf.requestRetryIncrementalDelay, "request-retry-incremental-delay", 1*time.Second, "linear delay increase between retries for the requester engine")
+	flags.DurationVar(&exeConf.requestRetryMaximumDelay, "request-retry-maximum-delay", 5*time.Second, "maximum retry delay for the requester engine")
 	flags.DurationVar(&exeConf.computationConfig.ScriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
 		"threshold for logging script execution")
 	flags.DurationVar(&exeConf.computationConfig.ScriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit,
