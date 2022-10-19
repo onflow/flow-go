@@ -230,7 +230,7 @@ func (i TransactionInvoker) logExecutionIntensities(
 	}
 	env.Logger().Info().
 		Uint64("ledgerInteractionUsed", txnState.InteractionUsed()).
-		Uint("computationUsed", txnState.TotalComputationUsed()).
+		Uint64("computationUsed", txnState.TotalComputationUsed()).
 		Uint64("memoryEstimate", txnState.TotalMemoryEstimate()).
 		Dict("computationIntensities", computation).
 		Dict("memoryIntensities", memory).
