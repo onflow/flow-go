@@ -631,7 +631,9 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	chain := flow.Mainnet.Chain()
 	vm := fvm.NewVirtualMachine()
 
-	eventEncoder := &testingEventEncoder{}
+	eventEncoder := &testingEventEncoder{
+		realEncoder: environment.NewCadenceEventEncoder(),
+	}
 
 	execCtx := fvm.NewContext(
 		fvm.WithChain(chain),
@@ -735,6 +737,8 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	view := delta.NewView(ledger.Get)
 	blockView := view.NewChild()
 
+	eventEncoder.enabled = true
+
 	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
 	require.NoError(t, err)
 
@@ -754,20 +758,22 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 }
 
 type testingEventEncoder struct {
-	environment.CadenceEventEncoder
-	calls int
+	realEncoder *environment.CadenceEventEncoder
+	calls       int
+	enabled     bool
 }
 
 func (e *testingEventEncoder) Encode(event cadence.Event) ([]byte, error) {
 	defer func() {
-		e.calls++
+		if e.enabled {
+			e.calls++
+		}
 	}()
 
-	if e.calls == 1 {
+	if e.calls == 1 && e.enabled {
 		return nil, fmt.Errorf("I failed encoding")
 	}
-	return e.CadenceEventEncoder.Encode(event)
-
+	return e.realEncoder.Encode(event)
 }
 
 func TestScriptStorageMutationsDiscarded(t *testing.T) {

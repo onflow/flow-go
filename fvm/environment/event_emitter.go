@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -157,9 +155,9 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 		return fmt.Errorf("emit event failed: %w", err)
 	}
 
-	payload, err := jsoncdc.Encode(event)
+	payload, err := emitter.EventEncoder.Encode(event)
 	if err != nil {
-		return errors.NewEncodingFailuref(
+		return errors.NewEventEncodingErrorf(
 			err,
 			"failed to json encode a cadence event")
 	}

@@ -17,7 +17,7 @@ type EventEncodingError struct {
 }
 
 // NewEventEncodingErrorf formats and returns a new EventEncodingError
-func NewEventEncodingErrorf(msg string, err error) *EventEncodingError {
+func NewEventEncodingErrorf(err error, msg string) *EventEncodingError {
 	return &EventEncodingError{
 		err: fmt.Errorf(msg, err),
 	}
