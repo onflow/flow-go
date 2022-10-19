@@ -27,6 +27,9 @@ import (
 )
 
 func TestOnEntityRequestFull(t *testing.T) {
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 
 	entities := make(map[flow.Identifier]flow.Entity)
 
@@ -70,6 +73,8 @@ func TestOnEntityRequestFull(t *testing.T) {
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
+			defer cancel()
+
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
 			assert.Equal(t, nodeID, originID)
@@ -105,9 +110,6 @@ func TestOnEntityRequestFull(t *testing.T) {
 		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll4.ID(), coll5.ID()},
 	}
 
-	cancelCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	e.Start(ctx)
 
 	unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
@@ -115,11 +117,13 @@ func TestOnEntityRequestFull(t *testing.T) {
 	err = e.Process(channels.TestNetworkChannel, originID, request)
 	require.NoError(t, err, "should not error on full response")
 
-	cancel()
 	unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 }
 
 func TestOnEntityRequestPartial(t *testing.T) {
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 
 	entities := make(map[flow.Identifier]flow.Entity)
 
@@ -163,6 +167,8 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
+			defer cancel()
+
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
 			assert.Equal(t, nodeID, originID)
@@ -198,21 +204,19 @@ func TestOnEntityRequestPartial(t *testing.T) {
 		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll4.ID(), coll5.ID()},
 	}
 
-	cancelCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	e.Start(ctx)
 
 	unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
-
 	err = e.Process(channels.TestNetworkChannel, originID, request)
 	require.NoError(t, err, "should not error on full response")
-
-	cancel()
 	unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 }
 
 func TestOnEntityRequestDuplicates(t *testing.T) {
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
+
 	entities := make(map[flow.Identifier]flow.Entity)
 
 	identities := unittest.IdentityListFixture(8)
@@ -251,6 +255,8 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
+			defer cancel()
+
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
 			assert.Equal(t, nodeID, originID)
@@ -287,24 +293,19 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll3.ID(), coll2.ID(), coll1.ID()},
 	}
 
-	cancelCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	e.Start(ctx)
-
 	unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
-
 	err = e.Process(channels.TestNetworkChannel, originID, request)
 	require.NoError(t, err, "should not error on full response")
-
-	cancel()
 	unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 }
 
 func TestOnEntityRequestEmpty(t *testing.T) {
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 
 	entities := make(map[flow.Identifier]flow.Entity)
-
 	identities := unittest.IdentityListFixture(8)
 	selector := filter.HasNodeID(identities.NodeIDs()...)
 	originID := identities[0].NodeID
@@ -339,6 +340,8 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
+			defer cancel()
+
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
 			assert.Equal(t, nodeID, originID)
@@ -368,24 +371,19 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll4.ID(), coll5.ID()},
 	}
 
-	cancelCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	e.Start(ctx)
-
 	unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
-
 	err = e.Process(channels.TestNetworkChannel, originID, request)
 	require.NoError(t, err, "should not error on full response")
-
-	cancel()
 	unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 }
 
 func TestOnEntityRequestInvalidOrigin(t *testing.T) {
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 
 	entities := make(map[flow.Identifier]flow.Entity)
-
 	identities := unittest.IdentityListFixture(8)
 	selector := filter.HasNodeID(identities.NodeIDs()...)
 	originID := unittest.IdentifierFixture()
@@ -413,6 +411,7 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 	final := protocol.NewSnapshot(t)
 	final.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
+			defer cancel()
 			return identities.Filter(selector)
 		},
 		nil,
@@ -446,16 +445,9 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll4.ID(), coll5.ID()},
 	}
 
-	cancelCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	e.Start(ctx)
-
 	unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
-
 	err = e.Process(channels.TestNetworkChannel, originID, request)
 	require.NoError(t, err)
-
-	cancel()
 	unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 }
