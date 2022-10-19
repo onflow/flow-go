@@ -16,11 +16,12 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/environment"
 
 	"github.com/onflow/flow-go/engine/execution"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
@@ -720,12 +721,6 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	programsCache, err := programs.NewChainPrograms(10)
 	require.NoError(t, err)
-
-	//eds := new(state_synchronization.ExecutionDataService)
-	//eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
-	//
-	//edCache := new(state_synchronization.ExecutionDataCIDCache)
-	//edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
 
 	engine := &Manager{
 		blockComputer: blockComputer,
