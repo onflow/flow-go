@@ -15,7 +15,6 @@ func NewTransactionEnvironment(
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
-	eventHandlerOptions ...handler.FlowEventHandlerOption,
 ) environment.Environment {
 	ctx.RootSpan = traceSpan
 	ctx.TxIndex = txIndex

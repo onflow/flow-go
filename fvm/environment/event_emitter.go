@@ -19,12 +19,14 @@ const (
 type EventEmitterParams struct {
 	ServiceEventCollectionEnabled bool
 	EventCollectionByteSizeLimit  uint64
+	EventEncoder                  EventEncoder
 }
 
 func DefaultEventEmitterParams() EventEmitterParams {
 	return EventEmitterParams{
 		ServiceEventCollectionEnabled: false,
 		EventCollectionByteSizeLimit:  DefaultEventCollectionByteSizeLimit,
+		EventEncoder:                  NewCadenceEventEncoder(),
 	}
 }
 

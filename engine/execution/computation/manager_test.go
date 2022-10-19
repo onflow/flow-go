@@ -16,12 +16,11 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/fvm/handler"
 
 	"github.com/onflow/flow-go/engine/execution"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
@@ -628,24 +627,21 @@ func TestExecuteScriptCancelled(t *testing.T) {
 }
 
 func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
-	rt := fvm.NewInterpreterRuntime()
+
 	chain := flow.Mainnet.Chain()
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVirtualMachine()
 
-	eventEncoder := &testingEventEncoder{
-		CadenceEventEncoder: *handler.NewCadenceEventEncoder(),
-	}
+	eventEncoder := &testingEventEncoder{}
 
-	execCtx := fvm.NewContext(zerolog.Nop(),
+	execCtx := fvm.NewContext(
 		fvm.WithChain(chain),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop(),
-				fvm.WithFlowEventHandleOptions(handler.WithEncoder(eventEncoder)))))
+		fvm.WithEventEncoder(eventEncoder),
+	)
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 	require.NoError(t, err)
 
 	// setup transactions
@@ -695,25 +691,45 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
+
+	prov := provider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		prov,
+	)
 	require.NoError(t, err)
 
-	programsCache, err := NewProgramsCache(10)
+	programsCache, err := programs.NewChainPrograms(10)
 	require.NoError(t, err)
 
-	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
-
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
-	edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
+	//eds := new(state_synchronization.ExecutionDataService)
+	//eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
+	//
+	//edCache := new(state_synchronization.ExecutionDataCIDCache)
+	//edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
 
 	engine := &Manager{
-		tracer:        trace.NewNoopTracer(),
 		blockComputer: blockComputer,
 		me:            me,
 		programsCache: programsCache,
-		eds:           eds,
-		edCache:       edCache,
+		tracer:        trace.NewNoopTracer(),
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -738,7 +754,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 }
 
 type testingEventEncoder struct {
-	handler.CadenceEventEncoder
+	environment.CadenceEventEncoder
 	calls int
 }
 

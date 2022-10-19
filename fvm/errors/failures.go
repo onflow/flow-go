@@ -1,7 +1,6 @@
 package errors
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -10,30 +9,6 @@ func NewUnknownFailure(err error) CodedError {
 		FailureCodeUnknownFailure,
 		err,
 		"unknown failure")
-
-
-// UnknownFailure captures an unknown vm fatal error
-type UnknownFailure struct {
-	err error
-}
-
-// NewUnknownFailure constructs a new UnknownFailure
-func NewUnknownFailure(err error) *UnknownFailure {
-	return &UnknownFailure{err: err}
-}
-
-func (e *UnknownFailure) Error() string {
-	return fmt.Sprintf("%s unknown failure: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e *UnknownFailure) FailureCode() FailureCode {
-	return FailureCodeUnknownFailure
-}
-
-// Unwrap unwraps the error
-func (e UnknownFailure) Unwrap() error {
-	return e.err
 }
 
 // EventEncodingError captures an error sourced from encoding issues
