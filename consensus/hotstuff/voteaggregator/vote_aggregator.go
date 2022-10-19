@@ -224,7 +224,6 @@ func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
 		}
 		return fmt.Errorf("could not get or create collector for block %v: %w", block.Block.BlockID, err)
 	}
-
 	if created {
 		va.log.Info().
 			Uint64("view", block.Block.View).

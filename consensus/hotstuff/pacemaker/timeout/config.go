@@ -94,8 +94,8 @@ func NewConfig(
 	if blockRateDelay < 0 {
 		return Config{}, model.NewConfigurationErrorf("blockRateDelay must be must be non-negative")
 	}
-	if maxRebroadcastInterval < minReplicaTimeout {
-		return Config{}, model.NewConfigurationErrorf("maxRebroadcastInterval must be bigger or equal to minReplicaTimeout")
+	if maxRebroadcastInterval <= 0 {
+		return Config{}, model.NewConfigurationErrorf("maxRebroadcastInterval must be a positive number [milliseconds]")
 	}
 
 	tc := Config{

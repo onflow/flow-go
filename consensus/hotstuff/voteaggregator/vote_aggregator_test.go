@@ -82,7 +82,9 @@ func (s *VoteAggregatorTestSuite) TestOnFinalizedBlock() {
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
 
-// TestProcessInvalidBlock tests that processing invalid block results in exception, and it's correctly propagated to caller
+// TestProcessInvalidBlock tests that processing invalid block results in exception, when given as
+// an input to AddBlock (only expects _valid_ blocks per API contract).
+// The exception should be propagated to the VoteAggregator's internal `ComponentManager`.
 func (s *VoteAggregatorTestSuite) TestProcessInvalidBlock() {
 	block := helper.MakeProposal(
 		helper.WithBlock(

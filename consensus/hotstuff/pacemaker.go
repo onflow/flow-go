@@ -82,6 +82,7 @@ type PaceMaker interface {
 	// methods, or concurrency safety has to be implemented externally.
 	Start(ctx context.Context)
 
-	// BlockRateDelay
+	// BlockRateDelay returns the minimal wait time for broadcasting a proposal, measured from
+	// the point in time when the primary (locally) enters the respective view.    
 	BlockRateDelay() time.Duration
 }

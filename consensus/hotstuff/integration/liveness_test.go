@@ -19,8 +19,10 @@ import (
 // if your laptop is fast enough, 10 ms is enough
 const pmTimeout = 60 * time.Millisecond
 
-// keep the value small so we have smaller latency
-const pmMaxTimeoutRebroadcast = 60 * time.Millisecond
+// maxTimeoutRebroadcast specifies how often the PaceMaker rebroadcasts
+// its timeout object in case there is no progress. We keep the value
+// small so we have smaller latency
+const maxTimeoutRebroadcast = 60 * time.Millisecond
 
 // If 2 nodes are down in a 7 nodes cluster, the rest of 5 nodes can
 // still make progress and reach consensus
@@ -322,13 +324,13 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 // TestAsyncClusterStartup tests a realistic scenario where nodes are started asynchronously:
 //   - Replicas are started in sequential order
 //   - Each replica skips voting for first block(emulating message omission).
-//   - Each replica skips first timeout object(emulating message omission).
+//   - Each replica skips first Timeout Object [TO] (emulating message omission).
 //   - At this point protocol loses liveness unless a timeout rebroadcast happens from super-majority of replicas.
 //
 // This test verifies that nodes still make progress, despite first TO messages being lost.
 // Implementation:
 //   - We have 4 replicas in total, each of them skips voting for first view to force a timeout
-//   - Block timeouts for whole committee until each replicas generates a timeout.
+//   - Block TOs for whole committee until each replica has generated its first TO.
 //   - After each replica has generated a timeout allow subsequent timeout rebroadcasts to make progress.
 func TestAsyncClusterStartup(t *testing.T) {
 	replicas := 4
