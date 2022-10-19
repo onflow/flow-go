@@ -18,7 +18,7 @@ func TestRateLimit(t *testing.T) {
 	rateLimitedBs := newRateLimitedBlockStore(bs, "rate_test", 4, 4) // 4 bytes per second, burst of 4
 
 	data := make([]byte, 4)
-	_ = rand.Read(data)
+	_, _ = rand.Read(data)
 	blk := blocks.NewBlock(data)
 	err := rateLimitedBs.Put(context.Background(), blk)
 	require.NoError(t, err)
@@ -35,7 +35,7 @@ func TestBurstLimit(t *testing.T) {
 	rateLimitedBs := newRateLimitedBlockStore(bs, "burst_test", 4, 8) // 4 bytes per second, burst of 8
 
 	data := make([]byte, 4)
-	_ = rand.Read(data)
+	_, _ = rand.Read(data)
 	blk := blocks.NewBlock(data)
 	err := rateLimitedBs.Put(context.Background(), blk)
 	require.NoError(t, err)
