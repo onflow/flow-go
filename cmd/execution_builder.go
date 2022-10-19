@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
+	"path"
 	"path/filepath"
 	goruntime "runtime"
+	"strings"
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -15,15 +16,12 @@ import (
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/atomic"
-
-	"github.com/onflow/flow-go/network/p2p/blob"
-
-	"github.com/onflow/flow-go/module/mempool/queue"
 
 	"github.com/onflow/flow-go/admin/commands"
 	executionCommands "github.com/onflow/flow-go/admin/commands/execution"
@@ -70,9 +68,11 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -137,7 +137,8 @@ type ExecutionNode struct {
 	diskWAL                       *wal.DiskWAL
 	blockDataUploaders            []uploader.Uploader
 	executionDataStore            execution_data.ExecutionDataStore
-	toTriggerCheckpoint           *atomic.Bool // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	toTriggerCheckpoint           *atomic.Bool           // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	stopControl                   *ingestion.StopControl // stop the node at given block height
 	executionDataDatastore        *badger.Datastore
 	executionDataPruner           *pruner.Pruner
 	executionDataBlobstore        blobs.Blobstore
@@ -146,6 +147,7 @@ type ExecutionNode struct {
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
+
 	exeNode := &ExecutionNode{
 		builder:             builder.FlowNodeBuilder,
 		exeConf:             builder.exeConf,
@@ -158,6 +160,9 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		}).
 		AdminCommand("trigger-checkpoint", func(config *NodeConfig) commands.AdminCommand {
 			return executionCommands.NewTriggerCheckpointCommand(exeNode.toTriggerCheckpoint)
+		}).
+		AdminCommand("stop-at-height", func(config *NodeConfig) commands.AdminCommand {
+			return executionCommands.NewStopAtHeightCommand(exeNode.stopControl)
 		}).
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand()
@@ -176,7 +181,17 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
+		Module("bootstrap", exeNode.LoadBootstrapper).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
+
+		// TODO: Modules should be able to depends on components
+		// Because all modules are always bootstrapped first, before components,
+		// its not possible to have a module depending on a Component.
+		// This is the case for a StopControl which needs to query ExecutionState which needs execution state ledger.
+		// I prefer to use dummy component now and keep the bootstrapping steps properly separated,
+		// so it will be easier to follow and refactor later
+		Component("execution state", exeNode.LoadExecutionState).
+		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
 		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
@@ -359,7 +374,42 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
-	opts := []network.BlobServiceOption{}
+	// build list of Access nodes that are allowed to request execution data from this node
+	var allowedANs map[flow.Identifier]bool
+	if exeNode.exeConf.executionDataAllowedPeers != "" {
+		ids := strings.Split(exeNode.exeConf.executionDataAllowedPeers, ",")
+		allowedANs = make(map[flow.Identifier]bool, len(ids))
+		for _, idHex := range ids {
+			anID, err := flow.HexStringToIdentifier(idHex)
+			if err != nil {
+				return nil, fmt.Errorf("invalid node ID %s: %w", idHex, err)
+			}
+
+			id, ok := exeNode.builder.IdentityProvider.ByNodeID(anID)
+			if !ok {
+				return nil, fmt.Errorf("allowed node ID %s is not in identity list", idHex)
+			}
+
+			if id.Role != flow.RoleAccess {
+				return nil, fmt.Errorf("allowed node ID %s is not an access node", id.NodeID.String())
+			}
+
+			if id.Ejected {
+				return nil, fmt.Errorf("allowed node ID %s is ejected", id.NodeID.String())
+			}
+
+			allowedANs[anID] = true
+		}
+	}
+
+	opts := []network.BlobServiceOption{
+		blob.WithBitswapOptions(
+			// Only allow block requests from staked ENs and ANs on the allowedANs list (if set)
+			bitswap.WithPeerBlockRequestFilter(
+				blob.AuthorizedRequester(allowedANs, exeNode.builder.IdentityProvider, exeNode.builder.Logger),
+			),
+		),
+	}
 
 	if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
 		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
@@ -407,30 +457,6 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	}
 	exeNode.computationManager = manager
 
-	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
-	stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
-
-	// Needed for gRPC server, make sure to assign to main scoped vars
-	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
-	exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
-	exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
-
-	exeNode.executionState = state.NewExecutionState(
-		exeNode.ledgerStorage,
-		stateCommitments,
-		node.Storage.Blocks,
-		node.Storage.Headers,
-		node.Storage.Collections,
-		chunkDataPacks,
-		exeNode.results,
-		exeNode.myReceipts,
-		exeNode.events,
-		exeNode.serviceEvents,
-		exeNode.txResults,
-		node.DB,
-		node.Tracer,
-	)
-
 	var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
 	if node.HeroCacheMetricsEnable {
 		chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
@@ -461,7 +487,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	}
 	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get the state comitment at latest executed block id %s: %w", blockID.String(), err)
+		return nil, fmt.Errorf("cannot get the state commitment at latest executed block id %s: %w", blockID.String(), err)
 	}
 	blockView := exeNode.executionState.NewView(stateCommit)
 
@@ -549,51 +575,76 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	return nil
 }
 
+func (exeNode *ExecutionNode) LoadExecutionState(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+
+	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
+
+	// Needed for gRPC server, make sure to assign to main scoped vars
+	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
+	exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
+	exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
+
+	exeNode.executionState = state.NewExecutionState(
+		exeNode.ledgerStorage,
+		stateCommitments,
+		node.Storage.Blocks,
+		node.Storage.Headers,
+		node.Storage.Collections,
+		chunkDataPacks,
+		exeNode.results,
+		exeNode.myReceipts,
+		exeNode.events,
+		exeNode.serviceEvents,
+		exeNode.txResults,
+		node.DB,
+		node.Tracer,
+	)
+
+	return &module.NoopReadyDoneAware{}, nil
+}
+
+func (exeNode *ExecutionNode) LoadStopControl(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	lastExecutedHeight, _, err := exeNode.executionState.GetHighestExecutedBlockID(context.TODO())
+	if err != nil {
+		return nil, fmt.Errorf("cannot get the latest executed block height for stop control: %w", err)
+	}
+
+	exeNode.stopControl = ingestion.NewStopControl(
+		exeNode.builder.Logger.With().Str("compontent", "stop_control").Logger(),
+		exeNode.exeConf.pauseExecution,
+		lastExecutedHeight)
+
+	return &module.NoopReadyDoneAware{}, nil
+}
+
 func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	node *NodeConfig,
 ) (
 	module.ReadyDoneAware,
 	error,
 ) {
-	// check if the execution database already exists
-	bootstrapper := bootstrap.NewBootstrapper(node.Logger)
-
-	commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.DB)
-	if err != nil {
-		return nil, fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
-	}
-
-	// if the execution database does not exist, then we need to bootstrap the execution database.
-	if !bootstrapped {
-		// when bootstrapping, the bootstrap folder must have a checkpoint file
-		// we need to cover this file to the trie folder to restore the trie to restore the execution state.
-		err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
-		if err != nil {
-			return nil, fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
-		}
-
-		// TODO: check that the checkpoint file contains the root block's statecommit hash
-
-		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
-		if err != nil {
-			return nil, fmt.Errorf("could not bootstrap execution database: %w", err)
-		}
-	} else {
-		// if execution database has been bootstrapped, then the root statecommit must equal to the one
-		// in the bootstrap folder
-		if commit != node.RootSeal.FinalState {
-			return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %x, "+
-				"bootstap has statecommitment: %x",
-				commit, node.RootSeal.FinalState)
-		}
-	}
-
 	// DiskWal is a dependent component because we need to ensure
 	// that all WAL updates are completed before closing opened WAL segment.
+	var err error
 	exeNode.diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
 		node.MetricsRegisterer, exeNode.collector, exeNode.exeConf.triedir, int(exeNode.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize wal: %w", err)
+	}
+
+	if exeNode.exeConf.outputCheckpointV5 {
+		exeNode.diskWAL.UseCheckpointVersion5()
 	}
 
 	exeNode.ledgerStorage, err = ledger.NewLedger(exeNode.diskWAL, int(exeNode.exeConf.mTrieCacheSize), exeNode.collector, node.Logger.With().Str("subcomponent",
@@ -734,9 +785,9 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.exeConf.syncThreshold,
 		exeNode.exeConf.syncFast,
 		exeNode.checkAuthorizedAtBlock,
-		exeNode.exeConf.pauseExecution,
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploaders,
+		exeNode.stopControl,
 	)
 
 	// TODO: we should solve these mutual dependencies better
@@ -910,6 +961,44 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 	), nil
 }
 
+func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
+
+	// check if the execution database already exists
+	bootstrapper := bootstrap.NewBootstrapper(node.Logger)
+
+	commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.DB)
+	if err != nil {
+		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
+	}
+
+	// if the execution database does not exist, then we need to bootstrap the execution database.
+	if !bootstrapped {
+		// when bootstrapping, the bootstrap folder must have a checkpoint file
+		// we need to cover this file to the trie folder to restore the trie to restore the execution state.
+		err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
+		if err != nil {
+			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
+		}
+
+		// TODO: check that the checkpoint file contains the root block's statecommit hash
+
+		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap execution database: %w", err)
+		}
+	} else {
+		// if execution database has been bootstrapped, then the root statecommit must equal to the one
+		// in the bootstrap folder
+		if commit != node.RootSeal.FinalState {
+			return fmt.Errorf("mismatching root statecommitment. database has state commitment: %x, "+
+				"bootstap has statecommitment: %x",
+				commit, node.RootSeal.FinalState)
+		}
+	}
+
+	return nil
+}
+
 // getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the view provided.
 func getContractEpochCounter(vm computer.VirtualMachine, vmCtx fvm.Context, view *delta.View) (uint64, error) {
 	// Get the address of the FlowEpoch smart contract
@@ -979,35 +1068,18 @@ func copyBootstrapState(dir, trie string) error {
 	}
 
 	// copy from the bootstrap folder to the execution state folder
-	src := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, filename)
-	dst := filepath.Join(trie, filename)
-
-	in, err := os.Open(src)
+	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
+	copiedFiles, err := wal.CopyCheckpointFile(filename, from, to)
 	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	// It's possible that the trie dir does not yet exist. If not this will create the the required path
-	err = os.MkdirAll(trie, 0700)
-	if err != nil {
-		return err
+		return fmt.Errorf("can not copy checkpoint file %s, from %s to %s",
+			filename, from, to)
 	}
 
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
+	for _, newPath := range copiedFiles {
+		fmt.Printf("copied root checkpoint file from directory: %v, to: %v\n", from, newPath)
 	}
 
-	fmt.Printf("copied bootstrap state file from: %v, to: %v\n", src, dst)
-
-	return out.Close()
+	return nil
 }
 
 func logSysInfo(logger zerolog.Logger) error {

@@ -39,6 +39,7 @@ type ExecutionCollector struct {
 	readDuration                        prometheus.Histogram
 	readDurationPerValue                prometheus.Histogram
 	blockComputationUsed                prometheus.Histogram
+	blockComputationVector              *prometheus.GaugeVec
 	blockExecutionTime                  prometheus.Histogram
 	blockTransactionCounts              prometheus.Histogram
 	blockCollectionCounts               prometheus.Histogram
@@ -211,6 +212,13 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Help:      "the total amount of computation used by a block",
 		Buckets:   []float64{1000, 10000, 100000, 500000, 1000000, 5000000, 10000000},
 	})
+
+	blockComputationVector := promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_execution_effort_vector",
+		Help:      "execution effort vector of the last executed block by computation kind",
+	}, []string{LabelComputationKind})
 
 	blockTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
@@ -435,6 +443,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		readDurationPerValue:                readDurationPerValue,
 		blockExecutionTime:                  blockExecutionTime,
 		blockComputationUsed:                blockComputationUsed,
+		blockComputationVector:              blockComputationVector,
 		blockTransactionCounts:              blockTransactionCounts,
 		blockCollectionCounts:               blockCollectionCounts,
 		collectionExecutionTime:             collectionExecutionTime,
@@ -568,6 +577,10 @@ func (ec *ExecutionCollector) ExecutionBlockExecuted(dur time.Duration, compUsed
 	ec.blockComputationUsed.Observe(float64(compUsed))
 	ec.blockTransactionCounts.Observe(float64(txCounts))
 	ec.blockCollectionCounts.Observe(float64(colCounts))
+}
+
+func (ec *ExecutionCollector) ExecutionBlockExecutionEffortVectorComponent(compKind string, value uint) {
+	ec.blockComputationVector.With(prometheus.Labels{LabelComputationKind: compKind}).Set(float64(value))
 }
 
 // ExecutionCollectionExecuted reports computation and total time spent on a block computation
