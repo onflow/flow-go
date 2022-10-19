@@ -300,7 +300,7 @@ func (s *TransactionState) TotalComputationLimit() uint {
 	return s.currentState().TotalComputationLimit()
 }
 
-func (s *TransactionState) TotalComputationUsed() uint {
+func (s *TransactionState) TotalComputationUsed() uint64 {
 	return s.currentState().TotalComputationUsed()
 }
 
