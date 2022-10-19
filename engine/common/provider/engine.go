@@ -291,6 +291,12 @@ func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.Signaler
 
 func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		msg, ok := e.requestQueue.Get()
 		if !ok {
 			// no more requests, return
