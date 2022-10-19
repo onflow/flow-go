@@ -13,10 +13,10 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/ipfs/go-bitswap"
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
@@ -286,15 +286,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			exeNode.collector,
 		)
 
-		bs, err := node.Network.RegisterBlobService(
-			channels.ExecutionDataService,
-			exeNode.executionDataDatastore,
-			blob.WithBitswapOptions(
-				bitswap.WithTracer(
-					blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
-				),
-			),
-		)
+		bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore)
 		if err != nil {
 			return nil, fmt.Errorf("could not register blob service: %w", err)
 		}
