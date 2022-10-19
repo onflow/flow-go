@@ -1,41 +1,10 @@
 package errors
 
-import (
-	"fmt"
-)
-
 func NewUnknownFailure(err error) CodedError {
 	return WrapCodedError(
 		FailureCodeUnknownFailure,
 		err,
 		"unknown failure")
-}
-
-// EventEncodingError captures an error sourced from encoding issues
-type EventEncodingError struct {
-	err error
-}
-
-// NewEventEncodingErrorf formats and returns a new EventEncodingError
-func NewEventEncodingErrorf(err error, msg string) *EventEncodingError {
-	return &EventEncodingError{
-		err: fmt.Errorf(msg, err),
-	}
-}
-
-func (e *EventEncodingError) Error() string {
-	//return fmt.Sprintf("%s encoding failed: %s", e.ErrorCode().String(), e.err.Error())
-	return fmt.Sprintf("%s encoding failed: %s", e.ErrorCode().String(), e.err.Error())
-}
-
-// ErrorCode returns the error code
-func (e *EventEncodingError) ErrorCode() ErrorCode {
-	return ErrCodeEventEncodingError
-}
-
-// Unwrap unwraps the error
-func (e EventEncodingError) Unwrap() error {
-	return e.err
 }
 
 // EncodingFailure captures an fatal error sourced from encoding issues

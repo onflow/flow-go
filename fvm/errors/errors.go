@@ -199,3 +199,11 @@ func (err codedError) Error() string {
 func (err codedError) Code() ErrorCode {
 	return err.code
 }
+
+// NewEventEncodingError construct a new CodedError which indicates
+// that encoding event has failed
+func NewEventEncodingError(err error) CodedError {
+	return NewCodedError(
+		ErrCodeEventEncodingError,
+		"error while encoding emitted event: %w ", err)
+}

@@ -157,9 +157,7 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 
 	payload, err := emitter.EventEncoder.Encode(event)
 	if err != nil {
-		return errors.NewEventEncodingErrorf(
-			err,
-			"failed to json encode a cadence event")
+		return errors.NewEventEncodingError(err)
 	}
 
 	payloadSize := uint64(len(payload))
