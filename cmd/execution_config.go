@@ -76,6 +76,8 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 10*time.Second, "the interval between requests for the requester engine")
+	// collection retry parameters: these are chosen to have a balance between retrying too fast to DDoS the collection node
+	// and retrying too slow to stall execution in presense of a network partition (or transient collection node failure).
 	flags.DurationVar(&exeConf.requestRetryInitialDelay, "request-retry-initial-delay", 1*time.Second, "initial retry delay for the requester engine")
 	flags.DurationVar(&exeConf.requestRetryIncrementalDelay, "request-retry-incremental-delay", 1*time.Second, "linear delay increase between retries for the requester engine")
 	flags.DurationVar(&exeConf.requestRetryMaximumDelay, "request-retry-maximum-delay", 5*time.Second, "maximum retry delay for the requester engine")
