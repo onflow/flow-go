@@ -3,6 +3,7 @@
 package merkle
 
 import (
+	"errors"
 	"fmt"
 
 	"golang.org/x/crypto/blake2b"
@@ -45,8 +46,9 @@ func init() {
 type Tree struct {
 	keyLength int
 	root      node
-	// if nodes should cache hash values (false by default)
-	hashValueCachingEnabled bool
+	// setting this flag would prevent more writes to the trie
+	// but makes it more efficent for proof generation
+	readOnlyEnabled bool
 	// maximum depth that has been reached while updating the trie,
 	//the actual depth of the trie might be smaller in case some paths are deleted.
 	maxDepthTouched int
@@ -66,9 +68,11 @@ func NewTree(keyLength int) (*Tree, error) {
 	}, nil
 }
 
-// SetHashValueCachingEnabled sets flag if hash values of the nodes should be cached
-func (t *Tree) SetHashValueCachingEnabled(enabled bool) {
-	t.hashValueCachingEnabled = enabled
+// MakeItReadOnly makes the tree read only, this operation is not reversible.
+// when tree becomes readonly, while doing operations it starts caching hashValues
+// for faster operations.
+func (t *Tree) MakeItReadOnly() {
+	t.readOnlyEnabled = true
 }
 
 // MaxDepthTouched returns the maximum depth that has been reached while updating the trie
@@ -88,6 +92,9 @@ func (t *Tree) MaxDepthTouched() int {
 //   - ErrorIncompatibleKeyLength if `key` has different length than the pre-configured value
 //     No other errors are returned.
 func (t *Tree) Put(key []byte, val []byte) (bool, error) {
+	if t.readOnlyEnabled {
+		return false, errors.New("tree is readonly mode, no more put operation is accepted.")
+	}
 	if len(key) != t.keyLength {
 		return false, fmt.Errorf("trie is configured for key length of %d bytes, but got key with length %d: %w", t.keyLength, len(key), ErrorIncompatibleKeyLength)
 	}
@@ -351,7 +358,7 @@ ProveLoop:
 			}
 
 			index++
-			siblingHashes = append(siblingHashes, sibling.Hash(t.hashValueCachingEnabled))
+			siblingHashes = append(siblingHashes, sibling.Hash(t.readOnlyEnabled))
 			shortNodeVisited = append(shortNodeVisited, false)
 			steps++
 
@@ -406,11 +413,14 @@ ProveLoop:
 // Internally, any parent nodes between the leaf up to the closest shared path
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
-func (t *Tree) Del(key []byte) bool {
-	if t.keyLength != len(key) {
-		return false
+func (t *Tree) Del(key []byte) (bool, error) {
+	if t.readOnlyEnabled {
+		return false, errors.New("tree is readonly mode, no more delete operation is accepted.")
 	}
-	return t.unsafeDel(key)
+	if t.keyLength != len(key) {
+		return false, fmt.Errorf("trie is configured for key length of %d bytes, but got key with length %d: %w", t.keyLength, len(key), ErrorIncompatibleKeyLength)
+	}
+	return t.unsafeDel(key), nil
 }
 
 // unsafeDel removes the value associated with the given key from the patricia
@@ -540,7 +550,7 @@ func (t *Tree) Hash() []byte {
 	if t.root == nil {
 		return EmptyTreeRootHash
 	}
-	return t.root.Hash(t.hashValueCachingEnabled)
+	return t.root.Hash(t.readOnlyEnabled)
 }
 
 // merge will merge a child short node into a parent short node.
