@@ -483,7 +483,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	if node.HeroCacheMetricsEnable {
 		chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
 	}
-	chdpReqQueue := queue.NewChunkDataPackRequestQueue(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
+	chdpReqQueue := queue.NewHeroStore(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
 	exeNode.providerEngine, err = exeprovider.New(
 		node.Logger,
 		node.Tracer,
@@ -905,12 +905,21 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 	retrieve := func(blockID flow.Identifier) (flow.Entity, error) {
 		return exeNode.myReceipts.MyReceipt(blockID)
 	}
+
+	var receiptRequestQueueMetric module.HeroCacheMetrics = metrics.NewNoopCollector()
+	if node.HeroCacheMetricsEnable {
+		receiptRequestQueueMetric = metrics.ReceiptRequestsQueueMetricFactory(node.MetricsRegisterer)
+	}
+	receiptRequestQueue := queue.NewHeroStore(exeNode.exeConf.receiptRequestsCacheSize, node.Logger, receiptRequestQueueMetric)
+
 	eng, err := provider.New(
 		node.Logger,
 		node.Metrics.Engine,
 		node.Network,
 		node.Me,
 		node.State,
+		receiptRequestQueue,
+		exeNode.exeConf.receiptRequestWorkers,
 		channels.ProvideReceiptsByBlockID,
 		filter.HasRole(flow.RoleConsensus),
 		retrieve,
