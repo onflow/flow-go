@@ -279,7 +279,7 @@ func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.Signaler
 		select {
 		case <-e.requestHandler.GetNotifier():
 			// there is at least a single request in the queue, so we try to process it.
-			e.processAvailableMessages()
+			e.processAvailableMessages(ctx)
 		case <-ctx.Done():
 			// close the internal channel, the workers will drain the channel before exiting
 			close(e.requestChannel)
@@ -289,7 +289,7 @@ func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.Signaler
 	}
 }
 
-func (e *Engine) processAvailableMessages() {
+func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 	for {
 		msg, ok := e.requestQueue.Get()
 		if !ok {
@@ -301,7 +301,7 @@ func (e *Engine) processAvailableMessages() {
 		if !ok {
 			// should never happen, as we only put EntityRequest in the queue,
 			// if it does happen, it means there is a bug in the queue implementation.
-			e.log.Fatal().Msg("invalid entity request type")
+			ctx.Throw(fmt.Errorf("invalid message type in entity request queue: %T", msg.Payload))
 		}
 
 		req := &internal.EntityRequest{
