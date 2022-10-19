@@ -143,7 +143,9 @@ func (cn *mockCorruptNetwork) ConnectAttacker(_ *empty.Empty, stream insecure.Co
 // withMockCorruptNetwork creates and starts a mock corrupt network. This mock corrupt network only runs the gRPC server part of an
 // actual corrupt network, and then executes the run function on it.
 func withMockCorruptNetwork(t *testing.T, run func(flow.Identity, irrecoverable.SignalerContext, *mockCorruptNetwork)) {
-	corruptIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
+	// for egress messages (from corrupt node to another node), this is the ID of the corrupt node
+	// for ingress messages (from an honest node to a corrupt node), this is the ID of the honest node
+	nodeIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
 	// life-cycle management of corrupt network.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -163,7 +165,7 @@ func withMockCorruptNetwork(t *testing.T, run func(flow.Identity, irrecoverable.
 	cn.Start(cnCtx)
 	unittest.RequireCloseBefore(t, cn.Ready(), 100*time.Millisecond, "could not start corrupt network on time")
 
-	run(*corruptIdentity, cnCtx, cn)
+	run(*nodeIdentity, cnCtx, cn)
 
 	// terminates corrupt network
 	cancel()
