@@ -67,6 +67,15 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 		assert.True(t, IsNotBLSKeyError(err))
 		assert.False(t, result)
 	})
+
+	// test with an identity public key
+	t.Run("identity proof", func(t *testing.T) {
+		identityProof := make([]byte, signatureLengthBLSBLS12381)
+		identityProof[0] = byte(0xC0) // 0xC0 is the header of the point at infinity
+		result, err := SPOCKVerifyAgainstData(IdentityBLSPublicKey(), identityProof, data, kmac)
+		assert.NoError(t, err)
+		assert.False(t, result)
+	})
 }
 
 // tests of happy and unhappy paths of SPOCKVerify
@@ -152,6 +161,19 @@ func TestSPOCKProveVerify(t *testing.T) {
 		result, err = SPOCKVerify(sk1.PublicKey(), pr1, wrongSk.PublicKey(), pr2)
 		require.Error(t, err)
 		assert.True(t, IsNotBLSKeyError(err))
+		assert.False(t, result)
+	})
+
+	// test with identity public key and proof
+	t.Run("identity proof", func(t *testing.T) {
+		identityProof := make([]byte, signatureLengthBLSBLS12381)
+		identityProof[0] = byte(0xC0) // 0xC0 is the header of the point at infinity
+		result, err := SPOCKVerify(IdentityBLSPublicKey(), identityProof, sk2.PublicKey(), pr2)
+		assert.NoError(t, err)
+		assert.False(t, result)
+
+		result, err = SPOCKVerify(sk1.PublicKey(), pr1, IdentityBLSPublicKey(), identityProof)
+		assert.NoError(t, err)
 		assert.False(t, result)
 	})
 }
