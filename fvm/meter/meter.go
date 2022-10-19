@@ -470,8 +470,8 @@ func (m *Meter) ComputationIntensities() MeteredComputationIntensities {
 }
 
 // TotalComputationUsed returns the total computation used
-func (m *Meter) TotalComputationUsed() uint {
-	return uint(m.computationUsed >> MeterExecutionInternalPrecisionBytes)
+func (m *Meter) TotalComputationUsed() uint64 {
+	return m.computationUsed >> MeterExecutionInternalPrecisionBytes
 }
 
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit
