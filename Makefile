@@ -119,7 +119,7 @@ generate-openapi:
 	go fmt ./engine/access/rest/models
 
 .PHONY: generate
-generate: generate-proto generate-mocks
+generate: generate-proto generate-mocks generate-fvm-env-wrappers
 
 .PHONY: generate-proto
 generate-proto:
@@ -128,6 +128,10 @@ generate-proto:
 .PHONY: verify-mocks
 verify-mocks: generate-mocks
 	git diff --exit-code
+
+.PHONY: generate-fvm-env-wrappers
+generate-fvm-env-wrappers:
+	go run ./fvm/environment/generate-wrappers fvm/environment/parse_restricted_checker.go
 
 .PHONY: generate-mocks
 generate-mocks: install-mock-generators

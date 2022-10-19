@@ -195,7 +195,7 @@ func (s *State) MeterComputation(kind common.ComputationKind, intensity uint) er
 }
 
 // TotalComputationUsed returns total computation used
-func (s *State) TotalComputationUsed() uint {
+func (s *State) TotalComputationUsed() uint64 {
 	return s.meter.TotalComputationUsed()
 }
 

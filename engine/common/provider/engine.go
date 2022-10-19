@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // RetrieveFunc is a function provided to the provider engine upon construction.
@@ -174,6 +175,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 		if _, ok := seen[entityID]; ok {
 			lg.Warn().
 				Str("entity_id", entityID.String()).
+				Bool(logging.KeySuspicious, true).
 				Msg("duplicate entity ID in entity request")
 			continue
 		}

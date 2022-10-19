@@ -156,6 +156,7 @@ func (i TransactionInvoker) Process(
 		// if fee deduction fails just do clean up and exit
 		if feesError != nil {
 			ctx.Logger.Info().
+				Err(feesError).
 				Msg("transaction fee deduction executed with error")
 
 			if mergeErrorShouldEarlyExit(feesError) {
@@ -229,7 +230,7 @@ func (i TransactionInvoker) logExecutionIntensities(
 	}
 	env.Logger().Info().
 		Uint64("ledgerInteractionUsed", txnState.InteractionUsed()).
-		Uint("computationUsed", txnState.TotalComputationUsed()).
+		Uint64("computationUsed", txnState.TotalComputationUsed()).
 		Uint64("memoryEstimate", txnState.TotalMemoryEstimate()).
 		Dict("computationIntensities", computation).
 		Dict("memoryIntensities", memory).
