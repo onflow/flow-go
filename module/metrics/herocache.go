@@ -101,7 +101,7 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 		Help:      "total number of unsuccessful read queries",
 	})
 
-	coutKeyPutAttempt := prometheus.NewCounter(prometheus.CounterOpts{
+	countKeyPutAttempt := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
 		Name:      cacheName + "_" + "write_attempt_count_total",
@@ -162,7 +162,7 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 		countKeyPutSuccess,
 		countKeyPutDeduplicated,
 		countKeyPutDrop,
-		coutKeyPutAttempt,
+		countKeyPutAttempt,
 
 		// remove
 		countKeyRemoved,
@@ -177,7 +177,7 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 		countKeyGetSuccess: countKeyGetSuccess,
 		countKeyGetFailure: countKeyGetFailure,
 
-		countKeyPutAttempt:      coutKeyPutAttempt,
+		countKeyPutAttempt:      countKeyPutAttempt,
 		countKeyPutSuccess:      countKeyPutSuccess,
 		countKeyPutDeduplicated: countKeyPutDeduplicated,
 		countKeyPutDrop:         countKeyPutDrop,

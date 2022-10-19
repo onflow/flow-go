@@ -34,13 +34,28 @@ func (_m *HeroCacheMetrics) OnKeyGetSuccess() {
 	_m.Called()
 }
 
-// OnKeyPutFailure provides a mock function with given fields:
-func (_m *HeroCacheMetrics) OnKeyPutFailure() {
+// OnKeyPutAttempt provides a mock function with given fields:
+func (_m *HeroCacheMetrics) OnKeyPutAttempt() {
+	_m.Called()
+}
+
+// OnKeyPutDeduplicated provides a mock function with given fields:
+func (_m *HeroCacheMetrics) OnKeyPutDeduplicated() {
+	_m.Called()
+}
+
+// OnKeyPutDrop provides a mock function with given fields:
+func (_m *HeroCacheMetrics) OnKeyPutDrop() {
 	_m.Called()
 }
 
 // OnKeyPutSuccess provides a mock function with given fields:
 func (_m *HeroCacheMetrics) OnKeyPutSuccess() {
+	_m.Called()
+}
+
+// OnKeyRemoved provides a mock function with given fields:
+func (_m *HeroCacheMetrics) OnKeyRemoved() {
 	_m.Called()
 }
 
