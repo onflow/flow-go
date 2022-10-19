@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ipfs/go-bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
