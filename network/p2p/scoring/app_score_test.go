@@ -89,7 +89,7 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	// checks end-to-end message delivery works
 	// each node sends a distinct message to all and checks that all nodes receive it.
 	for _, node := range nodes {
-		proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture())
+		proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 		require.NoError(t, node.Publish(ctx, blockTopic, proposalMsg))
 
 		// checks that the message is received by all nodes.
@@ -197,7 +197,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	// let nodes reside on a full topology, hence no partition is caused by the topology.
 	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, allNodes, allIds)
 
-	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture())
+	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 	require.NoError(t, con1Node.Publish(ctx, blockTopic, proposalMsg))
 
 	// we check that whether within a one-second window the message is received by the other honest consensus node.
