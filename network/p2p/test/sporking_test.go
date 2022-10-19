@@ -306,7 +306,8 @@ func createTestMessage(t *testing.T) []byte {
 	require.NoError(t, err)
 
 	msg := &message.Message{
-		Payload: b,
+		ChannelID: channels.TestNetworkChannel.String(),
+		Payload:   b,
 	}
 	payload, err := msg.Marshal()
 	require.NoError(t, err)
