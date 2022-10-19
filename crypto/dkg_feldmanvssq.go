@@ -194,9 +194,11 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	// update receiveVector function to disqualify the dealer if any public key share
 	// is identity, only when FeldmanVSSQ is not a building primitive of Joint-Feldman
 	if C.bn_is_zero((*C.bn_st)(&s.x)) != valid {
+		s.disqualified = true
 		return nil, nil, nil, dkgFailureErrorf("private key share is identity and therefore invalid")
 	}
 	if Y.isIdentity {
+		s.disqualified = true
 		return nil, nil, nil, dkgFailureErrorf("group private key is identity and is therefore invalid")
 	}
 	return x, Y, y, nil
