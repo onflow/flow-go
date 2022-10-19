@@ -322,6 +322,20 @@ func (c *Container) Disconnect() error {
 	return nil
 }
 
+// WaitForContainerStopped waits until the container is stopped
+func (c *Container) WaitForContainerStopped(timeout time.Duration) error {
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	err := c.waitForCondition(ctx, containerStopped)
+	if err != nil {
+		return fmt.Errorf("error waiting for container stopped: %w", err)
+	}
+
+	return nil
+}
+
 // Connect connects this container to the network.
 func (c *Container) Connect() error {
 
