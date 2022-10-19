@@ -105,7 +105,7 @@ func New(
 					// should never happen, unless there is a bug.
 					log.Warn().
 						Str("entity_ids", fmt.Sprintf("%v", request.EntityIDs)).
-						Hex("requester_id", logging.ID(message.OriginID)).
+						Hex("origin_id", logging.ID(message.OriginID)).
 						Msg("cannot match the payload to entity request")
 					return nil, false
 				}
