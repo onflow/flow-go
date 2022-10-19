@@ -67,6 +67,9 @@ var _ flownet.Network = &Network{}
 var _ insecure.EgressController = &Network{}
 var _ insecure.IngressController = &Network{}
 var _ insecure.CorruptNetworkServer = &Network{}
+var _ component.Component = &Network{}
+var _ module.ReadyDoneAware = &Network{}
+var _ module.Startable = &Network{}
 
 func NewCorruptNetwork(
 	logger zerolog.Logger,
@@ -121,20 +124,20 @@ func NewCorruptNetwork(
 // Except, it first wraps the given processor around a corrupt message processor, and then
 // registers the corrupt message processor to the original Flow network.
 // Returns a non nil error if fails to register the corrupt message processor with the original Flow network.
-func (n *Network) Register(channel channels.Channel, messageProcessor flownet.MessageProcessor) (flownet.Conduit, error) {
+func (cn *Network) Register(channel channels.Channel, messageProcessor flownet.MessageProcessor) (flownet.Conduit, error) {
 	corruptProcessor := NewCorruptMessageProcessor(
-		n.logger.With().Str("module", "corrupt-message-processor").Hex("corrupt_id", logging.ID(n.me.NodeID())).Logger(),
+		cn.logger.With().Str("module", "corrupt-message-processor").Hex("corrupt_id", logging.ID(cn.me.NodeID())).Logger(),
 		messageProcessor,
-		n)
+		cn)
 	// TODO: we can dissolve CCF and instead have a decorator pattern to turn a conduit into
 	// a corrupt one?
-	conduit, err := n.flowNetwork.Register(channel, corruptProcessor)
+	conduit, err := cn.flowNetwork.Register(channel, corruptProcessor)
 	if err != nil {
 		return nil, fmt.Errorf("could not register corrupt message processor on channel: %s, %w", channel, err)
 	}
 	// we keep the original message processor here so that we can directly send messages to it when
 	// attacker dictates to do so.
-	n.originalMessageProcessors.Store(channel, messageProcessor)
+	cn.originalMessageProcessors.Store(channel, messageProcessor)
 
 	return conduit, nil
 }
@@ -142,21 +145,21 @@ func (n *Network) Register(channel channels.Channel, messageProcessor flownet.Me
 // RegisterBlobService directly invokes the corresponding method on the underlying Flow network instance. It does not perform
 // any corruption and passes everything through as it is.
 // Returns a non nil error if fails to register with original Flow network.
-func (n *Network) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...flownet.BlobServiceOption) (flownet.BlobService,
+func (cn *Network) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...flownet.BlobServiceOption) (flownet.BlobService,
 	error) {
-	return n.flowNetwork.RegisterBlobService(channel, store, opts...)
+	return cn.flowNetwork.RegisterBlobService(channel, store, opts...)
 }
 
 // RegisterPingService directly invokes the corresponding method on the underlying Flow network instance. It does not perform
 // any corruption and passes everything through as it is.
 // Returns a non nil error if fails to register with original Flow network.
-func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider flownet.PingInfoProvider) (flownet.PingService, error) {
-	return n.flowNetwork.RegisterPingService(pingProtocolID, pingInfoProvider)
+func (cn *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider flownet.PingInfoProvider) (flownet.PingService, error) {
+	return cn.flowNetwork.RegisterPingService(pingProtocolID, pingInfoProvider)
 }
 
 // ProcessAttackerMessage is the central place for the corrupt network to process messages from an attacker.
 // The messages coming from an attacker can be destined to this corrupt node (on behalf of another node) (ingress message) or to another node (on behalf of this corrupt node) (egress message).
-// This is a Client Streaming gRPC end-point that allows a registered attack orchestrator to dictate messages to this corrupt
+// This is a Client Streaming gRPC end-point that allows a registered attacker orchestrator to dictate messages to this corrupt
 // network.
 // The first call to this Client Streaming gRPC method creates the "stream" from attack orchestrator (i.e., client) to this corrupt network
 // (i.e., server), where attack orchestrator can send messages through that stream to the corrupt network.
@@ -165,46 +168,46 @@ func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvid
 // of this corrupt network instance on the original Flow network to other Flow nodes.
 //
 // Returns a fatal error and crashes if message from attacker is invalid (i.e. contains both ingress and egress message or neither ingress nor egress message).
-func (n *Network) ProcessAttackerMessage(stream insecure.CorruptNetwork_ProcessAttackerMessageServer) error {
+func (cn *Network) ProcessAttackerMessage(stream insecure.CorruptNetwork_ProcessAttackerMessageServer) error {
 	for {
 		select {
-		case <-n.ComponentManager.ShutdownSignal():
+		case <-cn.ComponentManager.ShutdownSignal():
 			return nil
 		default:
 			msg, err := stream.Recv()
 			if err == io.EOF || errors.Is(stream.Context().Err(), context.Canceled) {
-				n.logger.Info().Msg("attack orchestrator closed processing stream")
+				cn.logger.Info().Msg("attack orchestrator closed processing stream")
 				return stream.SendAndClose(&empty.Empty{})
 			}
 			if err != nil {
-				n.logger.Fatal().Err(err).Msg("could not read attack orchestrator's stream")
+				cn.logger.Fatal().Err(err).Msg("could not read attack orchestrator's stream")
 				return stream.SendAndClose(&empty.Empty{})
 			}
 
 			// this should never happen - one of them (and only one) should be non-nil
 			// can't have a message with nil for both ingress and egress
 			if msg.Egress == nil && msg.Ingress == nil {
-				n.logger.Fatal().Err(err).Msg("could not process attack orchestrator's message - both ingress and egress messages can't be nil")
+				cn.logger.Fatal().Err(err).Msg("could not process attack orchestrator's message - both ingress and egress messages can't be nil")
 				return stream.SendAndClose(&empty.Empty{})
 			}
 
 			// this should never happen - one of them (and only one) should be not nil
 			// can't have a message with not nil for both ingress and egress
 			if msg.Egress != nil && msg.Ingress != nil {
-				n.logger.Fatal().Err(err).Msg("could not process attack orchestrator's message - both ingress and egress messages can't be set")
+				cn.logger.Fatal().Err(err).Msg("could not process attack orchestrator's message - both ingress and egress messages can't be set")
 				return stream.SendAndClose(&empty.Empty{})
 			}
 
 			if msg.Ingress != nil {
-				if err := n.processAttackerIngressMessage(msg.Ingress); err != nil {
-					n.logger.Fatal().Err(err).Msg("could not process attack orchestrator's ingress message")
+				if err := cn.processAttackerIngressMessage(msg.Ingress); err != nil {
+					cn.logger.Fatal().Err(err).Msg("could not process attack orchestrator's ingress message")
 					return stream.SendAndClose(&empty.Empty{})
 				}
 			}
 
 			if msg.Egress != nil {
-				if err := n.processAttackerEgressMessage(msg); err != nil {
-					n.logger.Fatal().Err(err).Msg("could not process attack orchestrator's egress message")
+				if err := cn.processAttackerEgressMessage(msg); err != nil {
+					cn.logger.Fatal().Err(err).Msg("could not process attack orchestrator's egress message")
 					return stream.SendAndClose(&empty.Empty{})
 				}
 			}
@@ -212,10 +215,10 @@ func (n *Network) ProcessAttackerMessage(stream insecure.CorruptNetwork_ProcessA
 	}
 }
 
-func (n *Network) processAttackerIngressMessage(msg *insecure.IngressMessage) error {
-	lg := n.logger.With().
+func (cn *Network) processAttackerIngressMessage(msg *insecure.IngressMessage) error {
+	lg := cn.logger.With().
 		Str("channel", msg.ChannelID).Logger()
-	event, err := n.codec.Decode(msg.Payload)
+	event, err := cn.codec.Decode(msg.Payload)
 	if err != nil {
 		lg.Err(err).Msg("could not decode attack orchestrator's ingress message")
 		return fmt.Errorf("could not decode ingress message: %w", err)
@@ -231,12 +234,12 @@ func (n *Network) processAttackerIngressMessage(msg *insecure.IngressMessage) er
 		return fmt.Errorf("could not convert corrupt target id to flow identifier: %w", err)
 	}
 
-	lg = n.logger.With().
+	lg = cn.logger.With().
 		Hex("sender_id", logging.ID(senderId)).
 		Hex("corrupt_target_id", logging.ID(targetId)).
 		Str("flow_protocol_event_type", fmt.Sprintf("%T", event)).Logger()
 
-	if targetId != n.me.NodeID() {
+	if targetId != cn.me.NodeID() {
 		lg.Fatal().Msg("corrupt network received ingress message for a different node")
 	}
 
@@ -245,7 +248,7 @@ func (n *Network) processAttackerIngressMessage(msg *insecure.IngressMessage) er
 	// As this ingress message is dictated by the attack orchestrator, we need to send it to the original message processor
 	// instead of the corrupt one. The reason is the corrupt one always routes the ingress messages back to the attack
 	// orchestrator, which yields an infinite loop.
-	originalProcessor, ok := n.originalMessageProcessors.Load(channels.Channel(msg.ChannelID))
+	originalProcessor, ok := cn.originalMessageProcessors.Load(channels.Channel(msg.ChannelID))
 	if !ok {
 		lg.Fatal().Msg("corrupt network received ingress message for an unknown channel")
 	}
@@ -261,19 +264,19 @@ func (n *Network) processAttackerIngressMessage(msg *insecure.IngressMessage) er
 }
 
 // processAttackerEgressMessage dispatches the attack orchestrator message on the Flow network on behalf of this node.
-func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
-	lg := n.logger.With().
+func (cn *Network) processAttackerEgressMessage(msg *insecure.Message) error {
+	lg := cn.logger.With().
 		Str("protocol", insecure.ProtocolStr(msg.Egress.Protocol)).
 		Uint32("target_num", msg.Egress.TargetNum).
 		Str("channel", msg.Egress.ChannelID).Logger()
 
-	event, err := n.codec.Decode(msg.Egress.Payload)
+	event, err := cn.codec.Decode(msg.Egress.Payload)
 	if err != nil {
 		lg.Err(err).Msg("could not decode attack orchestrator's egress message")
 		return fmt.Errorf("could not decode egress message: %w", err)
 	}
 
-	lg = n.logger.With().
+	lg = cn.logger.With().
 		Str("flow_protocol_event_type", fmt.Sprintf("%T", event)).Logger()
 
 	switch e := event.(type) {
@@ -281,7 +284,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 		if len(e.ExecutorSignature) == 0 {
 			// empty signature field on execution receipt means attack orchestrator is dictating a result to
 			// CCF, and the receipt fields must be filled out locally.
-			receipt, err := n.generateExecutionReceipt(&e.ExecutionResult)
+			receipt, err := cn.generateExecutionReceipt(&e.ExecutionResult)
 			if err != nil {
 				lg.Err(err).
 					Hex("result_id", logging.ID(e.ExecutionResult.ID())).
@@ -295,7 +298,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 		if len(e.VerifierSignature) == 0 {
 			// empty signature field on result approval means attack orchestrator is dictating an attestation to
 			// CCF, and the approval fields must be filled out locally.
-			approval, err := n.generateResultApproval(&e.Body.Attestation)
+			approval, err := cn.generateResultApproval(&e.Body.Attestation)
 			if err != nil {
 				lg.Err(err).
 					Hex("result_id", logging.ID(e.Body.ExecutionResultID)).
@@ -319,7 +322,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 	}
 
 	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.Egress.TargetIDs)).Logger()
-	err = n.conduitFactory.SendOnFlowNetwork(event, channels.Channel(msg.Egress.ChannelID), msg.Egress.Protocol, uint(msg.Egress.TargetNum), targetIds...)
+	err = cn.conduitFactory.SendOnFlowNetwork(event, channels.Channel(msg.Egress.ChannelID), msg.Egress.Protocol, uint(msg.Egress.TargetNum), targetIds...)
 	if err != nil {
 		lg.Err(err).Msg("could not send attack orchestrator egress message to the network")
 		return fmt.Errorf("could not send attack orchestrator egress message to the network: %w", err)
@@ -330,16 +333,16 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 	return nil
 }
 
-func (n *Network) start(ctx irrecoverable.SignalerContext, gRPCListenAddress string) {
+func (cn *Network) start(ctx irrecoverable.SignalerContext, gRPCListenAddress string) {
 	// starts up gRPC server of corrupt network at given address.
 	server := grpc.NewServer()
-	insecure.RegisterCorruptNetworkServer(server, n)
+	insecure.RegisterCorruptNetworkServer(server, cn)
 	ln, err := net.Listen(networkingProtocolTCP, gRPCListenAddress)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
 	}
-	n.server = server
-	n.gRPCListenAddress = ln.Addr()
+	cn.server = server
+	cn.gRPCListenAddress = ln.Addr()
 
 	// waits till gRPC server is coming up and running.
 	wg := sync.WaitGroup{}
@@ -355,35 +358,35 @@ func (n *Network) start(ctx irrecoverable.SignalerContext, gRPCListenAddress str
 }
 
 // stop terminates the corrupt network.
-func (n *Network) stop() {
-	n.server.Stop()
+func (cn *Network) stop() {
+	cn.server.Stop()
 }
 
 // ServerAddress returns listen address of the gRPC server that is running by this corrupt network.
-func (n *Network) ServerAddress() string {
-	return n.gRPCListenAddress.String()
+func (cn *Network) ServerAddress() string {
+	return cn.gRPCListenAddress.String()
 }
 
 // EngineClosingChannel is called by the conduits of this corrupt network to let it know that the corresponding
 // engine of the conduit is not going to use it anymore, so the channel can be closed safely.
-func (n *Network) EngineClosingChannel(channel channels.Channel) error {
-	return n.conduitFactory.UnregisterChannel(channel)
+func (cn *Network) EngineClosingChannel(channel channels.Channel) error {
+	return cn.conduitFactory.UnregisterChannel(channel)
 }
 
 // eventToEgressMessage converts the given application layer event to a protobuf message that is meant to be sent to the attack orchestrator.
-func (n *Network) eventToEgressMessage(
+func (cn *Network) eventToEgressMessage(
 	event interface{},
 	channel channels.Channel,
 	protocol insecure.Protocol,
 	targetNum uint32,
 	targetIds ...flow.Identifier) (*insecure.Message, error) {
 
-	payload, err := n.codec.Encode(event)
+	payload, err := cn.codec.Encode(event)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
 
-	myId := n.me.NodeID()
+	myId := cn.me.NodeID()
 
 	egressMsg := &insecure.EgressMessage{
 		ChannelID:       channel.String(),
@@ -401,12 +404,12 @@ func (n *Network) eventToEgressMessage(
 	return msg, nil
 }
 
-func (n *Network) eventToIngressMessage(event interface{}, channel channels.Channel, originId flow.Identifier) (*insecure.Message, error) {
-	payload, err := n.codec.Encode(event)
+func (cn *Network) eventToIngressMessage(event interface{}, channel channels.Channel, originId flow.Identifier) (*insecure.Message, error) {
+	payload, err := cn.codec.Encode(event)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
-	myId := n.me.NodeID()
+	myId := cn.me.NodeID()
 
 	ingressMsg := &insecure.IngressMessage{
 		ChannelID:       channel.String(),
@@ -422,22 +425,22 @@ func (n *Network) eventToIngressMessage(event interface{}, channel channels.Chan
 	return msg, nil
 }
 
-func (n *Network) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
+func (cn *Network) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
 	// TODO: fill spock secret with dictated spock data from attack orchestrator.
-	return ingestion.GenerateExecutionReceipt(n.me, n.receiptHasher, n.spockHasher, result, []*delta.SpockSnapshot{})
+	return ingestion.GenerateExecutionReceipt(cn.me, cn.receiptHasher, cn.spockHasher, result, []*delta.SpockSnapshot{})
 }
 
-func (n *Network) generateResultApproval(attestation *flow.Attestation) (*flow.ResultApproval, error) {
+func (cn *Network) generateResultApproval(attestation *flow.Attestation) (*flow.ResultApproval, error) {
 	// TODO: fill spock secret with dictated spock data from attack orchestrator.
-	return verifier.GenerateResultApproval(n.me, n.approvalHasher, n.spockHasher, attestation, []byte{})
+	return verifier.GenerateResultApproval(cn.me, cn.approvalHasher, cn.spockHasher, attestation, []byte{})
 }
 
 // AttackerRegistered returns whether an attack orchestrator has registered on this corrupt network instance.
-func (n *Network) AttackerRegistered() bool {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+func (cn *Network) AttackerRegistered() bool {
+	cn.mu.Lock()
+	defer cn.mu.Unlock()
 
-	return n.attackerInboundStream != nil
+	return cn.attackerInboundStream != nil
 }
 
 // ConnectAttacker is a blocking Server Streaming gRPC end-point for this corrupt network that registers an attacker to the corrupt network,
@@ -454,17 +457,17 @@ func (n *Network) AttackerRegistered() bool {
 //
 // Registering an attack orchestrator on a networking layer is an exactly-once immutable operation,
 // any second attempt after a successful registration returns an error.
-func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptNetwork_ConnectAttackerServer) error {
-	n.mu.Lock()
-	n.logger.Info().Msg("attack orchestrator registration called arrived")
-	if n.attackerInboundStream != nil {
-		n.mu.Unlock()
+func (cn *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptNetwork_ConnectAttackerServer) error {
+	cn.mu.Lock()
+	cn.logger.Info().Msg("attack orchestrator registration called arrived")
+	if cn.attackerInboundStream != nil {
+		cn.mu.Unlock()
 		return fmt.Errorf("could not register a new attack orchestrator, one already exists")
 	}
-	n.attackerInboundStream = stream
+	cn.attackerInboundStream = stream
 
-	n.mu.Unlock()
-	n.logger.Info().Msg("attack orchestrator registered successfully")
+	cn.mu.Unlock()
+	cn.logger.Info().Msg("attack orchestrator registered successfully")
 
 	// WARNING: this method call should not return through the entire lifetime of this
 	// corrupt conduit factory.
@@ -472,8 +475,8 @@ func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptNetwork
 	// is tightly coupled with the lifecycle of this function call.
 	// Once it returns, the client stream is closed forever.
 	// Hence, we block the call and wait till a component shutdown.
-	<-n.ComponentManager.ShutdownSignal()
-	n.logger.Info().Msg("component is shutting down, closing attack orchestrator's inbound stream ")
+	<-cn.ComponentManager.ShutdownSignal()
+	cn.logger.Info().Msg("component is shutting down, closing attack orchestrator's inbound stream ")
 
 	return nil
 }
@@ -482,34 +485,34 @@ func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptNetwork
 // If there is an attack orchestrator connected to this network, the event is dispatched to it.
 // Otherwise, the network follows the correct protocol path by sending the message down to the original networking layer
 // of Flow to deliver to its targets.
-func (n *Network) HandleOutgoingEvent(
+func (cn *Network) HandleOutgoingEvent(
 	event interface{},
 	channel channels.Channel,
 	protocol insecure.Protocol,
 	num uint32,
 	targetIds ...flow.Identifier) error {
 
-	lg := n.logger.With().
-		Hex("corrupt_id", logging.ID(n.me.NodeID())).
+	lg := cn.logger.With().
+		Hex("corrupt_id", logging.ID(cn.me.NodeID())).
 		Str("channel", string(channel)).
 		Str("protocol", protocol.String()).
 		Uint32("target_num", num).
 		Str("target_ids", fmt.Sprintf("%v", targetIds)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
 
-	if !n.AttackerRegistered() {
+	if !cn.AttackerRegistered() {
 		// no attack orchestrator yet registered, hence sending message on the network following the
 		// correct expected behavior.
 		lg.Info().Msg("no attack orchestrator registered, passing through event")
-		return n.conduitFactory.SendOnFlowNetwork(event, channel, protocol, uint(num), targetIds...)
+		return cn.conduitFactory.SendOnFlowNetwork(event, channel, protocol, uint(num), targetIds...)
 	}
 
-	msg, err := n.eventToEgressMessage(event, channel, protocol, num, targetIds...)
+	msg, err := cn.eventToEgressMessage(event, channel, protocol, num, targetIds...)
 	if err != nil {
 		return fmt.Errorf("could not convert event to message: %w", err)
 	}
 
-	err = n.attackerInboundStream.Send(msg)
+	err = cn.attackerInboundStream.Send(msg)
 	if err != nil {
 		return fmt.Errorf("could not send message to attack orchestrator to observe: %w", err)
 	}
@@ -523,25 +526,25 @@ func (n *Network) HandleOutgoingEvent(
 // Honest node (i.e., not running with a corrupt network) message flow: Flow Networking Layer -> Honest Engine
 // Corrupt node (i.e., running with a corrupt network) message flow (with attacker registered):
 // Flow Networking Layer -> Corrupt Network -> Attack Orchestrator (mute or passthrough) -> Corrupt Network -> Honest / Corrupt Engine
-func (n *Network) HandleIncomingEvent(event interface{}, channel channels.Channel, originId flow.Identifier) bool {
-	lg := n.logger.With().
-		Hex("corrupt_id", logging.ID(n.me.NodeID())).
+func (cn *Network) HandleIncomingEvent(event interface{}, channel channels.Channel, originId flow.Identifier) bool {
+	lg := cn.logger.With().
+		Hex("corrupt_id", logging.ID(cn.me.NodeID())).
 		Str("channel", string(channel)).
 		Str("origin_id", fmt.Sprintf("%v", originId)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
 
-	if !n.AttackerRegistered() {
+	if !cn.AttackerRegistered() {
 		// no attack orchestrator registered, so return to message processor to pass back to flow network
 		lg.Info().Msg("no attack orchestrator registered, passing through event")
 		return false
 	}
 
-	msg, err := n.eventToIngressMessage(event, channel, originId)
+	msg, err := cn.eventToIngressMessage(event, channel, originId)
 	if err != nil {
 		lg.Fatal().Err(err).Msg("could not convert event to ingress message")
 	}
 
-	err = n.attackerInboundStream.Send(msg)
+	err = cn.attackerInboundStream.Send(msg)
 	if err != nil {
 		lg.Fatal().Err(err).Msg("could not send message to attack orchestrator to observe")
 	}

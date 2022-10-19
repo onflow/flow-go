@@ -41,51 +41,52 @@ type mockCorruptNetwork struct {
 }
 
 var _ insecure.CorruptNetworkServer = &mockCorruptNetwork{}
+var _ component.Component = &mockCorruptNetwork{}
 var _ module.ReadyDoneAware = &mockCorruptNetwork{}
 var _ module.Startable = &mockCorruptNetwork{}
 
 func newMockCorruptNetwork() *mockCorruptNetwork {
-	factory := &mockCorruptNetwork{
+	corruptNetwork := &mockCorruptNetwork{
 		attackerRegMsg: make(chan interface{}),
 		attackerMsg:    make(chan *insecure.Message),
 	}
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			factory.start(ctx, insecure.DefaultAddress)
+			corruptNetwork.start(ctx, insecure.DefaultAddress)
 
 			ready()
 
 			<-ctx.Done()
-			factory.stop()
+			corruptNetwork.stop()
 		}).Build()
 
-	factory.Component = cm
-	factory.cm = cm
+	corruptNetwork.Component = cm
+	corruptNetwork.cm = cm
 
-	return factory
+	return corruptNetwork
 }
 
-func (c *mockCorruptNetwork) ServerAddress() string {
-	return c.address.String()
+func (cn *mockCorruptNetwork) ServerAddress() string {
+	return cn.address.String()
 }
 
-func (c *mockCorruptNetwork) start(ctx irrecoverable.SignalerContext, address string) {
+func (cn *mockCorruptNetwork) start(ctx irrecoverable.SignalerContext, address string) {
 	// starts up gRPC server of corrupt network at given address.
-	s := grpc.NewServer()
-	insecure.RegisterCorruptNetworkServer(s, c)
+	server := grpc.NewServer()
+	insecure.RegisterCorruptNetworkServer(server, cn)
 	ln, err := net.Listen(networkingProtocolTCP, address)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
 	}
-	c.server = s
-	c.address = ln.Addr()
+	cn.server = server
+	cn.address = ln.Addr()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		wg.Done()
-		if err = s.Serve(ln); err != nil { // blocking call
+		if err = server.Serve(ln); err != nil { // blocking call
 			ctx.Throw(fmt.Errorf("could not bind factory to the tcp listener: %w", err))
 		}
 	}()
@@ -93,16 +94,16 @@ func (c *mockCorruptNetwork) start(ctx irrecoverable.SignalerContext, address st
 	wg.Wait()
 }
 
-func (c *mockCorruptNetwork) stop() {
-	c.server.Stop()
+func (cn *mockCorruptNetwork) stop() {
+	cn.server.Stop()
 }
 
 // ProcessAttackerMessage is a gRPC end-point of this mock corrupt network, that accepts messages from attacker network, and
 // puts the incoming message in a channel to be read by the test procedure.
-func (c *mockCorruptNetwork) ProcessAttackerMessage(stream insecure.CorruptNetwork_ProcessAttackerMessageServer) error {
+func (cn *mockCorruptNetwork) ProcessAttackerMessage(stream insecure.CorruptNetwork_ProcessAttackerMessageServer) error {
 	for {
 		select {
-		case <-c.cm.ShutdownSignal():
+		case <-cn.cm.ShutdownSignal():
 			return nil
 		default:
 			msg, err := stream.Recv()
@@ -112,21 +113,21 @@ func (c *mockCorruptNetwork) ProcessAttackerMessage(stream insecure.CorruptNetwo
 			if err != nil {
 				return stream.SendAndClose(&empty.Empty{})
 			}
-			c.attackerMsg <- msg
+			cn.attackerMsg <- msg
 		}
 	}
 }
 
 // ConnectAttacker is a gRPC end-point of this mock corrupt network, that accepts attacker registration messages from the attacker network.
 // It puts the incoming message into a channel to be read by test procedure.
-func (c *mockCorruptNetwork) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptNetwork_ConnectAttackerServer) error {
+func (cn *mockCorruptNetwork) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptNetwork_ConnectAttackerServer) error {
 	select {
-	case <-c.cm.ShutdownSignal():
+	case <-cn.cm.ShutdownSignal():
 		return nil
 
 	default:
-		c.attackerObserveStream = stream
-		close(c.attackerRegMsg)
+		cn.attackerObserveStream = stream
+		close(cn.attackerRegMsg)
 	}
 
 	// WARNING: this method call should not return through the entire lifetime of this corrupt network.
@@ -134,7 +135,7 @@ func (c *mockCorruptNetwork) ConnectAttacker(_ *empty.Empty, stream insecure.Cor
 	// is tightly coupled with the lifecycle of this function call.
 	// Once it returns, the client stream is closed forever.
 	// Hence, we block the call and wait till a component shutdown.
-	<-c.cm.ShutdownSignal()
+	<-cn.cm.ShutdownSignal()
 
 	return nil
 }
