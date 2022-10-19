@@ -166,7 +166,7 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovelerWorker(ctx irrecovera
 		select {
 		case <-e.chdpRequestHandler.GetNotifier():
 			// there is at list a single chunk data pack request queued up.
-			e.shovelChunkDataPackRequests()
+			e.processAvailableMesssages()
 		case <-ctx.Done():
 			// close the internal channel, the workers will drain the channel before exiting
 			close(e.chdpRequestChannel)
@@ -176,10 +176,10 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovelerWorker(ctx irrecovera
 	}
 }
 
-// shovelChunkDataPackRequests is a blocking method that reads all queued ChunkDataRequests till the queue gets empty.
+// processAvailableMesssages is a blocking method that reads all queued ChunkDataRequests till the queue gets empty.
 // Each ChunkDataRequest is processed by a single concurrent worker. However, there are limited number of such workers.
 // If there is no worker available for a request, the method blocks till one is available.
-func (e *Engine) shovelChunkDataPackRequests() {
+func (e *Engine) processAvailableMesssages() {
 	for {
 		msg, ok := e.chdpRequestQueue.Get()
 		if !ok {
