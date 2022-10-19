@@ -451,6 +451,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 					bitswap.WithPeerBlockRequestFilter(
 						blob.AuthorizedRequester(nil, builder.IdentityProvider, builder.Logger),
 					),
+					bitswap.WithTracer(
+						blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
+					),
 				),
 			}
 
