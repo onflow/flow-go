@@ -168,12 +168,12 @@ func (s *Suite) SetupSuite() {
 	}()
 
 	attackerNetwork.Start(attackCtx)
-	unittest.RequireCloseBefore(s.T(), attackerNetwork.Ready(), 1*time.Second, "could not start orchestrator network on time")
+	unittest.RequireCloseBefore(s.T(), attackerNetwork.Ready(), 1*time.Second, "could not start attacker network on time")
 }
 
 // TearDownSuite tears down the test network of Flow as well as the BFT testing attacker network.
 func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	s.cancel()
-	unittest.RequireCloseBefore(s.T(), s.attackerNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
+	unittest.RequireCloseBefore(s.T(), s.attackerNetwork.Done(), 1*time.Second, "could not stop attacker network on time")
 }

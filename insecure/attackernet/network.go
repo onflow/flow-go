@@ -73,9 +73,9 @@ func NewAttackerNetwork(
 	return orchestratorNetwork, nil
 }
 
-// start triggers the sub-modules of orchestrator network.
+// start triggers the sub-modules of attacker network.
 func (on *Network) start(ctx irrecoverable.SignalerContext) error {
-	// creates a connection to all corrupt nodes in the orchestrator network.
+	// creates a connection to all corrupt nodes in the attacker network.
 	for _, corruptNodeId := range on.corruptNodeIds {
 		connection, err := on.corruptConnector.Connect(ctx, corruptNodeId.NodeID)
 		if err != nil {
@@ -85,13 +85,13 @@ func (on *Network) start(ctx irrecoverable.SignalerContext) error {
 		on.logger.Info().Hex("node_id", logging.ID(corruptNodeId.NodeID)).Msg("attack orchestrator successfully registered on corrupt node")
 	}
 
-	// registers orchestrator network for orchestrator.
+	// registers attacker network for orchestrator.
 	on.orchestrator.Register(on)
 
 	return nil
 }
 
-// stop terminates all gRPC client connections within an orchestrator network.
+// stop terminates all gRPC client connections within an attacker network.
 func (on *Network) stop() error {
 	// tears down connections to corrupt nodes.
 	var errors *multierror.Error
@@ -106,10 +106,10 @@ func (on *Network) stop() error {
 	return errors.ErrorOrNil()
 }
 
-// Observe is the inbound message handler of the orchestrator network.
+// Observe is the inbound message handler of the attacker network.
 // Instead of dispatching their messages to the networking layer of Flow, the corrupt nodes
 // dispatch both the incoming (i.e., ingress) as well as the outgoing (i.e., egress)
-// messages to the orchestrator network by calling the InboundHandler method of it remotely.
+// messages to the attacker network by calling the InboundHandler method of it remotely.
 func (on *Network) Observe(message *insecure.Message) {
 	if message.Ingress == nil && message.Egress == nil {
 		// In BFT testing framework, it is a bug to has neither ingress nor egress not set.
@@ -224,7 +224,7 @@ func (on *Network) SendEgress(event *insecure.EgressEvent) error {
 }
 
 // SendIngress sends an incoming message from the flow network (from another node that could be or honest or corrupt)
-// to the corrupt node. This message was intercepted by the orchestrator network and relayed to the orchestrator before being sent
+// to the corrupt node. This message was intercepted by the attacker network and relayed to the orchestrator before being sent
 // to the corrupt node.
 func (on *Network) SendIngress(event *insecure.IngressEvent) error {
 	msg, err := on.eventToIngressMessage(event.OriginID, event.FlowProtocolEvent, event.Channel, event.CorruptTargetID)

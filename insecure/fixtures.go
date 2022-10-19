@@ -17,7 +17,7 @@ import (
 const DefaultAddress = "localhost:0"
 
 // EgressMessageFixture creates and returns a randomly generated gRPC egress message that is sent between a corrupt network and attacker network.
-// It also generates and returns the corresponding application-layer event of that message, which is sent between the orchestrator network and the
+// It also generates and returns the corresponding application-layer event of that message, which is sent between the attacker network and the
 // orchestrator.
 func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, content interface{}) (*Message, *EgressEvent, *flow.Identity) {
 	// fixture for content of message
@@ -57,7 +57,7 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	}
 
 	// creates corresponding event of that message that
-	// is sent by orchestrator network to orchestrator.
+	// is sent by attacker network to orchestrator.
 	e := &EgressEvent{
 		CorruptOriginId:   originId,
 		Channel:           channel,

@@ -128,7 +128,7 @@ func TestMultipleConcurrentExecutionReceipts_SameResult(t *testing.T) {
 
 // testConcurrentExecutionReceipts sends two execution receipts concurrently to the orchestrator. Depending on the "sameResult" parameter, receipts
 // may have the same execution result or not.
-// It then sanity checks the behavior of orchestrator regarding the total expected number of events it sends to the orchestrator network, as well as
+// It then sanity checks the behavior of orchestrator regarding the total expected number of events it sends to the attacker network, as well as
 // the execution receipts it passes through.
 func testConcurrentExecutionReceipts(t *testing.T,
 	count int,
@@ -157,12 +157,12 @@ func testConcurrentExecutionReceipts(t *testing.T,
 
 	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptIds, allIds)
 
-	// keeps list of output events sent by orchestrator to the orchestrator network.
+	// keeps list of output events sent by orchestrator to the attacker network.
 	orchestratorOutputEvents := make([]*insecure.EgressEvent, 0)
 	orchestratorSentAllEventsWg := &sync.WaitGroup{}
 	orchestratorSentAllEventsWg.Add(expectedOrchestratorOutputEvents)
 
-	// mocks orchestrator network to record and keep the output events of
+	// mocks attacker network to record and keep the output events of
 	// orchestrator for further sanity check.
 	mockAttackerNetwork := &mockinsecure.AttackerNetwork{}
 	mockAttackerNetwork.
@@ -283,7 +283,7 @@ func TestRespondingWithCorruptAttestation(t *testing.T) {
 
 	corruptAttestationWG := &sync.WaitGroup{}
 	corruptAttestationWG.Add(totalChunks * len(corruptVerIds))
-	// mocks orchestrator network to record and keep the output events of orchestrator
+	// mocks attacker network to record and keep the output events of orchestrator
 	mockAttackerNetwork := &mockinsecure.AttackerNetwork{}
 	mockAttackerNetwork.On("SendEgress", mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -365,7 +365,7 @@ func TestPassingThroughChunkDataRequests(t *testing.T) {
 
 	chunkRequestPassThrough := &sync.WaitGroup{}
 	chunkRequestPassThrough.Add(totalChunks * len(corruptVerIds))
-	// mocks orchestrator network to record and keep the output events of orchestrator
+	// mocks attacker network to record and keep the output events of orchestrator
 	mockAttackerNetwork := &mockinsecure.AttackerNetwork{}
 	mockAttackerNetwork.On("SendEgress", mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -454,7 +454,7 @@ func testPassingThroughChunkDataResponse(t *testing.T, state *attackState) {
 	chunkResponsePassThrough := &sync.WaitGroup{}
 	chunkResponsePassThrough.Add(totalChunks * len(verIds))
 
-	// mocks orchestrator network to record and keep the output events of orchestrator
+	// mocks attacker network to record and keep the output events of orchestrator
 	mockAttackerNetwork := &mockinsecure.AttackerNetwork{}
 	mockAttackerNetwork.On("SendEgress", mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -568,7 +568,7 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 	eventPassThrough := &sync.WaitGroup{}
 	eventPassThrough.Add(1)
 
-	// mocks orchestrator network to record and keep the output events of orchestrator
+	// mocks attacker network to record and keep the output events of orchestrator
 	mockAttackerNetwork := &mockinsecure.AttackerNetwork{}
 	mockAttackerNetwork.On("SendEgress", mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -642,7 +642,7 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 	approvalPassThrough := &sync.WaitGroup{}
 	approvalPassThrough.Add(1)
 
-	// mocks orchestrator network to record and keep the output events of orchestrator
+	// mocks attacker network to record and keep the output events of orchestrator
 	mockAttackerNetwork := &mockinsecure.AttackerNetwork{}
 	mockAttackerNetwork.On("SendEgress", mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -713,7 +713,7 @@ func TestWintermute_ResultApproval(t *testing.T) {
 			unittest.WithChunk(0)),
 	}
 
-	// mocks orchestrator network
+	// mocks attacker network
 	mockAttackerNetwork := &mockinsecure.AttackerNetwork{}
 	// SendEgress() method should never be called, don't set method mock
 	wintermuteOrchestrator.Register(mockAttackerNetwork)

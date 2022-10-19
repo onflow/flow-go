@@ -1145,7 +1145,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 	if nodeConf.Corrupt {
 		// corrupt nodes are running with a corrupt network (cn), hence need to bind their
-		// CN port to local host, so they can be accessible by the orchestrator network.
+		// CN port to local host, so they can be accessible by the attacker network.
 		hostPort := testingdock.RandomPort(t)
 		nodeContainer.bindPort(hostPort, strconv.Itoa(cmd.CorruptNetworkPort))
 		net.CorruptPortMapping[nodeConf.NodeID] = hostPort

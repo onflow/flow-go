@@ -24,7 +24,7 @@ func TestHandleIncomingEvent_AttackerRegistered(t *testing.T) {
 			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
-			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
+			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that attacker network uses to send messages to this corrupt network.
 		) {
 			codec := unittest.NetworkCodec()
 			attacker := newMockAttacker()
@@ -75,7 +75,7 @@ func TestHandleIncomingEvent_NoAttacker(t *testing.T) {
 			corruptId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
-			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
+			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that attacker network uses to send messages to this corrupt network.
 		) {
 			originId := unittest.IdentifierFixture()
 			msg := &message.TestMessage{Text: "this is a test msg"}

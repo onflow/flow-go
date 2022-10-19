@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// testOrchestratorNetworkObserve evaluates that upon receiving concurrent messages from corrupt network, the orchestrator network
+// testOrchestratorNetworkObserve evaluates that upon receiving concurrent messages from corrupt network, the attacker network
 // decodes the messages into events and relays them to its registered orchestrator.
 func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
@@ -31,8 +31,8 @@ func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
 			// mocks orchestrator to receive each event exactly once.
 			orchestratorWG := mockOrchestratorHandlingEgressEvent(t, orchestrator, egressEvents)
 
-			// sends all messages concurrently to the orchestrator network (imitating corrupt networks sending
-			// messages concurrently to orchestrator network).
+			// sends all messages concurrently to the attacker network (imitating corrupt networks sending
+			// messages concurrently to attacker network).
 			orchestratorNetworkSendWG := sync.WaitGroup{}
 			orchestratorNetworkSendWG.Add(concurrencyDegree)
 
@@ -47,9 +47,9 @@ func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
 				}()
 			}
 
-			// all messages should be sent to orchestrator network in a timely fashion.
+			// all messages should be sent to attacker network in a timely fashion.
 			unittest.RequireReturnsBefore(t, orchestratorNetworkSendWG.Wait, 1*time.Second, "could not send all messages to attack orchestratorNetwork on time")
-			// all events should be relayed to the orchestrator by the orchestrator network in a timely fashion.
+			// all events should be relayed to the orchestrator by the attacker network in a timely fashion.
 			unittest.RequireReturnsBefore(t, orchestratorWG.Wait, 1*time.Second, "orchestrator could not receive messages on time")
 		})
 }
@@ -70,7 +70,7 @@ func testOrchestratorNetwork(t *testing.T, protocol insecure.Protocol, concurren
 				corruptId := corruptId
 				corruptNetwork := corruptNetworks[i]
 
-				// testing message delivery from orchestrator network to corruptNetworks
+				// testing message delivery from attacker network to corruptNetworks
 				go func() {
 					msg := <-corruptNetwork.attackerMsg
 					matchEventForMessage(t, egressEvents, msg, corruptId.NodeID)
@@ -125,9 +125,9 @@ func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, me
 }
 
 // withMockOrchestrator creates a corrupt network for each given corrupt identity.
-// It then creates an orchestrator network, establishes a connection to each corrupt network, and then registers a mock orchestrator
-// on top of the orchestrator network.
-// Once the orchestrator network, corrupt networks, and mock orchestrator are all ready, it executes the injected "run" function.
+// It then creates an attacker network, establishes a connection to each corrupt network, and then registers a mock orchestrator
+// on top of the attacker network.
+// Once the attacker network, corrupt networks, and mock orchestrator are all ready, it executes the injected "run" function.
 func withMockOrchestrator(t *testing.T,
 	corruptIds flow.IdentityList,
 	run func(*Network, *mockinsecure.AttackerOrchestrator, []*mockCorruptNetwork)) {
@@ -147,7 +147,7 @@ func withMockOrchestrator(t *testing.T,
 				corruptIds)
 			require.NoError(t, err)
 
-			// mocks registering attackerNetwork as the orchestrator network functionality for orchestrator.
+			// mocks registering attackerNetwork as the attacker network functionality for orchestrator.
 			orchestrator.On("Register", attackerNetwork).Return().Once()
 
 			// life-cycle management of attackerNetwork.

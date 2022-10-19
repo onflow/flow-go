@@ -13,7 +13,7 @@ import (
 type mockAttacker struct {
 	grpc.ClientStream
 
-	// incomingBuffer imitates the gRPC buffer of the orchestrator network,
+	// incomingBuffer imitates the gRPC buffer of the attacker network,
 	// i.e., when a corrupt network is relaying an ingress/egress message to an attacker for observation,
 	// the message goes to the gRPC buffer (i.e., incomingBuffer).
 	incomingBuffer chan *insecure.Message
