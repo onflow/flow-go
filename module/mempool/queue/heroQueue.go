@@ -12,6 +12,7 @@ import (
 )
 
 // HeroQueue implements a HeroCache-based in-memory queue.
+// HeroCache is a key-value cache with zero heap allocation and optimized Garbage Collection.
 type HeroQueue struct {
 	mu        sync.RWMutex
 	cache     *herocache.Cache
