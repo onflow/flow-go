@@ -29,7 +29,7 @@ func (c *HeroStore) Put(message *engine.Message) bool {
 }
 
 // Get pops the queue, i.e., it returns the head of queue, and updates the head to the next element.
-// Boolean return value determines whether pop is successful, i.e., poping an empty queue returns false.
+// Boolean return value determines whether pop is successful, i.e., popping an empty queue returns false.
 func (c *HeroStore) Get() (*engine.Message, bool) {
 	head, ok := c.q.Pop()
 	if !ok {
