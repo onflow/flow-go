@@ -343,6 +343,11 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	e.detachedGoroutinesWg.Add(1)
 	go func() {
 		defer e.detachedGoroutinesWg.Done()
+		select {
+		case <-e.cm.ShutdownSignal():
+			return
+		default:
+		}
 		// send the vote the desired recipient
 		err := e.con.Unicast(vote, recipientID)
 		if err != nil {
@@ -378,6 +383,11 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 	e.detachedGoroutinesWg.Add(1)
 	go func() {
 		defer e.detachedGoroutinesWg.Done()
+		select {
+		case <-e.cm.ShutdownSignal():
+			return
+		default:
+		}
 		// Retrieve all consensus nodes (excluding myself).
 		// CAUTION: We must include also nodes with weight zero, because otherwise
 		//          TCs might not be constructed at epoch switchover.

@@ -175,10 +175,6 @@ func (va *VoteAggregator) processQueuedMessages(ctx context.Context) error {
 // concurrent goroutines.
 func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 	collector, created, err := va.collectors.GetOrCreateCollector(vote.View)
-	if created {
-		va.log.Info().Uint64("view", vote.View).Msg("vote collector is created by processing vote")
-	}
-
 	if err != nil {
 		// ignore if our routine is outdated and some other one has pruned collectors
 		if mempool.IsBelowPrunedThresholdError(err) {
@@ -187,14 +183,12 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 		return fmt.Errorf("could not get collector for view %d: %w",
 			vote.View, err)
 	}
+	if created {
+		va.log.Info().Uint64("view", vote.View).Msg("vote collector is created by processing vote")
+	}
+
 	err = collector.AddVote(vote)
 	if err != nil {
-		if model.IsDoubleVoteError(err) {
-			doubleVoteErr := err.(model.DoubleVoteError)
-			va.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
-			return nil
-		}
-
 		return fmt.Errorf("could not process vote for view %d, blockID %v: %w",
 			vote.View, vote.BlockID, err)
 	}
@@ -210,6 +204,9 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 
 // processQueuedBlock performs actual processing of queued block proposals, this method is called from multiple
 // concurrent goroutines.
+// CAUTION: we expect that the input block's validity has been confirmed prior to calling AddBlock,
+// including the proposer's signature. Otherwise, VoteAggregator might crash or exhibit undefined
+// behaviour.
 // No errors are expected during normal operation.
 func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
 	// check if the block is for a view that has already been pruned (and is thus stale)
@@ -273,9 +270,12 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) {
 	}
 }
 
-// AddBlock notifies the VoteAggregator about a known block so that it can start processing
-// pending votes whose block was unknown.
-// It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
+// AddBlock notifies the VoteAggregator that it should start processing votes for the given block.
+// The input block is queued internally within the `VoteAggregator` and processed _asynchronously_
+// by the VoteAggregator's internal worker routines.
+// CAUTION: we expect that the input block's validity has been confirmed prior to calling AddBlock,
+// including the proposer's signature. Otherwise, VoteAggregator might crash or exhibit undefined
+// behaviour.
 func (va *VoteAggregator) AddBlock(block *model.Proposal) {
 	// It's ok to silently drop blocks in case our processing pipeline is full.
 	// It means that we are probably catching up.
@@ -287,9 +287,8 @@ func (va *VoteAggregator) AddBlock(block *model.Proposal) {
 }
 
 // InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it
-// can process votes for the invalid block and slash the voters. Expected error
-// returns during normal operations:
-// * mempool.BelowPrunedThresholdError if proposal's view has already been pruned
+// can process votes for the invalid block and slash the voters.
+// No errors are expected during normal operations
 func (va *VoteAggregator) InvalidBlock(proposal *model.Proposal) error {
 	slashingVoteConsumer := func(vote *model.Vote) {
 		if proposal.Block.BlockID == vote.BlockID {

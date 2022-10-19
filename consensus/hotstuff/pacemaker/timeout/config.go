@@ -82,8 +82,8 @@ func NewConfig(
 	blockRateDelay time.Duration,
 	maxRebroadcastInterval time.Duration,
 ) (Config, error) {
-	if minReplicaTimeout < 0 {
-		return Config{}, model.NewConfigurationErrorf("minReplicaTimeout must non-negative")
+	if minReplicaTimeout <= 0 {
+		return Config{}, model.NewConfigurationErrorf("minReplicaTimeout must be a positive number[milliseconds]")
 	}
 	if maxReplicaTimeout < minReplicaTimeout {
 		return Config{}, model.NewConfigurationErrorf("maxReplicaTimeout cannot be smaller than minReplicaTimeout")
