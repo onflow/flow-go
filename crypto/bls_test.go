@@ -125,7 +125,7 @@ func TestBLSEncodeDecode(t *testing.T) {
 	//  zero private key
 	skBytes := make([]byte, PrKeyLenBLSBLS12381)
 	sk, err := DecodePrivateKey(BLSBLS12381, skBytes)
-	require.Error(t, err, "the key decoding should fail - key value is zero")
+	require.Error(t, err, "decoding identity private key should fail")
 	assert.True(t, IsInvalidInputsError(err))
 	assert.Nil(t, sk)
 
@@ -133,9 +133,8 @@ func TestBLSEncodeDecode(t *testing.T) {
 	pkBytes := make([]byte, PubKeyLenBLSBLS12381)
 	pkBytes[0] = 0xC0
 	pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
-	require.Error(t, err, "the key decoding should fail - key value is identity")
-	assert.True(t, IsInvalidInputsError(err))
-	assert.Nil(t, pk)
+	require.NoError(t, err, "decoding identity public key should succeed")
+	assert.True(t, pk.Equals(IdentityBLSPublicKey()))
 
 	// invalid point
 	pkBytes = make([]byte, PubKeyLenBLSBLS12381)
@@ -980,5 +979,53 @@ func BenchmarkAggregate(b *testing.B) {
 			require.NoError(b, err)
 		}
 		b.StopTimer()
+	})
+}
+
+func TestBLSIdentity(t *testing.T) {
+	var identitySig []byte
+	msg := []byte("random_message")
+	hasher := NewExpandMsgXOFKMAC128("")
+
+	t.Run("identity signature comparisons", func(t *testing.T) {
+		// identtity comparison
+		identitySig = make([]byte, signatureLengthBLSBLS12381)
+		identitySig[0] = byte(0xC0) // 0xC0 is the header of the point at infinity
+		assert.True(t, IsBLSSignatureIdentity(identitySig))
+
+		// sum up a random signature and its opposite to get identity
+		seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+		sk := randomSK(t, seed)
+		sig, err := sk.Sign(msg, hasher)
+		require.NoError(t, err)
+		oppositeSig := make([]byte, signatureLengthBLSBLS12381)
+		copy(oppositeSig, sig)
+		oppositeSig[0] ^= 0x20 // flip the last 3 bit to flip the point sign
+		aggSig, err := AggregateBLSSignatures([]Signature{sig, oppositeSig})
+		require.NoError(t, err)
+		assert.True(t, IsBLSSignatureIdentity(aggSig))
+	})
+
+	t.Run("verification with identity key", func(t *testing.T) {
+		idPk := IdentityBLSPublicKey()
+		valid, err := idPk.Verify(identitySig, msg, hasher)
+		assert.NoError(t, err)
+		assert.False(t, valid)
+
+		valid, err = VerifyBLSSignatureOneMessage([]PublicKey{idPk}, identitySig, msg, hasher)
+		assert.NoError(t, err)
+		assert.False(t, valid)
+
+		valid, err = VerifyBLSSignatureManyMessages([]PublicKey{idPk}, identitySig, [][]byte{msg}, []hash.Hasher{hasher})
+		assert.NoError(t, err)
+		assert.False(t, valid)
+
+		validSlice, err := BatchVerifyBLSSignaturesOneMessage([]PublicKey{idPk}, []Signature{identitySig}, msg, hasher)
+		assert.NoError(t, err)
+		assert.False(t, validSlice[0])
+
+		valid, err = BLSVerifyPOP(idPk, identitySig)
+		assert.NoError(t, err)
+		assert.False(t, validSlice[0])
 	})
 }

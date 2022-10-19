@@ -234,6 +234,14 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 
 const identityBLSSignatureHeader = byte(0xC0)
 
+// IsBLSSignatureIdentity checks whether the input signature is
+// the identity signature (point at infinity in G1).
+//
+// An identity signature is always an invalid signature even when
+// verified against the identity public key.
+// This identity check is useful when an aggregated signature is
+// suspected to be equal to identity, which avoids failing the aggregated
+// signature verification.
 func IsBLSSignatureIdentity(s Signature) bool {
 	if len(s) != signatureLengthBLSBLS12381 {
 		return false
