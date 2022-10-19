@@ -10,14 +10,21 @@ import (
 
 const subsystemHeroCache = "hero_cache"
 
+var _ module.HeroCacheMetrics = (*HeroCacheCollector)(nil)
+
 type HeroCacheCollector struct {
 	histogramNormalizedBucketSlotAvailable prometheus.Histogram
 
 	countKeyGetSuccess prometheus.Counter
 	countKeyGetFailure prometheus.Counter
 
-	countKeyPutSuccess prometheus.Counter
-	countKeyPutFailure prometheus.Counter
+	countKeyPutSuccess      prometheus.Counter
+	countKeyPutDrop         prometheus.Counter
+	countKeyPutDeduplicated prometheus.Counter
+	countKeyPutAttempt      prometheus.Counter
+	countKeyRemoved         prometheus.Counter
+
+	size prometheus.Gauge
 
 	countKeyEjectionDueToFullCapacity prometheus.Counter
 	countKeyEjectionDueToEmergency    prometheus.Counter
@@ -43,6 +50,14 @@ func NetworkDnsIpCacheMetricsFactory(registrar prometheus.Registerer) *HeroCache
 
 func ChunkDataPackRequestQueueMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceExecution, ResourceChunkDataPackRequests, registrar)
+}
+
+func ReceiptRequestsQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceExecution, ResourceReceipt, registrar)
+}
+
+func CollectionRequestsQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceCollection, ResourceCollection, registrar)
 }
 
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer, epoch uint64) *HeroCacheCollector {
@@ -74,6 +89,13 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 		Help:    "normalized histogram of available slots across all buckets",
 	})
 
+	size := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: nameSpace,
+		Subsystem: subsystemHeroCache,
+		Name:      cacheName + "_" + "items_total",
+		Help:      "total number of items in the cache",
+	})
+
 	countKeyGetSuccess := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
@@ -88,6 +110,20 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 		Help:      "total number of unsuccessful read queries",
 	})
 
+	countKeyPutAttempt := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: nameSpace,
+		Subsystem: subsystemHeroCache,
+		Name:      cacheName + "_" + "write_attempt_count_total",
+		Help:      "total number of put queries",
+	})
+
+	countKeyPutDrop := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: nameSpace,
+		Subsystem: subsystemHeroCache,
+		Name:      cacheName + "_" + "write_drop_count_total",
+		Help:      "total number of put queries dropped due to full capacity",
+	})
+
 	countKeyPutSuccess := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
@@ -95,11 +131,18 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 		Help:      "total number successful write queries",
 	})
 
-	countKeyPutFailure := prometheus.NewCounter(prometheus.CounterOpts{
+	countKeyPutDeduplicated := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
 		Name:      cacheName + "_" + "unsuccessful_write_count_total",
 		Help:      "total number of queries writing an already existing (duplicate) entity to the cache",
+	})
+
+	countKeyRemoved := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: nameSpace,
+		Subsystem: subsystemHeroCache,
+		Name:      cacheName + "_" + "removed_count_total",
+		Help:      "total number of entities removed from the cache",
 	})
 
 	countKeyEjectionDueToFullCapacity := prometheus.NewCounter(prometheus.CounterOpts{
@@ -120,13 +163,21 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 		// available slot distribution
 		histogramNormalizedBucketSlotAvailable,
 
+		// size
+		size,
+
 		// read
 		countKeyGetSuccess,
 		countKeyGetFailure,
 
 		// write
 		countKeyPutSuccess,
-		countKeyPutFailure,
+		countKeyPutDeduplicated,
+		countKeyPutDrop,
+		countKeyPutAttempt,
+
+		// remove
+		countKeyRemoved,
 
 		// ejection
 		countKeyEjectionDueToFullCapacity,
@@ -134,12 +185,16 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 
 	return &HeroCacheCollector{
 		histogramNormalizedBucketSlotAvailable: histogramNormalizedBucketSlotAvailable,
+		size:                                   size,
+		countKeyGetSuccess:                     countKeyGetSuccess,
+		countKeyGetFailure:                     countKeyGetFailure,
 
-		countKeyGetSuccess: countKeyGetSuccess,
-		countKeyGetFailure: countKeyGetFailure,
+		countKeyPutAttempt:      countKeyPutAttempt,
+		countKeyPutSuccess:      countKeyPutSuccess,
+		countKeyPutDeduplicated: countKeyPutDeduplicated,
+		countKeyPutDrop:         countKeyPutDrop,
 
-		countKeyPutSuccess: countKeyPutSuccess,
-		countKeyPutFailure: countKeyPutFailure,
+		countKeyRemoved: countKeyRemoved,
 
 		countKeyEjectionDueToFullCapacity: countKeyEjectionDueToFullCapacity,
 		countKeyEjectionDueToEmergency:    countKeyEjectionDueToEmergency,
@@ -153,16 +208,18 @@ func (h *HeroCacheCollector) BucketAvailableSlots(availableSlots uint64, totalSl
 }
 
 // OnKeyPutSuccess is called whenever a new (key, entity) pair is successfully added to the cache.
-func (h *HeroCacheCollector) OnKeyPutSuccess() {
+// size parameter is the current size of the cache post insertion.
+func (h *HeroCacheCollector) OnKeyPutSuccess(size uint32) {
 	h.countKeyPutSuccess.Inc()
+	h.size.Set(float64(size))
 }
 
-// OnKeyPutFailure is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
+// OnKeyPutDeduplicated is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
 // A duplicate key is dropped by the cache when it is written to the cache.
 // Note: in context of HeroCache, the key corresponds to the identifier of its entity. Hence, a duplicate key corresponds to
 // a duplicate entity.
-func (h *HeroCacheCollector) OnKeyPutFailure() {
-	h.countKeyPutFailure.Inc()
+func (h *HeroCacheCollector) OnKeyPutDeduplicated() {
+	h.countKeyPutDeduplicated.Inc()
 }
 
 // OnKeyGetSuccess tracks total number of successful read queries.
@@ -177,6 +234,27 @@ func (h *HeroCacheCollector) OnKeyGetSuccess() {
 // Note: in context of HeroCache, the key corresponds to the identifier of its entity.
 func (h *HeroCacheCollector) OnKeyGetFailure() {
 	h.countKeyGetFailure.Inc()
+}
+
+// OnKeyPutAttempt is called whenever a new (key, value) pair is attempted to be put in cache.
+// It does not reflect whether the put was successful or not.
+// A (key, value) pair put attempt may fail if the cache is full, or the key already exists.
+// size parameter is the current size of the cache prior to the put attempt.
+func (h *HeroCacheCollector) OnKeyPutAttempt(size uint32) {
+	h.countKeyPutAttempt.Inc()
+	h.size.Set(float64(size))
+}
+
+// OnKeyPutDrop is called whenever a new (key, entity) pair is dropped from the cache due to full cache.
+func (h *HeroCacheCollector) OnKeyPutDrop() {
+	h.countKeyPutDrop.Inc()
+}
+
+// OnKeyRemoved is called whenever a (key, entity) pair is removed from the cache.
+// size parameter is the current size of the cache.
+func (h *HeroCacheCollector) OnKeyRemoved(size uint32) {
+	h.countKeyRemoved.Inc()
+	h.size.Set(float64(size))
 }
 
 // OnEntityEjectionDueToFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
