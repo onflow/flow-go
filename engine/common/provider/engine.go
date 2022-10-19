@@ -3,7 +3,6 @@ package provider
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 
 	"github.com/rs/zerolog"
 	"github.com/vmihailenco/msgpack"
@@ -186,13 +185,13 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 // * NetworkTransmissionError if there is a network error happens on transmitting the requested entities.
 // * InvalidInputError if the list of requested entities is invalid (empty).
 // * generic error in case of unexpected failure or implementation bug.
-func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []flow.Identifier) error {
+func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
 
-	lg := e.log.With().Str("origin_id", originID.String()).Logger()
+	lg := e.log.With().Str("origin_id", request.OriginId.String()).Logger()
 
 	lg.Debug().
-		Strs("entity_ids", flow.IdentifierList(requestedEntityIds).Strings()).
+		Strs("entity_ids", flow.IdentifierList(request.EntityIds).Strings()).
 		Msg("entity request received")
 
 	// TODO: add reputation system to punish nodes for malicious behaviour (spam / repeated requests)
@@ -201,20 +200,20 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []
 	// for the handler to make sure the requester is authorized for this resource
 	requesters, err := e.state.Final().Identities(filter.And(
 		e.selector,
-		filter.HasNodeID(originID)),
+		filter.HasNodeID(request.OriginId)),
 	)
 	if err != nil {
 		return fmt.Errorf("could not get requesters: %w", err)
 	}
 	if len(requesters) == 0 {
-		return engine.NewInvalidInputErrorf("invalid requester origin (%x)", originID)
+		return engine.NewInvalidInputErrorf("invalid requester origin (%x)", request.OriginId)
 	}
 
 	// try to retrieve each entity and skip missing ones
-	entities := make([]flow.Entity, 0, len(requestedEntityIds))
-	entityIDs := make([]flow.Identifier, 0, len(requestedEntityIds))
+	entities := make([]flow.Entity, 0, len(request.EntityIds))
+	entityIDs := make([]flow.Identifier, 0, len(request.EntityIds))
 	seen := make(map[flow.Identifier]struct{})
-	for _, entityID := range requestedEntityIds {
+	for _, entityID := range request.EntityIds {
 		// skip requesting duplicate entity IDs
 		if _, ok := seen[entityID]; ok {
 			lg.Warn().
@@ -256,11 +255,11 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, requestedEntityIds []
 
 	// send back the response
 	res := &messages.EntityResponse{
-		Nonce:     rand.Uint64(),
+		Nonce:     request.Nonce,
 		EntityIDs: entityIDs,
 		Blobs:     blobs,
 	}
-	err = e.con.Unicast(res, originID)
+	err = e.con.Unicast(res, request.OriginId)
 	if err != nil {
 		return engine.NewNetworkTransmissionErrorf("could not send entity response: %w", err)
 	}
@@ -334,7 +333,7 @@ func (e *Engine) processEntityRequestWorker(ctx irrecoverable.SignalerContext, r
 			Hex("origin_id", logging.ID(request.OriginId)).
 			Str("requested_entity_ids", fmt.Sprintf("%v", request.EntityIds)).Logger()
 		lg.Trace().Msg("worker picked up entity request for processing")
-		err := e.onEntityRequest(request.OriginId, request.EntityIds)
+		err := e.onEntityRequest(request)
 		if err != nil {
 			if engine.IsInvalidInputError(err) || engine.IsNetworkTransmissionError(err) {
 				lg.Error().Err(err).Msg("worker could not process entity request")
