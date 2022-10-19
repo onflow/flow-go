@@ -1,6 +1,7 @@
 package eventhandler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool"
 )
 
 // EventHandler is the main handler for individual events that trigger state transition.
@@ -33,6 +33,8 @@ import (
 //     as well, but only when receiving proposal for view lower than active view.
 //     To summarize, to make a valid proposal for view N we need to have a QC or TC for N-1 and know the proposal with blockID
 //     NewestQC.BlockID.
+//
+// Not concurrency safe.
 type EventHandler struct {
 	log               zerolog.Logger
 	paceMaker         hotstuff.PaceMaker
@@ -178,12 +180,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 
 	// notify vote aggregator about a new block, so that it can start verifying
 	// votes for it.
-	err = e.voteAggregator.AddBlock(proposal)
-	if err != nil {
-		if !mempool.IsBelowPrunedThresholdError(err) {
-			return fmt.Errorf("could not add block (%v) to vote aggregator: %w", block.BlockID, err)
-		}
-	}
+	e.voteAggregator.AddBlock(proposal)
 
 	// if the block is for the current view, then try voting for this block
 	err = e.processBlockForCurrentView(proposal)
@@ -255,7 +252,10 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 
 // Start starts the event handler.
 // No errors are expected during normal operation.
-func (e *EventHandler) Start() error {
+// CAUTION: EventHandler is not concurrency safe. The Start method must
+// be executed by the same goroutine that also calls the other business logic
+// methods, or concurrency safety has to be implemented externally.
+func (e *EventHandler) Start(ctx context.Context) error {
 	err := e.processPendingBlocks()
 	if err != nil {
 		return fmt.Errorf("could not process pending blocks: %w", err)
@@ -264,7 +264,7 @@ func (e *EventHandler) Start() error {
 	if err != nil {
 		return fmt.Errorf("could not start new view: %w", err)
 	}
-	e.paceMaker.Start()
+	e.paceMaker.Start(ctx)
 	return nil
 }
 

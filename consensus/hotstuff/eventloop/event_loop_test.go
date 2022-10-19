@@ -40,7 +40,7 @@ type EventLoopTestSuite struct {
 
 func (s *EventLoopTestSuite) SetupTest() {
 	s.eh = mocks.NewEventHandler(s.T())
-	s.eh.On("Start").Return(nil).Maybe()
+	s.eh.On("Start", mock.Anything).Return(nil).Maybe()
 	s.eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C).Maybe()
 	s.eh.On("OnLocalTimeout").Return(nil).Maybe()
 
@@ -192,7 +192,7 @@ func (s *EventLoopTestSuite) Test_OnPartialTcCreated() {
 func TestEventLoop_Timeout(t *testing.T) {
 	eh := &mocks.EventHandler{}
 	processed := atomic.NewBool(false)
-	eh.On("Start").Return(nil).Once()
+	eh.On("Start", mock.Anything).Return(nil).Once()
 	eh.On("TimeoutChannel").Return(time.NewTimer(100 * time.Millisecond).C)
 	eh.On("OnReceiveQc", mock.Anything).Return(nil).Maybe()
 	eh.On("OnReceiveProposal", mock.Anything).Return(nil).Maybe()
@@ -244,7 +244,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 // when startTime argument is used
 func TestReadyDoneWithStartTime(t *testing.T) {
 	eh := &mocks.EventHandler{}
-	eh.On("Start").Return(nil)
+	eh.On("Start", mock.Anything).Return(nil)
 	eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C)
 	eh.On("OnLocalTimeout").Return(nil)
 
