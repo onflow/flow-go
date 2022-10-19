@@ -300,7 +300,7 @@ func (s *TransactionState) TotalComputationLimit() uint {
 	return s.currentState().TotalComputationLimit()
 }
 
-func (s *TransactionState) TotalComputationUsed() uint {
+func (s *TransactionState) TotalComputationUsed() uint64 {
 	return s.currentState().TotalComputationUsed()
 }
 
@@ -322,10 +322,6 @@ func (s *TransactionState) MeterEmittedEvent(byteSize uint64) error {
 
 func (s *TransactionState) TotalEmittedEventBytes() uint64 {
 	return s.currentState().TotalEmittedEventBytes()
-}
-
-func (s *TransactionState) TotalEventCounter() uint32 {
-	return s.currentState().TotalEventCounter()
 }
 
 func (s *TransactionState) ViewForTestingOnly() View {

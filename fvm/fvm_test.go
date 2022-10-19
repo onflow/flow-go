@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -597,6 +598,8 @@ func TestEventLimits(t *testing.T) {
 		err := vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
+		unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
+
 		// transaction should not fail due to event size limit
 		assert.NoError(t, tx.Err)
 	})
@@ -697,15 +700,17 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
+				chain := flow.Testnet.Chain()
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
 						withdraws = append(withdraws, e)
 					}
 				}
 
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.Len(t, deposits, 2)
 				require.Len(t, withdraws, 2)
 			},
@@ -720,18 +725,21 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			},
 		},
 		{
-			name:          "Transaction fees are deducted and fe deduction is emitted",
+			name:          "Transaction fees are deducted and fee deduction is emitted",
 			fundWith:      fundingAmount,
 			tryToTransfer: transferAmount,
 			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
+				chain := flow.Testnet.Chain()
+
 				var feeDeduction flow.Event // fee deduction event
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", environment.FlowFeesAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", environment.FlowFeesAddress(chain)) {
 						feeDeduction = e
 						break
 					}
 				}
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.NotEmpty(t, feeDeduction.Payload)
 
 				payload, err := jsoncdc.Decode(nil, feeDeduction.Payload)
@@ -786,15 +794,18 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
+				chain := flow.Testnet.Chain()
+
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
 						withdraws = append(withdraws, e)
 					}
 				}
 
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 1)
 			},
@@ -810,15 +821,18 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
+				chain := flow.Testnet.Chain()
+
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
 						withdraws = append(withdraws, e)
 					}
 				}
 
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 1)
 			},
@@ -845,15 +859,18 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
+				chain := flow.Testnet.Chain()
+
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
 						withdraws = append(withdraws, e)
 					}
 				}
 
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.Len(t, deposits, 2)
 				require.Len(t, withdraws, 2)
 			},
@@ -895,15 +912,18 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
+				chain := flow.Testnet.Chain()
+
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
 						withdraws = append(withdraws, e)
 					}
 				}
 
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 1)
 			},
@@ -919,15 +939,18 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
+				chain := flow.Testnet.Chain()
+
 				for _, e := range tx.Events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
 						withdraws = append(withdraws, e)
 					}
 				}
 
+				unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 1)
 			},
@@ -950,6 +973,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			assert.NoError(t, tx.Err)
 
 			assert.Len(t, tx.Events, 10)
+			unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 
 			accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
 
@@ -1098,7 +1122,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 	for k, v := range meter.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}
-	memoryWeights[common.MemoryKindBoolValue] = 20_000_000_000
+
+	const highWeight = 20_000_000_000
+	memoryWeights[common.MemoryKindIntegerExpression] = highWeight
 
 	t.Run("normal transactions should fail with high memory weights", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
@@ -1124,7 +1150,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: AuthAccount) {
-					var a = false
+					var a = 1
                   }
                 }
 			`)).
@@ -1138,7 +1164,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view)
 			require.NoError(t, err)
-			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
+			require.Greater(t, tx.MemoryEstimate, uint64(highWeight))
 
 			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
 		},
@@ -1160,7 +1186,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: AuthAccount) {
-					var a = false
+					var a = 1
                   }
                 }
 			`)).
@@ -1174,7 +1200,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 			err = vm.Run(ctx, tx, view)
 			require.NoError(t, err)
-			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
+			require.Greater(t, tx.MemoryEstimate, uint64(highWeight))
 
 			require.NoError(t, tx.Err)
 		},
@@ -1421,6 +1447,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					assert.Equal(t, maxExecutionEffort, ev.(cadence.Event).Fields[2].ToGoValue().(uint64))
 				}
 			}
+			unittest.EnsureEventsIndexSeq(t, tx.Events, chain.ChainID())
 		},
 	))
 }
@@ -1946,6 +1973,7 @@ func TestInteractionLimit(t *testing.T) {
 			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
 				require.Len(t, tx.Events, 5)
+				unittest.EnsureEventsIndexSeq(t, tx.Events, flow.Testnet.Chain().ChainID())
 			},
 		},
 		{
@@ -1954,6 +1982,7 @@ func TestInteractionLimit(t *testing.T) {
 			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
 				require.Len(t, tx.Events, 5)
+				unittest.EnsureEventsIndexSeq(t, tx.Events, flow.Testnet.Chain().ChainID())
 			},
 		},
 		{
@@ -1962,6 +1991,7 @@ func TestInteractionLimit(t *testing.T) {
 			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.Error(t, tx.Err)
 				require.Len(t, tx.Events, 3)
+				unittest.EnsureEventsIndexSeq(t, tx.Events, flow.Testnet.Chain().ChainID())
 			},
 		},
 	}

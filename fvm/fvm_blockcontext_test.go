@@ -1769,9 +1769,21 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 				err = vm.Run(ctx, tx, view)
 				require.NoError(t, err)
-				castedErr, ok := tx.Err.(errors.InvalidProposalSeqNumberError)
+
+				require.Equal(
+					t,
+					errors.ErrCodeInvalidProposalSeqNumberError,
+					tx.Err.Code())
+
+				// The outer most coded error is a wrapper, not the actual
+				// InvalidProposalSeqNumberError itself.
+				_, ok := tx.Err.(errors.InvalidProposalSeqNumberError)
+				require.False(t, ok)
+
+				var seqNumErr errors.InvalidProposalSeqNumberError
+				ok = errors.As(tx.Err, &seqNumErr)
 				require.True(t, ok)
-				require.Equal(t, uint64(0), castedErr.CurrentSeqNumber())
+				require.Equal(t, uint64(0), seqNumErr.CurrentSeqNumber())
 			}),
 	)
 
@@ -1816,9 +1828,20 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = vm.Run(ctx, tx, view)
 				require.NoError(t, err)
 
-				castedErr, ok := tx.Err.(errors.InvalidProposalSeqNumberError)
+				require.Equal(
+					t,
+					errors.ErrCodeInvalidProposalSeqNumberError,
+					tx.Err.Code())
+
+				// The outer most coded error is a wrapper, not the actual
+				// InvalidProposalSeqNumberError itself.
+				_, ok := tx.Err.(errors.InvalidProposalSeqNumberError)
+				require.False(t, ok)
+
+				var seqNumErr errors.InvalidProposalSeqNumberError
+				ok = errors.As(tx.Err, &seqNumErr)
 				require.True(t, ok)
-				require.Equal(t, uint64(1), castedErr.CurrentSeqNumber())
+				require.Equal(t, uint64(1), seqNumErr.CurrentSeqNumber())
 			}),
 	)
 }

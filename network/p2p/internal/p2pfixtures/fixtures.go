@@ -1,6 +1,7 @@
 package p2pfixtures
 
 import (
+	"bytes"
 	"context"
 	"net"
 	"testing"
@@ -24,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
@@ -32,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/test"
@@ -108,7 +111,11 @@ func NodeFixture(
 	}
 
 	if parameters.PeerScoringEnabled {
-		builder.EnableGossipSubPeerScoring(parameters.IdProvider)
+		scoreOptionParams := make([]scoring.PeerScoreParamsOption, 0)
+		if parameters.AppSpecificScore != nil {
+			scoreOptionParams = append(scoreOptionParams, scoring.WithAppSpecificScoreFunction(parameters.AppSpecificScore))
+		}
+		builder.EnableGossipSubPeerScoring(parameters.IdProvider, scoreOptionParams...)
 	}
 
 	n, err := builder.Build()
@@ -135,6 +142,7 @@ type NodeFixtureParameters struct {
 	Logger             zerolog.Logger
 	PeerScoringEnabled bool
 	IdProvider         module.IdentityProvider
+	AppSpecificScore   func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
 }
 
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
@@ -185,6 +193,12 @@ func WithPeerFilter(filter p2p.PeerFilter) NodeFixtureParameterOption {
 func WithRole(role flow.Role) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Role = role
+	}
+}
+
+func WithAppSpecificScore(score func(peer.ID) float64) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.AppSpecificScore = score
 	}
 }
 
@@ -342,12 +356,13 @@ func PeerIdsFixture(t *testing.T, n int) []peer.ID {
 }
 
 // MustEncodeEvent encodes and returns the given event and fails the test if it faces any issue while encoding.
-func MustEncodeEvent(t *testing.T, v interface{}) []byte {
+func MustEncodeEvent(t *testing.T, v interface{}, channel channels.Channel) []byte {
 	bz, err := unittest.NetworkCodec().Encode(v)
 	require.NoError(t, err)
 
 	msg := message.Message{
-		Payload: bz,
+		ChannelID: channel.String(),
+		Payload:   bz,
 	}
 	data, err := msg.Marshal()
 	require.NoError(t, err)
@@ -394,6 +409,30 @@ func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub *pubsu
 	// on a happy path the timeout never happens, and short enough to make sure that
 	// the test doesn't take too long in case of a failure.
 	unittest.RequireCloseBefore(t, timeouted, 10*time.Second, "timeout did not happen on receiving expected pubsub message")
+}
+
+// HasSubReceivedMessage checks that the subscription have received the given message within the given timeout by the context.
+// It returns true if the subscription has received the message, false otherwise.
+func HasSubReceivedMessage(t *testing.T, ctx context.Context, expectedMessage []byte, sub *pubsub.Subscription) bool {
+	received := make(chan struct{})
+	go func() {
+		msg, err := sub.Next(ctx)
+		if err != nil {
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+			return
+		}
+		if !bytes.Equal(expectedMessage, msg.Data) {
+			return
+		}
+		close(received)
+	}()
+
+	select {
+	case <-received:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 // SubsMustNeverReceiveAnyMessage checks that all subscriptions never receive any message within the given timeout by the context.
