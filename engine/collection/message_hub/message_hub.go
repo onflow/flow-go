@@ -322,7 +322,7 @@ func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 	return nil
 }
 
-// processQueuedProposal performs actual processing of model.Proposal, as a result of successful invocation
+// processQueuedProposal performs actual processing of flow.Header, as a result of successful invocation
 // broadcasts block proposal to collection cluster.
 // No errors are expected during normal operations.
 func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
