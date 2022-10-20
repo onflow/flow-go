@@ -4,6 +4,7 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,6 +20,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 		Transaction:            tx,
 		InitialSnapshotTxIndex: txIndex,
 		TxIndex:                txIndex,
+		ComputationIntensities: make(meter.MeteredComputationIntensities),
 	}
 }
 
@@ -37,13 +39,14 @@ type TransactionProcedure struct {
 	InitialSnapshotTxIndex uint32
 	TxIndex                uint32
 
-	Logs            []string
-	Events          []flow.Event
-	ServiceEvents   []flow.Event
-	ComputationUsed uint64
-	MemoryEstimate  uint64
-	Err             errors.CodedError
-	TraceSpan       otelTrace.Span
+	Logs                   []string
+	Events                 []flow.Event
+	ServiceEvents          []flow.Event
+	ComputationUsed        uint64
+	ComputationIntensities meter.MeteredComputationIntensities
+	MemoryEstimate         uint64
+	Err                    errors.CodedError
+	TraceSpan              otelTrace.Span
 }
 
 func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
