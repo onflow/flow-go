@@ -3,12 +3,10 @@ module github.com/onflow/flow-go/insecure
 go 1.19
 
 require (
-	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11
 	github.com/golang/protobuf v1.5.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ipfs/go-datastore v0.5.1
 	github.com/libp2p/go-libp2p v0.22.0
-
 	github.com/onflow/flow-go v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/rs/zerolog v1.28.0
