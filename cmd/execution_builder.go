@@ -266,6 +266,14 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 	module.ReadyDoneAware,
 	error,
 ) {
+
+	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
+	exeNode.commits = storage.NewCommits(node.Metrics.Cache, node.DB)
+	exeNode.computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
+	exeNode.transactions = storage.NewTransactions(node.Metrics.Cache, node.DB)
+	exeNode.collections = storage.NewCollections(node.DB, exeNode.transactions)
+	exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
+
 	// Since RetryableAsyncUploaderWrapper relies on executionDataService so we should create
 	// it after execution data service is fully setup.
 	if exeNode.exeConf.enableBlockDataUpload && exeNode.exeConf.gcpBucketName != "" {
@@ -286,13 +294,6 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			logger,
 			exeNode.collector,
 		)
-
-		exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
-		exeNode.commits = storage.NewCommits(node.Metrics.Cache, node.DB)
-		exeNode.computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
-		exeNode.transactions = storage.NewTransactions(node.Metrics.Cache, node.DB)
-		exeNode.collections = storage.NewCollections(node.DB, exeNode.transactions)
-		exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
 
 		// Setting up RetryableUploader for GCP uploader
 		retryableUploader := uploader.NewBadgerRetryableUploaderWrapper(
