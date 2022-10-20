@@ -451,11 +451,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_Vote_NotNextLeader() {
 	// proposal is safe to vote
 	es.safetyRules.votable[proposal.Block.BlockID] = struct{}{}
 
-	es.notifier.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		blockID, ok := args[0].(flow.Identifier)
-		require.True(es.T(), ok)
-		require.Equal(es.T(), proposal.Block.BlockID, blockID)
-	}).Once()
+	es.notifier.On("SendVote", proposal.Block.BlockID, mock.Anything, mock.Anything, mock.Anything).Once()
 
 	// vote should be created for this proposal
 	err := es.eventhandler.OnReceiveProposal(proposal)

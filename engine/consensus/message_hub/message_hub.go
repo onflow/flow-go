@@ -333,6 +333,7 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	}
 
 	// fill in the fields that can't be populated by HotStuff
+	// TODO(active-pacemaker): will be not relevant after merging flow.Header change
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 

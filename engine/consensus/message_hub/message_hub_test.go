@@ -250,6 +250,7 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 	})
 
 	// should fail with changed (missing) parent
+	// TODO(active-pacemaker): will be not relevant after merging flow.Header change
 	s.Run("should fail with changed/missing parent", func() {
 		header := *block.Header
 		header.ParentID[0]++
@@ -269,6 +270,7 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
 		// unset chain and height to make sure they are correctly reconstructed
+		// TODO(active-pacemaker): will be not relevant after merging flow.Header change
 		headerFromHotstuff := *block.Header // copy header
 		headerFromHotstuff.ChainID = ""
 		headerFromHotstuff.Height = 0

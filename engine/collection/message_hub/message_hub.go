@@ -264,9 +264,7 @@ func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
 
-	// Retrieve all consensus nodes (excluding myself).
-	// CAUTION: We must include also nodes with weight zero, because otherwise
-	//          TCs might not be constructed at epoch switchover.
+	// Retrieve all collection nodes in our cluster (excluding myself).
 	recipients, err := h.state.Final().Identities(filter.And(
 		filter.In(h.cluster),
 		filter.Not(filter.HasNodeID(h.me.NodeID())),
@@ -340,7 +338,7 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	}
 
 	// fill in the fields that can't be populated by HotStuff
-	// TODO clean this up - currently we set these fields in builder, then lose them in HotStuff, then need to set them again here
+	// TODO(active-pacemaker): will be not relevant after merging flow.Header change
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
