@@ -96,7 +96,7 @@ func (t *TelemetryConsumer) OnEnteringView(viewNumber uint64, leader flow.Identi
 		Msg("OnEnteringView")
 }
 
-func (t *TelemetryConsumer) OnReachedTimeout(timeout model.TimerInfo) {
+func (t *TelemetryConsumer) OnReachedTimeout(info model.TimerInfo) {
 	t.pathHandler.StartNextPath(info.View)
 	t.pathHandler.NextStep().
 		Time("timeout_start_time", info.StartTime).

@@ -71,6 +71,6 @@ func (c *NoopConsumer) OnNewTcDiscovered(*flow.TimeoutCertificate) {}
 
 func (c *NoopConsumer) SendVote(flow.Identifier, uint64, []byte, flow.Identifier) {}
 
-func (c *NoopConsumer) BroadcastTimeout(*model.TimeoutObject) {}
+func (c *NoopConsumer) BroadcastTimeout(*model.TimeoutObject, uint64) {}
 
 func (c *NoopConsumer) BroadcastProposalWithDelay(*flow.Header, time.Duration) {}

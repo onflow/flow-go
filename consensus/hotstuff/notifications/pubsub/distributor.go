@@ -198,11 +198,11 @@ func (p *Distributor) SendVote(blockID flow.Identifier, view uint64, sigData []b
 	}
 }
 
-func (p *Distributor) BroadcastTimeout(timeout *model.TimeoutObject) {
+func (p *Distributor) BroadcastTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, s := range p.subscribers {
-		s.BroadcastTimeout(timeout)
+		s.BroadcastTimeout(timeout, timeoutTick)
 	}
 }
 

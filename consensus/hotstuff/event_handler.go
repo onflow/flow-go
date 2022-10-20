@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"context"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )

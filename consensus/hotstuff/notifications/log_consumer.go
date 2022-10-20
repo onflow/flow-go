@@ -115,9 +115,10 @@ func (lc *LogConsumer) OnStartingTimeout(info model.TimerInfo) {
 		Msg("timeout started")
 }
 
-func (lc *LogConsumer) OnReachedTimeout(timeout model.TimerInfo) {
+func (lc *LogConsumer) OnReachedTimeout(info model.TimerInfo) {
 	lc.log.Debug().
 		Uint64("timeout_view", info.View).
+		Uint64("tick", info.Tick).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Msg("timeout reached")
 }
@@ -225,9 +226,10 @@ func (lc *LogConsumer) SendVote(blockID flow.Identifier, view uint64, sigData []
 		Msg("vote transmission request from hotstuff")
 }
 
-func (lc *LogConsumer) BroadcastTimeout(timeout *model.TimeoutObject) {
+func (lc *LogConsumer) BroadcastTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
 	logContext := lc.log.With().
 		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
+		Uint64("timeout_tick", timeoutTick).
 		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
 		Uint64("timeout_view", timeout.View)
 

@@ -449,7 +449,7 @@ func (h *MessageHub) SendVote(blockID flow.Identifier, view uint64, sigData []by
 }
 
 // BroadcastTimeout queues timeout for subsequent sending
-func (h *MessageHub) BroadcastTimeout(timeout *model.TimeoutObject) {
+func (h *MessageHub) BroadcastTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
 	if ok := h.queuedTimeouts.Push(timeout); ok {
 		h.queuedMessagesNotifier.Notify()
 	}

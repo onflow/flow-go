@@ -93,7 +93,7 @@ func (_m *MockedCommunicatorConsumer) BroadcastProposalWithDelay(proposal *flow.
 }
 
 // BroadcastTimeout provides a mock function with given fields: timeout
-func (_m *MockedCommunicatorConsumer) BroadcastTimeout(timeout *model.TimeoutObject) {
+func (_m *MockedCommunicatorConsumer) BroadcastTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
 	_m.Called(timeout)
 }
 
@@ -543,8 +543,8 @@ func (in *Instance) Run() error {
 
 		// we handle timeouts with priority
 		select {
-		case <-in.handler.TimeoutChannel():
-			err := in.handler.OnLocalTimeout()
+		case timerInfo := <-in.handler.TimeoutChannel():
+			err := in.handler.OnLocalTimeout(timerInfo)
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
 			}
@@ -558,8 +558,8 @@ func (in *Instance) Run() error {
 
 		// otherwise, process first received event
 		select {
-		case <-in.handler.TimeoutChannel():
-			err := in.handler.OnLocalTimeout()
+		case timerInfo := <-in.handler.TimeoutChannel():
+			err := in.handler.OnLocalTimeout(timerInfo)
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
 			}

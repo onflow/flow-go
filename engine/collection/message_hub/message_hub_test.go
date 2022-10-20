@@ -346,7 +346,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
 		// submit timeout
-		s.hub.BroadcastTimeout(timeout)
+		s.hub.BroadcastTimeout(timeout, 0)
 	})
 	s.Run("proposal", func() {
 		wg.Add(1)
