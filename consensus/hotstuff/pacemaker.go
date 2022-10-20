@@ -74,7 +74,7 @@ type PaceMaker interface {
 
 	// TimeoutChannel returns the timeout channel for the CURRENTLY ACTIVE timeout.
 	// Each time the pacemaker starts a new timeout, this channel is replaced.
-	TimeoutChannel() <-chan time.Time
+	TimeoutChannel() <-chan model.TimerInfo
 
 	// Start starts the PaceMaker (i.e. the timeout for the configured starting value for view).
 	// CAUTION: EventHandler is not concurrency safe. The Start method must

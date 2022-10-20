@@ -12,6 +12,7 @@ import (
 // The end of the time period is the timeout that will trigger pacemaker's view change.
 type TimerInfo struct {
 	View      uint64
+	Tick      uint64
 	StartTime time.Time
 	Duration  time.Duration
 }

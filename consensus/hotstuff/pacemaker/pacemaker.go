@@ -118,7 +118,7 @@ func (p *ActivePaceMaker) CurView() uint64 {
 // Note the returned timeout channel returns only one timeout, which is the current
 // timeout.
 // To get the timeout for the next timeout, you need to call TimeoutChannel() again.
-func (p *ActivePaceMaker) TimeoutChannel() <-chan time.Time {
+func (p *ActivePaceMaker) TimeoutChannel() <-chan model.TimerInfo {
 	return p.timeoutControl.Channel()
 }
 

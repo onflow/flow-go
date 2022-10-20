@@ -32,8 +32,7 @@ import (
 //   - on progress: decrease number of failed rounds, this results in exponential decrease of round duration.
 type Controller struct {
 	cfg            Config
-	timerInfo      *model.TimerInfo
-	timeoutChannel chan time.Time
+	timeoutChannel chan model.TimerInfo
 	stopTicker     context.CancelFunc
 	maxExponent    float64 // max exponent for exponential function, derived from maximum round duration
 	r              uint64  // failed rounds counter, higher value results in longer round duration
@@ -43,7 +42,7 @@ type Controller struct {
 func NewController(timeoutConfig Config) *Controller {
 	// the initial value for the timeout channel is a closed channel which returns immediately
 	// this prevents indefinite blocking when no timeout has been started
-	startChannel := make(chan time.Time)
+	startChannel := make(chan model.TimerInfo)
 	close(startChannel)
 
 	// we need to calculate log_b(t_max/t_min), golang doesn't support logarithm with custom base
@@ -61,35 +60,30 @@ func NewController(timeoutConfig Config) *Controller {
 	return &tc
 }
 
-// TimerInfo returns TimerInfo for the current timer.
-// New struct is created for each call of `StartTimeout`.
-// Returns nil if no timer has been started.
-func (t *Controller) TimerInfo() *model.TimerInfo { return t.timerInfo }
-
 // Channel returns a channel that will receive the specific timeout.
 // A new channel is created on each call of `StartTimeout`.
 // Returns closed channel if no timer has been started.
-func (t *Controller) Channel() <-chan time.Time {
+func (t *Controller) Channel() <-chan model.TimerInfo {
 	return t.timeoutChannel
 }
 
 // StartTimeout starts the timeout of the specified type and returns the timer info
-func (t *Controller) StartTimeout(ctx context.Context, view uint64) *model.TimerInfo {
+func (t *Controller) StartTimeout(ctx context.Context, view uint64) model.TimerInfo {
 	t.stopTicker() // stop old timeout
 
 	// setup new timer:
 	// when round duration is small react with faster timeout rebroadcasts
 	duration := t.ReplicaTimeout()
 	tickInterval := time.Duration(math.Min(float64(duration.Milliseconds()), t.cfg.MaxTimeoutObjectRebroadcastInterval))
-	t.timerInfo = &model.TimerInfo{View: view, StartTime: time.Now().UTC(), Duration: duration}
-	t.timeoutChannel = make(chan time.Time, 1)
+	timerInfo := model.TimerInfo{View: view, StartTime: time.Now().UTC(), Duration: duration}
+	t.timeoutChannel = make(chan model.TimerInfo, 1)
 
 	// start timeout logic for (re-)broadcasting timeout objects on regular basis as long as we are in the same round.
 	var childContext context.Context
 	childContext, t.stopTicker = context.WithCancel(ctx)
-	go tickAfterTimeout(childContext, duration, tickInterval, t.timeoutChannel)
+	go tickAfterTimeout(childContext, timerInfo, tickInterval, t.timeoutChannel)
 
-	return t.timerInfo
+	return timerInfo
 }
 
 // tickAfterTimeout is a utility function which:
@@ -100,12 +94,12 @@ func (t *Controller) StartTimeout(ctx context.Context, view uint64) *model.Timer
 // we drop ticks until the receiver catches up. When cancelling `ctx`, all timing logic stops.
 // This approach allows to have a concurrent-safe implementation, where there is no unsafe state sharing between caller and
 // ticking logic.
-func tickAfterTimeout(ctx context.Context, initialTimeout time.Duration, tickInterval time.Duration, timeoutChannel chan<- time.Time) {
+func tickAfterTimeout(ctx context.Context, timerInfo model.TimerInfo, tickInterval time.Duration, timeoutChannel chan<- model.TimerInfo) {
 	// wait for initial timeout
-	timer := time.NewTimer(initialTimeout)
+	timer := time.NewTimer(timerInfo.Duration)
 	select {
-	case t := <-timer.C:
-		timeoutChannel <- t // forward initial timeout to the sink
+	case <-timer.C:
+		timeoutChannel <- timerInfo // forward initial timeout to the sink
 	case <-ctx.Done():
 		timer.Stop() // allows timer to be garbage collected (before it expires)
 		return
@@ -115,8 +109,9 @@ func tickAfterTimeout(ctx context.Context, initialTimeout time.Duration, tickInt
 	ticker := time.NewTicker(tickInterval)
 	for {
 		select {
-		case t := <-ticker.C:
-			timeoutChannel <- t // forward ticks to the sink
+		case <-ticker.C:
+			timerInfo.Tick++
+			timeoutChannel <- timerInfo // forward ticks to the sink
 		case <-ctx.Done():
 			ticker.Stop() // critical for ticker to be garbage collected
 			return

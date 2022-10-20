@@ -44,9 +44,9 @@ func (c *NoopConsumer) OnVoting(*model.Vote) {}
 
 func (c *NoopConsumer) OnQcConstructedFromVotes(uint64, *flow.QuorumCertificate) {}
 
-func (*NoopConsumer) OnStartingTimeout(*model.TimerInfo) {}
+func (*NoopConsumer) OnStartingTimeout(model.TimerInfo) {}
 
-func (*NoopConsumer) OnReachedTimeout(*model.TimerInfo) {}
+func (*NoopConsumer) OnReachedTimeout(model.TimerInfo) {}
 
 func (*NoopConsumer) OnQcIncorporated(*flow.QuorumCertificate) {}
 

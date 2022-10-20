@@ -108,14 +108,14 @@ func (lc *LogConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumC
 		Msg("QC constructed from votes")
 }
 
-func (lc *LogConsumer) OnStartingTimeout(info *model.TimerInfo) {
+func (lc *LogConsumer) OnStartingTimeout(info model.TimerInfo) {
 	lc.log.Debug().
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Msg("timeout started")
 }
 
-func (lc *LogConsumer) OnReachedTimeout(info *model.TimerInfo) {
+func (lc *LogConsumer) OnReachedTimeout(timeout model.TimerInfo) {
 	lc.log.Debug().
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).

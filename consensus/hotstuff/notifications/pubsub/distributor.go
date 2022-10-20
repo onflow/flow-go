@@ -102,7 +102,7 @@ func (p *Distributor) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCe
 	}
 }
 
-func (p *Distributor) OnStartingTimeout(timerInfo *model.TimerInfo) {
+func (p *Distributor) OnStartingTimeout(timerInfo model.TimerInfo) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
@@ -110,7 +110,7 @@ func (p *Distributor) OnStartingTimeout(timerInfo *model.TimerInfo) {
 	}
 }
 
-func (p *Distributor) OnReachedTimeout(timeout *model.TimerInfo) {
+func (p *Distributor) OnReachedTimeout(timeout model.TimerInfo) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
