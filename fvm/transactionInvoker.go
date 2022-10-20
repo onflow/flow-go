@@ -314,7 +314,7 @@ func (i TransactionInvoker) commit(
 	// transaction without any deployed contracts
 	programs.AddInvalidator(modifiedSets)
 
-	commitErr := txnState.Commit(nestedTxnId)
+	_, commitErr := txnState.Commit(nestedTxnId)
 	if commitErr != nil {
 		return fmt.Errorf(
 			"transaction invocation failed when merging state: %w "+
