@@ -194,12 +194,6 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("could not process queued block %v: %w", block.ID(), err)
 			}
-
-			//h.log.Info().
-			//	Uint64("view", block.Block.View).
-			//	Hex("block_id", block.Block.BlockID[:]).
-			//	Msg("block has been processed successfully")
-
 			continue
 		}
 
@@ -210,12 +204,6 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("could not process queued vote: %w", err)
 			}
-
-			h.log.Info().
-				Uint64("view", packed.vote.View).
-				Hex("block_id", packed.vote.BlockID[:]).
-				Msg("packed has been processed successfully")
-
 			continue
 		}
 
@@ -316,7 +304,7 @@ func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 // processQueuedBlock performs actual processing of model.Proposal, as a result of successful invocation
 // broadcasts block proposal to collection cluster.
 // No errors are expected during normal operations.
-func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
+func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	// first, check that we are the proposer of the block
 	if header.ProposerID != h.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
