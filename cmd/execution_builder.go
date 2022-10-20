@@ -107,44 +107,40 @@ type ExecutionNode struct {
 	builder *FlowNodeBuilder // This is needed for accessing the ShutdownFunc
 	exeConf *ExecutionConfig
 
-	collector                     module.ExecutionMetrics
-	executionState                state.ExecutionState
-	followerState                 protocol.MutableState
-	committee                     hotstuff.Committee
-	ledgerStorage                 *ledger.Ledger
-	events                        *storage.Events
-	serviceEvents                 *storage.ServiceEvents
-	txResults                     *storage.TransactionResults
-	results                       *storage.ExecutionResults
-	myReceipts                    *storage.MyExecutionReceipts
-	computationResultUploadStatus *storage.ComputationResultUploadStatus
-	commits                       *storage.Commits
-	collections                   *storage.Collections
-	transactions                  *storage.Transactions
-	providerEngine                *exeprovider.Engine
-	checkerEng                    *checker.Engine
-	syncCore                      *chainsync.Core
-	pendingBlocks                 *buffer.PendingBlocks // used in follower engine
-	deltas                        *ingestion.Deltas
-	syncEngine                    *synchronization.Engine
-	followerEng                   *followereng.Engine // to sync blocks from consensus nodes
-	computationManager            *computation.Manager
-	collectionRequester           *requester.Engine
-	ingestionEng                  *ingestion.Engine
-	finalizationDistributor       *pubsub.FinalizationDistributor
-	finalizedHeader               *synchronization.FinalizedHeaderCache
-	checkAuthorizedAtBlock        func(blockID flow.Identifier) (bool, error)
-	diskWAL                       *wal.DiskWAL
-	blockDataUploaders            []uploader.Uploader
-	executionDataStore            execution_data.ExecutionDataStore
-	toTriggerCheckpoint           *atomic.Bool           // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
-	stopControl                   *ingestion.StopControl // stop the node at given block height
-	executionDataDatastore        *badger.Datastore
-	executionDataPruner           *pruner.Pruner
-	executionDataBlobstore        blobs.Blobstore
-	executionDataTracker          tracker.Storage
-	blobService                   network.BlobService
-	blobserviceDependable         *module.ProxiedReadyDoneAware
+	collector               module.ExecutionMetrics
+	executionState          state.ExecutionState
+	followerState           protocol.MutableState
+	committee               hotstuff.Committee
+	ledgerStorage           *ledger.Ledger
+	events                  *storage.Events
+	serviceEvents           *storage.ServiceEvents
+	txResults               *storage.TransactionResults
+	results                 *storage.ExecutionResults
+	myReceipts              *storage.MyExecutionReceipts
+	providerEngine          *exeprovider.Engine
+	checkerEng              *checker.Engine
+	syncCore                *chainsync.Core
+	pendingBlocks           *buffer.PendingBlocks // used in follower engine
+	deltas                  *ingestion.Deltas
+	syncEngine              *synchronization.Engine
+	followerEng             *followereng.Engine // to sync blocks from consensus nodes
+	computationManager      *computation.Manager
+	collectionRequester     *requester.Engine
+	ingestionEng            *ingestion.Engine
+	finalizationDistributor *pubsub.FinalizationDistributor
+	finalizedHeader         *synchronization.FinalizedHeaderCache
+	checkAuthorizedAtBlock  func(blockID flow.Identifier) (bool, error)
+	diskWAL                 *wal.DiskWAL
+	blockDataUploaders      []uploader.Uploader
+	executionDataStore      execution_data.ExecutionDataStore
+	toTriggerCheckpoint     *atomic.Bool           // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	stopControl             *ingestion.StopControl // stop the node at given block height
+	executionDataDatastore  *badger.Datastore
+	executionDataPruner     *pruner.Pruner
+	executionDataBlobstore  blobs.Blobstore
+	executionDataTracker    tracker.Storage
+	blobService             network.BlobService
+	blobserviceDependable   *module.ProxiedReadyDoneAware
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -287,23 +283,18 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			exeNode.collector,
 		)
 
-		exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
-		exeNode.commits = storage.NewCommits(node.Metrics.Cache, node.DB)
-		exeNode.computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
-		exeNode.transactions = storage.NewTransactions(node.Metrics.Cache, node.DB)
-		exeNode.collections = storage.NewCollections(node.DB, exeNode.transactions)
-		exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
+		computationResultUploadStatus := storage.NewComputationResultUploadStatus(node.DB)
 
 		// Setting up RetryableUploader for GCP uploader
 		retryableUploader := uploader.NewBadgerRetryableUploaderWrapper(
 			asyncUploader,
 			node.Storage.Blocks,
-			exeNode.commits,
-			exeNode.collections,
+			node.Storage.Commits,
+			node.Storage.Collections,
 			exeNode.events,
 			exeNode.results,
 			exeNode.txResults,
-			exeNode.computationResultUploadStatus,
+			computationResultUploadStatus,
 			execution_data.NewDownloader(exeNode.blobService),
 			exeNode.collector)
 		if retryableUploader == nil {
@@ -580,7 +571,6 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 ) {
 
 	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
-	stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
@@ -589,7 +579,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 
 	exeNode.executionState = state.NewExecutionState(
 		exeNode.ledgerStorage,
-		stateCommitments,
+		node.Storage.Commits,
 		node.Storage.Blocks,
 		node.Storage.Headers,
 		node.Storage.Collections,
@@ -950,7 +940,7 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		exeNode.events,
 		exeNode.results,
 		exeNode.txResults,
-		exeNode.commits,
+		node.Storage.Commits,
 		node.RootChainID,
 		signature.NewBlockSignerDecoder(exeNode.committee),
 		exeNode.exeConf.apiRatelimits,
