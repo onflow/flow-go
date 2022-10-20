@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
@@ -20,12 +19,14 @@ const (
 type EventEmitterParams struct {
 	ServiceEventCollectionEnabled bool
 	EventCollectionByteSizeLimit  uint64
+	EventEncoder                  EventEncoder
 }
 
 func DefaultEventEmitterParams() EventEmitterParams {
 	return EventEmitterParams{
 		ServiceEventCollectionEnabled: false,
 		EventCollectionByteSizeLimit:  DefaultEventCollectionByteSizeLimit,
+		EventEncoder:                  NewCadenceEventEncoder(),
 	}
 }
 
@@ -155,11 +156,9 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 		return fmt.Errorf("emit event failed: %w", err)
 	}
 
-	payload, err := jsoncdc.Encode(event)
+	payload, err := emitter.EventEncoder.Encode(event)
 	if err != nil {
-		return errors.NewEncodingFailuref(
-			err,
-			"failed to json encode a cadence event")
+		return errors.NewEventEncodingError(err)
 	}
 
 	payloadSize := uint64(len(payload))
