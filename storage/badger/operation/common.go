@@ -173,6 +173,9 @@ func remove(key []byte) func(*badger.Txn) error {
 	}
 }
 
+// batchRemove removes entry under a given key in a write-batch.
+// if key doesn't exist, does nothing.
+// No errors are expected during normal operation.
 func batchRemove(key []byte) func(writeBatch *badger.WriteBatch) error {
 	return func(writeBatch *badger.WriteBatch) error {
 		err := writeBatch.Delete(key)

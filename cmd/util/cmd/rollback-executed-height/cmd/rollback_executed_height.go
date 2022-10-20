@@ -187,6 +187,7 @@ func removeExecutionResultsFromHeight(
 }
 
 // removeForBlockID remove block execution related data for a given block.
+// All data to be removed will be removed in a batch write.
 func removeForBlockID(
 	writeBatch *badger.Batch,
 	headers *badger.Headers,
@@ -224,10 +225,6 @@ func removeForBlockID(
 
 		// remove chunkID-blockID index
 		err = headers.BatchRemoveChunkBlockIndexByChunkID(chunkID, writeBatch)
-		if errors.Is(err, storage.ErrNotFound) {
-			log.Warn().Msgf("chunk %v - block %v index not found", chunkID, blockID)
-			continue
-		}
 
 		if err != nil {
 			return fmt.Errorf("could not remove chunk block index for chunk %v block id %v: %w", chunkID, blockID, err)
