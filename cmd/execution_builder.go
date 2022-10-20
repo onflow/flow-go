@@ -283,8 +283,6 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			exeNode.collector,
 		)
 
-		computationResultUploadStatus := storage.NewComputationResultUploadStatus(node.DB)
-
 		// Setting up RetryableUploader for GCP uploader
 		retryableUploader := uploader.NewBadgerRetryableUploaderWrapper(
 			asyncUploader,
@@ -294,7 +292,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			exeNode.events,
 			exeNode.results,
 			exeNode.txResults,
-			computationResultUploadStatus,
+			storage.NewComputationResultUploadStatus(node.DB),
 			execution_data.NewDownloader(exeNode.blobService),
 			exeNode.collector)
 		if retryableUploader == nil {
