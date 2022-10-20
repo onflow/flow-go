@@ -3,6 +3,7 @@ package compliance
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -63,6 +64,7 @@ type Engine struct {
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
 	con                        network.Conduit
+	detachedGoroutinesWg       sync.WaitGroup
 
 	cm *component.ComponentManager
 	component.Component
@@ -195,6 +197,13 @@ func NewEngine(
 	eng.cm = component.NewComponentManagerBuilder().
 		AddWorker(eng.processMessagesLoop).
 		AddWorker(eng.finalizationProcessingLoop).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+
+			<-ctx.Done()
+
+			eng.detachedGoroutinesWg.Wait()
+		}).
 		Build()
 	eng.Component = eng.cm
 
@@ -332,7 +341,14 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 
 	// spawn a goroutine to asynchronously send the vote
 	// we do this so that network operations do not block the HotStuff EventLoop
+	e.detachedGoroutinesWg.Add(1)
 	go func() {
+		defer e.detachedGoroutinesWg.Done()
+		select {
+		case <-e.cm.ShutdownSignal():
+			return
+		default:
+		}
 		// send the vote the desired recipient
 		err := e.con.Unicast(vote, recipientID)
 		if err != nil {
@@ -365,7 +381,14 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 
 	// spawn a goroutine to asynchronously broadcast the timeout object
 	// we do this so that network operations do not block the HotStuff EventLoop
+	e.detachedGoroutinesWg.Add(1)
 	go func() {
+		defer e.detachedGoroutinesWg.Done()
+		select {
+		case <-e.cm.ShutdownSignal():
+			return
+		default:
+		}
 		// Retrieve all consensus nodes (excluding myself).
 		// CAUTION: We must include also nodes with weight zero, because otherwise
 		//          TCs might not be constructed at epoch switchover.
@@ -451,7 +474,9 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 	// spawn a goroutine to asynchronously broadcast the proposal - we do this
 	// to introduce a pre-proposal delay without blocking the Hotstuff EventLoop thread
+	e.detachedGoroutinesWg.Add(1)
 	go func() {
+		defer e.detachedGoroutinesWg.Done()
 		select {
 		case <-time.After(delay):
 		case <-e.cm.ShutdownSignal():
