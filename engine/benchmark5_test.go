@@ -80,3 +80,15 @@ func BenchmarkWaitingQueueEngine(b *testing.B) {
 		waitingQueueEngine()
 	}
 }
+
+//b1 - 1000      - 4     - 198239 ns/op
+//b2 - 1000      - 4     - 205373 ns/op
+//b3 - 1000      - 4     - 240547 ns/op
+//b4 - 1000      - 4     - 924907 ns/op
+//b5 - 1000      - 4     - 137634 ns/op
+//
+//b1 - 1000x2  - 4     - 470330 ns/op
+//b2 - 1000x2  - 4     - 580251 ns/op
+//b3 - 1000x2  - 4     - 580995 ns/op
+//b4 - 1000x2  - 4     - 2336128 ns/op
+//b5 - 1000x2  - 4x2   - 332127 ns/op
