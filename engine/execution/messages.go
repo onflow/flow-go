@@ -2,6 +2,7 @@ package execution
 
 import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
@@ -26,6 +27,7 @@ type ComputationResult struct {
 	ServiceEvents          flow.EventsList
 	TransactionResults     []flow.TransactionResult
 	TransactionResultIndex []int
+	ComputationIntensities meter.MeteredComputationIntensities
 	TrieUpdates            []*ledger.TrieUpdate
 	ExecutionDataID        flow.Identifier
 }
@@ -42,6 +44,7 @@ func NewEmptyComputationResult(block *entity.ExecutableBlock) *ComputationResult
 		Proofs:                 make([][]byte, 0, numberOfChunks),
 		TrieUpdates:            make([]*ledger.TrieUpdate, 0, numberOfChunks),
 		EventsHashes:           make([]flow.Identifier, 0, numberOfChunks),
+		ComputationIntensities: make(meter.MeteredComputationIntensities),
 	}
 }
 
@@ -64,6 +67,13 @@ func (cr *ComputationResult) UpdateTransactionResultIndex(txCounts int) {
 		lastIndex = cr.TransactionResultIndex[len(cr.TransactionResultIndex)-1]
 	}
 	cr.TransactionResultIndex = append(cr.TransactionResultIndex, lastIndex+txCounts)
+}
+
+func (cr *ComputationResult) MergeComputationEffortVector(
+	computationIntensities meter.MeteredComputationIntensities) {
+	for computationKind, intensity := range computationIntensities {
+		cr.ComputationIntensities[computationKind] += intensity
+	}
 }
 
 func (cr *ComputationResult) AddStateSnapshot(inp *delta.SpockSnapshot) {

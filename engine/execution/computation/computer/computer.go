@@ -466,6 +466,9 @@ func (e *blockComputer) executeTransaction(
 	res.AddEvents(collectionIndex, tx.Events)
 	res.AddServiceEvents(tx.ServiceEvents)
 	res.AddTransactionResult(&txResult)
+	if tx.IsSampled() {
+		res.MergeComputationEffortVector(tx.ComputationIntensities)
+	}
 
 	memAllocAfter := debug.GetHeapAllocsBytes()
 

@@ -11,6 +11,8 @@ import (
 
 type NoopCollector struct{}
 
+var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
+
 func NewNoopCollector() *NoopCollector {
 	nc := &NoopCollector{}
 	return nc
@@ -134,6 +136,7 @@ func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)        
 func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _, _ uint64, _, _, _, _ int)  {}
 func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _, _ uint64, _, _, _, _, _ int) {
 }
+func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
 func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _, _ int, _ bool) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                         {}
@@ -188,12 +191,15 @@ func (nc *NoopCollector) ResponseDropped()                                      
 func (nc *NoopCollector) Pruned(height uint64, duration time.Duration)                          {}
 func (nc *NoopCollector) UpdateCollectionMaxHeight(height uint64)                               {}
 func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                                   {}
-func (nc *NoopCollector) OnKeyPutSuccess()                                                      {}
+func (nc *NoopCollector) OnKeyPutSuccess(uint32)                                                {}
 func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity()                                    {}
 func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                                       {}
-func (nc *NoopCollector) OnKeyPutFailure()                                                      {}
 func (nc *NoopCollector) OnKeyGetSuccess()                                                      {}
 func (nc *NoopCollector) OnKeyGetFailure()                                                      {}
+func (nc *NoopCollector) OnKeyPutAttempt(uint32)                                                {}
+func (nc *NoopCollector) OnKeyPutDrop()                                                         {}
+func (nc *NoopCollector) OnKeyPutDeduplicated()                                                 {}
+func (nc *NoopCollector) OnKeyRemoved(uint32)                                                   {}
 func (nc *NoopCollector) ExecutionDataFetchStarted()                                            {}
 func (nc *NoopCollector) ExecutionDataFetchFinished(_ time.Duration, _ bool, _ uint64)          {}
 func (nc *NoopCollector) NotificationSent(height uint64)                                        {}

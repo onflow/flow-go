@@ -61,7 +61,6 @@ type TestBenchBlockExecutor interface {
 	ExecuteCollections(tb testing.TB, collections [][]*flow.TransactionBody) *execution.ComputationResult
 	Chain(tb testing.TB) flow.Chain
 	ServiceAccount(tb testing.TB) *TestBenchAccount
-	ResetProgramCache(tb testing.TB)
 }
 
 type TestBenchAccount struct {
@@ -136,7 +135,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 // BasicBlockExecutor executes blocks in sequence and applies all changes (not fork aware)
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
-	programCache          *programs.BlockPrograms
+	programsCache         *programs.ChainPrograms
 	activeView            state.View
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
@@ -217,9 +216,12 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 
 	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))
 
+	programsCache, err := programs.NewChainPrograms(programs.DefaultProgramsCacheSize)
+	require.NoError(tb, err)
+
 	return &BasicBlockExecutor{
 		blockComputer:         blockComputer,
-		programCache:          programs.NewEmptyBlockPrograms(),
+		programsCache:         programsCache,
 		activeStateCommitment: initialCommit,
 		activeView:            view,
 		chain:                 chain,
@@ -232,10 +234,6 @@ func (b *BasicBlockExecutor) Chain(_ testing.TB) flow.Chain {
 	return b.chain
 }
 
-func (b *BasicBlockExecutor) ResetProgramCache(tb testing.TB) {
-	b.programCache = programs.NewEmptyBlockPrograms()
-}
-
 func (b *BasicBlockExecutor) ServiceAccount(_ testing.TB) *TestBenchAccount {
 	return b.serviceAccount
 }
@@ -244,7 +242,11 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 	executableBlock := unittest.ExecutableBlockFromTransactions(b.chain.ChainID(), collections)
 	executableBlock.StartState = &b.activeStateCommitment
 
-	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, b.programCache)
+	blockPrograms := b.programsCache.GetOrCreateBlockPrograms(
+		executableBlock.ID(),
+		executableBlock.ParentID())
+
+	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, blockPrograms)
 	require.NoError(tb, err)
 
 	endState, _, _, err := execution.GenerateExecutionResultAndChunkDataPacks(metrics.NewNoopCollector(), unittest.IdentifierFixture(), b.activeStateCommitment, computationResult)
@@ -385,7 +387,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			addrs = append(addrs, account.Address)
 		}
 		// fund all accounts so not to run into storage problems
-		fundAccounts(b, blockExecutor, cadence.UFix64(10_0000_0000), addrs...)
+		fundAccounts(b, blockExecutor, cadence.UFix64(10_000_000_000), addrs...)
 
 		accounts[0].DeployContract(b, blockExecutor, "TestContract", `
 			access(all) contract TestContract {

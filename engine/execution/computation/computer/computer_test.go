@@ -460,6 +460,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
 		require.NoError(t, err)
 
+		// make sure event index sequence are valid
+		for _, eventsList := range result.Events {
+			unittest.EnsureEventsIndexSeq(t, eventsList, execCtx.Chain.ChainID())
+		}
+
 		// all events should have been collected
 		require.Len(t, result.ServiceEvents, 2)
 

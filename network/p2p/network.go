@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -337,13 +338,10 @@ func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message, decodedM
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message, decodedMsgPayload interface{}) error {
 	// checks the cache for deduplication and adds the message if not already present
 	if !n.receiveCache.Add(message.EventID) {
-		log := n.logger.With().
+		// drops duplicate message
+		n.logger.Debug().
 			Hex("sender_id", senderID[:]).
 			Hex("event_id", message.EventID).
-			Logger()
-
-		// drops duplicate message
-		log.Debug().
 			Str("channel", message.ChannelID).
 			Msg("dropping message due to duplication")
 
@@ -396,16 +394,18 @@ func (n *Network) genNetworkMessage(channel channels.Channel, event interface{},
 	originID := selfID[:]
 
 	// get message type from event type and remove the asterisk prefix if present
-	msgType := strings.TrimLeft(fmt.Sprintf("%T", event), "*")
+	msgType := MessageType(event)
 
 	// cast event to a libp2p.Message
 	msg := &message.Message{
 		ChannelID: channel.String(),
-		EventID:   eventId,
-		OriginID:  originID,
 		TargetIDs: emTargets,
 		Payload:   payload,
-		Type:      msgType,
+
+		// TODO: these fields should be derived by the receiver and removed from the message
+		EventID:  eventId,
+		OriginID: originID,
+		Type:     msgType,
 	}
 
 	return msg, nil
@@ -516,7 +516,10 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 
 	eng, err := n.subscriptionManager.GetEngine(qm.Target)
 	if err != nil {
-		logger.Err(err).Msg("failed to submit message")
+		// This means the message was received on a channel that the node has not registered an engine for
+		logger.Err(err).
+			Bool(logging.KeySuspicious, true).
+			Msg("failed to submit message")
 		return
 	}
 
@@ -554,4 +557,8 @@ func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
 	}
 
 	return h.SumHash(), nil
+}
+
+func MessageType(decodedPayload interface{}) string {
+	return strings.TrimLeft(fmt.Sprintf("%T", decodedPayload), "*")
 }

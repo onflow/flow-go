@@ -38,6 +38,7 @@ type ExecutionCollector struct {
 	readDuration                           prometheus.Histogram
 	readDurationPerValue                   prometheus.Histogram
 	blockComputationUsed                   prometheus.Histogram
+	blockComputationVector                 *prometheus.GaugeVec
 	blockMemoryUsed                        prometheus.Histogram
 	blockEventCounts                       prometheus.Histogram
 	blockEventSize                         prometheus.Histogram
@@ -245,6 +246,13 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Help:      "the total number of bytes used by events emitted during a block execution",
 		Buckets:   []float64{1_000, 10_000, 100_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000},
 	})
+
+	blockComputationVector := promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_execution_effort_vector",
+		Help:      "execution effort vector of the last executed block by computation kind",
+	}, []string{LabelComputationKind})
 
 	blockTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
@@ -534,6 +542,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		readDurationPerValue:                   readDurationPerValue,
 		blockExecutionTime:                     blockExecutionTime,
 		blockComputationUsed:                   blockComputationUsed,
+		blockComputationVector:                 blockComputationVector,
 		blockMemoryUsed:                        blockMemoryUsed,
 		blockEventCounts:                       blockEventCounts,
 		blockEventSize:                         blockEventSize,
@@ -696,6 +705,10 @@ func (ec *ExecutionCollector) ExecutionCollectionExecuted(
 	ec.collectionNumberOfRegistersTouched.Observe(float64(numberOfRegistersTouched))
 	ec.collectionTotalBytesWrittenToRegisters.Observe(float64(totalBytesWrittenToRegisters))
 	ec.collectionTransactionCounts.Observe(float64(txCounts))
+}
+
+func (ec *ExecutionCollector) ExecutionBlockExecutionEffortVectorComponent(compKind string, value uint) {
+	ec.blockComputationVector.With(prometheus.Labels{LabelComputationKind: compKind}).Set(float64(value))
 }
 
 // TransactionExecuted reports stats for executing a transaction

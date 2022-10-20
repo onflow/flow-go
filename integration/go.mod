@@ -132,7 +132,6 @@ require (
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
-	github.com/ipfs/go-bitswap v0.9.0 // indirect
 	github.com/ipfs/go-block-format v0.0.3 // indirect
 	github.com/ipfs/go-cidutil v0.1.0 // indirect
 	github.com/ipfs/go-fetcher v1.5.0 // indirect
@@ -168,7 +167,6 @@ require (
 	github.com/libp2p/go-libp2p-core v0.20.1 // indirect
 	github.com/libp2p/go-libp2p-kad-dht v0.18.0 // indirect
 	github.com/libp2p/go-libp2p-kbucket v0.4.7 // indirect
-	github.com/libp2p/go-libp2p-loggables v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-pubsub v0.8.1-0.20220908052023-8866ca88a105 // indirect
 	github.com/libp2p/go-libp2p-record v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-tls v0.4.1 // indirect
@@ -214,6 +212,7 @@ require (
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/onflow/atree v0.4.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
+	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8 // indirect
 	github.com/onflow/sdks v0.4.4 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
