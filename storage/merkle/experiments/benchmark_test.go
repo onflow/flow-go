@@ -59,7 +59,7 @@ func benchmarkBroccoli(numOfBlocks, numberOfCollections, numOfTxsPerCollection i
 	b.ReportMetric(float64(tree.MaxDepthTouched()), "max_depth")
 	b.ReportMetric(float64(memAllocAfter)-float64(memAllocBefore), "memory_usage_of_trie_without_cached_hashes_in_bytes")
 
-	tree.SetHashValueCachingEnabled(true)
+	tree.MakeItReadOnly()
 	start := time.Now()
 	_ = tree.Hash()
 	b.ReportMetric(float64(time.Since(start).Milliseconds()), "root_hash_generation_time_without_cached_hash_values_in_ms")
@@ -83,7 +83,7 @@ func benchmarkBroccoli(numOfBlocks, numberOfCollections, numOfTxsPerCollection i
 
 	// rest the tree
 	tree, err = merkle.NewTree(pathLen)
-	tree.SetHashValueCachingEnabled(true)
+	tree.MakeItReadOnly()
 	require.NoError(b, err)
 
 	pathsForProof := make([][]byte, 0, numOfTxsPerCollection)
