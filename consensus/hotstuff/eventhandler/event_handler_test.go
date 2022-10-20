@@ -712,7 +712,7 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 
 	es.timeoutAggregator.On("AddTimeout", mock.Anything).Return().Once()
 
-	es.notifier.On("BroadcastTimeout", mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("BroadcastTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		timeoutObject, ok := args[0].(*model.TimeoutObject)
 		require.True(es.T(), ok)
 		// it should broadcast a TO with same view as endView
@@ -753,7 +753,7 @@ func (es *EventHandlerSuite) TestOnTimeout_SanityChecks() {
 	require.Equal(es.T(), tc, es.paceMaker.LastViewTC(), "invalid last view TC")
 	require.Equal(es.T(), qc, es.paceMaker.NewestQC(), "invalid newest QC")
 
-	es.notifier.On("BroadcastTimeout", mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("BroadcastTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		timeoutObject, ok := args[0].(*model.TimeoutObject)
 		require.True(es.T(), ok)
 		require.Equal(es.T(), es.endView, timeoutObject.View)
@@ -1000,7 +1000,7 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_ProducedTimeout() {
 		LastViewTC: nil,
 	}
 
-	es.notifier.On("BroadcastTimeout", mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("BroadcastTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		timeoutObject, ok := args[0].(*model.TimeoutObject)
 		require.True(es.T(), ok)
 		// it should broadcast a TO with same view as partialTc.View
@@ -1045,7 +1045,7 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_QcAndTcProcessing() {
 
 		es.endView++
 
-		es.notifier.On("BroadcastTimeout", mock.Anything).Run(func(args mock.Arguments) {
+		es.notifier.On("BroadcastTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 			timeoutObject, ok := args[0].(*model.TimeoutObject)
 			require.True(es.T(), ok)
 			// it should broadcast a TO with same view as partialTc.View
