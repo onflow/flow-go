@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -29,7 +30,10 @@ import (
 
 const checkpointFilenamePrefix = "checkpoint."
 
-const MagicBytes uint16 = 0x2137
+const MagicBytesCheckpointHeader uint16 = 0x2137
+const MagicBytesCheckpointSubtrie uint16 = 0x2136
+const MagicBytesCheckpointToptrie uint16 = 0x2135
+
 const VersionV1 uint16 = 0x01
 
 // Versions was reset while changing trie format, so now bump it to 3 to avoid conflicts
@@ -47,17 +51,23 @@ const VersionV4 uint16 = 0x04
 // See EncodeNode() and EncodeTrie() for more details.
 const VersionV5 uint16 = 0x05
 
+// Version 6 includes these changes:
+//   - trie nodes are stored in additional 17 checkpoint files, with .0, .1, .2, ... .16 as
+//     file name extension
+const VersionV6 uint16 = 0x06
+
 // MaxVersion is the latest checkpoint version we support.
 // Need to update MaxVersion when creating a newer version.
-const MaxVersion = VersionV5
+const MaxVersion = VersionV6
 
 const (
-	encMagicSize     = 2
-	encVersionSize   = 2
-	headerSize       = encMagicSize + encVersionSize
-	encNodeCountSize = 8
-	encTrieCountSize = 2
-	crc32SumSize     = 4
+	encMagicSize        = 2
+	encVersionSize      = 2
+	headerSize          = encMagicSize + encVersionSize
+	encSubtrieCountSize = 2
+	encNodeCountSize    = 8
+	encTrieCountSize    = 2
+	crc32SumSize        = 4
 )
 
 // defaultBufioReadSize replaces the default bufio buffer size of 4096 bytes.
@@ -67,7 +77,7 @@ const defaultBufioReadSize = 1024 * 32
 
 // defaultBufioWriteSize replaces the default bufio buffer size of 4096 bytes.
 // defaultBufioWriteSize can be increased to 8KiB, 16KiB, 32KiB, etc. if it
-//  improves performance on typical EN hardware.
+// improves performance on typical EN hardware.
 const defaultBufioWriteSize = 1024 * 32
 
 type Checkpointer struct {
@@ -75,25 +85,32 @@ type Checkpointer struct {
 	wal            *DiskWAL
 	keyByteSize    int
 	forestCapacity int
+	outputVersion  uint16 // the output checkpoint version, only support VersionV5 or VersionV6
 }
 
-func NewCheckpointer(wal *DiskWAL, keyByteSize int, forestCapacity int) *Checkpointer {
+func NewCheckpointer(wal *DiskWAL, keyByteSize int, forestCapacity int, outputVersion uint16) *Checkpointer {
 	return &Checkpointer{
 		dir:            wal.wal.Dir(),
 		wal:            wal,
 		keyByteSize:    keyByteSize,
 		forestCapacity: forestCapacity,
+		outputVersion:  outputVersion,
 	}
 }
 
 // listCheckpoints returns all the numbers (unsorted) of the checkpoint files, and the number of the last checkpoint.
 func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
+	return ListCheckpoints(c.dir)
+}
 
+// ListCheckpoints returns all the numbers of the checkpoint files, and the number of the last checkpoint.
+// note, it doesn't include the root checkpoint file
+func ListCheckpoints(dir string) ([]int, int, error) {
 	list := make([]int, 0)
 
-	files, err := os.ReadDir(c.dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, -1, fmt.Errorf("cannot list directory [%s] content: %w", c.dir, err)
+		return nil, -1, fmt.Errorf("cannot list directory [%s] content: %w", dir, err)
 	}
 	last := -1
 	for _, fn := range files {
@@ -118,9 +135,15 @@ func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
 	return list, last, nil
 }
 
-// Checkpoints returns all the checkpoint numbers in asc order
+// Checkpoints returns all the numbers of the checkpoint files in asc order.
+// note, it doesn't include the root checkpoint file
 func (c *Checkpointer) Checkpoints() ([]int, error) {
-	list, _, err := c.listCheckpoints()
+	return Checkpoints(c.dir)
+}
+
+// Checkpoints returns all the checkpoint numbers in asc order
+func Checkpoints(dir string) ([]int, error) {
+	list, _, err := ListCheckpoints(dir)
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch all checkpoints: %w", err)
 	}
@@ -174,7 +197,7 @@ func (c *Checkpointer) NotCheckpointedSegments() (from, to int, err error) {
 }
 
 // Checkpoint creates new checkpoint stopping at given segment
-func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, error)) (err error) {
+func (c *Checkpointer) Checkpoint(to int) (err error) {
 
 	_, notCheckpointedTo, err := c.NotCheckpointedSegments()
 	if err != nil {
@@ -223,23 +246,16 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 
 	c.wal.log.Info().Msgf("serializing checkpoint %d", to)
 
-	writer, err := targetWriter()
-	if err != nil {
-		return fmt.Errorf("cannot generate writer: %w", err)
-	}
-	defer func() {
-		closeErr := writer.Close()
-		// Return close error if there isn't any prior error to return.
-		if err == nil {
-			err = closeErr
-		}
-	}()
+	fileName := NumberToFilename(to)
+	err = StoreCheckpointByVersion(c.outputVersion, tries, c.wal.dir, fileName, &c.wal.log)
 
-	err = StoreCheckpoint(writer, tries...)
+	if err != nil {
+		return fmt.Errorf("could not create checkpoint for %v: %w", to, err)
+	}
 
 	c.wal.log.Info().Msgf("created checkpoint %d with %d tries", to, len(tries))
 
-	return err
+	return nil
 }
 
 func NumberToFilenamePart(n int) string {
@@ -253,6 +269,14 @@ func NumberToFilename(n int) string {
 
 func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 	return CreateCheckpointWriterForFile(c.dir, NumberToFilename(to), &c.wal.log)
+}
+
+func (c *Checkpointer) Dir() string {
+	return c.dir
+}
+
+func (c *Checkpointer) OutputVersion() uint16 {
+	return c.outputVersion
 }
 
 // CreateCheckpointWriterForFile returns a file writer that will write to a temporary file and then move it to the checkpoint folder by renaming it.
@@ -278,11 +302,24 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 	}, nil
 }
 
-// StoreCheckpoint writes the given tries to checkpoint file, and also appends
+func StoreCheckpointByVersion(outputVersion uint16, tries []*trie.MTrie, dir string, fileName string, logger *zerolog.Logger) error {
+	switch outputVersion {
+	case VersionV5:
+		return StoreCheckpointV5(dir, fileName, logger, tries...)
+	case VersionV6:
+		// during normal operation,  single thread is used in order to minimize the memory footprint,
+		return StoreCheckpointV6SingleThread(tries, dir, fileName, logger)
+	default:
+		return fmt.Errorf("only support output checkpoint version VersionV5 and VersionV6, but got :%v", outputVersion)
+	}
+}
+
+// StoreCheckpointV5 writes the given tries to checkpoint file, and also appends
 // a CRC32 file checksum for integrity check.
 // Checkpoint file consists of a flattened forest. Specifically, it consists of:
-//   * a list of encoded nodes, where references to other nodes are by list index.
-//   * a list of encoded tries, each referencing their respective root node by index.
+//   - a list of encoded nodes, where references to other nodes are by list index.
+//   - a list of encoded tries, each referencing their respective root node by index.
+//
 // Referencing to other nodes by index 0 is a special case, meaning nil.
 //
 // As an important property, the nodes are listed in an order which satisfies
@@ -292,7 +329,19 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 // as for each node, the children have been previously encountered.
 // TODO: evaluate alternatives to CRC32 since checkpoint file is many GB in size.
 // TODO: add concurrency if the performance gains are enough to offset complexity.
-func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
+func StoreCheckpointV5(dir string, fileName string, logger *zerolog.Logger, tries ...*trie.MTrie) (
+	// error
+	// Note, the above code, which didn't define the name "err" for the returned error, would be wrong,
+	// beause err needs to be defined in order to be updated by the defer function
+	errToReturn error,
+) {
+	writer, err := CreateCheckpointWriterForFile(dir, fileName, logger)
+	if err != nil {
+		return fmt.Errorf("could not create writer: %w", err)
+	}
+	defer func() {
+		errToReturn = closeAndMergeError(writer, errToReturn)
+	}()
 
 	crc32Writer := NewCRC32Writer(writer)
 
@@ -305,64 +354,150 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 
 	// Write header: magic (2 bytes) + version (2 bytes)
 	header := scratch[:headerSize]
-	binary.BigEndian.PutUint16(header, MagicBytes)
+	binary.BigEndian.PutUint16(header, MagicBytesCheckpointHeader)
 	binary.BigEndian.PutUint16(header[encMagicSize:], VersionV5)
 
-	_, err := crc32Writer.Write(header)
+	_, err = crc32Writer.Write(header)
 	if err != nil {
 		return fmt.Errorf("cannot write checkpoint header: %w", err)
 	}
 
-	// allNodes contains all unique nodes of given tries and their index
-	// (ordered by node traversal sequence).
-	// Index 0 is a special case with nil node.
-	allNodes := make(map[*node.Node]uint64)
-	allNodes[nil] = 0
+	// Multiple tries might have shared nodes at higher level, However, we don't want to
+	// seralize duplicated nodes in the checkpoint file. In order to deduplicate, we build
+	// a map from unique nodes while iterating and seralizing the nodes to the checkpoint file.
+	//
+	// The map for deduplication contains all the trie nodes, which uses a lot of memory.
+	// In fact, we don't have to build a map for all nodes, since there are nodes which
+	// are never shared.  Nodes can only be shared if and only if they are
+	// on the same path. In other words, nodes on different path won't be shared.
+	// If we group trie nodes by path, then we have more smaller groups of trie nodes from the same path,
+	// which might have duplication. And then for each group, we could build a smaller map for deduplication.
+	// Processing each group sequentially would allow us reduce operational memory.
+	//
+	// With this idea in mind, the seralization can be done in two steps:
+	// 1. serialize nodes in subtries (tries with root at subtrieLevel).
+	// 2. serialize remaining nodes (from trie root to subtrie root).
+	// For instance, if there are 3 top tries, and subtrieLevel is 4, then there will be
+	// 	(2 ^ 4) * 3 = 48 subtrie root nodes at level 4.
+	// Then step 1 will seralize the 48 subtrie root nodes into the checkpoint file, and
+	// then step 2 will seralize the 3 root nodes (level 0) and the interim nodes from level 1 to 3 into
+	//
+	// Step 1:
+	// 1. Find all the subtrie root nodes at subtrieLevel (level 4)
+	// 2. Group the subtrie by path. Since subtries in different group have different path, they won't have
+	//		child nodes shared. Subtries in the same group might have duplication, we will build a map to deduplicate.
+	//
+	// subtrieLevel is number of edges from trie root to subtrie root.
+	// Trie root is at level 0.
+	const subtrieLevel = 4
 
-	// Serialize all unique nodes
-	nodeCounter := uint64(1) // start from 1, as 0 marks nil node
-	for _, t := range tries {
+	// subtrieCount is number of subtries at subtrieLevel.
+	const subtrieCount = 1 << subtrieLevel
 
-		// Traverse all unique nodes for trie t.
-		for itr := flattener.NewUniqueNodeIterator(t, allNodes); itr.Next(); {
-			n := itr.Value()
+	// since each trie has `subtrieCount` number of subtries at subtrieLevel,
+	// we create `subtrieCount` number of groups, each group contains all the subtrie root nodes
 
-			allNodes[n] = nodeCounter
-			nodeCounter++
+	// subtrieRoots is an array of groups.
+	// Each group contains the subtrie roots of the same path at subtrieLevel for different tries.
+	// For example, if subtrieLevel is 4, then
+	// - subtrieRoots[0] is a list of all subtrie roots at path [0,0,0,0]
+	// - subtrieRoots[1] is a list of all subtrie roots at path [0,0,0,1]
+	// - subtrieRoots[subtrieCount-1] is a list of all subtrie roots at path [1,1,1,1]
+	// subtrie roots in subtrieRoots[0] have the same path, therefore might have shared child nodes.
+	var subtrieRoots [subtrieCount][]*node.Node
+	for i := 0; i < len(subtrieRoots); i++ {
+		subtrieRoots[i] = make([]*node.Node, len(tries))
+	}
 
-			var lchildIndex, rchildIndex uint64
-
-			if lchild := n.LeftChild(); lchild != nil {
-				var found bool
-				lchildIndex, found = allNodes[lchild]
-				if !found {
-					hash := lchild.Hash()
-					return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
-				}
-			}
-			if rchild := n.RightChild(); rchild != nil {
-				var found bool
-				rchildIndex, found = allNodes[rchild]
-				if !found {
-					hash := rchild.Hash()
-					return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
-				}
-			}
-
-			encNode := flattener.EncodeNode(n, lchildIndex, rchildIndex, scratch)
-			_, err = crc32Writer.Write(encNode)
-			if err != nil {
-				return fmt.Errorf("cannot serialize node: %w", err)
-			}
+	for trieIndex, t := range tries {
+		// subtries is an array with subtrieCount trie nodes
+		// in breadth-first order at subtrieLevel of the trie `t`
+		subtries := getNodesAtLevel(t.RootNode(), subtrieLevel)
+		for subtrieIndex, subtrieRoot := range subtries {
+			subtrieRoots[subtrieIndex][trieIndex] = subtrieRoot
 		}
 	}
 
-	// Serialize trie root nodes
+	// topLevelNodes contains all unique nodes of given tries
+	// from root to subtrie root and their index
+	// (ordered by node traversal sequence).
+	// Index 0 is a special case with nil node.
+	topLevelNodes := make(map[*node.Node]uint64, 1<<(subtrieLevel+1))
+	topLevelNodes[nil] = 0
+
+	// nodeCounter is counter for all unique nodes.
+	// It starts from 1, as 0 marks nil node.
+	nodeCounter := uint64(1)
+
+	// estimatedSubtrieNodeCount is rough estimate of number of nodes in subtrie,
+	// assuming trie is a full binary tree.  estimatedSubtrieNodeCount is used
+	// to preallocate traversedSubtrieNodes for memory efficiency.
+	estimatedSubtrieNodeCount := 0
+	if len(tries) > 0 {
+		estimatedTrieNodeCount := 2*int(tries[0].AllocatedRegCount()) - 1
+		estimatedSubtrieNodeCount = estimatedTrieNodeCount / subtrieCount
+	}
+
+	// Serialize subtrie nodes
+	for i, subTrieRoot := range subtrieRoots {
+		// traversedSubtrieNodes contains all unique nodes of subtries of the same path and their index.
+		traversedSubtrieNodes := make(map[*node.Node]uint64, estimatedSubtrieNodeCount)
+		// Index 0 is a special case with nil node.
+		traversedSubtrieNodes[nil] = 0
+
+		logging := logProgress(fmt.Sprintf("storing %v-th sub trie roots", i), estimatedSubtrieNodeCount, &log.Logger)
+		for _, root := range subTrieRoot {
+			// Empty trie is always added to forest as starting point and
+			// empty trie's root is nil. It remains in the forest until evicted
+			// by trie queue exceeding capacity.
+			if root == nil {
+				continue
+			}
+			// Note: nodeCounter is to assign an global index to each node in the order of it being seralized
+			// into the checkpoint file. Therefore, it has to be reused when iterating each subtrie.
+			// storeUniqueNodes will add the unique visited node into traversedSubtrieNodes with key as the node
+			// itself, and value as n-th node being seralized in the checkpoint file.
+			nodeCounter, err = storeUniqueNodes(root, traversedSubtrieNodes, nodeCounter, scratch, crc32Writer, logging)
+			if err != nil {
+				return fmt.Errorf("fail to store nodes in step 1 for subtrie root %v: %w", root.Hash(), err)
+			}
+			// Save subtrie root node index in topLevelNodes,
+			// so when traversing top level tries
+			// (from level 0 to subtrieLevel) using topLevelNodes,
+			// node iterator skips subtrie as visited nodes.
+			topLevelNodes[root] = traversedSubtrieNodes[root]
+		}
+	}
+
+	// Step 2:
+	// Now all nodes above and include the subtrieLevel have been seralized. We now
+	// serialize remaining nodes of each trie from root node (level 0) to (subtrieLevel - 1).
+	for _, t := range tries {
+		root := t.RootNode()
+		if root == nil {
+			continue
+		}
+		// if we iterate through the root trie with an empty visited nodes map, then it will iterate through
+		// all nodes at all levels. In order to skip the nodes above subtrieLevel, since they have been seralized in step 1,
+		// we will need to pass in a visited nodes map that contains all the subtrie root nodes, which is the topLevelNodes.
+		// The topLevelNodes was built in step 1, when seralizing each subtrie root nodes.
+		nodeCounter, err = storeUniqueNodes(root, topLevelNodes, nodeCounter, scratch, crc32Writer, func(uint64) {})
+		if err != nil {
+			return fmt.Errorf("fail to store nodes in step 2 for root trie %v: %w", root.Hash(), err)
+		}
+	}
+
+	// The root tries are seralized at the end of the checkpoint file, so that it's easy to find what tries are
+	// included.
 	for _, t := range tries {
 		rootNode := t.RootNode()
+		if !t.IsEmpty() && rootNode.Height() != ledger.NodeMaxHeight {
+			return fmt.Errorf("height of root node must be %d, but is %d",
+				ledger.NodeMaxHeight, rootNode.Height())
+		}
 
 		// Get root node index
-		rootIndex, found := allNodes[rootNode]
+		rootIndex, found := topLevelNodes[rootNode]
 		if !found {
 			rootHash := t.RootHash()
 			return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(rootHash[:]))
@@ -375,9 +510,10 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 		}
 	}
 
-	// Write footer with nodes count and tries count
+	// all trie nodes have been seralized into the checkpoint file, now
+	// write footer with nodes count and tries count.
 	footer := scratch[:encNodeCountSize+encTrieCountSize]
-	binary.BigEndian.PutUint64(footer, uint64(len(allNodes)-1)) // -1 to account for 0 node meaning nil
+	binary.BigEndian.PutUint64(footer, nodeCounter-1) // -1 to account for 0 node meaning nil
 	binary.BigEndian.PutUint16(footer[encNodeCountSize:], uint16(len(tries)))
 
 	_, err = crc32Writer.Write(footer)
@@ -385,7 +521,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 		return fmt.Errorf("cannot write checkpoint footer: %w", err)
 	}
 
-	// Write CRC32 sum
+	// Write CRC32 sum of the footer for validation
 	crc32buf := scratch[:crc32SumSize]
 	binary.BigEndian.PutUint32(crc32buf, crc32Writer.Crc32())
 
@@ -395,6 +531,95 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	}
 
 	return nil
+}
+
+func logProgress(msg string, estimatedSubtrieNodeCount int, logger *zerolog.Logger) func(nodeCounter uint64) {
+	lookup := make(map[int]int)
+	for i := 1; i < 10; i++ { // [1...9]
+		lookup[estimatedSubtrieNodeCount/10*i] = i * 10
+	}
+	return func(nodeCounter uint64) {
+		percentage, ok := lookup[int(nodeCounter)]
+		if ok {
+			logger.Info().Msgf("%s completion percentage: %v percent", msg, percentage)
+		}
+	}
+}
+
+// storeUniqueNodes iterates and serializes unique nodes for trie with given root node.
+// It also saves unique nodes and node counter in visitedNodes map.
+// It returns nodeCounter and error (if any).
+func storeUniqueNodes(
+	root *node.Node,
+	visitedNodes map[*node.Node]uint64,
+	nodeCounter uint64,
+	scratch []byte,
+	writer io.Writer,
+	nodeCounterUpdated func(nodeCounter uint64), // for logging estimated progress
+) (uint64, error) {
+
+	for itr := flattener.NewUniqueNodeIterator(root, visitedNodes); itr.Next(); {
+		n := itr.Value()
+
+		visitedNodes[n] = nodeCounter
+		nodeCounter++
+		nodeCounterUpdated(nodeCounter)
+
+		var lchildIndex, rchildIndex uint64
+
+		if lchild := n.LeftChild(); lchild != nil {
+			var found bool
+			lchildIndex, found = visitedNodes[lchild]
+			if !found {
+				hash := lchild.Hash()
+				return 0, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
+			}
+		}
+		if rchild := n.RightChild(); rchild != nil {
+			var found bool
+			rchildIndex, found = visitedNodes[rchild]
+			if !found {
+				hash := rchild.Hash()
+				return 0, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
+			}
+		}
+
+		encNode := flattener.EncodeNode(n, lchildIndex, rchildIndex, scratch)
+		_, err := writer.Write(encNode)
+		if err != nil {
+			return 0, fmt.Errorf("cannot serialize node: %w", err)
+		}
+	}
+
+	return nodeCounter, nil
+}
+
+// getNodesAtLevel returns 2^level nodes at given level in breadth-first order.
+// It guarantees size and order of returned nodes (nil element if no node at the position).
+// For example, given nil root and level 3, getNodesAtLevel returns a slice
+// of 2^3 nil elements.
+func getNodesAtLevel(root *node.Node, level uint) []*node.Node {
+	nodes := []*node.Node{root}
+	nodesLevel := uint(0)
+
+	// Use breadth first traversal to get all nodes at given level.
+	// If a node isn't found, a nil node is used in its place.
+	for nodesLevel < level {
+		nextLevel := nodesLevel + 1
+		nodesAtNextLevel := make([]*node.Node, 1<<nextLevel)
+
+		for i, n := range nodes {
+			if n != nil {
+				nodesAtNextLevel[i*2] = n.LeftChild()
+				nodesAtNextLevel[i*2+1] = n.RightChild()
+			}
+		}
+
+		nodes = nodesAtNextLevel
+		nodesLevel = nextLevel
+	}
+
+	return nodes
 }
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
@@ -408,7 +633,11 @@ func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
-	if _, err := os.Stat(path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)); err == nil {
+	return HasRootCheckpoint(c.dir)
+}
+
+func HasRootCheckpoint(dir string) (bool, error) {
+	if _, err := os.Stat(path.Join(dir, bootstrap.FilenameWALRootCheckpoint)); err == nil {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil
@@ -418,10 +647,13 @@ func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
 }
 
 func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
-	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
+	name := NumberToFilename(checkpoint)
+	return deleteCheckpointFiles(c.dir, name)
 }
 
-func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func LoadCheckpoint(filepath string, logger *zerolog.Logger) (
+	tries []*trie.MTrie,
+	errToReturn error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
@@ -433,13 +665,13 @@ func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, err
 			// No need to return this error because it's possible to continue normal operations.
 		}
 
-		_ = file.Close()
+		errToReturn = closeAndMergeError(file, errToReturn)
 	}()
 
-	return readCheckpoint(file)
+	return readCheckpoint(file, logger)
 }
 
-func readCheckpoint(f *os.File) ([]*trie.MTrie, error) {
+func readCheckpoint(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 
 	// Read header: magic (2 bytes) + version (2 bytes)
 	header := make([]byte, headerSize)
@@ -458,8 +690,8 @@ func readCheckpoint(f *os.File) ([]*trie.MTrie, error) {
 		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
 	}
 
-	if magicBytes != MagicBytes {
-		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytes)
+	if magicBytes != MagicBytesCheckpointHeader {
+		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytesCheckpointHeader)
 	}
 
 	switch version {
@@ -468,7 +700,9 @@ func readCheckpoint(f *os.File) ([]*trie.MTrie, error) {
 	case VersionV4:
 		return readCheckpointV4(f)
 	case VersionV5:
-		return readCheckpointV5(f)
+		return readCheckpointV5(f, logger)
+	case VersionV6:
+		return readCheckpointV6(f, logger)
 	default:
 		return nil, fmt.Errorf("unsupported file version %x", version)
 	}
@@ -677,7 +911,8 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 
 // readCheckpointV5 decodes checkpoint file (version 5) and returns a list of tries.
 // Checkpoint file header (magic and version) are verified by the caller.
-func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
+func readCheckpointV5(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+	logger.Info().Msgf("reading v5 checkpoint file")
 
 	// Scratch buffer is used as temporary buffer that reader can read into.
 	// Raw data in scratch buffer should be copied or converted into desired
@@ -731,6 +966,8 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	tries := make([]*trie.MTrie, triesCount)
 
+	logging := logProgress("reading trie nodes", int(nodesCount), logger)
+
 	for i := uint64(1); i <= nodesCount; i++ {
 		n, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= uint64(i) {
@@ -742,7 +979,10 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 			return nil, fmt.Errorf("cannot read node %d: %w", i, err)
 		}
 		nodes[i] = n
+		logging(i)
 	}
+
+	logger.Info().Msgf("finished loading %v trie nodes, start loading %v tries", nodesCount, triesCount)
 
 	for i := uint16(0); i < triesCount; i++ {
 		trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
@@ -797,7 +1037,7 @@ func ReadLastTrieRootHashFromCheckpoint(f *os.File) (hash.Hash, error) {
 	magic := binary.BigEndian.Uint16(header)
 	version := binary.BigEndian.Uint16(header[encMagicSize:])
 
-	if magic != MagicBytes {
+	if magic != MagicBytesCheckpointHeader {
 		return hash.DummyHash, errors.New("invalid magic bytes in checkpoint")
 	}
 
@@ -888,9 +1128,61 @@ func evictFileFromLinuxPageCache(f *os.File, fsync bool, logger *zerolog.Logger)
 	fstat, err := f.Stat()
 	if err == nil {
 		fsize := fstat.Size()
-		logger.Info().Msgf("advised Linux to evict file %s (%d MiB) from page cache", f.Name(), fsize/1024/1024)
+		logger.Debug().Msgf("advised Linux to evict file %s (%d MiB) from page cache", f.Name(), fsize/1024/1024)
 	} else {
-		logger.Info().Msgf("advised Linux to evict file %s from page cache", f.Name())
+		logger.Debug().Msgf("advised Linux to evict file %s from page cache", f.Name())
 	}
 	return nil
+}
+
+// Copy the checkpoint file including the part files from the given `from` to
+// the `to` directory
+// it returns the path of all the copied files
+// any error returned are exceptions
+func CopyCheckpointFile(filename string, from string, to string) (
+	copied []string,
+	errToReturn error,
+) {
+	// It's possible that the trie dir does not yet exist. If not this will create the the required path
+	err := os.MkdirAll(to, 0700)
+	if err != nil {
+		return nil, err
+	}
+
+	// checkpoint V6 produces multiple checkpoint part files that need to be copied over
+	pattern := filePathPattern(from, filename)
+	matched, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("could not glob checkpoint file with pattern %v: %w", pattern, err)
+	}
+
+	newPaths := make([]string, len(matched))
+	for i, match := range matched {
+		in, err := os.Open(match)
+		if err != nil {
+			return nil, fmt.Errorf("can not open file %v to copy: %w", match, err)
+		}
+		defer func() {
+			errToReturn = closeAndMergeError(in, errToReturn)
+		}()
+
+		_, partfile := filepath.Split(match)
+		newPath := filepath.Join(to, partfile)
+		out, err := os.Create(newPath)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			errToReturn = closeAndMergeError(out, errToReturn)
+		}()
+
+		_, err = io.Copy(out, in)
+		if err != nil {
+			return nil, fmt.Errorf("can not copy file %v: %w", match, err)
+		}
+
+		newPaths[i] = newPath
+	}
+
+	return newPaths, nil
 }

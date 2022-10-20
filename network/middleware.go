@@ -4,8 +4,8 @@ package network
 
 import (
 	"github.com/ipfs/go-datastore"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
@@ -62,12 +62,12 @@ type Middleware interface {
 // overlay network layer.
 type Overlay interface {
 	// Topology returns an identity list of nodes which this node should be directly connected to as peers
-	Topology() (flow.IdentityList, error)
+	Topology() flow.IdentityList
 
 	// Identities returns a list of all Flow identities on the network
 	Identities() flow.IdentityList
 
-	// GetIdentity returns the Identity associated with the given peer ID, if it exists
+	// Identity returns the Identity associated with the given peer ID, if it exists
 	Identity(peer.ID) (*flow.Identity, bool)
 
 	Receive(nodeID flow.Identifier, msg *message.Message, decodedMsgPayload interface{}) error

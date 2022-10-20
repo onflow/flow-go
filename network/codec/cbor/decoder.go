@@ -17,6 +17,9 @@ type Decoder struct {
 }
 
 // Decode will decode the next CBOR value from the stream.
+// Expected error returns during normal operations:
+//   - codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
+//   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 func (d *Decoder) Decode() (interface{}, error) {
 
 	// read from stream and extract code
@@ -30,15 +33,15 @@ func (d *Decoder) Decode() (interface{}, error) {
 
 	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
 	if err != nil {
-		return nil, fmt.Errorf("could not determine interface from code: %w", err)
+		return nil, err
 	}
 
 	// unmarshal the payload
 	//bs2 := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":strm>2(cbor)", what, code), int64(len(data))) // e.g. ~3net:strm>2(cbor)CodeEntityRequest:23
-	err = cbor.Unmarshal(data[1:], msgInterface) // all but first byte
+	err = defaultDecMode.Unmarshal(data[1:], msgInterface) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode cbor payload with message code %d aka %s: %w", data[0], what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
+		return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
 	}
 
 	return msgInterface, nil

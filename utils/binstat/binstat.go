@@ -1,51 +1,51 @@
 /*
-	Package binstat implements file based code statistics in bins.
+Package binstat implements file based code statistics in bins.
 
-	Generate bin based statistics on code by wrapping it with binstat functions.
-	Every wallclock second, binstat will output bins to a text file if changed.
+Generate bin based statistics on code by wrapping it with binstat functions.
+Every wallclock second, binstat will output bins to a text file if changed.
 
-	API:
+API:
 
-	  bs := binstat.Enter[Time][Val]("<What>"[,<Val>])
-	  binstat.Leave[Val](bs, [<Val>])
+	bs := binstat.Enter[Time][Val]("<What>"[,<Val>])
+	binstat.Leave[Val](bs, [<Val>])
 
-	Bin (single text line in output file depends on .Enter*()/.Leave*() combo) anatomy:
+Bin (single text line in output file depends on .Enter*()/.Leave*() combo) anatomy:
 
-	  /GOMAXPROCS=8,CPUS=8/what[~4whatExampleOne]/size[<num>-<num>]/time[<num>-<num>]=<num> <num>
-	                                                                                        ^^^^^ Total wallclock
-	                                                                                  ^^^^^ Number of samples
-	                                                               ^^^^^^^^^^^^^^^^^^ If .EnterTime*() used
-	                                             ^^^^^^^^^^^^^^^^^^ If <Val> given in .Enter*Val() or .LeaveVal()
-	                      ^^^^^^^^^^^^^^^^^^^^^^^ <What> string from .Enter*()
-	                             ^^^^^ default <What> length to include in bin unless BINSTAT_LEN_WHAT
-	  ^^^^^^^^^^^^^^^^^^^^ normally does not change
+	/GOMAXPROCS=8,CPUS=8/what[~4whatExampleOne]/size[<num>-<num>]/time[<num>-<num>]=<num> <num>
+	                                                                                      ^^^^^ Total wallclock
+	                                                                                ^^^^^ Number of samples
+	                                                             ^^^^^^^^^^^^^^^^^^ If .EnterTime*() used
+	                                           ^^^^^^^^^^^^^^^^^^ If <Val> given in .Enter*Val() or .LeaveVal()
+	                    ^^^^^^^^^^^^^^^^^^^^^^^ <What> string from .Enter*()
+	                           ^^^^^ default <What> length to include in bin unless BINSTAT_LEN_WHAT
+	^^^^^^^^^^^^^^^^^^^^ normally does not change
 
-	Size and time ranges are optional and auto generated from a single value or time.
-	E.g. time 0.012345 will be transformed to the range 0.010000 to 0.019999.
-	E.g. value 234 will be transformed to the range 200 to 299.
-	Note: Value can be optionally given with .Enter*Val() or .Leave*Val() as appropriate.
+Size and time ranges are optional and auto generated from a single value or time.
+E.g. time 0.012345 will be transformed to the range 0.010000 to 0.019999.
+E.g. value 234 will be transformed to the range 200 to 299.
+Note: Value can be optionally given with .Enter*Val() or .Leave*Val() as appropriate.
 
-	Using different API combinations then a varity of bin formats are possible:
+Using different API combinations then a varity of bin formats are possible:
 
-	  /GOMAXPROCS=8,CPUS=8/what[~7formata]=<num> <num>
-	  /GOMAXPROCS=8,CPUS=8/what[~7formatb]/size[<num>-<num>]=<num> <num>
-	  /GOMAXPROCS=8,CPUS=8/what[~7formatc]/time[<num>-<num>]=<num> <num>
-	  /GOMAXPROCS=8,CPUS=8/what[~7formatd]/size[<num>-<num>]/time[<num>-<num>]=<num> <num>
+	/GOMAXPROCS=8,CPUS=8/what[~7formata]=<num> <num>
+	/GOMAXPROCS=8,CPUS=8/what[~7formatb]/size[<num>-<num>]=<num> <num>
+	/GOMAXPROCS=8,CPUS=8/what[~7formatc]/time[<num>-<num>]=<num> <num>
+	/GOMAXPROCS=8,CPUS=8/what[~7formatd]/size[<num>-<num>]/time[<num>-<num>]=<num> <num>
 
-	In this way, code can be called millions of times, but relatively few bins generated & updated.
+In this way, code can be called millions of times, but relatively few bins generated & updated.
 
-	The number of bins used at run-time & output can be modified at process start via env vars.
-	E.g. By default binstat is disabled and binstat function will just return, using little CPU.
-	E.g. BINSTAT_LEN_WHAT=~what=0 means disable this particular <What> stat.
-	E.g. BINSTAT_LEN_WHAT=~what=99 means create a longer <What> (therefore more bins) for this particular <What> stat.
+The number of bins used at run-time & output can be modified at process start via env vars.
+E.g. By default binstat is disabled and binstat function will just return, using little CPU.
+E.g. BINSTAT_LEN_WHAT=~what=0 means disable this particular <What> stat.
+E.g. BINSTAT_LEN_WHAT=~what=99 means create a longer <What> (therefore more bins) for this particular <What> stat.
 
-	Note: binstat also outputs bins for its internal function statistics.
+Note: binstat also outputs bins for its internal function statistics.
 
-	Please see API examples below.
+Please see API examples below.
 
-	Please see README for examples of commenting and uncommenting.
+Please see README for examples of commenting and uncommenting.
 
-	Please see test for example of binstat versus pprof.
+Please see test for example of binstat versus pprof.
 */
 package binstat
 

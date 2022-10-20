@@ -18,13 +18,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -32,10 +36,11 @@ import (
 // of engines over a complete graph
 type MeshEngineTestSuite struct {
 	suite.Suite
-	ConduitWrapper                   // used as a wrapper around conduit methods
-	nets           []network.Network // used to keep track of the networks
-	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
-	obs            chan string       // used to keep track of Protect events tagged by pubsub messages
+	ConduitWrapper                      // used as a wrapper around conduit methods
+	nets           []network.Network    // used to keep track of the networks
+	mws            []network.Middleware // used to keep track of the middlewares
+	ids            flow.IdentityList    // used to keep track of the identifiers associated with networks
+	obs            chan string          // used to keep track of Protect events tagged by pubsub messages
 	cancel         context.CancelFunc
 }
 
@@ -63,15 +68,19 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
-	suite.ids, _, suite.nets, obs = GenerateIDsMiddlewaresNetworks(
-		ctx,
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
+	var nodes []*p2pnode.Node
+	suite.ids, nodes, suite.mws, suite.nets, obs = GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
 		logger,
-		nil,
 		unittest.NetworkCodec(),
+		mocknetwork.NewViolationsConsumer(suite.T()),
 		WithIdentityOpts(unittest.WithAllRoles()),
 	)
+
+	StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -83,6 +92,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 func (suite *MeshEngineTestSuite) TearDownTest() {
 	suite.cancel()
 	stopNetworks(suite.T(), suite.nets, 3*time.Second)
+	stopMiddlewares(suite.T(), suite.mws, 3*time.Second)
 }
 
 // TestAllToAll_Publish evaluates the network of mesh engines against allToAllScenario scenario.
@@ -110,7 +120,7 @@ func (suite *MeshEngineTestSuite) TestTargetedValidators_Unicast() {
 }
 
 // TestTargetedValidators_Multicast tests if only the intended recipients in a 1-k messaging actually receive the
-//message.
+// message.
 // The messages are disseminated through the Multicast method of conduits.
 func (suite *MeshEngineTestSuite) TestTargetedValidators_Multicast() {
 	suite.targetValidatorScenario(suite.Multicast)
@@ -125,19 +135,19 @@ func (suite *MeshEngineTestSuite) TestTargetedValidators_Publish() {
 // TestMaxMessageSize_Unicast evaluates the messageSizeScenario scenario using
 // the Unicast method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Unicast() {
-	suite.messageSizeScenario(suite.Unicast, p2p.DefaultMaxUnicastMsgSize)
+	suite.messageSizeScenario(suite.Unicast, middleware.DefaultMaxUnicastMsgSize)
 }
 
 // TestMaxMessageSize_Multicast evaluates the messageSizeScenario scenario using
 // the Multicast method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Multicast() {
-	suite.messageSizeScenario(suite.Multicast, p2p.DefaultMaxPubSubMsgSize)
+	suite.messageSizeScenario(suite.Multicast, p2pnode.DefaultMaxPubSubMsgSize)
 }
 
 // TestMaxMessageSize_Publish evaluates the messageSizeScenario scenario using the
 // Publish method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Publish() {
-	suite.messageSizeScenario(suite.Publish, p2p.DefaultMaxPubSubMsgSize)
+	suite.messageSizeScenario(suite.Publish, p2pnode.DefaultMaxPubSubMsgSize)
 }
 
 // TestUnregister_Publish tests that an engine cannot send any message using Publish
@@ -304,7 +314,7 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 }
 
 // messageSizeScenario provides a scenario to check if a message of maximum permissible size can be sent
-//successfully.
+// successfully.
 // It broadcasts a message from the first node to all the nodes in the identifiers list using send wrapper function.
 func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFunc, size uint) {
 	// creating engines

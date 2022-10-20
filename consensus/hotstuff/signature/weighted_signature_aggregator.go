@@ -83,8 +83,9 @@ func NewWeightedSignatureAggregator(
 
 // Verify verifies the signature under the stored public keys and message.
 // Expected errors during normal operations:
-//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
-//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
+//   - model.InvalidSignerError if signerID is invalid (not a consensus participant)
+//   - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
+//
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) error {
 	info, ok := w.idToInfo[signerID]
@@ -108,8 +109,9 @@ func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 // The total weight of all collected signatures (excluding duplicates) is returned regardless
 // of any returned error.
 // The function errors with:
-//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
-//  - model.DuplicatedSignerError if the signer has been already added
+//   - model.InvalidSignerError if signerID is invalid (not a consensus participant)
+//   - model.DuplicatedSignerError if the signer has been already added
+//
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
 	info, found := w.idToInfo[signerID]
@@ -149,13 +151,14 @@ func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
 // The function performs a final verification and errors if the aggregated signature is not valid. This is
 // required for the function safety since "TrustedAdd" allows adding invalid signatures.
 // The function errors with:
-//  - model.InsufficientSignaturesError if no signatures have been added yet
-//  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
+//   - model.InsufficientSignaturesError if no signatures have been added yet
+//   - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
+//
 // The function is thread-safe.
 //
 // TODO : When compacting the list of signers, update the return from []flow.Identifier
-//        to a compact bit vector.
-func (w *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
+// to a compact bit vector.
+func (w *WeightedSignatureAggregator) Aggregate() (flow.IdentifierList, []byte, error) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 

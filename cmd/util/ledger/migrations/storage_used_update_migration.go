@@ -12,8 +12,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
-	fvm "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 
@@ -109,7 +109,12 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 	for i := 0; i < workerCount; i++ {
 		inputEG.Go(func() error {
 			for p := range payloadChan {
-				id, err := KeyToRegisterID(p.Payload.Key)
+				k, err := p.Payload.Key()
+				if err != nil {
+					log.Error().Err(err).Msg("error get payload key")
+					return err
+				}
+				id, err := KeyToRegisterID(k)
 				if err != nil {
 					log.Error().Err(err).Msg("error converting key to register ID")
 					return err
@@ -118,7 +123,7 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 					// not an address
 					continue
 				}
-				if id.Key == fvm.KeyAccountStatus {
+				if id.Key == state.KeyAccountStatus {
 					storageUsedPayloadChan <- accountStorageUsedPayload{
 						Address: id.Owner,
 						Index:   p.Index,
@@ -172,16 +177,21 @@ Loop:
 			return nil, fmt.Errorf(errStr)
 		}
 
-		id, err := KeyToRegisterID(p.Key)
+		k, err := p.Key()
+		if err != nil {
+			log.Error().Err(err).Msg("error get payload key")
+			return nil, err
+		}
+		id, err := KeyToRegisterID(k)
 		if err != nil {
 			log.Error().Err(err).Msg("error converting key to register ID")
 			return nil, err
 		}
-		if id.Key != fvm.KeyAccountStatus {
+		if id.Key != state.KeyAccountStatus {
 			return nil, fmt.Errorf("this is not a status register")
 		}
 
-		status, err := state.AccountStatusFromBytes(p.Value)
+		status, err := environment.AccountStatusFromBytes(p.Value())
 		if err != nil {
 			log.Error().Err(err).Msg("error getting status")
 			return nil, err
@@ -202,7 +212,7 @@ Loop:
 			return nil, err
 		}
 		status.SetStorageUsed(used)
-		payload[pIndex].Value = status.ToBytes()
+		payload[pIndex] = *ledger.NewPayload(k, status.ToBytes())
 	}
 
 	m.Log.Info().

@@ -1,7 +1,7 @@
 # syntax = docker/dockerfile:experimental
 # NOTE: Must be run in the context of the repo's root directory
 
-FROM golang:1.18-bullseye AS build-setup
+FROM golang:1.19-bullseye AS build-setup
 
 RUN apt-get update
 RUN apt-get -y install cmake zip
@@ -56,7 +56,7 @@ RUN --mount=type=ssh \
 
 RUN chmod a+x /app/app
 
-FROM golang:1.18-bullseye as debug
+FROM golang:1.19-bullseye as debug
 
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
@@ -70,3 +70,5 @@ FROM gcr.io/distroless/base-debian11 as production-transit-nocgo
 COPY --from=build-transit-production-nocgo /app/app /bin/app
 
 ENTRYPOINT ["/bin/app"]
+
+FROM build-setup as environment-clean

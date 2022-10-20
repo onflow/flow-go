@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/cluster"
@@ -19,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Builder is the builder for collection block payloads. Upon providing a
@@ -35,9 +37,10 @@ type Builder struct {
 	transactions   mempool.Transactions
 	tracer         module.Tracer
 	config         Config
+	log            zerolog.Logger
 }
 
-func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers, clusterHeaders storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, opts ...Opt) (*Builder, error) {
+func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers, clusterHeaders storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, log zerolog.Logger, opts ...Opt) (*Builder, error) {
 
 	b := Builder{
 		db:             db,
@@ -47,6 +50,7 @@ func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers
 		payloads:       payloads,
 		transactions:   transactions,
 		config:         DefaultConfig(),
+		log:            log.With().Str("component", "cluster_builder").Logger(),
 	}
 
 	for _, apply := range opts {
@@ -137,6 +141,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	if minPossibleRefHeight > refChainFinalizedHeight {
 		minPossibleRefHeight = 0 // overflow check
 	}
+
+	log := b.log.With().
+		Hex("parent_id", parentID[:]).
+		Str("chain_id", parent.ChainID.String()).
+		Uint64("final_ref_height", refChainFinalizedHeight).
+		Logger()
+
+	log.Debug().Msg("building new cluster block")
 
 	// TODO (ramtin): enable this again
 	// b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
@@ -270,7 +282,21 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 		// enforce rate limiting rules
 		if limiter.shouldRateLimit(tx) {
-			continue
+			if b.config.DryRunRateLimit {
+				// log that this transaction would have been rate-limited, but we will still include it in the collection
+				b.log.Info().
+					Hex("tx_id", logging.ID(txID)).
+					Str("payer_addr", tx.Payer.String()).
+					Float64("rate_limit", b.config.MaxPayerTransactionRate).
+					Msg("dry-run: observed transaction that would have been rate limited")
+			} else {
+				b.log.Debug().
+					Hex("tx_id", logging.ID(txID)).
+					Str("payer_addr", tx.Payer.String()).
+					Float64("rate_limit", b.config.MaxPayerTransactionRate).
+					Msg("transaction is rate-limited")
+				continue
+			}
 		}
 
 		// ensure we find the lowest reference block height

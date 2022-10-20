@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -189,7 +188,7 @@ func unWrapFile(bootDir string, nodeID string) error {
 		return fmt.Errorf("failed to decrypt random beacon key using private key from file: %s", privKeyPath)
 	}
 
-	err = ioutil.WriteFile(plaintextPath, plaintext, fileMode)
+	err = os.WriteFile(plaintextPath, plaintext, fileMode)
 	if err != nil {
 		return fmt.Errorf("failed to write the decrypted file %s: %w", plaintextPath, err)
 	}
@@ -222,7 +221,7 @@ func wrapFile(bootDir string, nodeID string) error {
 		return fmt.Errorf("could not encrypt file: %w", err)
 	}
 
-	err = ioutil.WriteFile(ciphertextPath, ciphertext, fileMode)
+	err = os.WriteFile(ciphertextPath, ciphertext, fileMode)
 	if err != nil {
 		return fmt.Errorf("error writing ciphertext: %w", err)
 	}
@@ -250,13 +249,13 @@ func generateKeys(bootDir string, nodeID string) error {
 	}
 
 	// Write private key file
-	err = ioutil.WriteFile(privPath, priv[:], fileMode)
+	err = os.WriteFile(privPath, priv[:], fileMode)
 	if err != nil {
 		return fmt.Errorf("failed to write pivate key file: %w", err)
 	}
 
 	// Write public key file
-	err = ioutil.WriteFile(pubPath, pub[:], fileMode)
+	err = os.WriteFile(pubPath, pub[:], fileMode)
 	if err != nil {
 		return fmt.Errorf("failed to write public key file: %w", err)
 	}

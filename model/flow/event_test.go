@@ -94,3 +94,27 @@ func TestEventsList(t *testing.T) {
 		assert.Equal(t, ABHash, BAHash)
 	})
 }
+
+func TestEventsMerkleRootHash(t *testing.T) {
+	eventA := flow.Event{
+		Type:             "eventTypeString",
+		TransactionIndex: 1,
+		EventIndex:       2,
+		Payload:          []byte("cadence-json encoded data"),
+		TransactionID:    [flow.IdentifierLen]byte{1, 2, 3},
+	}
+
+	eventB := flow.Event{
+		Type:             "eventTypeString",
+		TransactionIndex: 1,
+		EventIndex:       3,
+		Payload:          []byte("cadence-json encoded data"),
+		TransactionID:    [flow.IdentifierLen]byte{1, 2, 3},
+	}
+
+	expectedRootHashHex := "355446d7b2b9653403abe28ccc405f46c059d2059cb7863f4964c401ee1aa83b"
+
+	ABHash, err := flow.EventsMerkleRootHash([]flow.Event{eventA, eventB})
+	assert.NoError(t, err)
+	assert.Equal(t, expectedRootHashHex, ABHash.String())
+}

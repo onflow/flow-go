@@ -17,8 +17,11 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -27,9 +30,10 @@ import (
 // single message from one engine to the other one through different scenarios.
 type EchoEngineTestSuite struct {
 	suite.Suite
-	ConduitWrapper                   // used as a wrapper around conduit methods
-	nets           []network.Network // used to keep track of the networks
-	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
+	ConduitWrapper                      // used as a wrapper around conduit methods
+	nets           []network.Network    // used to keep track of the networks
+	mws            []network.Middleware // used to keep track of the middlewares
+	ids            flow.IdentityList    // used to keep track of the identifiers associated with networks
 	cancel         context.CancelFunc
 }
 
@@ -47,21 +51,27 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
+
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
 	// both nodes should be of the same role to get connected on epidemic dissemination
-	suite.ids, _, suite.nets, _ = GenerateIDsMiddlewaresNetworks(
-		ctx,
+	var nodes []*p2pnode.Node
+	suite.ids, nodes, suite.mws, suite.nets, _ = GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
 		logger,
-		nil,
 		unittest.NetworkCodec(),
+		mocknetwork.NewViolationsConsumer(suite.T()),
 	)
+
+	StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 }
 
 // TearDownTest closes the networks within a specified timeout
 func (suite *EchoEngineTestSuite) TearDownTest() {
 	suite.cancel()
 	stopNetworks(suite.T(), suite.nets, 3*time.Second)
+	stopMiddlewares(suite.T(), suite.mws, 3*time.Second)
 }
 
 // TestUnknownChannel evaluates that registering an engine with an unknown channel returns an error.

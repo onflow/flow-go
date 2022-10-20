@@ -58,6 +58,9 @@ func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) 
 	}
 }
 
+// ByID will return the EpochSetup event by its ID.
+// Error returns:
+// * storage.ErrNotFound if no EpochSetup with the ID exists
 func (es *EpochSetups) ByID(setupID flow.Identifier) (*flow.EpochSetup, error) {
 	tx := es.db.NewTransaction(false)
 	defer tx.Discard()

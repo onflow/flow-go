@@ -6,17 +6,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger/common/proof"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 )
 
 // Test_ProofVerify tests proof verification
 func Test_TrieProofVerify(t *testing.T) {
-	p, sc := utils.TrieProofFixture()
+	p, sc := testutils.TrieProofFixture()
 	require.True(t, proof.VerifyTrieProof(p, sc))
 }
 
 // Test_BatchProofVerify tests batch proof verification
 func Test_TrieBatchProofVerify(t *testing.T) {
-	bp, sc := utils.TrieBatchProofFixture()
+	bp, sc := testutils.TrieBatchProofFixture()
 	require.True(t, proof.VerifyTrieBatchProof(bp, sc))
 }

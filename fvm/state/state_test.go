@@ -1,7 +1,6 @@
 package state_test
 
 import (
-	"math"
 	"testing"
 	"unicode/utf8"
 
@@ -9,15 +8,21 @@ import (
 
 	"github.com/onflow/atree"
 
-	metering "github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
+func createByteArray(size int) []byte {
+	bytes := make([]byte, size)
+	for i := range bytes {
+		bytes[i] = 255
+	}
+	return bytes
+}
+
 func TestState_ChildMergeFunctionality(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
-	st := state.NewState(view, meter)
+	st := state.NewState(view, state.DefaultParameters())
 
 	t.Run("test read from parent state (backoff)", func(t *testing.T) {
 		key := "key1"
@@ -63,7 +68,7 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		require.Equal(t, len(v), 0)
 
 		// merge to parent
-		err = st.MergeState(stChild, true)
+		err = st.MergeState(stChild)
 		require.NoError(t, err)
 
 		// read key3 on parent
@@ -87,41 +92,9 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 
 }
 
-func TestState_InteractionMeasuring(t *testing.T) {
-	view := utils.NewSimpleView()
-	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
-	st := state.NewState(view, meter)
-
-	key := "key1"
-	value := createByteArray(1)
-	err := st.Set("address", key, value, true)
-	keySize := uint64(len("address") + len(key))
-	size := keySize + uint64(len(value))
-	require.NoError(t, err)
-	require.Equal(t, uint64(0), st.ReadCounter)
-	require.Equal(t, uint64(0), st.TotalBytesRead)
-	require.Equal(t, uint64(1), st.WriteCounter)
-	require.Equal(t, size, st.TotalBytesWritten)
-
-	// should read from the delta
-	// should not impact totalBytesRead
-	v, err := st.Get("address", key, true)
-	require.NoError(t, err)
-	require.Equal(t, v, value)
-	require.Equal(t, uint64(0), st.TotalBytesRead)
-
-	// non existing key
-	// should be counted towards reading from the ledger
-	key2 := "key2"
-	_, err = st.Get("address", key2, true)
-	require.NoError(t, err)
-	require.Equal(t, keySize, st.TotalBytesRead)
-}
-
 func TestState_MaxValueSize(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
-	st := state.NewState(view, meter, state.WithMaxValueSizeAllowed(6))
+	st := state.NewState(view, state.DefaultParameters().WithMaxValueSizeAllowed(6))
 
 	// update should pass
 	value := createByteArray(5)
@@ -136,8 +109,7 @@ func TestState_MaxValueSize(t *testing.T) {
 
 func TestState_MaxKeySize(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
-	st := state.NewState(view, meter, state.WithMaxKeySizeAllowed(4))
+	st := state.NewState(view, state.DefaultParameters().WithMaxKeySizeAllowed(4))
 
 	// read
 	_, err := st.Get("1", "2", true)
@@ -159,8 +131,7 @@ func TestState_MaxKeySize(t *testing.T) {
 
 func TestState_MaxInteraction(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
-	st := state.NewState(view, meter, state.WithMaxInteractionSizeAllowed(12))
+	st := state.NewState(view, state.DefaultParameters().WithMaxInteractionSizeAllowed(12))
 
 	// read - interaction 2
 	_, err := st.Get("1", "2", true)
@@ -177,8 +148,7 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Equal(t, st.InteractionUsed(), uint64(14))
 	require.Error(t, err)
 
-	meter = metering.NewMeter(math.MaxUint64, math.MaxUint64)
-	st = state.NewState(view, meter, state.WithMaxInteractionSizeAllowed(6))
+	st = state.NewState(view, state.DefaultParameters().WithMaxInteractionSizeAllowed(6))
 	stChild := st.NewChild()
 
 	// update - 0
@@ -187,7 +157,7 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Equal(t, st.InteractionUsed(), uint64(0))
 
 	// commit
-	err = st.MergeState(stChild, true)
+	err = st.MergeState(stChild)
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(3))
 

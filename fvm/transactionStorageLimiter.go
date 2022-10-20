@@ -6,7 +6,8 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 
-	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -18,15 +19,14 @@ func NewTransactionStorageLimiter() TransactionStorageLimiter {
 }
 
 func (d TransactionStorageLimiter) CheckLimits(
-	ctx *EnvContext,
-	env Environment,
+	env environment.Environment,
 	addresses []flow.Address,
 ) error {
-	if !env.Context().LimitAccountStorage {
+	if !env.LimitAccountStorage() {
 		return nil
 	}
 
-	defer ctx.StartSpanFromRoot(trace.FVMTransactionStorageUsedCheck).End()
+	defer env.StartSpanFromRoot(trace.FVMTransactionStorageUsedCheck).End()
 
 	commonAddresses := make([]common.Address, len(addresses))
 	usages := make([]uint64, len(commonAddresses))
@@ -40,7 +40,7 @@ func (d TransactionStorageLimiter) CheckLimits(
 		usages[i] = u
 	}
 
-	result, invokeErr := InvokeAccountsStorageCapacity(ctx, env, commonAddresses)
+	result, invokeErr := env.AccountsStorageCapacity(commonAddresses)
 
 	// This error only occurs in case of implementation errors. The InvokeAccountsStorageCapacity
 	// already handles cases where the default vault is missing.
@@ -55,7 +55,7 @@ func (d TransactionStorageLimiter) CheckLimits(
 	}
 
 	for i, value := range resultArray.Values {
-		capacity := storageMBUFixToBytesUInt(value)
+		capacity := environment.StorageMBUFixToBytesUInt(value)
 
 		if usages[i] > capacity {
 			return errors.NewStorageCapacityExceededError(flow.BytesToAddress(addresses[i].Bytes()), usages[i], capacity)

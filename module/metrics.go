@@ -29,10 +29,19 @@ type ResolverMetrics interface {
 	OnDNSLookupRequestDropped()
 }
 
+// NetworkSecurityMetrics metrics related to network protection.
+type NetworkSecurityMetrics interface {
+	// OnUnauthorizedMessage tracks the number of unauthorized messages seen on the network.
+	OnUnauthorizedMessage(role, msgType, topic, offense string)
+
+	// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
+	OnRateLimitedUnicastMessage(role, msgType, topic string)
+}
+
 type NetworkMetrics interface {
 	ResolverMetrics
 	DHTMetrics
-
+	NetworkSecurityMetrics
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
 
@@ -321,14 +330,20 @@ type LedgerMetrics interface {
 type WALMetrics interface {
 }
 
-type ExecutionDataServiceMetrics interface {
-	ExecutionDataAddStarted()
+type RateLimitedBlockstoreMetrics interface {
+	BytesRead(int)
+}
 
-	ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeSize uint64)
-
-	ExecutionDataGetStarted()
-
-	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize uint64)
+type BitswapMetrics interface {
+	Peers(prefix string, n int)
+	Wantlist(prefix string, n int)
+	BlobsReceived(prefix string, n uint64)
+	DataReceived(prefix string, n uint64)
+	BlobsSent(prefix string, n uint64)
+	DataSent(prefix string, n uint64)
+	DupBlobsReceived(prefix string, n uint64)
+	DupDataReceived(prefix string, n uint64)
+	MessagesReceived(prefix string, n uint64)
 }
 
 type ExecutionDataRequesterMetrics interface {
@@ -360,9 +375,28 @@ type RuntimeMetrics interface {
 }
 
 type ProviderMetrics interface {
-	// ChunkDataPackRequested is executed every time a chunk data pack request is arrived at execution node.
-	// It increases the request counter by one.
-	ChunkDataPackRequested()
+	// ChunkDataPackRequestProcessed is executed every time a chunk data pack request is picked up for processing at execution node.
+	// It increases the request processed counter by one.
+	ChunkDataPackRequestProcessed()
+}
+
+type ExecutionDataProviderMetrics interface {
+	RootIDComputed(duration time.Duration, numberOfChunks int)
+	AddBlobsSucceeded(duration time.Duration, totalSize uint64)
+	AddBlobsFailed()
+}
+
+type ExecutionDataRequesterV2Metrics interface {
+	FulfilledHeight(blockHeight uint64)
+	ReceiptSkipped()
+	RequestSucceeded(blockHeight uint64, duration time.Duration, totalSize uint64, numberOfAttempts int)
+	RequestFailed(duration time.Duration, retryable bool)
+	RequestCanceled()
+	ResponseDropped()
+}
+
+type ExecutionDataPrunerMetrics interface {
+	Pruned(height uint64, duration time.Duration)
 }
 
 type AccessMetrics interface {
@@ -414,6 +448,9 @@ type ExecutionMetrics interface {
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
 	ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int)
 
+	// ExecutionBlockExecutionEffortVectorComponent reports the unweighted effort of given ComputationKind at block level
+	ExecutionBlockExecutionEffortVectorComponent(string, uint)
+
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
 	ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int)
 
@@ -432,9 +469,11 @@ type ExecutionMetrics interface {
 	// ExecutionSync reports when the state syncing is triggered or stopped.
 	ExecutionSync(syncing bool)
 
+	// Upload metrics
 	ExecutionBlockDataUploadStarted()
-
 	ExecutionBlockDataUploadFinished(dur time.Duration)
+	ExecutionComputationResultUploaded()
+	ExecutionComputationResultUploadRetried()
 
 	UpdateCollectionMaxHeight(height uint64)
 }
@@ -484,14 +523,25 @@ type HeroCacheMetrics interface {
 	// BucketAvailableSlots keeps track of number of available slots in buckets of cache.
 	BucketAvailableSlots(uint64, uint64)
 
-	// OnKeyPutSuccess is called whenever a new (key, entity) pair is successfully added to the cache.
-	OnKeyPutSuccess()
+	// OnKeyPutAttempt is called whenever a new (key, value) pair is attempted to be put in cache.
+	// It does not reflect whether the put was successful or not.
+	// A (key, value) pair put attempt may fail if the cache is full, or the key already exists.
+	OnKeyPutAttempt(size uint32)
 
-	// OnKeyPutFailure is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
+	// OnKeyPutSuccess is called whenever a new (key, entity) pair is successfully added to the cache.
+	OnKeyPutSuccess(size uint32)
+
+	// OnKeyPutDrop is called whenever a new (key, entity) pair is dropped from the cache due to full cache.
+	OnKeyPutDrop()
+
+	// OnKeyPutDeduplicated is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
 	// A duplicate key is dropped by the cache when it is written to the cache.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity. Hence, a duplicate key corresponds to
 	// a duplicate entity.
-	OnKeyPutFailure()
+	OnKeyPutDeduplicated()
+
+	// OnKeyRemoved is called whenever a (key, entity) pair is removed from the cache.
+	OnKeyRemoved(size uint32)
 
 	// OnKeyGetSuccess tracks total number of successful read queries.
 	// A read query is successful if the entity corresponding to its key is available in the cache.

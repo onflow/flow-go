@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -21,21 +21,21 @@ import (
 func TestLeafNodeEncodingDecoding(t *testing.T) {
 
 	// Leaf node with nil payload
-	path1 := utils.PathByUint8(0)
+	path1 := testutils.PathByUint8(0)
 	payload1 := (*ledger.Payload)(nil)
 	hashValue1 := hash.Hash([32]byte{1, 1, 1})
 	leafNodeNilPayload := node.NewNode(255, nil, nil, ledger.Path(path1), payload1, hashValue1)
 
 	// Leaf node with empty payload (not nil)
 	// EmptyPayload() not used because decoded playload's value is empty slice (not nil)
-	path2 := utils.PathByUint8(1)
-	payload2 := &ledger.Payload{Value: []byte{}}
+	path2 := testutils.PathByUint8(1)
+	payload2 := ledger.NewPayload(ledger.Key{}, []byte{})
 	hashValue2 := hash.Hash([32]byte{2, 2, 2})
 	leafNodeEmptyPayload := node.NewNode(255, nil, nil, ledger.Path(path2), payload2, hashValue2)
 
 	// Leaf node with payload
-	path3 := utils.PathByUint8(2)
-	payload3 := utils.LightPayload8('A', 'a')
+	path3 := testutils.PathByUint8(2)
+	payload3 := testutils.LightPayload8('A', 'a')
 	hashValue3 := hash.Hash([32]byte{3, 3, 3})
 	leafNodePayload := node.NewNode(255, nil, nil, ledger.Path(path3), payload3, hashValue3)
 
@@ -150,8 +150,8 @@ func TestRandomLeafNodeEncodingDecoding(t *testing.T) {
 	// when encoded node size is sometimes larger than scratch buffer.
 	const scratchBufferSize = 512
 
-	paths := utils.RandomPaths(count)
-	payloads := utils.RandomPayloads(count, minPayloadSize, maxPayloadSize)
+	paths := testutils.RandomPaths(count)
+	payloads := testutils.RandomPayloads(count, minPayloadSize, maxPayloadSize)
 
 	writeScratch := make([]byte, scratchBufferSize)
 	readScratch := make([]byte, scratchBufferSize)
@@ -190,14 +190,14 @@ func TestInterimNodeEncodingDecoding(t *testing.T) {
 	const rchildIndex = 2
 
 	// Child node
-	path1 := utils.PathByUint8(0)
-	payload1 := utils.LightPayload8('A', 'a')
+	path1 := testutils.PathByUint8(0)
+	payload1 := testutils.LightPayload8('A', 'a')
 	hashValue1 := hash.Hash([32]byte{1, 1, 1})
 	leafNode1 := node.NewNode(255, nil, nil, ledger.Path(path1), payload1, hashValue1)
 
 	// Child node
-	path2 := utils.PathByUint8(1)
-	payload2 := utils.LightPayload8('B', 'b')
+	path2 := testutils.PathByUint8(1)
+	payload2 := testutils.LightPayload8('B', 'b')
 	hashValue2 := hash.Hash([32]byte{2, 2, 2})
 	leafNode2 := node.NewNode(255, nil, nil, ledger.Path(path2), payload2, hashValue2)
 

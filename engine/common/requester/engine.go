@@ -201,7 +201,7 @@ func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilt
 }
 
 // Query will request data through the request engine backing the interface.
-//The additional selector will be applied to the subset
+// The additional selector will be applied to the subset
 // of valid providers for the data and allows finer-grained control
 // over which providers to request data from. Doesn't perform integrity check
 // can be used to get entities without knowing their ID.
@@ -278,6 +278,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
+	e.log.Debug().Int("num_entities", len(e.items)).Msg("selecting entities")
+
 	// get the current top-level set of valid providers
 	providers, err := e.state.Final().Identities(e.selector)
 	if err != nil {
@@ -298,6 +300,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 		// if the item reached maximum amount of retries, drop
 		if item.NumAttempts >= e.cfg.RetryAttempts {
+			e.log.Debug().Str("entity_id", entityID.String()).Msg("dropping entity ID max amount of retries reached")
 			delete(e.items, entityID)
 			continue
 		}
@@ -346,6 +349,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			item.RetryAfter = e.cfg.RetryMaximum
 		}
 
+		e.log.Debug().Hex("entity", logging.ID(entityID)).Msg("selected entity")
+
 		// if we reached the maximum size for a batch, bail
 		if uint(len(entityIDs)) >= e.cfg.BatchThreshold {
 			break
@@ -362,11 +367,32 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		Nonce:     rand.Uint64(),
 		EntityIDs: entityIDs,
 	}
+
+	requestStart := time.Now()
+
+	if e.log.Debug().Enabled() {
+		e.log.Debug().
+			Hex("provider", logging.ID(providerID)).
+			Uint64("nonce", req.Nonce).
+			Int("num_selected", len(entityIDs)).
+			Strs("entities", logging.IDs(entityIDs)).
+			Msg("sending entity request")
+	}
+
 	err = e.con.Unicast(req, providerID)
 	if err != nil {
 		return true, fmt.Errorf("could not send request: %w", err)
 	}
 	e.requests[req.Nonce] = req
+
+	if e.log.Debug().Enabled() {
+		e.log.Debug().
+			Hex("provider", logging.ID(providerID)).
+			Uint64("nonce", req.Nonce).
+			Strs("entities", logging.IDs(entityIDs)).
+			TimeDiff("duration", time.Now(), requestStart).
+			Msg("entity request sent")
+	}
 
 	// NOTE: we forget about requests after the expiry of the shortest retry time
 	// from the entities in the list; this means that we purge requests aggressively.
@@ -382,6 +408,10 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	}()
 
 	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityRequest)
+	e.log.Debug().
+		Uint64("nonce", req.Nonce).
+		Strs("entity_ids", flow.IdentifierList(req.EntityIDs).Strings()).
+		Msg("entity request sent")
 
 	return true, nil
 }
@@ -404,6 +434,9 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 }
 
 func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.EntityResponse) error {
+	lg := e.log.With().Str("origin_id", originID.String()).Uint64("nonce", res.Nonce).Logger()
+
+	lg.Debug().Strs("entity_ids", flow.IdentifierList(res.EntityIDs).Strings()).Msg("entity response received")
 
 	if e.cfg.ValidateStaking {
 
@@ -418,6 +451,14 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		if len(providers) == 0 {
 			return engine.NewInvalidInputErrorf("invalid provider origin (%x)", originID)
 		}
+	}
+
+	if e.log.Debug().Enabled() {
+		e.log.Debug().
+			Hex("provider", logging.ID(originID)).
+			Strs("entities", logging.IDs(res.EntityIDs)).
+			Uint64("nonce", res.Nonce).
+			Msg("onEntityResponse entries received")
 	}
 
 	// build a list of needed entities; if not available, process anyway,
@@ -446,6 +487,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		// the entity might already have been returned in another response
 		item, exists := e.items[entityID]
 		if !exists {
+			lg.Debug().Hex("entity_id", logging.ID(entityID)).Msg("entity not in items skipping")
 			continue
 		}
 
@@ -460,10 +502,10 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 			actualEntityID := entity.ID()
 			// validate that we got correct entity, exactly what we were expecting
 			if entityID != actualEntityID {
-				e.log.Error().
-					Hex("origin", logging.ID(originID)).
+				lg.Error().
 					Hex("stated_entity_id", logging.ID(entityID)).
 					Hex("provided_entity", logging.ID(actualEntityID)).
+					Bool(logging.KeySuspicious, true).
 					Msg("provided entity does not match stated ID")
 				continue
 			}
