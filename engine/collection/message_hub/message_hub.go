@@ -190,7 +190,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 		msg, ok := h.queuedProposals.Pop()
 		if ok {
 			block := msg.(*flow.Header)
-			err := h.processQueuedBlock(block)
+			err := h.processQueuedProposal(block)
 			if err != nil {
 				return fmt.Errorf("could not process queued block %v: %w", block.ID(), err)
 			}
@@ -330,7 +330,7 @@ func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 //   - broadcast to all other cluster participants (excluding myself)
 //
 // No errors are expected during normal operations.
-func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
+func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	// first, check that we are the proposer of the block
 	if header.ProposerID != h.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
