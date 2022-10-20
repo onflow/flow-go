@@ -22,9 +22,9 @@ func (_m *Consumer) BroadcastProposalWithDelay(proposal *flow.Header, delay time
 	_m.Called(proposal, delay)
 }
 
-// BroadcastTimeout provides a mock function with given fields: timeout
-func (_m *Consumer) BroadcastTimeout(timeout *model.TimeoutObject) {
-	_m.Called(timeout)
+// BroadcastTimeout provides a mock function with given fields: timeout, timeoutTick
+func (_m *Consumer) BroadcastTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
+	_m.Called(timeout, timeoutTick)
 }
 
 // OnBlockIncorporated provides a mock function with given fields: _a0
