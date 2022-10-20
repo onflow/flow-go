@@ -224,7 +224,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 
 		msg, ok = h.queuedTimeouts.Pop()
 		if ok {
-			err := h.processQueuedTimeout(msg.(*model.TimeoutObject))
+			err := h.processQueuedTimeout(msg.(*messages.TimeoutObject))
 			if err != nil {
 				return fmt.Errorf("coult not process queued timeout: %w", err)
 			}
@@ -241,7 +241,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 // processQueuedTimeout performs actual processing of model.TimeoutObject, as a result of successful invocation
 // broadcasts timeout object to consensus committee.
 // No errors are expected during normal operations.
-func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
+func (h *MessageHub) processQueuedTimeout(timeout *messages.TimeoutObject) error {
 	logContext := h.log.With().
 		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
 		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
@@ -267,15 +267,7 @@ func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("could not get consensus recipients for broadcasting timeout: %w", err)
 	}
 
-	// create the timeout message
-	msg := &messages.TimeoutObject{
-		View:       timeout.View,
-		NewestQC:   timeout.NewestQC,
-		LastViewTC: timeout.LastViewTC,
-		SigData:    timeout.SigData,
-	}
-
-	err = h.con.Publish(msg, recipients.NodeIDs()...)
+	err = h.con.Publish(timeout, recipients.NodeIDs()...)
 	if errors.Is(err, network.EmptyTargetList) {
 		return nil
 	}
@@ -450,7 +442,13 @@ func (h *MessageHub) SendVote(blockID flow.Identifier, view uint64, sigData []by
 
 // BroadcastTimeout queues timeout for subsequent sending
 func (h *MessageHub) BroadcastTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
-	if ok := h.queuedTimeouts.Push(timeout); ok {
+	if ok := h.queuedTimeouts.Push(&messages.TimeoutObject{
+		Seq:        timeoutTick,
+		View:       timeout.View,
+		NewestQC:   timeout.NewestQC,
+		LastViewTC: timeout.LastViewTC,
+		SigData:    timeout.SigData,
+	}); ok {
 		h.queuedMessagesNotifier.Notify()
 	}
 }
