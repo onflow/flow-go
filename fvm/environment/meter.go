@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 )
 
@@ -46,6 +47,7 @@ const (
 type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error
 	ComputationUsed() uint64
+	ComputationIntensities() meter.MeteredComputationIntensities
 
 	MeterMemory(usage common.MemoryUsage) error
 	MemoryEstimate() uint64
@@ -72,6 +74,10 @@ func (meter *meterImpl) MeterComputation(
 		return meter.txnState.MeterComputation(kind, intensity)
 	}
 	return nil
+}
+
+func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensities {
+	return meter.txnState.ComputationIntensities()
 }
 
 func (meter *meterImpl) ComputationUsed() uint64 {

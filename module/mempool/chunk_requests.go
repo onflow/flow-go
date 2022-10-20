@@ -3,7 +3,6 @@ package mempool
 import (
 	"time"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
@@ -99,15 +98,6 @@ type ChunkRequests interface {
 }
 
 const DefaultChunkDataPackRequestQueueSize = 100_000
-
-// ChunkDataPackMessageStore is a FIFO (first-in-first-out) size-bound queue for maintaining chunk data pack requests.
-// It is designed to be utilized at Execution Nodes to maintain and respond chunk data pack requests.
-type ChunkDataPackMessageStore interface {
-	engine.MessageStore
-
-	// Size returns total chunk data pack requests stored in queue.
-	Size() uint
-}
 
 // ChunkDataPackRequest is an internal data type for Execution Nodes that
 // represents a request for a chunk data pack.

@@ -657,6 +657,9 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Msg("block executed")
 
 	e.metrics.ExecutionBlockExecuted(time.Since(startedAt), computationResult.ComputationUsed, len(computationResult.TransactionResults), len(computationResult.ExecutableBlock.CompleteCollections))
+	for computationKind, intensity := range computationResult.ComputationIntensities {
+		e.metrics.ExecutionBlockExecutionEffortVectorComponent(computationKind.String(), intensity)
+	}
 
 	err = e.onBlockExecuted(executableBlock, finalState)
 	if err != nil {
