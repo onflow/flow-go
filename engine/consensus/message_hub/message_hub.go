@@ -27,6 +27,18 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// defaultMessageHubRequestsWorkers number of workers to dispatch events for requests
+const defaultMessageHubRequestsWorkers = 5
+
+// defaultProposalQueueCapacity number of pending outgoing proposals stored in queue
+const defaultProposalQueueCapacity = 3
+
+// defaultVoteQueueCapacity number of pending outgoing votes stored in queue
+const defaultVoteQueueCapacity = 20
+
+// defaultTimeoutQueueCapacity number of pending outgoing timeouts stored in queue
+const defaultTimeoutQueueCapacity = 3
+
 // packedVote is a helper structure to pack recipientID and vote into one structure to pass through fifoqueue.FifoQueue
 type packedVote struct {
 	recipientID flow.Identifier
@@ -100,15 +112,21 @@ func NewMessageHub(log zerolog.Logger,
 	headers storage.Headers,
 	payloads storage.Payloads,
 ) (*MessageHub, error) {
-	queuedVotes, err := fifoqueue.NewFifoQueue()
+	queuedVotes, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize votes queue")
 	}
-	queuedProposals, err := fifoqueue.NewFifoQueue()
+	queuedProposals, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultProposalQueueCapacity),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize blocks queue")
 	}
-	queuedTimeouts, err := fifoqueue.NewFifoQueue()
+	queuedTimeouts, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultTimeoutQueueCapacity),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeouts queue")
 	}
@@ -141,10 +159,15 @@ func NewMessageHub(log zerolog.Logger,
 	}
 
 	componentBuilder := component.NewComponentManagerBuilder()
-	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		ready()
-		hub.queuedMessagesProcessingLoop(ctx)
-	})
+	// This implementation tolerates if the networking layer sometimes blocks on send requests.
+	// We use by default 5 go-routines here. This is fine, because outbound messages are temporally sparse
+	// under normal operations. Hence, the go-routines should mostly be asleep waiting for work.
+	for i := 0; i < defaultMessageHubRequestsWorkers; i++ {
+		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			hub.queuedMessagesProcessingLoop(ctx)
+		})
+	}
 	hub.ComponentManager = componentBuilder.Build()
 	return hub, nil
 }
@@ -180,7 +203,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 		msg, ok := h.queuedProposals.Pop()
 		if ok {
 			block := msg.(*flow.Header)
-			err := h.processQueuedBlock(block)
+			err := h.processQueuedProposal(block)
 			if err != nil {
 				return fmt.Errorf("could not process queued block %v: %w", block.ID(), err)
 			}
@@ -294,10 +317,10 @@ func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 	return nil
 }
 
-// processQueuedBlock performs actual processing of model.Proposal, as a result of successful invocation
+// processQueuedProposal performs actual processing of model.Proposal, as a result of successful invocation
 // broadcasts block proposal to consensus committee and rest of Flow network.
 // No errors are expected during normal operations.
-func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
+func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	// first, check that we are the proposer of the block
 	if header.ProposerID != h.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
@@ -336,6 +359,9 @@ func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
 
 	log.Debug().Msg("processing proposal broadcast request from hotstuff")
 
+	// TODO(active-pacemaker): replace with pub/sub?
+	h.hotstuff.SubmitProposal(header, parent.View) // non-blocking
+
 	// Retrieve all consensus nodes (excluding myself).
 	// CAUTION: We must include also nodes with weight zero, because otherwise
 	//          new consensus nodes for the next epoch are left out.
@@ -350,9 +376,6 @@ func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
 	}
 
 	recipients := allIdentities.Filter(filter.HasRole(flow.RoleConsensus))
-
-	// TODO(active-pacemaker): replace with pub/sub?
-	h.hotstuff.SubmitProposal(header, parent.View) // non-blocking
 
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
