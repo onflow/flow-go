@@ -235,15 +235,18 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 	}
 }
 
-// processQueuedTimeout performs actual processing of model.TimeoutObject, as a result of successful invocation
-// broadcasts timeout object to consensus committee.
+// processQueuedTimeout propagates the timeout the collector cluster:
+//   - the node's internal `timeoutAggregator`
+//   - broadcast to all other cluster participants (excluding myself)
+//
 // No errors are expected during normal operations.
 func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
+	h.forwardToOwnTimeoutAggregator(timeout) // forward timeout to my own `timeoutAggregator`
+
 	logContext := h.log.With().
 		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
 		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
 		Uint64("timeout_view", timeout.View)
-
 	if timeout.LastViewTC != nil {
 		logContext.
 			Uint64("last_view_tc_view", timeout.LastViewTC.View).
@@ -288,16 +291,24 @@ func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 	return nil
 }
 
-// processQueuedVote performs actual processing of model.Vote, as a result of successful invocation
-// sends vote to designated receiver.
+// processQueuedVote propagates the vote to relevant recipient(s):
+//   - [common case]  vote is sent via unicast to another node that is the next leader
+//   - [special case] this node is the next leader: vote is directly forwarded to the node's internal `VoteAggregator`
+//
 // No errors are expected during normal operations.
 func (h *MessageHub) processQueuedVote(packed *packedVote) error {
+	// special case: I am the next leader
+	if packed.recipientID == h.me.NodeID() {
+		h.forwardToOwnVoteAggregator(packed.vote, h.me.NodeID()) // forward vote to my own `voteAggregator`
+		return nil
+	}
+
+	// common case: somebody else is the next leader
 	log := h.log.With().
 		Hex("collection_id", packed.vote.BlockID[:]).
 		Uint64("collection_view", packed.vote.View).
 		Hex("recipient_id", packed.recipientID[:]).
 		Logger()
-
 	log.Info().Msg("processing vote transmission request from hotstuff")
 
 	// send the vote the desired recipient
@@ -313,8 +324,11 @@ func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 	return nil
 }
 
-// processQueuedBlock performs actual processing of model.Proposal, as a result of successful invocation
-// broadcasts block proposal to collection cluster.
+// processQueuedBlock propagates the block proposal to the collector cluster:
+//   - directly forwarded proposal to HotStuff core logic
+//     (skipping compliance engine as we assume our own proposals to be correct)
+//   - broadcast to all other cluster participants (excluding myself)
+//
 // No errors are expected during normal operations.
 func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
 	// first, check that we are the proposer of the block
@@ -351,6 +365,8 @@ func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
 		Logger()
 
 	log.Debug().Msg("processing cluster broadcast request from hotstuff")
+	// TODO(active-pacemaker): replace with pub/sub?
+	h.hotstuff.SubmitProposal(header, parent.View) // non-blocking
 
 	// retrieve all collection nodes in our cluster
 	recipients, err := h.state.Final().Identities(filter.And(
@@ -360,9 +376,6 @@ func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
 	if err != nil {
 		return fmt.Errorf("could not get cluster members for broadcasting collection proposal")
 	}
-
-	// TODO(active-pacemaker): replace with pub/sub?
-	h.hotstuff.SubmitProposal(header, parent.View) // non-blocking
 
 	// create the proposal message for the collection
 	proposal := &messages.ClusterBlockProposal{
@@ -389,7 +402,8 @@ func (h *MessageHub) processQueuedBlock(header *flow.Header) error {
 	return nil
 }
 
-// SendVote queues vote for subsequent sending
+// SendVote queues vote for subsequent propagation to next primary (`recipientID`),
+// which _may occasionally_ be also this node itself.
 func (h *MessageHub) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	vote := &packedVote{
 		recipientID: recipientID,
@@ -404,14 +418,15 @@ func (h *MessageHub) SendVote(blockID flow.Identifier, view uint64, sigData []by
 	}
 }
 
-// BroadcastTimeout queues timeout for subsequent sending
+// BroadcastTimeout queues timeout for subsequent propagation to all consensus participants (including this node)
 func (h *MessageHub) BroadcastTimeout(timeout *model.TimeoutObject) {
 	if ok := h.queuedTimeouts.Push(timeout); ok {
 		h.queuedMessagesNotifier.Notify()
 	}
 }
 
-// BroadcastProposalWithDelay queues proposal for subsequent sending
+// BroadcastProposalWithDelay queues proposal for subsequent propagation to all consensus participants (including this node).
+// The proposal will only be placed in the queue, after the specified delay (or dropped on shutdown signal).
 func (h *MessageHub) BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) {
 	go func() {
 		select {
@@ -436,21 +451,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 	case *messages.ClusterBlockProposal:
 		return h.compliance.Process(channel, h.me.NodeID(), message)
 	case *messages.ClusterBlockVote:
-		v := &model.Vote{
-			View:     msg.View,
-			BlockID:  msg.BlockID,
-			SignerID: originID,
-			SigData:  msg.SigData,
-		}
-		h.log.Info().
-			Uint64("block_view", v.View).
-			Hex("block_id", v.BlockID[:]).
-			Hex("voter", v.SignerID[:]).
-			Str("vote_id", v.ID().String()).
-			Msg("block vote received, forwarding block vote to hotstuff vote aggregator")
-
-		// forward the vote to hotstuff for processing
-		h.voteAggregator.AddVote(v)
+		h.forwardToOwnVoteAggregator(msg, originID)
 	case *messages.ClusterTimeoutObject:
 		t := &model.TimeoutObject{
 			View:       msg.View,
@@ -459,15 +460,38 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			SignerID:   originID,
 			SigData:    msg.SigData,
 		}
-		h.log.Info().
-			Hex("origin_id", originID[:]).
-			Uint64("view", t.View).
-			Str("timeout_id", t.ID().String()).
-			Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
-		// forward the timeout to hotstuff for processing
-		h.timeoutAggregator.AddTimeout(t)
+		h.forwardToOwnTimeoutAggregator(t)
 	default:
 		h.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
 	}
 	return nil
+}
+
+// forwardToOwnVoteAggregator converts vote to generic `model.Vote`, logs logs vote and forwards it to own `voteAggregator`.
+// Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
+func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.ClusterBlockVote, originID flow.Identifier) {
+	v := &model.Vote{
+		View:     vote.View,
+		BlockID:  vote.BlockID,
+		SignerID: originID,
+		SigData:  vote.SigData,
+	}
+	h.log.Info().
+		Uint64("block_view", v.View).
+		Hex("block_id", v.BlockID[:]).
+		Hex("voter", v.SignerID[:]).
+		Str("vote_id", v.ID().String()).
+		Msg("block vote received, forwarding block vote to hotstuff vote aggregator")
+	h.voteAggregator.AddVote(v)
+}
+
+// forwardToOwnTimeoutAggregator logs timeout and forwards it to own `timeoutAggregator`.
+// Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
+func (h *MessageHub) forwardToOwnTimeoutAggregator(t *model.TimeoutObject) {
+	h.log.Info().
+		Hex("origin_id", t.SignerID[:]).
+		Uint64("view", t.View).
+		Str("timeout_id", t.ID().String()).
+		Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
+	h.timeoutAggregator.AddTimeout(t)
 }
