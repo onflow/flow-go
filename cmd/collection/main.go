@@ -426,7 +426,7 @@ func main() {
 				return nil, err
 			}
 
-			proposalFactory, err := factories.NewProposalEngineFactory(
+			complianceEngineFactory, err := factories.NewComplianceEngineFactory(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -508,7 +508,7 @@ func main() {
 				builderFactory,
 				clusterStateFactory,
 				hotstuffFactory,
-				proposalFactory,
+				complianceEngineFactory,
 				syncFactory,
 				messageHubFactory,
 			)
