@@ -257,7 +257,7 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 	s.Run("should fail with wrong proposer", func() {
 		header := *block.Header
 		header.ProposerID = unittest.IdentifierFixture()
-		err := s.hub.processQueuedBlock(&header)
+		err := s.hub.processQueuedProposal(&header)
 		require.Error(s.T(), err, "should fail with wrong proposer")
 		header.ProposerID = s.myID
 	})
@@ -266,7 +266,7 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 	s.Run("should fail with changed/missing parent", func() {
 		header := *block.Header
 		header.ParentID[0]++
-		err := s.hub.processQueuedBlock(&header)
+		err := s.hub.processQueuedProposal(&header)
 		require.Error(s.T(), err, "should fail with missing parent")
 		header.ParentID[0]--
 	})
@@ -275,7 +275,7 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 	s.Run("should fail with wrong block ID", func() {
 		header := *block.Header
 		header.View++
-		err := s.hub.processQueuedBlock(&header)
+		err := s.hub.processQueuedProposal(&header)
 		require.Error(s.T(), err, "should fail with missing payload")
 		header.View--
 	})
@@ -308,7 +308,7 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 			Once()
 
 		// submit to broadcast proposal
-		err := s.hub.processQueuedBlock(&headerFromHotstuff)
+		err := s.hub.processQueuedProposal(&headerFromHotstuff)
 		require.NoError(s.T(), err, "header broadcast should pass")
 
 		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
