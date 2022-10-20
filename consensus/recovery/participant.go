@@ -28,11 +28,8 @@ func Participant(
 			return fmt.Errorf("could not add block to forks: %w", err)
 		}
 
-		// recovery the proposer's vote
-		err = voteAggregator.AddBlock(proposal)
-		if err != nil {
-			return fmt.Errorf("could not process proposal %v: %w", proposal.Block.BlockID, err)
-		}
+		// recover the proposer's vote
+		voteAggregator.AddBlock(proposal)
 
 		return nil
 	})
