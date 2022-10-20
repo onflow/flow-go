@@ -172,6 +172,9 @@ func (i TransactionInvoker) Process(
 	proc.Logs = append(proc.Logs, env.Logs()...)
 	proc.ComputationUsed = proc.ComputationUsed + env.ComputationUsed()
 	proc.MemoryEstimate = proc.MemoryEstimate + env.MemoryEstimate()
+	if proc.IsSampled() {
+		proc.ComputationIntensities = env.ComputationIntensities()
+	}
 
 	// if tx failed this will only contain fee deduction events
 	proc.Events = append(proc.Events, env.Events()...)
@@ -230,7 +233,7 @@ func (i TransactionInvoker) logExecutionIntensities(
 	}
 	env.Logger().Info().
 		Uint64("ledgerInteractionUsed", txnState.InteractionUsed()).
-		Uint("computationUsed", txnState.TotalComputationUsed()).
+		Uint64("computationUsed", txnState.TotalComputationUsed()).
 		Uint64("memoryEstimate", txnState.TotalMemoryEstimate()).
 		Dict("computationIntensities", computation).
 		Dict("memoryIntensities", memory).
