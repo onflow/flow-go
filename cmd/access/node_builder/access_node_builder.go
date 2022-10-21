@@ -53,7 +53,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
-	edreader "github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
@@ -134,6 +133,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			SecureGRPCListenAddr:      "0.0.0.0:9001",
 			HTTPListenAddr:            "0.0.0.0:8000",
 			RESTListenAddr:            "",
+			StateStreamListenAddr:     "",
 			CollectionAddr:            "",
 			HistoricalAccessAddrs:     "",
 			CollectionClientTimeout:   3 * time.Second,
@@ -199,7 +199,6 @@ type FlowAccessNodeBuilder struct {
 	FollowerCore               module.HotStuffFollower
 	ExecutionDataDownloader    execution_data.Downloader
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
-	ExecutionDataReader        edreader.ExecutionDataReader
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -490,21 +489,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			return builder.ExecutionDataRequester, nil
 		})
 
-	return builder
-}
-
-func (builder *FlowAccessNodeBuilder) BuildExecutionDataReader() *FlowAccessNodeBuilder {
-	builder.Component("execution data reader", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		builder.ExecutionDataReader = edreader.NewExecutionDataReader(
-			builder.ExecutionDataDownloader,
-			builder.Storage.Headers,
-			builder.Storage.Results,
-			builder.Storage.Seals,
-			edrequester.DefaultFetchTimeout,
-			builder.ExecutionDataRequester.GetLastProcessedIndex,
-		)
-		return builder.ExecutionDataRequester, nil
-	})
 	return builder
 }
 
@@ -816,6 +800,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Transactions,
 				node.Storage.Receipts,
 				node.Storage.Results,
+				node.Storage.Seals,
 				node.RootChainID,
 				builder.TransactionMetrics,
 				builder.AccessMetrics,
@@ -825,7 +810,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
-				builder.ExecutionDataReader,
+				builder.ExecutionDataDownloader,
 			)
 			if err != nil {
 				return nil, err
@@ -913,7 +898,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionDataRequester()
-		builder.BuildExecutionDataReader()
 	}
 
 	builder.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

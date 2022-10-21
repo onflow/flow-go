@@ -55,7 +55,6 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
-		suite.reader,
 	)
 
 	// Successfully return the transaction from the historical node
@@ -113,7 +112,6 @@ func (suite *Suite) TestHistoricalTransaction() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
-		suite.reader,
 	)
 
 	// Successfully return the transaction from the historical node

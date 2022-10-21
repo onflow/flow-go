@@ -19,12 +19,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/component"
+	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
-	exedatareadermock "github.com/onflow/flow-go/module/state_synchronization/requester/jobs/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -52,7 +52,8 @@ type Suite struct {
 	transactions *storage.Transactions
 	receipts     *storage.ExecutionReceipts
 	results      *storage.ExecutionResults
-	reader       *exedatareadermock.ExecutionDataReader
+	seals        *storage.Seals
+	downloader   *downloadermock.Downloader
 
 	eng    *Engine
 	cancel context.CancelFunc
@@ -96,7 +97,8 @@ func (suite *Suite) SetupTest() {
 	suite.transactions = new(storage.Transactions)
 	suite.receipts = new(storage.ExecutionReceipts)
 	suite.results = new(storage.ExecutionResults)
-	suite.reader = new(exedatareadermock.ExecutionDataReader)
+	suite.seals = new(storage.Seals)
+	suite.downloader = new(downloadermock.Downloader)
 	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 	require.NoError(suite.T(), err)
 	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
@@ -105,8 +107,8 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	rpcEngBuilder, err := rpc.NewBuilder(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0, 0,
-		false, false, nil, nil, suite.reader)
+		suite.transactions, suite.receipts, suite.results, suite.seals, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0,
+		0, false, false, nil, nil, suite.downloader)
 	require.NoError(suite.T(), err)
 	rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)

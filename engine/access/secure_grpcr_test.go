@@ -19,9 +19,9 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	exedatareadermock "github.com/onflow/flow-go/module/state_synchronization/requester/jobs/mock"
 	"github.com/onflow/flow-go/network"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -45,7 +45,7 @@ type SecureGRPCTestSuite struct {
 	metrics    *metrics.NoopCollector
 	rpcEng     *rpc.Engine
 	publicKey  crypto.PublicKey
-	reader     *exedatareadermock.ExecutionDataReader
+	downloader *downloadermock.Downloader
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -53,6 +53,7 @@ type SecureGRPCTestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
+	seals        *storagemock.Seals
 }
 
 func (suite *SecureGRPCTestSuite) SetupTest() {
@@ -70,7 +71,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	suite.transactions = new(storagemock.Transactions)
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
-	suite.reader = new(exedatareadermock.ExecutionDataReader)
+	suite.downloader = new(downloadermock.Downloader)
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -105,7 +106,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	suite.publicKey = networkingKey.PublicKey()
 
 	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
-		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil, suite.reader)
+		nil, suite.seals, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil, suite.downloader)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)

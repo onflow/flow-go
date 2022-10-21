@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -65,7 +64,6 @@ type Backend struct {
 	backendScripts
 	backendTransactions
 	backendEvents
-	backendExecutionData
 	backendBlockHeaders
 	backendBlockDetails
 	backendAccounts
@@ -98,7 +96,6 @@ func New(
 	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
-	reader jobs.ExecutionDataReader,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -146,10 +143,6 @@ func New(
 			connFactory:       connFactory,
 			log:               log,
 			maxHeightRange:    maxHeightRange,
-		},
-		backendExecutionData: backendExecutionData{
-			blocks:   blocks,
-			execData: reader,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,
