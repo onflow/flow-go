@@ -177,9 +177,13 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
 	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
 	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
-	mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
 	mockery --name '.*' --dir=./cmd/util/ledger/reporters --case=underscore --output="./cmd/util/ledger/reporters/mock" --outpkg="mock"
 	mockery --name 'Storage' --dir=module/executiondatasync/tracker --case=underscore --output="module/executiondatasync/tracker/mock" --outpkg="mocktracker"
+
+	#temporarily make insecure/ a non-module to allow mockery to create mocks
+	mv insecure/go.mod insecure/go2.mod
+	mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
+	mv insecure/go2.mod insecure/go.mod
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -276,6 +280,7 @@ docker-build-execution-debug:
 # build corrupted execution node for BFT testing
 .PHONY: docker-build-execution-corrupted
 docker-build-execution-corrupted:
+	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
 	mv insecure/go.mod insecure/go2.mod
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
@@ -296,6 +301,7 @@ docker-build-verification-debug:
 # build corrupted verification node for BFT testing
 .PHONY: docker-build-verification-corrupted
 docker-build-verification-corrupted:
+	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
 	mv insecure/go.mod insecure/go2.mod
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
