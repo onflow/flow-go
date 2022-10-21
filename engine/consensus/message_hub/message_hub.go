@@ -368,7 +368,7 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	//          new consensus nodes for the next epoch are left out.
 	// Note: retrieving the final state requires a time-intensive database read.
 	//       Therefore, we execute this in a separate routine, because
-	//       `BroadcastTimeout` is directly called by the consensus core logic.
+	//       `OnOwnTimeout` is directly called by the consensus core logic.
 	allIdentities, err := h.state.AtBlockID(header.ParentID).Identities(filter.And(
 		filter.Not(filter.HasNodeID(h.me.NodeID())),
 	))
@@ -434,8 +434,8 @@ func (h *MessageHub) provideProposal(proposal *messages.BlockProposal, recipient
 	log.Info().Msg("block proposal propagated to non-consensus nodes")
 }
 
-// SendVote queues vote for subsequent sending
-func (h *MessageHub) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+// OnOwnVote queues vote for subsequent sending
+func (h *MessageHub) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	vote := &packedVote{
 		recipientID: recipientID,
 		vote: &messages.BlockVote{
@@ -449,15 +449,15 @@ func (h *MessageHub) SendVote(blockID flow.Identifier, view uint64, sigData []by
 	}
 }
 
-// BroadcastTimeout queues timeout for subsequent sending
-func (h *MessageHub) BroadcastTimeout(timeout *model.TimeoutObject) {
+// OnOwnTimeout queues timeout for subsequent sending
+func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 	if ok := h.queuedTimeouts.Push(timeout); ok {
 		h.queuedMessagesNotifier.Notify()
 	}
 }
 
-// BroadcastProposalWithDelay queues proposal for subsequent sending
-func (h *MessageHub) BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) {
+// OnOwnProposal queues proposal for subsequent sending
+func (h *MessageHub) OnOwnProposal(proposal *flow.Header, delay time.Duration) {
 	go func() {
 		select {
 		case <-time.After(delay):

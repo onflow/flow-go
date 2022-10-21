@@ -217,7 +217,7 @@ func (lc *LogConsumer) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
 		Msg("new TC discovered")
 }
 
-func (lc *LogConsumer) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+func (lc *LogConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	lc.log.Info().
 		Hex("block_id", blockID[:]).
 		Uint64("block_view", view).
@@ -225,7 +225,7 @@ func (lc *LogConsumer) SendVote(blockID flow.Identifier, view uint64, sigData []
 		Msg("vote transmission request from hotstuff")
 }
 
-func (lc *LogConsumer) BroadcastTimeout(timeout *model.TimeoutObject) {
+func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	logContext := lc.log.With().
 		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
 		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
@@ -240,7 +240,7 @@ func (lc *LogConsumer) BroadcastTimeout(timeout *model.TimeoutObject) {
 	log.Info().Msg("timeout broadcast request from hotstuff")
 }
 
-func (lc *LogConsumer) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) {
+func (lc *LogConsumer) OnOwnProposal(header *flow.Header, delay time.Duration) {
 	lc.log.Info().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).

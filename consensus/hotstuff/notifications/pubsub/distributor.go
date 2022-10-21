@@ -190,26 +190,26 @@ func (p *Distributor) OnInvalidTimeoutDetected(timeout *model.TimeoutObject) {
 	}
 }
 
-func (p *Distributor) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+func (p *Distributor) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, s := range p.subscribers {
-		s.SendVote(blockID, view, sigData, recipientID)
+		s.OnOwnVote(blockID, view, sigData, recipientID)
 	}
 }
 
-func (p *Distributor) BroadcastTimeout(timeout *model.TimeoutObject) {
+func (p *Distributor) OnOwnTimeout(timeout *model.TimeoutObject) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, s := range p.subscribers {
-		s.BroadcastTimeout(timeout)
+		s.OnOwnTimeout(timeout)
 	}
 }
 
-func (p *Distributor) BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) {
+func (p *Distributor) OnOwnProposal(proposal *flow.Header, delay time.Duration) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, s := range p.subscribers {
-		s.BroadcastProposalWithDelay(proposal, delay)
+		s.OnOwnProposal(proposal, delay)
 	}
 }

@@ -299,7 +299,7 @@ func (e *EventHandler) broadcastTimeoutObjectIfAuthorized() error {
 	e.timeoutAggregator.AddTimeout(timeout)
 
 	// raise a notification to broadcast timeout
-	e.notifier.BroadcastTimeout(timeout)
+	e.notifier.OnOwnTimeout(timeout)
 	log.Debug().Msg("broadcast TimeoutObject done")
 
 	return nil
@@ -446,7 +446,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		delay = delay - elapsed
 	}
 	// raise a notification to broadcast proposal
-	e.notifier.BroadcastProposalWithDelay(header, delay)
+	e.notifier.OnOwnProposal(header, delay)
 	return nil
 }
 
@@ -528,7 +528,7 @@ func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLea
 	} else {
 		log.Debug().Msg("forwarding vote to compliance engine")
 		// raise a notification to send vote
-		e.notifier.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
+		e.notifier.OnOwnVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
 	}
 	return nil
 }

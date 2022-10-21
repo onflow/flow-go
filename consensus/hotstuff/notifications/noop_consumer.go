@@ -69,8 +69,8 @@ func (c *NoopConsumer) OnNewQcDiscovered(*flow.QuorumCertificate) {}
 
 func (c *NoopConsumer) OnNewTcDiscovered(*flow.TimeoutCertificate) {}
 
-func (c *NoopConsumer) SendVote(flow.Identifier, uint64, []byte, flow.Identifier) {}
+func (c *NoopConsumer) OnOwnVote(flow.Identifier, uint64, []byte, flow.Identifier) {}
 
-func (c *NoopConsumer) BroadcastTimeout(*model.TimeoutObject) {}
+func (c *NoopConsumer) OnOwnTimeout(*model.TimeoutObject) {}
 
-func (c *NoopConsumer) BroadcastProposalWithDelay(*flow.Header, time.Duration) {}
+func (c *NoopConsumer) OnOwnProposal(*flow.Header, time.Duration) {}

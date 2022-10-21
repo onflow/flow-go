@@ -17,13 +17,13 @@ type Consumer struct {
 	mock.Mock
 }
 
-// BroadcastProposalWithDelay provides a mock function with given fields: proposal, delay
-func (_m *Consumer) BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) {
+// OnOwnProposal provides a mock function with given fields: proposal, delay
+func (_m *Consumer) OnOwnProposal(proposal *flow.Header, delay time.Duration) {
 	_m.Called(proposal, delay)
 }
 
-// BroadcastTimeout provides a mock function with given fields: timeout
-func (_m *Consumer) BroadcastTimeout(timeout *model.TimeoutObject) {
+// OnOwnTimeout provides a mock function with given fields: timeout
+func (_m *Consumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	_m.Called(timeout)
 }
 
@@ -127,8 +127,8 @@ func (_m *Consumer) OnVoting(vote *model.Vote) {
 	_m.Called(vote)
 }
 
-// SendVote provides a mock function with given fields: blockID, view, sigData, recipientID
-func (_m *Consumer) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+// OnOwnVote provides a mock function with given fields: blockID, view, sigData, recipientID
+func (_m *Consumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	_m.Called(blockID, view, sigData, recipientID)
 }
 

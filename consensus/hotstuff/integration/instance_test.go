@@ -87,18 +87,18 @@ type MockedCommunicatorConsumer struct {
 	mock.Mock
 }
 
-// BroadcastProposalWithDelay provides a mock function with given fields: proposal, delay
-func (_m *MockedCommunicatorConsumer) BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) {
+// OnOwnProposal provides a mock function with given fields: proposal, delay
+func (_m *MockedCommunicatorConsumer) OnOwnProposal(proposal *flow.Header, delay time.Duration) {
 	_m.Called(proposal, delay)
 }
 
-// BroadcastTimeout provides a mock function with given fields: timeout
-func (_m *MockedCommunicatorConsumer) BroadcastTimeout(timeout *model.TimeoutObject) {
+// OnOwnTimeout provides a mock function with given fields: timeout
+func (_m *MockedCommunicatorConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	_m.Called(timeout)
 }
 
-// SendVote provides a mock function with given fields: blockID, view, sigData, recipientID
-func (_m *MockedCommunicatorConsumer) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+// OnOwnVote provides a mock function with given fields: blockID, view, sigData, recipientID
+func (_m *MockedCommunicatorConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	_m.Called(blockID, view, sigData, recipientID)
 }
 
@@ -292,7 +292,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	in.verifier.On("VerifyTC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// program the hotstuff communicator behaviour
-	in.notifier.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Run(
+	in.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			header, ok := args[0].(*flow.Header)
 			require.True(t, ok)
@@ -317,13 +317,13 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			in.ProcessBlock(proposal)
 		},
 	)
-	in.notifier.On("BroadcastTimeout", mock.Anything).Run(func(args mock.Arguments) {
+	in.notifier.On("OnOwnTimeout", mock.Anything).Run(func(args mock.Arguments) {
 		timeoutObject, ok := args[0].(*model.TimeoutObject)
 		require.True(t, ok)
 		in.queue <- timeoutObject
 	},
 	)
-	in.notifier.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	in.notifier.On("OnOwnVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	// program the finalizer module behaviour
 	in.finalizer.On("MakeFinal", mock.Anything).Return(

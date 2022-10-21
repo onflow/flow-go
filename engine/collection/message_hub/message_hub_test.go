@@ -235,8 +235,8 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	})
 }
 
-// TestBroadcastProposalWithDelay tests broadcasting proposals with different inputs
-func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
+// TestOnOwnProposal tests broadcasting proposals with different inputs
+func (s *MessageHubSuite) TestOnOwnProposal() {
 	// add execution node to cluster to make sure we exclude them from broadcast
 	s.cluster = append(s.cluster, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))
 
@@ -332,7 +332,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		}).Return(nil)
 
 		// submit vote
-		s.hub.SendVote(vote.BlockID, vote.View, vote.SigData, recipientID)
+		s.hub.OnOwnVote(vote.BlockID, vote.View, vote.SigData, recipientID)
 	})
 	s.Run("timeout", func() {
 		wg.Add(1)
@@ -348,7 +348,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
 		// submit timeout
-		s.hub.BroadcastTimeout(timeout)
+		s.hub.OnOwnTimeout(timeout)
 	})
 	s.Run("proposal", func() {
 		wg.Add(1)
@@ -369,7 +369,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 			Return(nil)
 
 		// submit proposal
-		s.hub.BroadcastProposalWithDelay(proposal.Header, 0)
+		s.hub.OnOwnProposal(proposal.Header, 0)
 	})
 
 	unittest.RequireReturnsBefore(s.T(), func() {

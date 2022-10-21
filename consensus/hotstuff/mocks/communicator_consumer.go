@@ -17,18 +17,18 @@ type CommunicatorConsumer struct {
 	mock.Mock
 }
 
-// BroadcastProposalWithDelay provides a mock function with given fields: proposal, delay
-func (_m *CommunicatorConsumer) BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) {
+// OnOwnProposal provides a mock function with given fields: proposal, delay
+func (_m *CommunicatorConsumer) OnOwnProposal(proposal *flow.Header, delay time.Duration) {
 	_m.Called(proposal, delay)
 }
 
-// BroadcastTimeout provides a mock function with given fields: timeout
-func (_m *CommunicatorConsumer) BroadcastTimeout(timeout *model.TimeoutObject) {
+// OnOwnTimeout provides a mock function with given fields: timeout
+func (_m *CommunicatorConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	_m.Called(timeout)
 }
 
-// SendVote provides a mock function with given fields: blockID, view, sigData, recipientID
-func (_m *CommunicatorConsumer) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+// OnOwnVote provides a mock function with given fields: blockID, view, sigData, recipientID
+func (_m *CommunicatorConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	_m.Called(blockID, view, sigData, recipientID)
 }
 

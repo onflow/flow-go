@@ -245,23 +245,23 @@ type TimeoutCollectorConsumer interface {
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
 type CommunicatorConsumer interface {
-	// SendVote notifies about intent to send a vote for the given parameters to the specified recipient.
+	// OnOwnVote notifies about intent to send a vote for the given parameters to the specified recipient.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier)
+	OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier)
 
-	// BroadcastTimeout notifies about intent to broadcast the given timeout object(TO) to all actors of the consensus process.
+	// OnOwnTimeout notifies about intent to broadcast the given timeout object(TO) to all actors of the consensus process.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	BroadcastTimeout(timeout *model.TimeoutObject)
+	OnOwnTimeout(timeout *model.TimeoutObject)
 
-	// BroadcastProposalWithDelay notifies about intent to broadcast the given block proposal to all actors of
+	// OnOwnProposal notifies about intent to broadcast the given block proposal to all actors of
 	// the consensus process.
 	// delay is to hold the proposal before broadcasting it. Useful to control the block production rate.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration)
+	OnOwnProposal(proposal *flow.Header, delay time.Duration)
 }
