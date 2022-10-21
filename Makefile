@@ -33,7 +33,6 @@ K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
 # docker container registry
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
-export DOCKER_BUILDKIT := 1
 
 # setup the crypto package under the GOPATH: needed to test packages importing flow-go/crypto
 .PHONY: crypto_setup_gopath
@@ -277,9 +276,11 @@ docker-build-execution-debug:
 # build corrupted execution node for BFT testing
 .PHONY: docker-build-execution-corrupted
 docker-build-execution-corrupted:
+	mv insecure/go.mod insecure/go2.mod
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/execution-corrupted:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)" .
+	mv insecure/go2.mod insecure/go.mod
 
 .PHONY: docker-build-verification
 docker-build-verification:
@@ -295,9 +296,11 @@ docker-build-verification-debug:
 # build corrupted verification node for BFT testing
 .PHONY: docker-build-verification-corrupted
 docker-build-verification-corrupted:
+	mv insecure/go.mod insecure/go2.mod
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/verification-corrupted:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)" .
+	mv insecure/go2.mod insecure/go.mod
 
 .PHONY: docker-build-access
 docker-build-access:
