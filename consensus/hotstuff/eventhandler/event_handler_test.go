@@ -301,7 +301,6 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.notifier.On("OnEnteringView", mock.Anything, mock.Anything).Maybe()
 	es.notifier.On("OnProposingBlock", mock.Anything).Maybe()
 	es.notifier.On("OnReceiveProposal", mock.Anything, mock.Anything).Maybe()
-	es.notifier.On("OnVoting", mock.Anything).Maybe()
 	es.notifier.On("OnQcConstructedFromVotes", mock.Anything, mock.Anything).Maybe()
 
 	eventhandler, err := NewEventHandler(
@@ -353,7 +352,7 @@ func (es *EventHandlerSuite) TestStartNewView_ParentProposalNotFound() {
 
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	es.forks.AssertCalled(es.T(), "GetProposal", newestQC.BlockID)
-	es.notifier.AssertNotCalled(es.T(), "BroadcastProposalWithDelay", mock.Anything, mock.Anything)
+	es.notifier.AssertNotCalled(es.T(), "OnOwnProposal", mock.Anything, mock.Anything)
 }
 
 // TestOnReceiveProposal_StaleProposal test that proposals lower than finalized view are not processed at all
@@ -451,11 +450,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_Vote_NotNextLeader() {
 	// proposal is safe to vote
 	es.safetyRules.votable[proposal.Block.BlockID] = struct{}{}
 
-	es.notifier.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		blockID, ok := args[0].(flow.Identifier)
-		require.True(es.T(), ok)
-		require.Equal(es.T(), proposal.Block.BlockID, blockID)
-	}).Once()
+	es.notifier.On("OnOwnVote", proposal.Block.BlockID, mock.Anything, mock.Anything, mock.Anything).Once()
 
 	// vote should be created for this proposal
 	err := es.eventhandler.OnReceiveProposal(proposal)
@@ -474,14 +469,14 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ProposeAfterReceivingQC() {
 	err := es.eventhandler.OnReceiveQc(qc)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), qc.View+1, es.paceMaker.CurView(), "expect a view change")
-	es.notifier.AssertNotCalled(es.T(), "BroadcastProposalWithDelay", mock.Anything, mock.Anything)
+	es.notifier.AssertNotCalled(es.T(), "OnOwnProposal", mock.Anything, mock.Anything)
 
 	es.voteAggregator.On("AddBlock", es.votingProposal).Return(nil).Once()
 
 	// we are leader for current view
 	es.committee.leaders[es.paceMaker.CurView()] = struct{}{}
 
-	es.notifier.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		header, ok := args[0].(*flow.Header)
 		require.True(es.T(), ok)
 		// it should broadcast a header as the same as current view
@@ -510,14 +505,14 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ProposeAfterReceivingTC() {
 	err := es.eventhandler.OnReceiveTc(tc)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), tc.View+1, es.paceMaker.CurView(), "expect a view change")
-	es.notifier.AssertNotCalled(es.T(), "BroadcastProposalWithDelay", mock.Anything, mock.Anything)
+	es.notifier.AssertNotCalled(es.T(), "OnOwnProposal", mock.Anything, mock.Anything)
 
 	es.voteAggregator.On("AddBlock", es.votingProposal).Return(nil).Once()
 
 	// we are leader for current view
 	es.committee.leaders[es.paceMaker.CurView()] = struct{}{}
 
-	es.notifier.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		header, ok := args[0].(*flow.Header)
 		require.True(es.T(), ok)
 		// it should broadcast a header as the same as current view
@@ -556,7 +551,7 @@ func (es *EventHandlerSuite) TestOnReceiveQc_HappyPath() {
 	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+
 		"and the QC triggered a view change, then start new view")
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	es.notifier.AssertNotCalled(es.T(), "BroadcastProposalWithDelay", mock.Anything, mock.Anything)
+	es.notifier.AssertNotCalled(es.T(), "OnOwnProposal", mock.Anything, mock.Anything)
 }
 
 // TestOnReceiveQc_FutureView tests that building a QC for future view triggers view change
@@ -623,7 +618,7 @@ func (es *EventHandlerSuite) TestOnReceiveQc_NextLeaderProposes() {
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
 
-	es.notifier.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		header, ok := args[0].(*flow.Header)
 		require.True(es.T(), ok)
 		// it should broadcast a header as the same as endView
@@ -649,7 +644,7 @@ func (es *EventHandlerSuite) TestOnReceiveQc_ProposeOnce() {
 
 	es.endView++
 
-	es.notifier.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Once()
+	es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Once()
 
 	err := es.eventhandler.OnReceiveProposal(es.votingProposal)
 	require.NoError(es.T(), err)
@@ -663,7 +658,7 @@ func (es *EventHandlerSuite) TestOnReceiveQc_ProposeOnce() {
 	require.NoError(es.T(), err)
 
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	es.notifier.AssertNumberOfCalls(es.T(), "BroadcastProposalWithDelay", 1)
+	es.notifier.AssertNumberOfCalls(es.T(), "OnOwnProposal", 1)
 }
 
 // TestOnTCConstructed_HappyPath tests that building a TC for current view triggers view change
@@ -688,7 +683,7 @@ func (es *EventHandlerSuite) TestOnReceiveTc_NextLeaderProposes() {
 	es.committee.leaders[es.tc.View+1] = struct{}{}
 	es.endView++
 
-	es.notifier.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		header, ok := args[0].(*flow.Header)
 		require.True(es.T(), ok)
 		// it should broadcast a header as the same as endView
@@ -712,7 +707,7 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 
 	es.timeoutAggregator.On("AddTimeout", mock.Anything).Return().Once()
 
-	es.notifier.On("BroadcastTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("OnOwnTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		timeoutObject, ok := args[0].(*model.TimeoutObject)
 		require.True(es.T(), ok)
 		// it should broadcast a TO with same view as endView
@@ -753,7 +748,7 @@ func (es *EventHandlerSuite) TestOnTimeout_SanityChecks() {
 	require.Equal(es.T(), tc, es.paceMaker.LastViewTC(), "invalid last view TC")
 	require.Equal(es.T(), qc, es.paceMaker.NewestQC(), "invalid newest QC")
 
-	es.notifier.On("BroadcastTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("OnOwnTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		timeoutObject, ok := args[0].(*model.TimeoutObject)
 		require.True(es.T(), ok)
 		require.Equal(es.T(), es.endView, timeoutObject.View)
@@ -782,7 +777,7 @@ func (es *EventHandlerSuite) TestOnTimeout_ReplicaEjected() {
 		require.ErrorIs(es.T(), err, exception, "expect a wrapped exception")
 	})
 	es.timeoutAggregator.AssertNotCalled(es.T(), "AddTimeout", mock.Anything)
-	es.notifier.AssertNotCalled(es.T(), "BroadcastTimeout", mock.Anything)
+	es.notifier.AssertNotCalled(es.T(), "OnOwnTimeout", mock.Anything, mock.Anything)
 }
 
 // Test100Timeout tests that receiving 100 TCs for increasing views advances rounds
@@ -828,7 +823,7 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 		// should trigger 100 view change
 		es.endView++
 
-		es.notifier.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 			header, ok := args[0].(*flow.Header)
 			require.True(es.T(), ok)
 			require.Equal(es.T(), proposal.Block.View+1, header.View)
@@ -926,7 +921,7 @@ func (es *EventHandlerSuite) TestStart_ProposeOnce() {
 
 	es.endView++
 
-	es.notifier.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Once()
+	es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Once()
 
 	err := es.eventhandler.OnReceiveProposal(es.votingProposal)
 	require.NoError(es.T(), err)
@@ -935,7 +930,7 @@ func (es *EventHandlerSuite) TestStart_ProposeOnce() {
 	err = es.eventhandler.OnReceiveQc(es.qc)
 	require.NoError(es.T(), err)
 
-	es.notifier.AssertNumberOfCalls(es.T(), "BroadcastProposalWithDelay", 1)
+	es.notifier.AssertNumberOfCalls(es.T(), "OnOwnProposal", 1)
 
 	es.forks.On("NewestView").Return(es.endView).Once()
 
@@ -945,7 +940,7 @@ func (es *EventHandlerSuite) TestStart_ProposeOnce() {
 
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	// assert that broadcast wasn't trigger again
-	es.notifier.AssertNumberOfCalls(es.T(), "BroadcastProposalWithDelay", 1)
+	es.notifier.AssertNumberOfCalls(es.T(), "OnOwnProposal", 1)
 }
 
 // TestCreateProposal_SanityChecks tests that proposing logic performs sanity checks when creating new block proposal.
@@ -960,7 +955,7 @@ func (es *EventHandlerSuite) TestCreateProposal_SanityChecks() {
 	// I'm the next leader
 	es.committee.leaders[tc.View+1] = struct{}{}
 
-	es.notifier.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		header, ok := args[0].(*flow.Header)
 		require.True(es.T(), ok)
 		// we need to make sure that produced proposal contains only QC even if there is TC for previous view as well
@@ -986,7 +981,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ProposalForActiveView() {
 	err := es.eventhandler.OnReceiveProposal(es.votingProposal)
 	require.NoError(es.T(), err)
 
-	es.notifier.AssertNotCalled(es.T(), "BroadcastProposalWithDelay", mock.Anything, mock.Anything)
+	es.notifier.AssertNotCalled(es.T(), "OnOwnProposal", mock.Anything, mock.Anything)
 }
 
 // TestOnPartialTcCreated_ProducedTimeout tests that when receiving partial TC for active view we will create a timeout object
@@ -1000,7 +995,7 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_ProducedTimeout() {
 		LastViewTC: nil,
 	}
 
-	es.notifier.On("BroadcastTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("OnOwnTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		timeoutObject, ok := args[0].(*model.TimeoutObject)
 		require.True(es.T(), ok)
 		// it should broadcast a TO with same view as partialTc.View
@@ -1030,7 +1025,7 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_NotActiveView() {
 	// partial TC shouldn't trigger view change
 	require.Equal(es.T(), es.initView, es.paceMaker.CurView(), "incorrect view change")
 	// we don't want to create timeout if partial TC was delivered for view different than active one.
-	es.notifier.AssertNotCalled(es.T(), "BroadcastTimeout", mock.Anything)
+	es.notifier.AssertNotCalled(es.T(), "OnOwnTimeout", mock.Anything, mock.Anything)
 }
 
 // TestOnPartialTcCreated_QcAndTcProcessing tests that EventHandler processes QC and TC included in hotstuff.PartialTcCreated
@@ -1045,7 +1040,7 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_QcAndTcProcessing() {
 
 		es.endView++
 
-		es.notifier.On("BroadcastTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		es.notifier.On("OnOwnTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 			timeoutObject, ok := args[0].(*model.TimeoutObject)
 			require.True(es.T(), ok)
 			// it should broadcast a TO with same view as partialTc.View

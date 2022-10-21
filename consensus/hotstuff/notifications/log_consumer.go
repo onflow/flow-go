@@ -93,13 +93,6 @@ func (lc *LogConsumer) OnProposingBlock(block *model.Proposal) {
 		Msg("proposing block")
 }
 
-func (lc *LogConsumer) OnVoting(vote *model.Vote) {
-	lc.log.Debug().
-		Uint64("block_view", vote.View).
-		Hex("block_id", vote.BlockID[:]).
-		Msg("voting for block")
-}
-
 func (lc *LogConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
 	lc.log.Debug().
 		Uint64("cur_view", curView).
@@ -218,7 +211,7 @@ func (lc *LogConsumer) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
 		Msg("new TC discovered")
 }
 
-func (lc *LogConsumer) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+func (lc *LogConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	lc.log.Info().
 		Hex("block_id", blockID[:]).
 		Uint64("block_view", view).
@@ -226,23 +219,12 @@ func (lc *LogConsumer) SendVote(blockID flow.Identifier, view uint64, sigData []
 		Msg("vote transmission request from hotstuff")
 }
 
-func (lc *LogConsumer) BroadcastTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
-	logContext := lc.log.With().
-		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
-		Uint64("timeout_tick", timeoutTick).
-		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
-		Uint64("timeout_view", timeout.View)
-
-	if timeout.LastViewTC != nil {
-		logContext.
-			Uint64("last_view_tc_view", timeout.LastViewTC.View).
-			Uint64("last_view_tc_newest_qc_view", timeout.LastViewTC.NewestQC.View)
-	}
-	log := logContext.Logger()
+func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
+	log := timeout.LogContext(lc.log).Uint64("timeout_tick", timeoutTick).Logger()
 	log.Info().Msg("timeout broadcast request from hotstuff")
 }
 
-func (lc *LogConsumer) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) {
+func (lc *LogConsumer) OnOwnProposal(header *flow.Header, delay time.Duration) {
 	lc.log.Info().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).

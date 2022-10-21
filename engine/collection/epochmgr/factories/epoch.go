@@ -21,7 +21,7 @@ type EpochComponentsFactory struct {
 	builder    *BuilderFactory
 	state      *ClusterStateFactory
 	hotstuff   *HotStuffFactory
-	proposal   *ProposalEngineFactory
+	compliance *ComplianceEngineFactory
 	sync       *SyncEngineFactory
 	messageHub *MessageHubFactory
 }
@@ -34,7 +34,7 @@ func NewEpochComponentsFactory(
 	builder *BuilderFactory,
 	state *ClusterStateFactory,
 	hotstuff *HotStuffFactory,
-	proposal *ProposalEngineFactory,
+	compliance *ComplianceEngineFactory,
 	sync *SyncEngineFactory,
 	mesageHub *MessageHubFactory,
 ) *EpochComponentsFactory {
@@ -45,7 +45,7 @@ func NewEpochComponentsFactory(
 		builder:    builder,
 		state:      state,
 		hotstuff:   hotstuff,
-		proposal:   proposal,
+		compliance: compliance,
 		sync:       sync,
 		messageHub: mesageHub,
 	}
@@ -56,7 +56,7 @@ func (factory *EpochComponentsFactory) Create(
 	epoch protocol.Epoch,
 ) (
 	state cluster.State,
-	proposal component.Component,
+	compliance component.Component,
 	sync module.ReadyDoneAware,
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
@@ -137,14 +137,14 @@ func (factory *EpochComponentsFactory) Create(
 	voteAggregator = hotstuffModules.VoteAggregator
 	timeoutAggregator = hotstuffModules.TimeoutAggregator
 
-	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads, hotstuffModules.VoteAggregator, hotstuffModules.TimeoutAggregator)
+	complianceEng, err := factory.compliance.Create(mutableState, headers, payloads, hotstuffModules.VoteAggregator, hotstuffModules.TimeoutAggregator)
 	if err != nil {
-		err = fmt.Errorf("could not create proposal engine: %w", err)
+		err = fmt.Errorf("could not create compliance engine: %w", err)
 		return
 	}
 
 	var syncCore *chainsync.Core
-	syncCore, sync, err = factory.sync.Create(cluster.Members(), state, blocks, proposalEng)
+	syncCore, sync, err = factory.sync.Create(cluster.Members(), state, blocks, complianceEng)
 	if err != nil {
 		err = fmt.Errorf("could not create sync engine: %w", err)
 		return
@@ -161,14 +161,14 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
-	hotstuffModules.FinalizationDistributor.AddOnBlockFinalizedConsumer(proposalEng.OnFinalizedBlock)
+	hotstuffModules.FinalizationDistributor.AddOnBlockFinalizedConsumer(complianceEng.OnFinalizedBlock)
 
-	// attach dependencies to the proposal engine
-	proposal = proposalEng.
+	// attach dependencies to the compliance engine
+	compliance = complianceEng.
 		WithConsensus(hotstuff).
 		WithSync(syncCore)
 
-	clusterMessageHub, err := factory.messageHub.Create(state, headers, payloads, hotstuff, proposalEng, hotstuffModules)
+	clusterMessageHub, err := factory.messageHub.Create(state, headers, payloads, hotstuff, complianceEng, hotstuffModules)
 	if err != nil {
 		err = fmt.Errorf("could not create message hub: %w", err)
 	}

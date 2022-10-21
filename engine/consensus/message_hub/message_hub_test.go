@@ -222,8 +222,8 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	})
 }
 
-// TestBroadcastProposalWithDelay tests broadcasting proposals with different inputs
-func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
+// TestOnOwnProposal tests broadcasting proposals with different inputs
+func (s *MessageHubSuite) TestOnOwnProposal() {
 	// add execution node to participants to make sure we exclude them from broadcast
 	s.participants = append(s.participants, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))
 
@@ -250,6 +250,7 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 	})
 
 	// should fail with changed (missing) parent
+	// TODO(active-pacemaker): will be not relevant after merging flow.Header change
 	s.Run("should fail with changed/missing parent", func() {
 		header := *block.Header
 		header.ParentID[0]++
@@ -269,6 +270,7 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
 		// unset chain and height to make sure they are correctly reconstructed
+		// TODO(active-pacemaker): will be not relevant after merging flow.Header change
 		headerFromHotstuff := *block.Header // copy header
 		headerFromHotstuff.ChainID = ""
 		headerFromHotstuff.Height = 0
@@ -322,7 +324,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		}).Return(nil)
 
 		// submit vote
-		s.hub.SendVote(vote.BlockID, vote.View, vote.SigData, recipientID)
+		s.hub.OnOwnVote(vote.BlockID, vote.View, vote.SigData, recipientID)
 	})
 	s.Run("timeout", func() {
 		wg.Add(1)
@@ -338,7 +340,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
 		// submit timeout
-		s.hub.BroadcastTimeout(timeout, 0)
+		s.hub.OnOwnTimeout(timeout, 0)
 	})
 	s.Run("proposal", func() {
 		wg.Add(1)
@@ -359,7 +361,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit proposal
-		s.hub.BroadcastProposalWithDelay(proposal.Header, 0)
+		s.hub.OnOwnProposal(proposal.Header, 0)
 	})
 
 	unittest.RequireReturnsBefore(s.T(), func() {

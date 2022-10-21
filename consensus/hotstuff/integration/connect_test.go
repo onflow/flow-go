@@ -23,7 +23,7 @@ func Connect(t *testing.T, instances []*Instance) {
 		sender := sender // avoid capturing loop variable in closure
 
 		*sender.notifier = MockedCommunicatorConsumer{}
-		sender.notifier.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Run(
+		sender.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(
 			func(args mock.Arguments) {
 				header, ok := args[0].(*flow.Header)
 				require.True(t, ok)
@@ -68,7 +68,7 @@ func Connect(t *testing.T, instances []*Instance) {
 				}
 			},
 		)
-		sender.notifier.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
+		sender.notifier.On("OnOwnVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
 			func(args mock.Arguments) {
 				blockID, ok := args[0].(flow.Identifier)
 				require.True(t, ok)
@@ -106,7 +106,7 @@ func Connect(t *testing.T, instances []*Instance) {
 				receiver.queue <- vote
 			},
 		)
-		sender.notifier.On("BroadcastTimeout", mock.Anything).Run(
+		sender.notifier.On("OnOwnTimeout", mock.Anything).Run(
 			func(args mock.Arguments) {
 				timeoutObject, ok := args[0].(*model.TimeoutObject)
 				require.True(t, ok)

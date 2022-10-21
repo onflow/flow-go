@@ -299,7 +299,7 @@ func (e *EventHandler) broadcastTimeoutObjectIfAuthorized(timeoutTick uint64) er
 	e.timeoutAggregator.AddTimeout(timeout)
 
 	// raise a notification to broadcast timeout
-	e.notifier.BroadcastTimeout(timeout, timeoutTick)
+	e.notifier.OnOwnTimeout(timeout, timeoutTick)
 	log.Debug().Msg("broadcast TimeoutObject done")
 
 	return nil
@@ -446,7 +446,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		delay = delay - elapsed
 	}
 	// raise a notification to broadcast proposal
-	e.notifier.BroadcastProposalWithDelay(header, delay)
+	e.notifier.OnOwnProposal(header, delay)
 	return nil
 }
 
@@ -518,17 +518,13 @@ func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLea
 		return nil
 	}
 
-	// The following code is only reached, if this replica has produced a vote.
-	// Send the vote to the next leader (or directly process it, if I am the next leader).
-	e.notifier.OnVoting(ownVote)
-
 	if e.committee.Self() == nextLeader { // I am the next leader
 		log.Debug().Msg("forwarding vote to vote aggregator")
 		e.voteAggregator.AddVote(ownVote)
 	} else {
 		log.Debug().Msg("forwarding vote to compliance engine")
 		// raise a notification to send vote
-		e.notifier.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
+		e.notifier.OnOwnVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
 	}
 	return nil
 }

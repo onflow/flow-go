@@ -48,16 +48,16 @@ type packedVote struct {
 
 // MessageHub is a central module for handling incoming and outgoing messages via cluster consensus channel.
 // It performs message routing for incoming messages by matching them by type and sending to respective engine.
-/* For incoming messages handling processing looks like this:
+// For incoming messages handling processing looks like this:
 //
-//    +-------------------+      +------------+
-// -->|  Cluster-Channel  |----->| MessageHub |
-//    +-------------------+      +------+-----+
-//                          ------------|------------
-//    +------+---------+    |    +------+-----+     |    +------+------------+
-//    | VoteAggregator |----+    | Compliance |     +----| TimeoutAggregator |
-//    +----------------+         +------------+          +------+------------+
-//           vote                     block                  timeout object
+//	   +-------------------+      +------------+
+//	-->|  Cluster-Channel  |----->| MessageHub |
+//	   +-------------------+      +------+-----+
+//	                         ------------|------------
+//	   +------+---------+    |    +------+-----+     |    +------+------------+
+//	   | VoteAggregator |----+    | Compliance |     +----| TimeoutAggregator |
+//	   +----------------+         +------------+          +------+------------+
+//	          vote                     block                  timeout object
 //
 // MessageHub acts as communicator and handles hotstuff.Consumer communication events to send votes, broadcast timeouts
 // and proposals. It is responsible for communication between cluster consensus participants.
@@ -65,13 +65,12 @@ type packedVote struct {
 // All communicator events are handled on worker thread to prevent sender from blocking.
 // For outgoing messages processing logic looks like this:
 //
-//    +-------------------+      +------------+      +----------+      +------------------------+
-//    |  Cluster-Channel  |<-----| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
-//    +-------------------+      +------+-----+      +----------+      +------------------------+
-//                                                      pub/sub          vote, timeout, proposal
+//	+-------------------+      +------------+      +----------+      +------------------------+
+//	|  Cluster-Channel  |<-----| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
+//	+-------------------+      +------+-----+      +----------+      +------------------------+
+//	                                                  pub/sub          vote, timeout, proposal
 //
 // MessageHub is safe to use in concurrent environment.
-*/
 type MessageHub struct {
 	*component.ComponentManager
 	notifications.NoopConsumer
@@ -252,6 +251,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 func (h *MessageHub) processQueuedTimeout(timeout *messages.ClusterTimeoutObject) error {
 	logContext := h.log.With().
 		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
+		Uint64("timeout_tick", timeout.Seq).
 		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
 		Uint64("timeout_view", timeout.View)
 
@@ -262,11 +262,7 @@ func (h *MessageHub) processQueuedTimeout(timeout *messages.ClusterTimeoutObject
 	}
 	log := logContext.Logger()
 
-	log.Info().Msg("processing timeout broadcast request from hotstuff")
-
-	// Retrieve all consensus nodes (excluding myself).
-	// CAUTION: We must include also nodes with weight zero, because otherwise
-	//          TCs might not be constructed at epoch switchover.
+	// Retrieve all collection nodes in our cluster (excluding myself).
 	recipients, err := h.state.Final().Identities(filter.And(
 		filter.In(h.cluster),
 		filter.Not(filter.HasNodeID(h.me.NodeID())),
@@ -317,7 +313,7 @@ func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 	return nil
 }
 
-// processQueuedProposal performs actual processing of model.Proposal, as a result of successful invocation
+// processQueuedProposal performs actual processing of flow.Header, as a result of successful invocation
 // broadcasts block proposal to collection cluster.
 // No errors are expected during normal operations.
 func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
@@ -333,7 +329,7 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	}
 
 	// fill in the fields that can't be populated by HotStuff
-	// TODO clean this up - currently we set these fields in builder, then lose them in HotStuff, then need to set them again here
+	// TODO(active-pacemaker): will be not relevant after merging flow.Header change
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
@@ -393,8 +389,8 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	return nil
 }
 
-// SendVote queues vote for subsequent sending
-func (h *MessageHub) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+// OnOwnVote queues vote for subsequent sending
+func (h *MessageHub) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	vote := &packedVote{
 		recipientID: recipientID,
 		vote: &messages.ClusterBlockVote{
@@ -408,8 +404,8 @@ func (h *MessageHub) SendVote(blockID flow.Identifier, view uint64, sigData []by
 	}
 }
 
-// BroadcastTimeout queues timeout for subsequent sending
-func (h *MessageHub) BroadcastTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
+// OnOwnTimeout queues timeout for subsequent sending
+func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
 	if ok := h.queuedTimeouts.Push(&messages.ClusterTimeoutObject{
 		Seq:        timeoutTick,
 		View:       timeout.View,
@@ -421,8 +417,8 @@ func (h *MessageHub) BroadcastTimeout(timeout *model.TimeoutObject, timeoutTick 
 	}
 }
 
-// BroadcastProposalWithDelay queues proposal for subsequent sending
-func (h *MessageHub) BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) {
+// OnOwnProposal queues proposal for subsequent sending
+func (h *MessageHub) OnOwnProposal(proposal *flow.Header, delay time.Duration) {
 	go func() {
 		select {
 		case <-time.After(delay):
