@@ -48,16 +48,16 @@ type packedVote struct {
 
 // MessageHub is a central module for handling incoming and outgoing messages via cluster consensus channel.
 // It performs message routing for incoming messages by matching them by type and sending to respective engine.
-/* For incoming messages handling processing looks like this:
+// For incoming messages handling processing looks like this:
 //
-//    +-------------------+      +------------+
-// -->|  Cluster-Channel  |----->| MessageHub |
-//    +-------------------+      +------+-----+
-//                          ------------|------------
-//    +------+---------+    |    +------+-----+     |    +------+------------+
-//    | VoteAggregator |----+    | Compliance |     +----| TimeoutAggregator |
-//    +----------------+         +------------+          +------+------------+
-//           vote                     block                  timeout object
+//	   +-------------------+      +------------+
+//	-->|  Cluster-Channel  |----->| MessageHub |
+//	   +-------------------+      +------+-----+
+//	                         ------------|------------
+//	   +------+---------+    |    +------+-----+     |    +------+------------+
+//	   | VoteAggregator |----+    | Compliance |     +----| TimeoutAggregator |
+//	   +----------------+         +------------+          +------+------------+
+//	          vote                     block                  timeout object
 //
 // MessageHub acts as communicator and handles hotstuff.Consumer communication events to send votes, broadcast timeouts
 // and proposals. It is responsible for communication between cluster consensus participants.
@@ -65,13 +65,12 @@ type packedVote struct {
 // All communicator events are handled on worker thread to prevent sender from blocking.
 // For outgoing messages processing logic looks like this:
 //
-//    +-------------------+      +------------+      +----------+      +------------------------+
-//    |  Cluster-Channel  |<-----| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
-//    +-------------------+      +------+-----+      +----------+      +------------------------+
-//                                                      pub/sub          vote, timeout, proposal
+//	+-------------------+      +------------+      +----------+      +------------------------+
+//	|  Cluster-Channel  |<-----| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
+//	+-------------------+      +------+-----+      +----------+      +------------------------+
+//	                                                  pub/sub          vote, timeout, proposal
 //
 // MessageHub is safe to use in concurrent environment.
-*/
 type MessageHub struct {
 	*component.ComponentManager
 	notifications.NoopConsumer

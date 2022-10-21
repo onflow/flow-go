@@ -45,35 +45,31 @@ type packedVote struct {
 	vote        *messages.BlockVote
 }
 
-// MessageHub is a central module for handling incoming and outgoing messages via consensus channel.
+// MessageHub is a central module for handling incoming and outgoing messages via cluster consensus channel.
 // It performs message routing for incoming messages by matching them by type and sending to respective engine.
-/* For incoming messages handling processing looks like this:
+// For incoming messages handling processing looks like this:
 //
-//    +-------------------+      +------------+
-// -->| Consensus-Channel |----->| MessageHub |
-//    +-------------------+      +------+-----+
-//                          ------------|------------
-//    +------+---------+    |    +------+-----+     |    +------+------------+
-//    | VoteAggregator |----+    | Compliance |     +----| TimeoutAggregator |
-//    +----------------+         +------------+          +------+------------+
-//           vote                     block                  timeout object
+//	   +-------------------+      +------------+
+//	-->|  Cluster-Channel  |----->| MessageHub |
+//	   +-------------------+      +------+-----+
+//	                         ------------|------------
+//	   +------+---------+    |    +------+-----+     |    +------+------------+
+//	   | VoteAggregator |----+    | Compliance |     +----| TimeoutAggregator |
+//	   +----------------+         +------------+          +------+------------+
+//	          vote                     block                  timeout object
 //
 // MessageHub acts as communicator and handles hotstuff.Consumer communication events to send votes, broadcast timeouts
-// and proposals. It is responsible for communication between consensus participants and broadcasting proposals to non-consensus nodes.
+// and proposals. It is responsible for communication between cluster consensus participants.
 // It implements hotstuff.Consumer interface and needs to be subscribed for notifications via pub/sub.
 // All communicator events are handled on worker thread to prevent sender from blocking.
 // For outgoing messages processing logic looks like this:
 //
-//    +-------------------+      +------------+      +----------+      +------------------------+
-//    | Consensus-Channel |<--+--| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
-//    +-------------------+   |  +------+-----+      +----------+      +------------------------+
-//                            |                         pub/sub          vote, timeout, proposal
-//    +-------------------+   |
-//    | PushBlock-Channel |<--+
-//    +-------------------+
+//	+-------------------+      +------------+      +----------+      +------------------------+
+//	|  Cluster-Channel  |<-----| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
+//	+-------------------+      +------+-----+      +----------+      +------------------------+
+//	                                                  pub/sub          vote, timeout, proposal
 //
 // MessageHub is safe to use in concurrent environment.
-*/
 type MessageHub struct {
 	*component.ComponentManager
 	notifications.NoopConsumer
