@@ -179,9 +179,6 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 
 	// compute aggregation result and cache it in `s.cachedSignerIndices`, `s.cachedSignature`
 	sharesNum := len(s.indexToSignature)
-	if sharesNum == 0 {
-		return nil, nil, NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures")
-	}
 	indices := make([]int, 0, sharesNum)
 	signatures := make([]crypto.Signature, 0, sharesNum)
 	for i, sig := range s.indexToSignature {
@@ -191,10 +188,10 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 
 	aggregatedSignature, err := crypto.AggregateBLSSignatures(signatures)
 	if err != nil {
-		// invalidInputsError for:
-		//  * empty `signatures` slice, i.e. sharesNum == 0, which we exclude by earlier check
-		//  * if some signature(s), included via TrustedAdd, could not be decoded
-		if crypto.IsInvalidInputsError(err) {
+		if crypto.IsBLSAggregateEmptyListError(err) {
+			return nil, nil, NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures: %w", err)
+		}
+		if crypto.IsInvalidSignatureError(err) {
 			return nil, nil, NewInvalidSignatureIncludedErrorf("signatures with invalid structure were included via TrustedAdd: %w", err)
 		}
 		return nil, nil, fmt.Errorf("BLS signature aggregation failed: %w", err)
@@ -223,11 +220,8 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 //   - InvalidSignerIdxError if some signer indices are out of bound
 //   - generic error in case of an unexpected runtime failure
 func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig crypto.Signature) (bool, error) {
-	sharesNum := len(signers)
-	keys := make([]crypto.PublicKey, 0, sharesNum)
-	if sharesNum == 0 {
-		return false, NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures")
-	}
+
+	keys := make([]crypto.PublicKey, 0, len(signers))
 	for _, signer := range signers {
 		if signer >= s.n || signer < 0 {
 			return false, NewInvalidSignerIdxErrorf("signer index %d is invalid", signer)
@@ -236,11 +230,13 @@ func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig cryp
 	}
 	KeyAggregate, err := crypto.AggregateBLSPublicKeys(keys)
 	if err != nil {
-		// invalidInputsError for:
-		//  * empty `keys` slice, i.e. sharesNum == 0, which we exclude by earlier check
+		// error for:
+		//  * empty `keys` slice
 		//  * some keys are not BLS12 381 keys, which should not happen, as we checked
 		//    each key's signing algorithm in the constructor to be `crypto.BLSBLS12381`
-		// Hence, we do _not_ expect any error here during normal operations
+		if crypto.IsBLSAggregateEmptyListError(err) {
+			return false, NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures: %w", err)
+		}
 		return false, fmt.Errorf("unexpected internal error during public key aggregation: %w", err)
 	}
 	ok, err := KeyAggregate.Verify(sig, s.message, s.hasher) // no errors expected
@@ -285,7 +281,7 @@ func NewPublicKeyAggregator(publicKeys []crypto.PublicKey) (*PublicKeyAggregator
 		n:                 len(publicKeys),
 		publicKeys:        publicKeys,
 		lastSigners:       make(map[int]struct{}),
-		lastAggregatedKey: crypto.NeutralBLSPublicKey(),
+		lastAggregatedKey: crypto.IdentityBLSPublicKey(),
 		RWMutex:           sync.RWMutex{},
 	}
 	return aggregator, nil
@@ -349,7 +345,7 @@ func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, err
 		// remove the missing keys
 		updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
 		if err != nil {
-			// not expected in notrmal operations as there is at least one key, and all keys are BLS
+			// not expected in normal operations as there is at least one key, and all keys are BLS
 			return nil, fmt.Errorf("removing missing keys failed: %w", err)
 		}
 	}

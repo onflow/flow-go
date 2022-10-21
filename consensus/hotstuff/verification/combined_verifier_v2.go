@@ -113,7 +113,7 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 //   - nil if `sigData` is cryptographically valid
 //   - model.InsufficientSignaturesError if `signers` is empty.
 //     Depending on the order of checks in the higher-level logic this error might
-//     be an indicator of a external byzantine input or an internal bug.
+//     be an indicator of an external byzantine input or an internal bug.
 //   - model.InvalidFormatError if `sigData` has an incompatible format
 //   - model.ErrInvalidSignature if a signature is invalid
 //   - error if running into any unexpected exception (i.e. fatal error)
@@ -121,6 +121,7 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	if len(signers) == 0 {
 		return model.NewInsufficientSignaturesErrorf("empty list of signers")
 	}
+
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get dkg data: %w", err)
@@ -147,17 +148,16 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	// TODO: update to use module/signature.PublicKeyAggregator
 	aggregatedKey, err := crypto.AggregateBLSPublicKeys(signers.PublicStakingKeys()) // caution: requires non-empty slice of keys!
 	if err != nil {
-		// `AggregateBLSPublicKeys` returns a `crypto.invalidInputsError` in two distinct cases:
+		// `AggregateBLSPublicKeys` returns an error in two distinct cases:
 		//  (i) In case no keys are provided, i.e.  `len(signers) == 0`.
 		//      This scenario _is expected_ during normal operations, because a byzantine
 		//      proposer might construct an (invalid) QC with an empty list of signers.
 		// (ii) In case some provided public keys type is not BLS.
 		//      This scenario is _not expected_ during normal operations, because all keys are
 		//      guaranteed by the protocol to be BLS keys.
-		//
-		// By checking `len(signers) == 0` upfront , we can rule out case (i) as a source of error.
-		// Hence, if we encounter an error here, we know it is case (ii). Thereby, we can clearly
-		// distinguish a faulty _external_ input from an _internal_ uncovered edge-case.
+		if crypto.IsBLSAggregateEmptyListError(err) {
+			return model.NewInsufficientSignaturesErrorf("aggregate public keys failed: %w", err)
+		}
 		return fmt.Errorf("could not compute aggregated key for block %x: %w", block.BlockID, err)
 	}
 

@@ -190,6 +190,11 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 // sentinel errors to distinguish between internal problems and external byzantine inputs.
 func Test_VerifyQC_EmptySigners(t *testing.T) {
 	committee := &mocks.Committee{}
+	dkg := &mocks.DKG{}
+	pk := &modulemock.PublicKey{}
+	dkg.On("GroupKey").Return(pk)
+	committee.On("DKG", mock.Anything).Return(dkg, nil)
+
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifier(committee, packer)
 

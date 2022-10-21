@@ -125,6 +125,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	if len(signers) == 0 {
 		return model.NewInsufficientSignaturesErrorf("empty list of signers")
 	}
+
 	signerIdentities := signers.Lookup()
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
@@ -153,10 +154,14 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	// Caution: this function will error if pubKeys is empty
 	verifyAggregatedSignature := func(pubKeys []crypto.PublicKey, aggregatedSig crypto.Signature, hasher hash.Hasher) error {
 		// TODO: as further optimization, replace the following call with model/signature.PublicKeyAggregator
-		aggregatedKey, err := crypto.AggregateBLSPublicKeys(pubKeys) // caution: requires non-empty slice of keys!
+		aggregatedKey, err := crypto.AggregateBLSPublicKeys(pubKeys)
 		if err != nil {
+			if crypto.IsBLSAggregateEmptyListError(err) {
+				return model.NewInsufficientSignaturesErrorf("aggregate public keys failed: %w", err)
+			}
 			return fmt.Errorf("internal error computing aggregated key: %w", err)
 		}
+
 		valid, err := aggregatedKey.Verify(aggregatedSig, msg, hasher)
 		if err != nil {
 			return fmt.Errorf("internal error while verifying aggregated signature: %w", err)

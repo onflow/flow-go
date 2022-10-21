@@ -313,7 +313,7 @@ func TestKeyAggregator(t *testing.T) {
 
 				require.NoError(t, err)
 				if low == high {
-					expectedKey = crypto.NeutralBLSPublicKey()
+					expectedKey = crypto.IdentityBLSPublicKey()
 				} else {
 					expectedKey, err = crypto.AggregateBLSPublicKeys(keys[low:high])
 					require.NoError(t, err)
