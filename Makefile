@@ -192,7 +192,7 @@ tidy:
 	cd integration; go mod tidy
 	cd crypto; go mod tidy
 	cd cmd/testclient; go mod tidy
-	cd insecure; go mod tidy
+	#cd insecure; go mod tidy
 	git diff --exit-code
 
 .PHONY: lint
