@@ -747,22 +747,30 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
+	events := bstorage.NewEvents(fnb.Metrics.Cache, fnb.DB)
+	serviceEvents := bstorage.NewServiceEvents(fnb.Metrics.Cache, fnb.DB)
+	myExecutionReceipts := bstorage.NewMyExecutionReceipts(fnb.Metrics.Cache, fnb.DB, receipts)
+	transactionResults := bstorage.NewTransactionResults(fnb.Metrics.Cache, fnb.DB, bstorage.DefaultCacheSize)
 
 	fnb.Storage = Storage{
-		Headers:      headers,
-		Guarantees:   guarantees,
-		Receipts:     receipts,
-		Results:      results,
-		Seals:        seals,
-		Index:        index,
-		Payloads:     payloads,
-		Blocks:       blocks,
-		Transactions: transactions,
-		Collections:  collections,
-		Setups:       setups,
-		EpochCommits: epochCommits,
-		Statuses:     statuses,
-		Commits:      commits,
+		Headers:             headers,
+		Guarantees:          guarantees,
+		Receipts:            receipts,
+		Results:             results,
+		Seals:               seals,
+		Index:               index,
+		Payloads:            payloads,
+		Blocks:              blocks,
+		Transactions:        transactions,
+		Collections:         collections,
+		Setups:              setups,
+		EpochCommits:        epochCommits,
+		Statuses:            statuses,
+		Commits:             commits,
+		Events:              events,
+		ServiceEvents:       serviceEvents,
+		MyExecutionReceipts: myExecutionReceipts,
+		TransactionResults:  transactionResults,
 	}
 }
 

@@ -112,11 +112,6 @@ type ExecutionNode struct {
 	followerState           protocol.MutableState
 	committee               hotstuff.Committee
 	ledgerStorage           *ledger.Ledger
-	events                  *storage.Events
-	serviceEvents           *storage.ServiceEvents
-	txResults               *storage.TransactionResults
-	results                 *storage.ExecutionResults
-	myReceipts              *storage.MyExecutionReceipts
 	providerEngine          *exeprovider.Engine
 	checkerEng              *checker.Engine
 	syncCore                *chainsync.Core
@@ -171,7 +166,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("system specs", exeNode.LoadSystemSpecs).
 		Module("execution metrics", exeNode.LoadExecutionMetrics).
 		Module("sync core", exeNode.LoadSyncCore).
-		Module("execution receipts storage", exeNode.LoadExecutionReceiptsStorage).
 		Module("pending block cache", exeNode.LoadPendingBlockCache).
 		Module("state exeNode.deltas mempool", exeNode.LoadDeltasMempool).
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
@@ -243,14 +237,6 @@ func (exeNode *ExecutionNode) LoadSyncCore(node *NodeConfig) error {
 	return err
 }
 
-func (exeNode *ExecutionNode) LoadExecutionReceiptsStorage(
-	node *NodeConfig,
-) error {
-	exeNode.results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
-	exeNode.myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts.(*storage.ExecutionReceipts))
-	return nil
-}
-
 func (exeNode *ExecutionNode) LoadPendingBlockCache(node *NodeConfig) error {
 	exeNode.pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 	return nil
@@ -289,9 +275,9 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			node.Storage.Blocks,
 			node.Storage.Commits,
 			node.Storage.Collections,
-			exeNode.events,
-			exeNode.results,
-			exeNode.txResults,
+			node.Storage.Events,
+			node.Storage.Results,
+			node.Storage.TransactionResults,
 			storage.NewComputationResultUploadStatus(node.DB),
 			execution_data.NewDownloader(exeNode.blobService),
 			exeNode.collector)
@@ -572,11 +558,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 ) {
 
 	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
-
-	// Needed for gRPC server, make sure to assign to main scoped vars
-	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
-	exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
-	exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
+	node.Storage.TransactionResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
 
 	exeNode.executionState = state.NewExecutionState(
 		exeNode.ledgerStorage,
@@ -585,11 +567,11 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		node.Storage.Headers,
 		node.Storage.Collections,
 		chunkDataPacks,
-		exeNode.results,
-		exeNode.myReceipts,
-		exeNode.events,
-		exeNode.serviceEvents,
-		exeNode.txResults,
+		node.Storage.Results,
+		node.Storage.MyExecutionReceipts,
+		node.Storage.Events,
+		node.Storage.ServiceEvents,
+		node.Storage.TransactionResults,
 		node.DB,
 		node.Tracer,
 	)
@@ -762,9 +744,9 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		node.State,
 		node.Storage.Blocks,
 		node.Storage.Collections,
-		exeNode.events,
-		exeNode.serviceEvents,
-		exeNode.txResults,
+		node.Storage.Events,
+		node.Storage.ServiceEvents,
+		node.Storage.TransactionResults,
 		exeNode.computationManager,
 		exeNode.providerEngine,
 		exeNode.executionState,
@@ -873,7 +855,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 	error,
 ) {
 	retrieve := func(blockID flow.Identifier) (flow.Entity, error) {
-		return exeNode.myReceipts.MyReceipt(blockID)
+		return node.Storage.MyExecutionReceipts.MyReceipt(blockID)
 	}
 
 	var receiptRequestQueueMetric module.HeroCacheMetrics = metrics.NewNoopCollector()
@@ -950,9 +932,9 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		exeNode.ingestionEng,
 		node.Storage.Headers,
 		node.State,
-		exeNode.events,
-		exeNode.results,
-		exeNode.txResults,
+		node.Storage.Events,
+		node.Storage.Results,
+		node.Storage.TransactionResults,
 		node.Storage.Commits,
 		node.RootChainID,
 		signature.NewBlockSignerDecoder(exeNode.committee),
