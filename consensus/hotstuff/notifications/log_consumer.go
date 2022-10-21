@@ -93,13 +93,6 @@ func (lc *LogConsumer) OnProposingBlock(block *model.Proposal) {
 		Msg("proposing block")
 }
 
-func (lc *LogConsumer) OnVoting(vote *model.Vote) {
-	lc.log.Debug().
-		Uint64("block_view", vote.View).
-		Hex("block_id", vote.BlockID[:]).
-		Msg("voting for block")
-}
-
 func (lc *LogConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
 	lc.log.Debug().
 		Uint64("cur_view", curView).

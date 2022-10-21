@@ -101,12 +101,6 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnProposingBlock(proposal *model.Proposal)
 
-	// OnVoting notifications are produced by the EventHandler when the replica votes for a block.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnVoting(vote *model.Vote)
-
 	// OnQcConstructedFromVotes notifications are produced by the VoteAggregator
 	// component, whenever it constructs a QC from votes.
 	// Prerequisites:

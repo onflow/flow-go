@@ -301,7 +301,6 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.notifier.On("OnEnteringView", mock.Anything, mock.Anything).Maybe()
 	es.notifier.On("OnProposingBlock", mock.Anything).Maybe()
 	es.notifier.On("OnReceiveProposal", mock.Anything, mock.Anything).Maybe()
-	es.notifier.On("OnVoting", mock.Anything).Maybe()
 	es.notifier.On("OnQcConstructedFromVotes", mock.Anything, mock.Anything).Maybe()
 
 	eventhandler, err := NewEventHandler(

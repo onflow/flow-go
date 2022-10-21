@@ -122,11 +122,6 @@ func (_m *Consumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidPropo
 	_m.Called(vote, invalidProposal)
 }
 
-// OnVoting provides a mock function with given fields: vote
-func (_m *Consumer) OnVoting(vote *model.Vote) {
-	_m.Called(vote)
-}
-
 // OnOwnVote provides a mock function with given fields: blockID, view, sigData, recipientID
 func (_m *Consumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	_m.Called(blockID, view, sigData, recipientID)

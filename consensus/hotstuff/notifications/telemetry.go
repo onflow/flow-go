@@ -149,14 +149,6 @@ func (t *TelemetryConsumer) OnProposingBlock(proposal *model.Proposal) {
 	step.Msg("OnProposingBlock")
 }
 
-func (t *TelemetryConsumer) OnVoting(vote *model.Vote) {
-	t.pathHandler.NextStep().
-		Uint64("voted_block_view", vote.View).
-		Hex("voted_block_id", vote.BlockID[:]).
-		Hex("voter_id", vote.SignerID[:]).
-		Msg("OnVoting")
-}
-
 func (t *TelemetryConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
 	t.pathHandler.StartNextPath(curView)
 	t.pathHandler.NextStep().

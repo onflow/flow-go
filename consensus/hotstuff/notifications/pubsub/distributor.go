@@ -86,14 +86,6 @@ func (p *Distributor) OnProposingBlock(proposal *model.Proposal) {
 	}
 }
 
-func (p *Distributor) OnVoting(vote *model.Vote) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnVoting(vote)
-	}
-}
-
 func (p *Distributor) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()

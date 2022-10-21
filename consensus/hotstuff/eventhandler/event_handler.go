@@ -518,10 +518,6 @@ func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLea
 		return nil
 	}
 
-	// The following code is only reached, if this replica has produced a vote.
-	// Send the vote to the next leader (or directly process it, if I am the next leader).
-	e.notifier.OnVoting(ownVote)
-
 	if e.committee.Self() == nextLeader { // I am the next leader
 		log.Debug().Msg("forwarding vote to vote aggregator")
 		e.voteAggregator.AddVote(ownVote)

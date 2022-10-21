@@ -40,8 +40,6 @@ func (c *NoopConsumer) OnTcTriggeredViewChange(*flow.TimeoutCertificate, uint64)
 
 func (c *NoopConsumer) OnProposingBlock(*model.Proposal) {}
 
-func (c *NoopConsumer) OnVoting(*model.Vote) {}
-
 func (c *NoopConsumer) OnQcConstructedFromVotes(uint64, *flow.QuorumCertificate) {}
 
 func (*NoopConsumer) OnStartingTimeout(*model.TimerInfo) {}
