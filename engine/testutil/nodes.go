@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/network/p2p/cache"
+
 	"github.com/onflow/flow-go/module/mempool/queue"
 
 	"github.com/onflow/flow-go/consensus"
@@ -84,7 +86,6 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
@@ -249,7 +250,7 @@ func CompleteStateFixture(
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
+func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.Hub, identity bootstrap.NodeInfo, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
 
 	node := GenericNode(t, hub, identity.Identity(), rootSnapshot)
 	privKeys, err := identity.PrivateKeys()
@@ -273,8 +274,20 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		coll, err := collections.ByID(collID)
 		return coll, err
 	}
-	providerEngine, err := provider.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.ProvideCollections, selector, retrieve)
+	providerEngine, err := provider.New(
+		node.Log,
+		node.Metrics,
+		node.Net,
+		node.Me,
+		node.State,
+		queue.NewHeroStore(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
+		uint(1000),
+		channels.ProvideCollections,
+		selector,
+		retrieve)
 	require.NoError(t, err)
+	// TODO: move this start logic to a more generalized test utility (we need all engines to be startable).
+	providerEngine.Start(ctx)
 
 	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
 	require.NoError(t, err)
@@ -564,7 +577,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		execState,
 		metricsCollector,
 		checkAuthorizedAtBlock,
-		queue.NewChunkDataPackRequestQueue(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
+		queue.NewHeroStore(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
 		executionprovider.DefaultChunkDataPackRequestWorker,
 		executionprovider.DefaultChunkDataPackQueryTimeout,
 		executionprovider.DefaultChunkDataPackDeliveryTimeout,
@@ -624,6 +637,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
 
+	latestExecutedHeight, _, err := execState.GetHighestExecutedBlockID(context.TODO())
+	require.NoError(t, err)
+
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
 		node.Log,
@@ -647,9 +663,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		syncThreshold,
 		false,
 		checkAuthorizedAtBlock,
-		false,
 		nil,
 		nil,
+		ingestion.NewStopControl(node.Log.With().Str("compontent", "stop_control").Logger(), false, latestExecutedHeight),
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
@@ -668,7 +684,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
 	require.NoError(t, err)
 
-	idCache, err := p2p.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
+	idCache, err := cache.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
 	require.NoError(t, err, "could not create finalized snapshot cache")
 	syncEngine, err := synchronization.New(
 		node.Log,
@@ -871,7 +887,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.VerifierEngine == nil {
-		vm := fvm.NewVM()
+		vm := fvm.NewVirtualMachine()
 
 		blockFinder := environment.NewBlockFinder(node.Headers)
 
@@ -929,6 +945,7 @@ func VerificationNode(t testing.TB,
 			node.Results,
 			node.Receipts,
 			node.RequesterEngine,
+			0,
 		)
 	}
 
@@ -951,7 +968,8 @@ func VerificationNode(t testing.TB,
 			node.State,
 			assigner,
 			node.ChunksQueue,
-			node.ChunkConsumer)
+			node.ChunkConsumer,
+			0)
 	}
 
 	if node.BlockConsumer == nil {

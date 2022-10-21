@@ -25,15 +25,15 @@ type ScriptProcedure struct {
 	Events         []flow.Event
 	GasUsed        uint64
 	MemoryEstimate uint64
-	Err            errors.Error
+	Err            errors.CodedError
 }
 
 type ScriptProcessor interface {
 	Process(
 		Context,
 		*ScriptProcedure,
-		*state.StateHolder,
-		*programs.Programs,
+		*state.TransactionState,
+		*programs.TransactionPrograms,
 	) error
 }
 
@@ -56,7 +56,9 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 	}
 }
 
-func (proc *ScriptProcedure) WithRequestContext(reqContext context.Context) *ScriptProcedure {
+func (proc *ScriptProcedure) WithRequestContext(
+	reqContext context.Context,
+) *ScriptProcedure {
 	return &ScriptProcedure{
 		ID:             proc.ID,
 		Script:         proc.Script,
@@ -65,7 +67,11 @@ func (proc *ScriptProcedure) WithRequestContext(reqContext context.Context) *Scr
 	}
 }
 
-func NewScriptWithContextAndArgs(code []byte, reqContext context.Context, args ...[]byte) *ScriptProcedure {
+func NewScriptWithContextAndArgs(
+	code []byte,
+	reqContext context.Context,
+	args ...[]byte,
+) *ScriptProcedure {
 	scriptHash := hash.DefaultHasher.ComputeHash(code)
 	return &ScriptProcedure{
 		ID:             flow.HashToID(scriptHash),
@@ -75,9 +81,13 @@ func NewScriptWithContextAndArgs(code []byte, reqContext context.Context, args .
 	}
 }
 
-func (proc *ScriptProcedure) Run(ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
+func (proc *ScriptProcedure) Run(
+	ctx Context,
+	txnState *state.TransactionState,
+	programs *programs.TransactionPrograms,
+) error {
 	for _, p := range ctx.ScriptProcessors {
-		err := p.Process(ctx, proc, sth, programs)
+		err := p.Process(ctx, proc, txnState, programs)
 		txError, failure := errors.SplitErrorTypes(err)
 		if failure != nil {
 			if errors.IsALedgerFailure(failure) {
@@ -118,6 +128,18 @@ func (proc *ScriptProcedure) ShouldDisableMemoryAndInteractionLimits(
 	return ctx.DisableMemoryAndInteractionLimits
 }
 
+func (ScriptProcedure) Type() ProcedureType {
+	return ScriptProcedureType
+}
+
+func (proc *ScriptProcedure) InitialSnapshotTime() programs.LogicalTime {
+	return programs.EndOfBlockExecutionTime
+}
+
+func (proc *ScriptProcedure) ExecutionTime() programs.LogicalTime {
+	return programs.EndOfBlockExecutionTime
+}
+
 type ScriptInvoker struct{}
 
 func NewScriptInvoker() ScriptInvoker {
@@ -127,10 +149,10 @@ func NewScriptInvoker() ScriptInvoker {
 func (i ScriptInvoker) Process(
 	ctx Context,
 	proc *ScriptProcedure,
-	sth *state.StateHolder,
-	programs *programs.Programs,
+	txnState *state.TransactionState,
+	programs *programs.TransactionPrograms,
 ) error {
-	env := NewScriptEnv(proc.RequestContext, ctx, sth, programs)
+	env := NewScriptEnv(proc.RequestContext, ctx, txnState, programs)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)

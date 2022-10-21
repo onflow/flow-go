@@ -28,13 +28,14 @@ func TestFungibleTokenTracker(t *testing.T) {
 	chain := flow.Testnet.Chain()
 	view := migrations.NewView(payloads)
 
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
+	blockPrograms := programs.NewEmptyBlockPrograms()
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
 			fvm.NewTransactionInvoker(),
 		),
-		fvm.WithBlockPrograms(programs.NewEmptyPrograms()),
+		fvm.WithBlockPrograms(blockPrograms),
 	}
 	ctx := fvm.NewContext(opts...)
 	bootstrapOptions := []fvm.BootstrapProcedureOption{
@@ -45,7 +46,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
 
-	err := vm.RunV2(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view)
+	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view)
 	require.NoError(t, err)
 
 	// deploy wrapper resource
@@ -80,8 +81,8 @@ func TestFungibleTokenTracker(t *testing.T) {
 		SetScript(deployingTestContractScript).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx := fvm.Transaction(txBody, 0)
-	err = vm.RunV2(ctx, tx, view)
+	tx := fvm.Transaction(txBody, blockPrograms.NextTxIndexForTestingOnly())
+	err = vm.Run(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
@@ -106,8 +107,8 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(105))).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx = fvm.Transaction(txBody, 0)
-	err = vm.RunV2(ctx, tx, view)
+	tx = fvm.Transaction(txBody, blockPrograms.NextTxIndexForTestingOnly())
+	err = vm.Run(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 

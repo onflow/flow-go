@@ -51,7 +51,7 @@ func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(num)
 	require.NoError(b, err)
 
-	addresses, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+	addresses, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 	require.NoError(b, err)
 
 	accs := &testAccounts{
@@ -66,16 +66,29 @@ func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num
 	return accs
 }
 
-func mustFundAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, execCtx fvm.Context, accs *testAccounts) {
+func mustFundAccounts(
+	b *testing.B,
+	vm *fvm.VirtualMachine,
+	ledger state.View,
+	execCtx fvm.Context,
+	accs *testAccounts,
+) {
+	blockPrograms := programs.NewEmptyBlockPrograms()
+	execCtx = fvm.NewContextFromParent(
+		execCtx,
+		fvm.WithBlockPrograms(blockPrograms))
+
 	var err error
-	for i, acc := range accs.accounts {
+	for _, acc := range accs.accounts {
 		transferTx := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress())
 		err = testutil.SignTransactionAsServiceAccount(transferTx, accs.seq, chain)
 		require.NoError(b, err)
 		accs.seq++
 
-		tx := fvm.Transaction(transferTx, uint32(i))
-		err = vm.RunV2(execCtx, tx, ledger)
+		tx := fvm.Transaction(
+			transferTx,
+			blockPrograms.NextTxIndexForTestingOnly())
+		err = vm.Run(execCtx, tx, ledger)
 		require.NoError(b, err)
 		require.NoError(b, tx.Err)
 	}
@@ -87,7 +100,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 	tracer, err := trace.NewTracer(zerolog.Nop(), "", "", 4)
 	require.NoError(b, err)
 
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 
 	chain := flow.Emulator.Chain()
 	execCtx := fvm.NewContext(

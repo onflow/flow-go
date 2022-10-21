@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -33,19 +34,8 @@ const (
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
-	// DEPRECATED. DO NOT USE
-	//
-	// TODO(patrick): remove after emulator is updated.
-	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
-
-	RunV2(fvm.Context, fvm.Procedure, state.View) error
-
-	// DEPRECATED. DO NOT USE
-	//
-	// TODO(patrick): remove after emulator is updated.
-	GetAccount(fvm.Context, flow.Address, state.View, *programs.Programs) (*flow.Account, error)
-
-	GetAccountV2(fvm.Context, flow.Address, state.View) (*flow.Account, error)
+	Run(fvm.Context, fvm.Procedure, state.View) error
+	GetAccount(fvm.Context, flow.Address, state.View) (*flow.Account, error)
 }
 
 // ViewCommitter commits views's deltas to the ledger and collects the proofs
@@ -56,7 +46,15 @@ type ViewCommitter interface {
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.Programs) (*execution.ComputationResult, error)
+	ExecuteBlock(
+		context.Context,
+		*entity.ExecutableBlock,
+		state.View,
+		*programs.BlockPrograms,
+	) (
+		*execution.ComputationResult,
+		error,
+	)
 }
 
 type blockComputer struct {
@@ -110,7 +108,7 @@ func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
 	stateView state.View,
-	program *programs.Programs,
+	program *programs.BlockPrograms,
 ) (*execution.ComputationResult, error) {
 
 	span, _, isSampled := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
@@ -134,7 +132,7 @@ func (e *blockComputer) executeBlock(
 	blockSpan otelTrace.Span,
 	block *entity.ExecutableBlock,
 	stateView state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 ) (*execution.ComputationResult, error) {
 
 	// check the start state is set
@@ -155,14 +153,15 @@ func (e *blockComputer) executeBlock(
 	chunksSize := len(collections) + 1 // + 1 system chunk
 
 	res := &execution.ComputationResult{
-		ExecutableBlock:    block,
-		Events:             make([]flow.EventsList, chunksSize),
-		ServiceEvents:      make(flow.EventsList, 0),
-		TransactionResults: make([]flow.TransactionResult, 0),
-		StateCommitments:   make([]flow.StateCommitment, 0, chunksSize),
-		Proofs:             make([][]byte, 0, chunksSize),
-		TrieUpdates:        make([]*ledger.TrieUpdate, 0, chunksSize),
-		EventsHashes:       make([]flow.Identifier, 0, chunksSize),
+		ExecutableBlock:        block,
+		Events:                 make([]flow.EventsList, chunksSize),
+		ServiceEvents:          make(flow.EventsList, 0),
+		TransactionResults:     make([]flow.TransactionResult, 0),
+		StateCommitments:       make([]flow.StateCommitment, 0, chunksSize),
+		Proofs:                 make([][]byte, 0, chunksSize),
+		TrieUpdates:            make([]*ledger.TrieUpdate, 0, chunksSize),
+		EventsHashes:           make([]flow.Identifier, 0, chunksSize),
+		ComputationIntensities: make(meter.MeteredComputationIntensities),
 	}
 
 	var txIndex uint32
@@ -425,7 +424,7 @@ func (e *blockComputer) executeTransaction(
 			Bool("system_chunk", isSystemChunk).
 			Logger()),
 	)
-	err := e.vm.RunV2(childCtx, tx, txView)
+	err := e.vm.Run(childCtx, tx, txView)
 	if err != nil {
 		return fmt.Errorf("failed to execute transaction %v for block %v at height %v: %w",
 			txID.String(),
@@ -459,6 +458,9 @@ func (e *blockComputer) executeTransaction(
 	res.AddServiceEvents(tx.ServiceEvents)
 	res.AddTransactionResult(&txResult)
 	res.AddComputationUsed(tx.ComputationUsed)
+	if tx.IsSampled() {
+		res.MergeComputationEffortVector(tx.ComputationIntensities)
+	}
 
 	memAllocAfter := debug.GetHeapAllocsBytes()
 

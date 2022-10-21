@@ -25,7 +25,7 @@ import (
 )
 
 type LoadCase struct {
-	tps      int
+	tps      uint
 	duration time.Duration
 }
 
@@ -94,61 +94,73 @@ func main() {
 		clients = append(clients, client)
 	}
 
-	// run load cases
-	for i, c := range parseLoadCases(log, tpsFlag, tpsDurationsFlag) {
-		log.Info().Str("load_type", *loadTypeFlag).Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
+	// run load cases and compute max tps
+	var maxTPS uint
+	loadCases := parseLoadCases(log, tpsFlag, tpsDurationsFlag)
+	for _, c := range loadCases {
+		if c.tps > maxTPS {
+			maxTPS = c.tps
+		}
+	}
 
-		loaderMetrics.SetTPSConfigured(c.tps)
+	lg, err := benchmark.New(
+		ctx,
+		log,
+		loaderMetrics,
+		clients,
+		benchmark.NetworkParams{
+			ServAccPrivKeyHex:     *serviceAccountPrivateKeyHex,
+			ServiceAccountAddress: &serviceAccountAddress,
+			FungibleTokenAddress:  &fungibleTokenAddress,
+			FlowTokenAddress:      &flowTokenAddress,
+		},
+		benchmark.LoadParams{
+			NumberOfAccounts: int(maxTPS) * *accountMultiplierFlag,
+			LoadType:         benchmark.LoadType(*loadTypeFlag),
+			FeedbackEnabled:  *feedbackEnabled,
+		},
+		benchmark.ConstExecParams{
+			MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
+			AuthAccountNum:  *authAccNumInConstExecTx,
+			ArgSizeInByte:   *argSizeInByteInConstExecTx,
+			PayerKeyCount:   *payerKeyCountInConstExecTx,
+		},
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to create new cont load generator")
+	}
+	defer lg.Stop()
 
-		var lg *benchmark.ContLoadGenerator
-		if c.tps > 0 {
-			var err error
-			lg, err = benchmark.New(
-				ctx,
-				log,
-				loaderMetrics,
-				clients,
-				benchmark.NetworkParams{
-					ServAccPrivKeyHex:     *serviceAccountPrivateKeyHex,
-					ServiceAccountAddress: &serviceAccountAddress,
-					FungibleTokenAddress:  &fungibleTokenAddress,
-					FlowTokenAddress:      &flowTokenAddress,
-				},
-				benchmark.LoadParams{
-					TPS:              c.tps,
-					NumberOfAccounts: c.tps * *accountMultiplierFlag,
-					LoadType:         benchmark.LoadType(*loadTypeFlag),
-					FeedbackEnabled:  *feedbackEnabled,
-				},
-				benchmark.ConstExecParams{
-					MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
-					AuthAccountNum:  *authAccNumInConstExecTx,
-					ArgSizeInByte:   *argSizeInByteInConstExecTx,
-					PayerKeyCount:   *payerKeyCountInConstExecTx,
-				},
-			)
-			if err != nil {
-				log.Fatal().Err(err).Msgf("unable to create new cont load generator")
-			}
+	err = lg.Init()
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to init loader")
+	}
 
-			err = lg.Init()
-			if err != nil {
-				log.Fatal().Err(err).Msgf("unable to init loader")
-			}
-			lg.Start()
+	for i, c := range loadCases {
+		log.Info().
+			Str("load_type", *loadTypeFlag).
+			Int("number", i).
+			Uint("tps", c.tps).
+			Dur("duration", c.duration).
+			Msg("running load case")
+
+		err = lg.SetTPS(c.tps)
+		if err != nil {
+			log.Fatal().Err(err).Msg("unable to set tps")
 		}
 
 		// if the duration is 0, we run this case forever
-		if c.duration.Nanoseconds() == 0 {
-			for {
-				time.Sleep(time.Minute)
-			}
+		waitC := make(<-chan time.Time)
+		if c.duration != 0 {
+			waitC = time.After(c.duration)
 		}
 
-		time.Sleep(c.duration)
-
-		if lg != nil {
-			lg.Stop()
+		select {
+		case <-ctx.Done():
+			log.Info().Err(ctx.Err()).Msg("context cancelled")
+			return
+		case <-waitC:
+			log.Info().Msg("finished load case")
 		}
 	}
 }
@@ -162,7 +174,7 @@ func parseLoadCases(log zerolog.Logger, tpsFlag, tpsDurationsFlag *string) []Loa
 			log.Fatal().Err(err).Str("value", s).
 				Msg("could not parse tps flag, expected comma separated list of integers")
 		}
-		cases = append(cases, LoadCase{tps: int(t)})
+		cases = append(cases, LoadCase{tps: uint(t)})
 	}
 
 	tpsDurationsStrings := strings.Split(*tpsDurationsFlag, ",")

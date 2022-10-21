@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 )
 
@@ -46,18 +47,22 @@ const (
 type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error
 	ComputationUsed() uint64
+	ComputationIntensities() meter.MeteredComputationIntensities
 
 	MeterMemory(usage common.MemoryUsage) error
 	MemoryEstimate() uint64
+
+	MeterEmittedEvent(byteSize uint64) error
+	TotalEmittedEventBytes() uint64
 }
 
 type meterImpl struct {
-	stTxn *state.StateHolder
+	txnState *state.TransactionState
 }
 
-func NewMeter(stTxn *state.StateHolder) Meter {
+func NewMeter(txnState *state.TransactionState) Meter {
 	return &meterImpl{
-		stTxn: stTxn,
+		txnState: txnState,
 	}
 }
 
@@ -65,25 +70,40 @@ func (meter *meterImpl) MeterComputation(
 	kind common.ComputationKind,
 	intensity uint,
 ) error {
-	if meter.stTxn.EnforceLimits() {
-		return meter.stTxn.MeterComputation(kind, intensity)
+	if meter.txnState.EnforceLimits() {
+		return meter.txnState.MeterComputation(kind, intensity)
 	}
 	return nil
 }
 
+func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensities {
+	return meter.txnState.ComputationIntensities()
+}
+
 func (meter *meterImpl) ComputationUsed() uint64 {
-	return uint64(meter.stTxn.TotalComputationUsed())
+	return meter.txnState.TotalComputationUsed()
 }
 
 func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
-	if meter.stTxn.EnforceLimits() {
-		return meter.stTxn.MeterMemory(usage.Kind, uint(usage.Amount))
+	if meter.txnState.EnforceLimits() {
+		return meter.txnState.MeterMemory(usage.Kind, uint(usage.Amount))
 	}
 	return nil
 }
 
 func (meter *meterImpl) MemoryEstimate() uint64 {
-	return meter.stTxn.TotalMemoryEstimate()
+	return meter.txnState.TotalMemoryEstimate()
+}
+
+func (meter *meterImpl) MeterEmittedEvent(byteSize uint64) error {
+	if meter.txnState.EnforceLimits() {
+		return meter.txnState.MeterEmittedEvent(byteSize)
+	}
+	return nil
+}
+
+func (meter *meterImpl) TotalEmittedEventBytes() uint64 {
+	return meter.txnState.TotalEmittedEventBytes()
 }
 
 type cancellableMeter struct {
@@ -92,10 +112,13 @@ type cancellableMeter struct {
 	ctx context.Context
 }
 
-func NewCancellableMeter(ctx context.Context, stTxn *state.StateHolder) Meter {
+func NewCancellableMeter(
+	ctx context.Context,
+	txnState *state.TransactionState,
+) Meter {
 	return &cancellableMeter{
 		meterImpl: meterImpl{
-			stTxn: stTxn,
+			txnState: txnState,
 		},
 		ctx: ctx,
 	}

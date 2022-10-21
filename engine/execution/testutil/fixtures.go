@@ -190,7 +190,7 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 func CreateAccounts(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -200,7 +200,7 @@ func CreateAccounts(
 func CreateAccountsWithSimpleAddresses(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	programs *programs.Programs,
+	programs *programs.BlockPrograms,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -253,7 +253,7 @@ func CreateAccountsWithSimpleAddresses(
 			AddAuthorizer(serviceAddress)
 
 		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
-		err := vm.RunV2(ctx, tx, view)
+		err := vm.Run(ctx, tx, view)
 		if err != nil {
 			return nil, err
 		}
@@ -302,7 +302,7 @@ func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalO
 		options...,
 	)
 
-	_ = vm.RunV2(ctx, bootstrap, view)
+	_ = vm.Run(ctx, bootstrap, view)
 	return view
 }
 

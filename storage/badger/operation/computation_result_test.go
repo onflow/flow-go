@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TesInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
+func TestInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := generateComputationResult(t)
 		expectedId := expected.ExecutableBlock.ID()
@@ -58,7 +58,7 @@ func TesInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 	})
 }
 
-func TesUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
+func TestUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := generateComputationResult(t)
 		expectedId := expected.ExecutableBlock.ID()

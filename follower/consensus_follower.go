@@ -205,6 +205,7 @@ func NewConsensusFollower(
 	anb.BaseConfig.NodeRole = "consensus_follower"
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(cf.onBlockFinalized)
 	cf.NodeConfig = anb.NodeConfig
+
 	cf.Component, err = anb.Build()
 	if err != nil {
 		return nil, err

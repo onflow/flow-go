@@ -65,6 +65,7 @@ func TestExtractExecutionState(t *testing.T) {
 				outdir,
 				zerolog.Nop(),
 				flow.Emulator.Chain(),
+				6,
 				false,
 				false,
 			)
