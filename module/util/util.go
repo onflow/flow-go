@@ -3,7 +3,6 @@ package util
 import (
 	"context"
 	"reflect"
-	"sync"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -36,18 +35,11 @@ func AllDone(components ...module.ReadyDoneAware) <-chan struct{} {
 // AllClosed returns a channel that is closed when all input channels are closed.
 func AllClosed(channels ...<-chan struct{}) <-chan struct{} {
 	done := make(chan struct{})
-	var wg sync.WaitGroup
-
-	for _, ch := range channels {
-		wg.Add(1)
-		go func(ch <-chan struct{}) {
-			<-ch
-			wg.Done()
-		}(ch)
-	}
 
 	go func() {
-		wg.Wait()
+		for _, ch := range channels {
+			<-ch
+		}
 		close(done)
 	}()
 

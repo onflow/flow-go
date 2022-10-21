@@ -88,12 +88,14 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	// get account for given address and also validates AccountKeyIndex is valid
 	account, err := c.GetAccount(ctx)
 	if err != nil {
+		// we consider all errors from client network calls to be transient and non-critical
 		return network.NewTransientErrorf("could not get account: %w", err)
 	}
 
 	// get latest finalized block to execute transaction
 	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, false)
 	if err != nil {
+		// we consider all errors from client network calls to be transient and non-critical
 		return network.NewTransientErrorf("could not get latest block from node: %w", err)
 	}
 
@@ -160,6 +162,7 @@ func (c *QCContractClient) Voted(ctx context.Context) (bool, error) {
 	template := templates.GenerateGetNodeHasVotedScript(c.env)
 	ret, err := c.FlowClient.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{cadence.String(c.nodeID.String())})
 	if err != nil {
+		// we consider all errors from client network calls to be transient and non-critical
 		return false, network.NewTransientErrorf("could not execute voted script: %w", err)
 	}
 
