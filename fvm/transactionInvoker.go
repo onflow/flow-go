@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
@@ -30,7 +29,7 @@ func (i TransactionInvoker) Process(
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
 	programs *programsCache.TransactionPrograms,
-) (processErr error) {
+) error {
 
 	txIDStr := proc.ID.String()
 	span := proc.StartSpanFromProcTraceSpan(ctx.Tracer, trace.FVMExecuteTransaction)
@@ -45,138 +44,59 @@ func (i TransactionInvoker) Process(
 	}
 
 	var modifiedSets programsCache.ModifiedSetsInvalidator
-	defer func() {
-		if errors.IsFailure(processErr) {
-			// Just immediately halt if the error is a unrecoverable failure.
-			return
-		}
 
-		if txnState.NumNestedTransactions() > 1 {
-			if processErr == nil {
-				// This is a fvm internal programming error.  We forgot to
-				// call Commit somewhere in the control flow.  We should halt.
-				processErr = fmt.Errorf(
-					"successfully executed transaction has unexpected " +
-						"nested transactions.")
-				return
-			} else {
-				restartErr := txnState.RestartNestedTransaction(nestedTxnId)
-				if restartErr != nil {
-					// This should never happen since merging views should
-					// never fail.
-					processErr = fmt.Errorf(
-						"cannot restart nested transaction on error: %w "+
-							"(original processErr: %v)",
-						restartErr,
-						processErr)
-					return
-				}
-
-				ctx.Logger.Warn().Msg(
-					"transaction had unexpected nested transactions, " +
-						"which have been restarted.")
-
-				// Note: proc.Err is set by TransactionProcedure.
-				proc.Logs = make([]string, 0)
-				proc.Events = make([]flow.Event, 0)
-				proc.ServiceEvents = make([]flow.Event, 0)
-			}
-		}
-
-		// based on the contract and frozen account updates we decide how to
-		// clean up the programs for failed transactions we also do the same as
-		// transaction without any deployed contracts
-		programs.AddInvalidator(modifiedSets)
-
-		commitErr := txnState.Commit(nestedTxnId)
-		if commitErr != nil {
-			processErr = fmt.Errorf(
-				"transaction invocation failed when merging state: %w "+
-					"(original processErr: %v)",
-				commitErr,
-				processErr)
-		}
-	}()
-
-	mergeErrorShouldEarlyExit := func(err error) bool {
-		if err == nil {
-			return false
-		}
-
-		if errors.IsFailure(err) {
-			if processErr == nil {
-				processErr = err
-			} else {
-				processErr = fmt.Errorf(
-					"%w (collected errors: %v)",
-					err,
-					processErr)
-			}
-			return true
-		}
-
-		processErr = multierror.Append(processErr, err)
-		return false
-	}
+	errs := errors.NewErrorsCollector()
 
 	env := NewTransactionEnvironment(ctx, txnState, programs, proc.Transaction, proc.TxIndex, span)
 
 	var txError error
 	modifiedSets, txError = i.normalExecution(proc, txnState, env)
-	if mergeErrorShouldEarlyExit(txError) {
-		return
+	if errs.Collect(txError).CollectedFailure() {
+		return errs.ErrorOrNil()
 	}
 
-	// it there was any transaction error clear changes and try to deduct fees again
-	if processErr != nil {
-		txnState.DisableAllLimitEnforcements()
-		defer txnState.EnableAllLimitEnforcements()
-
-		// log transaction as failed
-		ctx.Logger.Info().
-			Err(processErr).
-			Msg("transaction executed with error")
-
+	if errs.CollectedError() {
 		modifiedSets = programsCache.ModifiedSetsInvalidator{}
-		env.Reset()
 
-		// drop delta since transaction failed
-		restartErr := txnState.RestartNestedTransaction(nestedTxnId)
-		if restartErr != nil {
-			return fmt.Errorf(
-				"cannot restart nested transaction: %w "+
-					"(original processErr: %v)",
-				restartErr,
-				processErr)
-		}
-
-		// try to deduct fees again, to get the fee deduction events
-		feesError := i.deductTransactionFees(proc, txnState, env)
-
-		// if fee deduction fails just do clean up and exit
-		if feesError != nil {
-			ctx.Logger.Info().
-				Msg("transaction fee deduction executed with error")
-
-			if mergeErrorShouldEarlyExit(feesError) {
-				return
-			}
-
-			// drop delta
-			_ = txnState.RestartNestedTransaction(nestedTxnId)
+		fatalErr := i.errorExecution(proc, txnState, nestedTxnId, env, errs)
+		if fatalErr != nil {
+			return fatalErr
 		}
 	}
 
+	// TODO(patrick): tighten validateCommit check and move proc result
+	// population into commit
+	//
 	// if tx failed this will only contain fee deduction logs
 	proc.Logs = append(proc.Logs, env.Logs()...)
 	proc.ComputationUsed = proc.ComputationUsed + env.ComputationUsed()
 	proc.MemoryEstimate = proc.MemoryEstimate + env.MemoryEstimate()
+	if proc.IsSampled() {
+		proc.ComputationIntensities = env.ComputationIntensities()
+	}
 
 	// if tx failed this will only contain fee deduction events
 	proc.Events = append(proc.Events, env.Events()...)
 	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
 
-	return
+	processErr := errs.ErrorOrNil()
+
+	fatalErr := i.validateCommit(
+		proc,
+		txnState,
+		nestedTxnId,
+		env,
+		processErr)
+	if fatalErr != nil {
+		return fatalErr
+	}
+
+	return i.commit(
+		txnState,
+		nestedTxnId,
+		programs,
+		modifiedSets,
+		processErr)
 }
 
 func (i TransactionInvoker) deductTransactionFees(
@@ -229,7 +149,7 @@ func (i TransactionInvoker) logExecutionIntensities(
 	}
 	env.Logger().Info().
 		Uint64("ledgerInteractionUsed", txnState.InteractionUsed()).
-		Uint("computationUsed", txnState.TotalComputationUsed()).
+		Uint64("computationUsed", txnState.TotalComputationUsed()).
 		Uint64("memoryEstimate", txnState.TotalMemoryEstimate()).
 		Dict("computationIntensities", computation).
 		Dict("memoryIntensities", memory).
@@ -294,4 +214,114 @@ func (i TransactionInvoker) normalExecution(
 	})
 
 	return
+}
+
+// Clear changes and try to deduct fees again.
+func (i TransactionInvoker) errorExecution(
+	proc *TransactionProcedure,
+	txnState *state.TransactionState,
+	nestedTxnId state.NestedTransactionId,
+	env environment.Environment,
+	errs *errors.ErrorsCollector,
+) error {
+	txnState.DisableAllLimitEnforcements()
+	defer txnState.EnableAllLimitEnforcements()
+
+	// log transaction as failed
+	env.Logger().Info().
+		Err(errs.ErrorOrNil()).
+		Msg("transaction executed with error")
+
+	env.Reset()
+
+	// drop delta since transaction failed
+	restartErr := txnState.RestartNestedTransaction(nestedTxnId)
+	if errs.Collect(restartErr).CollectedFailure() {
+		return errs.ErrorOrNil()
+	}
+
+	// try to deduct fees again, to get the fee deduction events
+	feesError := i.deductTransactionFees(proc, txnState, env)
+
+	// if fee deduction fails just do clean up and exit
+	if feesError != nil {
+		env.Logger().Info().
+			Err(feesError).
+			Msg("transaction fee deduction executed with error")
+
+		if errs.Collect(feesError).CollectedFailure() {
+			return errs.ErrorOrNil()
+		}
+
+		// drop delta
+		restartErr = txnState.RestartNestedTransaction(nestedTxnId)
+		if errs.Collect(restartErr).CollectedFailure() {
+			return errs.ErrorOrNil()
+		}
+	}
+
+	return nil
+}
+
+func (i TransactionInvoker) validateCommit(
+	proc *TransactionProcedure,
+	txnState *state.TransactionState,
+	nestedTxnId state.NestedTransactionId,
+	env environment.Environment,
+	processErr error,
+) error {
+	if txnState.NumNestedTransactions() > 1 {
+		if processErr == nil {
+			// This is a fvm internal programming error.  We forgot to
+			// call Commit somewhere in the control flow.  We should halt.
+			return fmt.Errorf(
+				"successfully executed transaction has unexpected " +
+					"nested transactions.")
+		} else {
+			restartErr := txnState.RestartNestedTransaction(nestedTxnId)
+			if restartErr != nil {
+				// This should never happen since merging views should
+				// never fail.
+				return fmt.Errorf(
+					"cannot restart nested transaction on error: %w "+
+						"(original processErr: %v)",
+					restartErr,
+					processErr)
+			}
+
+			env.Logger().Warn().Msg(
+				"transaction had unexpected nested transactions, " +
+					"which have been restarted.")
+
+			// Note: proc.Err is set by TransactionProcedure.
+			proc.Logs = make([]string, 0)
+			proc.Events = make([]flow.Event, 0)
+			proc.ServiceEvents = make([]flow.Event, 0)
+		}
+	}
+	return nil
+}
+
+func (i TransactionInvoker) commit(
+	txnState *state.TransactionState,
+	nestedTxnId state.NestedTransactionId,
+	programs *programsCache.TransactionPrograms,
+	modifiedSets programsCache.ModifiedSetsInvalidator,
+	processErr error,
+) error {
+	// based on the contract and frozen account updates we decide how to
+	// clean up the programs for failed transactions we also do the same as
+	// transaction without any deployed contracts
+	programs.AddInvalidator(modifiedSets)
+
+	commitErr := txnState.Commit(nestedTxnId)
+	if commitErr != nil {
+		return fmt.Errorf(
+			"transaction invocation failed when merging state: %w "+
+				"(original processErr: %v)",
+			commitErr,
+			processErr)
+	}
+
+	return processErr
 }

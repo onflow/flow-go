@@ -723,7 +723,7 @@ func decodeSubtrieCount(encoded []byte) (uint16, error) {
 //	) {
 //		def func() {
 //			// good, because the error to returned is only updated here, and guaranteed to be returned
-//			errToReturn = closeAndMergeError(closable, err)
+//			errToReturn = closeAndMergeError(closable, errToReturn)
 //		}()
 func closeAndMergeError(closable io.Closer, err error) error {
 	var merr *multierror.Error

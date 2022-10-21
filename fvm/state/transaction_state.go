@@ -100,7 +100,7 @@ func (s *TransactionState) BeginNestedTransaction() (
 ) {
 	if s.IsParseRestricted() {
 		return NestedTransactionId{}, fmt.Errorf(
-			"cannot beinga a unrestricted nested transaction inside a " +
+			"cannot begin a unrestricted nested transaction inside a " +
 				"program restricted nested transaction",
 		)
 	}
@@ -240,7 +240,8 @@ func (s *TransactionState) RestartNestedTransaction(
 	}
 
 	if !found {
-		return fmt.Errorf("nested transaction not found")
+		return fmt.Errorf(
+			"cannot restart nested transaction: nested transaction not found")
 	}
 
 	for s.currentState() != id.state {
@@ -300,7 +301,7 @@ func (s *TransactionState) TotalComputationLimit() uint {
 	return s.currentState().TotalComputationLimit()
 }
 
-func (s *TransactionState) TotalComputationUsed() uint {
+func (s *TransactionState) TotalComputationUsed() uint64 {
 	return s.currentState().TotalComputationUsed()
 }
 

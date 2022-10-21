@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/engine/common/provider"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 
 	"github.com/onflow/flow-go/engine/execution/computation"
@@ -31,6 +34,9 @@ type ExecutionConfig struct {
 	chunkDataPackCacheSize               uint
 	chunkDataPackRequestsCacheSize       uint32
 	requestInterval                      time.Duration
+	requestRetryInitialDelay             time.Duration
+	requestRetryIncrementalDelay         time.Duration
+	requestRetryMaximumDelay             time.Duration
 	preferredExeNodeIDStr                string
 	syncByBlocks                         bool
 	syncFast                             bool
@@ -44,13 +50,16 @@ type ExecutionConfig struct {
 	s3BucketName                         string
 	apiRatelimits                        map[string]int
 	apiBurstlimits                       map[string]int
+	executionDataAllowedPeers            string
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
 	blobstoreRateLimit                   int
 	blobstoreBurstLimit                  int
 	chunkDataPackRequestWorkers          uint
 
-	computationConfig computation.ComputationConfig
+	computationConfig        computation.ComputationConfig
+	receiptRequestWorkers    uint   // common provider engine workers
+	receiptRequestsCacheSize uint32 // common provider engine cache size
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -72,7 +81,14 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&exeConf.computationConfig.CadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
 	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
-	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
+	flags.DurationVar(&exeConf.requestInterval, "request-interval", 10*time.Second, "the interval between requests for the requester engine")
+	// collection retry parameters: these are chosen to have a balance between retrying too fast to DDoS the collection node
+	// and retrying too slow to stall execution in presense of a network partition (or transient collection node failure).
+	flags.DurationVar(&exeConf.requestRetryInitialDelay, "request-retry-initial-delay", 1*time.Second, "initial retry delay for the requester engine")
+	flags.DurationVar(&exeConf.requestRetryIncrementalDelay, "request-retry-incremental-delay", 1*time.Second, "linear delay increase between retries for the requester engine")
+	flags.DurationVar(&exeConf.requestRetryMaximumDelay, "request-retry-maximum-delay", 5*time.Second, "maximum retry delay for the requester engine")
+	flags.Uint32Var(&exeConf.receiptRequestsCacheSize, "receipt-request-cache", provider.DefaultEntityRequestCacheSize, "queue size for entity requests at common provider engine")
+	flags.UintVar(&exeConf.receiptRequestWorkers, "receipt-request-workers", provider.DefaultRequestProviderWorkers, "number of workers for entity requests at common provider engine")
 	flags.DurationVar(&exeConf.computationConfig.ScriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
 		"threshold for logging script execution")
 	flags.DurationVar(&exeConf.computationConfig.ScriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit,
@@ -93,6 +109,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&exeConf.enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
 	flags.StringVar(&exeConf.gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
 	flags.StringVar(&exeConf.s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
+	flags.StringVar(&exeConf.executionDataAllowedPeers, "execution-data-allowed-requesters", "", "comma separated list of Access node IDs that are allowed to request Execution Data. an empty list allows all peers")
 	flags.Uint64Var(&exeConf.executionDataPrunerHeightRangeTarget, "execution-data-height-range-target", 0, "target height range size used to limit the amount of Execution Data kept on disk")
 	flags.Uint64Var(&exeConf.executionDataPrunerThreshold, "execution-data-height-range-threshold", 100_000, "height threshold used to trigger Execution Data pruning")
 	flags.StringToIntVar(&exeConf.apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,ExecuteScriptAtBlockID=500 etc. note limits apply globally to all clients.")
@@ -105,6 +122,14 @@ func (exeConf *ExecutionConfig) ValidateFlags() error {
 	if exeConf.enableBlockDataUpload {
 		if exeConf.gcpBucketName == "" && exeConf.s3BucketName == "" {
 			return fmt.Errorf("invalid flag. gcp-bucket-name or s3-bucket-name required when blockdata-uploader is enabled")
+		}
+	}
+	if exeConf.executionDataAllowedPeers != "" {
+		ids := strings.Split(exeConf.executionDataAllowedPeers, ",")
+		for _, id := range ids {
+			if _, err := flow.HexStringToIdentifier(id); err != nil {
+				return fmt.Errorf("invalid node ID in execution-data-allowed-requesters %s: %w", id, err)
+			}
 		}
 	}
 	return nil
