@@ -1,25 +1,13 @@
 package automate
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
-
-func TestGenerateTestTemplates(t *testing.T) {
-	outputFilePath := "test_values.yml"
-	expectedValues := textReader("templates/test_templates/expected_values.yml")
-
-	GenerateValuesYaml("test_files/sample-infos.pub.json", "test_files/", outputFilePath)
-	actualValues := textReader(outputFilePath)
-
-	require.Equal(t, expectedValues, actualValues)
-
-	// cleanup
-	deleteFile(outputFilePath)
-}
 
 func TestSubString(t *testing.T) {
 	expectedMatched := "templates_test:\nreplacement1: 1\nreplacement2: 2"
@@ -41,17 +29,31 @@ func TestSubString(t *testing.T) {
 	// require.Equal(t, expectedOvermatched, overmatchedString)
 }
 
-func TestCreateWriteReadYaml(t *testing.T) {
-	filepath := "testYaml.yml"
-	testString := "Test String 123@"
-	file := createFile(filepath)
-	yamlWriter(file, "Test String 123@")
+// func TestCreateWriteReadYaml(t *testing.T) {
+// 	filepath := "testYaml.yml"
+// 	testString := "Test String 123@"
+// 	file := createFile(filepath)
+// 	yamlWriter(file, "Test String 123@")
 
-	file.Close()
+// 	file.Close()
 
-	actualString := textReader(filepath)
-	require.Equal(t, actualString, testString)
-	deleteFile(filepath)
+// 	actualString := textReader(filepath)
+// 	require.Equal(t, actualString, testString)
+// 	deleteFile(filepath)
+// }
+
+func TestUnmarshal(t *testing.T) {
+	fmt.Println("Start Test")
+	fmt.Println("New run")
+	envTemplate := textReader(TEMPLATE_PATH + ACCESS_TEMPLATE)
+
+	envStruct := unmarshalToStruct(envTemplate, &NodeDetails{}).(*NodeDetails)
+	fmt.Println(envStruct.Args[0])
+}
+
+func TestStructs(t *testing.T) {
+	loadYamlStructs()
+	deleteFile("values.yml")
 }
 
 func deleteFile(filepath string) {

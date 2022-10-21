@@ -1,38 +1,37 @@
-  defaults:
-    imagePullPolicy: Always
-    containerPorts:
-      - name: ptp
-        containerPort: 3569
-      - name: grpc
-        containerPort: 9000
-      - name: secure-grpc
-        containerPort: 9001
-      - name: admin
-        containerPort: 9002
-    env: []
-    resources:
-      requests:
-        cpu: "200m"
-        memory: "512Mi"
-      limits:
-        cpu: "800m"
-        memory: "10Gi"
-    servicePorts:
-      - name: ptp
-        protocol: TCP
-        port: 3569
-        targetPort: ptp
-      - name: grpc
-        protocol: TCP
-        port: 9000
-        targetPort: grpc
-      - name: secure-grpc
-        protocol: TCP
-        port: 9001
-        targetPort: secure-grpc
-      - name: admin
-        protocol: TCP
-        port: 9002
-        targetPort: admin
-    storage: 5G
-  nodes:
+defaults:
+  imagePullPolicy: Always
+  containerPorts:
+    - name: ptp
+      containerPort: 3569
+    - name: grpc
+      containerPort: 9000
+    - name: secure-grpc
+      containerPort: 9001
+    - name: admin
+      containerPort: 9002
+  env: []
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "800m"
+      memory: "10Gi"
+  servicePorts:
+    - name: ptp
+      protocol: TCP
+      port: 3569
+      targetPort: ptp
+    - name: grpc
+      protocol: TCP
+      port: 9000
+      targetPort: grpc
+    - name: secure-grpc
+      protocol: TCP
+      port: 9001
+      targetPort: secure-grpc
+    - name: admin
+      protocol: TCP
+      port: 9002
+      targetPort: admin
+  storage: 5G

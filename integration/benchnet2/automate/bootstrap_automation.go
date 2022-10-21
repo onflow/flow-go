@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"regexp"
+
+	"github.com/go-yaml/yaml"
 )
 
 // Node struct which to unmarshal the node-info into
@@ -35,7 +37,6 @@ var CONSENSUS_TEMPLATE string = "consensus_template.yml"
 var EXECUTION_TEMPLATE string = "execution_template.yml"
 var VERIFICATION_TEMPLATE string = "verification_template.yml"
 var RESOURCES_TEMPLATE string = "resources_template.yml"
-var ENV_TEMPLATE string = "env_template.yml"
 var TEMPLATE_PATH string = "templates/"
 
 var VALUES_HEADER string = "branch: fake-branch\n# Commit must be a string\ncommit: \"123456\"\n\ndefaults: {}\n"
@@ -89,118 +90,18 @@ func textReader(path string) string {
 	return string(file)
 }
 
-func yamlWriter(file *os.File, content string) {
-	_, err := file.Write([]byte(content))
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func createFile(filename string) *os.File {
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+func writeYamlToFile(filepath string, yamlData []byte) {
+	file, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return file
-}
-
-// Takes params
-// jsonDataFilePath - file path to node info json file
-// templatePath - folder path that contains all templates
-// outputFilePath - path and filename to save the generated yml file
-func GenerateValuesYaml(jsonDataFilePath string, templatePath string, outputFilePath string) {
-	var nodesData map[string]Node
-	var nodeConfig map[string]int
-	templateFolder := TEMPLATE_PATH
-	if jsonDataFilePath == "" {
-		nodesData, nodeConfig = loadNodeJsonData(DEFAULT_NODE_INFO_PATH)
-	} else {
-		nodesData, nodeConfig = loadNodeJsonData(jsonDataFilePath)
+	_, err = file.Write(yamlData)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	if templatePath != "" {
-		templateFolder = templatePath
-	}
-
-	valuesFilePath := "values.yml"
-	if outputFilePath != "" {
-		valuesFilePath = outputFilePath
-	}
-	values := createFile(valuesFilePath)
-	log.Printf("Values file created at %s", valuesFilePath)
-
-	envTemplate := createTemplate(templateFolder + ENV_TEMPLATE)
-	resources := textReader(templateFolder + RESOURCES_TEMPLATE)
-
-	yamlWriter(values, VALUES_HEADER)
-
-	yamlWriter(values, "access:\n")
-	yamlWriter(values, resources)
-
-	accessTemplate := createTemplate(templateFolder + ACCESS_TEMPLATE)
-	for i := 1; i <= nodeConfig["access"]; i++ {
-		name := fmt.Sprint("access", i)
-		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_ACCESS_IMAGE}
-
-		writeNodeData(values, name, envTemplate, accessTemplate, replacementData)
-	}
-
-	yamlWriter(values, "collection:\n")
-	yamlWriter(values, resources)
-
-	collectionTemplate := createTemplate(templateFolder + COLLECTION_TEMPLATE)
-	for i := 1; i <= nodeConfig["collection"]; i++ {
-		name := fmt.Sprint("collection", i)
-		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_COLLECTION_IMAGE}
-
-		writeNodeData(values, name, envTemplate, collectionTemplate, replacementData)
-	}
-
-	yamlWriter(values, "consensus:\n")
-	yamlWriter(values, resources)
-
-	consensusTemplate := createTemplate(templateFolder + CONSENSUS_TEMPLATE)
-	for i := 1; i <= nodeConfig["consensus"]; i++ {
-		name := fmt.Sprint("consensus", i)
-		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_CONSENSUS_IMAGE}
-
-		writeNodeData(values, name, envTemplate, consensusTemplate, replacementData)
-	}
-
-	yamlWriter(values, "execution:\n")
-	yamlWriter(values, resources)
-
-	executionTemplate := createTemplate(templateFolder + EXECUTION_TEMPLATE)
-	for i := 1; i <= nodeConfig["execution"]; i++ {
-		name := fmt.Sprint("execution", i)
-		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_EXECUTION_IMAGE}
-
-		writeNodeData(values, name, envTemplate, executionTemplate, replacementData)
-	}
-
-	yamlWriter(values, "verification:\n")
-	yamlWriter(values, resources)
-
-	verificationTemplate := createTemplate(templateFolder + VERIFICATION_TEMPLATE)
-	for i := 1; i <= nodeConfig["verification"]; i++ {
-		name := fmt.Sprint("verification", i)
-		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_VERIFICATION_IMAGE}
-
-		writeNodeData(values, name, envTemplate, verificationTemplate, replacementData)
-	}
-
-	log.Printf("Values files successfully written to %s", outputFilePath)
-	values.Close()
-}
-
-func writeNodeData(file *os.File, name string, envTemplate *template.Template, data *template.Template, replacementData ReplacementData) {
-	replacedData := replaceTemplateData(data, replacementData)
-	replacedEnv := replaceTemplateData(envTemplate, replacementData)
-
-	yamlWriter(file, "    "+name+":\n")
-	yamlWriter(file, replacedData)
-	yamlWriter(file, replacedEnv)
+	file.Close()
 }
 
 func replaceTemplateData(template *template.Template, data ReplacementData) string {
@@ -219,4 +120,89 @@ func createTemplate(templatePath string) *template.Template {
 	}
 
 	return template
+}
+
+func loadYamlStructs() {
+	templateFolder := "struct_templates/"
+	nodesData, nodeConfig := loadNodeJsonData(DEFAULT_NODE_INFO_PATH)
+	resources := textReader(templateFolder + RESOURCES_TEMPLATE)
+	nodeTypeResources := unmarshalToStruct(resources, &Defaults{}).(*Defaults)
+
+	accessTemplate := createTemplate(templateFolder + ACCESS_TEMPLATE)
+	var accessNodeMap = make(map[string]NodeDetails)
+	for i := 1; i <= nodeConfig["access"]; i++ {
+		name := fmt.Sprint("access", i)
+		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_ACCESS_IMAGE}
+
+		accessNodeMap[name] = *structNodeReplacement(accessTemplate, replacementData)
+	}
+	var accessNodes = Access{Defaults: *nodeTypeResources, Nodes: accessNodeMap}
+
+	collectionTemplate := createTemplate(templateFolder + COLLECTION_TEMPLATE)
+	var collectionNodeMap = make(map[string]NodeDetails)
+	for i := 1; i <= nodeConfig["collection"]; i++ {
+		name := fmt.Sprint("collection", i)
+		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_COLLECTION_IMAGE}
+
+		collectionNodeMap[name] = *structNodeReplacement(collectionTemplate, replacementData)
+	}
+	var collectionNodes = Collection{Defaults: *nodeTypeResources, Nodes: collectionNodeMap}
+
+	consensusTemplate := createTemplate(templateFolder + CONSENSUS_TEMPLATE)
+	var consensusNodeMap = make(map[string]NodeDetails)
+	for i := 1; i <= nodeConfig["consensus"]; i++ {
+		name := fmt.Sprint("consensus", i)
+		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_CONSENSUS_IMAGE}
+
+		consensusNodeMap[name] = *structNodeReplacement(consensusTemplate, replacementData)
+	}
+	var consensusNodes = Consensus{Defaults: *nodeTypeResources, Nodes: consensusNodeMap}
+
+	executionTemplate := createTemplate(templateFolder + EXECUTION_TEMPLATE)
+	var executionNodeMap = make(map[string]NodeDetails)
+	for i := 1; i <= nodeConfig["execution"]; i++ {
+		name := fmt.Sprint("execution", i)
+		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_EXECUTION_IMAGE}
+
+		executionNodeMap[name] = *structNodeReplacement(executionTemplate, replacementData)
+	}
+	var executionNodes = Execution{Defaults: *nodeTypeResources, Nodes: executionNodeMap}
+
+	verificationTemplate := createTemplate(templateFolder + VERIFICATION_TEMPLATE)
+	var verificationNodeMap = make(map[string]NodeDetails)
+	for i := 1; i <= nodeConfig["verification"]; i++ {
+		name := fmt.Sprint("verification", i)
+		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: DEFAULT_VERIFICATION_IMAGE}
+
+		verificationNodeMap[name] = *structNodeReplacement(verificationTemplate, replacementData)
+	}
+	var verificationNodes = Verification{Defaults: *nodeTypeResources, Nodes: verificationNodeMap}
+
+	values := unmarshalToStruct(VALUES_HEADER, &Values{}).(*Values)
+	values.Access = accessNodes
+	values.Collection = collectionNodes
+	values.Consensus = consensusNodes
+	values.Execution = executionNodes
+	values.Verification = verificationNodes
+
+	marshalToYaml(values)
+}
+
+func unmarshalToStruct(source string, target interface{}) interface{} {
+	yaml.Unmarshal([]byte(source), target)
+	return target
+}
+
+func marshalToYaml(source interface{}) {
+	output, _ := yaml.Marshal(source)
+	writeYamlToFile("values.yml", output)
+}
+
+func structNodeReplacement(nodeTemplate *template.Template, replacementData ReplacementData) *NodeDetails {
+	nodeString := replaceTemplateData(nodeTemplate, replacementData)
+	nodeStruct := unmarshalToStruct(nodeString, &NodeDetails{}).(*NodeDetails)
+	nodeStruct.Image = replacementData.ImageTag
+	nodeStruct.NodeID = replacementData.NodeID
+
+	return nodeStruct
 }
