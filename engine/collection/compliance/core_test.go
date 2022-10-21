@@ -21,18 +21,13 @@ import (
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/state"
 	clusterint "github.com/onflow/flow-go/state/cluster"
 	clusterstate "github.com/onflow/flow-go/state/cluster/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func doneChan() <-chan struct{} {
-	c := make(chan struct{})
-	close(c)
-	return c
-}
 
 func TestComplianceCore(t *testing.T) {
 	suite.Run(t, new(CoreSuite))
@@ -62,6 +57,7 @@ type CommonSuite struct {
 	pending           *module.PendingClusterBlockBuffer
 	hotstuff          *module.HotStuff
 	sync              *module.BlockRequester
+	validator         *hotstuff.Validator
 	voteAggregator    *hotstuff.VoteAggregator
 	timeoutAggregator *hotstuff.TimeoutAggregator
 
@@ -159,6 +155,7 @@ func (cs *CommonSuite) SetupTest() {
 	// set up hotstuff module mock
 	cs.hotstuff = module.NewHotStuff(cs.T())
 
+	cs.validator = hotstuff.NewValidator(cs.T())
 	cs.voteAggregator = hotstuff.NewVoteAggregator(cs.T())
 	cs.timeoutAggregator = hotstuff.NewTimeoutAggregator(cs.T())
 
@@ -179,6 +176,7 @@ func (cs *CommonSuite) SetupTest() {
 		cs.headers,
 		cs.state,
 		cs.pending,
+		cs.validator,
 		cs.voteAggregator,
 		cs.timeoutAggregator,
 	)
@@ -204,30 +202,12 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
+	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, cs.head.Header.View)).Return(nil)
 	cs.hotstuff.On("SubmitProposal", proposal.Header, cs.head.Header.View)
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
-
-	// we should submit the proposal to hotstuff
-	cs.hotstuff.AssertExpectations(cs.T())
-}
-
-func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
-
-	// create a proposal which is far enough ahead to be dropped
-	originID := unittest.IdentifierFixture()
-	block := unittest.ClusterBlockFixture()
-	block.Header.Height = cs.head.Header.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
-	proposal := unittest.ClusterProposalFromBlock(&block)
-
-	err := cs.core.OnBlockProposal(originID, proposal)
-	require.NoError(cs.T(), err)
-
-	// block should be dropped - not added to state or cache
-	cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
-	cs.pending.AssertNotCalled(cs.T(), "Add", originID, mock.Anything)
 }
 
 func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
@@ -246,6 +226,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
 
+	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(nil)
 	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Once()
 
 	// it should be processed without error
@@ -254,45 +235,170 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 
 	// we should extend the state with the header
 	cs.state.AssertCalled(cs.T(), "Extend", &block)
-
-	// we should submit the proposal to hotstuff
-	cs.hotstuff.AssertExpectations(cs.T())
 }
 
-func (cs *CoreSuite) TestOnBlockProposalInvalidExtension() {
+func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
+
+	// create a proposal which is far enough ahead to be dropped
+	originID := unittest.IdentifierFixture()
+	block := unittest.ClusterBlockFixture()
+	block.Header.Height = cs.head.Header.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+	proposal := unittest.ClusterProposalFromBlock(&block)
+
+	err := cs.core.OnBlockProposal(originID, proposal)
+	require.NoError(cs.T(), err)
+
+	// block should be dropped - not added to state or cache
+	cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+	cs.pending.AssertNotCalled(cs.T(), "Add", originID, mock.Anything)
+}
+
+// TestOnBlockProposal_FailsHotStuffValidation tests that a proposal which fails HotStuff validation.
+//   - should not go through protocol state validation
+//   - should not be added to the state
+//   - we should not attempt to process its children
+//   - we should notify VoteAggregator, for known errors
+func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
 	ancestor := unittest.ClusterBlockWithParent(cs.head)
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
+	proposal := unittest.ClusterProposalFromBlock(&block)
+	hotstuffProposal := model.ProposalFromFlow(block.Header, parent.Header.View)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
 
-	// make sure we fail to extend the state
-	*cs.state = clusterstate.MutableState{}
-	cs.state.On("Final").Return(
-		func() clusterint.Snapshot {
-			return cs.snapshot
-		},
-	)
-	cs.state.On("Extend", mock.Anything).Return(errors.New("dummy error"))
+	cs.Run("invalid block error", func() {
+		// the block fails HotStuff validation
+		*cs.validator = *hotstuff.NewValidator(cs.T())
+		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(model.InvalidBlockError{})
+		// we should notify VoteAggregator about the invalid block
+		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
-	// it should be processed without error
-	err := cs.core.OnBlockProposal(originID, proposal)
-	require.Error(cs.T(), err, "proposal with invalid extension should fail")
+		// the expected error should be handled within the Core
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
-	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", &block)
+		// we should not extend the state with the header
+		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
 
-	// we should not submit the proposal to hotstuff
-	cs.hotstuff.AssertExpectations(cs.T())
+	cs.Run("view for unknown epoch error", func() {
+		// the block fails HotStuff validation
+		*cs.validator = *hotstuff.NewValidator(cs.T())
+		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(model.ErrViewForUnknownEpoch)
+
+		// the expected error should be handled within the Core
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
+
+		// we should not extend the state with the header
+		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
+
+	cs.Run("unexpected error", func() {
+		// the block fails HotStuff validation
+		unexpectedErr := errors.New("generic unexpected error")
+		*cs.validator = *hotstuff.NewValidator(cs.T())
+		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(unexpectedErr)
+
+		// the error should be propagated
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.ErrorIs(cs.T(), err, unexpectedErr)
+
+		// we should not extend the state with the header
+		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
+}
+
+// TestOnBlockProposal_FailsProtocolStateValidation tests processing a proposal which passes HotStuff validation,
+// but fails protocol state validation.
+//   - should not be added to the state
+//   - we should not attempt to process its children
+//   - we should notify VoteAggregator, for known errors
+func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
+
+	// create a proposal that has two ancestors in the cache
+	originID := unittest.IdentifierFixture()
+	ancestor := unittest.ClusterBlockWithParent(cs.head)
+	parent := unittest.ClusterBlockWithParent(&ancestor)
+	block := unittest.ClusterBlockWithParent(&parent)
+	proposal := unittest.ClusterProposalFromBlock(&block)
+	hotstuffProposal := model.ProposalFromFlow(block.Header, parent.Header.View)
+
+	// store the data for retrieval
+	cs.headerDB[parent.ID()] = &parent
+	cs.headerDB[ancestor.ID()] = &ancestor
+
+	// the block passes HotStuff validation
+	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(nil)
+
+	cs.Run("invalid block", func() {
+		// make sure we fail to extend the state
+		*cs.state = clusterstate.MutableState{}
+		cs.state.On("Final").Return(func() clusterint.Snapshot { return cs.snapshot })
+		cs.state.On("Extend", mock.Anything).Return(state.NewInvalidExtensionError(""))
+		// we should notify VoteAggregator about the invalid block
+		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
+
+		// the expected error should be handled within the Core
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
+
+		// we should extend the state with the header
+		cs.state.AssertCalled(cs.T(), "Extend", &block)
+		// we should not pass the block to hotstuff
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
+
+	cs.Run("outdated block", func() {
+		// make sure we fail to extend the state
+		*cs.state = clusterstate.MutableState{}
+		cs.state.On("Final").Return(func() clusterint.Snapshot { return cs.snapshot })
+		cs.state.On("Extend", mock.Anything).Return(state.NewOutdatedExtensionError(""))
+
+		// the expected error should be handled within the Core
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
+
+		// we should extend the state with the header
+		cs.state.AssertCalled(cs.T(), "Extend", &block)
+		// we should not pass the block to hotstuff
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
+
+	cs.Run("unexpected error", func() {
+		// make sure we fail to extend the state
+		*cs.state = clusterstate.MutableState{}
+		cs.state.On("Final").Return(func() clusterint.Snapshot { return cs.snapshot })
+		unexpectedErr := errors.New("unexpected generic error")
+		cs.state.On("Extend", mock.Anything).Return(unexpectedErr)
+
+		// it should be processed without error
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.ErrorIs(cs.T(), err, unexpectedErr)
+
+		// we should extend the state with the header
+		cs.state.AssertCalled(cs.T(), "Extend", &block)
+		// we should not pass the block to hotstuff
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
 }
 
 func (cs *CoreSuite) TestProcessBlockAndDescendants() {
@@ -329,13 +435,18 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
+	cs.validator.On("ValidateProposal", model.ProposalFromFlow(parent.Header, cs.head.Header.View)).Return(nil)
+	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block1.Header, parent.Header.View)).Return(nil)
+	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block2.Header, parent.Header.View)).Return(nil)
+	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block3.Header, parent.Header.View)).Return(nil)
+
 	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.Header.View).Once()
 	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Once()
 	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Once()
 	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Once()
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(proposal)
+	err := cs.core.processBlockAndDescendants(proposal, cs.head.Header)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff
@@ -456,6 +567,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 			cs.headerDB[header.ID()] = proposalsLookup[header.ID()]
 		},
 	)
+	cs.validator.On("ValidateProposal", mock.Anything).Times(4).Return(nil)
 
 	missingProposal := &messages.ClusterBlockProposal{
 		Header:  missing.Header,
