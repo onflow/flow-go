@@ -89,7 +89,7 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	// checks end-to-end message delivery works
 	// each node sends a distinct message to all and checks that all nodes receive it.
 	for _, node := range nodes {
-		proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture())
+		proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 		require.NoError(t, node.Publish(ctx, blockTopic, proposalMsg))
 
 		// checks that the message is received by all nodes.
@@ -106,6 +106,7 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 // This test proves that if access nodes are PUSHED to the edge of the network, even their malicious majority cannot partition
 // the network of honest nodes.
 func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testing.T) {
+	// Note: if this test is ever flaky, this means a bug in our scoring system. Please escalate to the team instead of skipping.
 	total := 10
 	for i := 0; i < total; i++ {
 		if !testGossipSubMessageDeliveryUnderNetworkPartition(t, true) {
@@ -120,7 +121,8 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 // This test proves that if access nodes are NOT pushed to the edge of network, a malicious majority of them can
 // partition the network by disconnecting honest nodes from each other even when the network topology is a complete graph (i.e., full topology).
 func TestNetworkPartitionWithNoHonestPeerScoringInFullTopology(t *testing.T) {
-	total := 30
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "to be fixed later")
+	total := 100
 	for i := 0; i < total; i++ {
 		// false means no honest peer scoring.
 		if !testGossipSubMessageDeliveryUnderNetworkPartition(t, false) {
@@ -195,7 +197,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	// let nodes reside on a full topology, hence no partition is caused by the topology.
 	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, allNodes, allIds)
 
-	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture())
+	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 	require.NoError(t, con1Node.Publish(ctx, blockTopic, proposalMsg))
 
 	// we check that whether within a one-second window the message is received by the other honest consensus node.

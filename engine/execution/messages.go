@@ -2,6 +2,7 @@ package execution
 
 import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
@@ -17,18 +18,19 @@ type ComputationOrder struct {
 }
 
 type ComputationResult struct {
-	ExecutableBlock    *entity.ExecutableBlock
-	StateSnapshots     []*delta.SpockSnapshot
-	StateCommitments   []flow.StateCommitment
-	Proofs             [][]byte
-	Events             []flow.EventsList
-	EventsHashes       []flow.Identifier
-	ServiceEvents      flow.EventsList
-	TransactionResults []flow.TransactionResult
-	ComputationUsed    uint64
-	StateReads         uint64
-	TrieUpdates        []*ledger.TrieUpdate
-	ExecutionDataID    flow.Identifier
+	ExecutableBlock        *entity.ExecutableBlock
+	StateSnapshots         []*delta.SpockSnapshot
+	StateCommitments       []flow.StateCommitment
+	Proofs                 [][]byte
+	Events                 []flow.EventsList
+	EventsHashes           []flow.Identifier
+	ServiceEvents          flow.EventsList
+	TransactionResults     []flow.TransactionResult
+	ComputationUsed        uint64
+	ComputationIntensities meter.MeteredComputationIntensities
+	StateReads             uint64
+	TrieUpdates            []*ledger.TrieUpdate
+	ExecutionDataID        flow.Identifier
 }
 
 func (cr *ComputationResult) AddEvents(chunkIndex int, inp []flow.Event) {
@@ -45,6 +47,13 @@ func (cr *ComputationResult) AddTransactionResult(inp *flow.TransactionResult) {
 
 func (cr *ComputationResult) AddComputationUsed(inp uint64) {
 	cr.ComputationUsed += inp
+}
+
+func (cr *ComputationResult) MergeComputationEffortVector(
+	computationIntensities meter.MeteredComputationIntensities) {
+	for computationKind, intensity := range computationIntensities {
+		cr.ComputationIntensities[computationKind] += intensity
+	}
 }
 
 func (cr *ComputationResult) AddStateSnapshot(inp *delta.SpockSnapshot) {

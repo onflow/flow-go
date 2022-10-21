@@ -28,12 +28,15 @@ func extractExecutionState(
 	outputDir string,
 	log zerolog.Logger,
 	chain flow.Chain,
+	version int, // to be removed after next spork
 	migrate bool,
 	report bool,
 ) error {
 
+	log.Info().Msg("init WAL")
+
 	diskWal, err := wal.NewDiskWAL(
-		zerolog.Nop(),
+		log,
 		nil,
 		metrics.NewNoopCollector(),
 		dir,
@@ -44,6 +47,8 @@ func extractExecutionState(
 	if err != nil {
 		return fmt.Errorf("cannot create disk WAL: %w", err)
 	}
+
+	log.Info().Msg("init ledger")
 
 	led, err := complete.NewLedger(
 		diskWal,
@@ -60,10 +65,14 @@ func extractExecutionState(
 		checkpointsToKeep  = 1
 	)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	log.Info().Msg("init compactor")
+
+	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
+
+	log.Info().Msgf("waiting for compactor to load checkpoint and WAL")
 
 	<-compactor.Ready()
 
@@ -116,6 +125,7 @@ func extractExecutionState(
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
+		version,
 	)
 	if err != nil {
 		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
