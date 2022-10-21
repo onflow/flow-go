@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	programsCache "github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -64,39 +63,15 @@ func (i TransactionInvoker) Process(
 		}
 	}
 
-	// TODO(patrick): tighten validateCommit check and move proc result
-	// population into commit
-	//
-	// if tx failed this will only contain fee deduction logs
-	proc.Logs = append(proc.Logs, env.Logs()...)
-	proc.ComputationUsed = proc.ComputationUsed + env.ComputationUsed()
-	proc.MemoryEstimate = proc.MemoryEstimate + env.MemoryEstimate()
-	if proc.IsSampled() {
-		proc.ComputationIntensities = env.ComputationIntensities()
-	}
-
-	// if tx failed this will only contain fee deduction events
-	proc.Events = append(proc.Events, env.Events()...)
-	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
-
-	processErr := errs.ErrorOrNil()
-
-	fatalErr := i.validateCommit(
+	errs.Collect(i.commit(
 		proc,
 		txnState,
 		nestedTxnId,
 		env,
-		processErr)
-	if fatalErr != nil {
-		return fatalErr
-	}
-
-	return i.commit(
-		txnState,
-		nestedTxnId,
 		programs,
-		modifiedSets,
-		processErr)
+		modifiedSets))
+
+	return errs.ErrorOrNil()
 }
 
 func (i TransactionInvoker) deductTransactionFees(
@@ -263,52 +238,34 @@ func (i TransactionInvoker) errorExecution(
 	return nil
 }
 
-func (i TransactionInvoker) validateCommit(
+func (i TransactionInvoker) commit(
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
 	nestedTxnId state.NestedTransactionId,
 	env environment.Environment,
-	processErr error,
-) error {
-	if txnState.NumNestedTransactions() > 1 {
-		if processErr == nil {
-			// This is a fvm internal programming error.  We forgot to
-			// call Commit somewhere in the control flow.  We should halt.
-			return fmt.Errorf(
-				"successfully executed transaction has unexpected " +
-					"nested transactions.")
-		} else {
-			restartErr := txnState.RestartNestedTransaction(nestedTxnId)
-			if restartErr != nil {
-				// This should never happen since merging views should
-				// never fail.
-				return fmt.Errorf(
-					"cannot restart nested transaction on error: %w "+
-						"(original processErr: %v)",
-					restartErr,
-					processErr)
-			}
-
-			env.Logger().Warn().Msg(
-				"transaction had unexpected nested transactions, " +
-					"which have been restarted.")
-
-			// Note: proc.Err is set by TransactionProcedure.
-			proc.Logs = make([]string, 0)
-			proc.Events = make([]flow.Event, 0)
-			proc.ServiceEvents = make([]flow.Event, 0)
-		}
-	}
-	return nil
-}
-
-func (i TransactionInvoker) commit(
-	txnState *state.TransactionState,
-	nestedTxnId state.NestedTransactionId,
 	programs *programsCache.TransactionPrograms,
 	modifiedSets programsCache.ModifiedSetsInvalidator,
-	processErr error,
 ) error {
+	if txnState.NumNestedTransactions() > 1 {
+		// This is a fvm internal programming error.  We forgot to call Commit
+		// somewhere in the control flow.  We should halt.
+		return fmt.Errorf(
+			"successfully executed transaction has unexpected " +
+				"nested transactions.")
+	}
+
+	// if tx failed this will only contain fee deduction logs
+	proc.Logs = append(proc.Logs, env.Logs()...)
+	proc.ComputationUsed = proc.ComputationUsed + env.ComputationUsed()
+	proc.MemoryEstimate = proc.MemoryEstimate + env.MemoryEstimate()
+	if proc.IsSampled() {
+		proc.ComputationIntensities = env.ComputationIntensities()
+	}
+
+	// if tx failed this will only contain fee deduction events
+	proc.Events = append(proc.Events, env.Events()...)
+	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
+
 	// based on the contract and frozen account updates we decide how to
 	// clean up the programs for failed transactions we also do the same as
 	// transaction without any deployed contracts
@@ -317,11 +274,9 @@ func (i TransactionInvoker) commit(
 	commitErr := txnState.Commit(nestedTxnId)
 	if commitErr != nil {
 		return fmt.Errorf(
-			"transaction invocation failed when merging state: %w "+
-				"(original processErr: %v)",
-			commitErr,
-			processErr)
+			"transaction invocation failed when merging state: %w",
+			commitErr)
 	}
 
-	return processErr
+	return nil
 }
