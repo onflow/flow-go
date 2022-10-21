@@ -249,17 +249,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 // broadcasts timeout object to consensus committee.
 // No errors are expected during normal operations.
 func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
-	logContext := h.log.With().
-		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
-		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
-		Uint64("timeout_view", timeout.View)
-
-	if timeout.LastViewTC != nil {
-		logContext.
-			Uint64("last_view_tc_view", timeout.LastViewTC.View).
-			Uint64("last_view_tc_newest_qc_view", timeout.LastViewTC.NewestQC.View)
-	}
-	log := logContext.Logger()
+	log := timeout.LogContext(h.log).Logger()
 
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
 

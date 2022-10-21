@@ -219,17 +219,7 @@ func (lc *LogConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData [
 }
 
 func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
-	logContext := lc.log.With().
-		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
-		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
-		Uint64("timeout_view", timeout.View)
-
-	if timeout.LastViewTC != nil {
-		logContext.
-			Uint64("last_view_tc_view", timeout.LastViewTC.View).
-			Uint64("last_view_tc_newest_qc_view", timeout.LastViewTC.NewestQC.View)
-	}
-	log := logContext.Logger()
+	log := timeout.LogContext(lc.log).Logger()
 	log.Info().Msg("timeout broadcast request from hotstuff")
 }
 
