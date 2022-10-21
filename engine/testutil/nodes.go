@@ -660,7 +660,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	followerCore, finalizer := createFollowerCore(t, &node, followerState, finalizationDistributor, rootHead, rootQC)
 	// mock out hotstuff validator
 	validator := new(mockhotstuff.Validator)
-	validator.On("ValidatorProposal", mock.Anything).Return(nil)
+	validator.On("ValidateProposal", mock.Anything).Return(nil)
 
 	// initialize cleaner for DB
 	cleaner := storage.NewCleaner(node.Log, node.PublicDB, node.Metrics, flow.DefaultValueLogGCFrequency)
