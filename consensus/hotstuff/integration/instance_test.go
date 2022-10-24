@@ -83,25 +83,18 @@ type Instance struct {
 }
 
 type MockedCommunicatorConsumer struct {
-	notifications.NoopConsumer
-	mock.Mock
+	notifications.NoopPartialConsumer
+	notifications.NoopFinalizationConsumer
+	*mocks.CommunicatorConsumer
 }
 
-// OnOwnProposal provides a mock function with given fields: proposal, delay
-func (_m *MockedCommunicatorConsumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
-	_m.Called(proposal, targetPublicationTime)
+func NewMockedCommunicatorConsumer() *MockedCommunicatorConsumer {
+	return &MockedCommunicatorConsumer{
+		CommunicatorConsumer: &mocks.CommunicatorConsumer{},
+	}
 }
 
-// OnOwnTimeout provides a mock function with given fields: timeout
-func (_m *MockedCommunicatorConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
-	_m.Called(timeout)
-}
-
-// OnOwnVote provides a mock function with given fields: blockID, view, sigData, recipientID
-func (_m *MockedCommunicatorConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
-	_m.Called(blockID, view, sigData, recipientID)
-}
-
+var _ hotstuff.Consumer = (*MockedCommunicatorConsumer)(nil)
 var _ hotstuff.TimeoutCollectorConsumer = (*Instance)(nil)
 
 func NewInstance(t *testing.T, options ...Option) *Instance {
@@ -166,7 +159,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		persist:   &mocks.Persister{},
 		signer:    &mocks.Signer{},
 		verifier:  &mocks.Verifier{},
-		notifier:  &MockedCommunicatorConsumer{},
+		notifier:  NewMockedCommunicatorConsumer(),
 		finalizer: &module.Finalizer{},
 	}
 

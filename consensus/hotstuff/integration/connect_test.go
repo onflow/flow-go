@@ -22,7 +22,7 @@ func Connect(t *testing.T, instances []*Instance) {
 	for _, sender := range instances {
 		sender := sender // avoid capturing loop variable in closure
 
-		*sender.notifier = MockedCommunicatorConsumer{}
+		*sender.notifier = *NewMockedCommunicatorConsumer()
 		sender.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(
 			func(args mock.Arguments) {
 				header, ok := args[0].(*flow.Header)
