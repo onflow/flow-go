@@ -178,7 +178,7 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 	sn1, _ := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
 	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
 
-	nodes := []*p2pnode.Node{sn1, sn2}
+	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
@@ -195,11 +195,11 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
 
 	// sn2 will subscribe with an unauthenticated callback to allow processing of message after the authorization check
-	_, err = sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	_, err = sn1.Subscribe(topic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
 	// sn2 will subscribe with an unauthenticated callback to allow it to send the unauthenticated message
-	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	_, err = sn2.Subscribe(topic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
 	// let nodes form the mesh
@@ -234,7 +234,7 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 	sn1, _ := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
 	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
 
-	nodes := []*p2pnode.Node{sn1, sn2}
+	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
@@ -250,11 +250,11 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
 
 	// sn2 will subscribe with an unauthenticated callback to allow processing of message after the authorization check
-	_, err = sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	_, err = sn1.Subscribe(topic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
 	// sn2 will subscribe with an unauthenticated callback to allow it to send the unauthenticated message
-	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	_, err = sn2.Subscribe(topic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
 	// let nodes form the mesh
