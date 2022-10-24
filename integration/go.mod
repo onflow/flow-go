@@ -27,12 +27,14 @@ require (
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.13.0
-	github.com/rs/zerolog v1.26.1
+	github.com/rs/zerolog v1.28.0
 	github.com/sethvargo/go-retry v0.2.3
 	github.com/stretchr/testify v1.8.0
 	go.uber.org/atomic v1.10.0
-	google.golang.org/grpc v1.48.0
+	google.golang.org/grpc v1.50.1
 )
+
+require github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 
 require (
 	cloud.google.com/go v0.102.1 // indirect
@@ -184,6 +186,7 @@ require (
 	github.com/marten-seemann/qtls-go1-18 v0.1.2 // indirect
 	github.com/marten-seemann/qtls-go1-19 v0.1.0 // indirect
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
+	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/mattn/go-pointer v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
@@ -297,4 +300,4 @@ require (
 
 replace github.com/onflow/flow-go => ../
 
-//replace github.com/onflow/flow-go/insecure => ../insecure
+replace github.com/onflow/flow-go/insecure => ../insecure
