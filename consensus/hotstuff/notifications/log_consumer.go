@@ -215,12 +215,12 @@ func (lc *LogConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData [
 		Hex("block_id", blockID[:]).
 		Uint64("block_view", view).
 		Hex("recipient_id", recipientID[:]).
-		Msg("vote transmission request from hotstuff")
+		Msg("publishing HotStuff vote")
 }
 
 func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	log := timeout.LogContext(lc.log).Logger()
-	log.Info().Msg("timeout broadcast request from hotstuff")
+	log.Info().Msg("publishing HotStuff timeout object")
 }
 
 func (lc *LogConsumer) OnOwnProposal(header *flow.Header, delay time.Duration) {
@@ -232,7 +232,7 @@ func (lc *LogConsumer) OnOwnProposal(header *flow.Header, delay time.Duration) {
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
-		Hex("signers", header.ParentVoterIndices).
-		Dur("delay", delay).
-		Msg("proposal broadcast request from hotstuff")
+		Hex("parent_signer_indices", header.ParentVoterIndices).
+		Time("target_publication_time", delay).
+		Msg("publishing HotStuff block proposal")
 }

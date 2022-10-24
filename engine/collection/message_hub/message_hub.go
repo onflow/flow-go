@@ -250,7 +250,6 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 // No errors are expected during normal operations.
 func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 	log := timeout.LogContext(h.log).Logger()
-
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
 
 	// Retrieve all collection nodes in our cluster (excluding myself).
@@ -270,11 +269,10 @@ func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 	}
 
 	err = h.con.Publish(msg, recipients.NodeIDs()...)
-	if errors.Is(err, network.EmptyTargetList) {
-		return nil
-	}
 	if err != nil {
-		log.Err(err).Msg("could not broadcast timeout")
+		if !errors.Is(err, network.EmptyTargetList) {
+			log.Err(err).Msg("could not broadcast timeout")
+		}
 		return nil
 	}
 	log.Info().Msg("cluster timeout was broadcast")
@@ -370,18 +368,16 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 
 	// broadcast the proposal to consensus nodes
 	err = h.con.Publish(proposal, recipients.NodeIDs()...)
-	if errors.Is(err, network.EmptyTargetList) {
-		return nil
-	}
 	if err != nil {
-		log.Err(err).Msg("could not send proposal message")
+		if !errors.Is(err, network.EmptyTargetList) {
+			log.Err(err).Msg("could not send proposal message")
+		}
 		return nil
 	}
+	log.Info().Msg("cluster proposal was broadcast")
 
 	//TODO(active-pacemaker): update metrics
 	//e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
-
-	log.Info().Msg("cluster proposal was broadcast")
 
 	//TODO(active-pacemaker): add metrics for ClusterBlockProposed
 	return nil

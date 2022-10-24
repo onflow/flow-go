@@ -65,6 +65,11 @@ func (t *TimeoutObject) String() string {
 	return fmt.Sprintf("View: %d, HighestQC.View: %d, LastViewTC: %v", t.View, t.NewestQC.View, t.LastViewTC)
 }
 
+// LogContext returns a `zerolog.Contex` including the most important properties of the TC:
+//   - view number that this TC is for
+//   - view and ID of the block that the included QC points to
+//   - [optional] if the TC also includes a TC for the prior view, i.e. `LastViewTC` ≠ nil:
+//     the new of `LastViewTC` and the view that `LastViewTC.NewestQC` is for
 func (t *TimeoutObject) LogContext(logger zerolog.Logger) zerolog.Context {
 	logContext := logger.With().
 		Uint64("timeout_newest_qc_view", t.NewestQC.View).

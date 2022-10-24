@@ -239,13 +239,13 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 // No errors are expected during normal operations.
 func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 	log := timeout.LogContext(h.log).Logger()
-
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
 
 	// Retrieve all consensus nodes (excluding myself).
 	// CAUTION: We must include also nodes with weight zero, because otherwise
 	//          TCs might not be constructed at epoch switchover.
 	recipients, err := h.state.Final().Identities(filter.And(
+		filter.Not(filter.Ejected),
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(h.me.NodeID())),
 	))
@@ -262,11 +262,10 @@ func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 	}
 
 	err = h.con.Publish(msg, recipients.NodeIDs()...)
-	if errors.Is(err, network.EmptyTargetList) {
-		return nil
-	}
 	if err != nil {
-		log.Err(err).Msg("could not broadcast timeout")
+		if !errors.Is(err, network.EmptyTargetList) {
+			log.Err(err).Msg("could not broadcast timeout")
+		}
 		return nil
 	}
 	log.Info().Msg("consensus timeout was broadcast")
@@ -287,7 +286,6 @@ func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 		Uint64("block_view", packed.vote.View).
 		Hex("recipient_id", packed.recipientID[:]).
 		Logger()
-
 	log.Info().Msg("processing vote transmission request from hotstuff")
 
 	// send the vote the desired recipient
@@ -356,13 +354,14 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	//       Therefore, we execute this in a separate routine, because
 	//       `OnOwnTimeout` is directly called by the consensus core logic.
 	allIdentities, err := h.state.AtBlockID(header.ParentID).Identities(filter.And(
+		filter.Not(filter.Ejected),
 		filter.Not(filter.HasNodeID(h.me.NodeID())),
 	))
 	if err != nil {
 		return fmt.Errorf("could not get identities for broadcasting proposal: %w", err)
 	}
 
-	recipients := allIdentities.Filter(filter.HasRole(flow.RoleConsensus))
+	consRecipients := allIdentities.Filter(filter.HasRole(flow.RoleConsensus))
 
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
@@ -374,24 +373,19 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 
 	// broadcast the proposal to consensus nodes
 	err = h.con.Publish(proposal, recipients.NodeIDs()...)
-	if errors.Is(err, network.EmptyTargetList) {
-		return nil
-	}
 	if err != nil {
-		log.Err(err).Msg("could not send proposal message")
+		if !errors.Is(err, network.EmptyTargetList) {
+			log.Err(err).Msg("could not send proposal message")
+		}
 		return nil
 	}
+	log.Info().Msg("block proposal was broadcast")
 
 	//TODO(active-pacemaker): update metrics
 	//e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
 
-	log.Info().Msg("block proposal was broadcast")
-
 	// submit proposal to non-consensus nodes
-	h.provideProposal(proposal, allIdentities.Filter(filter.And(
-		filter.Not(filter.Ejected),
-		filter.Not(filter.HasRole(flow.RoleConsensus)),
-	)))
+	h.provideProposal(proposal, allIdentities.Filter(filter.Not(filter.HasRole(flow.RoleConsensus))))
 
 	return nil
 }
@@ -399,7 +393,6 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 // provideProposal is used when we want to broadcast a local block to the rest  of the
 // network (non-consensus nodes).
 func (h *MessageHub) provideProposal(proposal *messages.BlockProposal, recipients flow.IdentityList) {
-
 	blockID := proposal.Header.ID()
 	log := h.log.With().
 		Uint64("block_view", proposal.Header.View).
