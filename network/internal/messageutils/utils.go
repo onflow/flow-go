@@ -1,10 +1,11 @@
 package messageutils
 
 import (
+	"testing"
+
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/stretchr/testify/require"
-	"testing"
 
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
