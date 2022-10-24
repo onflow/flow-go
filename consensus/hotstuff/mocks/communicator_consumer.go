@@ -17,7 +17,7 @@ type CommunicatorConsumer struct {
 	mock.Mock
 }
 
-// OnOwnProposal provides a mock function with given fields: proposal, delay
+// OnOwnProposal provides a mock function with given fields: proposal, targetPublicationTime
 func (_m *CommunicatorConsumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
 	_m.Called(proposal, targetPublicationTime)
 }
