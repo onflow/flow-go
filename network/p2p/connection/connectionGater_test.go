@@ -6,13 +6,10 @@ import (
 	"testing"
 	"time"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -39,16 +36,12 @@ func TestConnectionGater(t *testing.T) {
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
-	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
-
-	subs := make([]*pubsub.Subscription, len(nodes))
-	var err error
-	for i, node := range nodes {
-		subs[i], err = node.Subscribe(blockTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
-		require.NoError(t, err)
-	}
-
 	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+
+	// ensures that all nodes are connected to each other, and they can exchange messages over the pubsub and unicast
 	p2pfixtures.EnsureConnected(t, ctx, nodes)
+	p2pfixtures.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
+		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+		return unittest.ProposalFixture(), blockTopic
+	})
 }
