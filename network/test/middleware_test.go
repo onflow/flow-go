@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/messageutils"
 	"github.com/onflow/flow-go/network/internal/testutils"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -383,7 +384,18 @@ func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvi
 	}, nil)
 	// this test is not testing the topic validator, especially in spoofing,
 	// so we always return a valid identity
-	overlay.On("Identity", mockery.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(), true)
+	//overlay.On("Identity", mockery.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(), true)
+
+	overlay.On("Identity", mockery.AnythingOfType("peer.ID")).Maybe().Return(
+		func(p peer.ID) *flow.Identity {
+			id, _ := provider.ByPeerID(p)
+			return id
+		},
+		func(p peer.ID) bool {
+			_, ok := provider.ByPeerID(p)
+			return ok
+		},
+	)
 	return overlay
 }
 
@@ -482,6 +494,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 		receiveWG.Add(1)
 		sendWG.Add(1)
 		msg, expectedPayload := messageutils.CreateMessage(m.ids[firstNode].NodeID, m.ids[lastNode].NodeID, testChannel.String(), fmt.Sprintf("hello from: %d", i))
+
 		m.ov[lastNode].On("Receive", m.ids[firstNode].NodeID, msg, expectedPayload).Return(nil).Once().
 			Run(func(args mockery.Arguments) {
 				payload := args.Get(2).(*libp2pmessage.TestMessage)
@@ -526,6 +539,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 	expectedSendPayload := sendPayload.(*libp2pmessage.TestMessage)
 
 	replyMsg, replyPayload := messageutils.CreateMessage(lastNode, firstNode, testChannel.String(), "hello back")
+
 	expectedReplyPayload := replyPayload.(*libp2pmessage.TestMessage)
 
 	// last node
@@ -601,14 +615,11 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 
 	msg, _ := messageutils.CreateMessage(sourceNode, targetNode, testChannel.String(), "")
 
-	// creates a network payload with a size greater than the default max size
-	payload := testutils.NetworkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
-	event := &libp2pmessage.TestMessage{
-		Text: string(payload),
-	}
-
-	// set the message type to a known large message type
+	// creates a network payload with a size greater than the default max size using a known large message type
+	targetSize := uint64(middleware.DefaultMaxUnicastMsgSize) + 1000
+	event := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture(), unittest.WithApproximateSize(targetSize))
 	msg.Type = "messages.ChunkDataResponse"
+	msg.ChannelID = channels.ProvideChunks.String()
 
 	codec := unittest.NetworkCodec()
 	encodedEvent, err := codec.Encode(event)
@@ -616,6 +627,8 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 
 	// set the message payload as the large message
 	msg.Payload = encodedEvent
+	msg.EventID, err = p2p.EventId(channels.Channel(msg.ChannelID), encodedEvent)
+	require.NoError(m.T(), err)
 
 	// expect one message to be received by the target
 	ch := make(chan struct{})
@@ -635,6 +648,43 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	m.ov[targetIndex].AssertExpectations(m.T())
 }
 
+// TestMessageFieldsOverriden_SendDirect asserts that OriginID, EventID and Type fields are
+// overridden in the message received over unicast
+func (m *MiddlewareTestSuite) TestMessageFieldsOverriden_SendDirect() {
+	first := 0
+	last := m.size - 1
+	firstNode := m.ids[first].NodeID
+	lastNode := m.ids[last].NodeID
+
+	expected, event := messageutils.CreateMessage(firstNode, lastNode, testChannel.String(), "test message")
+
+	fakeID := unittest.IdentifierFixture()
+	msg := &message.Message{
+		OriginID:  fakeID[:],
+		EventID:   fakeID[:],
+		Type:      "messages.ChunkDataResponse",
+		ChannelID: expected.ChannelID,
+		Payload:   expected.Payload,
+		TargetIDs: expected.TargetIDs,
+	}
+
+	// should receive the expected message, not msg
+	ch := make(chan struct{})
+	m.ov[last].On("Receive", firstNode, expected, event).Return(nil).Once().
+		Run(func(args mockery.Arguments) {
+			close(ch)
+		})
+
+	// sends a direct message from first node to the last node with the modified fields
+	err := m.mws[first].SendDirect(msg, lastNode)
+	assert.NoError(m.Suite.T(), err)
+
+	// check message reception on target
+	unittest.RequireCloseBefore(m.T(), ch, 60*time.Second, "source node failed to send overridden message to target")
+
+	m.ov[last].AssertExpectations(m.T())
+}
+
 // TestMaxMessageSize_Publish evaluates that invoking Publish method of the middleware on a message
 // size beyond the permissible publish message size returns an error.
 func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
@@ -644,6 +694,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	lastNode := m.ids[last].NodeID
 
 	msg, _ := messageutils.CreateMessage(firstNode, lastNode, testChannel.String(), "")
+
 	// adds another node as the target id to imitate publishing
 	msg.TargetIDs = append(msg.TargetIDs, lastNode[:])
 
@@ -666,6 +717,62 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	// sends a direct message from first node to the last node
 	err = m.mws[first].Publish(msg, testChannel)
 	require.Error(m.Suite.T(), err)
+}
+
+// TestMessageFieldsOverriden_Publish asserts that OriginID, EventID and Type fields are
+// overridden in the message received over pubsub
+func (m *MiddlewareTestSuite) TestMessageFieldsOverriden_Publish() {
+	first := 0
+	last := m.size - 1
+	firstNode := m.ids[first].NodeID
+	lastNode := m.ids[last].NodeID
+
+	expected, event := messageutils.CreateMessage(firstNode, lastNode, testChannel.String(), "test message")
+
+	// adds another node as the target id to imitate publishing
+	expected.TargetIDs = append(expected.TargetIDs, lastNode[:])
+
+	fakeID := unittest.IdentifierFixture()
+
+	msg := &message.Message{
+		OriginID:  fakeID[:],
+		EventID:   fakeID[:],
+		Type:      "messages.ChunkDataResponse",
+		ChannelID: expected.ChannelID,
+		Payload:   expected.Payload,
+		TargetIDs: expected.TargetIDs,
+	}
+
+	// should receive the expected message, not msg
+	ch := make(chan struct{})
+	m.ov[last].On("Receive", firstNode, expected, event).Return(nil).Once().
+		Run(func(args mockery.Arguments) {
+			close(ch)
+		})
+
+	// initially subscribe the nodes to the channel
+	for _, mw := range m.mws {
+		err := mw.Subscribe(testChannel)
+		require.NoError(m.Suite.T(), err)
+	}
+
+	// set up waiting for m.size pubsub tags indicating a mesh has formed
+	for i := 0; i < m.size; i++ {
+		select {
+		case <-m.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(m.T(), "could not receive pubsub tag indicating mesh formed")
+		}
+	}
+
+	// sends a direct message from first node to the last node with the modified fields
+	err := m.mws[first].Publish(msg, testChannel)
+	assert.NoError(m.Suite.T(), err)
+
+	// check message reception on target
+	unittest.RequireCloseBefore(m.T(), ch, 2*time.Second, "source node failed to send overridden message to target")
+
+	m.ov[last].AssertExpectations(m.T())
 }
 
 // TestUnsubscribe tests that an engine can unsubscribe from a topic it was earlier subscribed to and stop receiving
@@ -696,6 +803,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 		<-msgRcvd
 	}
 	message1, _ := messageutils.CreateMessage(firstNode, lastNode, testChannel.String(), "hello1")
+
 	m.ov[last].On("Receive", firstNode, mockery.Anything, mockery.Anything).Return(nil).Run(func(_ mockery.Arguments) {
 		msgRcvd <- struct{}{}
 	})
@@ -712,6 +820,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 
 	// create and send a new message on the channel from the origin node
 	message2, _ := messageutils.CreateMessage(firstNode, lastNode, testChannel.String(), "hello2")
+
 	err = m.mws[first].Publish(message2, testChannel)
 	assert.NoError(m.T(), err)
 

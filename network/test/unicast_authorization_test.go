@@ -251,6 +251,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 	u.startMiddlewares(overlay)
 
 	msg, _ := messageutils.CreateMessage(u.senderID.NodeID, u.receiverID.NodeID, testChannel.String(), "hello")
+
 	// set channel ID to an unauthorized channel for TestMessage
 	msg.ChannelID = channels.ConsensusCommittee.String()
 
@@ -307,6 +308,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 	u.startMiddlewares(overlay)
 
 	msg, _ := messageutils.CreateMessage(u.senderID.NodeID, u.receiverID.NodeID, testChannel.String(), "hello")
+
 	// manipulate message code byte
 	msg.Payload[0] = invalidMessageCode
 
@@ -364,6 +366,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 	u.startMiddlewares(overlay)
 
 	msg, _ := messageutils.CreateMessage(u.senderID.NodeID, u.receiverID.NodeID, testChannel.String(), "hello")
+
 	// manipulate message code byte
 	msg.Payload[0] = modifiedMessageCode
 

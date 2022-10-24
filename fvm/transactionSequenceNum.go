@@ -37,10 +37,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	txnState *state.TransactionState,
 ) error {
 
-	if ctx.Tracer != nil && proc.TraceSpan != nil {
-		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMSeqNumCheckTransaction)
-		defer span.End()
-	}
+	defer proc.StartSpanFromProcTraceSpan(ctx.Tracer, trace.FVMSeqNumCheckTransaction).End()
 
 	nestedTxnId, err := txnState.BeginNestedTransaction()
 	if err != nil {
@@ -48,7 +45,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	}
 
 	defer func() {
-		commitError := txnState.Commit(nestedTxnId)
+		_, commitError := txnState.Commit(nestedTxnId)
 		if commitError != nil {
 			panic(commitError)
 		}

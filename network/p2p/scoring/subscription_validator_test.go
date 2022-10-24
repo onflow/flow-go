@@ -229,7 +229,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// wait for the subscriptions to be established
 	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
-	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture())
+	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 	// consensus node publishes a proposal
 	require.NoError(t, conNode.Publish(ctx, blockTopic, proposalMsg))
 
@@ -249,7 +249,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// consensus node publishes another proposal, but this time, it should not reach verification node.
 	// since upon an unauthorized subscription, verification node should have slashed consensus node on
 	// the GossipSub scoring protocol.
-	proposalMsg = p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture())
+	proposalMsg = p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 	// publishes a message to the topic.
 	require.NoError(t, conNode.Publish(ctx, blockTopic, proposalMsg))
 
@@ -262,7 +262,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	chunkDataPackRequestMsg := p2pfixtures.MustEncodeEvent(t, &messages.ChunkDataRequest{
 		ChunkID: unittest.IdentifierFixture(),
 		Nonce:   rand.Uint64(),
-	})
+	}, channels.RequestChunks)
 	require.NoError(t, verNode1.Publish(ctx, channels.TopicFromChannel(channels.RequestChunks, sporkId), chunkDataPackRequestMsg))
 
 	ctx1s, cancel1s = context.WithTimeout(ctx, 1*time.Second)
