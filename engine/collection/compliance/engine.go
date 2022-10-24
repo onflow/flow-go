@@ -70,9 +70,7 @@ func NewEngine(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
-	pendingBlocks := &engine.FifoMessageStore{
-		FifoQueue: blocksQueue,
-	}
+	pendingBlocks := &engine.FifoMessageStore{FifoQueue: blocksQueue}
 
 	// define message queueing behaviour
 	handler := engine.NewMessageHandler(

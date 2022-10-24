@@ -50,7 +50,7 @@ type packedVote struct {
 // For incoming messages handling processing looks like this:
 //
 //	   +-------------------+      +------------+
-//	-->|  Cluster-Channel  |----->| MessageHub |
+//	-->| Consensus-Channel |----->| MessageHub |
 //	   +-------------------+      +------+-----+
 //	                         ------------|------------
 //	   +------+---------+    |    +------+-----+     |    +------+------------+
@@ -65,7 +65,7 @@ type packedVote struct {
 // For outgoing messages processing logic looks like this:
 //
 //	+-------------------+      +------------+      +----------+      +------------------------+
-//	|  Cluster-Channel  |<-----| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
+//	| Consensus-Channel |<-----| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
 //	+-------------------+      +------+-----+      +----------+      +------------------------+
 //	                                                  pub/sub          vote, timeout, proposal
 //
@@ -203,7 +203,6 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("could not process queued block %v: %w", block.ID(), err)
 			}
-
 			continue
 		}
 
@@ -214,7 +213,6 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("could not process queued vote: %w", err)
 			}
-
 			continue
 		}
 
@@ -224,7 +222,6 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("coult not process queued timeout: %w", err)
 			}
-
 			continue
 		}
 

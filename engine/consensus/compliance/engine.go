@@ -191,7 +191,6 @@ func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready comp
 
 	doneSignal := ctx.Done()
 	newMessageSignal := e.messageHandler.GetNotifier()
-
 	for {
 		select {
 		case <-doneSignal:
