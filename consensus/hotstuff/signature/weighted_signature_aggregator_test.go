@@ -218,7 +218,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 	t.Run("aggregating empty set of signatures", func(t *testing.T) {
 		aggregator, _, _, _, _, _ := createAggregationData(t, signersNum)
 
-		// no signatures were added => aggregate should error with
+		// no signatures were added => aggregate should error with IsInsufficientSignaturesError
 		signers, agg, err := aggregator.Aggregate()
 		assert.True(t, model.IsInsufficientSignaturesError(err))
 		assert.Nil(t, agg)
@@ -234,6 +234,28 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 
 		signers, agg, err = aggregator.Aggregate()
 		assert.True(t, model.IsInsufficientSignaturesError(err))
+		assert.Nil(t, agg)
+		assert.Nil(t, signers)
+	})
+
+	t.Run("identity aggregated signature", func(t *testing.T) {
+		aggregator, ids, _, sigs, _, _ := createAggregationData(t, 2)
+		// signature at index 1 is opposite of signature at index 0
+		copy(sigs[1], sigs[0])
+		sigs[1][0] ^= 0x20 // flip the sign bit
+
+		// first, add a valid signature
+		_, err := aggregator.TrustedAdd(ids[0].NodeID, sigs[0])
+		require.NoError(t, err)
+
+		// add invalid signature for signer with index 1:
+		_, err = aggregator.TrustedAdd(ids[1].NodeID, sigs[1]) // stand-alone verification
+		require.NoError(t, err)
+
+		// Aggregation should validate its own aggregation result and error with sentinel InvalidAggregatedSignatureError
+		signers, agg, err := aggregator.Aggregate()
+		assert.Error(t, err)
+		assert.True(t, model.IsInvalidAggregatedSignatureError(err))
 		assert.Nil(t, agg)
 		assert.Nil(t, signers)
 	})

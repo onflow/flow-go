@@ -176,11 +176,12 @@ func TestAggregatorSameMessage(t *testing.T) {
 		}
 	})
 
-	// Generally, `Aggregate()` can fail in two places, when invalid signatures were added via `TrustedAdd`:
+	// Generally, `Aggregate()` can fail in three places, when invalid signatures were added via `TrustedAdd`:
 	//  1. The signature itself has an invalid structure, i.e. it can't be deserialized successfully. In this
 	//     case, already the aggregation step fails.
-	//  2. The signature was deserialized successfully, but the aggregate signature doesn't verify to the aggregate public key. In
-	//     this case, the aggregation step succeeds. But the post-check fails.
+	//  2. The signatures were deserialized successfully, but the aggregated signature is identity signature (invalid)
+	//  3. The signatures were deserialized successfully, but the aggregate signature doesn't verify to the aggregate public key
+	//     (although it is not identity)
 	t.Run("invalid signature", func(t *testing.T) {
 		_, s := createAggregationData(t, 1)
 		invalidStructureSig := (crypto.Signature)([]byte{0, 0})
@@ -216,6 +217,29 @@ func TestAggregatorSameMessage(t *testing.T) {
 			assert.Nil(t, agg)
 			assert.Nil(t, signers)
 		}
+	})
+
+	t.Run("identity aggregated signature", func(t *testing.T) {
+		aggregator, sigs := createAggregationData(t, 2)
+		// signature at index 1 is opposite of signature at index 0
+		copy(sigs[1], sigs[0])
+		sigs[1][0] ^= 0x20 // flip the sign bit
+
+		// first, add a valid signature
+		ok, err := aggregator.VerifyAndAdd(0, sigs[0])
+		require.NoError(t, err)
+		assert.True(t, ok)
+
+		// add invalid signature for signer with index 1:
+		err = aggregator.TrustedAdd(1, sigs[1]) // stand-alone verification
+		require.NoError(t, err)
+
+		// Aggregation should validate its own aggregation result and error with sentinel InvalidAggregatedSignatureError
+		signers, agg, err := aggregator.Aggregate()
+		assert.Error(t, err)
+		assert.True(t, IsInvalidAggregatedSignatureError(err))
+		assert.Nil(t, agg)
+		assert.Nil(t, signers)
 	})
 
 }

@@ -43,6 +43,18 @@ func IsInvalidSignatureIncludedError(err error) bool {
 	return errors.As(err, &e)
 }
 
+/* ********************* InvalidAggregatedSignatureError ********************* */
+
+// InvalidAggregatedSignatureError indicates that the aggregated signature is invalid.
+// This can happen either because a signature added via TrustedAdd is invalid, or because
+// the public keys were forged to sum up to an identity public key.
+var InvalidAggregatedSignatureError = errors.New("aggregated signature is invalid (identity signature)")
+
+// IsInvalidAggregatedSignatureError returns whether err is an InvalidAggregatedSignatureError
+func IsInvalidAggregatedSignatureError(err error) bool {
+	return errors.Is(err, InvalidAggregatedSignatureError)
+}
+
 /* ************************* InvalidSignerIdxError ************************* */
 
 // InvalidSignerIdxError indicates that the signer index is invalid

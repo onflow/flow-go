@@ -161,16 +161,20 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 // Aggregate aggregates the stored BLS signatures and returns the aggregated signature.
 //
 // Aggregate attempts to aggregate the internal signatures and returns the resulting signature.
-// The function performs a final verification and errors if any signature fails the deserialization
-// or if the aggregated signature is not valid. It also errors if no signatures were added.
+// The function errors if any signature fails the deserialization. It also performs a final
+// verification and errors if the aggregated signature is not valid.
+// It also errors if no signatures were added.
 // Post-check of aggregated signature is required for function safety, as `TrustedAdd` allows
-// adding invalid signatures. The function is not thread-safe.
+// adding invalid signatures. Aggregation may also output an invalid signature (identity)
+// even though all included signatures are valid (extremely unlikely case when all keys are sampled
+// uniformly)
+// The function is not thread-safe.
 // Returns:
 //   - InsufficientSignaturesError if no signatures have been added yet
+//   - InvalidAggregatedSignatureError if the aggregated signature is invalid. It's not clear whether included
+//     signatures via TrustedAdd are invalid. This case can happen even when all added signatures
+//     are individually valid.
 //   - InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
-//
-// TODO : When compacting the list of signers, update the return from []int
-// to a compact bit vector.
 func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, error) {
 	// check if signature was already computed
 	if s.cachedSignature != nil {
@@ -201,6 +205,11 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 		return nil, nil, fmt.Errorf("unexpected error during signature aggregation: %w", err)
 	}
 	if !ok {
+		// check for identity signature (invalid signature)
+		if crypto.IsBLSSignatureIdentity(aggregatedSignature) {
+			return nil, nil, InvalidAggregatedSignatureError
+		}
+		// this case can only happen if at least one added signature via TrustedAdd is invalid
 		return nil, nil, NewInvalidSignatureIncludedErrorf("invalid signature(s) have been included via TrustedAdd")
 	}
 	s.cachedSignature = aggregatedSignature
