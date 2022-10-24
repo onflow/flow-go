@@ -17,8 +17,6 @@ type nestedTransactionStackFrame struct {
 	// the parts of the runtime environment necessary for importing/parsing the
 	// program, specifically, environment.ContractReader and
 	// environment.Programs.
-	//
-	// TODO(patrick): restrict environment method access
 	parseRestriction *common.AddressLocation
 }
 
@@ -106,14 +104,7 @@ func (s *TransactionState) BeginNestedTransaction() (
 	}
 
 	child := s.currentState().NewChild()
-
-	s.nestedTransactions = append(
-		s.nestedTransactions,
-		nestedTransactionStackFrame{
-			state:            child,
-			parseRestriction: nil,
-		},
-	)
+	s.push(child, nil)
 
 	return NestedTransactionId{
 		state: child,
@@ -129,47 +120,76 @@ func (s *TransactionState) BeginParseRestrictedNestedTransaction(
 	error,
 ) {
 	child := s.currentState().NewChild()
-
-	s.nestedTransactions = append(
-		s.nestedTransactions,
-		nestedTransactionStackFrame{
-			state:            child,
-			parseRestriction: &location,
-		},
-	)
+	s.push(child, &location)
 
 	return NestedTransactionId{
 		state: child,
 	}, nil
 }
 
-func (s *TransactionState) mergeIntoParent() error {
+func (s *TransactionState) push(
+	child *State,
+	location *common.AddressLocation,
+) {
+	s.nestedTransactions = append(
+		s.nestedTransactions,
+		nestedTransactionStackFrame{
+			state:            child,
+			parseRestriction: location,
+		},
+	)
+}
+
+func (s *TransactionState) pop(op string) (*State, error) {
 	if len(s.nestedTransactions) < 2 {
-		return fmt.Errorf("cannot commit the main transaction")
+		return nil, fmt.Errorf("cannot %s the main transaction", op)
 	}
 
 	child := s.current()
 	s.nestedTransactions = s.nestedTransactions[:len(s.nestedTransactions)-1]
-	parent := s.current()
 
-	return parent.state.MergeState(child.state)
+	return child.state, nil
+}
+
+func (s *TransactionState) mergeIntoParent() (*State, error) {
+	childState, err := s.pop("commit")
+	if err != nil {
+		return nil, err
+	}
+
+	childState.committed = true
+
+	err = s.current().state.MergeState(childState)
+	if err != nil {
+		return nil, err
+	}
+
+	return childState, nil
 }
 
 // Commit commits the changes in the current unrestricted nested transaction
 // to the parent (nested) transaction.  This returns error if the expectedId
-// does not match the current nested transaction.
+// does not match the current nested transaction.  This returns the committed
+// state otherwise.
+//
+// Note: The returned committed state may be reused by another transaction via
+// AttachAndCommit to update the transaction bookkeeping, but the caller must
+// manually invalidate the state. USE WITH EXTREME CAUTION.
 func (s *TransactionState) Commit(
 	expectedId NestedTransactionId,
-) error {
+) (
+	*State,
+	error,
+) {
 	if !s.IsCurrent(expectedId) {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"cannot commit unexpected nested transaction: id mismatch",
 		)
 	}
 
 	if s.IsParseRestricted() {
 		// This is due to a programming error.
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"cannot commit unexpected nested transaction: parse restricted",
 		)
 	}
@@ -179,7 +199,12 @@ func (s *TransactionState) Commit(
 
 // CommitParseRestricted commits the changes in the current restricted nested
 // transaction to the parent (nested) transaction.  This returns error if the
-// specified location does not match the tracked location.
+// specified location does not match the tracked location.  This returns the
+// committed state otherwise.
+//
+// Note: The returned committed state may be reused by another transaction via
+// AttachAndCommit to update the transaction bookkeeping, but the caller must
+// manually invalidate the state. USE WITH EXTREME CAUTION.
 func (s *TransactionState) CommitParseRestricted(
 	location common.AddressLocation,
 ) (
@@ -198,28 +223,54 @@ func (s *TransactionState) CommitParseRestricted(
 		)
 	}
 
-	err := s.mergeIntoParent()
-	if err != nil {
-		return nil, err
-	}
-
-	return currentFrame.state, nil
+	return s.mergeIntoParent()
 }
 
-// AttachAndCommitParseRestricted commits the changes in the cached nested
-// transaction to the current (nested) transaction.
-func (s *TransactionState) AttachAndCommitParseRestricted(
-	cachedNestedTransaction *State,
-) error {
-	s.nestedTransactions = append(
-		s.nestedTransactions,
-		nestedTransactionStackFrame{
-			state:            cachedNestedTransaction,
-			parseRestriction: nil,
-		},
-	)
+// Pause detaches the current nested transaction from the parent transaction,
+// and returns the paused nested transaction state.  The paused nested
+// transaction may be resume via Resume.
+//
+// WARNING: Pause and Resume are intended for implementing continuation passing
+// style behavior for the transaction invoker, with the assumption that no
+// other transaction processor modify the state (other than the spock and
+// metering). The paused nested transaction should not be reused across
+// transactions.  IT IS NOT SAFE TO PAUSE A NESTED TRANSACTION IN GENERAL SINCE
+// THAT COULD LEAD TO PHANTOM READS.
+//
+// TODO(patrick): Sequence number is modified by the verify tx processor.  Make
+// sure it doesn't interfere with transaction invoker pause / resumption.
+func (s *TransactionState) Pause(
+	expectedId NestedTransactionId,
+) (
+	*State,
+	error,
+) {
+	if !s.IsCurrent(expectedId) {
+		return nil, fmt.Errorf(
+			"cannot pause unexpected nested transaction: id mismatch",
+		)
+	}
 
-	return s.mergeIntoParent()
+	if s.IsParseRestricted() {
+		return nil, fmt.Errorf(
+			"cannot Pause parse restricted nested transaction")
+	}
+
+	return s.pop("pause")
+}
+
+// Resume attaches the paused nested transaction (state) to the current
+// transaction.
+func (s *TransactionState) Resume(pausedState *State) {
+	s.push(pausedState, nil)
+}
+
+// AttachAndCommit commits the changes in the cached nested transaction state
+// to the current (nested) transaction.
+func (s *TransactionState) AttachAndCommit(cachedState *State) error {
+	s.push(cachedState, nil)
+	_, err := s.mergeIntoParent()
+	return err
 }
 
 // RestartNestedTransaction merges all changes that belongs to the nested
@@ -245,7 +296,7 @@ func (s *TransactionState) RestartNestedTransaction(
 	}
 
 	for s.currentState() != id.state {
-		err := s.mergeIntoParent()
+		_, err := s.mergeIntoParent()
 		if err != nil {
 			return fmt.Errorf("cannot restart nested transaction: %w", err)
 		}
