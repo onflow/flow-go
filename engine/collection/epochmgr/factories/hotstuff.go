@@ -159,7 +159,6 @@ func (f *HotStuffFactory) Create(
 	metrics module.HotstuffMetrics,
 	builder module.Builder,
 	headers storage.Headers,
-	communicator hotstuff.Communicator,
 	hotstuffModules *consensus.HotstuffModules,
 ) (module.HotStuff, error) {
 
@@ -175,7 +174,6 @@ func (f *HotStuffFactory) Create(
 		f.log,
 		metrics,
 		builder,
-		communicator,
 		finalizedBlock,
 		pendingBlocks,
 		hotstuffModules,

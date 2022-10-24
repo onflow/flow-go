@@ -327,47 +327,6 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 	return nil
 }
 
-// OnBlockVote handles votes for blocks by passing them to the core consensus algorithm.
-// No errors are expected during normal operation.
-func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
-	c.log.Debug().
-		Hex("origin_id", originID[:]).
-		Hex("block_id", vote.BlockID[:]).
-		Uint64("view", vote.View).
-		Msg("received vote")
-
-	c.voteAggregator.AddVote(&model.Vote{
-		View:     vote.View,
-		BlockID:  vote.BlockID,
-		SignerID: originID,
-		SigData:  vote.SigData,
-	})
-	return nil
-}
-
-// OnTimeoutObject forwards incoming TimeoutObjects to the `hotstuff.TimeoutAggregator`.
-// No errors are expected during normal operation.
-func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.ClusterTimeoutObject) error {
-	t := &model.TimeoutObject{
-		View:       timeout.View,
-		NewestQC:   timeout.NewestQC,
-		LastViewTC: timeout.LastViewTC,
-		SignerID:   originID,
-		SigData:    timeout.SigData,
-	}
-
-	c.log.Debug().
-		Hex("origin_id", originID[:]).
-		Uint64("view", t.View).
-		Str("timeout_id", t.ID().String()).
-		Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
-
-	// forward the timeout to hotstuff for processing
-	c.timeoutAggregator.AddTimeout(t)
-
-	return nil
-}
-
 // ProcessFinalizedView performs pruning of stale data based on finalization event
 // removes pending blocks below the finalized view
 func (c *Core) ProcessFinalizedView(finalizedView uint64) {

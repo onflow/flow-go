@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
@@ -454,55 +453,6 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	// make sure we drop the cache after trying to process
 	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header.ID())
-}
-
-func (cs *CoreSuite) TestOnSubmitVote() {
-	// create a vote
-	originID := unittest.IdentifierFixture()
-	vote := messages.ClusterBlockVote{
-		BlockID: unittest.IdentifierFixture(),
-		View:    rand.Uint64(),
-		SigData: unittest.SignatureFixture(),
-	}
-
-	cs.voteAggregator.On("AddVote", &model.Vote{
-		View:     vote.View,
-		BlockID:  vote.BlockID,
-		SignerID: originID,
-		SigData:  vote.SigData,
-	}).Return()
-
-	// execute the vote submission
-	err := cs.core.OnBlockVote(originID, &vote)
-	require.NoError(cs.T(), err, "block vote should pass")
-
-	// check that submit vote was called with correct parameters
-	cs.hotstuff.AssertExpectations(cs.T())
-}
-
-// TestOnSubmitTimeout tests that submitting messages.ClusterTimeoutObject adds model.TimeoutObject into
-// TimeoutAggregator.
-func (cs *CoreSuite) TestOnSubmitTimeout() {
-	// create a timeout
-	originID := unittest.IdentifierFixture()
-	timeout := messages.ClusterTimeoutObject{
-		View:       rand.Uint64(),
-		NewestQC:   helper.MakeQC(),
-		LastViewTC: helper.MakeTC(),
-		SigData:    unittest.SignatureFixture(),
-	}
-
-	cs.timeoutAggregator.On("AddTimeout", &model.TimeoutObject{
-		View:       timeout.View,
-		NewestQC:   timeout.NewestQC,
-		LastViewTC: timeout.LastViewTC,
-		SignerID:   originID,
-		SigData:    timeout.SigData,
-	}).Return()
-
-	// execute the timeout submission
-	err := cs.core.OnTimeoutObject(originID, &timeout)
-	require.NoError(cs.T(), err, "timeout object should pass")
 }
 
 func (cs *CoreSuite) TestProposalBufferingOrder() {

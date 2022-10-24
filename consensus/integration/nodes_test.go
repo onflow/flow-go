@@ -31,7 +31,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
-	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
+	"github.com/onflow/flow-go/engine/consensus/message_hub"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -145,6 +145,7 @@ type Node struct {
 	committee         *committees.Consensus
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
+	messageHub        *message_hub.MessageHub
 	state             *bprotocol.MutableState
 	headers           *storage.Headers
 	net               *Network
@@ -457,9 +458,6 @@ func createNode(
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
 
-	prov := &mockconsensus.ProposalProvider{}
-	prov.On("ProvideProposal", mock.Anything).Maybe()
-
 	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector)
 	require.NoError(t, err)
 
@@ -547,7 +545,7 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	comp, err := compliance.NewEngine(log, net, me, prov, compCore)
+	comp, err := compliance.NewEngine(log, me, compCore)
 	require.NoError(t, err)
 
 	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
@@ -579,7 +577,6 @@ func createNode(
 		log,
 		metricsCollector,
 		build,
-		comp,
 		rootHeader,
 		[]*flow.Header{},
 		hotstuffModules,
@@ -592,6 +589,22 @@ func createNode(
 
 	comp = comp.WithConsensus(hot)
 
+	messageHub, err := message_hub.NewMessageHub(
+		log,
+		net,
+		me,
+		comp,
+		hot,
+		voteAggregator,
+		timeoutAggregator,
+		state,
+		headersDB,
+		payloadsDB,
+	)
+	require.NoError(t, err)
+
+	notifier.AddConsumer(messageHub)
+
 	node.compliance = comp
 	node.sync = sync
 	node.state = fullState
@@ -599,6 +612,7 @@ func createNode(
 	node.committee = committee
 	node.voteAggregator = hotstuffModules.VoteAggregator
 	node.timeoutAggregator = hotstuffModules.TimeoutAggregator
+	node.messageHub = messageHub
 	node.headers = headersDB
 	node.net = net
 	node.log = log

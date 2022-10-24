@@ -16,13 +16,14 @@ import (
 )
 
 type EpochComponentsFactory struct {
-	me       module.Local
-	pools    *epochs.TransactionPools
-	builder  *BuilderFactory
-	state    *ClusterStateFactory
-	hotstuff *HotStuffFactory
-	proposal *ProposalEngineFactory
-	sync     *SyncEngineFactory
+	me         module.Local
+	pools      *epochs.TransactionPools
+	builder    *BuilderFactory
+	state      *ClusterStateFactory
+	hotstuff   *HotStuffFactory
+	compliance *ComplianceEngineFactory
+	sync       *SyncEngineFactory
+	messageHub *MessageHubFactory
 }
 
 var _ epochmgr.EpochComponentsFactory = (*EpochComponentsFactory)(nil)
@@ -33,18 +34,20 @@ func NewEpochComponentsFactory(
 	builder *BuilderFactory,
 	state *ClusterStateFactory,
 	hotstuff *HotStuffFactory,
-	proposal *ProposalEngineFactory,
+	compliance *ComplianceEngineFactory,
 	sync *SyncEngineFactory,
+	messageHub *MessageHubFactory,
 ) *EpochComponentsFactory {
 
 	factory := &EpochComponentsFactory{
-		me:       me,
-		pools:    pools,
-		builder:  builder,
-		state:    state,
-		hotstuff: hotstuff,
-		proposal: proposal,
-		sync:     sync,
+		me:         me,
+		pools:      pools,
+		builder:    builder,
+		state:      state,
+		hotstuff:   hotstuff,
+		compliance: compliance,
+		sync:       sync,
+		messageHub: messageHub,
 	}
 	return factory
 }
@@ -53,11 +56,12 @@ func (factory *EpochComponentsFactory) Create(
 	epoch protocol.Epoch,
 ) (
 	state cluster.State,
-	proposal component.Component,
+	compliance component.Component,
 	sync module.ReadyDoneAware,
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
+	messageHub component.Component,
 	err error,
 ) {
 
@@ -134,14 +138,14 @@ func (factory *EpochComponentsFactory) Create(
 	timeoutAggregator = hotstuffModules.TimeoutAggregator
 	validator := hotstuffModules.Validator
 
-	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads, hotstuffModules.VoteAggregator, hotstuffModules.TimeoutAggregator, validator)
+	complianceEng, err := factory.compliance.Create(mutableState, headers, payloads, hotstuffModules.VoteAggregator, hotstuffModules.TimeoutAggregator, validator)
 	if err != nil {
-		err = fmt.Errorf("could not create proposal engine: %w", err)
+		err = fmt.Errorf("could not create compliance engine: %w", err)
 		return
 	}
 
 	var syncCore *chainsync.Core
-	syncCore, sync, err = factory.sync.Create(cluster.Members(), state, blocks, proposalEng)
+	syncCore, sync, err = factory.sync.Create(cluster.Members(), state, blocks, complianceEng)
 	if err != nil {
 		err = fmt.Errorf("could not create sync engine: %w", err)
 		return
@@ -151,7 +155,6 @@ func (factory *EpochComponentsFactory) Create(
 		metrics,
 		builder,
 		headers,
-		proposalEng,
 		hotstuffModules,
 	)
 	if err != nil {
@@ -159,12 +162,19 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
-	hotstuffModules.FinalizationDistributor.AddOnBlockFinalizedConsumer(proposalEng.OnFinalizedBlock)
+	hotstuffModules.FinalizationDistributor.AddOnBlockFinalizedConsumer(complianceEng.OnFinalizedBlock)
 
-	// attach dependencies to the proposal engine
-	proposal = proposalEng.
+	// attach dependencies to the compliance engine
+	compliance = complianceEng.
 		WithConsensus(hotstuff).
 		WithSync(syncCore)
+
+	clusterMessageHub, err := factory.messageHub.Create(state, headers, payloads, hotstuff, complianceEng, hotstuffModules)
+	if err != nil {
+		err = fmt.Errorf("could not create message hub: %w", err)
+	}
+	hotstuffModules.Notifier.AddConsumer(clusterMessageHub)
+	messageHub = clusterMessageHub
 
 	return
 }

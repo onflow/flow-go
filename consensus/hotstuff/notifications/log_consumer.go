@@ -1,6 +1,8 @@
 package notifications
 
 import (
+	"time"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -84,18 +86,6 @@ func (lc *LogConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newV
 		Uint64("tc_newest_qc_view", tc.NewestQC.View).
 		Uint64("new_view", newView).
 		Msg("TC triggered view change")
-}
-
-func (lc *LogConsumer) OnProposingBlock(block *model.Proposal) {
-	lc.logBasicBlockData(lc.log.Debug(), block.Block).
-		Msg("proposing block")
-}
-
-func (lc *LogConsumer) OnVoting(vote *model.Vote) {
-	lc.log.Debug().
-		Uint64("block_view", vote.View).
-		Hex("block_id", vote.BlockID[:]).
-		Msg("voting for block")
 }
 
 func (lc *LogConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
@@ -213,4 +203,31 @@ func (lc *LogConsumer) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
 		Uint64("newest_qc_view", tc.NewestQC.View).
 		Hex("newest_qc_block_id", tc.NewestQC.BlockID[:]).
 		Msg("new TC discovered")
+}
+
+func (lc *LogConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+	lc.log.Info().
+		Hex("block_id", blockID[:]).
+		Uint64("block_view", view).
+		Hex("recipient_id", recipientID[:]).
+		Msg("publishing HotStuff vote")
+}
+
+func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
+	log := timeout.LogContext(lc.log).Logger()
+	log.Info().Msg("publishing HotStuff timeout object")
+}
+
+func (lc *LogConsumer) OnOwnProposal(header *flow.Header, targetPublicationTime time.Time) {
+	lc.log.Info().
+		Str("chain_id", header.ChainID.String()).
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Hex("block_id", logging.Entity(header)).
+		Hex("parent_id", header.ParentID[:]).
+		Hex("payload_hash", header.PayloadHash[:]).
+		Time("timestamp", header.Timestamp).
+		Hex("parent_signer_indices", header.ParentVoterIndices).
+		Time("target_publication_time", targetPublicationTime).
+		Msg("publishing HotStuff block proposal")
 }

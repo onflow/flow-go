@@ -430,7 +430,7 @@ func main() {
 				return nil, err
 			}
 
-			proposalFactory, err := factories.NewProposalEngineFactory(
+			complianceEngineFactory, err := factories.NewComplianceEngineFactory(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -499,14 +499,22 @@ func main() {
 				qcContractClients,
 			)
 
+			messageHubFactory := factories.NewMessageHubFactory(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.State,
+			)
+
 			factory := factories.NewEpochComponentsFactory(
 				node.Me,
 				pools,
 				builderFactory,
 				clusterStateFactory,
 				hotstuffFactory,
-				proposalFactory,
+				complianceEngineFactory,
 				syncFactory,
+				messageHubFactory,
 			)
 
 			heightEvents := gadgets.NewHeights()
