@@ -132,7 +132,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 		close(u.waitCh)
 	})
 
-	overlay := &mocknetwork.Overlay{}
+	overlay := mocknetwork.NewOverlay(u.T())
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return u.providers[0].Identities(filter.Any)
 	})
@@ -183,7 +183,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 		close(u.waitCh)
 	})
 
-	overlay := &mocknetwork.Overlay{}
+	overlay := mocknetwork.NewOverlay(u.T())
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return u.providers[0].Identities(filter.Any)
 	})
@@ -232,7 +232,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 		close(u.waitCh)
 	})
 
-	overlay := &mocknetwork.Overlay{}
+	overlay := mocknetwork.NewOverlay(u.T())
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return u.providers[0].Identities(filter.Any)
 	})
@@ -285,7 +285,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 		close(u.waitCh)
 	})
 
-	overlay := &mocknetwork.Overlay{}
+	overlay := mocknetwork.NewOverlay(u.T())
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return u.providers[0].Identities(filter.Any)
 	})
@@ -340,7 +340,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 		close(u.waitCh)
 	})
 
-	overlay := &mocknetwork.Overlay{}
+	overlay := mocknetwork.NewOverlay(u.T())
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return u.providers[0].Identities(filter.Any)
 	})
@@ -374,7 +374,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 
 	msg, payload := createMessage(u.senderID.NodeID, u.receiverID.NodeID, "hello")
 
-	overlay := &mocknetwork.Overlay{}
+	overlay := mocknetwork.NewOverlay(u.T())
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return u.providers[0].Identities(filter.Any)
 	})
@@ -428,7 +428,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 		close(u.waitCh)
 	})
 
-	overlay := &mocknetwork.Overlay{}
+	overlay := mocknetwork.NewOverlay(u.T())
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return u.providers[0].Identities(filter.Any)
 	})
