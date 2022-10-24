@@ -361,7 +361,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit proposal
-		s.hub.OnOwnProposal(proposal.Header, 0)
+		s.hub.OnOwnProposal(proposal.Header, time.Now())
 	})
 
 	unittest.RequireReturnsBefore(s.T(), func() {
