@@ -360,6 +360,10 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal, parent *fl
 		return fmt.Errorf("unexpected exception while extending protocol state with block %x at height %d: %w", blockID, header.Height, err)
 	}
 
+	// notify vote aggregator about a new block, so that it can start verifying
+	// votes for it.
+	c.voteAggregator.AddBlock(hotstuffProposal)
+
 	// submit the model to hotstuff for processing
 	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
 	log.Info().Msg("forwarding block proposal to hotstuff")

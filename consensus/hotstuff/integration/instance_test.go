@@ -503,8 +503,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		in.forks,
 		in.persist,
 		in.committee,
-		in.voteAggregator,
-		in.timeoutAggregator,
 		in.safetyRules,
 		notifier,
 	)

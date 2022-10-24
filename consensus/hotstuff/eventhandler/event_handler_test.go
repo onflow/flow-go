@@ -309,8 +309,6 @@ func (es *EventHandlerSuite) SetupTest() {
 		es.forks,
 		es.persist,
 		es.committee,
-		es.voteAggregator,
-		es.timeoutAggregator,
 		es.safetyRules,
 		es.notifier)
 	require.NoError(es.T(), err)
