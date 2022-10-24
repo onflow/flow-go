@@ -3,6 +3,7 @@ package p2pfixtures
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -69,7 +70,7 @@ func NodeFixture(
 		Unicasts:    nil,
 		Key:         NetworkingKeyFixtures(t),
 		Address:     defaultAddress,
-		Logger:      unittest.Logger().Level(zerolog.ErrorLevel),
+		Logger:      unittest.Logger().Level(zerolog.DebugLevel),
 		Role:        flow.RoleCollection,
 	}
 
@@ -472,11 +473,9 @@ func EnsureConnected(t *testing.T, ctx context.Context, nodes []*p2pnode.Node) {
 	}
 }
 
-func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, messageFactory func() (interface{}, channels.Topic)) {
-	msg, topic := messageFactory()
-	channel, ok := channels.ChannelFromTopic(topic)
-	require.True(t, ok)
-	data := MustEncodeEvent(t, msg, channel)
+// EnsurePubsubMessageExchange ensures that the given nodes exchange the given message on the given channel through pubsub.
+func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, ids flow.IdentityList, messageFactory func() (interface{}, channels.Topic)) {
+	_, topic := messageFactory()
 
 	subs := make([]*pubsub.Subscription, len(nodes))
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
@@ -490,11 +489,21 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2p
 			slashingViolationsConsumer)
 	}
 
-	for _, node := range nodes {
+	// let subscriptions propagate
+	time.Sleep(1 * time.Second)
+
+	for i, node := range nodes {
+		fmt.Println("sending message from node", i)
+		msg, _ := messageFactory()
+		channel, ok := channels.ChannelFromTopic(topic)
+		require.True(t, ok)
+		data := MustEncodeEvent(t, msg, channel)
+
 		require.NoError(t, node.Publish(ctx, topic, data))
+
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		SubsMustReceiveMessage(t, ctx, data, subs)
+		cancel()
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	SubsMustReceiveMessage(t, ctx, data, subs)
-	cancel()
 }
