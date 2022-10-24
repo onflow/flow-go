@@ -29,31 +29,37 @@ func TestSubString(t *testing.T) {
 	// require.Equal(t, expectedOvermatched, overmatchedString)
 }
 
-// func TestCreateWriteReadYaml(t *testing.T) {
-// 	filepath := "testYaml.yml"
-// 	testString := "Test String 123@"
-// 	file := createFile(filepath)
-// 	yamlWriter(file, "Test String 123@")
+func TestCreateWriteReadYaml(t *testing.T) {
+	filepath := "testYaml.yml"
+	testString := "Test String 123@"
 
-// 	file.Close()
-
-// 	actualString := textReader(filepath)
-// 	require.Equal(t, actualString, testString)
-// 	deleteFile(filepath)
-// }
+	actualString := textReader(filepath)
+	require.Equal(t, actualString, testString)
+}
 
 func TestUnmarshal(t *testing.T) {
-	fmt.Println("Start Test")
-	fmt.Println("New run")
-	envTemplate := textReader(TEMPLATE_PATH + ACCESS_TEMPLATE)
+	envTemplate := textReader("test_files/" + ACCESS_TEMPLATE)
 
 	envStruct := unmarshalToStruct(envTemplate, &NodeDetails{}).(*NodeDetails)
+	require.Equal(t, "--bootstrapdir=/bootstrap", envStruct.Args[0])
 	fmt.Println(envStruct.Args[0])
+	fmt.Println(envStruct.Env[1])
 }
 
 func TestStructs(t *testing.T) {
-	loadYamlStructs()
+	GenerateValuesYaml("", "", "")
 	deleteFile("values.yml")
+}
+
+func TestMarshalFileWrite(t *testing.T) {
+	testString := "yaml: some data\nline2: 123"
+	filename := "test_file.yml"
+
+	marshalToYaml([]byte(testString), filename)
+
+	actual := textReader(filename)
+
+	require.Equal(t, testString, actual)
 }
 
 func deleteFile(filepath string) {

@@ -1,1 +1,8 @@
-      access_template: {{.NodeID}}
+args:
+  - "--bootstrapdir=/bootstrap"
+  - "--datadir=/data/protocol"
+env:
+  - name: test name
+    value: test value
+  - name: test numbers
+    value: 123

@@ -122,9 +122,23 @@ func createTemplate(templatePath string) *template.Template {
 	return template
 }
 
-func loadYamlStructs() {
-	templateFolder := "struct_templates/"
-	nodesData, nodeConfig := loadNodeJsonData(DEFAULT_NODE_INFO_PATH)
+func GenerateValuesYaml(inputJsonFilePath string, templatePath string, outputYamlFilePath string) {
+	templateFolder := TEMPLATE_PATH
+	if templatePath != "" {
+		templateFolder = templatePath
+	}
+	nodeInfoJson := DEFAULT_NODE_INFO_PATH
+	if inputJsonFilePath != "" {
+		nodeInfoJson = inputJsonFilePath
+	}
+	nodesData, nodeConfig := loadNodeJsonData(nodeInfoJson)
+
+	values := createObject(templateFolder, nodesData, nodeConfig)
+
+	marshalToYaml(values, outputYamlFilePath)
+}
+
+func createObject(templateFolder string, nodesData map[string]Node, nodeConfig map[string]int) *Values {
 	resources := textReader(templateFolder + RESOURCES_TEMPLATE)
 	nodeTypeResources := unmarshalToStruct(resources, &Defaults{}).(*Defaults)
 
@@ -184,8 +198,7 @@ func loadYamlStructs() {
 	values.Consensus = consensusNodes
 	values.Execution = executionNodes
 	values.Verification = verificationNodes
-
-	marshalToYaml(values)
+	return values
 }
 
 func unmarshalToStruct(source string, target interface{}) interface{} {
@@ -193,9 +206,12 @@ func unmarshalToStruct(source string, target interface{}) interface{} {
 	return target
 }
 
-func marshalToYaml(source interface{}) {
-	output, _ := yaml.Marshal(source)
-	writeYamlToFile("values.yml", output)
+func marshalToYaml(source interface{}, outputFilePath string) {
+	yamlData, err := yaml.Marshal(source)
+	if err != nil {
+		log.Fatal(err)
+	}
+	writeYamlToFile(outputFilePath, yamlData)
 }
 
 func structNodeReplacement(nodeTemplate *template.Template, replacementData ReplacementData) *NodeDetails {
