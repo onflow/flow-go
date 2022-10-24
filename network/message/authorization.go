@@ -40,12 +40,12 @@ func (m MsgAuthConfig) EnsureAuthorized(role flow.Role, channel channels.Channel
 		return ErrUnauthorizedMessageOnChannel
 	}
 
-	if isUnicast && !channelAuthConfig.AllowedUnicast {
-		return ErrUnauthorizedUnicastOnChannel
-	}
-
 	if !channelAuthConfig.AuthorizedRoles.Contains(role) {
 		return ErrUnauthorizedRole
+	}
+
+	if isUnicast && !channelAuthConfig.AllowedUnicast {
+		return ErrUnauthorizedUnicastOnChannel
 	}
 
 	return nil
