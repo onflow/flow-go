@@ -181,7 +181,8 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			}
 			// store the data for retrieval
 			cs.headerDB[block.Header.ParentID] = cs.head
-			cs.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Return().Once()
+			cs.hotstuff.On("SubmitProposal", block.Header, cs.head.Header.View).Return().Once()
+			cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, cs.head.Header.View)).Return(nil).Once()
 			// execute the block submission
 			_ = cs.engine.Process(channel, originID, &block)
 		}
@@ -199,8 +200,8 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
-		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.Header.View)
-		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, cs.head.Header.View)).Return(nil)
+		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.Header.View).Once()
+		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, cs.head.Header.View)).Return(nil).Once()
 		err := cs.engine.Process(channel, originID, proposal)
 		cs.Assert().NoError(err)
 		wg.Done()

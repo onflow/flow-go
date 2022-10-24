@@ -73,17 +73,17 @@ type packedVote struct {
 type MessageHub struct {
 	*component.ComponentManager
 	notifications.NoopConsumer
-	log                    zerolog.Logger
-	me                     module.Local
-	state                  protocol.State
-	headers                storage.Headers
-	payloads               storage.Payloads
-	con                    network.Conduit
-	pushBlocksCon          network.Conduit
-	queuedMessagesNotifier engine.Notifier
-	queuedVotes            *fifoqueue.FifoQueue // queue for handling outgoing vote transmissions
-	queuedProposals        *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions
-	queuedTimeouts         *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
+	log                        zerolog.Logger
+	me                         module.Local
+	state                      protocol.State
+	headers                    storage.Headers
+	payloads                   storage.Payloads
+	con                        network.Conduit
+	pushBlocksCon              network.Conduit
+	ownOutboundMessageNotifier engine.Notifier
+	ownOutboundVotes           *fifoqueue.FifoQueue // queue for handling outgoing vote transmissions
+	ownOutboundProposals       *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions
+	ownOutboundTimeouts        *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
 
 	// injected dependencies
 	compliance        network.MessageProcessor   // handler of incoming block proposals
@@ -108,38 +108,38 @@ func NewMessageHub(log zerolog.Logger,
 	headers storage.Headers,
 	payloads storage.Payloads,
 ) (*MessageHub, error) {
-	queuedVotes, err := fifoqueue.NewFifoQueue(
+	ownOutboundVotes, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize votes queue")
 	}
-	queuedProposals, err := fifoqueue.NewFifoQueue(
+	ownOutboundProposals, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultProposalQueueCapacity),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize blocks queue")
 	}
-	queuedTimeouts, err := fifoqueue.NewFifoQueue(
+	ownOutboundTimeouts, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultTimeoutQueueCapacity),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeouts queue")
 	}
 	hub := &MessageHub{
-		log:                    log.With().Str("engine", "message_hub").Logger(),
-		me:                     me,
-		state:                  state,
-		headers:                headers,
-		payloads:               payloads,
-		compliance:             compliance,
-		hotstuff:               hotstuff,
-		voteAggregator:         voteAggregator,
-		timeoutAggregator:      timeoutAggregator,
-		queuedMessagesNotifier: engine.NewNotifier(),
-		queuedVotes:            queuedVotes,
-		queuedProposals:        queuedProposals,
-		queuedTimeouts:         queuedTimeouts,
+		log:                        log.With().Str("engine", "message_hub").Logger(),
+		me:                         me,
+		state:                      state,
+		headers:                    headers,
+		payloads:                   payloads,
+		compliance:                 compliance,
+		hotstuff:                   hotstuff,
+		voteAggregator:             voteAggregator,
+		timeoutAggregator:          timeoutAggregator,
+		ownOutboundMessageNotifier: engine.NewNotifier(),
+		ownOutboundVotes:           ownOutboundVotes,
+		ownOutboundProposals:       ownOutboundProposals,
+		ownOutboundTimeouts:        ownOutboundTimeouts,
 	}
 
 	// register with the network layer and store the conduit
@@ -170,7 +170,7 @@ func NewMessageHub(log zerolog.Logger,
 
 // queuedMessagesProcessingLoop orchestrates dispatching of previously queued messages
 func (h *MessageHub) queuedMessagesProcessingLoop(ctx irrecoverable.SignalerContext) {
-	notifier := h.queuedMessagesNotifier.Channel()
+	notifier := h.ownOutboundMessageNotifier.Channel()
 	for {
 		select {
 		case <-ctx.Done():
@@ -196,7 +196,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 		default:
 		}
 
-		msg, ok := h.queuedProposals.Pop()
+		msg, ok := h.ownOutboundProposals.Pop()
 		if ok {
 			block := msg.(*flow.Header)
 			err := h.processQueuedProposal(block)
@@ -207,7 +207,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 			continue
 		}
 
-		msg, ok = h.queuedVotes.Pop()
+		msg, ok = h.ownOutboundVotes.Pop()
 		if ok {
 			packed := msg.(*packedVote)
 			err := h.processQueuedVote(packed)
@@ -218,7 +218,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 			continue
 		}
 
-		msg, ok = h.queuedTimeouts.Pop()
+		msg, ok = h.ownOutboundTimeouts.Pop()
 		if ok {
 			err := h.processQueuedTimeout(msg.(*model.TimeoutObject))
 			if err != nil {
@@ -423,15 +423,15 @@ func (h *MessageHub) OnOwnVote(blockID flow.Identifier, view uint64, sigData []b
 			SigData: sigData,
 		},
 	}
-	if ok := h.queuedVotes.Push(vote); ok {
-		h.queuedMessagesNotifier.Notify()
+	if ok := h.ownOutboundVotes.Push(vote); ok {
+		h.ownOutboundMessageNotifier.Notify()
 	}
 }
 
 // OnOwnTimeout queues timeout for subsequent sending
 func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
-	if ok := h.queuedTimeouts.Push(timeout); ok {
-		h.queuedMessagesNotifier.Notify()
+	if ok := h.ownOutboundTimeouts.Push(timeout); ok {
+		h.ownOutboundMessageNotifier.Notify()
 	}
 }
 
@@ -444,8 +444,8 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 			return
 		}
 
-		if ok := h.queuedProposals.Push(proposal); ok {
-			h.queuedMessagesNotifier.Notify()
+		if ok := h.ownOutboundProposals.Push(proposal); ok {
+			h.ownOutboundMessageNotifier.Notify()
 		}
 	}()
 }
