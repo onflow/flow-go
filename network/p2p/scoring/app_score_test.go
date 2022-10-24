@@ -2,8 +2,6 @@ package scoring_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/network/p2p"
-	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"testing"
 	"time"
 
@@ -18,8 +16,10 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/scoring"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
