@@ -63,7 +63,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
 		}
 		cnb.LibP2PNode = libp2pNode
-
+		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", myAddr).Msg("corrupted libp2p node initialized")
 		return libp2pNode, nil
 	})
 	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
