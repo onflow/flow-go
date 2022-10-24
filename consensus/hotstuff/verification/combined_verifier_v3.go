@@ -156,9 +156,19 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 		// TODO: as further optimization, replace the following call with model/signature.PublicKeyAggregator
 		aggregatedKey, err := crypto.AggregateBLSPublicKeys(pubKeys)
 		if err != nil {
+			// `AggregateBLSPublicKeys` returns an error in two distinct cases:
+			//  (i) In case no keys are provided, i.e.  `len(signers) == 0`.
+			//      This scenario _is expected_ during normal operations, because a byzantine
+			//      proposer might construct an (invalid) QC with an empty list of signers.
+			// (ii) In case some provided public keys type is not BLS.
+			//      This scenario is _not expected_ during normal operations, because all keys are
+			//      guaranteed by the protocol to be BLS keys.
+
+			// check case (i)
 			if crypto.IsBLSAggregateEmptyListError(err) {
-				return model.NewInsufficientSignaturesErrorf("aggregate public keys failed: %w", err)
+				return model.NewInsufficientSignaturesErrorf("aggregating public keys failed: %w", err)
 			}
+			// case (ii) or any other error are not expected during normal operations
 			return fmt.Errorf("internal error computing aggregated key: %w", err)
 		}
 

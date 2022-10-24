@@ -155,9 +155,11 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 		// (ii) In case some provided public keys type is not BLS.
 		//      This scenario is _not expected_ during normal operations, because all keys are
 		//      guaranteed by the protocol to be BLS keys.
+		// check case (i)
 		if crypto.IsBLSAggregateEmptyListError(err) {
-			return model.NewInsufficientSignaturesErrorf("aggregate public keys failed: %w", err)
+			return model.NewInsufficientSignaturesErrorf("aggregating public keys failed: %w", err)
 		}
+		// case (ii) or any other error are not expected during normal operations
 		return fmt.Errorf("could not compute aggregated key for block %x: %w", block.BlockID, err)
 	}
 
