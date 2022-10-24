@@ -11,6 +11,7 @@ require (
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/rs/zerolog v1.28.0
 	github.com/stretchr/testify v1.8.0
+	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
 )
