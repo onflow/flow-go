@@ -33,6 +33,7 @@ K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
 # docker container registry
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
+export DOCKER_BUILDKIT := 1
 
 # setup the crypto package under the GOPATH: needed to test packages importing flow-go/crypto
 .PHONY: crypto_setup_gopath
