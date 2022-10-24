@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -19,12 +19,14 @@ const (
 type EventEmitterParams struct {
 	ServiceEventCollectionEnabled bool
 	EventCollectionByteSizeLimit  uint64
+	EventEncoder                  EventEncoder
 }
 
 func DefaultEventEmitterParams() EventEmitterParams {
 	return EventEmitterParams{
 		ServiceEventCollectionEnabled: false,
 		EventCollectionByteSizeLimit:  DefaultEventCollectionByteSizeLimit,
+		EventEncoder:                  NewCadenceEventEncoder(),
 	}
 }
 
@@ -42,6 +44,41 @@ type EventEmitter interface {
 	ServiceEvents() []flow.Event
 
 	Reset()
+}
+
+type ParseRestrictedEventEmitter struct {
+	txnState *state.TransactionState
+	impl     EventEmitter
+}
+
+func NewParseRestrictedEventEmitter(
+	txnState *state.TransactionState,
+	impl EventEmitter,
+) EventEmitter {
+	return ParseRestrictedEventEmitter{
+		txnState: txnState,
+		impl:     impl,
+	}
+}
+
+func (emitter ParseRestrictedEventEmitter) EmitEvent(event cadence.Event) error {
+	return parseRestrict1Arg(
+		emitter.txnState,
+		"EmitEvent",
+		emitter.impl.EmitEvent,
+		event)
+}
+
+func (emitter ParseRestrictedEventEmitter) Events() []flow.Event {
+	return emitter.impl.Events()
+}
+
+func (emitter ParseRestrictedEventEmitter) ServiceEvents() []flow.Event {
+	return emitter.impl.ServiceEvents()
+}
+
+func (emitter ParseRestrictedEventEmitter) Reset() {
+	emitter.impl.Reset()
 }
 
 var _ EventEmitter = NoEventEmitter{}
@@ -119,11 +156,9 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 		return fmt.Errorf("emit event failed: %w", err)
 	}
 
-	payload, err := jsoncdc.Encode(event)
+	payload, err := emitter.EventEncoder.Encode(event)
 	if err != nil {
-		return errors.NewEncodingFailuref(
-			err,
-			"failed to json encode a cadence event")
+		return errors.NewEventEncodingError(err)
 	}
 
 	payloadSize := uint64(len(payload))

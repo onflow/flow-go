@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -152,14 +153,15 @@ func (e *blockComputer) executeBlock(
 	chunksSize := len(collections) + 1 // + 1 system chunk
 
 	res := &execution.ComputationResult{
-		ExecutableBlock:    block,
-		Events:             make([]flow.EventsList, chunksSize),
-		ServiceEvents:      make(flow.EventsList, 0),
-		TransactionResults: make([]flow.TransactionResult, 0),
-		StateCommitments:   make([]flow.StateCommitment, 0, chunksSize),
-		Proofs:             make([][]byte, 0, chunksSize),
-		TrieUpdates:        make([]*ledger.TrieUpdate, 0, chunksSize),
-		EventsHashes:       make([]flow.Identifier, 0, chunksSize),
+		ExecutableBlock:        block,
+		Events:                 make([]flow.EventsList, chunksSize),
+		ServiceEvents:          make(flow.EventsList, 0),
+		TransactionResults:     make([]flow.TransactionResult, 0),
+		StateCommitments:       make([]flow.StateCommitment, 0, chunksSize),
+		Proofs:                 make([][]byte, 0, chunksSize),
+		TrieUpdates:            make([]*ledger.TrieUpdate, 0, chunksSize),
+		EventsHashes:           make([]flow.Identifier, 0, chunksSize),
+		ComputationIntensities: make(meter.MeteredComputationIntensities),
 	}
 
 	var txIndex uint32
@@ -456,6 +458,9 @@ func (e *blockComputer) executeTransaction(
 	res.AddServiceEvents(tx.ServiceEvents)
 	res.AddTransactionResult(&txResult)
 	res.AddComputationUsed(tx.ComputationUsed)
+	if tx.IsSampled() {
+		res.MergeComputationEffortVector(tx.ComputationIntensities)
+	}
 
 	memAllocAfter := debug.GetHeapAllocsBytes()
 
