@@ -406,10 +406,10 @@ func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 }
 
 // OnOwnProposal queues proposal for subsequent sending
-func (h *MessageHub) OnOwnProposal(proposal *flow.Header, delay time.Duration) {
+func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
 	go func() {
 		select {
-		case <-time.After(delay):
+		case <-time.After(time.Until(targetPublicationTime)):
 		case <-h.ShutdownSignal():
 			return
 		}

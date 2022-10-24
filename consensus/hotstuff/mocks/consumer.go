@@ -18,8 +18,8 @@ type Consumer struct {
 }
 
 // OnOwnProposal provides a mock function with given fields: proposal, delay
-func (_m *Consumer) OnOwnProposal(proposal *flow.Header, delay time.Duration) {
-	_m.Called(proposal, delay)
+func (_m *Consumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+	_m.Called(proposal, targetPublicationTime)
 }
 
 // OnOwnTimeout provides a mock function with given fields: timeout
@@ -70,11 +70,6 @@ func (_m *Consumer) OnInvalidTimeoutDetected(_a0 *model.TimeoutObject) {
 // OnInvalidVoteDetected provides a mock function with given fields: _a0
 func (_m *Consumer) OnInvalidVoteDetected(_a0 *model.Vote) {
 	_m.Called(_a0)
-}
-
-// OnProposingBlock provides a mock function with given fields: proposal
-func (_m *Consumer) OnProposingBlock(proposal *model.Proposal) {
-	_m.Called(proposal)
 }
 
 // OnQcConstructedFromVotes provides a mock function with given fields: curView, qc

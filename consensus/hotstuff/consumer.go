@@ -94,13 +94,6 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64)
 
-	// OnProposingBlock notifications are produced by the EventHandler when the replica, as
-	// leader for the respective view, proposing a block.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnProposingBlock(proposal *model.Proposal)
-
 	// OnQcConstructedFromVotes notifications are produced by the VoteAggregator
 	// component, whenever it constructs a QC from votes.
 	// Prerequisites:
@@ -257,5 +250,5 @@ type CommunicatorConsumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnOwnProposal(proposal *flow.Header, delay time.Duration)
+	OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time)
 }

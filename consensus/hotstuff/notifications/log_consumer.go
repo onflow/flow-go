@@ -88,11 +88,6 @@ func (lc *LogConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newV
 		Msg("TC triggered view change")
 }
 
-func (lc *LogConsumer) OnProposingBlock(block *model.Proposal) {
-	lc.logBasicBlockData(lc.log.Debug(), block.Block).
-		Msg("proposing block")
-}
-
 func (lc *LogConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
 	lc.log.Debug().
 		Uint64("cur_view", curView).
@@ -223,7 +218,7 @@ func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	log.Info().Msg("publishing HotStuff timeout object")
 }
 
-func (lc *LogConsumer) OnOwnProposal(header *flow.Header, delay time.Duration) {
+func (lc *LogConsumer) OnOwnProposal(header *flow.Header, targetPublicationTime time.Time) {
 	lc.log.Info().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
@@ -233,6 +228,6 @@ func (lc *LogConsumer) OnOwnProposal(header *flow.Header, delay time.Duration) {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
-		Time("target_publication_time", delay).
+		Time("target_publication_time", targetPublicationTime).
 		Msg("publishing HotStuff block proposal")
 }
