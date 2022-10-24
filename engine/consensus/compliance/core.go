@@ -29,8 +29,11 @@ import (
 
 // Core contains the central business logic for the main consensus' compliance engine.
 // It is responsible for handling communication for the embedded consensus algorithm.
-// NOTE: Core is designed to be non-thread safe and cannot be used in concurrent environment
-// user of this object needs to ensure single thread access.
+// CAUTION with CONCURRENCY:
+//   - At the moment, compliance.Core  _can not_ process blocks concurrently. Callers of `OnBlockProposal`
+//     needs to ensure single thread access.
+//   - The only exception is calls to `ProcessFinalizedView`, which is the only concurrency-safe
+//     method of compliance.Core
 type Core struct {
 	log               zerolog.Logger // used to log relevant actions with context
 	config            compliance.Config
