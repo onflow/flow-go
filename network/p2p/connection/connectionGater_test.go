@@ -40,7 +40,7 @@ func TestConnectionGater(t *testing.T) {
 
 	// ensures that all nodes are connected to each other, and they can exchange messages over the pubsub and unicast
 	p2pfixtures.EnsureConnected(t, ctx, nodes)
-	p2pfixtures.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
+	p2pfixtures.EnsurePubsubMessageExchange(t, ctx, nodes, ids, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
 	})
