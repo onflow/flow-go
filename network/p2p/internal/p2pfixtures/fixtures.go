@@ -471,3 +471,30 @@ func EnsureConnected(t *testing.T, ctx context.Context, nodes []*p2pnode.Node) {
 		}
 	}
 }
+
+func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, messageFactory func() (interface{}, channels.Topic)) {
+	msg, topic := messageFactory()
+	channel, ok := channels.ChannelFromTopic(topic)
+	require.True(t, ok)
+	data := MustEncodeEvent(t, msg, channel)
+
+	subs := make([]*pubsub.Subscription, len(nodes))
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+	for i, node := range nodes {
+		// this is to make sure that the node is subscribed to the topic before we send the message
+		// hence, we don't check the error.
+		subs[i], _ = node.Subscribe(
+			topic,
+			unittest.NetworkCodec(),
+			unittest.AllowAllPeerFilter(),
+			slashingViolationsConsumer)
+	}
+
+	for _, node := range nodes {
+		require.NoError(t, node.Publish(ctx, topic, data))
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	SubsMustReceiveMessage(t, ctx, data, subs)
+	cancel()
+}
