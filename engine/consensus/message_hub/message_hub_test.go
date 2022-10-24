@@ -339,6 +339,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.con.On("Publish", expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
+		s.timeoutAggregator.On("AddTimeout", timeout).Once()
 		// submit timeout
 		s.hub.OnOwnTimeout(timeout)
 	})
