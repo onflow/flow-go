@@ -10,17 +10,15 @@ import (
 	"time"
 
 	badger "github.com/ipfs/go-ds-badger2"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
-
-	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/admin/commands"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
@@ -32,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -59,6 +58,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
@@ -211,7 +211,7 @@ type FlowAccessNodeBuilder struct {
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
 	// Hence, a factory function that needs to be called just before creating the sync engine
-	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
+	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
 	IngestEng   *ingestion.Engine
@@ -404,6 +404,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
+	var bsDependable *module.ProxiedReadyDoneAware
 
 	builder.
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
@@ -437,12 +438,35 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			processedNotifications = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
+		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
+			bsDependable = module.NewProxiedReadyDoneAware()
+			builder.PeerManagerDependencies.Add(bsDependable)
+			return nil
+		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+
+			opts := []network.BlobServiceOption{
+				blob.WithBitswapOptions(
+					// Only allow block requests from staked ENs and ANs
+					bitswap.WithPeerBlockRequestFilter(
+						blob.AuthorizedRequester(nil, builder.IdentityProvider, builder.Logger),
+					),
+					bitswap.WithTracer(
+						blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
+					),
+				),
+			}
+
 			var err error
-			bs, err = node.Network.RegisterBlobService(channels.ExecutionDataService, ds)
+			bs, err = node.Network.RegisterBlobService(channels.ExecutionDataService, ds, opts...)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
+
+			// add blobservice into ReadyDoneAware dependency passed to peer manager
+			// this starts the blob service and configures peer manager to wait for the blobservice
+			// to be ready before starting
+			bsDependable.Init(bs)
 
 			builder.ExecutionDataDownloader = execution_data.NewDownloader(bs)
 
@@ -619,7 +643,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	return net, nil
 }
 
-func publicNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
+func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
 	return []network.MessageValidator{
 		// filter out messages sent by this node itself
 		validator.ValidateNotSender(selfID),
@@ -634,30 +658,31 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvid
 	}
 }
 
-// accessNodeBuilder builds a staked access node.
-// The access node can optionally participate in the public network publishing data for the observers downstream.
 func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
+		}
+		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
+
+		// The following wrapper allows to black-list byzantine nodes via an admin command:
+		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
+		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		if err != nil {
+			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
 		}
 
-		builder.IdentityProvider = idCache
-
-		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
+		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
 				filter.And(
 					filter.HasRole(flow.RoleConsensus),
 					filter.Not(filter.HasNodeID(node.Me.NodeID())),
 					p2p.NotEjectedFilter,
 				),
-				idCache,
+				builder.IdentityProvider,
 			)
 		}
-
-		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
-
 		return nil
 	})
 }
@@ -930,41 +955,56 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 // enqueuePublicNetworkInit enqueues the public network component initialized for the staked node
 func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
-	builder.Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(metrics.WithNetworkPrefix("public"))
+	var libp2pNode *p2pnode.Node
+	builder.
+		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-		libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey)
+			libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey)
 
-		msgValidators := publicNetworkMsgValidators(node.Logger.With().Bool("public", true).Logger(), node.IdentityProvider, builder.NodeID)
+			var err error
+			libp2pNode, err = libP2PFactory()
+			if err != nil {
+				return nil, fmt.Errorf("could not create public libp2p node: %w", err)
+			}
 
-		middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libP2PFactory, msgValidators...)
+			return libp2pNode, nil
+		}).
+		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(metrics.WithNetworkPrefix("public"))
 
-		// topology returns empty list since peers are not known upfront
-		top := topology.EmptyTopology{}
+			msgValidators := publicNetworkMsgValidators(node.Logger.With().Bool("public", true).Logger(), node.IdentityProvider, builder.NodeID)
 
-		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-		if builder.HeroCacheMetricsEnable {
-			heroCacheCollector = metrics.PublicNetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
-		}
-		receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
-			builder.Logger,
-			heroCacheCollector)
+			middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libp2pNode, msgValidators...)
 
-		err := node.Metrics.Mempool.Register(metrics.ResourcePublicNetworkingReceiveCache, receiveCache.Size)
-		if err != nil {
-			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
-		}
+			// topology returns empty list since peers are not known upfront
+			top := topology.EmptyTopology{}
 
-		net, err := builder.initNetwork(builder.Me, builder.PublicNetworkConfig.Metrics, middleware, top, receiveCache)
-		if err != nil {
-			return nil, err
-		}
+			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if builder.HeroCacheMetricsEnable {
+				heroCacheCollector = metrics.PublicNetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
+			}
+			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
+				builder.Logger,
+				heroCacheCollector)
 
-		builder.AccessNodeConfig.PublicNetworkConfig.Network = net
+			err := node.Metrics.Mempool.Register(metrics.ResourcePublicNetworkingReceiveCache, receiveCache.Size)
+			if err != nil {
+				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+			}
 
-		node.Logger.Info().Msgf("network will run on address: %s", builder.PublicNetworkConfig.BindAddress)
-		return net, nil
-	})
+			net, err := builder.initNetwork(builder.Me, builder.PublicNetworkConfig.Metrics, middleware, top, receiveCache)
+			if err != nil {
+				return nil, err
+			}
+
+			builder.AccessNodeConfig.PublicNetworkConfig.Network = net
+
+			node.Logger.Info().Msgf("network will run on address: %s", builder.PublicNetworkConfig.BindAddress)
+			return net, nil
+		}).
+		Component("public peer manager", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			return libp2pNode.PeerManagerComponent(), nil
+		})
 }
 
 // initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
@@ -976,7 +1016,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 //   - No connection gater
 //   - Default Flow libp2p pubsub options
 func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
-	return func(ctx context.Context) (*p2pnode.Node, error) {
+	return func() (*p2pnode.Node, error) {
 		connManager := connection.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
 
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
@@ -997,8 +1037,9 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 					dht.AsServer(),
 				)
 			}).
-			SetPubSub(pubsub.NewGossipSub).
-			Build(ctx)
+			// disable connection pruning for the access node which supports the observer
+			SetPeerManagerOptions(connection.ConnectionPruningDisabled, builder.PeerUpdateInterval).
+			Build()
 
 		if err != nil {
 			return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
@@ -1014,18 +1055,16 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
-	factoryFunc p2pbuilder.LibP2PFactoryFunc,
+	libp2pNode *p2pnode.Node,
 	validators ...network.MessageValidator) network.Middleware {
 
 	logger := builder.Logger.With().Bool("staked", false).Logger()
 
-	// disable connection pruning for the access node which supports the observer
-	peerManagerFactory := connection.PeerManagerFactory(connection.ConnectionPruningDisabled, builder.PeerUpdateInterval)
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, builder.Metrics.Network)
 
 	builder.Middleware = middleware.NewMiddleware(
 		logger,
-		factoryFunc,
+		libp2pNode,
 		nodeID,
 		networkMetrics,
 		builder.Metrics.Bitswap,
@@ -1035,7 +1074,6 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.CodecFactory(),
 		slashingViolationsConsumer,
 		middleware.WithMessageValidators(validators...),
-		middleware.WithPeerManager(peerManagerFactory),
 		// use default identifier provider
 	)
 

@@ -56,41 +56,14 @@ func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
-	Runtime runtime.Runtime // DEPRECATED.  DO NOT USE.
 }
 
-func NewVM() *VirtualMachine {
+func NewVirtualMachine() *VirtualMachine {
 	return &VirtualMachine{}
 }
 
-// DEPRECATED.  DO NOT USE.
-//
-// TODO(patrick): remove after emulator is updated.
-//
-// Emulator is a special snowflake which prevents fvm from every changing its
-// APIs (integration test uses a pinned version of the emulator, which in turn
-// uses a pinned non-master version of flow-go).  This method is expose to break
-// the ridiculous circular dependency between the two builds.
-func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
-	return &VirtualMachine{
-		Runtime: rt,
-	}
-}
-
-// DEPRECATED.  DO NOT USE.
-//
-// TODO(patrick): remove after emulator is updated
-//
 // Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, _ *programs.Programs) (err error) {
-	return vm.RunV2(ctx, proc, v)
-}
-
-// TODO(patrick): rename back to Run after emulator is fully updated (this
-// takes at least 3 sporks ...).
-//
-// Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) RunV2(
+func (vm *VirtualMachine) Run(
 	ctx Context,
 	proc Procedure,
 	v state.View,
@@ -118,22 +91,6 @@ func (vm *VirtualMachine) RunV2(
 
 	if err != nil {
 		return fmt.Errorf("error creating transaction programs: %w", err)
-	}
-
-	// Note: it is safe to skip committing the parsed programs for non-normal
-	// transactions (i.e., bootstrap and script) since this is only an
-	// optimization.
-	if proc.Type() == TransactionProcedureType {
-		defer func() {
-			commitErr := txnPrograms.Commit()
-			if commitErr != nil {
-				// NOTE: txnPrograms commit error does not impact correctness,
-				// but may slow down execution since some programs may need to
-				// be re-parsed.
-				ctx.Logger.Warn().Err(commitErr).Msg(
-					"failed to commit transaction programs")
-			}
-		}()
 	}
 
 	meterParams := meter.DefaultParameters().
@@ -168,21 +125,25 @@ func (vm *VirtualMachine) RunV2(
 			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
-	return proc.Run(ctx, txnState, txnPrograms)
+	err = proc.Run(ctx, txnState, txnPrograms)
+	if err != nil {
+		return err
+	}
+
+	// Note: it is safe to skip committing the parsed programs for non-normal
+	// transactions (i.e., bootstrap and script) since these do not invalidate
+	// programs.
+	if proc.Type() == TransactionProcedureType {
+		// NOTE: It is not safe to ignore txnPrograms' commit error for
+		// transactions that trigger programs invalidation.
+		return txnPrograms.Commit()
+	}
+
+	return nil
 }
 
-// DEPRECATED. DO NOT USE
-//
-// TODO(patrick): remove after emulator is updated
-func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
-	return vm.GetAccountV2(ctx, address, v)
-}
-
-// TODO(patrick): rename back to GetAccount after emulator is fully updated
-// (this takes at least 3 sporks ...).
-//
-// GetAccountV2 returns an account by address or an error if none exists.
-func (vm *VirtualMachine) GetAccountV2(
+// GetAccount returns an account by address or an error if none exists.
+func (vm *VirtualMachine) GetAccount(
 	ctx Context,
 	address flow.Address,
 	v state.View,

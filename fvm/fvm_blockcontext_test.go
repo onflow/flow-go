@@ -161,7 +161,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		view := testutil.RootBootstrappedLedger(vm, ctx)
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, view)
+		err = vm.Run(ctx, tx, view)
 		require.NoError(t, err)
 
 		assert.Nil(t, tx.Err)
@@ -194,7 +194,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.Error(t, tx.Err)
@@ -218,7 +218,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		require.Len(t, tx.Logs, 2)
@@ -244,7 +244,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -290,7 +290,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -320,7 +320,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -353,7 +353,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx = fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -383,7 +383,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		var parsingCheckingError *runtime.ParsingCheckingError
@@ -409,7 +409,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.Error(t, tx.Err)
@@ -448,7 +448,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 		assert.Error(t, tx.Err)
 
@@ -481,7 +481,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 	})
@@ -509,7 +509,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
@@ -522,7 +522,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx = fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 	})
@@ -550,7 +550,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
@@ -563,7 +563,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx = fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 		assert.Error(t, tx.Err)
 
@@ -594,7 +594,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
@@ -610,7 +610,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx = fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 	})
@@ -636,7 +636,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 		authTx := fvm.Transaction(authTxBody, 0)
 
-		err = vm.RunV2(ctx, authTx, ledger)
+		err = vm.Run(ctx, authTx, ledger)
 		require.NoError(t, err)
 		assert.NoError(t, authTx.Err)
 
@@ -649,7 +649,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		tx := fvm.Transaction(txBody, 0)
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 	})
@@ -671,7 +671,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 		assert.Error(t, tx.Err)
 		assert.Contains(t, tx.Err.Error(), "deploying contracts requires authorization from specific accounts")
@@ -690,7 +690,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 		authTx := fvm.Transaction(authTxBody, 0)
 
-		err = vm.RunV2(ctx, authTx, ledger)
+		err = vm.Run(ctx, authTx, ledger)
 		require.NoError(t, err)
 		assert.NoError(t, authTx.Err)
 
@@ -702,7 +702,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 		tx = fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 		assert.NoError(t, tx.Err)
 	})
@@ -793,7 +793,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 			tx := fvm.Transaction(txBody, 0)
 
-			err = vm.RunV2(ctx, tx, ledger)
+			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
 
 			tt.check(t, tx)
@@ -873,7 +873,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 			tx := fvm.Transaction(txBody, 0)
 
-			err = vm.RunV2(ctx, tx, ledger)
+			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
 
 			tt.check(t, tx)
@@ -936,7 +936,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.RunV2(ctx, tx, view)
+				err = vm.Run(ctx, tx, view)
 				require.NoError(t, err)
 
 				assert.True(t, errors.IsStorageCapacityExceededError(tx.Err))
@@ -989,7 +989,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.RunV2(ctx, tx, view)
+				err = vm.Run(ctx, tx, view)
 				require.NoError(t, err)
 
 				require.NoError(t, tx.Err)
@@ -1050,7 +1050,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.RunV2(ctx, tx, view)
+				err = vm.Run(ctx, tx, view)
 				require.NoError(t, err)
 
 				assert.True(t, errors.IsLedgerInteractionLimitExceededError(tx.Err))
@@ -1088,7 +1088,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.RunV2(ctx, tx, view)
+				err = vm.Run(ctx, tx, view)
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
 			}))
@@ -1125,7 +1125,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.RunV2(ctx, tx, view)
+				err = vm.Run(ctx, tx, view)
 				require.NoError(t, err)
 				require.Error(t, tx.Err)
 
@@ -1163,7 +1163,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.RunV2(ctx, script, ledger)
+		err := vm.Run(ctx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -1181,7 +1181,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.RunV2(ctx, script, ledger)
+		err := vm.Run(ctx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.Error(t, script.Err)
@@ -1200,7 +1200,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.RunV2(ctx, script, ledger)
+		err := vm.Run(ctx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -1255,7 +1255,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -1275,7 +1275,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err = vm.RunV2(ctx, script, ledger)
+		err = vm.Run(ctx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -1329,7 +1329,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(blockCtx, tx, ledger)
+		err = vm.Run(blockCtx, tx, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -1374,7 +1374,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.RunV2(blockCtx, script, ledger)
+		err := vm.Run(blockCtx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -1420,7 +1420,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 		require.NoError(t, err)
 
-		err = vm.RunV2(blockCtx, fvm.Transaction(tx, 0), ledger)
+		err = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger)
 		require.Error(t, err)
 	})
 
@@ -1433,7 +1433,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
         `)
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-		err := vm.RunV2(blockCtx, fvm.Script(script), ledger)
+		err := vm.Run(blockCtx, fvm.Script(script), ledger)
 		require.Error(t, err)
 	})
 }
@@ -1477,7 +1477,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// execute the transaction
 		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -1516,7 +1516,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	t.Run("get accounts", func(t *testing.T) {
 		for address, expectedKey := range accounts {
 
-			account, err := vm.GetAccountV2(ctx, address, ledger)
+			account, err := vm.GetAccount(ctx, address, ledger)
 			require.NoError(t, err)
 
 			assert.Len(t, account.Keys, 1)
@@ -1531,7 +1531,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		var account *flow.Account
-		account, err = vm.GetAccountV2(ctx, address, ledger)
+		account, err = vm.GetAccount(ctx, address, ledger)
 		assert.True(t, errors.IsAccountNotFoundError(err))
 		assert.Nil(t, account)
 	})
@@ -1570,7 +1570,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.RunV2(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -1604,7 +1604,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	tx := fvm.Transaction(txBody, 0)
 
-	err = vm.RunV2(ctx, tx, ledger)
+	err = vm.Run(ctx, tx, ledger)
 	assert.NoError(t, err)
 
 	assert.NoError(t, tx.Err)
@@ -1640,7 +1640,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)
 
-		err := vm.RunV2(ctx, script, view)
+		err := vm.Run(ctx, script, view)
 		require.NoError(t, err)
 		require.NoError(t, script.Err)
 		return script.Value.ToGoValue().(uint64)
@@ -1678,7 +1678,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-			err = vm.RunV2(ctx, tx, view)
+			err = vm.Run(ctx, tx, view)
 			require.NoError(t, err)
 
 			require.True(t, errors.IsStorageCapacityExceededError(tx.Err))
@@ -1726,7 +1726,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-			err = vm.RunV2(ctx, tx, view)
+			err = vm.Run(ctx, tx, view)
 			require.NoError(t, err)
 
 			require.True(t, errors.IsCadenceRuntimeError(tx.Err))
@@ -1767,11 +1767,23 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.RunV2(ctx, tx, view)
+				err = vm.Run(ctx, tx, view)
 				require.NoError(t, err)
-				castedErr, ok := tx.Err.(errors.InvalidProposalSeqNumberError)
+
+				require.Equal(
+					t,
+					errors.ErrCodeInvalidProposalSeqNumberError,
+					tx.Err.Code())
+
+				// The outer most coded error is a wrapper, not the actual
+				// InvalidProposalSeqNumberError itself.
+				_, ok := tx.Err.(errors.InvalidProposalSeqNumberError)
+				require.False(t, ok)
+
+				var seqNumErr errors.InvalidProposalSeqNumberError
+				ok = errors.As(tx.Err, &seqNumErr)
 				require.True(t, ok)
-				require.Equal(t, uint64(0), castedErr.CurrentSeqNumber())
+				require.Equal(t, uint64(0), seqNumErr.CurrentSeqNumber())
 			}),
 	)
 
@@ -1805,7 +1817,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.RunV2(ctx, tx, view)
+				err = vm.Run(ctx, tx, view)
 				require.NoError(t, err)
 
 				require.True(t, errors.IsCadenceRuntimeError(tx.Err))
@@ -1813,12 +1825,23 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				// send it again
 				tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-				err = vm.RunV2(ctx, tx, view)
+				err = vm.Run(ctx, tx, view)
 				require.NoError(t, err)
 
-				castedErr, ok := tx.Err.(errors.InvalidProposalSeqNumberError)
+				require.Equal(
+					t,
+					errors.ErrCodeInvalidProposalSeqNumberError,
+					tx.Err.Code())
+
+				// The outer most coded error is a wrapper, not the actual
+				// InvalidProposalSeqNumberError itself.
+				_, ok := tx.Err.(errors.InvalidProposalSeqNumberError)
+				require.False(t, ok)
+
+				var seqNumErr errors.InvalidProposalSeqNumberError
+				ok = errors.As(tx.Err, &seqNumErr)
 				require.True(t, ok)
-				require.Equal(t, uint64(1), castedErr.CurrentSeqNumber())
+				require.Equal(t, uint64(1), seqNumErr.CurrentSeqNumber())
 			}),
 	)
 }

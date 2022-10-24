@@ -2,11 +2,10 @@ package blob
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/ipfs/go-bitswap"
-	bsnet "github.com/ipfs/go-bitswap/network"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
@@ -15,22 +14,29 @@ import (
 	provider "github.com/ipfs/go-ipfs-provider"
 	"github.com/ipfs/go-ipfs-provider/simple"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/go-bitswap"
+	bsmsg "github.com/onflow/go-bitswap/message"
+	bsnet "github.com/onflow/go-bitswap/network"
 	"github.com/rs/zerolog"
 	"golang.org/x/time/rate"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/logging"
 
 	ipld "github.com/ipfs/go-ipld-format"
 )
 
 type blobService struct {
+	prefix string
 	component.Component
 	blockService blockservice.BlockService
 	blockStore   blockstore.Blockstore
@@ -76,7 +82,7 @@ func WithHashOnRead(enabled bool) network.BlobServiceOption {
 func WithRateLimit(r float64, b int) network.BlobServiceOption {
 	return func(bs network.BlobService) {
 		blobService := bs.(*blobService)
-		blobService.blockStore = newRateLimitedBlockStore(blobService.blockStore, r, b)
+		blobService.blockStore = newRateLimitedBlockStore(blobService.blockStore, blobService.prefix, r, b)
 	}
 }
 
@@ -92,6 +98,7 @@ func NewBlobService(
 ) *blobService {
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
 	bs := &blobService{
+		prefix: prefix,
 		config: &BlobServiceConfig{
 			ReprovideInterval: 12 * time.Hour,
 		},
@@ -215,11 +222,13 @@ type rateLimitedBlockStore struct {
 	metrics module.RateLimitedBlockstoreMetrics
 }
 
-func newRateLimitedBlockStore(bs blockstore.Blockstore, r float64, b int) *rateLimitedBlockStore {
+var rateLimitedError = errors.New("rate limited")
+
+func newRateLimitedBlockStore(bs blockstore.Blockstore, prefix string, r float64, b int) *rateLimitedBlockStore {
 	return &rateLimitedBlockStore{
 		Blockstore: bs,
 		limiter:    rate.NewLimiter(rate.Limit(r), b),
-		metrics:    metrics.NewRateLimitedBlockstoreCollector(),
+		metrics:    metrics.NewRateLimitedBlockstoreCollector(prefix),
 	}
 }
 
@@ -229,12 +238,118 @@ func (r *rateLimitedBlockStore) Get(ctx context.Context, c cid.Cid) (blocks.Bloc
 		return nil, err
 	}
 
-	err = r.limiter.WaitN(ctx, size)
-	if err != nil {
-		return nil, err
+	allowed := r.limiter.AllowN(time.Now(), size)
+	if !allowed {
+		return nil, rateLimitedError
 	}
 
 	r.metrics.BytesRead(size)
 
 	return r.Blockstore.Get(ctx, c)
+}
+
+// AuthorizedRequester returns a callback function used by bitswap to authorize block requests
+// A request is authorized if the peer is
+// * known by the identity provider
+// * not ejected
+// * an Access node
+// * in the allowedNodes list (if non-empty)
+func AuthorizedRequester(
+	allowedNodes map[flow.Identifier]bool,
+	identityProvider module.IdentityProvider,
+	logger zerolog.Logger,
+) func(peer.ID, cid.Cid) bool {
+	return func(peerID peer.ID, _ cid.Cid) bool {
+		lg := logger.With().
+			Str("component", "blob_service").
+			Str("peer_id", peerID.String()).
+			Logger()
+
+		id, ok := identityProvider.ByPeerID(peerID)
+
+		if !ok {
+			lg.Warn().
+				Bool(logging.KeySuspicious, true).
+				Msg("rejecting request from unknown peer")
+			return false
+		}
+
+		lg = lg.With().
+			Str("peer_node_id", id.NodeID.String()).
+			Str("role", id.Role.String()).
+			Logger()
+
+		// TODO: when execution data verification is enabled, add verification nodes here
+		if (id.Role != flow.RoleExecution && id.Role != flow.RoleAccess) || id.Ejected {
+			lg.Warn().
+				Bool(logging.KeySuspicious, true).
+				Msg("rejecting request from peer: unauthorized")
+			return false
+		}
+
+		// allow list is only for Access nodes
+		if id.Role == flow.RoleAccess && len(allowedNodes) > 0 && !allowedNodes[id.NodeID] {
+			// honest peers not on the allowed list have no way to know and will continue to request
+			// blobs. therefore, these requests do not indicate suspicious behavior
+			lg.Debug().Msg("rejecting request from peer: not in allowed list")
+			return false
+		}
+
+		lg.Debug().Msg("accepting request from peer")
+		return true
+	}
+}
+
+type Tracer struct {
+	logger zerolog.Logger
+}
+
+func NewTracer(logger zerolog.Logger) *Tracer {
+	return &Tracer{
+		logger,
+	}
+}
+
+func (t *Tracer) logMsg(msg bsmsg.BitSwapMessage, s string) {
+	evt := t.logger.Debug()
+
+	wantlist := zerolog.Arr()
+	for _, entry := range msg.Wantlist() {
+		wantlist = wantlist.Interface(entry)
+	}
+	evt.Array("wantlist", wantlist)
+
+	blks := zerolog.Arr()
+	for _, blk := range msg.Blocks() {
+		blks = blks.Str(blk.Cid().String())
+	}
+	evt.Array("blocks", blks)
+
+	haves := zerolog.Arr()
+	for _, have := range msg.Haves() {
+		haves = haves.Str(have.String())
+	}
+	evt.Array("haves", haves)
+
+	dontHaves := zerolog.Arr()
+	for _, dontHave := range msg.DontHaves() {
+		dontHaves = dontHaves.Str(dontHave.String())
+	}
+	evt.Array("dontHaves", dontHaves)
+
+	evt.Int32("pendingBytes", msg.PendingBytes())
+
+	evt.Msg(s)
+}
+
+func (t *Tracer) MessageReceived(pid peer.ID, msg bsmsg.BitSwapMessage) {
+	if t.logger.Debug().Enabled() {
+		t.logMsg(msg, "bitswap message received")
+	}
+}
+
+func (t *Tracer) MessageSent(pid peer.ID, msg bsmsg.BitSwapMessage) {
+	if t.logger.Debug().Enabled() {
+		t.logMsg(msg, "bitswap message sent")
+	}
 }

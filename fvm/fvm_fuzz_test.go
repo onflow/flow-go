@@ -55,7 +55,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
 			require.NotPanics(t, func() {
-				err = vm.RunV2(ctx, tx, view)
+				err = vm.Run(ctx, tx, view)
 			}, "Transaction should never result in a panic.")
 			require.NoError(t, err, "Transaction should never result in an error.")
 
@@ -102,6 +102,7 @@ var fuzzTransactionTypes = []transactionType{
 			// if there is an error, it should be computation exceeded
 			if results.tx.Err != nil {
 				require.Len(t, results.tx.Events, 3)
+				unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
@@ -114,6 +115,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -133,6 +135,7 @@ var fuzzTransactionTypes = []transactionType{
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.tx.Err)
 			require.Len(t, results.tx.Events, 3)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the failed transfer
@@ -144,6 +147,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -160,6 +164,7 @@ var fuzzTransactionTypes = []transactionType{
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.tx.Err)
 			require.Len(t, results.tx.Events, 3)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the panic
@@ -171,6 +176,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -186,6 +192,7 @@ var fuzzTransactionTypes = []transactionType{
 			// if there is an error, it should be computation exceeded
 			if results.tx.Err != nil {
 				require.Len(t, results.tx.Events, 3)
+				unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
@@ -198,6 +205,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 }
@@ -255,7 +263,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 
 		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-		err = vm.RunV2(ctx, tx, view)
+		err = vm.Run(ctx, tx, view)
 
 		require.NoError(tb, err)
 		accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
@@ -284,7 +292,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 
 		tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 
-		err = vm.RunV2(ctx, tx, view)
+		err = vm.Run(ctx, tx, view)
 		if err != nil {
 			return err
 		}

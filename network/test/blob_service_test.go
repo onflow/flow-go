@@ -21,6 +21,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -80,8 +81,9 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
-	ids, mws, networks, _ := GenerateIDsMiddlewaresNetworks(
-		ctx,
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
+	ids, nodes, mws, networks, _ := GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		suite.numNodes,
 		logger,
@@ -91,6 +93,8 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		WithPeerUpdateInterval(time.Second),
 	)
 	suite.networks = networks
+
+	StartNodesAndNetworks(signalerCtx, suite.T(), nodes, networks, 100*time.Millisecond)
 
 	blobExchangeChannel := channels.Channel("blob-exchange")
 

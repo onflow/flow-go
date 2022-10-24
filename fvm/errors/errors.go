@@ -8,9 +8,6 @@ import (
 	"github.com/onflow/cadence/runtime/errors"
 )
 
-// TODO(patrick): remove after emulator is updated.
-type Error = CodedError
-
 type CodedError interface {
 	Code() ErrorCode
 
@@ -39,10 +36,7 @@ func As(err error, target interface{}) bool {
 //  3. If err has a failure error code, this returns
 //     (<the shallowest failure coded error>, false),
 //  4. If err has a non-failure error code, this returns
-//     (<the shallowest non-failure coded error>, false)
-//
-// TODO(patrick): for case 4, return the deepest (aka root cause) error code
-// instead.
+//     (<the deepest, aka root cause, non-failure coded error>, false)
 func findImportantCodedError(err error) (CodedError, bool) {
 	if err == nil {
 		return nil, false
@@ -53,20 +47,29 @@ func findImportantCodedError(err error) (CodedError, bool) {
 		return nil, true
 	}
 
-	if coded.Code().IsFailure() {
-		return coded, false
-	}
-
-	shallowest := coded
 	for {
-		if !As(coded.Unwrap(), &coded) {
-			return shallowest, false
-		}
-
 		if coded.Code().IsFailure() {
 			return coded, false
 		}
+
+		var nextCoded CodedError
+		if !As(coded.Unwrap(), &nextCoded) {
+			return coded, false
+		}
+
+		coded = nextCoded
 	}
+}
+
+// IsFailure returns true if the error is un-coded, or if the error contains
+// a failure code.
+func IsFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	coded, isUnknown := findImportantCodedError(err)
+	return isUnknown || coded.Code().IsFailure()
 }
 
 // SplitErrorTypes splits the error into fatal (failures) and non-fatal errors
@@ -80,15 +83,17 @@ func SplitErrorTypes(inp error) (err CodedError, failure CodedError) {
 		return nil, NewUnknownFailure(inp)
 	}
 
-	// TODO(patrick): Right now, we're dropping a bunch of error details since
-	// we're returning coded instead of inp.  Wrap inp with coded.Code() and
-	// return that instead.
-
 	if coded.Code().IsFailure() {
-		return nil, coded
+		return nil, WrapCodedError(
+			coded.Code(),
+			inp,
+			"failure caused by")
 	}
 
-	return coded, nil
+	return WrapCodedError(
+		coded.Code(),
+		inp,
+		"error caused by"), nil
 }
 
 // HandleRuntimeError handles runtime errors and separates
@@ -193,4 +198,12 @@ func (err codedError) Error() string {
 
 func (err codedError) Code() ErrorCode {
 	return err.code
+}
+
+// NewEventEncodingError construct a new CodedError which indicates
+// that encoding event has failed
+func NewEventEncodingError(err error) CodedError {
+	return NewCodedError(
+		ErrCodeEventEncodingError,
+		"error while encoding emitted event: %w ", err)
 }

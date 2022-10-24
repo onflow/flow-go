@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 )
 
@@ -46,13 +47,13 @@ const (
 type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error
 	ComputationUsed() uint64
+	ComputationIntensities() meter.MeteredComputationIntensities
 
 	MeterMemory(usage common.MemoryUsage) error
 	MemoryEstimate() uint64
 
 	MeterEmittedEvent(byteSize uint64) error
 	TotalEmittedEventBytes() uint64
-	TotalEventCounter() uint32
 }
 
 type meterImpl struct {
@@ -75,8 +76,12 @@ func (meter *meterImpl) MeterComputation(
 	return nil
 }
 
+func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensities {
+	return meter.txnState.ComputationIntensities()
+}
+
 func (meter *meterImpl) ComputationUsed() uint64 {
-	return uint64(meter.txnState.TotalComputationUsed())
+	return meter.txnState.TotalComputationUsed()
 }
 
 func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
@@ -99,10 +104,6 @@ func (meter *meterImpl) MeterEmittedEvent(byteSize uint64) error {
 
 func (meter *meterImpl) TotalEmittedEventBytes() uint64 {
 	return meter.txnState.TotalEmittedEventBytes()
-}
-
-func (meter *meterImpl) TotalEventCounter() uint32 {
-	return meter.txnState.TotalEventCounter()
 }
 
 type cancellableMeter struct {

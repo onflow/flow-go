@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 var _ connmgr.ConnectionGater = (*ConnGater)(nil)
@@ -60,7 +61,7 @@ func NewConnGater(log zerolog.Logger, opts ...ConnGaterOption) *ConnGater {
 func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
 	if len(c.onInterceptPeerDialFilters) == 0 {
 		c.log.Debug().
-			Str("peer_id", p.Pretty()).
+			Str("peer_id", p.String()).
 			Msg("allowing outbound connection intercept peer dial has no peer filters set")
 		return true
 	}
@@ -69,7 +70,7 @@ func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
 		// log the filtered outbound connection attempt
 		c.log.Warn().
 			Err(err).
-			Str("peer_id", p.Pretty()).
+			Str("peer_id", p.String()).
 			Msg("rejected outbound connection attempt")
 		return false
 	}
@@ -92,24 +93,27 @@ func (c *ConnGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
 func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr network.ConnMultiaddrs) bool {
 	switch dir {
 	case network.DirInbound:
+		lg := c.log.With().
+			Str("peer_id", p.String()).
+			Str("remote_address", addr.RemoteMultiaddr().String()).
+			Logger()
+
 		if len(c.onInterceptSecuredFilters) == 0 {
-			c.log.Debug().
-				Str("peer_id", p.Pretty()).
-				Msg("allowing inbound connection intercept secured has no peer filters set")
+			lg.Info().Msg("inbound connection established")
 			return true
 		}
 
 		if err := c.peerIDPassesAllFilters(p, c.onInterceptSecuredFilters); err != nil {
 			// log the illegal connection attempt from the remote node
-			c.log.Error().
+			lg.Error().
 				Err(err).
-				Str("peer_id", p.Pretty()).
 				Str("local_address", addr.LocalMultiaddr().String()).
-				Str("remote_address", addr.RemoteMultiaddr().String()).
+				Bool(logging.KeySuspicious, true).
 				Msg("rejected inbound connection")
 			return false
 		}
 
+		lg.Info().Msg("inbound connection established")
 		return true
 	default:
 		// outbound connection should have been already blocked before this call

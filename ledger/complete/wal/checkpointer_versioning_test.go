@@ -174,7 +174,7 @@ func CreateCheckpointV3() {
 	file, err := os.OpenFile("checkpoint.v3", os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
 	require.NoError(t, err)
 
-	err = realWAL.StoreCheckpoint(flattenedForest, file)
+	err = realWAL.StoreCheckpointV5(flattenedForest, file)
 	require.NoError(t, err)
 
 	file.Close()
