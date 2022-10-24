@@ -458,3 +458,16 @@ func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []*p2pno
 	// wait for all nodes to discover each other
 	time.Sleep(time.Second)
 }
+
+// EnsureConnected ensures that the given nodes are connected to each other.
+// It fails the test if any of the nodes is not connected to any other node.
+func EnsureConnected(t *testing.T, ctx context.Context, nodes []*p2pnode.Node) {
+	for _, node := range nodes {
+		for _, other := range nodes {
+			if node == other {
+				continue
+			}
+			require.NoError(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
+		}
+	}
+}
