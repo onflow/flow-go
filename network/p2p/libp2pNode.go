@@ -19,6 +19,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
+// LibP2PNode represents a flow libp2p node. It provides the network layer with the necessary interface to
+// control the underlying libp2p node. It is essentially the flow wrapper around the libp2p node, and allows
+// us to define different types of libp2p nodes that can operate in different ways by overriding these methods.
 type LibP2PNode interface {
 	module.ReadyDoneAware
 	// Start the libp2p node.
