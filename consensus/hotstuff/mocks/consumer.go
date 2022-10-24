@@ -17,16 +17,6 @@ type Consumer struct {
 	mock.Mock
 }
 
-// BroadcastProposalWithDelay provides a mock function with given fields: proposal, delay
-func (_m *Consumer) BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) {
-	_m.Called(proposal, delay)
-}
-
-// BroadcastTimeout provides a mock function with given fields: timeout
-func (_m *Consumer) BroadcastTimeout(timeout *model.TimeoutObject) {
-	_m.Called(timeout)
-}
-
 // OnBlockIncorporated provides a mock function with given fields: _a0
 func (_m *Consumer) OnBlockIncorporated(_a0 *model.Block) {
 	_m.Called(_a0)
@@ -72,9 +62,19 @@ func (_m *Consumer) OnInvalidVoteDetected(_a0 *model.Vote) {
 	_m.Called(_a0)
 }
 
-// OnProposingBlock provides a mock function with given fields: proposal
-func (_m *Consumer) OnProposingBlock(proposal *model.Proposal) {
-	_m.Called(proposal)
+// OnOwnProposal provides a mock function with given fields: proposal, targetPublicationTime
+func (_m *Consumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+	_m.Called(proposal, targetPublicationTime)
+}
+
+// OnOwnTimeout provides a mock function with given fields: timeout
+func (_m *Consumer) OnOwnTimeout(timeout *model.TimeoutObject) {
+	_m.Called(timeout)
+}
+
+// OnOwnVote provides a mock function with given fields: blockID, view, sigData, recipientID
+func (_m *Consumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+	_m.Called(blockID, view, sigData, recipientID)
 }
 
 // OnQcConstructedFromVotes provides a mock function with given fields: curView, qc
@@ -120,16 +120,6 @@ func (_m *Consumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView
 // OnVoteForInvalidBlockDetected provides a mock function with given fields: vote, invalidProposal
 func (_m *Consumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
 	_m.Called(vote, invalidProposal)
-}
-
-// OnVoting provides a mock function with given fields: vote
-func (_m *Consumer) OnVoting(vote *model.Vote) {
-	_m.Called(vote)
-}
-
-// SendVote provides a mock function with given fields: blockID, view, sigData, recipientID
-func (_m *Consumer) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
-	_m.Called(blockID, view, sigData, recipientID)
 }
 
 type mockConstructorTestingTNewConsumer interface {

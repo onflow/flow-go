@@ -88,18 +88,6 @@ func (lc *LogConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newV
 		Msg("TC triggered view change")
 }
 
-func (lc *LogConsumer) OnProposingBlock(block *model.Proposal) {
-	lc.logBasicBlockData(lc.log.Debug(), block.Block).
-		Msg("proposing block")
-}
-
-func (lc *LogConsumer) OnVoting(vote *model.Vote) {
-	lc.log.Debug().
-		Uint64("block_view", vote.View).
-		Hex("block_id", vote.BlockID[:]).
-		Msg("voting for block")
-}
-
 func (lc *LogConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
 	lc.log.Debug().
 		Uint64("cur_view", curView).
@@ -217,30 +205,20 @@ func (lc *LogConsumer) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
 		Msg("new TC discovered")
 }
 
-func (lc *LogConsumer) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+func (lc *LogConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	lc.log.Info().
 		Hex("block_id", blockID[:]).
 		Uint64("block_view", view).
 		Hex("recipient_id", recipientID[:]).
-		Msg("vote transmission request from hotstuff")
+		Msg("publishing HotStuff vote")
 }
 
-func (lc *LogConsumer) BroadcastTimeout(timeout *model.TimeoutObject) {
-	logContext := lc.log.With().
-		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
-		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
-		Uint64("timeout_view", timeout.View)
-
-	if timeout.LastViewTC != nil {
-		logContext.
-			Uint64("last_view_tc_view", timeout.LastViewTC.View).
-			Uint64("last_view_tc_newest_qc_view", timeout.LastViewTC.NewestQC.View)
-	}
-	log := logContext.Logger()
-	log.Info().Msg("timeout broadcast request from hotstuff")
+func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
+	log := timeout.LogContext(lc.log).Logger()
+	log.Info().Msg("publishing HotStuff timeout object")
 }
 
-func (lc *LogConsumer) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) {
+func (lc *LogConsumer) OnOwnProposal(header *flow.Header, targetPublicationTime time.Time) {
 	lc.log.Info().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
@@ -249,7 +227,7 @@ func (lc *LogConsumer) BroadcastProposalWithDelay(header *flow.Header, delay tim
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
-		Hex("signers", header.ParentVoterIndices).
-		Dur("delay", delay).
-		Msg("proposal broadcast request from hotstuff")
+		Hex("parent_signer_indices", header.ParentVoterIndices).
+		Time("target_publication_time", targetPublicationTime).
+		Msg("publishing HotStuff block proposal")
 }

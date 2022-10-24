@@ -78,22 +78,6 @@ func (p *Distributor) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newVi
 	}
 }
 
-func (p *Distributor) OnProposingBlock(proposal *model.Proposal) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnProposingBlock(proposal)
-	}
-}
-
-func (p *Distributor) OnVoting(vote *model.Vote) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnVoting(vote)
-	}
-}
-
 func (p *Distributor) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -190,26 +174,26 @@ func (p *Distributor) OnInvalidTimeoutDetected(timeout *model.TimeoutObject) {
 	}
 }
 
-func (p *Distributor) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+func (p *Distributor) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, s := range p.subscribers {
-		s.SendVote(blockID, view, sigData, recipientID)
+		s.OnOwnVote(blockID, view, sigData, recipientID)
 	}
 }
 
-func (p *Distributor) BroadcastTimeout(timeout *model.TimeoutObject) {
+func (p *Distributor) OnOwnTimeout(timeout *model.TimeoutObject) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, s := range p.subscribers {
-		s.BroadcastTimeout(timeout)
+		s.OnOwnTimeout(timeout)
 	}
 }
 
-func (p *Distributor) BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) {
+func (p *Distributor) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, s := range p.subscribers {
-		s.BroadcastProposalWithDelay(proposal, delay)
+		s.OnOwnProposal(proposal, targetPublicationTime)
 	}
 }

@@ -235,8 +235,8 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	})
 }
 
-// TestBroadcastProposalWithDelay tests broadcasting proposals with different inputs
-func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
+// TestOnOwnProposal tests broadcasting proposals with different inputs
+func (s *MessageHubSuite) TestOnOwnProposal() {
 	// add execution node to cluster to make sure we exclude them from broadcast
 	s.cluster = append(s.cluster, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))
 
@@ -257,16 +257,17 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 	s.Run("should fail with wrong proposer", func() {
 		header := *block.Header
 		header.ProposerID = unittest.IdentifierFixture()
-		err := s.hub.processQueuedBlock(&header)
+		err := s.hub.processQueuedProposal(&header)
 		require.Error(s.T(), err, "should fail with wrong proposer")
 		header.ProposerID = s.myID
 	})
 
 	// should fail with changed (missing) parent
+	// TODO(active-pacemaker): will be not relevant after merging flow.Header change
 	s.Run("should fail with changed/missing parent", func() {
 		header := *block.Header
 		header.ParentID[0]++
-		err := s.hub.processQueuedBlock(&header)
+		err := s.hub.processQueuedProposal(&header)
 		require.Error(s.T(), err, "should fail with missing parent")
 		header.ParentID[0]--
 	})
@@ -275,13 +276,14 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 	s.Run("should fail with wrong block ID", func() {
 		header := *block.Header
 		header.View++
-		err := s.hub.processQueuedBlock(&header)
+		err := s.hub.processQueuedProposal(&header)
 		require.Error(s.T(), err, "should fail with missing payload")
 		header.View--
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
 		// unset chain and height to make sure they are correctly reconstructed
+		// TODO(active-pacemaker): will be not relevant after merging flow.Header change
 		headerFromHotstuff := *block.Header // copy header
 		headerFromHotstuff.ChainID = ""
 		headerFromHotstuff.Height = 0
@@ -308,7 +310,7 @@ func (s *MessageHubSuite) TestBroadcastProposalWithDelay() {
 			Once()
 
 		// submit to broadcast proposal
-		err := s.hub.processQueuedBlock(&headerFromHotstuff)
+		err := s.hub.processQueuedProposal(&headerFromHotstuff)
 		require.NoError(s.T(), err, "header broadcast should pass")
 
 		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
@@ -330,7 +332,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		}).Return(nil)
 
 		// submit vote
-		s.hub.SendVote(vote.BlockID, vote.View, vote.SigData, recipientID)
+		s.hub.OnOwnVote(vote.BlockID, vote.View, vote.SigData, recipientID)
 	})
 	s.Run("timeout", func() {
 		wg.Add(1)
@@ -346,7 +348,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
 		// submit timeout
-		s.hub.BroadcastTimeout(timeout)
+		s.hub.OnOwnTimeout(timeout)
 	})
 	s.Run("proposal", func() {
 		wg.Add(1)
@@ -367,7 +369,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 			Return(nil)
 
 		// submit proposal
-		s.hub.BroadcastProposalWithDelay(proposal.Header, 0)
+		s.hub.OnOwnProposal(proposal.Header, time.Now())
 	})
 
 	unittest.RequireReturnsBefore(s.T(), func() {

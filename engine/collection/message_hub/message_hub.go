@@ -28,6 +28,18 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// defaultMessageHubRequestsWorkers number of workers to dispatch events for requests
+const defaultMessageHubRequestsWorkers = 5
+
+// defaultProposalQueueCapacity number of pending outgoing proposals stored in queue
+const defaultProposalQueueCapacity = 3
+
+// defaultVoteQueueCapacity number of pending outgoing votes stored in queue
+const defaultVoteQueueCapacity = 20
+
+// defaultTimeoutQueueCapacity number of pending outgoing timeouts stored in queue
+const defaultTimeoutQueueCapacity = 3
+
 // packedVote is a helper structure to pack recipientID and vote into one structure to pass through fifoqueue.FifoQueue
 type packedVote struct {
 	recipientID flow.Identifier
@@ -36,16 +48,16 @@ type packedVote struct {
 
 // MessageHub is a central module for handling incoming and outgoing messages via cluster consensus channel.
 // It performs message routing for incoming messages by matching them by type and sending to respective engine.
-/* For incoming messages handling processing looks like this:
+// For incoming messages handling processing looks like this:
 //
-//    +-------------------+      +------------+
-// -->|  Cluster-Channel  |----->| MessageHub |
-//    +-------------------+      +------+-----+
-//                          ------------|------------
-//    +------+---------+    |    +------+-----+     |    +------+------------+
-//    | VoteAggregator |----+    | Compliance |     +----| TimeoutAggregator |
-//    +----------------+         +------------+          +------+------------+
-//           vote                     block                  timeout object
+//	   +-------------------+      +------------+
+//	-->|  Cluster-Channel  |----->| MessageHub |
+//	   +-------------------+      +------+-----+
+//	                         ------------|------------
+//	   +------+---------+    |    +------+-----+     |    +------+------------+
+//	   | VoteAggregator |----+    | Compliance |     +----| TimeoutAggregator |
+//	   +----------------+         +------------+          +------+------------+
+//	          vote                     block                  timeout object
 //
 // MessageHub acts as communicator and handles hotstuff.Consumer communication events to send votes, broadcast timeouts
 // and proposals. It is responsible for communication between cluster consensus participants.
@@ -53,27 +65,26 @@ type packedVote struct {
 // All communicator events are handled on worker thread to prevent sender from blocking.
 // For outgoing messages processing logic looks like this:
 //
-//    +-------------------+      +------------+      +----------+      +------------------------+
-//    |  Cluster-Channel  |<-----| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
-//    +-------------------+      +------+-----+      +----------+      +------------------------+
-//                                                      pub/sub          vote, timeout, proposal
+//	+-------------------+      +------------+      +----------+      +------------------------+
+//	|  Cluster-Channel  |<-----| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
+//	+-------------------+      +------+-----+      +----------+      +------------------------+
+//	                                                  pub/sub          vote, timeout, proposal
 //
 // MessageHub is safe to use in concurrent environment.
-*/
 type MessageHub struct {
 	*component.ComponentManager
 	notifications.NoopConsumer
-	log                    zerolog.Logger
-	me                     module.Local
-	state                  protocol.State
-	headers                storage.Headers
-	payloads               storage.ClusterPayloads
-	con                    network.Conduit
-	queuedMessagesNotifier engine.Notifier
-	queuedVotes            *fifoqueue.FifoQueue // queue for handling outgoing vote transmissions
-	queuedProposals        *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions
-	queuedTimeouts         *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
-	cluster                flow.IdentityList    // consensus participants in our cluster
+	log                        zerolog.Logger
+	me                         module.Local
+	state                      protocol.State
+	headers                    storage.Headers
+	payloads                   storage.ClusterPayloads
+	con                        network.Conduit
+	ownOutboundMessageNotifier engine.Notifier
+	ownOutboundVotes           *fifoqueue.FifoQueue // queue for handling outgoing vote transmissions
+	ownOutboundProposals       *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions
+	ownOutboundTimeouts        *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
+	cluster                    flow.IdentityList    // consensus participants in our cluster
 
 	// injected dependencies
 	compliance        network.MessageProcessor   // handler of incoming block proposals
@@ -110,33 +121,39 @@ func NewMessageHub(log zerolog.Logger,
 		return nil, fmt.Errorf("could not find cluster for self")
 	}
 
-	queuedVotes, err := fifoqueue.NewFifoQueue()
+	ownOutboundVotes, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize votes queue")
 	}
-	queuedProposals, err := fifoqueue.NewFifoQueue()
+	ownOutboundProposals, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultProposalQueueCapacity),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize blocks queue")
 	}
-	queuedTimeouts, err := fifoqueue.NewFifoQueue()
+	ownOutboundTimeouts, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultTimeoutQueueCapacity),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeouts queue")
 	}
 	hub := &MessageHub{
-		log:                    log.With().Str("engine", "cluster_message_hub").Logger(),
-		me:                     me,
-		state:                  state,
-		headers:                headers,
-		payloads:               payloads,
-		compliance:             compliance,
-		hotstuff:               hotstuff,
-		voteAggregator:         voteAggregator,
-		timeoutAggregator:      timeoutAggregator,
-		queuedMessagesNotifier: engine.NewNotifier(),
-		queuedVotes:            queuedVotes,
-		queuedProposals:        queuedProposals,
-		queuedTimeouts:         queuedTimeouts,
-		cluster:                currentCluster,
+		log:                        log.With().Str("engine", "cluster_message_hub").Logger(),
+		me:                         me,
+		state:                      state,
+		headers:                    headers,
+		payloads:                   payloads,
+		compliance:                 compliance,
+		hotstuff:                   hotstuff,
+		voteAggregator:             voteAggregator,
+		timeoutAggregator:          timeoutAggregator,
+		ownOutboundMessageNotifier: engine.NewNotifier(),
+		ownOutboundVotes:           ownOutboundVotes,
+		ownOutboundProposals:       ownOutboundProposals,
+		ownOutboundTimeouts:        ownOutboundTimeouts,
+		cluster:                    currentCluster,
 	}
 
 	// register network conduit
@@ -151,17 +168,22 @@ func NewMessageHub(log zerolog.Logger,
 	hub.con = conduit
 
 	componentBuilder := component.NewComponentManagerBuilder()
-	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		ready()
-		hub.queuedMessagesProcessingLoop(ctx)
-	})
+	// This implementation tolerates if the networking layer sometimes blocks on send requests.
+	// We use by default 5 go-routines here. This is fine, because outbound messages are temporally sparse
+	// under normal operations. Hence, the go-routines should mostly be asleep waiting for work.
+	for i := 0; i < defaultMessageHubRequestsWorkers; i++ {
+		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			hub.queuedMessagesProcessingLoop(ctx)
+		})
+	}
 	hub.ComponentManager = componentBuilder.Build()
 	return hub, nil
 }
 
 // queuedMessagesProcessingLoop orchestrates dispatching of previously queued messages
 func (h *MessageHub) queuedMessagesProcessingLoop(ctx irrecoverable.SignalerContext) {
-	notifier := h.queuedMessagesNotifier.Channel()
+	notifier := h.ownOutboundMessageNotifier.Channel()
 	for {
 		select {
 		case <-ctx.Done():
@@ -187,45 +209,32 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 		default:
 		}
 
-		msg, ok := h.queuedProposals.Pop()
+		msg, ok := h.ownOutboundProposals.Pop()
 		if ok {
 			block := msg.(*flow.Header)
 			err := h.processQueuedProposal(block)
 			if err != nil {
 				return fmt.Errorf("could not process queued block %v: %w", block.ID(), err)
 			}
-
-			//h.log.Info().
-			//	Uint64("view", block.Block.View).
-			//	Hex("block_id", block.Block.BlockID[:]).
-			//	Msg("block has been processed successfully")
-
 			continue
 		}
 
-		msg, ok = h.queuedVotes.Pop()
+		msg, ok = h.ownOutboundVotes.Pop()
 		if ok {
 			packed := msg.(*packedVote)
 			err := h.processQueuedVote(packed)
 			if err != nil {
 				return fmt.Errorf("could not process queued vote: %w", err)
 			}
-
-			h.log.Info().
-				Uint64("view", packed.vote.View).
-				Hex("block_id", packed.vote.BlockID[:]).
-				Msg("packed has been processed successfully")
-
 			continue
 		}
 
-		msg, ok = h.queuedTimeouts.Pop()
+		msg, ok = h.ownOutboundTimeouts.Pop()
 		if ok {
 			err := h.processQueuedTimeout(msg.(*model.TimeoutObject))
 			if err != nil {
 				return fmt.Errorf("coult not process queued timeout: %w", err)
 			}
-
 			continue
 		}
 
@@ -243,22 +252,10 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 	h.forwardToOwnTimeoutAggregator(timeout) // forward timeout to my own `timeoutAggregator`
 
-	logContext := h.log.With().
-		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
-		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
-		Uint64("timeout_view", timeout.View)
-	if timeout.LastViewTC != nil {
-		logContext.
-			Uint64("last_view_tc_view", timeout.LastViewTC.View).
-			Uint64("last_view_tc_newest_qc_view", timeout.LastViewTC.NewestQC.View)
-	}
-	log := logContext.Logger()
-
+	log := timeout.LogContext(h.log).Logger()
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
 
-	// Retrieve all consensus nodes (excluding myself).
-	// CAUTION: We must include also nodes with weight zero, because otherwise
-	//          TCs might not be constructed at epoch switchover.
+	// Retrieve all collection nodes in our cluster (excluding myself).
 	recipients, err := h.state.Final().Identities(filter.And(
 		filter.In(h.cluster),
 		filter.Not(filter.HasNodeID(h.me.NodeID())),
@@ -275,11 +272,10 @@ func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 	}
 
 	err = h.con.Publish(msg, recipients.NodeIDs()...)
-	if errors.Is(err, network.EmptyTargetList) {
-		return nil
-	}
 	if err != nil {
-		log.Err(err).Msg("could not broadcast timeout")
+		if !errors.Is(err, network.EmptyTargetList) {
+			log.Err(err).Msg("could not broadcast timeout")
+		}
 		return nil
 	}
 	log.Info().Msg("cluster timeout was broadcast")
@@ -343,7 +339,7 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	}
 
 	// fill in the fields that can't be populated by HotStuff
-	// TODO clean this up - currently we set these fields in builder, then lose them in HotStuff, then need to set them again here
+	// TODO(active-pacemaker): will be not relevant after merging flow.Header change
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
@@ -365,6 +361,7 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 		Logger()
 
 	log.Debug().Msg("processing cluster broadcast request from hotstuff")
+
 	// TODO(active-pacemaker): replace with pub/sub?
 	h.hotstuff.SubmitProposal(header, parent.View) // non-blocking
 
@@ -385,26 +382,24 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 
 	// broadcast the proposal to consensus nodes
 	err = h.con.Publish(proposal, recipients.NodeIDs()...)
-	if errors.Is(err, network.EmptyTargetList) {
-		return nil
-	}
 	if err != nil {
-		log.Err(err).Msg("could not send proposal message")
+		if !errors.Is(err, network.EmptyTargetList) {
+			log.Err(err).Msg("could not send proposal message")
+		}
 		return nil
 	}
+	log.Info().Msg("cluster proposal was broadcast")
 
 	//TODO(active-pacemaker): update metrics
 	//e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
-
-	log.Info().Msg("cluster proposal was broadcast")
 
 	//TODO(active-pacemaker): add metrics for ClusterBlockProposed
 	return nil
 }
 
-// SendVote queues vote for subsequent propagation to next primary (`recipientID`),
+// OnOwnVote queues vote for subsequent propagation to next primary (`recipientID`),
 // which _may occasionally_ be also this node itself.
-func (h *MessageHub) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+func (h *MessageHub) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	vote := &packedVote{
 		recipientID: recipientID,
 		vote: &messages.ClusterBlockVote{
@@ -413,30 +408,30 @@ func (h *MessageHub) SendVote(blockID flow.Identifier, view uint64, sigData []by
 			SigData: sigData,
 		},
 	}
-	if ok := h.queuedVotes.Push(vote); ok {
-		h.queuedMessagesNotifier.Notify()
+	if ok := h.ownOutboundVotes.Push(vote); ok {
+		h.ownOutboundMessageNotifier.Notify()
 	}
 }
 
-// BroadcastTimeout queues timeout for subsequent propagation to all consensus participants (including this node)
-func (h *MessageHub) BroadcastTimeout(timeout *model.TimeoutObject) {
-	if ok := h.queuedTimeouts.Push(timeout); ok {
-		h.queuedMessagesNotifier.Notify()
+// OnOwnTimeout queues timeout for subsequent propagation to all consensus participants (including this node)
+func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
+	if ok := h.ownOutboundTimeouts.Push(timeout); ok {
+		h.ownOutboundMessageNotifier.Notify()
 	}
 }
 
-// BroadcastProposalWithDelay queues proposal for subsequent propagation to all consensus participants (including this node).
+// OnOwnProposal queues proposal for subsequent propagation to all consensus participants (including this node).
 // The proposal will only be placed in the queue, after the specified delay (or dropped on shutdown signal).
-func (h *MessageHub) BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) {
+func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
 	go func() {
 		select {
-		case <-time.After(delay):
+		case <-time.After(time.Until(targetPublicationTime)):
 		case <-h.ShutdownSignal():
 			return
 		}
 
-		if ok := h.queuedProposals.Push(proposal); ok {
-			h.queuedMessagesNotifier.Notify()
+		if ok := h.ownOutboundProposals.Push(proposal); ok {
+			h.ownOutboundMessageNotifier.Notify()
 		}
 	}()
 }

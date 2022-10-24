@@ -9,12 +9,14 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state"
 	clusterkv "github.com/onflow/flow-go/state/cluster"
@@ -37,6 +39,7 @@ type Core struct {
 	pending           module.PendingClusterBlockBuffer // pending block cache
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff
+	validator         hotstuff.Validator
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
 }
@@ -50,6 +53,7 @@ func NewCore(
 	headers storage.Headers,
 	state clusterkv.MutableState,
 	pending module.PendingClusterBlockBuffer,
+	validator hotstuff.Validator,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
 	opts ...compliance.Opt,
@@ -71,6 +75,7 @@ func NewCore(
 		pending:           pending,
 		sync:              nil, // use `WithSync`
 		hotstuff:          nil, // use `WithConsensus`
+		validator:         validator,
 		voteAggregator:    voteAggregator,
 		timeoutAggregator: timeoutAggregator,
 	}
@@ -82,14 +87,16 @@ func NewCore(
 }
 
 // OnBlockProposal handles incoming block proposals.
+// No errors are expected during normal operation.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 	header := proposal.Header
+	blockID := header.ID()
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
-		Hex("block_id", logging.Entity(header)).
+		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("ref_block_id", proposal.Payload.ReferenceBlockID[:]).
 		Hex("collection_id", logging.Entity(proposal.Payload.Collection)).
@@ -105,14 +112,14 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	// 2) blocks already on disk; they were processed and await finalization
 
 	// ignore proposals that are already cached
-	_, cached := c.pending.ByID(header.ID())
+	_, cached := c.pending.ByID(blockID)
 	if cached {
 		log.Debug().Msg("skipping already cached proposal")
 		return nil
 	}
 
 	// ignore proposals that were already processed
-	_, err := c.headers.ByBlockID(header.ID())
+	_, err := c.headers.ByBlockID(blockID)
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
 		return nil
@@ -149,7 +156,6 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	// syncing with range requests for finalized blocks will request for the blocks.
 	_, found := c.pending.ByID(header.ParentID)
 	if found {
-
 		// add the block to the cache
 		_ = c.pending.Add(originID, proposal)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
@@ -160,17 +166,13 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	// if the proposal is connected to a block that is neither in the cache, nor
 	// in persistent storage, its direct parent is missing; cache the proposal
 	// and request the parent
-	_, err = c.headers.ByBlockID(header.ParentID)
+	parent, err := c.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
-
 		_ = c.pending.Add(originID, proposal)
-
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
-		log.Debug().Msg("requesting missing parent for proposal")
-
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
-
+		log.Debug().Msg("requesting missing parent for proposal")
 		return nil
 	}
 	if err != nil {
@@ -183,7 +185,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(proposal)
+	err = c.processBlockAndDescendants(proposal, parent)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -193,27 +195,37 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 }
 
 // processBlockAndDescendants is a recursive function that processes a block and
-// its pending proposals for its children. By induction, any children connected
-// to a valid proposal are validly connected to the finalized state and can be
+// its pending descendants. By induction, any child block of a
+// valid proposal is itself connected to the finalized state and can be
 // processed as well.
-func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposal) error {
+// No errors are expected during normal operation.
+func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposal, parent *flow.Header) error {
 	blockID := proposal.Header.ID()
+	log := c.log.With().
+		Str("block_id", blockID.String()).
+		Uint64("block_height", proposal.Header.Height).
+		Uint64("block_view", proposal.Header.View).
+		Uint64("parent_view", parent.View).
+		Logger()
 
 	// process block itself
-	err := c.processBlockProposal(proposal)
-	// child is outdated by the time we started processing it
-	// => node was probably behind and is catching up. Log as warning
-	if engine.IsOutdatedInputError(err) {
-		c.log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
-		return nil
-	}
-	// the block is invalid; log as error as we desire honest participation
-	// ToDo: potential slashing
-	if engine.IsInvalidInputError(err) {
-		c.log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
-		return nil
-	}
+	err := c.processBlockProposal(proposal, parent)
 	if err != nil {
+		if checkForAndLogOutdatedInputError(err, log) {
+			return nil
+		}
+		if checkForAndLogInvalidInputError(err, log) || checkForAndLogUnverifiableInputError(err, log) {
+			// in both cases, notify VoteAggregator about the invalid block
+			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header, parent.View))
+			if err != nil {
+				if mempool.IsBelowPrunedThresholdError(err) {
+					log.Warn().Msg("received invalid block, but is below pruned threshold")
+					return nil
+				}
+				return fmt.Errorf("unexpected error notifying vote aggregator about invalid block: %w", err)
+			}
+			return nil
+		}
 		// unexpected error: potentially corrupted internal state => abort processing and escalate error
 		return fmt.Errorf("failed to process block %x: %w", blockID, err)
 	}
@@ -230,7 +242,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 			Header:  child.Header,
 			Payload: child.Payload,
 		}
-		cpr := c.processBlockAndDescendants(childProposal)
+		cpr := c.processBlockAndDescendants(childProposal, proposal.Header)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
@@ -245,13 +257,18 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 
 // processBlockProposal processes the given block proposal. The proposal must connect to
 // the finalized state.
-func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) error {
+// Expected errors during normal operations:
+//   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
+//   - engine.InvalidInputError if the block proposal is invalid
+//   - engine.UnverifiableInputError if the proposal cannot be validated
+func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, parent *flow.Header) error {
 	header := proposal.Header
+	blockID := header.ID()
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
-		Hex("block_id", logging.Entity(header)).
+		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
@@ -260,32 +277,50 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 		Logger()
 	log.Info().Msg("processing block proposal")
 
+	hotstuffProposal := model.ProposalFromFlow(header, parent.View)
+	err := c.validator.ValidateProposal(hotstuffProposal)
+	if err != nil {
+		if model.IsInvalidBlockError(err) {
+			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// We have received a proposal, but we don't know the epoch its view is within.
+			// We know:
+			//  - the parent of this block is valid and was appended to the state (ie. we knew the epoch for it)
+			//  - if we then see this for the child, one of two things must have happened:
+			//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
+			//      -> in this case we can disregard the block
+			//    2. no blocks have been finalized within the epoch commitment deadline, and the epoch ended
+			//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
+			//      -> in this case, the network has encountered a critical failure
+			//  - we assume in general that Case 2 will not happen, however we cannot prove Case 1, therefore we can discard this proposal
+			return engine.NewUnverifiableInputError("cannot validate proposal with view from unknown epoch: %w", err)
+		}
+		return fmt.Errorf("unexpected error validating proposal: %w", err)
+	}
+
 	// see if the block is a valid extension of the protocol state
 	block := &cluster.Block{
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
-	err := c.state.Extend(block)
-	// if the block proposes an invalid extension of the protocol state, then the block is invalid
-	if state.IsInvalidExtensionError(err) {
-		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
-			header.ID(), header.Height, err)
-	}
-	// protocol state aborted processing of block as it is on an abandoned fork: block is outdated
-	if state.IsOutdatedExtensionError(err) {
-		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
-	}
+	err = c.state.Extend(block)
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
-	}
-
-	// retrieve the parent
-	parent, err := c.headers.ByBlockID(header.ParentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve proposal parent: %w", err)
+		if state.IsInvalidExtensionError(err) {
+			// if the block proposes an invalid extension of the cluster state, then the block is invalid
+			// TODO: we should slash the block proposer
+			return engine.NewInvalidInputErrorf("invalid extension of cluster state (block: %x, height: %d): %w", blockID, header.Height, err)
+		}
+		if state.IsOutdatedExtensionError(err) {
+			// cluster state aborted processing of block as it is on an abandoned fork: block is outdated
+			return engine.NewOutdatedInputErrorf("outdated extension of cluster state: %w", err)
+		}
+		// unexpected error: potentially corrupted internal state => abort processing and escalate error
+		return fmt.Errorf("unexpected exception while extending cluster state with block %x at height %d: %w", blockID, header.Height, err)
 	}
 
 	// submit the model to hotstuff for processing
+	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
 	log.Info().Msg("forwarding block proposal to hotstuff")
 	c.hotstuff.SubmitProposal(header, parent.View)
 
@@ -300,4 +335,44 @@ func (c *Core) ProcessFinalizedView(finalizedView uint64) {
 
 	// always record the metric
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
+}
+
+// checkForAndLogOutdatedInputError checks whether error is an `engine.OutdatedInputError`.
+// If this is the case, we emit a log message and return true.
+// For any error other than `engine.OutdatedInputError`, this function is a no-op
+// and returns false.
+func checkForAndLogOutdatedInputError(err error, log zerolog.Logger) bool {
+	if engine.IsOutdatedInputError(err) {
+		// child is outdated by the time we started processing it
+		// => node was probably behind and is catching up. Log as warning
+		log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
+		return true
+	}
+	return false
+}
+
+// checkForAndLogInvalidInputError checks whether error is an `engine.InvalidInputError`.
+// If this is the case, we emit a log message and return true.
+// For any error other than `engine.InvalidInputError`, this function is a no-op
+// and returns false.
+func checkForAndLogInvalidInputError(err error, log zerolog.Logger) bool {
+	if engine.IsInvalidInputError(err) {
+		// the block is invalid; log as error as we desire honest participation
+		log.Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+		return true
+	}
+	return false
+}
+
+// checkForAndLogUnverifiableInputError checks whether error is an `engine.UnverifiableInputError`.
+// If this is the case, we emit a log message and return true.
+// For any error other than `engine.UnverifiableInputError`, this function is a no-op
+// and returns false.
+func checkForAndLogUnverifiableInputError(err error, log zerolog.Logger) bool {
+	if engine.IsUnverifiableInputError(err) {
+		// the block cannot be validated
+		log.Err(err).Msg("received unverifiable block proposal; this is an indicator of an invalid (slashable) proposal or an epoch failure")
+		return true
+	}
+	return false
 }
