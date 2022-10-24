@@ -246,7 +246,7 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeAuthorizationTestCases() 
 					Channel:     channel,
 					Message:     c.Type(),
 					MessageStr:  c.Name,
-					Unicast:     channelAuthConfig.Unicast,
+					Unicast:     channelAuthConfig.AllowedUnicast,
 				}
 				if channelAuthConfig.AuthorizedRoles.Contains(role) {
 					// test cases for validation success happy path
@@ -282,7 +282,7 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeInvalidMessageOnChannelTe
 						Channel:     channel,
 						Message:     config.Type(),
 						MessageStr:  config.Name,
-						Unicast:     channelAuthConfig.Unicast,
+						Unicast:     channelAuthConfig.AllowedUnicast,
 					}
 					s.unauthorizedMessageOnChannelTestCases = append(s.unauthorizedMessageOnChannelTestCases, tc)
 				}
