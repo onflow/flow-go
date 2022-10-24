@@ -185,6 +185,7 @@ const (
 	FVMEnvAddAccountKey             SpanName = "fvm.env.addAccountKey"
 	FVMEnvGetAccountKey             SpanName = "fvm.env.getAccountKey"
 	FVMEnvRemoveAccountKey          SpanName = "fvm.env.removeAccountKey"
+	FVMEnvAccountKeysCount SpanName = "fvm.env.accountKeysCount"
 	FVMEnvUpdateAccountContractCode SpanName = "fvm.env.updateAccountContractCode"
 	FVMEnvGetAccountContractCode    SpanName = "fvm.env.getAccountContractCode"
 	FVMEnvRemoveAccountContractCode SpanName = "fvm.env.removeAccountContractCode"

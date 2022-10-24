@@ -291,20 +291,6 @@ func (_m *Accounts) GetValue(address flow.Address, key string) ([]byte, error) {
 	return r0, r1
 }
 
-// IterateKeys provides a mock function with given fields: address, fn
-func (_m *Accounts) IterateKeys(address flow.Address, fn func(flow.AccountPublicKey) bool) error {
-	ret := _m.Called(address, fn)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Address, func(flow.AccountPublicKey) bool) error); ok {
-		r0 = rf(address, fn)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // SetAccountFrozen provides a mock function with given fields: address, frozen
 func (_m *Accounts) SetAccountFrozen(address flow.Address, frozen bool) error {
 	ret := _m.Called(address, frozen)

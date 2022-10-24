@@ -26,6 +26,7 @@ type AccountKeyReader interface {
 		*runtime.AccountKey,
 		error,
 	)
+	AccountKeysCount(address runtime.Address) (uint64, error)
 }
 
 type ParseRestrictedAccountKeyReader struct {
@@ -56,6 +57,15 @@ func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
 		reader.impl.GetAccountKey,
 		address,
 		keyIndex)
+}
+
+func (reader ParseRestrictedAccountKeyReader) AccountKeysCount( address runtime.Address,) (uint64, error) {
+	return parseRestrict1Arg1Ret(
+		reader.txnState,
+		"AccountKeysCount",
+		reader.impl.AccountKeysCount,
+		address,
+	)
 }
 
 type accountKeyReader struct {
@@ -152,4 +162,33 @@ func (reader *accountKeyReader) GetAccountKey(
 		Weight:    publicKey.Weight,
 		IsRevoked: publicKey.Revoked,
 	}, nil
+}
+
+func (reader *accountKeyReader) AccountKeysCount( address runtime.Address)  (count uint64, err error) {
+	defer reader.tracer.StartSpanFromRoot(trace.FVMEnvAccountKeysCount).End()
+
+	fmtErr := func(err error) error {
+		return fmt.Errorf("fetching account key count failed: %w", err)
+	}
+
+	err = reader.meter.MeterComputation(ComputationKindAccountKeysCount, 1)
+	if err != nil {
+		err = fmtErr(err)
+		return
+	}
+
+	accountAddress := flow.Address(address)
+
+	ok, err := reader.accounts.Exists(accountAddress)
+	if err != nil {
+		err = fmtErr(err)
+		return
+	}
+
+	if !ok {
+		err = fmtErr(errors.NewAccountNotFoundError(accountAddress))
+		return
+	}
+
+	return reader.accounts.GetPublicKeyCount(accountAddress)
 }

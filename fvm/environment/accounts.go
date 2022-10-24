@@ -24,7 +24,6 @@ type Accounts interface {
 	Exists(address flow.Address) (bool, error)
 	Get(address flow.Address) (*flow.Account, error)
 	GetPublicKeyCount(address flow.Address) (uint64, error)
-	IterateKeys(address flow.Address, fn func(flow.AccountPublicKey) bool) error
 	AppendPublicKey(address flow.Address, key flow.AccountPublicKey) error
 	GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error)
 	SetPublicKey(address flow.Address, keyIndex uint64, publicKey flow.AccountPublicKey) ([]byte, error)
@@ -205,25 +204,6 @@ func (a *StatefulAccounts) setPublicKeyCount(address flow.Address, count uint64)
 	if err != nil {
 		return fmt.Errorf("failed to set public key count for account (%s): %w", address.String(), err)
 	}
-	return nil
-}
-
-func (a *StatefulAccounts) IterateKeys(address flow.Address, fn func(flow.AccountPublicKey) bool) error {
-	count, err := a.GetPublicKeyCount(address)
-	if err != nil {
-		return fmt.Errorf("failed to get public key count of account: %w", err)
-	}
-
-	shouldContinue := true
-	for i := uint64(0); i < count && shouldContinue; i++ {
-		publicKey, err := a.GetPublicKey(address, i)
-		if err != nil {
-			return err
-		}
-
-		shouldContinue = fn(publicKey)
-	}
-
 	return nil
 }
 
