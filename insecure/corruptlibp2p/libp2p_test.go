@@ -1,8 +1,9 @@
 package corruptlibp2p
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetGossipSubParams(t *testing.T) {
