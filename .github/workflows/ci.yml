@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dir: [./, ./integration/, ./crypto/]
+        dir: [./, ./integration/, ./crypto/, ./insecure/]
     name: Lint
     runs-on: ubuntu-latest
     steps:
