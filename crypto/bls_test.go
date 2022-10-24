@@ -131,7 +131,7 @@ func TestBLSEncodeDecode(t *testing.T) {
 
 	//  identity public key
 	pkBytes := make([]byte, PubKeyLenBLSBLS12381)
-	pkBytes[0] = 0xC0
+	pkBytes[0] = identityBLSSignatureHeader
 	pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
 	require.NoError(t, err, "decoding identity public key should succeed")
 	assert.True(t, pk.Equals(IdentityBLSPublicKey()))
@@ -404,15 +404,15 @@ func TestAggregatePubKeys(t *testing.T) {
 		assert.Nil(t, aggPk)
 	})
 
-	// aggregate with the neutral key
-	t.Run("neutral list", func(t *testing.T) {
-		// aggregate the neutral key with a non neutral key
+	// aggregate with the identity key
+	t.Run("identity list", func(t *testing.T) {
+		// aggregate the identity key with a non identity key
 		keys := []PublicKey{pks[0], IdentityBLSPublicKey()}
-		aggPkWithNeutral, err := AggregateBLSPublicKeys(keys)
+		aggPkWithIdentity, err := AggregateBLSPublicKeys(keys)
 		assert.NoError(t, err)
-		assert.True(t, aggPkWithNeutral.Equals(pks[0]),
+		assert.True(t, aggPkWithIdentity.Equals(pks[0]),
 			"incorrect public key %s, should be %s",
-			aggPkWithNeutral, pks[0])
+			aggPkWithIdentity, pks[0])
 	})
 
 	t.Run("invalid inputs", func(t *testing.T) {
@@ -484,19 +484,19 @@ func TestBLSRemovePubKeys(t *testing.T) {
 
 	// specific test to remove all keys
 	t.Run("remove all keys", func(t *testing.T) {
-		neutralPk, err := RemoveBLSPublicKeys(aggPk, pks)
+		identityPk, err := RemoveBLSPublicKeys(aggPk, pks)
 		require.NoError(t, err)
-		// neutral public key is expected
+		// identity public key is expected
 		randomPk := randomSK(t, seed).PublicKey()
-		randomPkPlusNeutralPk, err := AggregateBLSPublicKeys([]PublicKey{randomPk, neutralPk})
+		randomPkPlusIdentityPk, err := AggregateBLSPublicKeys([]PublicKey{randomPk, identityPk})
 		require.NoError(t, err)
 
 		BLSRandomPk, ok := randomPk.(*pubKeyBLSBLS12381)
 		require.True(t, ok)
 
-		assert.True(t, BLSRandomPk.Equals(randomPkPlusNeutralPk),
+		assert.True(t, BLSRandomPk.Equals(randomPkPlusIdentityPk),
 			"incorrect key %s, should be infinity point, keys are %s",
-			neutralPk, pks)
+			identityPk, pks)
 	})
 
 	// specific test with an empty slice of keys to remove
@@ -987,26 +987,30 @@ func TestBLSIdentity(t *testing.T) {
 	msg := []byte("random_message")
 	hasher := NewExpandMsgXOFKMAC128("")
 
-	t.Run("identity signature comparisons", func(t *testing.T) {
-		// identtity comparison
+	t.Run("identity signature comparison", func(t *testing.T) {
+		// verify that constructed identity signatures are recognized as such by IsBLSSignatureIdentity.
+		// construct identity signature by summing (aggregating) a random signature and its inverse.
+
 		identitySig = make([]byte, signatureLengthBLSBLS12381)
-		identitySig[0] = byte(0xC0) // 0xC0 is the header of the point at infinity
+		identitySig[0] = identityBLSSignatureHeader
 		assert.True(t, IsBLSSignatureIdentity(identitySig))
 
-		// sum up a random signature and its opposite to get identity
+		// sum up a random signature and its inverse to get identity
 		seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 		sk := randomSK(t, seed)
 		sig, err := sk.Sign(msg, hasher)
 		require.NoError(t, err)
 		oppositeSig := make([]byte, signatureLengthBLSBLS12381)
 		copy(oppositeSig, sig)
-		oppositeSig[0] ^= 0x20 // flip the last 3 bit to flip the point sign
+		oppositeSig[0] ^= 0x20 // flip the last 3rd bit to flip the point sign
 		aggSig, err := AggregateBLSSignatures([]Signature{sig, oppositeSig})
 		require.NoError(t, err)
 		assert.True(t, IsBLSSignatureIdentity(aggSig))
 	})
 
 	t.Run("verification with identity key", func(t *testing.T) {
+		// all verification methods should return (false, nil) when verified against
+		// an identity public key.
 		idPk := IdentityBLSPublicKey()
 		valid, err := idPk.Verify(identitySig, msg, hasher)
 		assert.NoError(t, err)

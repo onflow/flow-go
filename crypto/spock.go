@@ -84,7 +84,7 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 
 	// if pk1 and proof1 are identities of their respective groups, any couple (pk2, proof2) would
 	// verify the pairing equality which breaks the unforgeability of the SPoCK scheme. This edge case
-	// is avoided by not allowing an identity pk1. Similarly, an identtity pk2 is not allowed.
+	// is avoided by not allowing an identity pk1. Similarly, an identity pk2 is not allowed.
 	if blsPk1.isIdentity || blsPk2.isIdentity {
 		return false, nil
 	}

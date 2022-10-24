@@ -71,7 +71,7 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 	// test with an identity public key
 	t.Run("identity proof", func(t *testing.T) {
 		identityProof := make([]byte, signatureLengthBLSBLS12381)
-		identityProof[0] = byte(0xC0) // 0xC0 is the header of the point at infinity
+		identityProof[0] = identityBLSSignatureHeader
 		result, err := SPOCKVerifyAgainstData(IdentityBLSPublicKey(), identityProof, data, kmac)
 		assert.NoError(t, err)
 		assert.False(t, result)
@@ -167,7 +167,7 @@ func TestSPOCKProveVerify(t *testing.T) {
 	// test with identity public key and proof
 	t.Run("identity proof", func(t *testing.T) {
 		identityProof := make([]byte, signatureLengthBLSBLS12381)
-		identityProof[0] = byte(0xC0) // 0xC0 is the header of the point at infinity
+		identityProof[0] = identityBLSSignatureHeader
 		result, err := SPOCKVerify(IdentityBLSPublicKey(), identityProof, sk2.PublicKey(), pr2)
 		assert.NoError(t, err)
 		assert.False(t, result)

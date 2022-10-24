@@ -167,8 +167,8 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 //
 // The order of the keys in the slice does not matter since the aggregation
 // is commutative. The slice should not be empty.
-// No check is performed on the input public keys. The input keys are guaranteed to
-// be on the G2 subgroup.
+// No check is performed on the input public keys. The input keys are guaranteed by
+// the package constructors to be on the G2 subgroup.
 // Input or output keys can be equal to the identity key. Note that any
 // signature verified against the identity key is invalid (to avoid equivocation issues).
 //
@@ -202,8 +202,8 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	return sumKey, nil
 }
 
-// IdentityBLSPublicKey returns a neutral public key which corresponds to the point
-// at infinity in G2 (identtity element of G2).
+// IdentityBLSPublicKey returns an identity public key which corresponds to the point
+// at infinity in G2 (identity element of G2).
 func IdentityBLSPublicKey() PublicKey {
 	// set BLS context
 	blsInstance.reInit()
@@ -222,8 +222,8 @@ func IdentityBLSPublicKey() PublicKey {
 // can still be called in different use cases.
 // The order of the keys to be removed in the slice does not matter since the removal
 // is commutative. The slice of keys to be removed can be empty.
-// No check is performed on the input public keys. The input keys are guaranteed to
-// be on the G2 subgroup.
+// No check is performed on the input public keys. The input keys are guaranteed by the
+// package constructors to be on the G2 subgroup.
 // Input or output keys can be equal to the identity key.
 //
 // The function returns:
@@ -316,7 +316,7 @@ func VerifyBLSSignatureOneMessage(
 // function has the same behavior as VerifyBLSSignatureOneMessage. If there is one input message and
 // input public key, the function has the same behavior as pk.Verify.
 // Membership check is performed on the input signature.
-// In order to avoid equivocation issues, any identiy public key results in the overall
+// In order to avoid equivocation issues, any identity public key results in the overall
 // signature being invalid.
 //
 // The function returns:
@@ -465,7 +465,7 @@ func VerifyBLSSignatureManyMessages(
 // Membership checks are performed on the input signatures but are not performed
 // on the input public keys (which are guaranteed by the package to be on the correct
 // G2 subgroup).
-// In order to avoid equivocation issues, any identiy public key results in the corresponding
+// In order to avoid equivocation issues, any identity public key results in the corresponding
 // signature being invalid.
 //
 // The function returns:
