@@ -167,7 +167,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// needed to enable ID translation
 	m.providers[0].SetIdentities(idList)
 
-	msg, _ := messageutils.CreateMessage(m.ids[0].NodeID, newId.NodeID, testChannel.String(), "hello")
+	msg, _ := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, newId.NodeID, testChannel, "hello")
 
 	// message should fail to send because no address is known yet
 	// for the new identity
@@ -229,6 +229,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	defer netmet.AssertNumberOfCalls(m.T(), "NetworkMessageReceived", 5)
 
 	mws, providers := testutils.GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer, testutils.WithUnicastRateLimiters(rateLimiters), testutils.WithNetworkMetrics(netmet))
+
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -263,7 +264,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		// a message is sent every 167 milliseconds which equates to around 6 req/sec surpassing our limit
 		testtime.Advance(168 * time.Millisecond)
 
-		msg, _ := messageutils.CreateMessage(m.ids[0].NodeID, newId.NodeID, testChannel.String(), fmt.Sprintf("hello-%s", testtime.Now().String()))
+		msg, _ := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, newId.NodeID, testChannel, fmt.Sprintf("hello-%s", testtime.Now().String()))
 		err := m.mws[0].SendDirect(msg, newId.NodeID)
 		require.NoError(m.T(), err)
 	}
@@ -345,7 +346,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		b[i] = byte('X')
 	}
 
-	msg, _ := messageutils.CreateMessage(m.ids[0].NodeID, newId.NodeID, testChannel.String(), string(b))
+	msg, _ := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, newId.NodeID, testChannel, string(b))
 
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
@@ -383,19 +384,10 @@ func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvi
 		return provider.Identities(filter.Any)
 	}, nil)
 	// this test is not testing the topic validator, especially in spoofing,
-	// so we always return a valid identity
-	//overlay.On("Identity", mockery.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(), true)
-
-	overlay.On("Identity", mockery.AnythingOfType("peer.ID")).Maybe().Return(
-		func(p peer.ID) *flow.Identity {
-			id, _ := provider.ByPeerID(p)
-			return id
-		},
-		func(p peer.ID) bool {
-			_, ok := provider.ByPeerID(p)
-			return ok
-		},
-	)
+	// so we always return a valid identity. We only care about the node role for the test TestMaxMessageSize_SendDirect
+	// where EN are the only node authorized to send chunk data response.
+	identityOpts := unittest.WithRole(flow.RoleExecution)
+	overlay.On("Identity", mockery.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(identityOpts), true)
 	return overlay
 }
 
@@ -422,14 +414,14 @@ func (m *MiddlewareTestSuite) TestPingTypeReception() {
 // and content of the payload of the event upon reception at the receiver side
 // it does not evaluate the actual value of the sender ID
 func (m *MiddlewareTestSuite) TestPingIDType() {
-	msg, decodedPayload := messageutils.CreateMessage(m.ids[0].NodeID, m.ids[1].NodeID, testChannel.String(), "hello")
+	msg, decodedPayload := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, m.ids[1].NodeID, testChannel, "hello")
 	m.Ping(mockery.AnythingOfType("flow.Identifier"), msg, decodedPayload)
 }
 
 // TestPingContentReception tests the middleware against both
 // the payload and sender ID of the event upon reception at the receiver side
 func (m *MiddlewareTestSuite) TestPingContentReception() {
-	msg, decodedPayload := messageutils.CreateMessage(m.ids[0].NodeID, m.ids[1].NodeID, testChannel.String(), "hello")
+	msg, decodedPayload := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, m.ids[1].NodeID, testChannel, "hello")
 	m.Ping(m.ids[0].NodeID, msg, decodedPayload)
 }
 
@@ -462,7 +454,7 @@ func (m *MiddlewareTestSuite) Ping(expectID, expectedMessage, expectedPayload in
 			ch <- struct{}{}
 		})
 
-	msg, _ := messageutils.CreateMessage(m.ids[firstNode].NodeID, m.ids[lastNode].NodeID, testChannel.String(), "hello")
+	msg, _ := messageutils.CreateMessage(m.T(), m.ids[firstNode].NodeID, m.ids[lastNode].NodeID, testChannel, "hello")
 
 	// sends a direct message from first node to the last node
 	err = m.mws[firstNode].SendDirect(msg, m.ids[lastNode].NodeID)
@@ -493,7 +485,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 	for i := 0; i < count; i++ {
 		receiveWG.Add(1)
 		sendWG.Add(1)
-		msg, expectedPayload := messageutils.CreateMessage(m.ids[firstNode].NodeID, m.ids[lastNode].NodeID, testChannel.String(), fmt.Sprintf("hello from: %d", i))
+		msg, expectedPayload := messageutils.CreateMessage(m.T(), m.ids[firstNode].NodeID, m.ids[lastNode].NodeID, testChannel, fmt.Sprintf("hello from: %d", i))
 
 		m.ov[lastNode].On("Receive", m.ids[firstNode].NodeID, msg, expectedPayload).Return(nil).Once().
 			Run(func(args mockery.Arguments) {
@@ -535,10 +527,10 @@ func (m *MiddlewareTestSuite) TestEcho() {
 	firstNode := m.ids[first].NodeID
 	lastNode := m.ids[last].NodeID
 
-	sendMsg, sendPayload := messageutils.CreateMessage(firstNode, lastNode, testChannel.String(), "hello")
+	sendMsg, sendPayload := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "hello")
 	expectedSendPayload := sendPayload.(*libp2pmessage.TestMessage)
 
-	replyMsg, replyPayload := messageutils.CreateMessage(lastNode, firstNode, testChannel.String(), "hello back")
+	replyMsg, replyPayload := messageutils.CreateMessage(m.T(), lastNode, firstNode, testChannel, "hello back")
 
 	expectedReplyPayload := replyPayload.(*libp2pmessage.TestMessage)
 
@@ -582,7 +574,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 	firstNode := m.ids[first].NodeID
 	lastNode := m.ids[last].NodeID
 
-	msg, _ := messageutils.CreateMessage(firstNode, lastNode, testChannel.String(), "")
+	msg, _ := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "")
 
 	// creates a network payload beyond the maximum message size
 	// Note: networkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
@@ -613,7 +605,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	sourceNode := m.ids[sourceIndex].NodeID
 	targetNode := m.ids[targetIndex].NodeID
 
-	msg, _ := messageutils.CreateMessage(sourceNode, targetNode, testChannel.String(), "")
+	msg, _ := messageutils.CreateMessage(m.T(), sourceNode, targetNode, testChannel, "")
 
 	// creates a network payload with a size greater than the default max size using a known large message type
 	targetSize := uint64(middleware.DefaultMaxUnicastMsgSize) + 1000
@@ -656,7 +648,7 @@ func (m *MiddlewareTestSuite) TestMessageFieldsOverriden_SendDirect() {
 	firstNode := m.ids[first].NodeID
 	lastNode := m.ids[last].NodeID
 
-	expected, event := messageutils.CreateMessage(firstNode, lastNode, testChannel.String(), "test message")
+	expected, event := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "test message")
 
 	fakeID := unittest.IdentifierFixture()
 	msg := &message.Message{
@@ -693,7 +685,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	firstNode := m.ids[first].NodeID
 	lastNode := m.ids[last].NodeID
 
-	msg, _ := messageutils.CreateMessage(firstNode, lastNode, testChannel.String(), "")
+	msg, _ := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "")
 
 	// adds another node as the target id to imitate publishing
 	msg.TargetIDs = append(msg.TargetIDs, lastNode[:])
@@ -727,7 +719,7 @@ func (m *MiddlewareTestSuite) TestMessageFieldsOverriden_Publish() {
 	firstNode := m.ids[first].NodeID
 	lastNode := m.ids[last].NodeID
 
-	expected, event := messageutils.CreateMessage(firstNode, lastNode, testChannel.String(), "test message")
+	expected, event := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "test message")
 
 	// adds another node as the target id to imitate publishing
 	expected.TargetIDs = append(expected.TargetIDs, lastNode[:])
@@ -802,7 +794,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	msgRcvdFun := func() {
 		<-msgRcvd
 	}
-	message1, _ := messageutils.CreateMessage(firstNode, lastNode, testChannel.String(), "hello1")
+	message1, _ := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "hello1")
 
 	m.ov[last].On("Receive", firstNode, mockery.Anything, mockery.Anything).Return(nil).Run(func(_ mockery.Arguments) {
 		msgRcvd <- struct{}{}
@@ -819,7 +811,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	assert.NoError(m.T(), err)
 
 	// create and send a new message on the channel from the origin node
-	message2, _ := messageutils.CreateMessage(firstNode, lastNode, testChannel.String(), "hello2")
+	message2, _ := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "hello2")
 
 	err = m.mws[first].Publish(message2, testChannel)
 	assert.NoError(m.T(), err)

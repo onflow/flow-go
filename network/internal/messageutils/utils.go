@@ -1,7 +1,10 @@
 package messageutils
 
 import (
-	"fmt"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/stretchr/testify/require"
+	"testing"
 
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
@@ -9,24 +12,25 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func CreateMessage(originID flow.Identifier, targetID flow.Identifier, channel, msg string) (*message.Message, interface{}) {
+func CreateMessage(t *testing.T, originID flow.Identifier, targetID flow.Identifier, channel channels.Channel, msg string) (*message.Message, interface{}) {
 	payload := &libp2pmessage.TestMessage{
 		Text: msg,
 	}
 
 	codec := unittest.NetworkCodec()
 	b, err := codec.Encode(payload)
-	if err != nil {
-		fmt.Println(err)
-	}
+	require.NoError(t, err)
+
+	eventID, err := p2p.EventId(channel, b)
+	require.NoError(t, err)
 
 	m := &message.Message{
-		ChannelID: channel,
-		Type:      flow.MakeID(payload).String(),
-		EventID:   []byte("1"),
+		ChannelID: channel.String(),
+		EventID:   eventID,
 		OriginID:  originID[:],
 		TargetIDs: [][]byte{targetID[:]},
 		Payload:   b,
+		Type:      p2p.MessageType(payload),
 	}
 
 	return m, payload
