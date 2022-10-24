@@ -182,9 +182,9 @@ generate-mocks: install-mock-generators
 	mockery --name 'Storage' --dir=module/executiondatasync/tracker --case=underscore --output="module/executiondatasync/tracker/mock" --outpkg="mocktracker"
 
 	#temporarily make insecure/ a non-module to allow mockery to create mocks
-	#mv insecure/go.mod insecure/go2.mod
+	mv insecure/go.mod insecure/go2.mod
 	mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
-	#mv insecure/go2.mod insecure/go.mod
+	mv insecure/go2.mod insecure/go.mod
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -282,11 +282,11 @@ docker-build-execution-debug:
 .PHONY: docker-build-execution-corrupted
 docker-build-execution-corrupted:
 	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
-	#mv insecure/go.mod insecure/go2.mod
+	mv insecure/go.mod insecure/go2.mod
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/execution-corrupted:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)" .
-	#mv insecure/go2.mod insecure/go.mod
+	mv insecure/go2.mod insecure/go.mod
 
 .PHONY: docker-build-verification
 docker-build-verification:
@@ -303,11 +303,11 @@ docker-build-verification-debug:
 .PHONY: docker-build-verification-corrupted
 docker-build-verification-corrupted:
 	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
-	#mv insecure/go.mod insecure/go2.mod
+	mv insecure/go.mod insecure/go2.mod
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/verification-corrupted:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)" .
-	#mv insecure/go2.mod insecure/go.mod
+	mv insecure/go2.mod insecure/go.mod
 
 .PHONY: docker-build-access
 docker-build-access:
