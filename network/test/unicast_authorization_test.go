@@ -6,22 +6,19 @@ import (
 	"testing"
 	"time"
 
-	mockery "github.com/stretchr/testify/mock"
-
-	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/codec"
-	"github.com/onflow/flow-go/network/message"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/codec"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
@@ -443,10 +440,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	u.startMiddlewares(overlay)
 
 	// messages.BlockProposal is not authorized to be sent via unicast over the ConsensusCommittee channel
-	payload := &messages.BlockProposal{
-		Header:  unittest.BlockHeaderFixture(),
-		Payload: nil,
-	}
+	payload := unittest.ProposalFixture()
 	msg, _ := createMessageWithPayload(u.senderID.NodeID, u.receiverID.NodeID, channels.ConsensusCommittee.String(), payload)
 
 	// send message via unicast
