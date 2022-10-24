@@ -34,5 +34,8 @@ type MutableState interface {
 	State
 	// Extend introduces the given block into the cluster state as a pending
 	// without modifying the current finalized state.
+	// Expected errors during normal operations:
+	//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+	//   - state.InvalidExtensionError if the candidate block is invalid
 	Extend(candidate *cluster.Block) error
 }

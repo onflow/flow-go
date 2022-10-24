@@ -95,6 +95,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
 		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
+		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, cs.head.View)).Return(nil)
 		err := cs.engine.Process(channels.ConsensusCommittee, originID, proposal)
 		cs.Assert().NoError(err)
 		wg.Done()

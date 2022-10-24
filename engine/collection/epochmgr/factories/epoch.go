@@ -36,7 +36,7 @@ func NewEpochComponentsFactory(
 	hotstuff *HotStuffFactory,
 	compliance *ComplianceEngineFactory,
 	sync *SyncEngineFactory,
-	mesageHub *MessageHubFactory,
+	messageHub *MessageHubFactory,
 ) *EpochComponentsFactory {
 
 	factory := &EpochComponentsFactory{
@@ -47,7 +47,7 @@ func NewEpochComponentsFactory(
 		hotstuff:   hotstuff,
 		compliance: compliance,
 		sync:       sync,
-		messageHub: mesageHub,
+		messageHub: messageHub,
 	}
 	return factory
 }
@@ -136,8 +136,9 @@ func (factory *EpochComponentsFactory) Create(
 	}
 	voteAggregator = hotstuffModules.VoteAggregator
 	timeoutAggregator = hotstuffModules.TimeoutAggregator
+	validator := hotstuffModules.Validator
 
-	complianceEng, err := factory.compliance.Create(mutableState, headers, payloads, hotstuffModules.VoteAggregator, hotstuffModules.TimeoutAggregator)
+	complianceEng, err := factory.compliance.Create(mutableState, headers, payloads, hotstuffModules.VoteAggregator, hotstuffModules.TimeoutAggregator, validator)
 	if err != nil {
 		err = fmt.Errorf("could not create compliance engine: %w", err)
 		return

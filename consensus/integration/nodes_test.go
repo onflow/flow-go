@@ -539,6 +539,7 @@ func createNode(
 		fullState,
 		cache,
 		syncCore,
+		validator,
 		voteAggregator,
 		timeoutAggregator,
 	)

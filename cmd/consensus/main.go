@@ -688,6 +688,7 @@ func main() {
 				mutableState,
 				proposals,
 				syncCore,
+				hotstuffModules.Validator,
 				hotstuffModules.VoteAggregator,
 				hotstuffModules.TimeoutAggregator,
 				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),

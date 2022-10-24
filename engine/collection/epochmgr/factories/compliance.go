@@ -61,6 +61,7 @@ func (f *ComplianceEngineFactory) Create(
 	payloads storage.ClusterPayloads,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
+	validator hotstuff.Validator,
 ) (*compliance.Engine, error) {
 
 	cache := buffer.NewPendingClusterBlocks()
@@ -72,6 +73,7 @@ func (f *ComplianceEngineFactory) Create(
 		headers,
 		clusterState,
 		cache,
+		validator,
 		voteAggregator,
 		timeoutAggregator,
 		f.complianceOpts...,
