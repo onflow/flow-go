@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"net"
 	"os"
 	"runtime"
 	"strings"
@@ -52,13 +53,11 @@ type dataSlice struct {
 
 // Hardcoded CI values
 const (
-	loadType                    = "token-transfer"
-	metricport                  = uint(8080)
-	accessNodeAddress           = "127.0.0.1:3569"
-	pushgateway                 = "127.0.0.1:9091"
-	accountMultiplier           = 50
-	feedbackEnabled             = true
-	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
+	loadType          = "token-transfer"
+	metricport        = uint(8080)
+	pushgateway       = "127.0.0.1:9091"
+	accountMultiplier = 50
+	feedbackEnabled   = true
 
 	// Auto TPS scaling constants
 	additiveIncrease       = 50
@@ -74,6 +73,8 @@ func main() {
 	authAccNumInConstExecTx := flag.Uint("const-exec-num-authorizer", 1, "num of authorizer for each constant exec transaction to generate")
 	argSizeInByteInConstExecTx := flag.Uint("const-exec-arg-size", 100, "byte size of tx argument for each constant exec transaction to generate")
 	payerKeyCountInConstExecTx := flag.Uint("const-exec-payer-key-count", 2, "num of payer keys for each constant exec transaction to generate")
+	accessNodeAddress := flag.String("access", net.JoinHostPort("127.0.0.1", "3569"), "access node address")
+	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 
 	// CI relevant flags
 	initialTPSFlag := flag.Int("initial-tps", 10, "starting transactions per second")
@@ -130,7 +131,7 @@ func main() {
 		Stringer("flowTokenAddress", flowTokenAddress).
 		Msg("addresses")
 
-	flowClient, err := client.NewClient(accessNodeAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	flowClient, err := client.NewClient(*accessNodeAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to initialize Flow client")
 	}
@@ -150,7 +151,7 @@ func main() {
 		loaderMetrics,
 		[]access.Client{flowClient},
 		benchmark.NetworkParams{
-			ServAccPrivKeyHex:     serviceAccountPrivateKeyHex,
+			ServAccPrivKeyHex:     *serviceAccountPrivateKeyHex,
 			ServiceAccountAddress: &serviceAccountAddress,
 			FungibleTokenAddress:  &fungibleTokenAddress,
 			FlowTokenAddress:      &flowTokenAddress,
