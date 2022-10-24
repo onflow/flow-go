@@ -441,7 +441,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 
 	// messages.BlockProposal is not authorized to be sent via unicast over the ConsensusCommittee channel
 	payload := unittest.ProposalFixture()
-	msg, _ := createMessageWithPayload(u.senderID.NodeID, u.receiverID.NodeID, channels.ConsensusCommittee.String(), payload)
+	msg, _ := createMessageWithPayload(u.T(), u.senderID.NodeID, u.receiverID.NodeID, channels.ConsensusCommittee, payload)
 
 	// send message via unicast
 	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
