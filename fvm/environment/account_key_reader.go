@@ -59,7 +59,7 @@ func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
 		keyIndex)
 }
 
-func (reader ParseRestrictedAccountKeyReader) AccountKeysCount( address runtime.Address,) (uint64, error) {
+func (reader ParseRestrictedAccountKeyReader) AccountKeysCount(address runtime.Address) (uint64, error) {
 	return parseRestrict1Arg1Ret(
 		reader.txnState,
 		"AccountKeysCount",
@@ -164,7 +164,7 @@ func (reader *accountKeyReader) GetAccountKey(
 	}, nil
 }
 
-func (reader *accountKeyReader) AccountKeysCount( address runtime.Address)  (count uint64, err error) {
+func (reader *accountKeyReader) AccountKeysCount(address runtime.Address) (count uint64, err error) {
 	defer reader.tracer.StartSpanFromRoot(trace.FVMEnvAccountKeysCount).End()
 
 	fmtErr := func(err error) error {
