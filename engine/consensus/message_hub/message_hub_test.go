@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -286,6 +287,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		}
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
+		s.voteAggregator.On("AddBlock", model.ProposalFromFlow(block.Header, parent.View)).Once()
 		s.hotstuff.On("SubmitProposal", &headerFromHotstuff, parent.View).
 			Run(func(args mock.Arguments) { close(submitted) }).
 			Once()
@@ -351,6 +353,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.payloads.On("ByBlockID", proposal.Header.ID()).Return(proposal.Payload, nil)
 
 		// unset chain and height to make sure they are correctly reconstructed
+		s.voteAggregator.On("AddBlock", model.ProposalFromFlow(proposal.Header, s.head.View)).Once()
 		s.hotstuff.On("SubmitProposal", proposal.Header, s.head.View)
 		expectedBroadcastMsg := &messages.BlockProposal{
 			Header:  proposal.Header,

@@ -358,6 +358,9 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 
 	log.Debug().Msg("processing proposal broadcast request from hotstuff")
 
+	// notify vote aggregator that new block proposal is available, in case we are next leader
+	h.voteAggregator.AddBlock(model.ProposalFromFlow(header, parent.View))
+
 	// TODO(active-pacemaker): replace with pub/sub?
 	h.hotstuff.SubmitProposal(header, parent.View) // non-blocking
 
