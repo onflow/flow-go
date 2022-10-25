@@ -53,14 +53,14 @@ jobs:
         # https://github.com/golangci/golangci-lint-action/issues/244
         skip-cache: true
 
-  tidy:
-    name: Tidy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-      - name: Run tidy
-        run: make tidy
+#  tidy:
+#    name: Tidy
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout repo
+#        uses: actions/checkout@v3
+#      - name: Run tidy
+#        run: make tidy
 
   shell-check:
     name: ShellCheck
