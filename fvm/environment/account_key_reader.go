@@ -53,7 +53,7 @@ func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
 ) {
 	return parseRestrict2Arg1Ret(
 		reader.txnState,
-		"GetAccountKey",
+		trace.FVMEnvGetAccountKey,
 		reader.impl.GetAccountKey,
 		address,
 		keyIndex)
