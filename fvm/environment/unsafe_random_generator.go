@@ -47,7 +47,7 @@ func (gen ParseRestrictedUnsafeRandomGenerator) UnsafeRandom() (
 ) {
 	return parseRestrict1Ret(
 		gen.txnState,
-		"UnsafeRandom",
+		trace.FVMEnvUnsafeRandom,
 		gen.impl.UnsafeRandom)
 }
 
