@@ -38,7 +38,7 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Build relic
+    - name: Setup Crypto in GOPATH
       run: make crypto_setup_gopath
     - name: Run go generate
       run: go generate
@@ -144,7 +144,7 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Build relic
+    - name: Setup Crypto in GOPATH
       run: make crypto_setup_gopath
     - name: Docker build
       run: make docker-build-flow
@@ -162,6 +162,35 @@ jobs:
         max_attempts: 2
         command: ${{ matrix.make }}
 
+  crypto-test:
+    name: Crypto Tests
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    - name: Setup Crypto dependencies
+      run: make -C crypto setup
+    - name: Run tests
+      if: github.actor != 'bors[bot]'
+      run: make -C crypto test
+      env:
+        RACE_DETECTOR: 1
+    - name: Run tests (Bors)
+      if: github.actor == 'bors[bot]'
+      uses: nick-invision/retry@v2
+      with:
+        timeout_minutes: 15
+        max_attempts: 1
+        command: make -C crypto test
+
+
   localnet-test:
     name: Localnet Compatibility Tests With Flow-CLI Client and Observer
     strategy:
@@ -175,7 +204,7 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Build relic and other tools
+    - name: Setup Crypto in GOPATH and other tools
       run: make install-tools
     - name: Install Flow Client In Docker
       # This proved to be more reliable than installing it locally.
