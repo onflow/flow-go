@@ -508,10 +508,10 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2p
 	}
 }
 
-// testUnicastOverStreamRoundTrip checks node1 and node2 can create stream between each other and push unicast messages
-// to each other over the streams.
-//
-// The channel argument keeps the individual messages received at both ends.
+// EnsureMessageExchangeOverUnicast ensures that the given nodes exchange arbitrary messages on through unicasting (i.e., stream creation).
+// It fails the test if any of the nodes does not receive the message from the other nodes.
+// The "inbounds" parameter specifies the inbound channel of the nodes on which the messages are received.
+// The "messageFactory" parameter specifies the function that creates unique messages to be sent.
 func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, ids flow.IdentityList, inbounds []chan string, messageFactory func() string) {
 	pInfo, err := utils.PeerInfosFromIDs(ids)
 	require.Empty(t, err)
