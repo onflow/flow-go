@@ -493,8 +493,7 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2p
 	// let subscriptions propagate
 	time.Sleep(1 * time.Second)
 
-	for i, node := range nodes {
-		fmt.Println("sending message from node", i)
+	for _, node := range nodes {
 		msg, _ := messageFactory()
 		channel, ok := channels.ChannelFromTopic(topic)
 		require.True(t, ok)
@@ -559,8 +558,14 @@ func StreamHandlerFixture(t *testing.T) (func(s network.Stream), chan string) {
 		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 		str, err := rw.ReadString('\n')
 		require.NoError(t, err)
-		fmt.Println("received message", str)
 		ch <- str
-		fmt.Println("sent message to channel", str)
 	}, ch
+}
+
+func LongMessageFactoryFixture(t *testing.T) func() string {
+	return func() string {
+		msg := "this is an intentionally long MESSAGE to be bigger than buffer size of most of stream compressors"
+		require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
+		return fmt.Sprintf("%s %d \n", msg, time.Now().UnixNano()) // add timestamp to make sure we don't send the same message twice
+	}
 }
