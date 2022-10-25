@@ -52,7 +52,7 @@ func TestUnmarshal(t *testing.T) {
 
 func TestStructs(t *testing.T) {
 	GenerateValuesYaml("", "", "values.yml")
-	// deleteFile("values.yml")
+	deleteFile("values.yml")
 }
 
 func TestByteFileWrite(t *testing.T) {
