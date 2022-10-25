@@ -96,21 +96,24 @@ func (reader *accountKeyReader) GetAccountKey(
 ) {
 	defer reader.tracer.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
 
+	formatErr := func(err error) (*runtime.AccountKey, error) {
+		return nil, fmt.Errorf("getting account key failed: %w", err)
+	}
+
 	err := reader.meter.MeterComputation(ComputationKindGetAccountKey, 1)
 	if err != nil {
-		return nil, fmt.Errorf("get account key failed: %w", err)
+		return formatErr(err)
 	}
 
 	accountAddress := flow.Address(address)
 
 	ok, err := reader.accounts.Exists(accountAddress)
 	if err != nil {
-		return nil, fmt.Errorf("getting account key failed: %w", err)
+		return formatErr(err)
 	}
 
 	if !ok {
-		issue := errors.NewAccountNotFoundError(accountAddress)
-		return nil, fmt.Errorf("getting account key failed: %w", issue)
+		return formatErr(errors.NewAccountNotFoundError(accountAddress))
 	}
 
 	// Don't return an error for invalid key indices
@@ -131,64 +134,71 @@ func (reader *accountKeyReader) GetAccountKey(
 			return nil, nil
 		}
 
-		return nil, fmt.Errorf("getting account key failed: %w", err)
+		return formatErr(err)
 	}
 
 	// Prepare the account key to return
-
-	signAlgo := crypto.CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
-	if signAlgo == runtime.SignatureAlgorithmUnknown {
-		err = errors.NewValueErrorf(
-			publicKey.SignAlgo.String(),
-			"signature algorithm type not found")
-		return nil, fmt.Errorf("getting account key failed: %w", err)
+	runtimeAccountKey, err := FlowToRuntimeAccountKey(publicKey)
+	if err != nil {
+		return formatErr(err)
 	}
 
-	hashAlgo := crypto.CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
-	if hashAlgo == runtime.HashAlgorithmUnknown {
-		err = errors.NewValueErrorf(
-			publicKey.HashAlgo.String(),
-			"hashing algorithm type not found")
-		return nil, fmt.Errorf("getting account key failed: %w", err)
-	}
-
-	return &runtime.AccountKey{
-		KeyIndex: publicKey.Index,
-		PublicKey: &runtime.PublicKey{
-			PublicKey: publicKey.PublicKey.Encode(),
-			SignAlgo:  signAlgo,
-		},
-		HashAlgo:  hashAlgo,
-		Weight:    publicKey.Weight,
-		IsRevoked: publicKey.Revoked,
-	}, nil
+	return runtimeAccountKey, nil
 }
 
-func (reader *accountKeyReader) AccountKeysCount(address runtime.Address) (count uint64, err error) {
+func (reader *accountKeyReader) AccountKeysCount(address runtime.Address) (uint64, error) {
 	defer reader.tracer.StartSpanFromRoot(trace.FVMEnvAccountKeysCount).End()
 
-	fmtErr := func(err error) error {
-		return fmt.Errorf("fetching account key count failed: %w", err)
+	formatErr := func(err error) (uint64, error) {
+		return 0, fmt.Errorf("fetching account key count failed: %w", err)
 	}
 
-	err = reader.meter.MeterComputation(ComputationKindAccountKeysCount, 1)
+	err := reader.meter.MeterComputation(ComputationKindAccountKeysCount, 1)
 	if err != nil {
-		err = fmtErr(err)
-		return
+		return formatErr(err)
 	}
 
 	accountAddress := flow.Address(address)
 
 	ok, err := reader.accounts.Exists(accountAddress)
 	if err != nil {
-		err = fmtErr(err)
-		return
+		return formatErr(err)
 	}
 
 	if !ok {
-		err = fmtErr(errors.NewAccountNotFoundError(accountAddress))
-		return
+		return formatErr(errors.NewAccountNotFoundError(accountAddress))
 	}
 
 	return reader.accounts.GetPublicKeyCount(accountAddress)
+}
+
+func FlowToRuntimeAccountKey(flowKey flow.AccountPublicKey) (*runtime.AccountKey, error) {
+	signAlgo := crypto.CryptoToRuntimeSigningAlgorithm(flowKey.SignAlgo)
+	if signAlgo == runtime.SignatureAlgorithmUnknown {
+		return nil, errors.NewValueErrorf(
+			flowKey.SignAlgo.String(),
+			"signature algorithm type not found",
+		)
+	}
+
+	hashAlgo := crypto.CryptoToRuntimeHashingAlgorithm(flowKey.HashAlgo)
+	if hashAlgo == runtime.HashAlgorithmUnknown {
+		return nil, errors.NewValueErrorf(
+			flowKey.HashAlgo.String(),
+			"hashing algorithm type not found",
+		)
+	}
+
+	publicKey := &runtime.PublicKey{
+		PublicKey: flowKey.PublicKey.Encode(),
+		SignAlgo:  signAlgo,
+	}
+
+	return &runtime.AccountKey{
+		KeyIndex:  flowKey.Index,
+		PublicKey: publicKey,
+		HashAlgo:  hashAlgo,
+		Weight:    flowKey.Weight,
+		IsRevoked: flowKey.Revoked,
+	}, nil
 }
