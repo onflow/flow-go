@@ -1,6 +1,7 @@
 package p2pfixtures
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -505,5 +506,61 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2p
 		SubsMustReceiveMessage(t, ctx, data, subs)
 		cancel()
 	}
+}
 
+// testUnicastOverStreamRoundTrip checks node1 and node2 can create stream between each other and push unicast messages
+// to each other over the streams.
+//
+// The channel argument keeps the individual messages received at both ends.
+func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, ids flow.IdentityList, inbounds []chan string, messageFactory func() string) {
+	pInfo, err := utils.PeerInfosFromIDs(ids)
+	require.Empty(t, err)
+
+	LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+
+	for _, this := range nodes {
+		msg := messageFactory()
+
+		// send the message to all other nodes
+		for i, other := range nodes {
+			if this == other {
+				continue
+			}
+			s, err := this.CreateStream(ctx, pInfo[i].ID)
+			require.NoError(t, err)
+			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+			_, err = rw.WriteString(msg)
+			require.NoError(t, err)
+
+			// Flush the stream
+			require.NoError(t, rw.Flush())
+		}
+
+		// wait for the message to be received by all other nodes
+		for i, other := range nodes {
+			if this == other {
+				continue
+			}
+
+			select {
+			case rcv := <-inbounds[i]:
+				require.Equal(t, msg, rcv)
+			case <-time.After(3 * time.Second):
+				require.Fail(t, fmt.Sprintf("did not receive message from node %d", i))
+			}
+		}
+	}
+}
+
+func StreamHandlerFixture(t *testing.T) (func(s network.Stream), chan string) {
+	ch := make(chan string, 1) // channel to receive messages
+
+	return func(s network.Stream) {
+		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+		str, err := rw.ReadString('\n')
+		require.NoError(t, err)
+		fmt.Println("received message", str)
+		ch <- str
+		fmt.Println("sent message to channel", str)
+	}, ch
 }
