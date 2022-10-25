@@ -198,7 +198,7 @@ type NetworkConfig struct {
 	UnicastRateLimitDryRun bool
 	//UnicastRateLimitLockoutDuration the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node
 	// after being rate limited.
-	UnicastRateLimitLockoutDuration int
+	UnicastRateLimitLockoutDuration time.Duration
 	// UnicastMessageRateLimit amount of unicast messages that can be sent by a peer per second.
 	UnicastMessageRateLimit int
 	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.

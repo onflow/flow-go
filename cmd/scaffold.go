@@ -196,7 +196,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageRateLimit, "unicast-message-rate-limit", 0, "maximum number of unicast messages that a peer can send per second")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthRateLimit, "unicast-bandwidth-rate-limit", 0, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", middleware.LargeMsgMaxUnicastMsgSize, "bandwidth size in bytes a peer is allowed to send at one time")
-	fnb.flags.IntVar(&fnb.BaseConfig.UnicastRateLimitLockoutDuration, "unicast-rate-limit-lockout-duration", 10, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
+	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastRateLimitLockoutDuration, "unicast-rate-limit-lockout-duration", 10, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
 	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitDryRun, "unicast-rate-limit-dry-run", true, "disable peer disconnects and connections gating when rate limiting peers")
 
 }
@@ -298,7 +298,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		unicastMessageRateLimiter := ratelimit.NewMessageRateLimiter(
 			rate.Limit(fnb.BaseConfig.UnicastMessageRateLimit),
 			fnb.BaseConfig.UnicastMessageRateLimit,
-			time.Duration(fnb.BaseConfig.UnicastRateLimitLockoutDuration),
+			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
 		)
 		unicastRateLimiters.MessageRateLimiter = unicastMessageRateLimiter
 
@@ -318,7 +318,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		unicastBandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(
 			rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit),
 			fnb.BaseConfig.UnicastBandwidthBurstLimit,
-			time.Duration(fnb.BaseConfig.UnicastRateLimitLockoutDuration),
+			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
 		)
 		unicastRateLimiters.BandWidthRateLimiter = unicastBandwidthRateLimiter
 
