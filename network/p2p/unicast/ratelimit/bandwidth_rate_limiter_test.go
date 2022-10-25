@@ -72,4 +72,9 @@ func TestBandWidthRateLimiter_IsRateLimited(t *testing.T) {
 	allowed := bandwidthRateLimiter.Allow(peerID, msg)
 	require.False(t, allowed)
 	require.True(t, bandwidthRateLimiter.IsRateLimited(peerID))
+	
+	
+        // wait for 1 second, the rate limiter should reset
+	time.Sleep(1 * time.Second)
+	require.False(t, bandwidthRateLimiter.IsRateLimited(peerID))
 }
