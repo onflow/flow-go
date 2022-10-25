@@ -577,7 +577,7 @@ func newState(
 	}
 }
 
-// IsBootstrapped returns whether or not the database contains a bootstrapped state
+// IsBootstrapped returns whether the database contains a bootstrapped state
 func IsBootstrapped(db *badger.DB) (bool, error) {
 	var finalized uint64
 	err := db.View(operation.RetrieveFinalizedHeight(&finalized))

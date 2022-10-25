@@ -425,7 +425,20 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 	defer span.End()
 
 	blockID := candidate.ID()
+	parentID := candidate.Header.ParentID
 	latestSealID := last.ID()
+
+	parent, err := m.headers.ByBlockID(parentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
+	}
+	// root blocks and blocks below the root block are considered as "processed",
+	// so we don't want to trigger `BlockProcessable` event for them.
+	var rootHeight uint64
+	err = m.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return fmt.Errorf("could not retrieve root block's height: %w", err)
+	}
 
 	// apply any state changes from service events sealed by this block's parent
 	dbUpdates, insertingBlockTriggersEpochFallback, err := m.handleEpochServiceEvents(candidate)
@@ -474,6 +487,12 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 		if insertingBlockTriggersEpochFallback {
 			m.consumer.EpochEmergencyFallbackTriggered()
+		}
+
+		// trigger BlockProcessable for parent blocks above root height
+		if parent.Height > rootHeight {
+			// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
+			m.consumer.BlockProcessable(parent)
 		}
 
 		return nil

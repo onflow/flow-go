@@ -42,9 +42,9 @@ type MutableState interface {
 	// Extend introduces the block with the given ID into the persistent
 	// protocol state without modifying the current finalized state. It allows
 	// us to execute fork-aware queries against ambiguous protocol state, while
-	// still checking that the given block is a valid extension of the protocol
-	// state. Depending on implementation it might be a lighter version that checks only
-	// block header.
+	// still checking that the given block is a valid extension of the protocol state.
+	// Depending on implementation it might be a lighter version that checks only block header.
+	// The candidate block must have passed HotStuff validation before being passed to Extend.
 	// Expected errors during normal operations:
 	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 	//  * state.InvalidExtensionError if the candidate block is invalid
