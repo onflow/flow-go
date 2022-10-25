@@ -142,7 +142,7 @@ jobs:
           RACE_DETECTOR: 1
         # run `make test` inside each module's root
         run: |
-          cd $ {{ matrix.module }}
+          cd ${{ matrix.module }}
           make test
       - name: Run tests (Bors)
         if: github.actor == 'bors[bot]'
@@ -151,7 +151,7 @@ jobs:
           timeout_minutes: 25
           max_attempts: 3
           command: |
-            cd $ {{ matrix.module }}
+            cd ${{ matrix.module }}
             make test
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
