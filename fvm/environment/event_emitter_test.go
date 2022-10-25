@@ -171,7 +171,6 @@ func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, e
 		environment.EventEmitterParams{
 			ServiceEventCollectionEnabled: false,
 			EventCollectionByteSizeLimit:  eventEmitLimit,
-			EventEncoder:                  environment.NewCadenceEventEncoder(),
 		},
 	)
 }

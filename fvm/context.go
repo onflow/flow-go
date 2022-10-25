@@ -310,11 +310,3 @@ func WithBlockPrograms(programs *programs.BlockPrograms) Option {
 		return ctx
 	}
 }
-
-// WithEventEncoder sets events encoder to be used for encoding events emitted during execution
-func WithEventEncoder(encoder environment.EventEncoder) Option {
-	return func(ctx Context) Context {
-		ctx.EventEncoder = encoder
-		return ctx
-	}
-}
