@@ -530,22 +530,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			return
 		}
 
-		// TODO: once we've implemented per topic message size limits per the TODO above,
-		// we can remove this check
-		maxSize := unicastMaxMsgSize(&msg)
-		if msg.Size() > maxSize {
-			// message size exceeded
-			m.log.Error().
-				Hex("sender", msg.OriginID).
-				Hex("event_id", msg.EventID).
-				Str("event_type", msg.Type).
-				Str("channel", msg.ChannelID).
-				Int("maxSize", maxSize).
-				Bool(logging.KeySuspicious, true).
-				Msg("received message exceeded permissible message maxSize")
-			return
-		}
-
 		m.wg.Add(1)
 		go func() {
 			defer m.wg.Done()
