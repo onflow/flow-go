@@ -2,6 +2,7 @@ package ratelimit
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
@@ -40,8 +41,7 @@ func TestBandWidthRateLimiter_Allow(t *testing.T) {
 	require.True(t, allowed)
 	allowed = bandwidthRateLimiter.Allow(peerID, msg)
 	require.False(t, allowed)
-	
-	
+
 	// wait for 1 second, the rate limiter should allow 3 messages again
 	time.Sleep(1 * time.Second)
 	allowed = bandwidthRateLimiter.Allow(peerID, msg)
@@ -82,9 +82,8 @@ func TestBandWidthRateLimiter_IsRateLimited(t *testing.T) {
 	allowed := bandwidthRateLimiter.Allow(peerID, msg)
 	require.False(t, allowed)
 	require.True(t, bandwidthRateLimiter.IsRateLimited(peerID))
-	
-	
-        // wait for 1 second, the rate limiter should reset
+
+	// wait for 1 second, the rate limiter should reset
 	time.Sleep(1 * time.Second)
 	require.False(t, bandwidthRateLimiter.IsRateLimited(peerID))
 }
