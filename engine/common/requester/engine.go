@@ -49,6 +49,7 @@ type Engine struct {
 	items                 map[flow.Identifier]*Item
 	requests              map[uint64]*messages.EntityRequest
 	forcedDispatchOngoing *atomic.Bool // to ensure only trigger dispatching logic once at any time
+	rng                   *rand.Rand
 }
 
 // New creates a new requester engine, operating on the provided network channel, and requesting entities from a node
@@ -114,6 +115,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 		items:                 make(map[flow.Identifier]*Item),          // holds all pending items
 		requests:              make(map[uint64]*messages.EntityRequest), // holds all sent requests
 		forcedDispatchOngoing: atomic.NewBool(false),
+		rng:                   rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -310,11 +312,19 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		return false, fmt.Errorf("could not get providers: %w", err)
 	}
 
+	// randomize order of items, so that they can be requested in different order each time
+	rndItems := make([]flow.Identifier, 0, len(e.items))
+	for k := range e.items {
+		rndItems = append(rndItems, e.items[k].EntityID)
+	}
+	e.rng.Shuffle(len(rndItems), func(i, j int) { rndItems[i], rndItems[j] = rndItems[j], rndItems[i] })
+
 	// go through each item and decide if it should be requested again
 	now := time.Now().UTC()
 	var providerID flow.Identifier
 	var entityIDs []flow.Identifier
-	for entityID, item := range e.items {
+	for _, entityID := range rndItems {
+		item := e.items[entityID]
 
 		// if the item should not be requested yet, ignore
 		cutoff := item.LastRequested.Add(item.RetryAfter)
@@ -344,8 +354,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 		// if no provider has been chosen yet, choose from restricted set
 		// NOTE: a single item can not permanently block requests going
-		// out when no providers are available for it, because the map
-		// iteration is random and will skip the item most of the times
+		// out when no providers are available for it, because the iteration
+		// order is random and will skip the item most of the times
 		// when other items are available
 		if providerID == flow.ZeroID {
 			providers = providers.Filter(item.ExtraSelector)
