@@ -507,6 +507,50 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2p
 	}
 }
 
+// EnsureNoPubsubMessageExchange ensures that the no pubsub message is exchanged "from" the given nodes "to" the given nodes.
+func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []*p2pnode.Node, to []*p2pnode.Node, messageFactory func() (interface{}, channels.Topic)) {
+	_, topic := messageFactory()
+
+	subs := make([]*pubsub.Subscription, len(to))
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+	for _, node := range from {
+		// this is to make sure that the node is subscribed to the topic before we send the message
+		// hence, we don't check the error.
+		// Also, as the "from" nodes are senders, we don't need to keep the subscription instances.
+		_, _ = node.Subscribe(
+			topic,
+			unittest.NetworkCodec(),
+			unittest.AllowAllPeerFilter(),
+			slashingViolationsConsumer)
+	}
+
+	for i, node := range to {
+		// this is to make sure that the node is subscribed to the topic before we send the message
+		// hence, we don't check the error.
+		subs[i], _ = node.Subscribe(
+			topic,
+			unittest.NetworkCodec(),
+			unittest.AllowAllPeerFilter(),
+			slashingViolationsConsumer)
+	}
+
+	// let subscriptions propagate
+	time.Sleep(1 * time.Second)
+
+	for _, node := range from {
+		msg, _ := messageFactory()
+		channel, ok := channels.ChannelFromTopic(topic)
+		require.True(t, ok)
+		data := MustEncodeEvent(t, msg, channel)
+
+		require.NoError(t, node.Publish(ctx, topic, data))
+
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		SubsMustNeverReceiveAnyMessage(t, ctx, subs)
+		cancel()
+	}
+}
+
 // EnsureMessageExchangeOverUnicast ensures that the given nodes exchange arbitrary messages on through unicasting (i.e., stream creation).
 // It fails the test if any of the nodes does not receive the message from the other nodes.
 // The "inbounds" parameter specifies the inbound channel of the nodes on which the messages are received.
