@@ -641,7 +641,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 // epochFallbackTriggeredByFinalizedBlock checks whether finalizing the input block
 // would trigger epoch emergency fallback mode. In particular, we trigger epoch
-// fallback mode when finalizing a block B when:
+// fallback mode while finalizing block B in either of the following cases:
 //  1. B is the head of a fork in which epoch fallback was tentatively triggered,
 //     due to incorporating an invalid service event.
 //  2. (a) B is the first finalized block with view greater than or equal to the epoch
@@ -653,7 +653,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 //
 // No errors are expected during normal operation.
 func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Header, epochStatus *flow.EpochStatus, currentEpochSetup *flow.EpochSetup) (bool, error) {
-
 	// 1. Epoch fallback is tentatively triggered on this fork
 	if epochStatus.InvalidServiceEventIncorporated {
 		return true, nil
@@ -884,7 +883,6 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 //
 // No errors are expected during normal operation.
 func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdates []func(*transaction.Tx) error, err error) {
-
 	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)

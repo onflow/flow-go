@@ -93,7 +93,7 @@ func SealBlock(t *testing.T, st protocol.MutableState, block *flow.Block, receip
 	return block2.Header, block3.Header
 }
 
-// InsertAndFinalize inserts, then finalizes, then input block.
+// InsertAndFinalize inserts, then finalizes, the input block.
 func InsertAndFinalize(t *testing.T, st protocol.MutableState, block *flow.Block) {
 	err := st.Extend(context.Background(), block)
 	require.NoError(t, err)
