@@ -930,15 +930,14 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
-
 				// validate the service event
 				err := isValidExtendingEpochSetup(ev, activeSetup, epochStatus)
-				if protocol.IsInvalidServiceEventError(err) {
-					// we have observed an invalid service event, which triggers epoch fallback mode
-					epochStatus.InvalidServiceEventIncorporated = true
-					return dbUpdates, nil
-				}
 				if err != nil {
+					if protocol.IsInvalidServiceEventError(err) {
+						// we have observed an invalid service event, which triggers epoch fallback mode
+						epochStatus.InvalidServiceEventIncorporated = true
+						return dbUpdates, nil
+					}
 					return nil, fmt.Errorf("unexpected error validating EpochSetup service event: %w", err)
 				}
 
@@ -949,24 +948,32 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 				dbUpdates = append(dbUpdates, m.epoch.setups.StoreTx(ev))
 
 			case *flow.EpochCommit:
-
-				extendingSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
-				if errors.Is(err, storage.ErrNotFound) {
-					// we have observed an EpochCommit without corresponding EpochSetup, which triggers epoch fallback mode
+				// if we receive an EpochCommit event, we must have already observed an EpochSetup event
+				// => otherwise, we have observed an EpochCommit without corresponding EpochSetup, which triggers epoch fallback mode
+				if epochStatus.NextEpoch.SetupID == flow.ZeroID {
 					epochStatus.InvalidServiceEventIncorporated = true
 					return dbUpdates, nil
 				}
+
+				// if we have observed an EpochSetup event, we must be able to retrieve it from the database
+				// => otherwise, this is a symptom of bug or data corruption since this component sets the SetupID field
+				extendingSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						return nil, fmt.Errorf("unexpected failure to retrieve EpochSetup (id=%x) stored in EpochStatus for block %x: %w",
+							epochStatus.NextEpoch.SetupID, blockID, err)
+					}
 					return nil, fmt.Errorf("unexpected error retrieving next epoch setup: %w", err)
 				}
+
 				// validate the service event
 				err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
-				if protocol.IsInvalidServiceEventError(err) {
-					// we have observed an invalid service event, which triggers epoch fallback mode
-					epochStatus.InvalidServiceEventIncorporated = true
-					return dbUpdates, nil
-				}
 				if err != nil {
+					if protocol.IsInvalidServiceEventError(err) {
+						// we have observed an invalid service event, which triggers epoch fallback mode
+						epochStatus.InvalidServiceEventIncorporated = true
+						return dbUpdates, nil
+					}
 					return nil, fmt.Errorf("unexpected error validating EpochCommit service event: %w", err)
 				}
 
