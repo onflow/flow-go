@@ -57,4 +57,9 @@ func TestMessageRateLimiter_IsRateLimited(t *testing.T) {
 	// second message should be rate limited
 	require.False(t, messageRateLimiter.Allow(peerID, nil))
 	require.True(t, messageRateLimiter.IsRateLimited(peerID))
+	
+	// wait for the next interval, the rate limiter should allow the next message.
+	time.Sleep(1 * time.Second)
+	require.True(t, messageRateLimiter.Allow(peerID, nil))
+	require.False(t, messageRateLimiter.IsRateLimited(peerID))
 }
