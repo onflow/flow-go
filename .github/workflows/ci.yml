@@ -133,7 +133,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [ crypto, insecure, integration/tests ]
+        module: [ crypto, insecure, integration ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
