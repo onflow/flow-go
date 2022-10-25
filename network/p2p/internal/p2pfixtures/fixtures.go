@@ -237,6 +237,11 @@ func StartNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []*p2pnod
 	for _, node := range nodes {
 		node.Start(ctx)
 		rdas = append(rdas, node)
+
+		if peerManager := node.PeerManagerComponent(); peerManager != nil {
+			peerManager.Start(ctx)
+			rdas = append(rdas, peerManager)
+		}
 	}
 	unittest.RequireComponentsReadyBefore(t, timeout, rdas...)
 }
