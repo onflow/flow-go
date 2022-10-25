@@ -311,7 +311,7 @@ func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 	return nil
 }
 
-// processQueuedBlock propagates the block proposal to the consensus cluster and submits to non-consensus network:
+// processQueuedProposal propagates the block proposal to the consensus cluster and submits to non-consensus network:
 //   - directly forwarded proposal to HotStuff core logic
 //     (skipping compliance engine as we assume our own proposals to be correct)
 //   - broadcast to all other consensus participants (excluding myself)

@@ -320,7 +320,7 @@ func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 	return nil
 }
 
-// processQueuedBlock propagates the block proposal to the collector cluster:
+// processQueuedProposal propagates the block proposal to the collector cluster:
 //   - directly forwarded proposal to HotStuff core logic
 //     (skipping compliance engine as we assume our own proposals to be correct)
 //   - broadcast to all other cluster participants (excluding myself)
