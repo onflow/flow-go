@@ -59,7 +59,7 @@ func (s *MessageRateLimiter) IsRateLimited(peerID peer.ID) bool {
 	if !ok {
 		return false
 	}
-	return time.Since(metadata.LastRateLimit) < s.rateLimitLockoutDuration
+	return time.Since(metadata.LastRateLimit()) < s.rateLimitLockoutDuration
 }
 
 // Start starts cleanup loop for underlying caches.
@@ -81,7 +81,7 @@ func (s *MessageRateLimiter) SetTimeNowFunc(now p2p.GetTimeNow) {
 // getLimiter returns limiter for the peerID, if a limiter does not exist one is created and stored.
 func (s *MessageRateLimiter) getLimiter(peerID peer.ID) *rate.Limiter {
 	if metadata, ok := s.limiters.Get(peerID); ok {
-		return metadata.Limiter
+		return metadata.Limiter()
 	}
 
 	limiter := rate.NewLimiter(s.limit, s.burst)

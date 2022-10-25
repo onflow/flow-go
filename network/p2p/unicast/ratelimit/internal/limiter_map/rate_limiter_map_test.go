@@ -60,12 +60,12 @@ func TestLimiterMap_cleanup(t *testing.T) {
 	peerID3 := peer.ID("id3")
 	m.Store(peerID3, rate.NewLimiter(0, 0))
 
-	// manually set LastAccessed on 2 items so that they are removed during Cleanup
+	// manually set lastAccessed on 2 items so that they are removed during Cleanup
 	limiter, _ := m.Get(peerID2)
-	limiter.LastAccessed = start.Add(-10 * time.Minute)
+	limiter.SetLastAccessed(start.Add(-10 * time.Minute))
 
 	limiter, _ = m.Get(peerID3)
-	limiter.LastAccessed = start.Add(-20 * time.Minute)
+	limiter.SetLastAccessed(start.Add(-20 * time.Minute))
 
 	// light clean up will only Remove expired keys
 	m.Cleanup()
@@ -102,15 +102,15 @@ func TestLimiterMap_cleanupLoopDone(t *testing.T) {
 	peerID3 := peer.ID("id3")
 	m.Store(peerID3, rate.NewLimiter(0, 0))
 
-	// manually set LastAccessed on 2 items so that they are removed during Cleanup
+	// manually set lastAccessed on 2 items so that they are removed during Cleanup
 	limiter, _ := m.Get(peerID1)
-	limiter.LastAccessed = start.Add(-10 * time.Minute)
+	limiter.SetLastAccessed(start.Add(-10 * time.Minute))
 
 	limiter, _ = m.Get(peerID2)
-	limiter.LastAccessed = start.Add(-10 * time.Minute)
+	limiter.SetLastAccessed(start.Add(-10 * time.Minute))
 
 	limiter, _ = m.Get(peerID3)
-	limiter.LastAccessed = start.Add(-20 * time.Minute)
+	limiter.SetLastAccessed(start.Add(-20 * time.Minute))
 
 	// kick off clean up process, tick should happen immediately
 	go m.CleanupLoop()

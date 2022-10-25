@@ -60,7 +60,7 @@ func (b *BandWidthRateLimiter) IsRateLimited(peerID peer.ID) bool {
 	if !ok {
 		return false
 	}
-	return time.Since(metadata.LastRateLimit) < b.rateLimitLockoutDuration
+	return time.Since(metadata.LastRateLimit()) < b.rateLimitLockoutDuration
 }
 
 // SetTimeNowFunc overrides the default time.Now func with the GetTimeNow func provided.
@@ -82,7 +82,7 @@ func (b *BandWidthRateLimiter) Stop() {
 // getLimiter returns limiter for the peerID, if a limiter does not exist one is created and stored.
 func (b *BandWidthRateLimiter) getLimiter(peerID peer.ID) *rate.Limiter {
 	if metadata, ok := b.limiters.Get(peerID); ok {
-		return metadata.Limiter
+		return metadata.Limiter()
 	}
 
 	limiter := rate.NewLimiter(b.limit, b.burst)
