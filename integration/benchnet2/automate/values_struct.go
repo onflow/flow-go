@@ -1,31 +1,29 @@
 package automate
 
 type Values struct {
-	Branch       string       `yaml:"branch"`
-	Commit       string       `yaml:"commit"`
-	Defaults     Defaults     `yaml:"defaults"`
-	Access       Access       `yaml:"access"`
-	Collection   Collection   `yaml:"collection"`
-	Consensus    Consensus    `yaml:"consensus"`
-	Execution    Execution    `yaml:"execution"`
-	Verification Verification `yaml:"verification"`
+	Branch       string      `yaml:"branch"`
+	Commit       string      `yaml:"commit"`
+	Defaults     EmptyStruct `yaml:"defaults"`
+	Access       NodesDefs   `yaml:"access"`
+	Collection   NodesDefs   `yaml:"collection"`
+	Consensus    NodesDefs   `yaml:"consensus"`
+	Execution    NodesDefs   `yaml:"execution"`
+	Verification NodesDefs   `yaml:"verification"`
 }
 
+type EmptyStruct struct {
+}
 type ContainerPorts struct {
 	Name          string `yaml:"name"`
 	ContainerPort int    `yaml:"containerPort"`
 }
-type Requests struct {
-	CPU    string `yaml:"cpu"`
-	Memory string `yaml:"memory"`
-}
-type Limits struct {
+type Resource struct {
 	CPU    string `yaml:"cpu"`
 	Memory string `yaml:"memory"`
 }
 type Resources struct {
-	Requests Requests `yaml:"requests"`
-	Limits   Limits   `yaml:"limits"`
+	Requests Resource `yaml:"requests"`
+	Limits   Resource `yaml:"limits"`
 }
 type ServicePorts struct {
 	Name       string `yaml:"name"`
@@ -52,27 +50,7 @@ type NodeDetails struct {
 	NodeID string   `yaml:"nodeId"`
 }
 
-type Access struct {
-	Defaults Defaults               `yaml:"defaults"`
-	Nodes    map[string]NodeDetails `yaml:"nodes"`
-}
-
-type Collection struct {
-	Defaults Defaults               `yaml:"defaults"`
-	Nodes    map[string]NodeDetails `yaml:"nodes"`
-}
-
-type Consensus struct {
-	Defaults Defaults               `yaml:"defaults"`
-	Nodes    map[string]NodeDetails `yaml:"nodes"`
-}
-
-type Execution struct {
-	Defaults Defaults               `yaml:"defaults"`
-	Nodes    map[string]NodeDetails `yaml:"nodes"`
-}
-
-type Verification struct {
+type NodesDefs struct {
 	Defaults Defaults               `yaml:"defaults"`
 	Nodes    map[string]NodeDetails `yaml:"nodes"`
 }

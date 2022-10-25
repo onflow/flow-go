@@ -1,1 +1,8 @@
-      execution_template: {{.NodeID}}
+args:
+  - "--bootstrapdir=/bootstrap"
+  - "--execution"
+env:
+  - name: execution name
+    value: execution {{.NodeID}}
+  - name: execution numbers
+    value: 123

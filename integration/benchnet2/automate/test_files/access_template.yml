@@ -1,8 +1,8 @@
 args:
   - "--bootstrapdir=/bootstrap"
-  - "--datadir=/data/protocol"
+  - "--access"
 env:
-  - name: test name
-    value: test value
-  - name: test numbers
+  - name: access name
+    value: access {{.NodeID}}
+  - name: access numbers
     value: 123
