@@ -40,11 +40,6 @@ export DOCKER_BUILDKIT := 1
 crypto_setup_gopath:
 	bash crypto_setup.sh
 
-# setup the crypto package in the current repo folder: needed to test the crypto package itself in `unittest` target
-.PHONY: crypto_setup_tests
-crypto_setup_tests:
-	$(MAKE) -C crypto setup
-
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
@@ -68,18 +63,13 @@ install-mock-generators:
 ############################################################################################
 
 .PHONY: install-tools
-install-tools: crypto_setup_tests crypto_setup_gopath check-go-version install-mock-generators
+install-tools: crypto_setup_gopath check-go-version install-mock-generators
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.49.0; \
 	cd ${GOPATH}; \
 	go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
 	go install golang.org/x/tools/cmd/stringer@master;
-
-.PHONY: unittest
-unittest: unittest-main
-	$(MAKE) -C crypto test
-	$(MAKE) -C integration test
 
 .PHONY: emulator-build
 emulator-build:
@@ -92,7 +82,7 @@ fuzz-fvm:
 	cd ./fvm && go test -fuzz=Fuzz -run ^$$ --tags relic
 
 .PHONY: test
-test: verify-mocks emulator-build unittest
+test: verify-mocks emulator-build unittest-main
 
 .PHONY: integration-test
 integration-test: docker-build-flow
