@@ -133,7 +133,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [ crypto, insecure, integration ]
+        include:
+          - name: crypto
+            make: setup
+            retries: 1
+            race: 1
+          - name: insecure
+            make: install-tools
+            retries: 3
+            race: 1
+          - name: integration
+            make: install-tools
+            retries: 3
+            race: 0
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -143,24 +155,24 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Install tools
-        run: make install-tools
-      - name: Run tests (${{ matrix.module }})
+      - name: Run prerequisites
+        run: make ${{ matrix.make }}
+      - name: Run tests (${{ matrix.name }})
         if: github.actor != 'bors[bot]'
         env:
-          RACE_DETECTOR: 1
+          RACE_DETECTOR: ${{ matrix.race }}
         # run `make test` inside each module's root
         run: |
-          cd ${{ matrix.module }}
+          cd ${{ matrix.name }}
           make test
       - name: Run tests (Bors)
         if: github.actor == 'bors[bot]'
         uses: nick-invision/retry@v2
         with:
           timeout_minutes: 25
-          max_attempts: 3
+          max_attempts: ${{ matrix.retries }}
           command: |
-            cd ${{ matrix.module }}
+            cd ${{ matrix.name }}
             make test
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
