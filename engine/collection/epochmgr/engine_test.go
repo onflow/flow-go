@@ -1,7 +1,7 @@
 package epochmgr
 
 import (
-	"io"
+	"context"
 	"testing"
 	"time"
 
@@ -15,13 +15,14 @@ import (
 	epochmgr "github.com/onflow/flow-go/engine/collection/epochmgr/mock"
 	"github.com/onflow/flow-go/model/flow"
 	realmodule "github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	mockcomponent "github.com/onflow/flow-go/module/component/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
-	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	realcluster "github.com/onflow/flow-go/state/cluster"
 	cluster "github.com/onflow/flow-go/state/cluster/mock"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
@@ -34,33 +35,37 @@ import (
 // mockComponents is a container for the mocked version of epoch components.
 type mockComponents struct {
 	state             *cluster.State
-	prop              *mocknetwork.Engine
-	sync              *mocknetwork.Engine
-	hotstuff          *module.HotStuff
+	prop              *mockcomponent.Component
+	sync              *mockmodule.ReadyDoneAware
+	hotstuff          *mockmodule.HotStuff
 	voteAggregator    *mockhotstuff.VoteAggregator
 	timeoutAggregator *mockhotstuff.TimeoutAggregator
+	messageHub        *mockcomponent.Component
 }
 
 func newMockComponents() *mockComponents {
 
 	components := &mockComponents{
 		state:             new(cluster.State),
-		prop:              new(mocknetwork.Engine),
-		sync:              new(mocknetwork.Engine),
-		hotstuff:          new(module.HotStuff),
+		prop:              new(mockcomponent.Component),
+		sync:              new(mockmodule.ReadyDoneAware),
+		hotstuff:          new(mockmodule.HotStuff),
 		voteAggregator:    new(mockhotstuff.VoteAggregator),
 		timeoutAggregator: new(mockhotstuff.TimeoutAggregator),
+		messageHub:        new(mockcomponent.Component),
 	}
 	unittest.ReadyDoneify(components.prop)
 	unittest.ReadyDoneify(components.sync)
 	unittest.ReadyDoneify(components.hotstuff)
 	unittest.ReadyDoneify(components.voteAggregator)
 	unittest.ReadyDoneify(components.timeoutAggregator)
+	unittest.ReadyDoneify(components.messageHub)
 
-	// for now only voteAggregator and hotstuff supports module.Startable, mock only it
+	components.prop.On("Start", mock.Anything)
 	components.hotstuff.On("Start", mock.Anything)
 	components.voteAggregator.On("Start", mock.Anything)
 	components.timeoutAggregator.On("Start", mock.Anything)
+	components.messageHub.On("Start", mock.Anything)
 
 	return components
 }
@@ -70,30 +75,36 @@ type Suite struct {
 
 	// engine dependencies
 	log   zerolog.Logger
-	me    *module.Local
+	me    *mockmodule.Local
 	state *protocol.State
 	snap  *protocol.Snapshot
 	pools *epochs.TransactionPools
 
 	// qc voter dependencies
 	signer  *mockhotstuff.Signer
-	client  *module.QCContractClient
-	voter   *module.ClusterRootQCVoter
+	client  *mockmodule.QCContractClient
+	voter   *mockmodule.ClusterRootQCVoter
 	factory *epochmgr.EpochComponentsFactory
 	heights *events.Heights
 
 	epochQuery *mocks.EpochQuery
 	counter    uint64                     // reflects the counter of the current epoch
+	phase      flow.EpochPhase            // phase at mocked snapshot
+	header     *flow.Header               // header at mocked snapshot
 	epochs     map[uint64]*protocol.Epoch // track all epochs
 	components map[uint64]*mockComponents // track all epoch components
+
+	ctx    irrecoverable.SignalerContext
+	cancel context.CancelFunc
+	errs   <-chan error
 
 	engine *Engine
 }
 
 func (suite *Suite) SetupTest() {
 
-	suite.log = zerolog.New(io.Discard)
-	suite.me = new(module.Local)
+	suite.log = unittest.Logger()
+	suite.me = new(mockmodule.Local)
 	suite.state = new(protocol.State)
 	suite.snap = new(protocol.Snapshot)
 
@@ -101,8 +112,8 @@ func (suite *Suite) SetupTest() {
 	suite.components = make(map[uint64]*mockComponents)
 
 	suite.signer = new(mockhotstuff.Signer)
-	suite.client = new(module.QCContractClient)
-	suite.voter = new(module.ClusterRootQCVoter)
+	suite.client = new(mockmodule.QCContractClient)
+	suite.voter = new(mockmodule.ClusterRootQCVoter)
 	suite.factory = new(epochmgr.EpochComponentsFactory)
 	suite.heights = new(events.Heights)
 
@@ -117,8 +128,8 @@ func (suite *Suite) SetupTest() {
 		}).
 		Return(
 			func(epoch realprotocol.Epoch) realcluster.State { return suite.ComponentsForEpoch(epoch).state },
-			func(epoch realprotocol.Epoch) network.Engine { return suite.ComponentsForEpoch(epoch).prop },
-			func(epoch realprotocol.Epoch) network.Engine { return suite.ComponentsForEpoch(epoch).sync },
+			func(epoch realprotocol.Epoch) component.Component { return suite.ComponentsForEpoch(epoch).prop },
+			func(epoch realprotocol.Epoch) realmodule.ReadyDoneAware { return suite.ComponentsForEpoch(epoch).sync },
 			func(epoch realprotocol.Epoch) realmodule.HotStuff { return suite.ComponentsForEpoch(epoch).hotstuff },
 			func(epoch realprotocol.Epoch) hotstuff.VoteAggregator {
 				return suite.ComponentsForEpoch(epoch).voteAggregator
@@ -126,12 +137,22 @@ func (suite *Suite) SetupTest() {
 			func(epoch realprotocol.Epoch) hotstuff.TimeoutAggregator {
 				return suite.ComponentsForEpoch(epoch).timeoutAggregator
 			},
+			func(epoch realprotocol.Epoch) component.Component { return suite.ComponentsForEpoch(epoch).messageHub },
 			func(epoch realprotocol.Epoch) error { return nil },
 		)
 
+	suite.phase = flow.EpochPhaseSetup
+	suite.header = unittest.BlockHeaderFixture()
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), suite.counter)
 	suite.state.On("Final").Return(suite.snap)
+	suite.state.On("AtBlockID", suite.header.ID()).Return(suite.snap)
 	suite.snap.On("Epochs").Return(suite.epochQuery)
+	suite.snap.On("Head").Return(
+		func() *flow.Header { return suite.header },
+		func() error { return nil })
+	suite.snap.On("Phase").Return(
+		func() flow.EpochPhase { return suite.phase },
+		func() error { return nil })
 
 	// add current and next epochs
 	suite.AddEpoch(suite.counter)
@@ -144,6 +165,28 @@ func (suite *Suite) SetupTest() {
 	var err error
 	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights)
 	suite.Require().Nil(err)
+}
+
+// StartEngine starts the engine under test, and spawns a routine to check for irrecoverable errors.
+func (suite *Suite) StartEngine() {
+	suite.ctx, suite.cancel, suite.errs = irrecoverable.WithSignallerAndCancel(context.Background())
+	go unittest.FailOnIrrecoverableError(suite.T(), suite.ctx.Done(), suite.errs)
+	suite.engine.Start(suite.ctx)
+	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
+}
+
+// TearDownTest stops the engine and checks for any irrecoverable errors.
+func (suite *Suite) TearDownTest() {
+	if suite.cancel == nil {
+		return
+	}
+	suite.cancel()
+	unittest.RequireCloseBefore(suite.T(), suite.engine.Done(), time.Second, "engine failed to stop")
+	select {
+	case err := <-suite.errs:
+		assert.NoError(suite.T(), err)
+	default:
+	}
 }
 
 func TestEpochManager(t *testing.T) {
@@ -198,17 +241,18 @@ func (suite *Suite) MockAsUnauthorizedNode() {
 	suite.factory = new(epochmgr.EpochComponentsFactory)
 	suite.factory.
 		On("Create", mock.Anything).
-		Return(nil, nil, nil, nil, nil, nil, ErrNotAuthorizedForEpoch)
+		Return(nil, nil, nil, nil, nil, nil, nil, ErrNotAuthorizedForEpoch)
 
 	var err error
 	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights)
 	suite.Require().Nil(err)
 }
 
-// if we start up during the setup phase, we should kick off the root QC voter
+// TestRestartInSetupPhase tests that, if we start up during the setup phase,
+// we should kick off the root QC voter
 func (suite *Suite) TestRestartInSetupPhase() {
-
-	suite.snap.On("Phase").Return(flow.EpochPhaseSetup, nil)
+	// we are in setup phase
+	suite.phase = flow.EpochPhaseSetup
 	// should call voter with next epoch
 	var called = make(chan struct{})
 	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
@@ -218,24 +262,22 @@ func (suite *Suite) TestRestartInSetupPhase() {
 		}).Once()
 
 	// start up the engine
-	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
-	unittest.AssertClosesBefore(suite.T(), called, time.Second)
+	suite.StartEngine()
 
-	suite.voter.AssertExpectations(suite.T())
+	unittest.AssertClosesBefore(suite.T(), called, time.Second)
+	suite.voter.AssertExpectations(suite.T()) // TODO replace with new constructor
 }
 
-// When a collection node joins the network at an epoch boundary, they must
-// start running during the EpochSetup phase in the epoch before they become
-// an authorized member so they submit their cluster QC vote.
+// TestStartAsUnauthorizedNode test that when a collection node joins the network
+// at an epoch boundary, they must start running during the EpochSetup phase in the
+// epoch before they become an authorized member so they submit their cluster QC vote.
 //
-// These nodes must kick off the root QC voter but should not attempt to
-// participate in cluster consensus in the current epoch.
+// These nodes must kick off the root QC voter but should not attempt to participate
+// in cluster consensus in the current epoch.
 func (suite *Suite) TestStartAsUnauthorizedNode() {
 	suite.MockAsUnauthorizedNode()
-
 	// we are in setup phase
-	suite.snap.On("Phase").Return(flow.EpochPhaseSetup, nil)
-
+	suite.phase = flow.EpochPhaseSetup
 	// should call voter with next epoch
 	var called = make(chan struct{})
 	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
@@ -245,7 +287,7 @@ func (suite *Suite) TestStartAsUnauthorizedNode() {
 		}).Once()
 
 	// start the engine
-	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
+	suite.StartEngine()
 
 	// should have submitted vote
 	unittest.AssertClosesBefore(suite.T(), called, time.Second)
@@ -254,9 +296,11 @@ func (suite *Suite) TestStartAsUnauthorizedNode() {
 	assert.Empty(suite.T(), suite.engine.epochs, "should have 0 epoch components")
 }
 
-// should kick off root QC voter on setup phase start event
+// TestRespondToPhaseChange should kick off root QC voter when we receive an event
+// indicating the EpochSetup phase has started.
 func (suite *Suite) TestRespondToPhaseChange() {
-
+	// start in staking phase
+	suite.phase = flow.EpochPhaseStaking
 	// should call voter with next epoch
 	var called = make(chan struct{})
 	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
@@ -265,46 +309,56 @@ func (suite *Suite) TestRespondToPhaseChange() {
 			close(called)
 		}).Once()
 
-	first := unittest.BlockHeaderFixture()
-	suite.state.On("AtBlockID", first.ID()).Return(suite.snap)
+	firstBlockOfEpochSetupPhase := unittest.BlockHeaderFixture()
+	suite.state.On("AtBlockID", firstBlockOfEpochSetupPhase.ID()).Return(suite.snap)
+	suite.StartEngine()
 
-	suite.engine.EpochSetupPhaseStarted(0, first)
+	// after receiving the protocol event, we should submit our root QC vote
+	suite.engine.EpochSetupPhaseStarted(0, firstBlockOfEpochSetupPhase)
 	unittest.AssertClosesBefore(suite.T(), called, time.Second)
 
 	suite.voter.AssertExpectations(suite.T())
 }
 
+// TestRespondToEpochTransition tests the engine's behaviour during epoch transition.
+// It should:
+//   - instantiate cluster consensus for the new epoch
+//   - register callback to stop the previous epoch's cluster consensus
+//   - stop the previous epoch's cluster consensus when the callback is invoked
 func (suite *Suite) TestRespondToEpochTransition() {
 
 	// we are in committed phase
-	suite.snap.On("Phase").Return(flow.EpochPhaseCommitted, nil)
+	suite.phase = flow.EpochPhaseCommitted
+	suite.StartEngine()
 
-	// start the engine
-	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
-
-	first := unittest.BlockHeaderFixture()
-	suite.state.On("AtBlockID", first.ID()).Return(suite.snap)
+	firstBlockOfEpoch := unittest.BlockHeaderFixture()
+	suite.state.On("AtBlockID", firstBlockOfEpoch.ID()).Return(suite.snap)
 
 	// should set up callback for height at which previous epoch expires
 	var expiryCallback func()
-	var done = make(chan struct{})
-	suite.heights.On("OnHeight", first.Height+flow.DefaultTransactionExpiry, mock.Anything).
+	heightRegistered := make(chan struct{})
+	suite.heights.On("OnHeight", firstBlockOfEpoch.Height+flow.DefaultTransactionExpiry, mock.Anything).
 		Run(func(args mock.Arguments) {
 			expiryCallback = args.Get(1).(func())
-			close(done)
+			close(heightRegistered)
 		}).
 		Once()
 
 	// mock the epoch transition
 	suite.TransitionEpoch()
 	// notify the engine of the epoch transition
-	suite.engine.EpochTransition(suite.counter, first)
-	unittest.AssertClosesBefore(suite.T(), done, time.Second)
+	suite.engine.EpochTransition(suite.counter, firstBlockOfEpoch)
+	// ensure we registered a height callback
+	unittest.AssertClosesBefore(suite.T(), heightRegistered, time.Second)
 	suite.Assert().NotNil(expiryCallback)
 
 	// the engine should have two epochs under management, the just ended epoch
 	// and the newly started epoch
-	suite.Assert().Len(suite.engine.epochs, 2)
+	suite.Eventually(func() bool {
+		suite.engine.mu.Lock()
+		defer suite.engine.mu.Unlock()
+		return len(suite.engine.epochs) == 2
+	}, time.Second, 10*time.Millisecond)
 	_, exists := suite.engine.epochs[suite.counter-1]
 	suite.Assert().True(exists, "should have previous epoch components")
 	_, exists = suite.engine.epochs[suite.counter]
@@ -318,10 +372,10 @@ func (suite *Suite) TestRespondToEpochTransition() {
 	expiryCallback()
 
 	suite.Assert().Eventually(func() bool {
-		suite.engine.unit.Lock()
-		defer suite.engine.unit.Unlock()
+		suite.engine.mu.Lock()
+		defer suite.engine.mu.Unlock()
 		return len(suite.engine.epochs) == 1
-	}, time.Second, time.Millisecond)
+	}, time.Second, 10*time.Millisecond)
 
 	// after the previous epoch expires, we should only have current epoch
 	_, exists = suite.engine.epochs[suite.counter]

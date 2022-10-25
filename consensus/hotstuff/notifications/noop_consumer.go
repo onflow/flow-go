@@ -1,6 +1,8 @@
 package notifications
 
 import (
+	"time"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -36,10 +38,6 @@ func (c *NoopConsumer) OnQcTriggeredViewChange(*flow.QuorumCertificate, uint64) 
 
 func (c *NoopConsumer) OnTcTriggeredViewChange(*flow.TimeoutCertificate, uint64) {}
 
-func (c *NoopConsumer) OnProposingBlock(*model.Proposal) {}
-
-func (c *NoopConsumer) OnVoting(*model.Vote) {}
-
 func (c *NoopConsumer) OnQcConstructedFromVotes(uint64, *flow.QuorumCertificate) {}
 
 func (*NoopConsumer) OnStartingTimeout(*model.TimerInfo) {}
@@ -66,3 +64,9 @@ func (c *NoopConsumer) OnPartialTcCreated(uint64, *flow.QuorumCertificate, *flow
 func (c *NoopConsumer) OnNewQcDiscovered(*flow.QuorumCertificate) {}
 
 func (c *NoopConsumer) OnNewTcDiscovered(*flow.TimeoutCertificate) {}
+
+func (c *NoopConsumer) OnOwnVote(flow.Identifier, uint64, []byte, flow.Identifier) {}
+
+func (c *NoopConsumer) OnOwnTimeout(*model.TimeoutObject) {}
+
+func (c *NoopConsumer) OnOwnProposal(*flow.Header, time.Time) {}

@@ -61,13 +61,13 @@ type Instance struct {
 	pendings       map[flow.Identifier]*model.Proposal // indexed by parent ID
 
 	// mocked dependencies
-	committee    *mocks.DynamicCommittee
-	builder      *module.Builder
-	finalizer    *module.Finalizer
-	persist      *mocks.Persister
-	signer       *mocks.Signer
-	verifier     *mocks.Verifier
-	communicator *mocks.Communicator
+	committee *mocks.DynamicCommittee
+	builder   *module.Builder
+	finalizer *module.Finalizer
+	persist   *mocks.Persister
+	signer    *mocks.Signer
+	verifier  *mocks.Verifier
+	notifier  *MockedCommunicatorConsumer
 
 	// real dependencies
 	pacemaker         hotstuff.PaceMaker
@@ -80,6 +80,26 @@ type Instance struct {
 
 	// main logic
 	handler *eventhandler.EventHandler
+}
+
+type MockedCommunicatorConsumer struct {
+	notifications.NoopConsumer
+	mock.Mock
+}
+
+// OnOwnProposal provides a mock function with given fields: proposal, delay
+func (_m *MockedCommunicatorConsumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+	_m.Called(proposal, targetPublicationTime)
+}
+
+// OnOwnTimeout provides a mock function with given fields: timeout
+func (_m *MockedCommunicatorConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
+	_m.Called(timeout)
+}
+
+// OnOwnVote provides a mock function with given fields: blockID, view, sigData, recipientID
+func (_m *MockedCommunicatorConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+	_m.Called(blockID, view, sigData, recipientID)
 }
 
 var _ hotstuff.TimeoutCollectorConsumer = (*Instance)(nil)
@@ -141,13 +161,13 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		queue:    make(chan interface{}, 1024),
 
 		// instance mocks
-		committee:    &mocks.DynamicCommittee{},
-		builder:      &module.Builder{},
-		persist:      &mocks.Persister{},
-		signer:       &mocks.Signer{},
-		verifier:     &mocks.Verifier{},
-		communicator: &mocks.Communicator{},
-		finalizer:    &module.Finalizer{},
+		committee: &mocks.DynamicCommittee{},
+		builder:   &module.Builder{},
+		persist:   &mocks.Persister{},
+		signer:    &mocks.Signer{},
+		verifier:  &mocks.Verifier{},
+		notifier:  &MockedCommunicatorConsumer{},
+		finalizer: &module.Finalizer{},
 	}
 
 	// insert root block into headers register
@@ -272,8 +292,10 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	in.verifier.On("VerifyTC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// program the hotstuff communicator behaviour
-	in.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(
-		func(header *flow.Header, delay time.Duration) error {
+	in.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			header, ok := args[0].(*flow.Header)
+			require.True(t, ok)
 
 			// sender should always have the parent
 			in.updatingBlocks.RLock()
@@ -281,7 +303,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			in.updatingBlocks.RUnlock()
 
 			if !exists {
-				return fmt.Errorf("parent for proposal not found (sender: %x, parent: %x)", in.localID, header.ParentID)
+				return
 			}
 
 			// set the height and chain ID
@@ -293,17 +315,15 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 			// store locally and loop back to engine for processing
 			in.ProcessBlock(proposal)
-
-			return nil
 		},
 	)
-	in.communicator.On("BroadcastTimeout", mock.Anything).Return(
-		func(timeoutObject *model.TimeoutObject) error {
-			in.queue <- timeoutObject
-			return nil
-		},
+	in.notifier.On("OnOwnTimeout", mock.Anything).Run(func(args mock.Arguments) {
+		timeoutObject, ok := args[0].(*model.TimeoutObject)
+		require.True(t, ok)
+		in.queue <- timeoutObject
+	},
 	)
-	in.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	in.notifier.On("OnOwnVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	// program the finalizer module behaviour
 	in.finalizer.On("MakeFinal", mock.Anything).Return(
@@ -322,7 +342,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				in.builder.Calls = nil
 				in.signer.Calls = nil
 				in.verifier.Calls = nil
-				in.communicator.Calls = nil
+				in.notifier.Calls = nil
 				in.finalizer.Calls = nil
 			}
 
@@ -340,7 +360,10 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		Int("index", int(index)).
 		Hex("node_id", in.localID[:]).
 		Logger()
-	notifier := notifications.NewLogConsumer(log)
+	notifier := pubsub.NewDistributor()
+	logConsumer := notifications.NewLogConsumer(log)
+	notifier.AddConsumer(logConsumer)
+	notifier.AddConsumer(in.notifier)
 
 	// initialize the block producer
 	in.producer, err = blockproducer.New(in.signer, in.committee, in.builder)
@@ -479,7 +502,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		in.producer,
 		in.forks,
 		in.persist,
-		in.communicator,
 		in.committee,
 		in.voteAggregator,
 		in.timeoutAggregator,
@@ -488,7 +510,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	)
 	require.NoError(t, err)
 
-	collectorDistributor.AddConsumer(notifier)
+	collectorDistributor.AddConsumer(logConsumer)
 	collectorDistributor.AddConsumer(&in)
 
 	return &in
@@ -506,7 +528,7 @@ func (in *Instance) Run() error {
 	<-util.AllReady(in.voteAggregator, in.timeoutAggregator)
 
 	// start the event handler
-	err := in.handler.Start()
+	err := in.handler.Start(ctx)
 	if err != nil {
 		return fmt.Errorf("could not start event handler: %w", err)
 	}

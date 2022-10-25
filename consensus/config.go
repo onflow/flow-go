@@ -10,10 +10,10 @@ import (
 // HotstuffModules is a helper structure to encapsulate dependencies to create
 // a hotStuff participant.
 type HotstuffModules struct {
-	Notifier                    hotstuff.Consumer               // observer for hotstuff events
 	Committee                   hotstuff.DynamicCommittee       // consensus committee
 	Signer                      hotstuff.Signer                 // signer of proposal & votes
 	Persist                     hotstuff.Persister              // last state of consensus participant
+	Notifier                    *pubsub.Distributor             // observer for hotstuff events
 	FinalizationDistributor     *pubsub.FinalizationDistributor // observer for finalization events, used by compliance engine
 	QCCreatedDistributor        *pubsub.QCCreatedDistributor    // observer for qc created event, used by leader
 	TimeoutCollectorDistributor *pubsub.TimeoutCollectorDistributor
@@ -24,12 +24,13 @@ type HotstuffModules struct {
 }
 
 type ParticipantConfig struct {
-	StartupTime               time.Time     // the time when consensus participant enters first view
-	TimeoutMinimum            time.Duration // the minimum timeout for the pacemaker
-	TimeoutMaximum            time.Duration // the maximum timeout for the pacemaker
-	TimeoutAdjustmentFactor   float64       // the factor at which the timeout duration is adjusted
-	HappyPathMaxRoundFailures uint64        // number of failed rounds before first timeout increase
-	BlockRateDelay            time.Duration // a delay to broadcast block proposal in order to control the block production rate
+	StartupTime                         time.Time     // the time when consensus participant enters first view
+	TimeoutMinimum                      time.Duration // the minimum timeout for the pacemaker
+	TimeoutMaximum                      time.Duration // the maximum timeout for the pacemaker
+	TimeoutAdjustmentFactor             float64       // the factor at which the timeout duration is adjusted
+	HappyPathMaxRoundFailures           uint64        // number of failed rounds before first timeout increase
+	BlockRateDelay                      time.Duration // a delay to broadcast block proposal in order to control the block production rate
+	MaxTimeoutObjectRebroadcastInterval time.Duration // maximum interval for timeout object rebroadcast
 }
 
 type Option func(*ParticipantConfig)

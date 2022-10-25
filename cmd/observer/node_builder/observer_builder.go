@@ -12,11 +12,12 @@ import (
 	"time"
 
 	badger "github.com/ipfs/go-ds-badger2"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
+
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
@@ -57,8 +59,16 @@ import (
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/cache"
+	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	stateprotocol "github.com/onflow/flow-go/state/protocol"
@@ -154,7 +164,7 @@ type ObserverServiceBuilder struct {
 	*ObserverServiceConfig
 
 	// components
-	LibP2PNode              *p2p.Node
+	LibP2PNode              *p2pnode.Node
 	FollowerState           stateprotocol.MutableState
 	SyncCore                *chainsync.Core
 	RpcEng                  *rpc.Engine
@@ -164,6 +174,7 @@ type ObserverServiceBuilder struct {
 	Finalized               *flow.Header
 	Pending                 []*flow.Header
 	FollowerCore            module.HotStuffFollower
+	Validator               hotstuff.Validator
 	ExecutionDataDownloader execution_data.Downloader
 	ExecutionDataRequester  state_synchronization.ExecutionDataRequester // for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
@@ -318,6 +329,7 @@ func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuild
 		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
 		// initialize the verifier for the protocol consensus
 		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
+		builder.Validator = hotstuffvalidator.New(builder.Committee, verifier)
 
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
@@ -360,6 +372,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 			builder.FollowerState,
 			conCache,
 			builder.FollowerCore,
+			builder.Validator,
 			builder.SyncCore,
 			node.Tracer,
 			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
@@ -618,7 +631,7 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 		Me:                  nodeID,
 		MiddlewareFactory:   func() (network.Middleware, error) { return builder.Middleware, nil },
 		Topology:            topology,
-		SubscriptionManager: p2p.NewChannelSubscriptionManager(middleware),
+		SubscriptionManager: subscription.NewChannelSubscriptionManager(middleware),
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
@@ -694,7 +707,7 @@ func (builder *ObserverServiceBuilder) initNodeInfo() error {
 		return fmt.Errorf("could not get peer ID from public key: %w", err)
 	}
 
-	builder.NodeID, err = p2p.NewPublicNetworkIDTranslator().GetFlowID(builder.peerID)
+	builder.NodeID, err = translator.NewPublicNetworkIDTranslator().GetFlowID(builder.peerID)
 	if err != nil {
 		return fmt.Errorf("could not get flow node ID: %w", err)
 	}
@@ -707,14 +720,14 @@ func (builder *ObserverServiceBuilder) initNodeInfo() error {
 
 func (builder *ObserverServiceBuilder) InitIDProviders() {
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
-		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
+		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
 		if err != nil {
 			return err
 		}
 
 		builder.IdentityProvider = idCache
 
-		builder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewPublicNetworkIDTranslator())
+		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
 		// use the default identifier provider
 		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
@@ -814,12 +827,12 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 // * No connection gater
 // * No connection manager
 // * Default libp2p pubsub options
-func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
-	return func(ctx context.Context) (*p2p.Node, error) {
+func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
+	return func(ctx context.Context) (*p2pnode.Node, error) {
 		var pis []peer.AddrInfo
 
 		for _, b := range builder.bootstrapIdentities {
-			pi, err := p2p.PeerAddressInfo(*b)
+			pi, err := utils.PeerAddressInfo(*b)
 
 			if err != nil {
 				return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
@@ -828,17 +841,17 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			pis = append(pis, pi)
 		}
 
-		node, err := p2p.NewNodeBuilder(builder.Logger, builder.BaseConfig.BindAddr, networkKey, builder.SporkID).
+		node, err := p2pbuilder.NewNodeBuilder(builder.Logger, builder.BaseConfig.BindAddr, networkKey, builder.SporkID).
 			SetSubscriptionFilter(
-				p2p.NewRoleBasedFilter(
-					p2p.UnstakedRole, builder.IdentityProvider,
+				subscription.NewRoleBasedFilter(
+					subscription.UnstakedRole, builder.IdentityProvider,
 				),
 			).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
+				return p2pdht.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
 					builder.Logger,
 					builder.Metrics.Network,
-					p2p.AsClient(),
+					p2pdht.AsClient(),
 					dht.BootstrapPeers(pis...),
 				)
 			}).
@@ -1018,21 +1031,21 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
-	factoryFunc p2p.LibP2PFactoryFunc,
+	factoryFunc p2pbuilder.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) network.Middleware {
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
-	builder.Middleware = p2p.NewMiddleware(
+	builder.Middleware = middleware.NewMiddleware(
 		builder.Logger,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
 		builder.Metrics.Bitswap,
 		builder.SporkID,
-		p2p.DefaultUnicastTimeout,
+		middleware.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
 		slashingViolationsConsumer,
-		p2p.WithMessageValidators(validators...),
+		middleware.WithMessageValidators(validators...),
 		// no peer manager
 		// use default identifier provider
 	)

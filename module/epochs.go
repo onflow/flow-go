@@ -12,12 +12,12 @@ import (
 // next epoch.
 type ClusterRootQCVoter interface {
 
-	// Vote handles the full procedure of generating a vote, submitting it to the
-	// epoch smart contract, and verifying submission. Returns an error only if
-	// there is a critical error that would make it impossible for the vote to be
-	// submitted. Otherwise, exits when the vote has been successfully submitted.
-	//
-	// It is safe to run Vote multiple times within a single setup phase.
+	// Vote handles the full procedure of generating a vote, submitting it to the epoch
+	// smart contract, and verifying submission. It is safe to run Vote multiple
+	// times within a single setup phase.
+	// Error returns:
+	//   - epochs.ErrWontVote if we fail to vote for a benign reason
+	//   - generic error in case of critical unexpected failure
 	Vote(context.Context, protocol.Epoch) error
 }
 
@@ -30,10 +30,18 @@ type QCContractClient interface {
 	// contract. This function returns only once the transaction has been
 	// processed by the network. An error is returned if the transaction has
 	// failed and should be re-submitted.
+	// Error returns:
+	//   - network.TransientError for any errors from the underlying client, if the retry period has been exceeded
+	//   - errTransactionExpired if the transaction has expired
+	//   - errTransactionReverted if the transaction execution reverted
+	//   - generic error in case of unexpected critical failure
 	SubmitVote(ctx context.Context, vote *model.Vote) error
 
 	// Voted returns true if we have successfully submitted a vote to the
 	// cluster QC aggregator smart contract for the current epoch.
+	// Error returns:
+	//   - network.TransientError for any errors from the underlying Flow client
+	//   - generic error in case of unexpected critical failures
 	Voted(ctx context.Context) (bool, error)
 }
 

@@ -31,7 +31,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
-	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
+	"github.com/onflow/flow-go/engine/consensus/message_hub"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -61,7 +61,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const hotstuffTimeout = 50 * time.Millisecond
+const hotstuffTimeout = 500 * time.Millisecond
 
 // RandomBeaconNodeInfo stores information about participation in DKG process for consensus node
 // contains private + public keys and participant index
@@ -145,6 +145,7 @@ type Node struct {
 	committee         *committees.Consensus
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
+	messageHub        *message_hub.MessageHub
 	state             *bprotocol.MutableState
 	headers           *storage.Headers
 	net               *Network
@@ -185,7 +186,7 @@ func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
 // stopping condition is reached.
 // The list of created nodes, the common network hub, and a function which starts
 // all the nodes together, is returned.
-func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot protocol.Snapshot, stopper *Stopper) (nodes []*Node, hub *Hub, startNodes func()) {
+func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot protocol.Snapshot, stopper *Stopper) (nodes []*Node, hub *Hub, runFor func(time.Duration)) {
 	consensus, err := rootSnapshot.Identities(filter.HasRole(flow.RoleConsensus))
 	require.NoError(t, err)
 
@@ -222,17 +223,19 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	// create a function to return which the test case can use to start the nodes
-	startNodes = func() {
+	// create a function to return which the test case can use to run the nodes for some maximum duration
+	// and gracefully stop after.
+	runFor = func(maxDuration time.Duration) {
 		runNodes(signalerCtx, nodes)
+		unittest.RequireCloseBefore(t, stopper.stopped, maxDuration, "expect to get signal from stopper before timeout")
+		stopNodes(t, cancel, nodes)
 	}
 
-	// register a function to stop all nodes once the Stopper determines the test is safe to stop
 	stopper.WithStopFunc(func() {
-		stopNodes(t, cancel, nodes)
+
 	})
 
-	return nodes, hub, startNodes
+	return nodes, hub, runFor
 }
 
 func createRootQC(t *testing.T, root *flow.Block, participantData *run.ParticipantData) *flow.QuorumCertificate {
@@ -455,9 +458,6 @@ func createNode(
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
 
-	prov := &mockconsensus.ProposalProvider{}
-	prov.On("ProvideProposal", mock.Anything).Maybe()
-
 	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector)
 	require.NoError(t, err)
 
@@ -539,12 +539,13 @@ func createNode(
 		fullState,
 		cache,
 		syncCore,
+		validator,
 		voteAggregator,
 		timeoutAggregator,
 	)
 	require.NoError(t, err)
 
-	comp, err := compliance.NewEngine(log, net, me, prov, compCore)
+	comp, err := compliance.NewEngine(log, me, compCore)
 	require.NoError(t, err)
 
 	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
@@ -576,15 +577,33 @@ func createNode(
 		log,
 		metricsCollector,
 		build,
-		comp,
 		rootHeader,
 		[]*flow.Header{},
 		hotstuffModules,
 		consensus.WithMinTimeout(hotstuffTimeout),
+		func(cfg *consensus.ParticipantConfig) {
+			cfg.MaxTimeoutObjectRebroadcastInterval = hotstuffTimeout
+		},
 	)
 	require.NoError(t, err)
 
 	comp = comp.WithConsensus(hot)
+
+	messageHub, err := message_hub.NewMessageHub(
+		log,
+		net,
+		me,
+		comp,
+		hot,
+		voteAggregator,
+		timeoutAggregator,
+		state,
+		headersDB,
+		payloadsDB,
+	)
+	require.NoError(t, err)
+
+	notifier.AddConsumer(messageHub)
 
 	node.compliance = comp
 	node.sync = sync
@@ -593,6 +612,7 @@ func createNode(
 	node.committee = committee
 	node.voteAggregator = hotstuffModules.VoteAggregator
 	node.timeoutAggregator = hotstuffModules.TimeoutAggregator
+	node.messageHub = messageHub
 	node.headers = headersDB
 	node.net = net
 	node.log = log

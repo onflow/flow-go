@@ -85,7 +85,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
@@ -170,11 +170,12 @@ func GenericNodeWithStateFixture(t testing.TB,
 	net := stub.NewNetwork(t, identity.NodeID, hub)
 
 	parentCtx, cancel := context.WithCancel(context.Background())
-	ctx, _ := irrecoverable.WithSignaler(parentCtx)
+	ctx, errs := irrecoverable.WithSignaler(parentCtx)
 
 	return testmock.GenericNode{
 		Ctx:            ctx,
 		Cancel:         cancel,
+		Errs:           errs,
 		Log:            log,
 		Metrics:        metrics,
 		Tracer:         tracer,
@@ -297,7 +298,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	)
 	require.NoError(t, err)
 
-	proposalFactory, err := factories.NewProposalEngineFactory(
+	complianceEngineFactory, err := factories.NewComplianceEngineFactory(
 		node.Log,
 		node.Net,
 		node.Me,
@@ -328,14 +329,22 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	)
 	require.NoError(t, err)
 
+	messageHubFactory := factories.NewMessageHubFactory(
+		node.Log,
+		node.Net,
+		node.Me,
+		node.State,
+	)
+
 	factory := factories.NewEpochComponentsFactory(
 		node.Me,
 		pools,
 		builderFactory,
 		clusterStateFactory,
 		hotstuffFactory,
-		proposalFactory,
+		complianceEngineFactory,
 		syncFactory,
+		messageHubFactory,
 	)
 
 	rootQCVoter := new(mockmodule.ClusterRootQCVoter)
@@ -657,18 +666,21 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	node.ProtocolEvents.AddConsumer(ingestionEngine)
 
 	followerCore, finalizer := createFollowerCore(t, &node, followerState, finalizationDistributor, rootHead, rootQC)
+	// mock out hotstuff validator
+	validator := new(mockhotstuff.Validator)
+	validator.On("ValidateProposal", mock.Anything).Return(nil)
 
 	// initialize cleaner for DB
 	cleaner := storage.NewCleaner(node.Log, node.PublicDB, node.Metrics, flow.DefaultValueLogGCFrequency)
 
 	followerEng, err := follower.New(node.Log, node.Net, node.Me, node.Metrics, node.Metrics, cleaner,
-		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, syncCore, node.Tracer)
+		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, validator, syncCore, node.Tracer)
 	require.NoError(t, err)
 
 	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
 	require.NoError(t, err)
 
-	idCache, err := p2p.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
+	idCache, err := cache.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
 	require.NoError(t, err, "could not create finalized snapshot cache")
 	syncEngine, err := synchronization.New(
 		node.Log,

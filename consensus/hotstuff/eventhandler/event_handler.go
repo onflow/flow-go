@@ -1,6 +1,7 @@
 package eventhandler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool"
 )
 
 // EventHandler is the main handler for individual events that trigger state transition.
@@ -33,13 +33,14 @@ import (
 //     as well, but only when receiving proposal for view lower than active view.
 //     To summarize, to make a valid proposal for view N we need to have a QC or TC for N-1 and know the proposal with blockID
 //     NewestQC.BlockID.
+//
+// Not concurrency safe.
 type EventHandler struct {
 	log               zerolog.Logger
 	paceMaker         hotstuff.PaceMaker
 	blockProducer     hotstuff.BlockProducer
 	forks             hotstuff.Forks
 	persist           hotstuff.Persister
-	communicator      hotstuff.Communicator
 	committee         hotstuff.Replicas
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
@@ -56,7 +57,6 @@ func NewEventHandler(
 	blockProducer hotstuff.BlockProducer,
 	forks hotstuff.Forks,
 	persist hotstuff.Persister,
-	communicator hotstuff.Communicator,
 	committee hotstuff.Replicas,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
@@ -69,7 +69,6 @@ func NewEventHandler(
 		blockProducer:     blockProducer,
 		forks:             forks,
 		persist:           persist,
-		communicator:      communicator,
 		safetyRules:       safetyRules,
 		committee:         committee,
 		voteAggregator:    voteAggregator,
@@ -178,12 +177,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 
 	// notify vote aggregator about a new block, so that it can start verifying
 	// votes for it.
-	err = e.voteAggregator.AddBlock(proposal)
-	if err != nil {
-		if !mempool.IsBelowPrunedThresholdError(err) {
-			return fmt.Errorf("could not add block (%v) to vote aggregator: %w", block.BlockID, err)
-		}
-	}
+	e.voteAggregator.AddBlock(proposal)
 
 	// if the block is for the current view, then try voting for this block
 	err = e.processBlockForCurrentView(proposal)
@@ -255,7 +249,10 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 
 // Start starts the event handler.
 // No errors are expected during normal operation.
-func (e *EventHandler) Start() error {
+// CAUTION: EventHandler is not concurrency safe. The Start method must
+// be executed by the same goroutine that also calls the other business logic
+// methods, or concurrency safety has to be implemented externally.
+func (e *EventHandler) Start(ctx context.Context) error {
 	err := e.processPendingBlocks()
 	if err != nil {
 		return fmt.Errorf("could not process pending blocks: %w", err)
@@ -264,7 +261,7 @@ func (e *EventHandler) Start() error {
 	if err != nil {
 		return fmt.Errorf("could not start new view: %w", err)
 	}
-	e.paceMaker.Start()
+	e.paceMaker.Start(ctx)
 	return nil
 }
 
@@ -301,11 +298,8 @@ func (e *EventHandler) broadcastTimeoutObjectIfAuthorized() error {
 	// contribute produced timeout to TC aggregation logic
 	e.timeoutAggregator.AddTimeout(timeout)
 
-	// broadcast timeout to participants
-	err = e.communicator.BroadcastTimeout(timeout)
-	if err != nil {
-		log.Warn().Err(err).Msg("failed to broadcast TimeoutObject")
-	}
+	// raise a notification to broadcast timeout
+	e.notifier.OnOwnTimeout(timeout)
 	log.Debug().Msg("broadcast TimeoutObject done")
 
 	return nil
@@ -423,7 +417,6 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	if err != nil {
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
-	e.notifier.OnProposingBlock(proposal)
 
 	// we want to store created proposal in forks to make sure that we don't create more proposals for
 	// current view. Due to asynchronous nature of our design it's possible that after creating proposal
@@ -442,20 +435,10 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		Hex("signer", block.ProposerID[:]).
 		Msg("forwarding proposal to communicator for broadcasting")
 
-	// broadcast the proposal
+	// raise a notification with proposal (also triggers broadcast)
 	header := model.ProposalToFlow(proposal)
-	delay := e.paceMaker.BlockRateDelay()
-	elapsed := time.Since(start)
-	if elapsed > delay {
-		delay = 0
-	} else {
-		delay = delay - elapsed
-	}
-	err = e.communicator.BroadcastProposalWithDelay(header, delay)
-	if err != nil {
-		log.Warn().Err(err).Msg("could not forward proposal")
-	}
-
+	targetPublicationTime := start.Add(e.paceMaker.BlockRateDelay())
+	e.notifier.OnOwnProposal(header, targetPublicationTime)
 	return nil
 }
 
@@ -527,19 +510,13 @@ func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLea
 		return nil
 	}
 
-	// The following code is only reached, if this replica has produced a vote.
-	// Send the vote to the next leader (or directly process it, if I am the next leader).
-	e.notifier.OnVoting(ownVote)
-
 	if e.committee.Self() == nextLeader { // I am the next leader
 		log.Debug().Msg("forwarding vote to vote aggregator")
 		e.voteAggregator.AddVote(ownVote)
 	} else {
 		log.Debug().Msg("forwarding vote to compliance engine")
-		err = e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
-		if err != nil {
-			log.Warn().Err(err).Msg("could not forward vote")
-		}
+		// raise a notification to send vote
+		e.notifier.OnOwnVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
 	}
 	return nil
 }

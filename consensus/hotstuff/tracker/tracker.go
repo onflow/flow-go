@@ -35,7 +35,7 @@ func (t *NewestQCTracker) Track(qc *flow.QuorumCertificate) bool {
 			return false
 		}
 		// attempt to install new value, repeat in case of shared update.
-		if t.newestQC.CAS(unsafe.Pointer(NewestQC), unsafe.Pointer(qc)) {
+		if t.newestQC.CompareAndSwap(unsafe.Pointer(NewestQC), unsafe.Pointer(qc)) {
 			return true
 		}
 	}
@@ -74,7 +74,7 @@ func (t *NewestTCTracker) Track(tc *flow.TimeoutCertificate) bool {
 			return false
 		}
 		// attempt to install new value, repeat in case of shared update.
-		if t.newestTC.CAS(unsafe.Pointer(NewestTC), unsafe.Pointer(tc)) {
+		if t.newestTC.CompareAndSwap(unsafe.Pointer(NewestTC), unsafe.Pointer(tc)) {
 			return true
 		}
 	}
