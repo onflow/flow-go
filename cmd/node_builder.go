@@ -187,9 +187,6 @@ type NetworkConfig struct {
 	PeerScoringEnabled              bool // enables peer scoring on pubsub
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
-	HeroCacheMetricsEnable          bool
-	SyncCoreConfig                  chainsync.Config
-	CodecFactory                    func() network.Codec
 	// UnicastRateLimitDryRun will disable connection disconnects and gating when unicast rate limiters are configured
 	UnicastRateLimitDryRun bool
 	//UnicastRateLimitLockoutDuration the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node
