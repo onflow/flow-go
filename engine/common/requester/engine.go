@@ -398,7 +398,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 	// create a batch request, send it and store it for reference
 	req := &messages.EntityRequest{
-		Nonce:     rand.Uint64(),
+		Nonce:     e.rng.Uint64(),
 		EntityIDs: entityIDs,
 	}
 
