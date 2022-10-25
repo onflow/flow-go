@@ -279,7 +279,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	// log and collect metrics for unicast messages that are rate limited
 	onUnicastRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
 		fnb.Logger.Warn().
-			Str("peer_id", peerID.Pretty()).
+			Str("peer_id", peerID.String()).
 			Str("role", role).
 			Str("message_type", msgType).
 			Str("topic", topic.String()).
