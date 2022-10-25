@@ -42,8 +42,10 @@ func TestUnmarshal(t *testing.T) {
 	envTemplate := string(textReader(TEST_FILES + ACCESS_TEMPLATE))
 
 	envStruct := unmarshalToStruct(envTemplate, &NodeDetails{}).(*NodeDetails)
+	require.Equal(t, 2, len(envStruct.Args))
 	require.Equal(t, "--bootstrapdir=/bootstrap", envStruct.Args[0])
 	require.Equal(t, "--access", envStruct.Args[1])
+	require.Equal(t, 2, len(envStruct.Env))
 	require.Equal(t, "access name", envStruct.Env[0].Name)
 	require.Equal(t, "access {{.NodeID}}", envStruct.Env[0].Value)
 	require.Equal(t, "access numbers", envStruct.Env[1].Name)
@@ -95,6 +97,11 @@ func TestLoadJson(t *testing.T) {
 	require.Equal(t, "consensus2_nodeID", nodesData["consensus2"].NodeID)
 	require.Equal(t, "execution1_nodeID", nodesData["execution1"].NodeID)
 	require.Equal(t, "verification1_nodeID", nodesData["verification1"].NodeID)
+}
+
+func TestBuildStruct(t *testing.T) {
+	nodeData := make(map[string]Node)
+	nodeData["access1"] = Node{NodeID: "access1_nodeID"}
 }
 
 func deleteFile(filepath string) {

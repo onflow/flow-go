@@ -44,7 +44,12 @@ var DEFAULT_CONSENSUS_IMAGE string = "gcr.io/flow-container-registry/consensus:v
 var DEFAULT_EXECUTION_IMAGE string = "gcr.io/flow-container-registry/execution:v0.27.6"
 var DEFAULT_VERIFICATION_IMAGE string = "gcr.io/flow-container-registry/verification:v0.27.6"
 
-func GenerateValuesYaml(inputJsonFilePath string, templatePath string, outputYamlFilePath string) {
+func GenerateValuesYaml(inputJsonFilePath string, templatePath string, outputYamlFilePath string, params ...string) {
+	GenerateValuesYamlWithImages(inputJsonFilePath, templatePath, outputYamlFilePath, DEFAULT_ACCESS_IMAGE, DEFAULT_COLLECTION_IMAGE, DEFAULT_CONSENSUS_IMAGE, DEFAULT_EXECUTION_IMAGE, DEFAULT_VERIFICATION_IMAGE)
+}
+
+func GenerateValuesYamlWithImages(inputJsonFilePath string, templatePath string, outputYamlFilePath string,
+	accessImage string, collectionImage string, consensusImage string, executionImage string, verificationImage string) {
 	templateFolder := TEMPLATE_PATH
 	if templatePath != "" {
 		templateFolder = templatePath
@@ -55,7 +60,7 @@ func GenerateValuesYaml(inputJsonFilePath string, templatePath string, outputYam
 	}
 	nodesData, nodeConfig := loadNodeJsonData(nodeInfoJson)
 
-	values := buildValuesStruct(templateFolder, nodesData, nodeConfig)
+	values := buildValuesStruct(templateFolder, nodesData, nodeConfig, accessImage, collectionImage, consensusImage, executionImage, verificationImage)
 
 	marshalToYaml(values, outputYamlFilePath)
 }
@@ -90,28 +95,29 @@ func loadNodeJsonData(nodeInfoPath string) (map[string]Node, map[string]int) {
 	return nodeMap, nodeConfig
 }
 
-func buildValuesStruct(templateFolder string, nodesData map[string]Node, nodeConfig map[string]int) *Values {
+func buildValuesStruct(templateFolder string, nodesData map[string]Node, nodeConfig map[string]int,
+	accessImage string, collectionImage string, consensusImage string, executionImage string, verificationImage string) *Values {
 	resources := string(textReader(templateFolder + RESOURCES_TEMPLATE))
 	nodeTypeResources := unmarshalToStruct(resources, &Defaults{}).(*Defaults)
 
 	accessTemplatePath := templateFolder + ACCESS_TEMPLATE
-	accessNodeMap := nodeStruct("access", accessTemplatePath, DEFAULT_ACCESS_IMAGE, nodesData, nodeConfig)
+	accessNodeMap := nodeStruct("access", accessTemplatePath, accessImage, nodesData, nodeConfig)
 	var accessNodes = NodesDefs{Defaults: *nodeTypeResources, Nodes: accessNodeMap}
 
 	collectionTemplatePath := templateFolder + COLLECTION_TEMPLATE
-	collectionNodeMap := nodeStruct("collection", collectionTemplatePath, DEFAULT_COLLECTION_IMAGE, nodesData, nodeConfig)
+	collectionNodeMap := nodeStruct("collection", collectionTemplatePath, collectionImage, nodesData, nodeConfig)
 	var collectionNodes = NodesDefs{Defaults: *nodeTypeResources, Nodes: collectionNodeMap}
 
 	consensusTemplatePath := templateFolder + CONSENSUS_TEMPLATE
-	consensusNodeMap := nodeStruct("consensus", consensusTemplatePath, DEFAULT_CONSENSUS_IMAGE, nodesData, nodeConfig)
+	consensusNodeMap := nodeStruct("consensus", consensusTemplatePath, consensusImage, nodesData, nodeConfig)
 	var consensusNodes = NodesDefs{Defaults: *nodeTypeResources, Nodes: consensusNodeMap}
 
 	executionTemplatePath := templateFolder + EXECUTION_TEMPLATE
-	executionNodeMap := nodeStruct("execution", executionTemplatePath, DEFAULT_EXECUTION_IMAGE, nodesData, nodeConfig)
+	executionNodeMap := nodeStruct("execution", executionTemplatePath, executionImage, nodesData, nodeConfig)
 	var executionNodes = NodesDefs{Defaults: *nodeTypeResources, Nodes: executionNodeMap}
 
 	verificationTemplatePath := templateFolder + VERIFICATION_TEMPLATE
-	verificationNodeMap := nodeStruct("verification", verificationTemplatePath, DEFAULT_VERIFICATION_IMAGE, nodesData, nodeConfig)
+	verificationNodeMap := nodeStruct("verification", verificationTemplatePath, verificationImage, nodesData, nodeConfig)
 	var verificationNodes = NodesDefs{Defaults: *nodeTypeResources, Nodes: verificationNodeMap}
 
 	return &Values{Branch: "fake-branch", Commit: "123456", Defaults: EmptyStruct{}, Access: accessNodes, Collection: collectionNodes,
