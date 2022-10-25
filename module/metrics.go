@@ -35,7 +35,7 @@ type NetworkSecurityMetrics interface {
 	OnUnauthorizedMessage(role, msgType, topic, offense string)
 
 	// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
-	OnRateLimitedUnicastMessage(role, msgType, topic string)
+	OnRateLimitedUnicastMessage(role, msgType, topic, reason string)
 }
 
 type NetworkMetrics interface {
