@@ -28,7 +28,7 @@ func TestConnectionGater(t *testing.T) {
 	ids := flow.IdentityList{}
 	inbounds := make([]chan string, 0, 5)
 
-	blacklist := flow.IdentityList{}
+	blacklist := map[*flow.Identity]struct{}{}
 
 	for i := 0; i < count; i++ {
 		handler, inbound := p2pfixtures.StreamHandlerFixture(t)
@@ -40,8 +40,12 @@ func TestConnectionGater(t *testing.T) {
 			p2pfixtures.WithDefaultStreamHandler(handler),
 			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
 			p2pfixtures.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
-				list := make(peer.IDSlice, 0, len(ids))
+				list := make(peer.IDSlice, 0)
 				for _, id := range ids {
+					if _, ok := blacklist[id]; ok {
+						continue
+					}
+
 					pid, err := unittest.PeerIDFromFlowID(id)
 					require.NoError(t, err)
 
@@ -50,7 +54,7 @@ func TestConnectionGater(t *testing.T) {
 				return list
 			}),
 			p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
-				for _, id := range blacklist {
+				for id := range blacklist {
 					bid, err := unittest.PeerIDFromFlowID(id)
 					require.NoError(t, err)
 					if bid == pid {
@@ -66,8 +70,8 @@ func TestConnectionGater(t *testing.T) {
 		inbounds = append(inbounds, inbound)
 	}
 
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 1*time.Second)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 1*time.Second)
 
 	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
@@ -81,10 +85,11 @@ func TestConnectionGater(t *testing.T) {
 
 	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
-	time.Sleep(2 * time.Second)
-
 	// now we blacklist one of the nodes (the last node)
-	blacklist = append(blacklist, ids[len(ids)-1])
+	blacklist[ids[len(ids)-1]] = struct{}{}
+
+	time.Sleep(1 * time.Second)
+
 	p2pfixtures.EnsureNotConnected(t, ctx, nodes[:count-1], nodes[count-1:])
 	p2pfixtures.EnsureNoPubsubMessageExchange(t, ctx, nodes[:count-1], nodes[count-1:], func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
