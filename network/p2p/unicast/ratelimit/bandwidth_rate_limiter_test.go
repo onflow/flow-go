@@ -40,6 +40,16 @@ func TestBandWidthRateLimiter_Allow(t *testing.T) {
 	require.True(t, allowed)
 	allowed = bandwidthRateLimiter.Allow(peerID, msg)
 	require.False(t, allowed)
+	
+	
+	// wait for 1 second, the rate limiter should allow 3 messages again
+	time.Sleep(1 * time.Second)
+	allowed = bandwidthRateLimiter.Allow(peerID, msg)
+	require.True(t, allowed)
+	allowed = bandwidthRateLimiter.Allow(peerID, msg)
+	require.True(t, allowed)
+	allowed = bandwidthRateLimiter.Allow(peerID, msg)
+	require.False(t, allowed)
 }
 
 // TestBandWidthRateLimiter_IsRateLimited ensures IsRateLimited returns true for peers that are rate limited.
