@@ -493,14 +493,8 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// create the reader
 	r := ggio.NewDelimitedReader(s, LargeMsgMaxUnicastMsgSize)
-
 	for {
 		if ctx.Err() != nil {
-			return
-		}
-
-		// check if unicast messages have reached rate limit before processing next message
-		if !m.unicastRateLimiters.MessageAllowed(remotePeer) {
 			return
 		}
 
@@ -514,6 +508,11 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			}
 
 			m.log.Err(err).Msg("failed to read message")
+			return
+		}
+
+		// check if unicast messages have reached rate limit before processing next message
+		if !m.unicastRateLimiters.MessageAllowed(remotePeer) {
 			return
 		}
 
