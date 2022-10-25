@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -22,15 +23,12 @@ func TestConnectionGater(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	defer cancel()
 
-	// We create a group of 5 nodes WITHOUT the peer scoring enabled.
-	// This is to isolate the connection gater functionality from the peer scoring, and
-	// ensure that peers are truly being blocked by the connection gater (and not by the peer scoring).
-	blacklistedPeers := make(map[peer.ID]struct{})
-
 	count := 5
 	nodes := make([]*p2pnode.Node, 0, 5)
 	ids := flow.IdentityList{}
 	inbounds := make([]chan string, 0, 5)
+
+	blacklist := flow.IdentityList{}
 
 	for i := 0; i < count; i++ {
 		handler, inbound := p2pfixtures.StreamHandlerFixture(t)
@@ -40,11 +38,26 @@ func TestConnectionGater(t *testing.T) {
 			t.Name(),
 			p2pfixtures.WithRole(flow.RoleConsensus),
 			p2pfixtures.WithDefaultStreamHandler(handler),
-			p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
-				_, blacklisted := blacklistedPeers[pid]
-				if blacklisted {
-					return fmt.Errorf("peer id blacklisted: %s", pid.String())
+			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
+			p2pfixtures.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
+				list := make(peer.IDSlice, 0, len(ids))
+				for _, id := range ids {
+					pid, err := unittest.PeerIDFromFlowID(id)
+					require.NoError(t, err)
+
+					list = append(list, pid)
 				}
+				return list
+			}),
+			p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
+				for _, id := range blacklist {
+					bid, err := unittest.PeerIDFromFlowID(id)
+					require.NoError(t, err)
+					if bid == pid {
+						return fmt.Errorf("blacklisted")
+					}
+				}
+
 				return nil
 			}))
 
@@ -65,4 +78,16 @@ func TestConnectionGater(t *testing.T) {
 		return unittest.ProposalFixture(), blockTopic
 	})
 	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, ids, inbounds, p2pfixtures.LongMessageFactoryFixture(t))
+
+	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+
+	time.Sleep(2 * time.Second)
+
+	// now we blacklist one of the nodes (the last node)
+	blacklist = append(blacklist, ids[len(ids)-1])
+	p2pfixtures.EnsureNotConnected(t, ctx, nodes[:count-1], nodes[count-1:])
+	p2pfixtures.EnsureNoPubsubMessageExchange(t, ctx, nodes[:count-1], nodes[count-1:], func() (interface{}, channels.Topic) {
+		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+		return unittest.ProposalFixture(), blockTopic
+	})
 }
