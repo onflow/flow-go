@@ -499,6 +499,11 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			return
 		}
 
+		// check if unicast messages have reached rate limit before processing next message
+		if !m.unicastRateLimiters.MessageAllowed(remotePeer) {
+			return
+		}
+
 		// Note: message fields must not be trusted until explicitly validated
 		var msg message.Message
 		// read the next message (blocking call)
@@ -509,11 +514,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			}
 
 			m.log.Err(err).Msg("failed to read message")
-			return
-		}
-
-		// check if unicast messages have reached rate limit before processing next message
-		if !m.unicastRateLimiters.MessageAllowed(remotePeer) {
 			return
 		}
 
