@@ -311,8 +311,7 @@ func (builder *LibP2PNodeBuilder) Build() (*p2pnode.Node, error) {
 
 // DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
 // customized with options
-func DefaultLibP2PHost(address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host,
-	error) {
+func DefaultLibP2PHost(address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host, error) {
 	defaultOptions, err := defaultLibP2POptions(address, key)
 	if err != nil {
 		return nil, err
