@@ -110,7 +110,6 @@ func (l *Libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSli
 // A node would have created such extra connections earlier when the identity list may have been different, or
 // it may have been target of such connections from node which have now been excluded.
 func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
-
 	// convert the peerInfos to a peer.ID -> bool map
 	peersToKeep := make(map[peer.ID]bool, len(peerIDs))
 	for _, pid := range peerIDs {
@@ -132,28 +131,24 @@ func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 		}
 
 		peerInfo := l.host.Network().Peerstore().PeerInfo(peerID)
-		log := l.log.With().Str("remote_peer", peerInfo.String()).Logger()
-		if l.host.ConnManager().IsProtected(peerID, "") {
-			log.Trace().Msg("skipping pruning since connection is protected")
-			continue // connection is protected (stream or connection in progress), skip pruning
-		}
+		lg := l.log.With().Str("remote_peer", peerInfo.String()).Logger()
 
-		// retain the connection if there is a Flow One-to-One stream on that connection
-		// (we do not want to sever a connection with on going direct one-to-one traffic)
+		// log the protected status of the connection
+		protected := l.host.ConnManager().IsProtected(peerID, "")
+		lg = lg.With().Bool("protected", protected).Logger()
+
+		// log if any stream is open on this connection.
 		flowStream := p2putils.FlowStream(conn)
 		if flowStream != nil {
-			log.Info().
-				Str("stream_protocol", string(flowStream.Protocol())).
-				Msg("skipping connection pruning with peer due to one-to-one stream")
-			continue // flow stream found, skip pruning
+			lg = lg.With().Str("flow_stream", fmt.Sprintf("%s", flowStream.Protocol())).Logger()
 		}
 
 		// close the connection with the peer if it is not part of the current fanout
 		err := l.host.Network().ClosePeer(peerID)
 		if err != nil {
-			log.Error().Err(err).Msg("failed to disconnect from peer")
+			lg.Error().Err(err).Msg("failed to disconnect from peer")
 		} else {
-			log.Debug().Msg("disconnected from peer not included in the fanout")
+			lg.Warn().Msg("disconnected from peer as it is not part of protocol")
 		}
 	}
 }
