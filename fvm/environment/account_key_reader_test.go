@@ -6,11 +6,12 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
+	testMock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/environment/mock"
-	testMock "github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 func newDummyAccountKeyReader(t *testing.T, keyCount uint64) AccountKeyReader {
