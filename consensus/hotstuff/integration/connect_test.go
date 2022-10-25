@@ -81,25 +81,23 @@ func Connect(t *testing.T, instances []*Instance) {
 				// convert into vote
 				vote := model.VoteFromFlow(sender.localID, blockID, view, sigData)
 
-				// should never send to self
-				if recipientID == sender.localID {
-					t.Fatalf("can't send to self (sender: %x)", sender.localID)
-				}
-
-				// check if we should block the outgoing vote
-				if sender.blockVoteOut(vote) {
-					return
-				}
-
 				// get the receiver
 				receiver, exists := lookup[recipientID]
 				if !exists {
 					t.Fatalf("recipient doesn't exist (sender: %x, receiver: %x)", sender.localID, recipientID)
 				}
 
-				// check if e should block the incoming vote
-				if receiver.blockVoteIn(vote) {
-					return
+				// if we are next leader we should be receiving our own vote
+				if recipientID != sender.localID {
+					// check if we should block the outgoing vote
+					if sender.blockVoteOut(vote) {
+						return
+					}
+
+					// check if e should block the incoming vote
+					if receiver.blockVoteIn(vote) {
+						return
+					}
 				}
 
 				// submit the vote to the receiving event loop (non-blocking)

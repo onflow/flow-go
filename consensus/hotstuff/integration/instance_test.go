@@ -316,7 +316,16 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		in.queue <- timeoutObject
 	},
 	)
-	in.notifier.On("OnOwnVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	// in case of single node setup we should just forward vote to our own node
+	// for multi-node setup this method will be overridden
+	in.notifier.On("OnOwnVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		in.queue <- &model.Vote{
+			View:     args[1].(uint64),
+			BlockID:  args[0].(flow.Identifier),
+			SignerID: in.localID,
+			SigData:  args[2].([]byte),
+		}
+	})
 
 	// program the finalizer module behaviour
 	in.finalizer.On("MakeFinal", mock.Anything).Return(
@@ -557,6 +566,9 @@ func (in *Instance) Run() error {
 		case msg := <-in.queue:
 			switch m := msg.(type) {
 			case *model.Proposal:
+				// add block to aggregator
+				in.voteAggregator.AddBlock(m)
+				// then pass to event handler
 				err := in.handler.OnReceiveProposal(m)
 				if err != nil {
 					return fmt.Errorf("could not process proposal: %w", err)

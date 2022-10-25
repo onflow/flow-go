@@ -253,15 +253,13 @@ type EventHandlerSuite struct {
 
 	eventhandler *EventHandler
 
-	paceMaker         hotstuff.PaceMaker
-	forks             *Forks
-	persist           *mocks.Persister
-	blockProducer     *BlockProducer
-	committee         *Committee
-	voteAggregator    *mocks.VoteAggregator
-	timeoutAggregator *mocks.TimeoutAggregator
-	notifier          *mocks.Consumer
-	safetyRules       *SafetyRules
+	paceMaker     hotstuff.PaceMaker
+	forks         *Forks
+	persist       *mocks.Persister
+	blockProducer *BlockProducer
+	committee     *Committee
+	notifier      *mocks.Consumer
+	safetyRules   *SafetyRules
 
 	initView       uint64 // the current view at the beginning of the test case
 	endView        uint64 // the expected current view at the end of the test case
@@ -293,8 +291,6 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.persist = mocks.NewPersister(es.T())
 	es.persist.On("PutStarted", mock.Anything).Return(nil).Maybe()
 	es.blockProducer = &BlockProducer{proposerID: es.committee.Self()}
-	es.voteAggregator = mocks.NewVoteAggregator(es.T())
-	es.timeoutAggregator = mocks.NewTimeoutAggregator(es.T())
 	es.safetyRules = NewSafetyRules(es.T())
 	es.notifier = mocks.NewConsumer(es.T())
 	es.notifier.On("OnEventProcessed").Maybe()
@@ -358,20 +354,19 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_StaleProposal() {
 	proposal := createProposal(es.forks.FinalizedView()-1, es.forks.FinalizedView()-2)
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
-	es.voteAggregator.AssertNotCalled(es.T(), "AddBlock", proposal)
+	es.forks.AssertNotCalled(es.T(), "AddBlock", proposal)
 }
 
 // TestOnReceiveProposal_QCOlderThanCurView tests scenario: received a valid proposal with QC that has older view,
 // the proposal's QC shouldn't trigger view change.
 func (es *EventHandlerSuite) TestOnReceiveProposal_QCOlderThanCurView() {
 	proposal := createProposal(es.initView-1, es.initView-2)
-	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
 	// should not trigger view change
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
+	es.forks.AssertCalled(es.T(), "AddProposal", proposal)
 }
 
 // TestOnReceiveProposal_TCOlderThanCurView tests scenario: received a valid proposal with QC and TC that has older view,
@@ -379,20 +374,18 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_QCOlderThanCurView() {
 func (es *EventHandlerSuite) TestOnReceiveProposal_TCOlderThanCurView() {
 	proposal := createProposal(es.initView-1, es.initView-3)
 	proposal.LastViewTC = helper.MakeTC(helper.WithTCView(proposal.Block.View-1), helper.WithTCNewestQC(proposal.Block.QC))
-	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
 	// should not trigger view change
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
+	es.forks.AssertCalled(es.T(), "AddProposal", proposal)
 }
 
 // TestOnReceiveProposal_NoVote tests scenario: received a valid proposal for cur view, but not a safe node to vote, and I'm the next leader
 // should not vote.
 func (es *EventHandlerSuite) TestOnReceiveProposal_NoVote() {
 	proposal := createProposal(es.initView, es.initView-1)
-	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
 	// I'm the next leader
 	es.committee.leaders[es.initView+1] = struct{}{}
@@ -400,14 +393,13 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_NoVote() {
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
+	es.forks.AssertCalled(es.T(), "AddProposal", proposal)
 }
 
 // TestOnReceiveProposal_NoVote_ParentProposalNotFound tests scenario: received a valid proposal for cur view, no parent for this proposal found
 // should not vote.
 func (es *EventHandlerSuite) TestOnReceiveProposal_NoVote_ParentProposalNotFound() {
 	proposal := createProposal(es.initView, es.initView-1)
-	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
 	// remove parent from known proposals
 	delete(es.forks.proposals, proposal.Block.QC.BlockID)
@@ -416,15 +408,13 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_NoVote_ParentProposalNotFound
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.Error(es.T(), err)
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
+	es.forks.AssertCalled(es.T(), "AddProposal", proposal)
 }
 
 // TestOnReceiveProposal_Vote_NextLeader tests scenario: received a valid proposal for cur view, safe to vote, I'm the next leader
 // should vote and add vote to VoteAggregator.
 func (es *EventHandlerSuite) TestOnReceiveProposal_Vote_NextLeader() {
 	proposal := createProposal(es.initView, es.initView-1)
-	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
-	es.voteAggregator.On("AddVote", mock.Anything).Return().Once()
 
 	// I'm the next leader
 	es.committee.leaders[es.initView+1] = struct{}{}
@@ -432,17 +422,18 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_Vote_NextLeader() {
 	// proposal is safe to vote
 	es.safetyRules.votable[proposal.Block.BlockID] = struct{}{}
 
+	es.notifier.On("OnOwnVote", proposal.Block.BlockID, proposal.Block.View, mock.Anything, mock.Anything).Once()
+
 	// vote should be created for this proposal
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 }
 
-// TestOnReceiveProposal_Vote_NextLeader tests scenario: received a valid proposal for cur view, safe to vote, I'm not the next leader
+// TestOnReceiveProposal_Vote_NotNextLeader tests scenario: received a valid proposal for cur view, safe to vote, I'm not the next leader
 // should vote and send vote to next leader.
 func (es *EventHandlerSuite) TestOnReceiveProposal_Vote_NotNextLeader() {
 	proposal := createProposal(es.initView, es.initView-1)
-	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
 	// proposal is safe to vote
 	es.safetyRules.votable[proposal.Block.BlockID] = struct{}{}
@@ -467,8 +458,6 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ProposeAfterReceivingQC() {
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), qc.View+1, es.paceMaker.CurView(), "expect a view change")
 	es.notifier.AssertNotCalled(es.T(), "OnOwnProposal", mock.Anything, mock.Anything)
-
-	es.voteAggregator.On("AddBlock", es.votingProposal).Return(nil).Once()
 
 	// we are leader for current view
 	es.committee.leaders[es.paceMaker.CurView()] = struct{}{}
@@ -503,8 +492,6 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ProposeAfterReceivingTC() {
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), tc.View+1, es.paceMaker.CurView(), "expect a view change")
 	es.notifier.AssertNotCalled(es.T(), "OnOwnProposal", mock.Anything, mock.Anything)
-
-	es.voteAggregator.On("AddBlock", es.votingProposal).Return(nil).Once()
 
 	// we are leader for current view
 	es.committee.leaders[es.paceMaker.CurView()] = struct{}{}
@@ -603,7 +590,6 @@ func (es *EventHandlerSuite) TestOnReceiveQc_FutureView() {
 func (es *EventHandlerSuite) TestOnReceiveQc_NextLeaderProposes() {
 	proposal := createProposal(es.initView, es.initView-1)
 	qc := createQC(proposal.Block)
-	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 	// I'm the next leader
 	es.committee.leaders[es.initView+1] = struct{}{}
 	// qc triggered view change
@@ -626,15 +612,12 @@ func (es *EventHandlerSuite) TestOnReceiveQc_NextLeaderProposes() {
 	require.NoError(es.T(), err)
 
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
+	es.forks.AssertCalled(es.T(), "AddProposal", proposal)
 }
 
 // TestOnReceiveQc_ProposeOnce tests that after constructing proposal we don't attempt to create another
 // proposal for same view.
 func (es *EventHandlerSuite) TestOnReceiveQc_ProposeOnce() {
-	// once per OnReceiveProposal call
-	es.voteAggregator.On("AddBlock", es.votingProposal).Return(nil).Twice()
-
 	// I'm the next leader
 	es.committee.leaders[es.initView+1] = struct{}{}
 
@@ -700,9 +683,6 @@ func (es *EventHandlerSuite) TestOnReceiveTc_NextLeaderProposes() {
 // TestOnTimeout tests that event handler produces TimeoutObject and broadcasts it to other members of consensus
 // committee. Additionally, It has to contribute TimeoutObject to timeout aggregation process by sending it to TimeoutAggregator.
 func (es *EventHandlerSuite) TestOnTimeout() {
-
-	es.timeoutAggregator.On("AddTimeout", mock.Anything).Return().Once()
-
 	es.notifier.On("OnOwnTimeout", mock.Anything).Run(func(args mock.Arguments) {
 		timeoutObject, ok := args[0].(*model.TimeoutObject)
 		require.True(es.T(), ok)
@@ -721,8 +701,6 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 // and EventHandler tries to produce a timeout object, such timeout object is invalid if both QC and TC is present, we
 // need to make sure that EventHandler filters out TC for last view if we know about QC for same view.
 func (es *EventHandlerSuite) TestOnTimeout_SanityChecks() {
-	es.timeoutAggregator.On("AddTimeout", mock.Anything).Return().Once()
-
 	// voting block exists
 	es.forks.proposals[es.votingProposal.Block.BlockID] = es.votingProposal
 
@@ -772,7 +750,6 @@ func (es *EventHandlerSuite) TestOnTimeout_ReplicaEjected() {
 		err := es.eventhandler.OnLocalTimeout()
 		require.ErrorIs(es.T(), err, exception, "expect a wrapped exception")
 	})
-	es.timeoutAggregator.AssertNotCalled(es.T(), "AddTimeout", mock.Anything)
 	es.notifier.AssertNotCalled(es.T(), "OnOwnTimeout", mock.Anything)
 }
 
@@ -812,9 +789,6 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 			es.forks.proposals[parentBlock.Block.BlockID] = parentBlock
 		}
 
-		es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
-		es.voteAggregator.On("AddVote", proposal.ProposerVote()).Return(nil).Once()
-
 		es.safetyRules.votable[proposal.Block.BlockID] = struct{}{}
 		// should trigger 100 view change
 		es.endView++
@@ -824,6 +798,7 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 			require.True(es.T(), ok)
 			require.Equal(es.T(), proposal.Block.View+1, header.View)
 		}).Once()
+		es.notifier.On("OnOwnVote", proposal.Block.BlockID, proposal.Block.View, mock.Anything, mock.Anything).Once()
 
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
@@ -833,7 +808,6 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	require.Equal(es.T(), totalView, (len(es.forks.proposals)-1)/2)
-	es.voteAggregator.AssertExpectations(es.T())
 }
 
 // TestFollowerFollows100Blocks tests scenario where follower receives 100 proposals one after another
@@ -844,7 +818,6 @@ func (es *EventHandlerSuite) TestFollowerFollows100Blocks() {
 	for i := 0; i < 100; i++ {
 		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i)+1, es.initView+uint64(i))
-		es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 		// as a follower, I receive these proposals
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
@@ -863,7 +836,6 @@ func (es *EventHandlerSuite) TestFollowerReceives100Forks() {
 			helper.WithTCNewestQC(proposal.Block.QC))
 		// expect a view change since fork can be made only if last view has ended with TC.
 		es.endView++
-		es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 		// as a follower, I receive these proposals
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
@@ -910,8 +882,6 @@ func (es *EventHandlerSuite) TestStart_PendingBlocksRecovery() {
 // TestStart_ProposeOnce tests that after starting event handler we don't create proposal in case we have already proposed
 // for this view.
 func (es *EventHandlerSuite) TestStart_ProposeOnce() {
-	es.voteAggregator.On("AddBlock", es.votingProposal).Return(nil).Once()
-
 	// I'm the next leader
 	es.committee.leaders[es.initView+1] = struct{}{}
 
@@ -969,8 +939,6 @@ func (es *EventHandlerSuite) TestCreateProposal_SanityChecks() {
 // TestOnReceiveProposal_ProposalForActiveView tests that when receiving proposal for active we don't attempt to create a proposal
 // Receiving proposal can trigger proposing logic only in case we have received missing block for past views.
 func (es *EventHandlerSuite) TestOnReceiveProposal_ProposalForActiveView() {
-	es.voteAggregator.On("AddBlock", mock.Anything).Return(nil)
-
 	// receive proposal where we are leader, meaning that we have produced this proposal
 	es.committee.leaders[es.votingProposal.Block.View] = struct{}{}
 
@@ -983,8 +951,6 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ProposalForActiveView() {
 // TestOnPartialTcCreated_ProducedTimeout tests that when receiving partial TC for active view we will create a timeout object
 // immediately.
 func (es *EventHandlerSuite) TestOnPartialTcCreated_ProducedTimeout() {
-	es.timeoutAggregator.On("AddTimeout", mock.Anything).Return().Once()
-
 	partialTc := &hotstuff.PartialTcCreated{
 		View:       es.initView,
 		NewestQC:   es.parentProposal.Block.QC,
@@ -1032,8 +998,6 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_NotActiveView() {
 func (es *EventHandlerSuite) TestOnPartialTcCreated_QcAndTcProcessing() {
 
 	testOnPartialTcCreated := func(partialTc *hotstuff.PartialTcCreated) {
-		es.timeoutAggregator.On("AddTimeout", mock.Anything).Return().Once()
-
 		es.endView++
 
 		es.notifier.On("OnOwnTimeout", mock.Anything).Run(func(args mock.Arguments) {
