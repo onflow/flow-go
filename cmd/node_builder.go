@@ -188,9 +188,20 @@ type NetworkConfig struct {
 	PeerScoringEnabled              bool // enables peer scoring on pubsub
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
-	PeerUpdateInterval              time.Duration
-	UnicastMessageTimeout           time.Duration
-	DNSCacheTTL                     time.Duration
+	// UnicastRateLimitDryRun will disable connection disconnects and gating when unicast rate limiters are configured
+	UnicastRateLimitDryRun bool
+	//UnicastRateLimitLockoutDuration the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node
+	// after being rate limited.
+	UnicastRateLimitLockoutDuration time.Duration
+	// UnicastMessageRateLimit amount of unicast messages that can be sent by a peer per second.
+	UnicastMessageRateLimit int
+	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
+	UnicastBandwidthRateLimit int
+	// UnicastBandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
+	UnicastBandwidthBurstLimit int
+	PeerUpdateInterval         time.Duration
+	UnicastMessageTimeout      time.Duration
+	DNSCacheTTL                time.Duration
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -258,9 +269,14 @@ func DefaultBaseConfig() *BaseConfig {
 			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
 			// By default we let networking layer trim connections to all nodes that
 			// are no longer part of protocol state.
-			NetworkConnectionPruning: connection.ConnectionPruningEnabled,
-			PeerScoringEnabled:       scoring.DefaultPeerScoringEnabled,
-			DNSCacheTTL:              dns.DefaultTimeToLive,
+			NetworkConnectionPruning:        connection.ConnectionPruningEnabled,
+			PeerScoringEnabled:              scoring.DefaultPeerScoringEnabled,
+			DNSCacheTTL:                     dns.DefaultTimeToLive,
+			UnicastMessageRateLimit:         0,
+			UnicastBandwidthRateLimit:       0,
+			UnicastBandwidthBurstLimit:      middleware.LargeMsgMaxUnicastMsgSize,
+			UnicastRateLimitLockoutDuration: 10,
+			UnicastRateLimitDryRun:          true,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
