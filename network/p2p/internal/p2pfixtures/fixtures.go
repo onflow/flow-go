@@ -120,6 +120,11 @@ func NodeFixture(
 		builder.EnableGossipSubPeerScoring(parameters.IdProvider, scoreOptionParams...)
 	}
 
+	if parameters.UpdateInterval != 0 {
+		require.NotNil(t, parameters.PeerProvider)
+		builder.SetPeerManagerOptions(parameters.ConnectionPruning, parameters.UpdateInterval)
+	}
+
 	n, err := builder.Build()
 	require.NoError(t, err)
 
@@ -130,6 +135,10 @@ func NodeFixture(
 	ip, port, err := n.GetIPPort()
 	require.NoError(t, err)
 	identity.Address = ip + ":" + port
+
+	if parameters.PeerProvider != nil {
+		n.WithPeersProvider(parameters.PeerProvider)
+	}
 	return n, *identity
 }
 
@@ -145,6 +154,9 @@ type NodeFixtureParameters struct {
 	PeerScoringEnabled bool
 	IdProvider         module.IdentityProvider
 	AppSpecificScore   func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
+	ConnectionPruning  bool                  // peer manager parameter
+	UpdateInterval     time.Duration         // peer manager parameter
+	PeerProvider       p2p.PeersProvider     // peer manager parameter
 }
 
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
@@ -159,6 +171,14 @@ func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParam
 func WithDefaultStreamHandler(handler network.StreamHandler) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.HandlerFunc = handler
+	}
+}
+
+func WithPeerManagerEnabled(connectionPruning bool, updateInterval time.Duration, peerProvider p2p.PeersProvider) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.ConnectionPruning = connectionPruning
+		p.UpdateInterval = updateInterval
+		p.PeerProvider = peerProvider
 	}
 }
 
@@ -470,6 +490,18 @@ func EnsureConnected(t *testing.T, ctx context.Context, nodes []*p2pnode.Node) {
 				continue
 			}
 			require.NoError(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
+		}
+	}
+}
+
+// EnsureNotConnected ensures that no (bidirectional) connection exists from "from" nodes to "to" nodes.
+func EnsureNotConnected(t *testing.T, ctx context.Context, from []*p2pnode.Node, to []*p2pnode.Node) {
+	for _, node := range from {
+		for _, other := range to {
+			if node == other {
+				require.Fail(t, "overlapping nodes in from and to lists")
+			}
+			require.Error(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
 		}
 	}
 }
