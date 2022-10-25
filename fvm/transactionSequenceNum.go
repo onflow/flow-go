@@ -45,7 +45,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	}
 
 	defer func() {
-		commitError := txnState.Commit(nestedTxnId)
+		_, commitError := txnState.Commit(nestedTxnId)
 		if commitError != nil {
 			panic(commitError)
 		}

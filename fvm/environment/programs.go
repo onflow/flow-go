@@ -94,8 +94,7 @@ func (programs *Programs) get(
 	program, state, has := programs.transactionPrograms.Get(location)
 	if has {
 		if state != nil {
-			err := programs.txnState.AttachAndCommitParseRestricted(
-				state)
+			err := programs.txnState.AttachAndCommit(state)
 			if err != nil {
 				panic(fmt.Sprintf(
 					"merge error while getting program, panic: %s",
