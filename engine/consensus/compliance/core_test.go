@@ -283,7 +283,9 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, cs.head.View)).Return(nil)
+	hotstuffProposal := model.ProposalFromFlow(block.Header, cs.head.View)
+	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View)
 
 	// it should be processed without error
@@ -307,7 +309,9 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.headerDB[parent.ID()] = parent.Header
 	cs.headerDB[ancestor.ID()] = ancestor.Header
 
-	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(nil)
+	hotstuffProposal := model.ProposalFromFlow(block.Header, parent.Header.View)
+	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View)
 
 	// it should be processed without error
@@ -511,6 +515,11 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block2.Header, parent.Header.View)).Return(nil)
 	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block3.Header, parent.Header.View)).Return(nil)
 
+	cs.voteAggregator.On("AddBlock", model.ProposalFromFlow(parent.Header, cs.head.View)).Once()
+	cs.voteAggregator.On("AddBlock", model.ProposalFromFlow(block1.Header, parent.Header.View)).Once()
+	cs.voteAggregator.On("AddBlock", model.ProposalFromFlow(block2.Header, parent.Header.View)).Once()
+	cs.voteAggregator.On("AddBlock", model.ProposalFromFlow(block3.Header, parent.Header.View)).Once()
+
 	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.View).Once()
 	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Once()
 	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Once()
@@ -582,6 +591,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 			calls++
 		},
 	)
+	cs.voteAggregator.On("AddBlock", mock.Anything, mock.Anything).Times(4)
 
 	// process the root proposal
 	err := cs.core.OnBlockProposal(originID, missing)
