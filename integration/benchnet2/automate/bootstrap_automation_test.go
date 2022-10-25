@@ -50,11 +50,6 @@ func TestUnmarshal(t *testing.T) {
 	require.Equal(t, "123", envStruct.Env[1].Value)
 }
 
-func TestStructs(t *testing.T) {
-	GenerateValuesYaml("", "", "values.yml")
-	deleteFile("values.yml")
-}
-
 func TestByteFileWrite(t *testing.T) {
 	testString := "yaml: some data\nline2: 123\n"
 	filename := "test_file_write.yml"
