@@ -65,7 +65,10 @@ func loadNodeJsonData(nodeInfoPath string) (map[string]Node, map[string]int) {
 	jsonFileBytes := textReader(nodeInfoPath)
 
 	var nodes []Node
-	json.Unmarshal(jsonFileBytes, &nodes)
+	err := json.Unmarshal(jsonFileBytes, &nodes)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	var nodeConfig = make(map[string]int)
 	nodeConfig["access"] = 0
@@ -176,7 +179,11 @@ func createTemplate(templatePath string) *template.Template {
 }
 
 func unmarshalToStruct(source string, target interface{}) interface{} {
-	yaml.Unmarshal([]byte(source), target)
+	err := yaml.Unmarshal([]byte(source), target)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return target
 }
 
