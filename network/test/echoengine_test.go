@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -30,11 +31,11 @@ import (
 // single message from one engine to the other one through different scenarios.
 type EchoEngineTestSuite struct {
 	suite.Suite
-	ConduitWrapper                      // used as a wrapper around conduit methods
-	nets           []network.Network    // used to keep track of the networks
-	mws            []network.Middleware // used to keep track of the middlewares
-	ids            flow.IdentityList    // used to keep track of the identifiers associated with networks
-	cancel         context.CancelFunc
+	testutils.ConduitWrapper                      // used as a wrapper around conduit methods
+	nets                     []network.Network    // used to keep track of the networks
+	mws                      []network.Middleware // used to keep track of the middlewares
+	ids                      flow.IdentityList    // used to keep track of the identifiers associated with networks
+	cancel                   context.CancelFunc
 }
 
 // Some tests are skipped in short mode to speedup the build.
@@ -56,7 +57,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 
 	// both nodes should be of the same role to get connected on epidemic dissemination
 	var nodes []*p2pnode.Node
-	suite.ids, nodes, suite.mws, suite.nets, _ = GenerateIDsMiddlewaresNetworks(
+	suite.ids, nodes, suite.mws, suite.nets, _ = testutils.GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
 		logger,
@@ -64,14 +65,14 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		mocknetwork.NewViolationsConsumer(suite.T()),
 	)
 
-	StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 }
 
 // TearDownTest closes the networks within a specified timeout
 func (suite *EchoEngineTestSuite) TearDownTest() {
 	suite.cancel()
-	stopNetworks(suite.T(), suite.nets, 3*time.Second)
-	stopMiddlewares(suite.T(), suite.mws, 3*time.Second)
+	testutils.StopNetworks(suite.T(), suite.nets, 3*time.Second)
+	testutils.StopMiddlewares(suite.T(), suite.mws, 3*time.Second)
 }
 
 // TestUnknownChannel evaluates that registering an engine with an unknown channel returns an error.
@@ -202,7 +203,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Multicast() 
 
 // duplicateMessageSequential is a helper function that sends duplicate messages sequentially
 // from a receiver to the sender via the injected send wrapper function of conduit.
-func (suite *EchoEngineTestSuite) duplicateMessageSequential(send ConduitSendWrapperFunc) {
+func (suite *EchoEngineTestSuite) duplicateMessageSequential(send testutils.ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
@@ -213,7 +214,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageSequential(send ConduitSendWra
 	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, channels.TestNetworkChannel, false, send)
 
 	// allow nodes to heartbeat and discover each other if using PubSub
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	// Sends a message from sender to receiver
 	event := &message.TestMessage{
@@ -237,7 +238,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageSequential(send ConduitSendWra
 
 // duplicateMessageParallel is a helper function that sends duplicate messages concurrent;u
 // from a receiver to the sender via the injected send wrapper function of conduit.
-func (suite *EchoEngineTestSuite) duplicateMessageParallel(send ConduitSendWrapperFunc) {
+func (suite *EchoEngineTestSuite) duplicateMessageParallel(send testutils.ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
@@ -248,7 +249,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageParallel(send ConduitSendWrapp
 	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, channels.TestNetworkChannel, false, send)
 
 	// allow nodes to heartbeat and discover each other
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	// Sends a message from sender to receiver
 	event := &message.TestMessage{
@@ -277,7 +278,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageParallel(send ConduitSendWrapp
 
 // duplicateMessageDifferentChan is a helper function that sends the same message from two distinct
 // sender engines to the two distinct receiver engines via the send wrapper function of Conduits.
-func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send ConduitSendWrapperFunc) {
+func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send testutils.ConduitSendWrapperFunc) {
 	const (
 		sndNode = iota
 		rcvNode
@@ -303,7 +304,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send ConduitSend
 	receiver2 := NewEchoEngine(suite.Suite.T(), suite.nets[rcvNode], 10, channel2, false, send)
 
 	// allow nodes to heartbeat and discover each other
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	// Sends a message from sender to receiver
 	event := &message.TestMessage{
@@ -342,7 +343,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send ConduitSend
 // singleMessage sends a single message from one network instance to the other one
 // it evaluates the correctness of implementation against correct delivery of the message.
 // in case echo is true, it also evaluates correct reception of the echo message from the receiver side
-func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapperFunc) {
+func (suite *EchoEngineTestSuite) singleMessage(echo bool, send testutils.ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 
@@ -354,7 +355,7 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, channels.TestNetworkChannel, echo, send)
 
 	// allow nodes to heartbeat and discover each other
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	// Sends a message from sender to receiver
 	event := &message.TestMessage{
@@ -408,7 +409,7 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 // sender and receiver are sync over reception, i.e., sender sends one message at a time and
 // waits for its reception
 // count defines number of messages
-func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send ConduitSendWrapperFunc) {
+func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send testutils.ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
@@ -419,7 +420,7 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, channels.TestNetworkChannel, echo, send)
 
 	// allow nodes to heartbeat and discover each other
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	for i := 0; i < count; i++ {
 		// Send the message to receiver
@@ -478,7 +479,7 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 // it evaluates the correctness of implementation against correct delivery of the messages.
 // sender and receiver are async, i.e., sender sends all its message at blast
 // count defines number of messages
-func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send ConduitSendWrapperFunc) {
+func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send testutils.ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 
@@ -490,7 +491,7 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, channels.TestNetworkChannel, echo, send)
 
 	// allow nodes to heartbeat and discover each other
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	// keeps track of async received messages at receiver side
 	received := make(map[string]struct{})

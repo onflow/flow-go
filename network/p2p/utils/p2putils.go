@@ -9,7 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
+	"github.com/onflow/flow-go/network/internal/p2putils"
 )
 
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
