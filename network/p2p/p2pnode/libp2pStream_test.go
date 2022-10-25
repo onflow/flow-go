@@ -371,47 +371,49 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	}
 }
 
-//// TestUnicastOverStream_WithPlainStream checks two nodes can send and receive unicast messages on libp2p plain streams.
-//func TestUnicastOverStream_WithPlainStream(t *testing.T) {
-//	testUnicastOverStream(t)
-//}
+// TestUnicastOverStream_WithPlainStream checks two nodes can send and receive unicast messages on libp2p plain streams.
+func TestUnicastOverStream_WithPlainStream(t *testing.T) {
+	testUnicastOverStream(t)
+}
 
-//// TestUnicastOverStream_WithGzipStreamCompression checks two nodes can send and receive unicast messages on gzip compressed streams
-//// when both nodes have gzip stream compression enabled.
-//func TestUnicastOverStream_WithGzipStreamCompression(t *testing.T) {
-//	testUnicastOverStream(t, p2pfixtures.WithPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
-//}
+// TestUnicastOverStream_WithGzipStreamCompression checks two nodes can send and receive unicast messages on gzip compressed streams
+// when both nodes have gzip stream compression enabled.
+func TestUnicastOverStream_WithGzipStreamCompression(t *testing.T) {
+	testUnicastOverStream(t, p2pfixtures.WithPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
+}
 
-//// testUnicastOverStream sends a message from node 1 to node 2 and then from node 2 to node 1 over a unicast stream.
-//func testUnicastOverStream(t *testing.T, opts ...p2pfixtures.NodeFixtureParameterOption) {
-//	ctx, cancel := context.WithCancel(context.Background())
-//	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-//
-//	count := 2
-//	ch := make(chan string, count) // we expect two messages during test, one from node1->node2 and vice versa.
-//
-//	// Create the handler function
-//	streamHandler := func(s network.Stream) {
-//		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-//		str, err := rw.ReadString('\n')
-//		require.NoError(t, err)
-//		ch <- str
-//	}
-//
-//	// Creates nodes
-//	nodes, identities := p2pfixtures.NodesFixture(t,
-//		unittest.IdentifierFixture(),
-//		"test_one_to_one_comm",
-//		count,
-//		p2pfixtures.WithDefaultStreamHandler(streamHandler),
-//	)
-//	require.Len(t, identities, count)
-//
-//	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-//	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
-//
-//	testUnicastOverStreamRoundTrip(t, ctx, *identities[0], nodes[0], *identities[1], nodes[1], ch)
-//}
+// testUnicastOverStream sends a message from node 1 to node 2 and then from node 2 to node 1 over a unicast stream.
+func testUnicastOverStream(t *testing.T, opts ...p2pfixtures.NodeFixtureParameterOption) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	// Creates nodes
+	sporkId := unittest.IdentifierFixture()
+
+	streamHandler1, inbound1 := p2pfixtures.StreamHandlerFixture(t)
+	node1, id1 := p2pfixtures.NodeFixture(
+		t,
+		sporkId,
+		t.Name(),
+		append(opts, p2pfixtures.WithDefaultStreamHandler(streamHandler1))...)
+
+	streamHandler2, inbound2 := p2pfixtures.StreamHandlerFixture(t)
+	node2, id2 := p2pfixtures.NodeFixture(
+		t,
+		sporkId,
+		t.Name(),
+		append(opts, p2pfixtures.WithDefaultStreamHandler(streamHandler2))...)
+
+	nodes := []*p2pnode.Node{node1, node2}
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+
+	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, flow.IdentityList{&id1, &id2}, []chan string{inbound1, inbound2}, func() string {
+		msg := "this is an intentionally long MESSAGE to be bigger than buffer size of most of stream compressors"
+		require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
+		return fmt.Sprintf("%s %d \n", msg, time.Now().UnixNano()) // add timestamp to make sure we don't send the same message twice
+	})
+}
 
 // TestUnicastOverStream_Fallback checks two nodes with asymmetric sets of preferred unicast protocols can create streams and
 // send and receive unicasts. Despite the asymmetry, the nodes must fall back to the libp2p plain stream during negotiation.
