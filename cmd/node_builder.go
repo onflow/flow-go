@@ -275,8 +275,13 @@ func DefaultBaseConfig() *BaseConfig {
 			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
 			// By default we let networking layer trim connections to all nodes that
 			// are no longer part of protocol state.
-			NetworkConnectionPruning: connection.ConnectionPruningEnabled,
-			PeerScoringEnabled:       scoring.DefaultPeerScoringEnabled,
+			NetworkConnectionPruning:        connection.ConnectionPruningEnabled,
+			PeerScoringEnabled:              scoring.DefaultPeerScoringEnabled,
+			UnicastMessageRateLimit:         0,
+			UnicastBandwidthRateLimit:       0,
+			UnicastBandwidthBurstLimit:      middleware.LargeMsgMaxUnicastMsgSize,
+			UnicastRateLimitLockoutDuration: 10,
+			UnicastRateLimitDryRun:          true,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
