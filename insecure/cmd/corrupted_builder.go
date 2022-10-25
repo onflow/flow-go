@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/insecure/corruptnet"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -52,7 +54,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 
 		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupted conduit factory initiated")
 
-		flowNetwork, err := cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, ccf)
+		flowNetwork, err := cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, ccf, ratelimit.NoopRateLimiters(), []p2p.PeerFilter{})
 		if err != nil {
 			return nil, fmt.Errorf("could not initiate flow network: %w", err)
 		}

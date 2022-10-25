@@ -1,4 +1,4 @@
-package test
+package testutils
 
 import (
 	"fmt"
@@ -18,25 +18,25 @@ import (
 type MeshEngine struct {
 	sync.Mutex
 	t        *testing.T
-	con      network.Conduit       // used to directly communicate with the network
+	Con      network.Conduit       // used to directly communicate with the network
 	originID flow.Identifier       // used to keep track of the id of the sender of the messages
-	event    chan interface{}      // used to keep track of the events that the node receives
-	channel  chan channels.Channel // used to keep track of the channels that events are received on
-	received chan struct{}         // used as an indicator on reception of messages for testing
+	Event    chan interface{}      // used to keep track of the events that the node receives
+	Channel  chan channels.Channel // used to keep track of the channels that events are Received on
+	Received chan struct{}         // used as an indicator on reception of messages for testing
 	mockcomponent.Component
 }
 
 func NewMeshEngine(t *testing.T, net network.Network, cap int, channel channels.Channel) *MeshEngine {
 	te := &MeshEngine{
 		t:        t,
-		event:    make(chan interface{}, cap),
-		channel:  make(chan channels.Channel, cap),
-		received: make(chan struct{}, cap),
+		Event:    make(chan interface{}, cap),
+		Channel:  make(chan channels.Channel, cap),
+		Received: make(chan struct{}, cap),
 	}
 
 	c2, err := net.Register(channel, te)
 	require.NoError(te.t, err)
-	te.con = c2
+	te.Con = c2
 
 	return te
 }
@@ -53,7 +53,7 @@ func (e *MeshEngine) Submit(channel channels.Channel, originID flow.Identifier, 
 	go func() {
 		err := e.Process(channel, originID, event)
 		if err != nil {
-			require.Fail(e.t, "could not process submitted event")
+			require.Fail(e.t, "could not process submitted Event")
 		}
 	}()
 }
@@ -65,16 +65,16 @@ func (e *MeshEngine) ProcessLocal(event interface{}) error {
 	return fmt.Errorf(" unexpected method called")
 }
 
-// Process receives an originID and an event and casts them into the corresponding fields of the
-// MeshEngine. It then flags the received channel on reception of an event.
+// Process receives an originID and an Event and casts them into the corresponding fields of the
+// MeshEngine. It then flags the Received Channel on reception of an Event.
 func (e *MeshEngine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	e.Lock()
 	defer e.Unlock()
 
 	// stores the message locally
 	e.originID = originID
-	e.channel <- channel
-	e.event <- event
-	e.received <- struct{}{}
+	e.Channel <- channel
+	e.Event <- event
+	e.Received <- struct{}{}
 	return nil
 }
