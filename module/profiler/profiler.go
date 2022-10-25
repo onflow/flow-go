@@ -75,7 +75,7 @@ func (p *AutoProfiler) Ready() <-chan struct{} {
 	delay := time.Duration(float64(p.interval) * rand.Float64())
 	p.unit.LaunchPeriodically(p.start, p.interval, delay)
 
-	if p.enabled.Load() {
+	if !p.Enabled() {
 		p.log.Info().Dur("duration", p.duration).Time("nextRunAt", time.Now().Add(p.interval)).Msg("AutoProfiler has started")
 	} else {
 		p.log.Info().Msg("AutoProfiler has started, profiler is disabled")
