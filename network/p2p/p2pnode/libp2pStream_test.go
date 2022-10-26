@@ -393,28 +393,29 @@ func testUnicastOverStream(t *testing.T, opts ...p2pfixtures.NodeFixtureParamete
 	sporkId := unittest.IdentifierFixture()
 
 	streamHandler1, inbound1 := p2pfixtures.StreamHandlerFixture(t)
-	node1, id1 := p2pfixtures.NodeFixture(
+	node1, _ := p2pfixtures.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		append(opts, p2pfixtures.WithDefaultStreamHandler(streamHandler1))...)
 
 	streamHandler2, inbound2 := p2pfixtures.StreamHandlerFixture(t)
-	node2, id2 := p2pfixtures.NodeFixture(
+	node2, _ := p2pfixtures.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		append(opts, p2pfixtures.WithDefaultStreamHandler(streamHandler2))...)
 
-	nodes := []*p2pnode.Node{node1, node2}
+	nodes := []p2p.LibP2PNode{node1, node2}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
-	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, flow.IdentityList{&id1, &id2}, []chan string{inbound1, inbound2}, func() string {
-		msg := "this is an intentionally long MESSAGE to be bigger than buffer size of most of stream compressors"
-		require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
-		return fmt.Sprintf("%s %d \n", msg, time.Now().UnixNano()) // add timestamp to make sure we don't send the same message twice
-	})
+	p2pfixtures.EnsureMessageExchangeOverUnicast(
+		t,
+		ctx,
+		nodes,
+		[]chan string{inbound1, inbound2},
+		p2pfixtures.LongStringMessageFactoryFixture(t))
 }
 
 // TestUnicastOverStream_Fallback checks two nodes with asymmetric sets of preferred unicast protocols can create streams and
@@ -429,7 +430,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 
 	streamHandler1, inbound1 := p2pfixtures.StreamHandlerFixture(t)
-	node1, id1 := p2pfixtures.NodeFixture(
+	node1, _ := p2pfixtures.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
@@ -437,7 +438,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	)
 
 	streamHandler2, inbound2 := p2pfixtures.StreamHandlerFixture(t)
-	node2, id2 := p2pfixtures.NodeFixture(
+	node2, _ := p2pfixtures.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
@@ -449,74 +450,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
-	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, flow.IdentityList{&id1, &id2}, []chan string{inbound1, inbound2}, func() string {
-		msg := "this is an intentionally long MESSAGE to be bigger than buffer size of most of stream compressors"
-		require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
-		return fmt.Sprintf("%s %d \n", msg, time.Now().UnixNano()) // add timestamp to make sure we don't send the same message twice
-	})
-}
-
-// testUnicastOverStreamRoundTrip checks node1 and node2 can create stream between each other and push unicast messages
-// to each other over the streams.
-//
-// The channel argument keeps the individual messages received at both ends.
-func testUnicastOverStreamRoundTrip(t *testing.T,
-	ctx context.Context,
-	id1 flow.Identity,
-	node1 p2p.LibP2PNode,
-	id2 flow.Identity,
-	node2 p2p.LibP2PNode,
-	ch <-chan string) {
-
-	pInfo1, err := utils.PeerAddressInfo(id1)
-	require.NoError(t, err)
-	pInfo2, err := utils.PeerAddressInfo(id2)
-	require.NoError(t, err)
-
-	// Create stream from node 1 to node 2
-	node1.Host().Peerstore().AddAddrs(pInfo2.ID, pInfo2.Addrs, peerstore.AddressTTL)
-	s1, err := node1.CreateStream(ctx, pInfo2.ID)
-	require.NoError(t, err)
-	rw := bufio.NewReadWriter(bufio.NewReader(s1), bufio.NewWriter(s1))
-
-	// Send message from node 1 to 2
-	msg := "this is an intentionally long MESSAGE to be bigger than buffer size of most of stream compressors\n"
-	require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
-	_, err = rw.WriteString(msg)
-	require.NoError(t, err)
-
-	// Flush the stream
-	require.NoError(t, rw.Flush())
-
-	// Wait for the message to be received
-	select {
-	case rcv := <-ch:
-		require.Equal(t, msg, rcv)
-	case <-time.After(1 * time.Second):
-		require.Fail(t, "message not received")
-	}
-
-	// Create stream from node 2 to node 1
-	node2.Host().Peerstore().AddAddrs(pInfo1.ID, pInfo1.Addrs, peerstore.AddressTTL)
-	s2, err := node2.CreateStream(ctx, pInfo1.ID)
-	require.NoError(t, err)
-	rw = bufio.NewReadWriter(bufio.NewReader(s2), bufio.NewWriter(s2))
-
-	// Send message from node 2 to 1
-	msg = "this is an intentionally long REPLY to be bigger than buffer size of most of stream compressors\n"
-	require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
-	_, err = rw.WriteString(msg)
-	require.NoError(t, err)
-
-	// Flush the stream
-	require.NoError(t, rw.Flush())
-
-	select {
-	case rcv := <-ch:
-		require.Equal(t, msg, rcv)
-	case <-time.After(3 * time.Second):
-		require.Fail(t, "message not received")
-	}
+	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, []chan string{inbound1, inbound2}, p2pfixtures.LongStringMessageFactoryFixture(t))
 }
 
 // TestCreateStreamTimeoutWithUnresponsiveNode tests that the CreateStream call does not block longer than the
