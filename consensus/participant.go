@@ -162,12 +162,6 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 		return makeRootBlockQC(rootHeader, rootQC), nil
 	}
 
-	// get the parent for the latest finalized block
-	parent, err := headers.ByBlockID(final.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get parent for finalized: %w", err)
-	}
-
 	// find a valid child of the finalized block in order to get its QC
 	children, err := headers.ByParentID(final.ID())
 	if err != nil {
@@ -178,11 +172,11 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 		return nil, fmt.Errorf("finalized block has no children")
 	}
 
-	child := model.BlockFromFlow(children[0], final.View)
+	child := model.BlockFromFlow(children[0])
 
 	// create the root block to use
 	trustedRoot := &forks.BlockQC{
-		Block: model.BlockFromFlow(final, parent.View),
+		Block: model.BlockFromFlow(final),
 		QC:    child.QC,
 	}
 

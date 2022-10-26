@@ -48,7 +48,6 @@ type MessageHubSuite struct {
 	head      *cluster.Block
 
 	// mocked dependencies
-	headers           *storage.Headers
 	payloads          *storage.ClusterPayloads
 	me                *module.Local
 	state             *clusterstate.MutableState
@@ -81,7 +80,6 @@ func (s *MessageHubSuite) SetupTest() {
 	block := unittest.ClusterBlockFixture()
 	s.head = &block
 
-	s.headers = storage.NewHeaders(s.T())
 	s.payloads = storage.NewClusterPayloads(s.T())
 	s.me = module.NewLocal(s.T())
 	s.protoState = protocol.NewMutableState(s.T())
@@ -161,7 +159,6 @@ func (s *MessageHubSuite) SetupTest() {
 		s.timeoutAggregator,
 		s.protoState,
 		s.state,
-		s.headers,
 		s.payloads,
 	)
 	require.NoError(s.T(), err)
@@ -250,8 +247,6 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	block := unittest.ClusterBlockWithParent(&parent)
 	block.Header.ProposerID = s.myID
 
-	s.headers.On("ByBlockID", block.Header.ParentID).Return(parent.Header, nil)
-	s.headers.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 	s.payloads.On("ByBlockID", block.Header.ID()).Return(block.Payload, nil)
 	s.payloads.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 
@@ -283,25 +278,15 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		// unset chain and height to make sure they are correctly reconstructed
-		// TODO(active-pacemaker): will be not relevant after merging flow.Header change
-		headerFromHotstuff := *block.Header // copy header
-		headerFromHotstuff.ChainID = ""
-		headerFromHotstuff.Height = 0
-
-		// keep a duplicate of the correct header to check against leader
-		header := block.Header
-		// make sure chain ID and height were reconstructed and we broadcast to correct nodes
-		header.ChainID = "test"
-		header.Height = 11
 		expectedBroadcastMsg := &messages.ClusterBlockProposal{
-			Header:  header,
+			Header:  block.Header,
 			Payload: block.Payload,
 		}
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		s.voteAggregator.On("AddBlock", model.ProposalFromFlow(block.Header, parent.Header.View)).Once()
-		s.hotstuff.On("SubmitProposal", &headerFromHotstuff, parent.Header.View).
+		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
+		s.hotstuff.On("SubmitProposal", hotstuffProposal).
 			Run(func(args mock.Arguments) { close(submitted) }).
 			Once()
 
@@ -312,7 +297,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 			Once()
 
 		// submit to broadcast proposal
-		err := s.hub.processQueuedProposal(&headerFromHotstuff)
+		err := s.hub.processQueuedProposal(block.Header)
 		require.NoError(s.T(), err, "header broadcast should pass")
 
 		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
@@ -358,12 +343,11 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		// prepare proposal fixture
 		proposal := unittest.ClusterBlockWithParent(s.head)
 		proposal.Header.ProposerID = s.myID
-		s.headers.On("ByBlockID", proposal.Header.ParentID).Return(s.head.Header, nil)
 		s.payloads.On("ByBlockID", proposal.Header.ID()).Return(proposal.Payload, nil)
 
 		// unset chain and height to make sure they are correctly reconstructed
-		s.voteAggregator.On("AddBlock", model.ProposalFromFlow(proposal.Header, s.head.Header.View)).Once()
-		s.hotstuff.On("SubmitProposal", proposal.Header, s.head.Header.View).Once()
+		hotstuffProposal := model.ProposalFromFlow(proposal.Header)
+		s.hotstuff.On("SubmitProposal", hotstuffProposal)
 		expectedBroadcastMsg := &messages.ClusterBlockProposal{
 			Header:  proposal.Header,
 			Payload: proposal.Payload,

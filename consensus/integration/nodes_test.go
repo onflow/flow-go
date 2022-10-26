@@ -598,7 +598,6 @@ func createNode(
 		voteAggregator,
 		timeoutAggregator,
 		state,
-		headersDB,
 		payloadsDB,
 	)
 	require.NoError(t, err)

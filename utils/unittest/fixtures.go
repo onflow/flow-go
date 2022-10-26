@@ -470,6 +470,7 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 		PayloadHash:        IdentifierFixture(),
 		Timestamp:          time.Now().UTC(),
 		View:               view,
+		ParentView:         parent.View,
 		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataFixture(),
 		ProposerID:         IdentifierFixture(),
@@ -512,6 +513,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	header.ChainID = parent.Header.ChainID
 	header.Timestamp = time.Now()
 	header.ParentID = parent.ID()
+	header.ParentView = parent.Header.View
 	header.PayloadHash = payload.Hash()
 
 	block := cluster.Block{
