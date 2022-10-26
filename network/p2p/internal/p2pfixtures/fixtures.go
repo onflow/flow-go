@@ -632,6 +632,26 @@ func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes [
 	}
 }
 
+func EnsureNoMessageExchangeOverUnicast(t *testing.T, ctx context.Context, from []*p2pnode.Node, to []*p2pnode.Node, toIds flow.IdentityList, messageFactory func() string) {
+	pInfo, err := utils.PeerInfosFromIDs(toIds)
+	require.Empty(t, err)
+
+	// LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+
+	// trying to create streams "from" to "to" nodes.
+	for _, this := range from {
+		for i, other := range to {
+			if this == other {
+				// should not happen, unless the test is misconfigured.
+				require.Fail(t, fmt.Sprintf("node is in both from and to lists"))
+			}
+			// stream creation should fail
+			_, err := this.CreateStream(ctx, pInfo[i].ID)
+			require.Error(t, err)
+		}
+	}
+}
+
 // StreamHandlerFixture returns a stream handler that writes the received message to the given channel.
 func StreamHandlerFixture(t *testing.T) (func(s network.Stream), chan string) {
 	ch := make(chan string, 1) // channel to receive messages
