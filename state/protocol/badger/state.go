@@ -30,6 +30,8 @@ type State struct {
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
+	// cache the root height because it cannot change over the lifecycle of a protocol state instance
+	rootHeight uint64
 }
 
 type BootstrapConfig struct {
@@ -145,6 +147,12 @@ func Bootstrap(
 	})
 	if err != nil {
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
+	}
+
+	// populate the protocol state cache
+	err = state.populateCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate cache: %w", err)
 	}
 
 	return state, nil
@@ -501,6 +509,11 @@ func OpenState(
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
+	// populate the protocol state cache
+	err = state.populateCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate cache: %w", err)
+	}
 
 	return state, nil
 }
@@ -639,6 +652,17 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 		state.metrics.EpochEmergencyFallbackTriggered()
 	}
 
+	return nil
+}
+
+// populateCache is used after opening or bootstrapping the state to populate the cache.
+func (state *State) populateCache() error {
+	var rootHeight uint64
+	err := state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return fmt.Errorf("could not read root block to populate cache: %w", err)
+	}
+	state.rootHeight = rootHeight
 	return nil
 }
 
