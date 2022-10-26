@@ -32,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
-	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -62,7 +61,6 @@ type Suite struct {
 	chainID              flow.ChainID
 	metrics              *metrics.NoopCollector
 	backend              *backend.Backend
-	downloader           *downloadermock.Downloader
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -105,7 +103,6 @@ func (suite *Suite) SetupTest() {
 
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
-	suite.downloader = new(downloadermock.Downloader)
 }
 
 func (suite *Suite) RunTest(
@@ -557,7 +554,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
 		results := storage.NewExecutionResults(suite.metrics, db)
 		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
-		seals := storage.NewSeals(suite.metrics, db)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := flow.IdentifierList(enIdentities.NodeIDs())
 
@@ -626,7 +622,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		handler := access.NewHandler(backend, suite.chainID.Chain())
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions, receipts,
-			results, seals, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil, suite.downloader)
+			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
 		require.NoError(suite.T(), err)
 		rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 		require.NoError(suite.T(), err)

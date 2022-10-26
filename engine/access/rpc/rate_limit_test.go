@@ -19,7 +19,6 @@ import (
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/model/flow"
-	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
@@ -45,7 +44,6 @@ type RateLimitTestSuite struct {
 	rpcEng     *Engine
 	client     accessproto.AccessAPIClient
 	closer     io.Closer
-	downloader *downloadermock.Downloader
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -53,7 +51,6 @@ type RateLimitTestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
-	seals        *storagemock.Seals
 
 	// test rate limit
 	rateLimit  int
@@ -75,8 +72,6 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.transactions = new(storagemock.Transactions)
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
-	suite.seals = new(storagemock.Seals)
-	suite.downloader = new(downloadermock.Downloader)
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -114,7 +109,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	}
 
 	rpcEngBuilder, err := NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
-		nil, suite.seals, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt, suite.downloader)
+		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)

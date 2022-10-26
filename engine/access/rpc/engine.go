@@ -20,10 +20,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/engine/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -38,7 +36,6 @@ type Config struct {
 	TransportCredentials      credentials.TransportCredentials // the secure GRPC credentials
 	HTTPListenAddr            string                           // the HTTP web proxy address as ip:port
 	RESTListenAddr            string                           // the REST server address as ip:port (if empty the REST server will not be started)
-	StateStreamListenAddr     string                           // the state stream client listen server address as ip:port
 	CollectionAddr            string                           // the address of the upstream collection node
 	HistoricalAccessAddrs     string                           // the list of all access nodes from previous spork
 	MaxMsgSize                int                              // GRPC max message size
@@ -57,19 +54,17 @@ type Engine struct {
 	unit               *engine.Unit
 	log                zerolog.Logger
 	backend            *backend.Backend // the gRPC service implementation
-	stateStream        *state_stream.StateStreamBackend
-	unsecureGrpcServer *grpc.Server // the unsecure gRPC server
-	secureGrpcServer   *grpc.Server // the secure gRPC server
+	unsecureGrpcServer *grpc.Server     // the unsecure gRPC server
+	secureGrpcServer   *grpc.Server     // the secure gRPC server
 	httpServer         *http.Server
 	restServer         *http.Server
 	config             Config
 	chain              flow.Chain
 
-	addrLock               sync.RWMutex
-	unsecureGrpcAddress    net.Addr
-	secureGrpcAddress      net.Addr
-	restAPIAddress         net.Addr
-	stateStreamGrpcAddress net.Addr
+	addrLock            sync.RWMutex
+	unsecureGrpcAddress net.Addr
+	secureGrpcAddress   net.Addr
+	restAPIAddress      net.Addr
 }
 
 // NewBuilder returns a new RPC engine builder.
@@ -84,7 +79,6 @@ func NewBuilder(log zerolog.Logger,
 	transactions storage.Transactions,
 	executionReceipts storage.ExecutionReceipts,
 	executionResults storage.ExecutionResults,
-	seals storage.Seals,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
 	accessMetrics module.AccessMetrics,
@@ -94,7 +88,6 @@ func NewBuilder(log zerolog.Logger,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
-	execDownloader execution_data.Downloader,
 ) (*RPCEngineBuilder, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -194,18 +187,10 @@ func NewBuilder(log zerolog.Logger,
 		backend.DefaultSnapshotHistoryLimit,
 	)
 
-	stateStreamClient := state_stream.New(
-		headers,
-		seals,
-		executionResults,
-		execDownloader,
-	)
-
 	eng := &Engine{
 		log:                log,
 		unit:               engine.NewUnit(),
 		backend:            backend,
-		stateStream:        stateStreamClient,
 		unsecureGrpcServer: unsecureGrpcServer,
 		secureGrpcServer:   secureGrpcServer,
 		httpServer:         httpServer,
@@ -230,9 +215,6 @@ func (e *Engine) Ready() <-chan struct{} {
 	e.unit.Launch(e.serveGRPCWebProxy)
 	if e.config.RESTListenAddr != "" {
 		e.unit.Launch(e.serveREST)
-	}
-	if e.config.StateStreamListenAddr != "" {
-		e.unit.Launch(e.serveStateStream)
 	}
 	return e.unit.Ready()
 }
@@ -395,26 +377,5 @@ func (e *Engine) serveREST() {
 			return
 		}
 		e.log.Error().Err(err).Msg("fatal error in REST server")
-	}
-}
-
-func (e *Engine) serveStateStream() {
-	e.log.Info().Str("state_stream_address", e.config.StateStreamListenAddr).Msg("starting grpc server on address")
-
-	l, err := net.Listen("tcp", e.config.StateStreamListenAddr)
-	if err != nil {
-		e.log.Err(err).Msg("failed to start the grpc server")
-		return
-	}
-
-	e.addrLock.Lock()
-	e.stateStreamGrpcAddress = l.Addr()
-	e.addrLock.Unlock()
-
-	e.log.Debug().Str("state_stream_address", e.stateStreamGrpcAddress.String()).Msg("listening on port")
-
-	err = e.secureGrpcServer.Serve(l) // blocking call
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("fatal error in secure grpc server")
 	}
 }

@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
-	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
@@ -51,7 +50,6 @@ type RestAPITestSuite struct {
 	chainID           flow.ChainID
 	metrics           *metrics.NoopCollector
 	rpcEng            *rpc.Engine
-	downloader        *downloadermock.Downloader
 
 	// storage
 	blocks           *storagemock.Blocks
@@ -60,7 +58,6 @@ type RestAPITestSuite struct {
 	transactions     *storagemock.Transactions
 	receipts         *storagemock.ExecutionReceipts
 	executionResults *storagemock.ExecutionResults
-	seals            *storagemock.Seals
 }
 
 func (suite *RestAPITestSuite) SetupTest() {
@@ -78,8 +75,6 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.executionResults = new(storagemock.ExecutionResults)
-	suite.seals = new(storagemock.Seals)
-	suite.downloader = new(downloadermock.Downloader)
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -106,8 +101,8 @@ func (suite *RestAPITestSuite) SetupTest() {
 	}
 
 	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, suite.executionResults, suite.seals, suite.chainID, suite.metrics, suite.metrics, 0, 0, false,
-		false, nil, nil, suite.downloader)
+		nil, suite.executionResults, suite.chainID, suite.metrics, suite.metrics, 0, 0, false,
+		false, nil, nil)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)

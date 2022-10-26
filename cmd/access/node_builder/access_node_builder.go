@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/state_stream"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/ipfs/go-bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
-	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -118,6 +119,7 @@ type AccessNodeConfig struct {
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
+	stateStreamListenAddr        string
 	baseOptions                  []cmd.Option
 
 	PublicNetworkConfig PublicNetworkConfig
@@ -142,7 +144,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			SecureGRPCListenAddr:      "0.0.0.0:9001",
 			HTTPListenAddr:            "0.0.0.0:8000",
 			RESTListenAddr:            "",
-			StateStreamListenAddr:     "",
 			CollectionAddr:            "",
 			HistoricalAccessAddrs:     "",
 			CollectionClientTimeout:   3 * time.Second,
@@ -177,6 +178,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
+		stateStreamListenAddr: "",
 	}
 }
 
@@ -215,10 +217,11 @@ type FlowAccessNodeBuilder struct {
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	IngestEng   *ingestion.Engine
-	RequestEng  *requester.Engine
-	FollowerEng *followereng.Engine
-	SyncEng     *synceng.Engine
+	IngestEng      *ingestion.Engine
+	RequestEng     *requester.Engine
+	FollowerEng    *followereng.Engine
+	SyncEng        *synceng.Engine
+	StateStreamEng *state_stream.Engine
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -559,7 +562,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
 		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
-		flags.StringVar(&builder.rpcConf.StateStreamListenAddr, "state-stream-addr", defaultConfig.rpcConf.StateStreamListenAddr, "the address the state stream server listens on (if empty the server will not be started)")
+		flags.StringVar(&builder.stateStreamListenAddr, "state-stream-addr", defaultConfig.stateStreamListenAddr, "the address the state stream server listens on (if empty the server will not be started)")
 		flags.StringVarP(&builder.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
 		flags.StringVarP(&builder.ExecutionNodeAddress, "script-addr", "s", defaultConfig.ExecutionNodeAddress, "the address (of the execution node) forward the script to")
 		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
@@ -835,7 +838,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Transactions,
 				node.Storage.Receipts,
 				node.Storage.Results,
-				node.Storage.Seals,
 				node.RootChainID,
 				builder.TransactionMetrics,
 				builder.AccessMetrics,
@@ -845,7 +847,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
-				builder.ExecutionDataDownloader,
 			)
 			if err != nil {
 				return nil, err
@@ -933,6 +934,27 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionDataRequester()
+		if builder.stateStreamListenAddr != "" {
+			builder.Component("state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				conf := state_stream.Config{
+					ListenAddr:        builder.stateStreamListenAddr,
+					MaxMsgSize:        builder.rpcConf.MaxMsgSize,
+					RpcMetricsEnabled: builder.rpcMetricsEnabled,
+				}
+				builder.StateStreamEng = state_stream.NewEng(
+					conf,
+					node.Storage.Headers,
+					node.Storage.Seals,
+					node.Storage.Results,
+					builder.ExecutionDataDownloader,
+					node.Logger,
+					node.RootChainID,
+					builder.apiRatelimits,
+					builder.apiBurstlimits,
+				)
+				return builder.StateStreamEng, nil
+			})
+		}
 	}
 
 	builder.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

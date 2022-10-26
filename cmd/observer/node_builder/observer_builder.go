@@ -979,7 +979,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.Storage.Transactions,
 			node.Storage.Receipts,
 			node.Storage.Results,
-			node.Storage.Seals,
 			node.RootChainID,
 			nil,
 			nil,
@@ -989,7 +988,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.rpcMetricsEnabled,
 			builder.apiRatelimits,
 			builder.apiBurstlimits,
-			builder.ExecutionDataDownloader,
 		)
 		if err != nil {
 			return nil, err
