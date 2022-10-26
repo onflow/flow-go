@@ -199,14 +199,19 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
 	s.submitProposal(nextBlock)
 
+	done := make(chan struct{})
+
 	// indirect 2-chain on top of expectedFinalized
 	lastBlock := nextBlock
 	nextBlock = s.mockConsensus.extendBlock(lastBlock.View+5, lastBlock)
 	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(expectedFinalized.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
-	s.updater.On("MakeFinal", blockID(expectedFinalized.ID())).Return(nil).Once()
+	s.updater.On("MakeFinal", blockID(expectedFinalized.ID())).Run(func(_ mock.Arguments) {
+		close(done)
+	}).Return(nil).Once()
 	s.submitProposal(nextBlock)
+	unittest.RequireCloseBefore(s.T(), done, time.Second, "expect to close before timeout")
 }
 
 // TestOutOfOrderBlocks verifies that when submitting a variety of blocks with view numbers
@@ -282,6 +287,8 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 	s.submitProposal(block08)
 	s.submitProposal(block02)
 
+	done := make(chan struct{})
+
 	// Block 20 should now finalize the fork up to and including block13
 	s.notifier.On("OnFinalizedBlock", blockWithID(block01.ID())).Return().Once()
 	s.updater.On("MakeFinal", blockID(block01.ID())).Return(nil).Once()
@@ -290,8 +297,11 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 	s.notifier.On("OnFinalizedBlock", blockWithID(block09.ID())).Return().Once()
 	s.updater.On("MakeFinal", blockID(block09.ID())).Return(nil).Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(block13.ID())).Return().Once()
-	s.updater.On("MakeFinal", blockID(block13.ID())).Return(nil).Once()
+	s.updater.On("MakeFinal", blockID(block13.ID())).Run(func(_ mock.Arguments) {
+		close(done)
+	}).Return(nil).Once()
 	s.submitProposal(block20)
+	unittest.RequireCloseBefore(s.T(), done, time.Second, "expect to close before timeout")
 }
 
 // blockWithID returns a testify `argumentMatcher` that only accepts blocks with the given ID

@@ -24,10 +24,14 @@ type FollowerLoop struct {
 
 // NewFollowerLoop creates an instance of EventLoop
 func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*FollowerLoop, error) {
+	// we will use a buffered channel to avoid blocking of caller
+	// TODO(active-pacemaker) add metrics for length of inbound channels
+	proposals := make(chan *model.Proposal, 1000)
+
 	return &FollowerLoop{
 		log:           log,
 		followerLogic: followerLogic,
-		proposals:     make(chan *model.Proposal),
+		proposals:     proposals,
 		runner:        runner.NewSingleRunner(),
 	}, nil
 }
@@ -41,7 +45,11 @@ func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header) {
 	received := time.Now()
 	proposal := model.ProposalFromFlow(proposalHeader)
 
-	fl.proposals <- proposal
+	select {
+	case fl.proposals <- proposal:
+	case <-fl.runner.ShutdownSignal():
+		return
+	}
 
 	// the busy duration is measured as how long it takes from a block being
 	// received to a block being handled by the event handler.
@@ -52,7 +60,7 @@ func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header) {
 		Msg("busy duration to handle a proposal")
 }
 
-// loop will synchronously processes all events.
+// loop will synchronously process all events.
 // All errors from FollowerLogic are fatal:
 //   - known critical error: some prerequisites of the HotStuff follower have been broken
 //   - unknown critical error: bug-related
