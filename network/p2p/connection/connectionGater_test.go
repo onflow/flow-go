@@ -81,7 +81,7 @@ func TestConnectionGater(t *testing.T) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
 	})
-	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, ids, inbounds, p2pfixtures.LongMessageFactoryFixture(t))
+	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, ids, inbounds, p2pfixtures.LongStringMessageFactoryFixture(t))
 
 	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 

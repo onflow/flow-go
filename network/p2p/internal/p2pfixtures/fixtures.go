@@ -643,7 +643,7 @@ func StreamHandlerFixture(t *testing.T) (func(s network.Stream), chan string) {
 	}, ch
 }
 
-func LongMessageFactoryFixture(t *testing.T) func() string {
+func LongStringMessageFactoryFixture(t *testing.T) func() string {
 	return func() string {
 		msg := "this is an intentionally long MESSAGE to be bigger than buffer size of most of stream compressors"
 		require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
