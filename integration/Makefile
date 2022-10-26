@@ -1,8 +1,6 @@
 # Name of the cover profile
 COVER_PROFILE := cover.out
 
-RACE_DETECTOR=1
-
 # allows CI to specify whether to have race detection on / off
 ifeq ($(RACE_DETECTOR),1)
 	RACE_FLAG := -race
