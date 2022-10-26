@@ -13,9 +13,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
-
 	fnetwork "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/message"
 )
 

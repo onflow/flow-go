@@ -93,7 +93,7 @@ func (info ParseRestrictedTransactionInfo) GetSigningAccounts() (
 ) {
 	return parseRestrict1Ret(
 		info.txnState,
-		"GetSigningAccounts",
+		trace.FVMEnvGetSigningAccounts,
 		info.impl.GetSigningAccounts)
 }
 
