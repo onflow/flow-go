@@ -67,9 +67,9 @@ func (_m *Consumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime t
 	_m.Called(proposal, targetPublicationTime)
 }
 
-// OnOwnTimeout provides a mock function with given fields: timeout
-func (_m *Consumer) OnOwnTimeout(timeout *model.TimeoutObject) {
-	_m.Called(timeout)
+// OnOwnTimeout provides a mock function with given fields: timeout, timeoutTick
+func (_m *Consumer) OnOwnTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
+	_m.Called(timeout, timeoutTick)
 }
 
 // OnOwnVote provides a mock function with given fields: blockID, view, sigData, recipientID
@@ -93,7 +93,7 @@ func (_m *Consumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView 
 }
 
 // OnReachedTimeout provides a mock function with given fields: timeout
-func (_m *Consumer) OnReachedTimeout(timeout *model.TimerInfo) {
+func (_m *Consumer) OnReachedTimeout(timeout model.TimerInfo) {
 	_m.Called(timeout)
 }
 
@@ -108,7 +108,7 @@ func (_m *Consumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
 }
 
 // OnStartingTimeout provides a mock function with given fields: _a0
-func (_m *Consumer) OnStartingTimeout(_a0 *model.TimerInfo) {
+func (_m *Consumer) OnStartingTimeout(_a0 model.TimerInfo) {
 	_m.Called(_a0)
 }
 

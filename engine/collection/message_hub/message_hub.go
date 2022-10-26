@@ -84,7 +84,7 @@ type MessageHub struct {
 	ownOutboundVotes           *fifoqueue.FifoQueue // queue for handling outgoing vote transmissions
 	ownOutboundProposals       *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions
 	ownOutboundTimeouts        *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
-	cluster                    flow.IdentityList    // consensus participants in our cluster
+	clusterIdentityFilter      flow.IdentityFilter
 
 	// injected dependencies
 	compliance        network.MessageProcessor   // handler of incoming block proposals
@@ -153,7 +153,10 @@ func NewMessageHub(log zerolog.Logger,
 		ownOutboundVotes:           ownOutboundVotes,
 		ownOutboundProposals:       ownOutboundProposals,
 		ownOutboundTimeouts:        ownOutboundTimeouts,
-		cluster:                    currentCluster,
+		clusterIdentityFilter: filter.And(
+			filter.In(currentCluster),
+			filter.Not(filter.HasNodeID(me.NodeID())),
+		),
 	}
 
 	// register network conduit
@@ -262,10 +265,7 @@ func (h *MessageHub) processQueuedTimeout(timeout *messages.ClusterTimeoutObject
 	log := logContext.Logger()
 
 	// Retrieve all collection nodes in our cluster (excluding myself).
-	recipients, err := h.state.Final().Identities(filter.And(
-		filter.In(h.cluster),
-		filter.Not(filter.HasNodeID(h.me.NodeID())),
-	))
+	recipients, err := h.state.Final().Identities(h.clusterIdentityFilter)
 	if err != nil {
 		return fmt.Errorf("could not get cluster members for broadcasting timeout: %w", err)
 	}
@@ -357,10 +357,7 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	h.hotstuff.SubmitProposal(header, parent.View) // non-blocking
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := h.state.Final().Identities(filter.And(
-		filter.In(h.cluster),
-		filter.Not(filter.HasNodeID(h.me.NodeID())),
-	))
+	recipients, err := h.state.Final().Identities(h.clusterIdentityFilter)
 	if err != nil {
 		return fmt.Errorf("could not get cluster members for broadcasting collection proposal")
 	}
