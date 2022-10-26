@@ -316,7 +316,7 @@ func blockID(expectedBlockID flow.Identifier) interface{} {
 
 // submitProposal submits the given (proposal, parentView) pair to the Follower.
 func (s *HotStuffFollowerSuite) submitProposal(proposal *flow.Header) {
-	s.follower.SubmitProposal(proposal)
+	s.follower.SubmitProposal(model.ProposalFromFlow(proposal))
 }
 
 // MockConsensus is used to generate Blocks for a mocked consensus committee

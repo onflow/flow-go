@@ -3,7 +3,7 @@
 package mock
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
+	model "github.com/onflow/flow-go/consensus/hotstuff/model"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -45,7 +45,7 @@ func (_m *HotStuffFollower) Ready() <-chan struct{} {
 }
 
 // SubmitProposal provides a mock function with given fields: proposal
-func (_m *HotStuffFollower) SubmitProposal(proposal *flow.Header) {
+func (_m *HotStuffFollower) SubmitProposal(proposal *model.Proposal) {
 	_m.Called(proposal)
 }
 

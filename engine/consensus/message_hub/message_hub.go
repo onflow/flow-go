@@ -328,7 +328,7 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	log.Debug().Msg("processing proposal broadcast request from hotstuff")
 
 	// TODO(active-pacemaker): replace with pub/sub?
-	h.hotstuff.SubmitProposal(header) // non-blocking
+	h.hotstuff.SubmitProposal(model.ProposalFromFlow(header)) // non-blocking
 
 	// Retrieve all consensus nodes (excluding myself).
 	// CAUTION: We must include also nodes with weight zero, because otherwise

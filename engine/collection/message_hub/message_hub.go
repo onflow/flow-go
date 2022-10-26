@@ -334,7 +334,7 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	log.Debug().Msg("processing cluster broadcast request from hotstuff")
 
 	// TODO(active-pacemaker): replace with pub/sub?
-	h.hotstuff.SubmitProposal(header) // non-blocking
+	h.hotstuff.SubmitProposal(model.ProposalFromFlow(header)) // non-blocking
 
 	// retrieve all collection nodes in our cluster
 	recipients, err := h.state.Final().Identities(filter.And(

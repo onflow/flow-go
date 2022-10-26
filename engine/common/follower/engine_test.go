@@ -137,10 +137,12 @@ func (suite *Suite) TestHandleProposal() {
 	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
+
 	// the parent is the last finalized state
 	suite.snapshot.On("Head").Return(parent.Header, nil)
 	// the block passes hotstuff validation
-	suite.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header)).Return(nil)
+	suite.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	// we should be able to extend the state with the block
 	suite.state.On("Extend", mock.Anything, &block).Return(nil).Once()
 	// we should be able to get the parent header by its ID
@@ -148,7 +150,7 @@ func (suite *Suite) TestHandleProposal() {
 	// we do not have any children cached
 	suite.cache.On("ByParentID", block.ID()).Return(nil, false)
 	// the proposal should be forwarded to the follower
-	suite.follower.On("SubmitProposal", block.Header).Once()
+	suite.follower.On("SubmitProposal", hotstuffProposal).Once()
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
@@ -194,6 +196,9 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	block := unittest.BlockWithParentFixture(parent.Header) // block which is passed as input to the engine
 	child := unittest.BlockWithParentFixture(block.Header)  // block which is already cached
 
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	childHotstuffProposal := model.ProposalFromFlow(child.Header)
+
 	// the parent is the last finalized state
 	suite.snapshot.On("Head").Return(parent.Header, nil)
 
@@ -201,8 +206,8 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	// first time calling, assume it's not there
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 	// both blocks pass HotStuff validation
-	suite.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header)).Return(nil)
-	suite.validator.On("ValidateProposal", model.ProposalFromFlow(child.Header)).Return(nil)
+	suite.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	suite.validator.On("ValidateProposal", childHotstuffProposal).Return(nil)
 	// should extend state with the input block, and the child
 	suite.state.On("Extend", mock.Anything, block).Return(nil).Once()
 	suite.state.On("Extend", mock.Anything, child).Return(nil).Once()
@@ -210,8 +215,8 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
 	suite.headers.On("ByBlockID", block.ID()).Return(block.Header, nil).Once()
 	// should submit to follower
-	suite.follower.On("SubmitProposal", block.Header).Once()
-	suite.follower.On("SubmitProposal", child.Header).Once()
+	suite.follower.On("SubmitProposal", hotstuffProposal).Once()
+	suite.follower.On("SubmitProposal", childHotstuffProposal).Once()
 
 	// we have one pending child cached
 	pending := []*flow.PendingBlock{

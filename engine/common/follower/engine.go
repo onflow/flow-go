@@ -442,7 +442,7 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 	log.Info().Msg("forwarding block proposal to hotstuff")
 
 	// submit the model to follower for processing
-	e.follower.SubmitProposal(header)
+	e.follower.SubmitProposal(hotstuffProposal)
 
 	// check for any descendants of the block to process
 	err = e.processPendingChildren(ctx, header)

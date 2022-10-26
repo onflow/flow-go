@@ -322,7 +322,7 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 	// submit the model to hotstuff for processing
 	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
 	log.Info().Msg("forwarding block proposal to hotstuff")
-	c.hotstuff.SubmitProposal(header)
+	c.hotstuff.SubmitProposal(hotstuffProposal)
 
 	return nil
 }

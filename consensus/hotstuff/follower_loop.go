@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/runner"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -41,9 +40,8 @@ func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*Follower
 //
 // Block proposals must be submitted in order, i.e. a proposal's parent must
 // have been previously processed by the FollowerLoop.
-func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header) {
+func (fl *FollowerLoop) SubmitProposal(proposal *model.Proposal) {
 	received := time.Now()
-	proposal := model.ProposalFromFlow(proposalHeader)
 
 	select {
 	case fl.proposals <- proposal:
