@@ -31,7 +31,13 @@ type View struct {
 
 type Snapshot struct {
 	Delta Delta
+	SnapshotStats
 	Reads map[string]flow.RegisterID
+}
+
+type SnapshotStats struct {
+	NumberOfBytesWrittenToRegisters int
+	NumberOfRegistersTouched        int
 }
 
 // Snapshot is state of interactions with the register
@@ -63,9 +69,11 @@ func (v *View) Interactions() *SpockSnapshot {
 	}
 	var reads = make(map[string]flow.RegisterID, len(v.regTouchSet))
 
+	bytesWrittenToRegisters := 0
 	//copy data
 	for s, value := range v.delta.Data {
 		delta.Data[s] = value
+		bytesWrittenToRegisters += len(value.Value)
 	}
 
 	for i, id := range v.regTouchSet {
@@ -76,6 +84,10 @@ func (v *View) Interactions() *SpockSnapshot {
 		Snapshot: Snapshot{
 			Delta: delta,
 			Reads: reads,
+			SnapshotStats: SnapshotStats{
+				NumberOfBytesWrittenToRegisters: bytesWrittenToRegisters,
+				NumberOfRegistersTouched:        len(reads),
+			},
 		},
 		SpockSecret: v.SpockSecret(),
 	}
@@ -110,6 +122,7 @@ func (v *View) AllRegisters() []flow.RegisterID {
 	return v.Interactions().AllRegisters()
 }
 
+// RegisterUpdates returns a list of register updates
 func (v *View) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 	return v.Delta().RegisterUpdates()
 }

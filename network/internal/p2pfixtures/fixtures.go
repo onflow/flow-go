@@ -29,18 +29,18 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/p2putils"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
+
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/utils"
-	"github.com/onflow/flow-go/network/test"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -65,7 +65,7 @@ func NodeFixture(
 	sporkID flow.Identifier,
 	dhtPrefix string,
 	opts ...NodeFixtureParameterOption,
-) (*p2pnode.Node, flow.Identity) {
+) (p2p.LibP2PNode, flow.Identity) {
 	// default parameters
 	parameters := &NodeFixtureParameters{
 		HandlerFunc: func(network.Stream) {},
@@ -89,7 +89,7 @@ func NodeFixture(
 
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := connection.NewConnManager(logger, noopMetrics)
-	resourceManager := test.NewResourceManager(t)
+	resourceManager := testutils.NewResourceManager(t)
 
 	builder := p2pbuilder.NewNodeBuilder(logger, parameters.Address, parameters.Key, sporkID).
 		SetConnectionManager(connManager).
@@ -101,7 +101,8 @@ func NodeFixture(
 				parameters.DhtOptions...,
 			)
 		}).
-		SetResourceManager(resourceManager)
+		SetResourceManager(resourceManager).
+		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc)
 
 	if parameters.PeerFilter != nil {
 		filters := []p2p.PeerFilter{parameters.PeerFilter}
@@ -233,7 +234,7 @@ func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 
 // StartNodes start all nodes in the input slice using the provided context, timing out if nodes are
 // not all Ready() before duration expires
-func StartNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []*p2pnode.Node, timeout time.Duration) {
+func StartNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []p2p.LibP2PNode, timeout time.Duration) {
 	rdas := make([]module.ReadyDoneAware, 0, len(nodes))
 	for _, node := range nodes {
 		node.Start(ctx)
@@ -249,14 +250,14 @@ func StartNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []*p2pnod
 
 // StartNode start a single node using the provided context, timing out if nodes are not all Ready()
 // before duration expires
-func StartNode(t *testing.T, ctx irrecoverable.SignalerContext, node *p2pnode.Node, timeout time.Duration) {
+func StartNode(t *testing.T, ctx irrecoverable.SignalerContext, node p2p.LibP2PNode, timeout time.Duration) {
 	node.Start(ctx)
 	unittest.RequireComponentsReadyBefore(t, timeout, node)
 }
 
 // StopNodes stops all nodes in the input slice using the provided cancel func, timing out if nodes are
 // not all Done() before duration expires
-func StopNodes(t *testing.T, nodes []*p2pnode.Node, cancel context.CancelFunc, timeout time.Duration) {
+func StopNodes(t *testing.T, nodes []p2p.LibP2PNode, cancel context.CancelFunc, timeout time.Duration) {
 	cancel()
 	for _, node := range nodes {
 		unittest.RequireComponentsDoneBefore(t, timeout, node)
@@ -265,7 +266,7 @@ func StopNodes(t *testing.T, nodes []*p2pnode.Node, cancel context.CancelFunc, t
 
 // StopNode stops a single node using the provided cancel func, timing out if nodes are not all Done()
 // before duration expires
-func StopNode(t *testing.T, node *p2pnode.Node, cancel context.CancelFunc, timeout time.Duration) {
+func StopNode(t *testing.T, node p2p.LibP2PNode, cancel context.CancelFunc, timeout time.Duration) {
 	cancel()
 	unittest.RequireComponentsDoneBefore(t, timeout, node)
 }
@@ -311,10 +312,9 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 
 // NodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func NodesFixture(t *testing.T, sporkID flow.Identifier, dhtPrefix string, count int, opts ...NodeFixtureParameterOption) ([]*p2pnode.Node,
+func NodesFixture(t *testing.T, sporkID flow.Identifier, dhtPrefix string, count int, opts ...NodeFixtureParameterOption) ([]p2p.LibP2PNode,
 	flow.IdentityList) {
-	// keeps track of errors on creating a node
-	var nodes []*p2pnode.Node
+	var nodes []p2p.LibP2PNode
 
 	// creating nodes
 	var identities flow.IdentityList
@@ -336,12 +336,12 @@ func WithSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
 	}
 }
 
-func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, opts ...nodeOpt) *p2pnode.Node {
+func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, opts ...nodeOpt) p2p.LibP2PNode {
 	builder := p2pbuilder.NewNodeBuilder(logger, "0.0.0.0:0", networkKey, sporkID).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
-		SetResourceManager(test.NewResourceManager(t))
+		SetResourceManager(testutils.NewResourceManager(t))
 
 	for _, opt := range opts {
 		opt(builder)
@@ -471,7 +471,7 @@ func SubsMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, subs []*p
 }
 
 // LetNodesDiscoverEachOther connects all nodes to each other on the pubsub mesh.
-func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, ids flow.IdentityList) {
+func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, ids flow.IdentityList) {
 	for _, node := range nodes {
 		for i, other := range nodes {
 			if node == other {
