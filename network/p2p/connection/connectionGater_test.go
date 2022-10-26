@@ -88,11 +88,36 @@ func TestConnectionGater(t *testing.T) {
 	// now we blacklist one of the nodes (the last node)
 	blacklist[ids[len(ids)-1]] = struct{}{}
 
+	// let peer manager prune the connections to the blacklisted node.
 	time.Sleep(1 * time.Second)
 
+	// ensures no connection, unicast, or pubsub going to the blacklisted node
 	p2pfixtures.EnsureNotConnected(t, ctx, nodes[:count-1], nodes[count-1:])
 	p2pfixtures.EnsureNoPubsubMessageExchange(t, ctx, nodes[:count-1], nodes[count-1:], func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
 	})
+	p2pfixtures.EnsureNoMessageExchangeOverUnicast(t, ctx, nodes[:count-1], nodes[count-1:], ids[count-1:], p2pfixtures.LongStringMessageFactoryFixture(t))
+
+	// now we blacklist another node (the second last node)
+	blacklist[ids[len(ids)-2]] = struct{}{}
+
+	// let peer manager prune the connections to the blacklisted node.
+	time.Sleep(1 * time.Second)
+
+	// ensures no connection, unicast, or pubsub going to the blacklisted nodes
+	p2pfixtures.EnsureNotConnected(t, ctx, nodes[:count-2], nodes[count-2:])
+	p2pfixtures.EnsureNoPubsubMessageExchange(t, ctx, nodes[:count-2], nodes[count-2:], func() (interface{}, channels.Topic) {
+		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+		return unittest.ProposalFixture(), blockTopic
+	})
+	p2pfixtures.EnsureNoMessageExchangeOverUnicast(t, ctx, nodes[:count-2], nodes[count-2:], ids[count-2:], p2pfixtures.LongStringMessageFactoryFixture(t))
+
+	// ensures that all nodes are other non-black listed nodes are connected to each other.
+	p2pfixtures.EnsureConnected(t, ctx, nodes[:count-2])
+	p2pfixtures.EnsurePubsubMessageExchange(t, ctx, nodes[:count-2], ids[:count-2], func() (interface{}, channels.Topic) {
+		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+		return unittest.ProposalFixture(), blockTopic
+	})
+	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes[:count-2], ids[:count-2], inbounds[:count-2], p2pfixtures.LongStringMessageFactoryFixture(t))
 }

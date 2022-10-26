@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
@@ -632,13 +633,18 @@ func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes [
 	}
 }
 
-func EnsureNoMessageExchangeOverUnicast(t *testing.T, ctx context.Context, from []*p2pnode.Node, to []*p2pnode.Node, toIds flow.IdentityList, messageFactory func() string) {
+func EnsureNoStreamCreation(t *testing.T, ctx context.Context, groupA []*p2pnode.Node, groupAIds flow.IdentityList, groupB []*p2pnode.Node, groupBIds flow.IdentityList) {
+	// no stream from groupA -> groupB
+	EnsureNoStreamCreationFrom(t, ctx, groupA, groupB, groupBIds)
+	// no stream from groupB -> groupA
+	EnsureNoStreamCreationFrom(t, ctx, groupB, groupA, groupAIds)
+}
+
+func EnsureNoStreamCreationFrom(t *testing.T, ctx context.Context, from []*p2pnode.Node, to []*p2pnode.Node, toIds flow.IdentityList) {
+	// trying to create streams "from" to "to" nodes.
 	pInfo, err := utils.PeerInfosFromIDs(toIds)
 	require.Empty(t, err)
 
-	// LetNodesDiscoverEachOther(t, ctx, nodes, ids)
-
-	// trying to create streams "from" to "to" nodes.
 	for _, this := range from {
 		for i, other := range to {
 			if this == other {
@@ -648,6 +654,7 @@ func EnsureNoMessageExchangeOverUnicast(t *testing.T, ctx context.Context, from 
 			// stream creation should fail
 			_, err := this.CreateStream(ctx, pInfo[i].ID)
 			require.Error(t, err)
+			require.True(t, flownet.IsPeerUnreachableError(err))
 		}
 	}
 }
