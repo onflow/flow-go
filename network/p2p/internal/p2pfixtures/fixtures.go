@@ -594,20 +594,15 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []*p2
 // The "inbounds" parameter specifies the inbound channel of the nodes on which the messages are received.
 // The "messageFactory" parameter specifies the function that creates unique messages to be sent.
 func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, ids flow.IdentityList, inbounds []chan string, messageFactory func() string) {
-	pInfo, err := utils.PeerInfosFromIDs(ids)
-	require.Empty(t, err)
-
-	LetNodesDiscoverEachOther(t, ctx, nodes, ids)
-
 	for _, this := range nodes {
 		msg := messageFactory()
 
 		// send the message to all other nodes
-		for i, other := range nodes {
+		for _, other := range nodes {
 			if this == other {
 				continue
 			}
-			s, err := this.CreateStream(ctx, pInfo[i].ID)
+			s, err := this.CreateStream(ctx, other.Host().ID())
 			require.NoError(t, err)
 			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 			_, err = rw.WriteString(msg)
@@ -641,18 +636,14 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, groupA []*p2pnode
 }
 
 func EnsureNoStreamCreationFrom(t *testing.T, ctx context.Context, from []*p2pnode.Node, to []*p2pnode.Node, toIds flow.IdentityList) {
-	// trying to create streams "from" to "to" nodes.
-	pInfo, err := utils.PeerInfosFromIDs(toIds)
-	require.Empty(t, err)
-
 	for _, this := range from {
-		for i, other := range to {
+		for _, other := range to {
 			if this == other {
 				// should not happen, unless the test is misconfigured.
 				require.Fail(t, fmt.Sprintf("node is in both from and to lists"))
 			}
 			// stream creation should fail
-			_, err := this.CreateStream(ctx, pInfo[i].ID)
+			_, err := this.CreateStream(ctx, other.Host().ID())
 			require.Error(t, err)
 			require.True(t, flownet.IsPeerUnreachableError(err))
 		}
