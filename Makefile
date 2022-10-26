@@ -76,13 +76,13 @@ emulator-build:
 	# test the fvm package compiles with Relic library disabled (required for the emulator build)
 	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
 
-.PHONY: emulator-build
+.PHONY: fuzz-fvm
 fuzz-fvm:
 	# run fuzz tests in the fvm package
 	cd ./fvm && go test -fuzz=Fuzz -run ^$$ --tags relic
 
 .PHONY: test
-test: verify-mocks emulator-build unittest-main
+test: verify-mocks unittest-main
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -196,9 +196,9 @@ fix-lint:
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic --fix ./...
 
-# Runs unit tests, SKIP FOR NOW linter, coverage
+# Runs unit tests with different list of packages as passed by CI so they run in parallel
 .PHONY: ci
-ci: install-tools tidy test # lint coverage
+ci: install-tools test
 
 # Runs integration tests
 .PHONY: ci-integration
