@@ -26,6 +26,8 @@ func NewCorruptLibP2PNodeFactory(
 	resolver madns.BasicResolver,
 	peerScoringEnabled bool,
 	role string,
+	onInterceptPeerDialFilters,
+	onInterceptSecuredFilters []p2p.PeerFilter,
 	connectionPruning bool,
 	updateInterval time.Duration,
 ) p2pbuilder.LibP2PFactoryFunc {
@@ -34,7 +36,7 @@ func NewCorruptLibP2PNodeFactory(
 			panic("illegal chain id for using corruptible conduit factory")
 		}
 
-		builder := p2pbuilder.DefaultNodeBuilder(log, address, flowKey, sporkId, idProvider, metrics, resolver, role, peerScoringEnabled, connectionPruning, updateInterval)
+		builder := p2pbuilder.DefaultNodeBuilder(log, address, flowKey, sporkId, idProvider, metrics, resolver, role, onInterceptPeerDialFilters, onInterceptSecuredFilters, peerScoringEnabled, connectionPruning, updateInterval)
 		builder.SetCreateNode(NewCorruptLibP2PNode)
 		return builder.Build()
 	}

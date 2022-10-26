@@ -55,6 +55,8 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.Resolver,
 			cnb.PeerScoringEnabled,
 			cnb.BaseConfig.NodeRole,
+			[]p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
+			[]p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
 			// run peer manager with the specified interval and let it also prune connections
 			cnb.NetworkConnectionPruning,
 			cnb.PeerUpdateInterval,
