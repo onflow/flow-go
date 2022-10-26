@@ -1,11 +1,13 @@
 package consensus
 
 import (
+	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/component"
 )
 
-// ProposalProvider provides proposals created by this node to non-consensus nodes.
-type ProposalProvider interface {
-	// ProvideProposal asynchronously submits our proposal to all non-consensus nodes.
-	ProvideProposal(proposal *messages.BlockProposal)
+type Compliance interface {
+	component.Component
+	OnBlockProposal(proposal *messages.BlockProposal)
+	OnSyncedBlock(block *events.SyncedBlock)
 }
