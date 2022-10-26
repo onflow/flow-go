@@ -1,6 +1,15 @@
 # Name of the cover profile
 COVER_PROFILE := cover.out
 
+RACE_DETECTOR=1
+
+# allows CI to specify whether to have race detection on / off
+ifeq ($(RACE_DETECTOR),1)
+	RACE_FLAG := -race
+else
+	RACE_FLAG :=
+endif
+
 # Run the integration test suite
 .PHONY: integration-test
 integration-test: access-tests ghost-tests mvp-tests execution-tests verification-tests collection-tests epochs-tests network-tests consensus-tests
@@ -15,7 +24,7 @@ ci-integration-test: access-tests ghost-tests mvp-tests epochs-tests consensus-t
 # Run unit tests for test utilities in this module
 .PHONY: test
 test:
-	go test $(if $(VERBOSE),-v,) -tags relic -coverprofile=$(COVER_PROFILE) $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests`
+	go test $(if $(VERBOSE),-v,) -tags relic -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests`
 
 .PHONY: access-tests
 access-tests:
