@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
@@ -202,8 +201,9 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, cs.head.Header.View)).Return(nil)
-	cs.hotstuff.On("SubmitProposal", proposal.Header, cs.head.Header.View)
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -226,8 +226,9 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
 
-	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(nil)
-	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Once()
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -266,7 +267,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
 	proposal := unittest.ClusterProposalFromBlock(&block)
-	hotstuffProposal := model.ProposalFromFlow(block.Header, parent.Header.View)
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
@@ -275,7 +276,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	cs.Run("invalid block error", func() {
 		// the block fails HotStuff validation
 		*cs.validator = *hotstuff.NewValidator(cs.T())
-		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(model.InvalidBlockError{})
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.InvalidBlockError{})
 		// we should notify VoteAggregator about the invalid block
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
@@ -292,7 +293,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	cs.Run("view for unknown epoch error", func() {
 		// the block fails HotStuff validation
 		*cs.validator = *hotstuff.NewValidator(cs.T())
-		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(model.ErrViewForUnknownEpoch)
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.ErrViewForUnknownEpoch)
 
 		// the expected error should be handled within the Core
 		err := cs.core.OnBlockProposal(originID, proposal)
@@ -308,7 +309,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		// the block fails HotStuff validation
 		unexpectedErr := errors.New("generic unexpected error")
 		*cs.validator = *hotstuff.NewValidator(cs.T())
-		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(unexpectedErr)
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(unexpectedErr)
 
 		// the error should be propagated
 		err := cs.core.OnBlockProposal(originID, proposal)
@@ -334,14 +335,14 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
 	proposal := unittest.ClusterProposalFromBlock(&block)
-	hotstuffProposal := model.ProposalFromFlow(block.Header, parent.Header.View)
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
 
 	// the block passes HotStuff validation
-	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, parent.Header.View)).Return(nil)
+	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 
 	cs.Run("invalid block", func() {
 		// make sure we fail to extend the state
@@ -358,7 +359,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		// we should extend the state with the header
 		cs.state.AssertCalled(cs.T(), "Extend", &block)
 		// we should not pass the block to hotstuff
-		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything)
 		// we should not attempt to process the children
 		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
 	})
@@ -376,7 +377,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		// we should extend the state with the header
 		cs.state.AssertCalled(cs.T(), "Extend", &block)
 		// we should not pass the block to hotstuff
-		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything)
 		// we should not attempt to process the children
 		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
 	})
@@ -435,15 +436,11 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
-	cs.validator.On("ValidateProposal", model.ProposalFromFlow(parent.Header, cs.head.Header.View)).Return(nil)
-	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block1.Header, parent.Header.View)).Return(nil)
-	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block2.Header, parent.Header.View)).Return(nil)
-	cs.validator.On("ValidateProposal", model.ProposalFromFlow(block3.Header, parent.Header.View)).Return(nil)
-
-	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.Header.View).Once()
-	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Once()
-	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Once()
-	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Once()
+	for _, block := range []cluster.Block{parent, block1, block2, block3} {
+		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
+	}
 
 	// execute the connected children handling
 	err := cs.core.processBlockAndDescendants(proposal, cs.head.Header)
@@ -454,55 +451,6 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	// make sure we drop the cache after trying to process
 	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header.ID())
-}
-
-func (cs *CoreSuite) TestOnSubmitVote() {
-	// create a vote
-	originID := unittest.IdentifierFixture()
-	vote := messages.ClusterBlockVote{
-		BlockID: unittest.IdentifierFixture(),
-		View:    rand.Uint64(),
-		SigData: unittest.SignatureFixture(),
-	}
-
-	cs.voteAggregator.On("AddVote", &model.Vote{
-		View:     vote.View,
-		BlockID:  vote.BlockID,
-		SignerID: originID,
-		SigData:  vote.SigData,
-	}).Return()
-
-	// execute the vote submission
-	err := cs.core.OnBlockVote(originID, &vote)
-	require.NoError(cs.T(), err, "block vote should pass")
-
-	// check that submit vote was called with correct parameters
-	cs.hotstuff.AssertExpectations(cs.T())
-}
-
-// TestOnSubmitTimeout tests that submitting messages.ClusterTimeoutObject adds model.TimeoutObject into
-// TimeoutAggregator.
-func (cs *CoreSuite) TestOnSubmitTimeout() {
-	// create a timeout
-	originID := unittest.IdentifierFixture()
-	timeout := messages.ClusterTimeoutObject{
-		View:       rand.Uint64(),
-		NewestQC:   helper.MakeQC(),
-		LastViewTC: helper.MakeTC(),
-		SigData:    unittest.SignatureFixture(),
-	}
-
-	cs.timeoutAggregator.On("AddTimeout", &model.TimeoutObject{
-		View:       timeout.View,
-		NewestQC:   timeout.NewestQC,
-		LastViewTC: timeout.LastViewTC,
-		SignerID:   originID,
-		SigData:    timeout.SigData,
-	}).Return()
-
-	// execute the timeout submission
-	err := cs.core.OnTimeoutObject(originID, &timeout)
-	require.NoError(cs.T(), err, "timeout object should pass")
 }
 
 func (cs *CoreSuite) TestProposalBufferingOrder() {
@@ -559,12 +507,12 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 		proposals[1].Header.ID(),
 		proposals[2].Header.ID(),
 	}
-	cs.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Times(4).Run(
+	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
-			header := args.Get(0).(*flow.Header)
-			assert.Equal(cs.T(), order[index], header.ID(), "should submit correct header to hotstuff")
+			header := args.Get(0).(*model.Proposal).Block
+			assert.Equal(cs.T(), order[index], header.BlockID, "should submit correct header to hotstuff")
 			index++
-			cs.headerDB[header.ID()] = proposalsLookup[header.ID()]
+			cs.headerDB[header.BlockID] = proposalsLookup[header.BlockID]
 		},
 	)
 	cs.validator.On("ValidateProposal", mock.Anything).Times(4).Return(nil)

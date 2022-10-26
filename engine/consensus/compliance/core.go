@@ -246,7 +246,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, pare
 		}
 		if checkForAndLogInvalidInputError(err, log) || checkForAndLogUnverifiableInputError(err, log) {
 			// in both cases, notify VoteAggregator about the invalid block
-			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header, parent.View))
+			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
 					log.Warn().Msg("received invalid block, but is below pruned threshold")
@@ -306,7 +306,7 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal, parent *fl
 	}
 	defer span.End()
 
-	hotstuffProposal := model.ProposalFromFlow(header, parent.View)
+	hotstuffProposal := model.ProposalFromFlow(header)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
 		if model.IsInvalidBlockError(err) {
@@ -363,61 +363,7 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal, parent *fl
 	// submit the model to hotstuff for processing
 	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
 	log.Info().Msg("forwarding block proposal to hotstuff")
-	c.hotstuff.SubmitProposal(header, parent.View)
-
-	return nil
-}
-
-// OnBlockVote forwards incoming block votes to the `hotstuff.VoteAggregator`
-// No errors are expected during normal operation.
-func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), vote.BlockID, trace.CONCompOnBlockVote)
-	if isSampled {
-		span.SetAttributes(
-			attribute.String("origin_id", originID.String()),
-		)
-	}
-	defer span.End()
-
-	v := &model.Vote{
-		View:     vote.View,
-		BlockID:  vote.BlockID,
-		SignerID: originID,
-		SigData:  vote.SigData,
-	}
-
-	c.log.Info().
-		Uint64("block_view", vote.View).
-		Hex("block_id", vote.BlockID[:]).
-		Hex("voter", v.SignerID[:]).
-		Str("vote_id", v.ID().String()).
-		Msg("block vote received, forwarding block vote to hotstuff vote aggregator")
-
-	// forward the vote to hotstuff for processing
-	c.voteAggregator.AddVote(v)
-
-	return nil
-}
-
-// OnTimeoutObject forwards incoming TimeoutObjects to the `hotstuff.TimeoutAggregator`
-// No errors are expected during normal operation.
-func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.TimeoutObject) error {
-	t := &model.TimeoutObject{
-		View:       timeout.View,
-		NewestQC:   timeout.NewestQC,
-		LastViewTC: timeout.LastViewTC,
-		SignerID:   originID,
-		SigData:    timeout.SigData,
-	}
-
-	c.log.Info().
-		Hex("origin_id", originID[:]).
-		Uint64("view", t.View).
-		Str("timeout_id", t.ID().String()).
-		Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
-
-	// forward the timeout to hotstuff for processing
-	c.timeoutAggregator.AddTimeout(t)
+	c.hotstuff.SubmitProposal(hotstuffProposal)
 
 	return nil
 }

@@ -347,6 +347,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		extend.Header.Height = 1
 		extend.Header.View = 1
 		extend.Header.ParentID = head.ID()
+		extend.Header.ParentView = head.View
 
 		err = state.Extend(context.Background(), &extend)
 		require.NoError(t, err)
@@ -381,6 +382,26 @@ func TestExtendHeightTooLarge(t *testing.T) {
 
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
+	})
+}
+
+// TestExtendInconsistentParentView tests if mutator rejects block with invalid ParentView. ParentView must be consistent
+// with view of block referred by ParentID.
+func TestExtendInconsistentParentView(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		block := unittest.BlockWithParentFixture(head)
+		block.SetPayload(flow.EmptyPayload())
+		// set an invalid parent view
+		block.Header.ParentView++
+
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err))
 	})
 }
 

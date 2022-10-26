@@ -386,14 +386,8 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 
 	log.Info().Msg("processing block proposal")
 
-	// retrieve the parent
-	parent, err := e.headers.ByBlockID(header.ParentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve proposal parent: %w", err)
-	}
-
-	hotstuffProposal := model.ProposalFromFlow(header, parent.View)
-	err = e.validator.ValidateProposal(hotstuffProposal)
+	hotstuffProposal := model.ProposalFromFlow(header)
+	err := e.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
 		if model.IsInvalidBlockError(err) {
 			// TODO potential slashing
@@ -448,7 +442,7 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 	log.Info().Msg("forwarding block proposal to hotstuff")
 
 	// submit the model to follower for processing
-	e.follower.SubmitProposal(header, parent.View)
+	e.follower.SubmitProposal(hotstuffProposal)
 
 	// check for any descendants of the block to process
 	err = e.processPendingChildren(ctx, header)

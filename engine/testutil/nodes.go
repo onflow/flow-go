@@ -298,7 +298,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	)
 	require.NoError(t, err)
 
-	proposalFactory, err := factories.NewProposalEngineFactory(
+	complianceEngineFactory, err := factories.NewComplianceEngineFactory(
 		node.Log,
 		node.Net,
 		node.Me,
@@ -329,14 +329,22 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	)
 	require.NoError(t, err)
 
+	messageHubFactory := factories.NewMessageHubFactory(
+		node.Log,
+		node.Net,
+		node.Me,
+		node.State,
+	)
+
 	factory := factories.NewEpochComponentsFactory(
 		node.Me,
 		pools,
 		builderFactory,
 		clusterStateFactory,
 		hotstuffFactory,
-		proposalFactory,
+		complianceEngineFactory,
 		syncFactory,
+		messageHubFactory,
 	)
 
 	rootQCVoter := new(mockmodule.ClusterRootQCVoter)

@@ -21,7 +21,7 @@ type EpochComponentsFactory struct {
 }
 
 // Create provides a mock function with given fields: epoch
-func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, component.Component, module.ReadyDoneAware, module.HotStuff, hotstuff.VoteAggregator, hotstuff.TimeoutAggregator, error) {
+func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, component.Component, module.ReadyDoneAware, module.HotStuff, hotstuff.VoteAggregator, hotstuff.TimeoutAggregator, component.Component, error) {
 	ret := _m.Called(epoch)
 
 	var r0 cluster.State
@@ -78,14 +78,23 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, c
 		}
 	}
 
-	var r6 error
-	if rf, ok := ret.Get(6).(func(protocol.Epoch) error); ok {
+	var r6 component.Component
+	if rf, ok := ret.Get(6).(func(protocol.Epoch) component.Component); ok {
 		r6 = rf(epoch)
 	} else {
-		r6 = ret.Error(6)
+		if ret.Get(6) != nil {
+			r6 = ret.Get(6).(component.Component)
+		}
 	}
 
-	return r0, r1, r2, r3, r4, r5, r6
+	var r7 error
+	if rf, ok := ret.Get(7).(func(protocol.Epoch) error); ok {
+		r7 = rf(epoch)
+	} else {
+		r7 = ret.Error(7)
+	}
+
+	return r0, r1, r2, r3, r4, r5, r6, r7
 }
 
 type mockConstructorTestingTNewEpochComponentsFactory interface {

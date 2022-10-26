@@ -24,9 +24,9 @@ func (p *Proposal) ProposerVote() *Vote {
 }
 
 // ProposalFromFlow turns a flow header into a hotstuff block type.
-func ProposalFromFlow(header *flow.Header, parentView uint64) *Proposal {
+func ProposalFromFlow(header *flow.Header) *Proposal {
 
-	block := BlockFromFlow(header, parentView)
+	block := BlockFromFlow(header)
 
 	proposal := Proposal{
 		Block:      block,
@@ -46,6 +46,7 @@ func ProposalToFlow(proposal *Proposal) *flow.Header {
 		PayloadHash:        block.PayloadHash,
 		Timestamp:          block.Timestamp,
 		View:               block.View,
+		ParentView:         block.QC.View,
 		ParentVoterIndices: block.QC.SignerIndices,
 		ParentVoterSigData: block.QC.SigData,
 		ProposerID:         block.ProposerID,

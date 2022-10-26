@@ -56,12 +56,12 @@ require (
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/onflow/atree v0.4.0
 	github.com/onflow/cadence v0.27.0
-	github.com/onflow/flow v0.3.2
+	github.com/onflow/flow v0.3.3-0.20221012172052-e4ab66320562
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220720151516-797b149ceaaa
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220720151516-797b149ceaaa
 	github.com/onflow/flow-go-sdk v0.28.0
 	github.com/onflow/flow-go/crypto v0.24.4
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20220718115540-bd33a4f1cc17
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221012172052-e4ab66320562
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1

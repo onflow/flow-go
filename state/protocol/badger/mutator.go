@@ -193,6 +193,10 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 		return state.NewInvalidExtensionErrorf("candidate built for invalid chain (candidate: %s, parent: %s)",
 			header.ChainID, parent.ChainID)
 	}
+	if header.ParentView != parent.View {
+		return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
+			header.ParentView, parent.View)
+	}
 	if header.Height != parent.Height+1 {
 		return state.NewInvalidExtensionErrorf("candidate built with invalid height (candidate: %d, parent: %d)",
 			header.Height, parent.Height)

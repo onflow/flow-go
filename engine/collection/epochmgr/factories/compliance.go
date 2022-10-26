@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type ProposalEngineFactory struct {
+type ComplianceEngineFactory struct {
 	log            zerolog.Logger
 	me             module.Local
 	net            network.Network
@@ -28,8 +28,8 @@ type ProposalEngineFactory struct {
 	complianceOpts []modulecompliance.Opt
 }
 
-// NewFactory returns a new collection proposal engine factory.
-func NewProposalEngineFactory(
+// NewComplianceEngineFactory returns a new collection compliance engine factory.
+func NewComplianceEngineFactory(
 	log zerolog.Logger,
 	net network.Network,
 	me module.Local,
@@ -39,9 +39,9 @@ func NewProposalEngineFactory(
 	protoState protocol.State,
 	transactions storage.Transactions,
 	complianceOpts ...modulecompliance.Opt,
-) (*ProposalEngineFactory, error) {
+) (*ComplianceEngineFactory, error) {
 
-	factory := &ProposalEngineFactory{
+	factory := &ComplianceEngineFactory{
 		log:            log,
 		me:             me,
 		net:            net,
@@ -55,7 +55,7 @@ func NewProposalEngineFactory(
 	return factory, nil
 }
 
-func (f *ProposalEngineFactory) Create(
+func (f *ComplianceEngineFactory) Create(
 	clusterState cluster.MutableState,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
@@ -84,7 +84,6 @@ func (f *ProposalEngineFactory) Create(
 
 	engine, err := compliance.NewEngine(
 		f.log,
-		f.net,
 		f.me,
 		f.protoState,
 		payloads,
