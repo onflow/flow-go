@@ -347,6 +347,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 
 		// unset chain and height to make sure they are correctly reconstructed
 		hotstuffProposal := model.ProposalFromFlow(proposal.Header)
+		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
 		expectedBroadcastMsg := &messages.ClusterBlockProposal{
 			Header:  proposal.Header,
