@@ -86,9 +86,11 @@ func NewEng(
 	e := &Engine{
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "state_stream_rpc").Logger(),
-		handler: NewHandler(backend, chainID.Chain()),
+		backend: backend,
 		server:  server,
+		chain:   chainID.Chain(),
 		config:  config,
+		handler: NewHandler(backend, chainID.Chain()),
 	}
 
 	access.RegisterExecutionDataAPIServer(e.server, e.handler)
