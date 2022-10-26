@@ -36,7 +36,12 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 	return mutableState, nil
 }
 
+// Extend validates that the given cluster block passes compliance rules, then inserts
+// it to the cluster state.
 // TODO (Ramtin) pass context here
+// Expected errors during normal operations:
+//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) Extend(block *cluster.Block) error {
 
 	blockID := block.ID()

@@ -8,6 +8,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
@@ -42,6 +44,7 @@ type Engine struct {
 	state          protocol.MutableState
 	pending        module.PendingBlockBuffer
 	follower       module.HotStuffFollower
+	validator      hotstuff.Validator
 	con            network.Conduit
 	sync           module.BlockRequester
 	tracer         module.Tracer
@@ -80,6 +83,7 @@ func New(
 	state protocol.MutableState,
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
+	validator hotstuff.Validator,
 	sync module.BlockRequester,
 	tracer module.Tracer,
 	opts ...Option,
@@ -97,6 +101,7 @@ func New(
 		state:          state,
 		pending:        pending,
 		follower:       follower,
+		validator:      validator,
 		sync:           sync,
 		tracer:         tracer,
 		channel:        channels.ReceiveBlocks,
@@ -381,6 +386,31 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 
 	log.Info().Msg("processing block proposal")
 
+	hotstuffProposal := model.ProposalFromFlow(header)
+	err := e.validator.ValidateProposal(hotstuffProposal)
+	if err != nil {
+		if model.IsInvalidBlockError(err) {
+			// TODO potential slashing
+			log.Err(err).Msgf("received invalid block proposal (potential slashing evidence)")
+			return nil
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// We have received a proposal, but we don't know the epoch its view is within.
+			// We know:
+			//  - the parent of this block is valid and inserted (ie. we knew the epoch for it)
+			//  - if we then see this for the child, one of two things must have happened:
+			//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
+			//      -> in this case we can disregard the block
+			//    2. no blocks have been finalized the epoch commitment deadline, and the epoch end
+			//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
+			//      -> in this case, the network has encountered a critical failure
+			//  - we assume in general that Case 2 will not happen, therefore we can discard this proposal
+			log.Err(err).Msg("unable to validate proposal with view from unknown epoch")
+			return nil
+		}
+		return fmt.Errorf("unexpected error validating proposal: %w", err)
+	}
+
 	// see if the block is a valid extension of the protocol state
 	block := &flow.Block{
 		Header:  proposal.Header,
@@ -390,7 +420,8 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 	// check whether the block is a valid extension of the chain.
 	// it only checks the block header, since checking block body is expensive.
 	// The full block check is done by the consensus participants.
-	err := e.state.Extend(ctx, block)
+	// TODO: CAUTION we write a block to disk, without validating its payload yet. This is vulnerable to malicious primaries.
+	err = e.state.Extend(ctx, block)
 	if err != nil {
 		// block is outdated by the time we started processing it
 		// => some other node generating the proposal is probably behind is catching up.

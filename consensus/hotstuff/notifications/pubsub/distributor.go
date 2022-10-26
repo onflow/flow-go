@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"sync"
+	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -74,22 +75,6 @@ func (p *Distributor) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newVi
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
 		subscriber.OnTcTriggeredViewChange(tc, newView)
-	}
-}
-
-func (p *Distributor) OnProposingBlock(proposal *model.Proposal) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnProposingBlock(proposal)
-	}
-}
-
-func (p *Distributor) OnVoting(vote *model.Vote) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnVoting(vote)
 	}
 }
 
@@ -186,5 +171,29 @@ func (p *Distributor) OnInvalidTimeoutDetected(timeout *model.TimeoutObject) {
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
 		subscriber.OnInvalidTimeoutDetected(timeout)
+	}
+}
+
+func (p *Distributor) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, s := range p.subscribers {
+		s.OnOwnVote(blockID, view, sigData, recipientID)
+	}
+}
+
+func (p *Distributor) OnOwnTimeout(timeout *model.TimeoutObject) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, s := range p.subscribers {
+		s.OnOwnTimeout(timeout)
+	}
+}
+
+func (p *Distributor) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, s := range p.subscribers {
+		s.OnOwnProposal(proposal, targetPublicationTime)
 	}
 }

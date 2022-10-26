@@ -8,6 +8,7 @@ import (
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/model/bootstrap"
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/mempool/herocache"
@@ -268,6 +269,8 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
 
+			validator := validator.New(mainConsensusCommittee, verifier)
+
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
 
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
@@ -304,6 +307,7 @@ func main() {
 				followerState,
 				followerBuffer,
 				followerCore,
+				validator,
 				mainChainSyncCore,
 				node.Tracer,
 				followereng.WithComplianceOptions(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
@@ -426,7 +430,7 @@ func main() {
 				return nil, err
 			}
 
-			proposalFactory, err := factories.NewProposalEngineFactory(
+			complianceEngineFactory, err := factories.NewComplianceEngineFactory(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -495,14 +499,22 @@ func main() {
 				qcContractClients,
 			)
 
+			messageHubFactory := factories.NewMessageHubFactory(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.State,
+			)
+
 			factory := factories.NewEpochComponentsFactory(
 				node.Me,
 				pools,
 				builderFactory,
 				clusterStateFactory,
 				hotstuffFactory,
-				proposalFactory,
+				complianceEngineFactory,
 				syncFactory,
+				messageHubFactory,
 			)
 
 			heightEvents := gadgets.NewHeights()

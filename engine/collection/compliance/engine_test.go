@@ -2,7 +2,6 @@ package compliance
 
 import (
 	"context"
-	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -19,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/util"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -140,7 +138,7 @@ func (cs *EngineSuite) SetupTest() {
 	cs.hotstuff.On("Done", mock.Anything).Return(unittest.ClosedChannel()).Maybe()
 	cs.hotstuff.On("Ready", mock.Anything).Return(unittest.ClosedChannel()).Maybe()
 
-	e, err := NewEngine(unittest.Logger(), cs.net, cs.me, cs.protoState, cs.payloads, cs.core)
+	e, err := NewEngine(unittest.Logger(), cs.me, cs.protoState, cs.payloads, cs.core)
 	require.NoError(cs.T(), err)
 	e.WithConsensus(cs.hotstuff)
 	e.WithSync(cs.sync)
@@ -164,128 +162,29 @@ func (cs *EngineSuite) TearDownTest() {
 	}
 }
 
-// TestSendVote tests that single vote can be sent and properly processed
-func (cs *EngineSuite) TestSendVote() {
-	// create parameters to send a vote
-	blockID := unittest.IdentifierFixture()
-	view := rand.Uint64()
-	sig := unittest.SignatureFixture()
-	recipientID := unittest.IdentifierFixture()
-
-	// check it was called with right params
-	vote := &messages.ClusterBlockVote{
-		BlockID: blockID,
-		View:    view,
-		SigData: sig,
-	}
-
-	done := make(chan struct{})
-	*cs.con = *mocknetwork.NewConduit(cs.T())
-	cs.con.On("Unicast", vote, recipientID).
-		Run(func(_ mock.Arguments) { close(done) }).
-		Return(nil).
-		Once()
-
-	// submit the vote
-	err := cs.engine.SendVote(blockID, view, sig, recipientID)
-	require.NoError(cs.T(), err, "should pass send vote")
-
-	// wait for the vote to be sent
-	unittest.AssertClosesBefore(cs.T(), done, time.Second)
-}
-
-// TestBroadcastProposalWithDelay tests broadcasting proposals with different inputs
-func (cs *EngineSuite) TestBroadcastProposalWithDelay() {
-
-	// generate a parent with height and chain ID set
-	parent := unittest.ClusterBlockFixture()
-	parent.Header.ChainID = "test"
-	parent.Header.Height = 10
-	cs.headerDB[parent.ID()] = &parent
-
-	// create a block with the parent and store the payload with correct ID
-	block := unittest.ClusterBlockWithParent(&parent)
-	block.Header.ProposerID = cs.myID
-	cs.payloadDB[block.ID()] = block.Payload
-
-	cs.Run("should fail with wrong proposer", func() {
-		header := *block.Header
-		header.ProposerID = unittest.IdentifierFixture()
-		err := cs.engine.BroadcastProposalWithDelay(&header, 0)
-		require.Error(cs.T(), err, "should fail with wrong proposer")
-		header.ProposerID = cs.myID
-	})
-
-	// should fail with changed (missing) parent
-	cs.Run("should fail with changed/missing parent", func() {
-		header := *block.Header
-		header.ParentID[0]++
-		err := cs.engine.BroadcastProposalWithDelay(&header, 0)
-		require.Error(cs.T(), err, "should fail with missing parent")
-		header.ParentID[0]--
-	})
-
-	// should fail with wrong block ID (payload unavailable)
-	cs.Run("should fail with wrong block ID", func() {
-		header := *block.Header
-		header.View++
-		err := cs.engine.BroadcastProposalWithDelay(&header, 0)
-		require.Error(cs.T(), err, "should fail with missing payload")
-		header.View--
-	})
-
-	cs.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		expectedBroadcastMsg := &messages.ClusterBlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		}
-
-		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		cs.hotstuff.On("SubmitProposal", block.Header).
-			Run(func(args mock.Arguments) { close(submitted) }).
-			Once()
-
-		broadcasted := make(chan struct{}) // closed when proposal is broadcast
-		*cs.con = *mocknetwork.NewConduit(cs.T())
-		cs.con.On("Publish", expectedBroadcastMsg, cs.cluster[1].NodeID, cs.cluster[2].NodeID).
-			Run(func(_ mock.Arguments) { close(broadcasted) }).
-			Return(nil).
-			Once()
-
-		// submit to broadcast proposal
-		err := cs.engine.BroadcastProposalWithDelay(block.Header, 0)
-		require.NoError(cs.T(), err, "header broadcast should pass")
-
-		unittest.AssertClosesBefore(cs.T(), util.AllClosed(broadcasted, submitted), time.Second)
-	})
-}
-
 // TestSubmittingMultipleVotes tests that we can send multiple votes and they
 // are queued and processed in expected way
 func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	// create a vote
 	originID := unittest.IdentifierFixture()
-	voteCount := 15
+	blockCount := 15
 
 	channel := channels.ConsensusCluster(cs.clusterID)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		for i := 0; i < voteCount; i++ {
-			vote := messages.ClusterBlockVote{
-				BlockID: unittest.IdentifierFixture(),
-				View:    rand.Uint64(),
-				SigData: unittest.SignatureFixture(),
+		for i := 0; i < blockCount; i++ {
+			block := messages.ClusterBlockProposal{
+				Header:  unittest.BlockHeaderWithParentFixture(cs.head.Header),
+				Payload: unittest.ClusterPayloadFixture(1),
 			}
-			cs.voteAggregator.On("AddVote", &model.Vote{
-				View:     vote.View,
-				BlockID:  vote.BlockID,
-				SignerID: originID,
-				SigData:  vote.SigData,
-			}).Return().Once()
-			// execute the vote submission
-			_ = cs.engine.Process(channel, originID, &vote)
+			// store the data for retrieval
+			cs.headerDB[block.Header.ParentID] = cs.head
+			cs.hotstuff.On("SubmitProposal", block.Header).Return().Once()
+			cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header)).Return(nil).Once()
+			// execute the block submission
+			_ = cs.engine.Process(channel, originID, &block)
 		}
 		wg.Done()
 	}()
@@ -301,7 +200,8 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
-		cs.hotstuff.On("SubmitProposal", block.Header)
+		cs.hotstuff.On("SubmitProposal", block.Header).Once()
+		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header)).Return(nil).Once()
 		err := cs.engine.Process(channel, originID, proposal)
 		cs.Assert().NoError(err)
 		wg.Done()
@@ -311,7 +211,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 
 	// wait for the votes queue to drain
 	assert.Eventually(cs.T(), func() bool {
-		return cs.engine.pendingVotes.(*engine.FifoMessageStore).Len() == 0
+		return cs.engine.pendingBlocks.(*engine.FifoMessageStore).Len() == 0
 	}, time.Second, time.Millisecond*10)
 }
 

@@ -72,7 +72,7 @@ func TestThreeInstances(t *testing.T) {
 	}
 
 	// connect the communicators of the instances together
-	Connect(instances)
+	Connect(t, instances)
 
 	// start the instances and wait for them to finish
 	var wg sync.WaitGroup
@@ -145,7 +145,7 @@ func TestSevenInstances(t *testing.T) {
 	}
 
 	// connect the communicators of the instances together
-	Connect(instances)
+	Connect(t, instances)
 
 	// start all seven instances and wait for them to wrap up
 	var wg sync.WaitGroup

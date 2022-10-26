@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recoveryprotocol "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -333,6 +334,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			packer := hotsignature.NewConsensusSigDataPacker(committee)
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(committee, packer)
+			validator := validator.New(committee, verifier)
 
 			finalized, pending, err := recoveryprotocol.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
@@ -362,6 +364,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				followerState,
 				pendingBlocks,
 				followerCore,
+				validator,
 				syncCore,
 				node.Tracer,
 				follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
