@@ -88,9 +88,9 @@ func (_m *NetworkMetrics) OnDNSLookupRequestDropped() {
 	_m.Called()
 }
 
-// OnRateLimitedUnicastMessage provides a mock function with given fields: role, msgType, topic
-func (_m *NetworkMetrics) OnRateLimitedUnicastMessage(role string, msgType string, topic string) {
-	_m.Called(role, msgType, topic)
+// OnRateLimitedUnicastMessage provides a mock function with given fields: role, msgType, topic, reason
+func (_m *NetworkMetrics) OnRateLimitedUnicastMessage(role string, msgType string, topic string, reason string) {
+	_m.Called(role, msgType, topic, reason)
 }
 
 // OnUnauthorizedMessage provides a mock function with given fields: role, msgType, topic, offense
