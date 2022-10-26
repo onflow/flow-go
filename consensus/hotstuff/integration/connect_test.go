@@ -106,7 +106,7 @@ func Connect(t *testing.T, instances []*Instance) {
 				receiver.queue <- vote
 			},
 		)
-		sender.notifier.On("OnOwnTimeout", mock.Anything).Run(
+		sender.notifier.On("OnOwnTimeout", mock.Anything, mock.Anything).Run(
 			func(args mock.Arguments) {
 				timeoutObject, ok := args[0].(*model.TimeoutObject)
 				require.True(t, ok)
