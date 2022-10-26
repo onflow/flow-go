@@ -643,6 +643,7 @@ func StreamHandlerFixture(t *testing.T) (func(s network.Stream), chan string) {
 	}, ch
 }
 
+// LongStringMessageFactoryFixture returns a function that creates a long unique string message.
 func LongStringMessageFactoryFixture(t *testing.T) func() string {
 	return func() string {
 		msg := "this is an intentionally long MESSAGE to be bigger than buffer size of most of stream compressors"
