@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
+
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
@@ -26,9 +28,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	"github.com/onflow/flow-go/network/slashing"
-	"github.com/onflow/flow-go/network/validator"
-	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
 const (
@@ -85,7 +84,12 @@ func NewNode(
 
 var _ component.Component = (*Node)(nil)
 
+func (n *Node) Start(ctx irrecoverable.SignalerContext) {
+	n.Component.Start(ctx)
+}
+
 // Stop terminates the libp2p node.
+// All errors returned from this function can be considered benign.
 func (n *Node) Stop() error {
 	var result error
 
@@ -134,12 +138,14 @@ func (n *Node) Stop() error {
 	return nil
 }
 
-// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
+// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it.
+// All errors returned from this function can be considered benign.
 func (n *Node) AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
 	return n.host.Connect(ctx, peerInfo)
 }
 
 // RemovePeer closes the connection with the peer.
+// All errors returned from this function can be considered benign.
 func (n *Node) RemovePeer(peerID peer.ID) error {
 	err := n.host.Network().ClosePeer(peerID)
 	if err != nil {
@@ -148,6 +154,7 @@ func (n *Node) RemovePeer(peerID peer.ID) error {
 	return nil
 }
 
+// GetPeersForProtocol returns slice peer IDs for the specified protocol ID.
 func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 	pMap := n.pCache.GetPeers(pid)
 	peers := make(peer.IDSlice, 0, len(pMap))
@@ -158,6 +165,7 @@ func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 }
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
+// All errors returned from this function can be considered benign.
 func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
 	lg := n.logger.With().Str("peer_id", peerID.String()).Logger()
 
@@ -195,22 +203,24 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 }
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.
+// All errors returned from this function can be considered benign.
 func (n *Node) GetIPPort() (string, string, error) {
 	return p2putils.IPPortFromMultiAddress(n.host.Network().ListenAddresses()...)
 }
 
+// RoutingTable returns the node routing table
 func (n *Node) RoutingTable() *kbucket.RoutingTable {
 	return n.routing.(*dht.IpfsDHT).RoutingTable()
 }
 
+// ListPeers returns list of peer IDs for peers subscribed to the topic.
 func (n *Node) ListPeers(topic string) []peer.ID {
 	return n.pubSub.ListPeers(topic)
 }
 
 // Subscribe subscribes the node to the given topic and returns the subscription
-// Currently only one subscriber is allowed per topic.
-// NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter p2p.PeerFilter, slashingViolationsConsumer slashing.ViolationsConsumer, validators ...validator.PubSubMessageValidator) (*pubsub.Subscription, error) {
+// All errors returned from this function can be considered benign.
+func (n *Node) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -219,7 +229,6 @@ func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter p
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		topicValidator := flowpubsub.TopicValidator(n.logger, codec, slashingViolationsConsumer, peerFilter, validators...)
 		if err := n.pubSub.RegisterTopicValidator(
 			topic.String(), topicValidator, pubsub.WithValidatorInline(true),
 		); err != nil {
@@ -255,6 +264,7 @@ func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter p
 }
 
 // UnSubscribe cancels the subscriber and closes the topic.
+// All errors returned from this function can be considered benign.
 func (n *Node) UnSubscribe(topic channels.Topic) error {
 	n.Lock()
 	defer n.Unlock()
@@ -290,7 +300,8 @@ func (n *Node) UnSubscribe(topic channels.Topic) error {
 	return err
 }
 
-// Publish publishes the given payload on the topic
+// Publish publishes the given payload on the topic.
+// All errors returned from this function can be considered benign.
 func (n *Node) Publish(ctx context.Context, topic channels.Topic, data []byte) error {
 	ps, found := n.topics[topic]
 	if !found {
@@ -308,6 +319,7 @@ func (n *Node) Host() host.Host {
 	return n.host
 }
 
+// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
 func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []unicast.ProtocolName) error {
 	n.uniMgr.WithDefaultHandler(defaultHandler)
 	for _, p := range preferred {
@@ -369,4 +381,14 @@ func (n *Node) SetPubSub(ps *pubsub.PubSub) {
 	}
 
 	n.pubSub = ps
+}
+
+// SetComponentManager sets the component manager for the node.
+// SetComponentManager may be called at most once.
+func (n *Node) SetComponentManager(cm *component.ComponentManager) {
+	if n.Component != nil {
+		n.logger.Fatal().Msg("component already set")
+	}
+
+	n.Component = cm
 }
