@@ -417,7 +417,6 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	if err != nil {
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
-	e.notifier.OnProposingBlock(proposal)
 
 	// we want to store created proposal in forks to make sure that we don't create more proposals for
 	// current view. Due to asynchronous nature of our design it's possible that after creating proposal
@@ -436,17 +435,10 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		Hex("signer", block.ProposerID[:]).
 		Msg("forwarding proposal to communicator for broadcasting")
 
-	// broadcast the proposal
+	// raise a notification with proposal (also triggers broadcast)
 	header := model.ProposalToFlow(proposal)
-	delay := e.paceMaker.BlockRateDelay()
-	elapsed := time.Since(start)
-	if elapsed > delay {
-		delay = 0
-	} else {
-		delay = delay - elapsed
-	}
-	// raise a notification to broadcast proposal
-	e.notifier.OnOwnProposal(header, delay)
+	targetPublicationTime := start.Add(e.paceMaker.BlockRateDelay())
+	e.notifier.OnOwnProposal(header, targetPublicationTime)
 	return nil
 }
 

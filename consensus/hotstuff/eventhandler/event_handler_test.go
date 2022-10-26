@@ -299,7 +299,6 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.notifier = mocks.NewConsumer(es.T())
 	es.notifier.On("OnEventProcessed").Maybe()
 	es.notifier.On("OnEnteringView", mock.Anything, mock.Anything).Maybe()
-	es.notifier.On("OnProposingBlock", mock.Anything).Maybe()
 	es.notifier.On("OnReceiveProposal", mock.Anything, mock.Anything).Maybe()
 	es.notifier.On("OnQcConstructedFromVotes", mock.Anything, mock.Anything).Maybe()
 
@@ -545,7 +544,6 @@ func (es *EventHandlerSuite) TestOnReceiveQc_HappyPath() {
 	es.endView++
 	// not the leader of the newview
 	// don't have block for the newview
-	// over
 
 	err := es.eventhandler.OnReceiveQc(qc)
 	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+

@@ -70,9 +70,7 @@ func NewEngine(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
-	pendingBlocks := &engine.FifoMessageStore{
-		FifoQueue: blocksQueue,
-	}
+	pendingBlocks := &engine.FifoMessageStore{FifoQueue: blocksQueue}
 
 	// define message queueing behaviour
 	handler := engine.NewMessageHandler(
@@ -126,7 +124,7 @@ func NewEngine(
 
 	// create the component manager and worker threads
 	eng.cm = component.NewComponentManagerBuilder().
-		AddWorker(eng.processMessagesLoop).
+		AddWorker(eng.processBlocksLoop).
 		AddWorker(eng.finalizationProcessingLoop).
 		Build()
 	eng.Component = eng.cm
@@ -195,8 +193,8 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 	return nil
 }
 
-// processMessagesLoop processes available block, vote, and timeout messages as they are queued.
-func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// processBlocksLoop processes available block, vote, and timeout messages as they are queued.
+func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	doneSignal := ctx.Done()
@@ -206,7 +204,7 @@ func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready co
 		case <-doneSignal:
 			return
 		case <-newMessageSignal:
-			err := e.processAvailableMessages(ctx)
+			err := e.processQueuedBlocks(ctx)
 			if err != nil {
 				ctx.Throw(err)
 			}
@@ -214,10 +212,10 @@ func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready co
 	}
 }
 
-// processAvailableMessages processes any available messages from the inbound queues.
+// processQueuedBlocks processes any available messages from the inbound queues.
 // Only returns when all inbound queues are empty (or the engine is terminated).
 // No errors expected during normal operations.
-func (e *Engine) processAvailableMessages(ctx context.Context) error {
+func (e *Engine) processQueuedBlocks(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():

@@ -124,7 +124,7 @@ func NewEngine(
 
 	// create the component manager and worker threads
 	eng.cm = component.NewComponentManagerBuilder().
-		AddWorker(eng.processMessagesLoop).
+		AddWorker(eng.processBlocksLoop).
 		AddWorker(eng.finalizationProcessingLoop).
 		Build()
 	eng.Component = eng.cm
@@ -134,12 +134,13 @@ func NewEngine(
 
 // WithConsensus adds the consensus algorithm to the engine. This must be
 // called before the engine can start.
+// TODO replace with pubsub communication https://github.com/dapperlabs/flow-go/issues/6395
 func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 	e.core.hotstuff = hot
 	return e
 }
 
-// Start starts the Hotstuff event processMessagesLoop, then the compliance engine worker threads.
+// Start starts the Hotstuff event processBlocksLoop, then the compliance engine worker threads.
 func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	if e.core.hotstuff == nil {
 		ctx.Throw(fmt.Errorf("must initialize compliance engine with hotstuff engine"))
@@ -184,19 +185,18 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 	return nil
 }
 
-// processMessagesLoop processes available block, vote, and timeout messages as they are queued.
-func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// processBlocksLoop processes available block, vote, and timeout messages as they are queued.
+func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	doneSignal := ctx.Done()
 	newMessageSignal := e.messageHandler.GetNotifier()
-
 	for {
 		select {
 		case <-doneSignal:
 			return
 		case <-newMessageSignal:
-			err := e.processAvailableMessages() // no errors expected during normal operations
+			err := e.processQueuedBlocks() // no errors expected during normal operations
 			if err != nil {
 				ctx.Throw(err)
 			}
@@ -204,11 +204,11 @@ func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready co
 	}
 }
 
-// processAvailableMessages processes any available messages until the message queue is empty.
+// processQueuedBlocks processes any available messages until the message queue is empty.
 // Only returns when all inbound queues are empty (or the engine is terminated).
 // No errors are expected during normal operation. All returned exceptions are potential
 // symptoms of internal state corruption and should be fatal.
-func (e *Engine) processAvailableMessages() error {
+func (e *Engine) processQueuedBlocks() error {
 	for {
 		msg, ok := e.pendingBlocks.Get()
 		if ok {
@@ -219,7 +219,7 @@ func (e *Engine) processAvailableMessages() error {
 			continue
 		}
 
-		// when there are no more messages in the queue, back to the processMessagesLoop to wait
+		// when there are no more messages in the queue, back to the processBlocksLoop to wait
 		// for the next incoming message to arrive.
 		return nil
 	}

@@ -88,8 +88,8 @@ type MockedCommunicatorConsumer struct {
 }
 
 // OnOwnProposal provides a mock function with given fields: proposal, delay
-func (_m *MockedCommunicatorConsumer) OnOwnProposal(proposal *flow.Header, delay time.Duration) {
-	_m.Called(proposal, delay)
+func (_m *MockedCommunicatorConsumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+	_m.Called(proposal, targetPublicationTime)
 }
 
 // OnOwnTimeout provides a mock function with given fields: timeout

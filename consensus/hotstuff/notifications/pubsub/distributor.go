@@ -78,14 +78,6 @@ func (p *Distributor) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newVi
 	}
 }
 
-func (p *Distributor) OnProposingBlock(proposal *model.Proposal) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnProposingBlock(proposal)
-	}
-}
-
 func (p *Distributor) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -198,10 +190,10 @@ func (p *Distributor) OnOwnTimeout(timeout *model.TimeoutObject, timeoutTick uin
 	}
 }
 
-func (p *Distributor) OnOwnProposal(proposal *flow.Header, delay time.Duration) {
+func (p *Distributor) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, s := range p.subscribers {
-		s.OnOwnProposal(proposal, delay)
+		s.OnOwnProposal(proposal, targetPublicationTime)
 	}
 }

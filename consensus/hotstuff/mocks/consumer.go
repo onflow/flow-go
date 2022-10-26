@@ -62,24 +62,19 @@ func (_m *Consumer) OnInvalidVoteDetected(_a0 *model.Vote) {
 	_m.Called(_a0)
 }
 
-// OnOwnProposal provides a mock function with given fields: proposal, delay
-func (_m *Consumer) OnOwnProposal(proposal *flow.Header, delay time.Duration) {
-	_m.Called(proposal, delay)
+// OnOwnProposal provides a mock function with given fields: proposal, targetPublicationTime
+func (_m *Consumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+	_m.Called(proposal, targetPublicationTime)
 }
 
-// OnOwnTimeout provides a mock function with given fields: timeout, timeoutTick
-func (_m *Consumer) OnOwnTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
-	_m.Called(timeout, timeoutTick)
+// OnOwnTimeout provides a mock function with given fields: timeout
+func (_m *Consumer) OnOwnTimeout(timeout *model.TimeoutObject) {
+	_m.Called(timeout)
 }
 
 // OnOwnVote provides a mock function with given fields: blockID, view, sigData, recipientID
 func (_m *Consumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
 	_m.Called(blockID, view, sigData, recipientID)
-}
-
-// OnProposingBlock provides a mock function with given fields: proposal
-func (_m *Consumer) OnProposingBlock(proposal *model.Proposal) {
-	_m.Called(proposal)
 }
 
 // OnQcConstructedFromVotes provides a mock function with given fields: curView, qc
@@ -98,7 +93,7 @@ func (_m *Consumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView 
 }
 
 // OnReachedTimeout provides a mock function with given fields: timeout
-func (_m *Consumer) OnReachedTimeout(timeout model.TimerInfo) {
+func (_m *Consumer) OnReachedTimeout(timeout *model.TimerInfo) {
 	_m.Called(timeout)
 }
 
@@ -113,7 +108,7 @@ func (_m *Consumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
 }
 
 // OnStartingTimeout provides a mock function with given fields: _a0
-func (_m *Consumer) OnStartingTimeout(_a0 model.TimerInfo) {
+func (_m *Consumer) OnStartingTimeout(_a0 *model.TimerInfo) {
 	_m.Called(_a0)
 }
 
