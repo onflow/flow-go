@@ -83,6 +83,12 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
 		}
 
+		// extending block must have correct parent view
+		if header.ParentView != parent.View {
+			return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
+				header.ParentView, parent.View)
+		}
+
 		// the extending block must increase height by 1 from parent
 		if header.Height != parent.Height+1 {
 			return state.NewInvalidExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",

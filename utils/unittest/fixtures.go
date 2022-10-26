@@ -513,6 +513,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	header.ChainID = parent.Header.ChainID
 	header.Timestamp = time.Now()
 	header.ParentID = parent.ID()
+	header.ParentView = parent.Header.View
 	header.PayloadHash = payload.Hash()
 
 	block := cluster.Block{
