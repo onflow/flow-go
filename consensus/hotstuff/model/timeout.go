@@ -10,13 +10,24 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TimerInfo represents a time period that pacemaker is waiting for a specific event.
-// The end of the time period is the timeout that will trigger pacemaker's view change.
+// TimerInfo represents a local timeout for a view, and indicates the Pacemaker has not yet
+// observed evidence to transition to the next view (QC or TC). When a timeout occurs for
+// the first time in a view, we will broadcast a TimeoutObject and continue waiting for evidence
+// to enter the next view, but we will no longer submit a vote for this view. A timeout may occur
+// multiple times for the same round (indicated by Tick > 0), which is an indication
+// to re-broadcast our TimeoutObject for the view, to ensure liveness.
 type TimerInfo struct {
-	View      uint64
-	Tick      uint64
+	// View is round at which timer was created.
+	View uint64
+	// Tick is the number of times a timeout event has been emitted for this view (beginning with 0).
+	// It is used to de-duplicate TimeoutObject re-broadcasts.
+	Tick uint64
+	// StartTime represents time of creating the timer.
 	StartTime time.Time
-	Duration  time.Duration
+	// Duration is how long we waited before timing out this round.
+	// It does not include subsequent timeouts (ie. all timeout events emitted for the same
+	// view will have the same Duration).
+	Duration time.Duration
 }
 
 // NewViewEvent indicates that a new view has started. While it has the same
