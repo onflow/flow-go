@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/consensus"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -85,7 +86,7 @@ type MessageHub struct {
 	ownOutboundTimeouts        *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
 
 	// injected dependencies
-	compliance        network.MessageProcessor   // handler of incoming block proposals
+	compliance        consensus.Compliance       // handler of incoming block proposals
 	hotstuff          module.HotStuff            // used to submit proposals that were previously broadcast
 	voteAggregator    hotstuff.VoteAggregator    // handler of incoming votes
 	timeoutAggregator hotstuff.TimeoutAggregator // handler of incoming timeouts
@@ -99,7 +100,7 @@ var _ hotstuff.CommunicatorConsumer = (*MessageHub)(nil)
 func NewMessageHub(log zerolog.Logger,
 	net network.Network,
 	me module.Local,
-	compliance network.MessageProcessor,
+	compliance consensus.Compliance,
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
@@ -439,9 +440,9 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *events.SyncedBlock:
-		return h.compliance.Process(channel, h.me.NodeID(), message)
+		h.compliance.OnSyncedBlock(msg)
 	case *messages.BlockProposal:
-		return h.compliance.Process(channel, h.me.NodeID(), message)
+		h.compliance.OnBlockProposal(msg)
 	case *messages.BlockVote:
 		v := &model.Vote{
 			View:     msg.View,
