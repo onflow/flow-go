@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine/state_stream"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/ipfs/go-bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -20,6 +18,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/go-bitswap"
 
 	"github.com/onflow/flow-go/admin/commands"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
@@ -40,6 +39,7 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
