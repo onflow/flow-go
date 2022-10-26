@@ -423,9 +423,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	if err != nil {
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
-
-	// turn the signed flow header into a proposal
-	proposal := model.ProposalFromFlow(flowProposal)
+	proposal := model.ProposalFromFlow(flowProposal) // turn the signed flow header into a proposal
 	e.notifier.OnProposingBlock(proposal)
 
 	// we want to store created proposal in forks to make sure that we don't create more proposals for

@@ -19,7 +19,6 @@ type Block struct {
 
 // BlockFromFlow converts a flow header to a hotstuff block.
 func BlockFromFlow(header *flow.Header) *Block {
-
 	qc := flow.QuorumCertificate{
 		BlockID:       header.ParentID,
 		View:          header.ParentView,

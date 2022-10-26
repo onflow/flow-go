@@ -257,7 +257,6 @@ func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header) {
 	received := time.Now()
 
 	proposal := model.ProposalFromFlow(proposalHeader)
-
 	select {
 	case el.proposals <- proposal:
 	case <-el.ComponentManager.ShutdownSignal():
