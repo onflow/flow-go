@@ -89,9 +89,6 @@ type ExecutionConfig struct {
 	cadenceTracing                       bool
 	chdpCacheSize                        uint
 	requestInterval                      time.Duration
-	requestRetryInitialDelay             time.Duration
-	requestRetryIncrementalDelay         time.Duration
-	requestRetryMaximumDelay             time.Duration
 	preferredExeNodeIDStr                string
 	syncByBlocks                         bool
 	syncFast                             bool
@@ -143,12 +140,7 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			flags.BoolVar(&e.exeConf.extensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
 			flags.BoolVar(&e.exeConf.cadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
 			flags.UintVar(&e.exeConf.chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
-			flags.DurationVar(&e.exeConf.requestInterval, "request-interval", 10*time.Second, "the interval between requests for the requester engine")
-			// collection retry parameters: these are chosen to have a balance between retrying too fast to DDoS the collection node
-			// and retrying too slow to stall execution in presense of a network partition (or transient collection node failure).
-			flags.DurationVar(&e.exeConf.requestRetryInitialDelay, "request-retry-initial-delay", 1*time.Second, "initial retry delay for the requester engine")
-			flags.DurationVar(&e.exeConf.requestRetryIncrementalDelay, "request-retry-incremental-delay", 1*time.Second, "linear delay increase between retries for the requester engine")
-			flags.DurationVar(&e.exeConf.requestRetryMaximumDelay, "request-retry-maximum-delay", 5*time.Second, "maximum retry delay for the requester engine")
+			flags.DurationVar(&e.exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.DurationVar(&e.exeConf.scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
 				"threshold for logging script execution")
 			flags.DurationVar(&e.exeConf.scriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit,
@@ -675,11 +667,8 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				channels.RequestCollections,
 				filter.Any,
 				func() flow.Entity { return &flow.Collection{} },
-				// we are manually triggering batches in execution, but lets still send off a batch once a in a while, as a safety net for the sake of retries.
+				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
 				requester.WithBatchInterval(e.exeConf.requestInterval),
-				requester.WithRetryFunction(requester.RetryLinear(e.exeConf.requestRetryIncrementalDelay)),
-				requester.WithRetryInitial(e.exeConf.requestRetryInitialDelay),
-				requester.WithRetryMaximum(e.exeConf.requestRetryMaximumDelay),
 				// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
 				// hence we not need to check origin
 				requester.WithValidateStaking(false),
