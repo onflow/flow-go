@@ -404,8 +404,9 @@ func TestAggregatePubKeys(t *testing.T) {
 		assert.Nil(t, aggPk)
 	})
 
-	// aggregate with the identity key
-	t.Run("identity list", func(t *testing.T) {
+	// aggregate a list that includes the identity key,
+	// to check that identity key is indeed the identity element with regards to aggregation.
+	t.Run("aggregate a list that includes the identity key", func(t *testing.T) {
 		// aggregate the identity key with a non identity key
 		keys := []PublicKey{pks[0], IdentityBLSPublicKey()}
 		aggPkWithIdentity, err := AggregateBLSPublicKeys(keys)
