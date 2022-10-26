@@ -97,7 +97,7 @@ func TestConnectionGater(t *testing.T) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
 	})
-	p2pfixtures.EnsureNoMessageExchangeOverUnicast(t, ctx, nodes[:count-1], nodes[count-1:], ids[count-1:], p2pfixtures.LongStringMessageFactoryFixture(t))
+	p2pfixtures.EnsureNoStreamCreation(t, ctx, nodes[:count-1], ids[:count-1], nodes[count-1:], ids[count-1:])
 
 	// now we blacklist another node (the second last node)
 	blacklist[ids[len(ids)-2]] = struct{}{}
@@ -111,7 +111,7 @@ func TestConnectionGater(t *testing.T) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
 	})
-	p2pfixtures.EnsureNoMessageExchangeOverUnicast(t, ctx, nodes[:count-2], nodes[count-2:], ids[count-2:], p2pfixtures.LongStringMessageFactoryFixture(t))
+	p2pfixtures.EnsureNoStreamCreation(t, ctx, nodes[:count-2], ids[:count-2], nodes[count-2:], ids[count-2:])
 
 	// ensures that all nodes are other non-black listed nodes are connected to each other.
 	p2pfixtures.EnsureConnected(t, ctx, nodes[:count-2])
