@@ -266,15 +266,8 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 		limit = 0
 	}
 
-	// look up the root height so we don't look too far back
-	// initially this is the genesis block height (aka 0).
-	var rootHeight uint64
-	err := m.db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return fmt.Errorf("could not retrieve root block height: %w", err)
-	}
-	if limit < rootHeight {
-		limit = rootHeight
+	if limit < m.rootHeight {
+		limit = m.rootHeight
 	}
 
 	// build a list of all previously used guarantees on this part of the chain
@@ -432,13 +425,6 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 	if err != nil {
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
 	}
-	// root blocks and blocks below the root block are considered as "processed",
-	// so we don't want to trigger `BlockProcessable` event for them.
-	var rootHeight uint64
-	err = m.db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return fmt.Errorf("could not retrieve root block's height: %w", err)
-	}
 
 	// apply any state changes from service events sealed by this block's parent
 	dbUpdates, insertingBlockTriggersEpochFallback, err := m.handleEpochServiceEvents(candidate)
@@ -490,7 +476,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		}
 
 		// trigger BlockProcessable for parent blocks above root height
-		if parent.Height > rootHeight {
+		if parent.Height > m.rootHeight {
 			// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 			m.consumer.BlockProcessable(parent)
 		}

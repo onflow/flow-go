@@ -253,16 +253,11 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 // receipt in the block's payload to make sure we have a corresponding execution result, any execution
 // results missing from blocks are stored in the SealingSegment.ExecutionResults field.
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
-	var rootHeight uint64
-	err := s.state.db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return nil, fmt.Errorf("could not get root height: %w", err)
-	}
 	head, err := s.Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get snapshot reference block: %w", err)
 	}
-	if head.Height < rootHeight {
+	if head.Height < s.state.rootHeight {
 		return nil, protocol.ErrSealingSegmentBelowRootBlock
 	}
 
