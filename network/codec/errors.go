@@ -5,6 +5,9 @@ import (
 	"fmt"
 )
 
+// ErrInvalidEncoding is returned when attempting to decoded a message with an invalid encoding.
+var ErrInvalidEncoding = errors.New("invalid encoding")
+
 // ErrUnknownMsgCode indicates that the message code byte (first byte of message payload) is unknown.
 type ErrUnknownMsgCode struct {
 	code uint8
