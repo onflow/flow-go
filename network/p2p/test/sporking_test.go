@@ -5,13 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/p2p"
+
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
@@ -20,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -201,10 +203,13 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	// spork topic is derived by suffixing the channel with the root block ID
 	topicBeforeSpork := channels.TopicFromChannel(channels.TestNetworkChannel, previousSporkId)
 
+	logger := unittest.Logger()
+	topicValidator := flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
+
 	// both nodes are initially on the same spork and subscribed to the same topic
-	_, err = node1.Subscribe(topicBeforeSpork, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+	_, err = node1.Subscribe(topicBeforeSpork, topicValidator)
 	require.NoError(t, err)
-	sub2, err := node2.Subscribe(topicBeforeSpork, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+	sub2, err := node2.Subscribe(topicBeforeSpork, topicValidator)
 	require.NoError(t, err)
 
 	// add node 2 as a peer of node 1
@@ -228,14 +233,14 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	// and keeping node2 subscribed to topic 'topicBeforeSpork'
 	err = node1.UnSubscribe(topicBeforeSpork)
 	require.NoError(t, err)
-	_, err = node1.Subscribe(topicAfterSpork, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+	_, err = node1.Subscribe(topicAfterSpork, topicValidator)
 	require.NoError(t, err)
 
 	// assert that node 1 can no longer send a message to node 2 via PubSub
 	testOneToKMessagingFails(ctx, t, node1, sub2, topicAfterSpork)
 }
 
-func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *p2pnode.Node, peerInfo peer.AddrInfo) {
+func testOneToOneMessagingSucceeds(t *testing.T, sourceNode p2p.LibP2PNode, peerInfo peer.AddrInfo) {
 	// create stream from node 1 to node 2
 	sourceNode.Host().Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
 	s, err := sourceNode.CreateStream(context.Background(), peerInfo.ID)
@@ -244,7 +249,7 @@ func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *p2pnode.Node, peerI
 	assert.NotNil(t, s)
 }
 
-func testOneToOneMessagingFails(t *testing.T, sourceNode *p2pnode.Node, peerInfo peer.AddrInfo) {
+func testOneToOneMessagingFails(t *testing.T, sourceNode p2p.LibP2PNode, peerInfo peer.AddrInfo) {
 	// create stream from source node to destination address
 	sourceNode.Host().Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
 	_, err := sourceNode.CreateStream(context.Background(), peerInfo.ID)
@@ -256,7 +261,7 @@ func testOneToOneMessagingFails(t *testing.T, sourceNode *p2pnode.Node, peerInfo
 
 func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
-	sourceNode *p2pnode.Node,
+	sourceNode p2p.LibP2PNode,
 	dstnSub *pubsub.Subscription,
 	topic channels.Topic) {
 
@@ -278,7 +283,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 
 func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
-	sourceNode *p2pnode.Node,
+	sourceNode p2p.LibP2PNode,
 	dstnSub *pubsub.Subscription,
 	topic channels.Topic) {
 

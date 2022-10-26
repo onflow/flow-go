@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -79,7 +80,7 @@ type Middleware struct {
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
 	// and worker routines.
 	wg                         *sync.WaitGroup
-	libP2PNode                 *p2pnode.Node
+	libP2PNode                 p2p.LibP2PNode
 	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
@@ -137,7 +138,7 @@ func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOpt
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
 func NewMiddleware(
 	log zerolog.Logger,
-	libP2PNode *p2pnode.Node,
+	libP2PNode p2p.LibP2PNode,
 	flowID flow.Identifier,
 	met module.NetworkMetrics,
 	bitswapMet module.BitswapMetrics,
@@ -562,7 +563,8 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 		peerFilter = m.isProtocolParticipant()
 	}
 
-	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, m.slashingViolationsConsumer, validators...)
+	topicValidator := flowpubsub.TopicValidator(m.log, m.codec, m.slashingViolationsConsumer, peerFilter, validators...)
+	s, err := m.libP2PNode.Subscribe(topic, topicValidator)
 	if err != nil {
 		return fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
 	}
@@ -602,7 +604,6 @@ func (m *Middleware) Unsubscribe(channel channels.Channel) error {
 // sent via unicast stream. This func should be invoked in a separate goroutine to avoid creating a message decoding bottleneck.
 func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *message.Message) {
 	channel := channels.Channel(msg.ChannelID)
-
 	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
 	if codec.IsErrUnknownMsgCode(err) {
 		// slash peer if message contains unknown message code byte
