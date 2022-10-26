@@ -296,6 +296,12 @@ func (s *State) UpdatedAddresses() []flow.Address {
 	return addresses
 }
 
+// UpdatedRegisters return a list of registers that were updated.
+func (s *State) UpdatedRegisters() []flow.RegisterID {
+	updatedRegisters, _ := s.view.RegisterUpdates()
+	return updatedRegisters
+}
+
 func (s *State) checkSize(owner, key string, value flow.RegisterValue) error {
 	keySize := uint64(len(owner) + len(key))
 	valueSize := uint64(len(value))
