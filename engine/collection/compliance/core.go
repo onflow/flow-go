@@ -216,7 +216,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 		}
 		if checkForAndLogInvalidInputError(err, log) || checkForAndLogUnverifiableInputError(err, log) {
 			// in both cases, notify VoteAggregator about the invalid block
-			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header, parent.View))
+			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
 					log.Warn().Msg("received invalid block, but is below pruned threshold")
@@ -277,7 +277,7 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 		Logger()
 	log.Info().Msg("processing block proposal")
 
-	hotstuffProposal := model.ProposalFromFlow(header, parent.View)
+	hotstuffProposal := model.ProposalFromFlow(header)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
 		if model.IsInvalidBlockError(err) {
@@ -322,7 +322,7 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 	// submit the model to hotstuff for processing
 	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
 	log.Info().Msg("forwarding block proposal to hotstuff")
-	c.hotstuff.SubmitProposal(header, parent.View)
+	c.hotstuff.SubmitProposal(hotstuffProposal)
 
 	return nil
 }

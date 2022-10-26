@@ -1,7 +1,6 @@
 package hotstuff
 
 import (
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -12,5 +11,5 @@ type BlockProducer interface {
 	// MakeBlockProposal builds a new HotStuff block proposal using the given view,
 	// the given quorum certificate for its parent and [optionally] a timeout certificate for last view(could be nil).
 	// No errors are expected during normal operation.
-	MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error)
+	MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Header, error)
 }

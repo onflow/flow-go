@@ -78,7 +78,7 @@ func (s *VoteAggregatorTestSuite) TestOnFinalizedBlock() {
 	s.collectors.On("PruneUpToView", finalizedBlock.View).Run(func(args mock.Arguments) {
 		close(done)
 	}).Once()
-	s.aggregator.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
+	s.aggregator.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock))
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
 

@@ -75,13 +75,12 @@ func (s *EventLoopTestSuite) TestReadyDone() {
 
 // Test_SubmitQC tests that submitted proposal is eventually sent to event handler for processing
 func (s *EventLoopTestSuite) Test_SubmitProposal() {
-	proposal := unittest.BlockHeaderFixture()
-	expectedProposal := model.ProposalFromFlow(proposal, proposal.View-1)
+	proposal := helper.MakeProposal()
 	processed := atomic.NewBool(false)
-	s.eh.On("OnReceiveProposal", expectedProposal).Run(func(args mock.Arguments) {
+	s.eh.On("OnReceiveProposal", proposal).Run(func(args mock.Arguments) {
 		processed.Store(true)
 	}).Return(nil).Once()
-	s.eventLoop.SubmitProposal(proposal, proposal.View-1)
+	s.eventLoop.SubmitProposal(proposal)
 	require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
 }
 
@@ -236,8 +235,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for !processed.Load() {
-			proposal := unittest.BlockHeaderFixture()
-			eventLoop.SubmitProposal(proposal, proposal.View-1)
+			eventLoop.SubmitProposal(helper.MakeProposal())
 		}
 	}()
 
@@ -279,7 +277,7 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 
 	parentBlock := unittest.BlockHeaderFixture()
 	block := unittest.BlockHeaderWithParentFixture(parentBlock)
-	eventLoop.SubmitProposal(block, parentBlock.View)
+	eventLoop.SubmitProposal(model.ProposalFromFlow(block))
 
 	unittest.RequireCloseBefore(t, done, startTimeDuration+100*time.Millisecond, "proposal wasn't received")
 	cancel()

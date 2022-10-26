@@ -736,7 +736,6 @@ func main() {
 				hotstuffModules.VoteAggregator,
 				hotstuffModules.TimeoutAggregator,
 				node.State,
-				node.Storage.Headers,
 				node.Storage.Payloads,
 			)
 			if err != nil {

@@ -33,7 +33,6 @@ func NewMessageHubFactory(log zerolog.Logger,
 
 func (f *MessageHubFactory) Create(
 	clusterState cluster.State,
-	headers storage.Headers,
 	payloads storage.ClusterPayloads,
 	hotstuff module.HotStuff,
 	compliance network.MessageProcessor,
@@ -49,7 +48,6 @@ func (f *MessageHubFactory) Create(
 		hotstuffModules.TimeoutAggregator,
 		f.protoState,
 		clusterState,
-		headers,
 		payloads,
 	)
 }
