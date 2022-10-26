@@ -37,6 +37,7 @@ import (
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -489,7 +490,7 @@ func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.Li
 
 // EnsureConnected ensures that the given nodes are connected to each other.
 // It fails the test if any of the nodes is not connected to any other node.
-func EnsureConnected(t *testing.T, ctx context.Context, nodes []*p2pnode.Node) {
+func EnsureConnected(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
 	for _, node := range nodes {
 		for _, other := range nodes {
 			if node == other {
@@ -501,7 +502,7 @@ func EnsureConnected(t *testing.T, ctx context.Context, nodes []*p2pnode.Node) {
 }
 
 // EnsureNotConnected ensures that no (bidirectional) connection exists from "from" nodes to "to" nodes.
-func EnsureNotConnected(t *testing.T, ctx context.Context, from []*p2pnode.Node, to []*p2pnode.Node) {
+func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode) {
 	for _, node := range from {
 		for _, other := range to {
 			if node == other {
@@ -513,7 +514,7 @@ func EnsureNotConnected(t *testing.T, ctx context.Context, from []*p2pnode.Node,
 }
 
 // EnsurePubsubMessageExchange ensures that the given nodes exchange the given message on the given channel through pubsub.
-func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, messageFactory func() (interface{}, channels.Topic)) {
+func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
 	_, topic := messageFactory()
 
 	subs := make([]*pubsub.Subscription, len(nodes))
@@ -523,9 +524,11 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2p
 		// hence, we don't check the error.
 		subs[i], _ = node.Subscribe(
 			topic,
-			unittest.NetworkCodec(),
-			unittest.AllowAllPeerFilter(),
-			slashingViolationsConsumer)
+			validator.TopicValidator(
+				unittest.Logger(),
+				unittest.NetworkCodec(),
+				slashingViolationsConsumer,
+				unittest.AllowAllPeerFilter()))
 	}
 
 	// let subscriptions propagate
@@ -546,7 +549,7 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2p
 }
 
 // EnsureNoPubsubMessageExchange ensures that the no pubsub message is exchanged "from" the given nodes "to" the given nodes.
-func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []*p2pnode.Node, to []*p2pnode.Node, messageFactory func() (interface{}, channels.Topic)) {
+func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
 	_, topic := messageFactory()
 
 	subs := make([]*pubsub.Subscription, len(to))
@@ -557,9 +560,11 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []*p2
 		// Also, as the "from" nodes are senders, we don't need to keep the subscription instances.
 		_, _ = node.Subscribe(
 			topic,
-			unittest.NetworkCodec(),
-			unittest.AllowAllPeerFilter(),
-			slashingViolationsConsumer)
+			validator.TopicValidator(
+				unittest.Logger(),
+				unittest.NetworkCodec(),
+				slashingViolationsConsumer,
+				unittest.AllowAllPeerFilter()))
 	}
 
 	for i, node := range to {
@@ -567,9 +572,11 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []*p2
 		// hence, we don't check the error.
 		subs[i], _ = node.Subscribe(
 			topic,
-			unittest.NetworkCodec(),
-			unittest.AllowAllPeerFilter(),
-			slashingViolationsConsumer)
+			validator.TopicValidator(
+				unittest.Logger(),
+				unittest.NetworkCodec(),
+				slashingViolationsConsumer,
+				unittest.AllowAllPeerFilter()))
 	}
 
 	// let subscriptions propagate
@@ -593,7 +600,7 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []*p2
 // It fails the test if any of the nodes does not receive the message from the other nodes.
 // The "inbounds" parameter specifies the inbound channel of the nodes on which the messages are received.
 // The "messageFactory" parameter specifies the function that creates unique messages to be sent.
-func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, inbounds []chan string, messageFactory func() string) {
+func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, inbounds []chan string, messageFactory func() string) {
 	for _, this := range nodes {
 		msg := messageFactory()
 
@@ -628,14 +635,14 @@ func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes [
 	}
 }
 
-func EnsureNoStreamCreation(t *testing.T, ctx context.Context, groupA []*p2pnode.Node, groupB []*p2pnode.Node) {
+func EnsureNoStreamCreation(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
 	// no stream from groupA -> groupB
 	EnsureNoStreamCreationFrom(t, ctx, groupA, groupB)
 	// no stream from groupB -> groupA
 	EnsureNoStreamCreationFrom(t, ctx, groupB, groupA)
 }
 
-func EnsureNoStreamCreationFrom(t *testing.T, ctx context.Context, from []*p2pnode.Node, to []*p2pnode.Node) {
+func EnsureNoStreamCreationFrom(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode) {
 	for _, this := range from {
 		for _, other := range to {
 			if this == other {

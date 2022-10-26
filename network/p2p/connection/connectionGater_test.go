@@ -12,8 +12,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -24,7 +24,7 @@ func TestConnectionGater(t *testing.T) {
 	defer cancel()
 
 	count := 5
-	nodes := make([]*p2pnode.Node, 0, 5)
+	nodes := make([]p2p.LibP2PNode, 0, 5)
 	ids := flow.IdentityList{}
 	inbounds := make([]chan string, 0, 5)
 
@@ -96,7 +96,7 @@ func TestConnectionGater(t *testing.T) {
 }
 
 // ensureCommunicationSilenceAmongGroups ensures no connection, unicast, or pubsub going to or coming from between the two groups of nodes.
-func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sporkId flow.Identifier, groupA []*p2pnode.Node, groupB []*p2pnode.Node) {
+func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sporkId flow.Identifier, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
 	// ensures no connection, unicast, or pubsub going to the blacklisted nodes
 	p2pfixtures.EnsureNotConnected(t, ctx, groupA, groupB)
 	p2pfixtures.EnsureNoPubsubMessageExchange(t, ctx, groupA, groupB, func() (interface{}, channels.Topic) {
@@ -107,7 +107,7 @@ func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sp
 }
 
 // ensureCommunicationOverAllProtocols ensures that all nodes are connected to each other, and they can exchange messages over the pubsub and unicast.
-func ensureCommunicationOverAllProtocols(t *testing.T, ctx context.Context, sporkId flow.Identifier, nodes []*p2pnode.Node, inbounds []chan string) {
+func ensureCommunicationOverAllProtocols(t *testing.T, ctx context.Context, sporkId flow.Identifier, nodes []p2p.LibP2PNode, inbounds []chan string) {
 	p2pfixtures.EnsureConnected(t, ctx, nodes)
 	p2pfixtures.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
