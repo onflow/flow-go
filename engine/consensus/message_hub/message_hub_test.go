@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -44,7 +45,6 @@ type MessageHubSuite struct {
 	head         *flow.Header
 
 	// mocked dependencies
-	headers           *storage.Headers
 	payloads          *storage.Payloads
 	me                *module.Local
 	state             *protocol.MutableState
@@ -76,7 +76,6 @@ func (s *MessageHubSuite) SetupTest() {
 	block := unittest.BlockFixture()
 	s.head = block.Header
 
-	s.headers = storage.NewHeaders(s.T())
 	s.payloads = storage.NewPayloads(s.T())
 	s.me = module.NewLocal(s.T())
 	s.state = protocol.NewMutableState(s.T())
@@ -147,7 +146,6 @@ func (s *MessageHubSuite) SetupTest() {
 		s.voteAggregator,
 		s.timeoutAggregator,
 		s.state,
-		s.headers,
 		s.payloads,
 	)
 	require.NoError(s.T(), err)
@@ -236,8 +234,6 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	block := unittest.BlockWithParentFixture(parent)
 	block.Header.ProposerID = s.myID
 
-	s.headers.On("ByBlockID", block.Header.ParentID).Return(parent, nil)
-	s.headers.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 	s.payloads.On("ByBlockID", block.Header.ID()).Return(block.Payload, nil)
 	s.payloads.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 
@@ -247,16 +243,6 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		err := s.hub.processQueuedProposal(&header)
 		require.Error(s.T(), err, "should fail with wrong proposer")
 		header.ProposerID = s.myID
-	})
-
-	// should fail with changed (missing) parent
-	// TODO(active-pacemaker): will be not relevant after merging flow.Header change
-	s.Run("should fail with changed/missing parent", func() {
-		header := *block.Header
-		header.ParentID[0]++
-		err := s.hub.processQueuedProposal(&header)
-		require.Error(s.T(), err, "should fail with missing parent")
-		header.ParentID[0]--
 	})
 
 	// should fail with wrong block ID (payload unavailable)
@@ -269,24 +255,13 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		// unset chain and height to make sure they are correctly reconstructed
-		// TODO(active-pacemaker): will be not relevant after merging flow.Header change
-		headerFromHotstuff := *block.Header // copy header
-		headerFromHotstuff.ChainID = ""
-		headerFromHotstuff.Height = 0
-
-		// keep a duplicate of the correct header to check against leader
-		header := block.Header
-		// make sure chain ID and height were reconstructed and we broadcast to correct nodes
-		header.ChainID = "test"
-		header.Height = 11
 		expectedBroadcastMsg := &messages.BlockProposal{
-			Header:  header,
+			Header:  block.Header,
 			Payload: block.Payload,
 		}
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		s.hotstuff.On("SubmitProposal", &headerFromHotstuff, parent.View).
+		s.hotstuff.On("SubmitProposal", model.ProposalFromFlow(block.Header)).
 			Run(func(args mock.Arguments) { close(submitted) }).
 			Once()
 
@@ -299,7 +274,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit to broadcast proposal
-		err := s.hub.processQueuedProposal(&headerFromHotstuff)
+		err := s.hub.processQueuedProposal(block.Header)
 		require.NoError(s.T(), err, "header broadcast should pass")
 
 		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
@@ -346,11 +321,10 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		wg.Add(1)
 		// prepare proposal fixture
 		proposal := unittest.BlockWithParentAndProposerFixture(s.T(), s.head, s.myID)
-		s.headers.On("ByBlockID", proposal.Header.ParentID).Return(s.head, nil)
 		s.payloads.On("ByBlockID", proposal.Header.ID()).Return(proposal.Payload, nil)
 
 		// unset chain and height to make sure they are correctly reconstructed
-		s.hotstuff.On("SubmitProposal", proposal.Header, s.head.View)
+		s.hotstuff.On("SubmitProposal", model.ProposalFromFlow(proposal.Header))
 		expectedBroadcastMsg := &messages.BlockProposal{
 			Header:  proposal.Header,
 			Payload: proposal.Payload,

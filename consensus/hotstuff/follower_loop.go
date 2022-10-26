@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/runner"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -24,10 +23,14 @@ type FollowerLoop struct {
 
 // NewFollowerLoop creates an instance of EventLoop
 func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*FollowerLoop, error) {
+	// we will use a buffered channel to avoid blocking of caller
+	// TODO(active-pacemaker) add metrics for length of inbound channels
+	proposals := make(chan *model.Proposal, 1000)
+
 	return &FollowerLoop{
 		log:           log,
 		followerLogic: followerLogic,
-		proposals:     make(chan *model.Proposal),
+		proposals:     proposals,
 		runner:        runner.NewSingleRunner(),
 	}, nil
 }
@@ -37,11 +40,14 @@ func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*Follower
 //
 // Block proposals must be submitted in order, i.e. a proposal's parent must
 // have been previously processed by the FollowerLoop.
-func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) {
+func (fl *FollowerLoop) SubmitProposal(proposal *model.Proposal) {
 	received := time.Now()
-	proposal := model.ProposalFromFlow(proposalHeader, parentView)
 
-	fl.proposals <- proposal
+	select {
+	case fl.proposals <- proposal:
+	case <-fl.runner.ShutdownSignal():
+		return
+	}
 
 	// the busy duration is measured as how long it takes from a block being
 	// received to a block being handled by the event handler.
@@ -52,7 +58,7 @@ func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView u
 		Msg("busy duration to handle a proposal")
 }
 
-// loop will synchronously processes all events.
+// loop will synchronously process all events.
 // All errors from FollowerLogic are fatal:
 //   - known critical error: some prerequisites of the HotStuff follower have been broken
 //   - unknown critical error: bug-related
