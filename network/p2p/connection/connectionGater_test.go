@@ -95,6 +95,7 @@ func TestConnectionGater(t *testing.T) {
 	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes[:count-2], inbounds[:count-2])
 }
 
+// ensureCommunicationSilenceAmongGroups ensures no connection, unicast, or pubsub going to or coming from between the two groups of nodes.
 func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sporkId flow.Identifier, groupA []*p2pnode.Node, groupB []*p2pnode.Node) {
 	// ensures no connection, unicast, or pubsub going to the blacklisted nodes
 	p2pfixtures.EnsureNotConnected(t, ctx, groupA, groupB)
@@ -105,6 +106,7 @@ func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sp
 	p2pfixtures.EnsureNoStreamCreation(t, ctx, groupA, groupB)
 }
 
+// ensureCommunicationOverAllProtocols ensures that all nodes are connected to each other, and they can exchange messages over the pubsub and unicast.
 func ensureCommunicationOverAllProtocols(t *testing.T, ctx context.Context, sporkId flow.Identifier, nodes []*p2pnode.Node, inbounds []chan string) {
 	p2pfixtures.EnsureConnected(t, ctx, nodes)
 	p2pfixtures.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
