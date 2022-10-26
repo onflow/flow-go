@@ -427,8 +427,6 @@ func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotoc
 func buildBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
 	err := state.Extend(context.Background(), block)
 	require.NoError(t, err)
-	err = state.MarkValid(block.ID())
-	require.NoError(t, err)
 }
 
 // assertSealingSegmentBlocksQueryable bootstraps the state with the given
