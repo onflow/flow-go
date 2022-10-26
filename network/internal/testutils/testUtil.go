@@ -1,4 +1,4 @@
-package test
+package testutils
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/libp2p/message"
+	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -43,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -50,8 +51,8 @@ import (
 var sporkID = unittest.IdentifierFixture()
 
 type PeerTag struct {
-	peer peer.ID
-	tag  string
+	Peer peer.ID
+	Tag  string
 }
 
 type TagWatchingConnManager struct {
@@ -78,7 +79,7 @@ func (cwcm *TagWatchingConnManager) Protect(id peer.ID, tag string) {
 	defer cwcm.obsLock.RUnlock()
 	cwcm.ConnManager.Protect(id, tag)
 	for obs := range cwcm.observers {
-		go obs.OnNext(PeerTag{peer: id, tag: tag})
+		go obs.OnNext(PeerTag{Peer: id, Tag: tag})
 	}
 }
 
@@ -87,7 +88,7 @@ func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 	defer cwcm.obsLock.RUnlock()
 	res := cwcm.ConnManager.Unprotect(id, tag)
 	for obs := range cwcm.observers {
-		go obs.OnNext(PeerTag{peer: id, tag: tag})
+		go obs.OnNext(PeerTag{Peer: id, Tag: tag})
 	}
 	return res
 }
@@ -151,11 +152,15 @@ func GenerateIDs(
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
 func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []p2p.LibP2PNode, codec network.Codec, consumer slashing.ViolationsConsumer, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
-	metrics := metrics.NewNoopCollector()
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
+	bitswapmet := metrics.NewNoopCollector()
+	o := &optsConfig{
+		peerUpdateInterval:  connection.DefaultPeerUpdateInterval,
+		unicastRateLimiters: ratelimit.NoopRateLimiters(),
+		networkMetrics:      metrics.NewNoopCollector(),
+	}
 
-	o := &optsConfig{peerUpdateInterval: connection.DefaultPeerUpdateInterval}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -172,13 +177,14 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		mws[i] = middleware.NewMiddleware(logger,
 			node,
 			nodeId,
-			metrics,
-			metrics,
+			o.networkMetrics,
+			bitswapmet,
 			sporkID,
 			middleware.DefaultUnicastTimeout,
 			translator.NewIdentityProviderIDTranslator(idProviders[i]),
 			codec,
 			consumer,
+			middleware.WithUnicastRateLimiters(o.unicastRateLimiters),
 		)
 	}
 	return mws, idProviders
@@ -242,10 +248,12 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 }
 
 type optsConfig struct {
-	idOpts             []func(*flow.Identity)
-	dhtPrefix          string
-	dhtOpts            []dht.Option
-	peerUpdateInterval time.Duration
+	idOpts              []func(*flow.Identity)
+	dhtPrefix           string
+	dhtOpts             []dht.Option
+	unicastRateLimiters *ratelimit.RateLimiters
+	peerUpdateInterval  time.Duration
+	networkMetrics      module.NetworkMetrics
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
@@ -264,6 +272,18 @@ func WithDHT(prefix string, dhtOpts ...dht.Option) func(*optsConfig) {
 func WithPeerUpdateInterval(interval time.Duration) func(*optsConfig) {
 	return func(o *optsConfig) {
 		o.peerUpdateInterval = interval
+	}
+}
+
+func WithUnicastRateLimiters(limiters *ratelimit.RateLimiters) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.unicastRateLimiters = limiters
+	}
+}
+
+func WithNetworkMetrics(m module.NetworkMetrics) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.networkMetrics = m
 	}
 }
 
@@ -301,7 +321,7 @@ func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, node
 		unittest.RequireComponentsReadyBefore(t, duration, net)
 	}
 
-	// start up nodes and peer managers
+	// start up nodes and Peer managers
 	StartNodes(ctx, t, nodes, duration)
 }
 
@@ -366,7 +386,7 @@ func generateLibP2PNode(
 }
 
 // OptionalSleep introduces a sleep to allow nodes to heartbeat and discover each other (only needed when using PubSub)
-func optionalSleep(send ConduitSendWrapperFunc) {
+func OptionalSleep(send ConduitSendWrapperFunc) {
 	sendFuncName := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
 	if strings.Contains(sendFuncName, "Multicast") || strings.Contains(sendFuncName, "Publish") {
 		time.Sleep(2 * time.Second)
@@ -391,9 +411,9 @@ func GenerateSubscriptionManagers(t *testing.T, mws []network.Middleware) []netw
 	return sms
 }
 
-// stopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
+// StopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
 // duration.
-func stopNetworks(t *testing.T, nets []network.Network, duration time.Duration) {
+func StopNetworks(t *testing.T, nets []network.Network, duration time.Duration) {
 	// casts nets instances into ReadyDoneAware components
 	comps := make([]module.ReadyDoneAware, 0, len(nets))
 	for _, net := range nets {
@@ -403,7 +423,7 @@ func stopNetworks(t *testing.T, nets []network.Network, duration time.Duration) 
 	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
-func stopMiddlewares(t *testing.T, mws []network.Middleware, duration time.Duration) {
+func StopMiddlewares(t *testing.T, mws []network.Middleware, duration time.Duration) {
 	// casts mws instances into ReadyDoneAware components
 	comps := make([]module.ReadyDoneAware, 0, len(mws))
 	for _, net := range mws {
@@ -413,14 +433,14 @@ func stopMiddlewares(t *testing.T, mws []network.Middleware, duration time.Durat
 	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
-// networkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.
+// NetworkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.
 // The primary goal of utilizing this helper function is to apply stress tests on the network layer by
 // sending large messages to transmit.
-func networkPayloadFixture(t *testing.T, size uint) []byte {
+func NetworkPayloadFixture(t *testing.T, size uint) []byte {
 	// reserves 1000 bytes for the message headers, encoding overhead, and libp2p message overhead.
 	overhead := 1000
 	require.Greater(t, int(size), overhead, "could not generate message below size threshold")
-	emptyEvent := &message.TestMessage{
+	emptyEvent := &libp2pmessage.TestMessage{
 		Text: "",
 	}
 
@@ -440,7 +460,7 @@ func networkPayloadFixture(t *testing.T, size uint) []byte {
 
 	event := emptyEvent
 	event.Text = string(payload)
-	// encode event the way the network would encode it to get the size of the message
+	// encode Event the way the network would encode it to get the size of the message
 	// just to do the size check
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(t, err)

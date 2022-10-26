@@ -12,8 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
+	
 	"github.com/onflow/flow-go/network/p2p/subscription"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -21,7 +20,10 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
+
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
+
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

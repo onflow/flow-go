@@ -22,21 +22,24 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+
+	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/utils"
+
+	"github.com/onflow/flow-go/network/p2p/dht"
+
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
-	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
@@ -54,11 +57,13 @@ func DefaultLibP2PNodeFactory(
 	resolver madns.BasicResolver,
 	peerScoringEnabled bool,
 	role string,
+	onInterceptPeerDialFilters,
+	onInterceptSecuredFilters []p2p.PeerFilter,
 	connectionPruning bool,
 	updateInterval time.Duration,
 ) LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
-		builder := DefaultNodeBuilder(log, address, flowKey, sporkId, idProvider, metrics, resolver, role, peerScoringEnabled, connectionPruning, updateInterval)
+		builder := DefaultNodeBuilder(log, address, flowKey, sporkId, idProvider, metrics, resolver, role, onInterceptPeerDialFilters, onInterceptSecuredFilters, peerScoringEnabled, connectionPruning, updateInterval)
 		return builder.Build()
 	}
 }
@@ -370,6 +375,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
 	role string,
+	onInterceptPeerDialFilters,
+	onInterceptSecuredFilters []p2p.PeerFilter,
 	peerScoringEnabled bool,
 	connectionPruning bool,
 	updateInterval time.Duration,
@@ -378,9 +385,11 @@ func DefaultNodeBuilder(log zerolog.Logger,
 
 	// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
 	peerFilter := notEjectedPeerFilter(idProvider)
+	peerFilters := []p2p.PeerFilter{peerFilter}
+
 	connGater := connection.NewConnGater(log,
-		connection.WithOnInterceptPeerDialFilters([]p2p.PeerFilter{peerFilter}),
-		connection.WithOnInterceptSecuredFilters([]p2p.PeerFilter{peerFilter}),
+		connection.WithOnInterceptPeerDialFilters(append(peerFilters, onInterceptPeerDialFilters...)),
+		connection.WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)),
 	)
 
 	builder := NewNodeBuilder(log, address, flowKey, sporkId).
