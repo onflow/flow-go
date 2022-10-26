@@ -27,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -173,7 +172,7 @@ type BaseConfig struct {
 	HeroCacheMetricsEnable      bool
 	SyncCoreConfig              chainsync.Config
 	CodecFactory                func() network.Codec
-	LibP2PNode                  *p2pnode.Node
+	LibP2PNode                  p2p.LibP2PNode
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
