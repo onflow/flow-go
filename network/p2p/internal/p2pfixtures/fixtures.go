@@ -513,7 +513,7 @@ func EnsureNotConnected(t *testing.T, ctx context.Context, from []*p2pnode.Node,
 }
 
 // EnsurePubsubMessageExchange ensures that the given nodes exchange the given message on the given channel through pubsub.
-func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, ids flow.IdentityList, messageFactory func() (interface{}, channels.Topic)) {
+func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, messageFactory func() (interface{}, channels.Topic)) {
 	_, topic := messageFactory()
 
 	subs := make([]*pubsub.Subscription, len(nodes))
@@ -593,7 +593,7 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []*p2
 // It fails the test if any of the nodes does not receive the message from the other nodes.
 // The "inbounds" parameter specifies the inbound channel of the nodes on which the messages are received.
 // The "messageFactory" parameter specifies the function that creates unique messages to be sent.
-func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, ids flow.IdentityList, inbounds []chan string, messageFactory func() string) {
+func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes []*p2pnode.Node, inbounds []chan string, messageFactory func() string) {
 	for _, this := range nodes {
 		msg := messageFactory()
 
@@ -628,14 +628,14 @@ func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes [
 	}
 }
 
-func EnsureNoStreamCreation(t *testing.T, ctx context.Context, groupA []*p2pnode.Node, groupAIds flow.IdentityList, groupB []*p2pnode.Node, groupBIds flow.IdentityList) {
+func EnsureNoStreamCreation(t *testing.T, ctx context.Context, groupA []*p2pnode.Node, groupB []*p2pnode.Node) {
 	// no stream from groupA -> groupB
-	EnsureNoStreamCreationFrom(t, ctx, groupA, groupB, groupBIds)
+	EnsureNoStreamCreationFrom(t, ctx, groupA, groupB)
 	// no stream from groupB -> groupA
-	EnsureNoStreamCreationFrom(t, ctx, groupB, groupA, groupAIds)
+	EnsureNoStreamCreationFrom(t, ctx, groupB, groupA)
 }
 
-func EnsureNoStreamCreationFrom(t *testing.T, ctx context.Context, from []*p2pnode.Node, to []*p2pnode.Node, toIds flow.IdentityList) {
+func EnsureNoStreamCreationFrom(t *testing.T, ctx context.Context, from []*p2pnode.Node, to []*p2pnode.Node) {
 	for _, this := range from {
 		for _, other := range to {
 			if this == other {

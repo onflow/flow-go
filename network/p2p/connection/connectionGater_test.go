@@ -77,11 +77,11 @@ func TestConnectionGater(t *testing.T) {
 
 	// ensures that all nodes are connected to each other, and they can exchange messages over the pubsub and unicast
 	p2pfixtures.EnsureConnected(t, ctx, nodes)
-	p2pfixtures.EnsurePubsubMessageExchange(t, ctx, nodes, ids, func() (interface{}, channels.Topic) {
+	p2pfixtures.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
 	})
-	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, ids, inbounds, p2pfixtures.LongStringMessageFactoryFixture(t))
+	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, inbounds, p2pfixtures.LongStringMessageFactoryFixture(t))
 
 	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
@@ -92,7 +92,7 @@ func TestConnectionGater(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// ensures no connection, unicast, or pubsub going to the blacklisted node
-	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:count-1], ids[:count-1], nodes[count-1:], ids[count-1:])
+	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:count-1], nodes[count-1:])
 
 	// now we blacklist another node (the second last node)
 	blacklist[ids[len(ids)-2]] = struct{}{}
@@ -100,23 +100,23 @@ func TestConnectionGater(t *testing.T) {
 	// let peer manager prune the connections to the blacklisted node.
 	time.Sleep(1 * time.Second)
 
-	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:count-2], ids[:count-2], nodes[count-2:], ids[count-2:])
+	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:count-2], nodes[count-2:])
 
 	// ensures that all nodes are other non-black listed nodes are connected to each other.
 	p2pfixtures.EnsureConnected(t, ctx, nodes[:count-2])
-	p2pfixtures.EnsurePubsubMessageExchange(t, ctx, nodes[:count-2], ids[:count-2], func() (interface{}, channels.Topic) {
+	p2pfixtures.EnsurePubsubMessageExchange(t, ctx, nodes[:count-2], func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
 	})
-	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes[:count-2], ids[:count-2], inbounds[:count-2], p2pfixtures.LongStringMessageFactoryFixture(t))
+	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes[:count-2], inbounds[:count-2], p2pfixtures.LongStringMessageFactoryFixture(t))
 }
 
-func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sporkId flow.Identifier, groupA []*p2pnode.Node, groupAIds flow.IdentityList, groupB []*p2pnode.Node, groupBIds flow.IdentityList) {
+func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sporkId flow.Identifier, groupA []*p2pnode.Node, groupB []*p2pnode.Node) {
 	// ensures no connection, unicast, or pubsub going to the blacklisted nodes
 	p2pfixtures.EnsureNotConnected(t, ctx, groupA, groupB)
 	p2pfixtures.EnsureNoPubsubMessageExchange(t, ctx, groupA, groupB, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
 	})
-	p2pfixtures.EnsureNoStreamCreation(t, ctx, groupA, groupAIds, groupB, groupBIds)
+	p2pfixtures.EnsureNoStreamCreation(t, ctx, groupA, groupB)
 }
