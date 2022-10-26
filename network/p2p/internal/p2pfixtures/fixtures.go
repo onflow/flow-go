@@ -632,6 +632,7 @@ func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes [
 	}
 }
 
+// StreamHandlerFixture returns a stream handler that writes the received message to the given channel.
 func StreamHandlerFixture(t *testing.T) (func(s network.Stream), chan string) {
 	ch := make(chan string, 1) // channel to receive messages
 
