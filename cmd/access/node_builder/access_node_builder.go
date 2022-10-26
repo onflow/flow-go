@@ -66,7 +66,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -189,7 +188,7 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	LibP2PNode                 *p2pnode.Node
+	LibP2PNode                 p2p.LibP2PNode
 	FollowerState              protocol.MutableState
 	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
@@ -966,7 +965,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 // enqueuePublicNetworkInit enqueues the public network component initialized for the staked node
 func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
-	var libp2pNode *p2pnode.Node
+	var libp2pNode p2p.LibP2PNode
 	builder.
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
@@ -1027,7 +1026,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 //   - No connection gater
 //   - Default Flow libp2p pubsub options
 func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
-	return func() (*p2pnode.Node, error) {
+	return func() (p2p.LibP2PNode, error) {
 		connManager := connection.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
 
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
@@ -1066,7 +1065,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
-	libp2pNode *p2pnode.Node,
+	libp2pNode p2p.LibP2PNode,
 	validators ...network.MessageValidator) network.Middleware {
 
 	logger := builder.Logger.With().Bool("staked", false).Logger()

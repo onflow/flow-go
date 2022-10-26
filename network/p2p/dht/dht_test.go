@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/dht"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -155,8 +156,11 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	data, err := msg.Marshal()
 	require.NoError(t, err)
 
+	logger := unittest.Logger()
+
+	topicValidator := flowpubsub.TopicValidator(logger, codec, unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
 	for _, n := range nodes {
-		s, err := n.Subscribe(topic, codec, unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+		s, err := n.Subscribe(topic, topicValidator)
 		require.NoError(t, err)
 
 		go func(s *pubsub.Subscription, nodeID peer.ID) {

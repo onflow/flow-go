@@ -38,6 +38,38 @@ func (cnb *CorruptedNodeBuilder) Initialize() error {
 }
 
 func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
+	cnb.FlowNodeBuilder.OverrideComponent(cmd.LibP2PNodeComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()
+		if cnb.FlowNodeBuilder.BaseConfig.BindAddr != cmd.NotSet {
+			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
+		}
+
+		libP2PNodeFactory := corruptnet.NewCorruptLibP2PNodeFactory(
+			cnb.Logger,
+			cnb.RootChainID,
+			myAddr,
+			cnb.NetworkKey,
+			cnb.SporkID,
+			cnb.IdentityProvider,
+			cnb.Metrics.Network,
+			cnb.Resolver,
+			cnb.PeerScoringEnabled,
+			cnb.BaseConfig.NodeRole,
+			[]p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
+			[]p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
+			// run peer manager with the specified interval and let it also prune connections
+			cnb.NetworkConnectionPruning,
+			cnb.PeerUpdateInterval,
+		)
+
+		libp2pNode, err := libP2PNodeFactory()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
+		}
+		cnb.LibP2PNode = libp2pNode
+		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", myAddr).Msg("corrupted libp2p node initialized")
+		return libp2pNode, nil
+	})
 	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()
 		if cnb.FlowNodeBuilder.BaseConfig.BindAddr != cmd.NotSet {

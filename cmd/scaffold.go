@@ -78,6 +78,7 @@ import (
 const (
 	NetworkComponent        = "network"
 	ConduitFactoryComponent = "conduit-factory"
+	LibP2PNodeComponent     = "libp2p-node"
 )
 
 type Metrics struct {
@@ -332,7 +333,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 	}
 
-	fnb.Component("libp2p node", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := fnb.NodeConfig.Me.Address()
 		if fnb.BaseConfig.BindAddr != NotSet {
 			myAddr = fnb.BaseConfig.BindAddr
@@ -367,7 +368,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		cf := conduit.NewDefaultConduitFactory()
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
-
 		return fnb.InitFlowNetworkWithConduitFactory(node, cf, unicastRateLimiters, peerManagerFilters)
 	})
 
