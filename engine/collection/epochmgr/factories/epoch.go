@@ -169,7 +169,7 @@ func (factory *EpochComponentsFactory) Create(
 		WithConsensus(hotstuff).
 		WithSync(syncCore)
 
-	clusterMessageHub, err := factory.messageHub.Create(state, headers, payloads, hotstuff, complianceEng, hotstuffModules)
+	clusterMessageHub, err := factory.messageHub.Create(state, payloads, hotstuff, complianceEng, hotstuffModules)
 	if err != nil {
 		err = fmt.Errorf("could not create message hub: %w", err)
 	}

@@ -77,7 +77,6 @@ type MessageHub struct {
 	log                        zerolog.Logger
 	me                         module.Local
 	state                      protocol.State
-	headers                    storage.Headers
 	payloads                   storage.ClusterPayloads
 	con                        network.Conduit
 	ownOutboundMessageNotifier engine.Notifier
@@ -107,7 +106,6 @@ func NewMessageHub(log zerolog.Logger,
 	timeoutAggregator hotstuff.TimeoutAggregator,
 	state protocol.State,
 	clusterState clusterkv.State,
-	headers storage.Headers,
 	payloads storage.ClusterPayloads,
 ) (*MessageHub, error) {
 	// find my cluster for the current epoch
@@ -143,7 +141,6 @@ func NewMessageHub(log zerolog.Logger,
 		log:                        log.With().Str("engine", "cluster_message_hub").Logger(),
 		me:                         me,
 		state:                      state,
-		headers:                    headers,
 		payloads:                   payloads,
 		compliance:                 compliance,
 		hotstuff:                   hotstuff,
@@ -316,17 +313,6 @@ func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
 	if header.ProposerID != h.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
 	}
-
-	// get the parent of the block
-	parent, err := h.headers.ByBlockID(header.ParentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve proposal parent: %w", err)
-	}
-
-	// fill in the fields that can't be populated by HotStuff
-	// TODO(active-pacemaker): will be not relevant after merging flow.Header change
-	header.ChainID = parent.ChainID
-	header.Height = parent.Height + 1
 
 	// retrieve the payload for the block
 	payload, err := h.payloads.ByBlockID(header.ID())
