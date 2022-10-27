@@ -25,6 +25,7 @@ jobs:
         test-category:
           - unit
           - unit-crypto
+          - unit-insecure
           - unit-integration
           - integration-bft
           - integration-mvp
