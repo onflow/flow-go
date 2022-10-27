@@ -179,11 +179,11 @@ generate-mocks: install-mock-generators
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
 tidy:
-	go mod tidy
-	cd integration; go mod tidy
-	cd crypto; go mod tidy
-	cd cmd/testclient; go mod tidy
-	cd insecure; go mod tidy
+	go mod tidy -v
+	cd integration; go mod tidy -v
+	cd crypto; go mod tidy -v
+	cd cmd/testclient; go mod tidy -v
+	cd insecure; go mod tidy -v
 	git diff --exit-code
 
 .PHONY: lint
