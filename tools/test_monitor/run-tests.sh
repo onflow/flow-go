@@ -28,14 +28,22 @@ then
 else
     case $TEST_CATEGORY in
         unit)
-          echo "running unittest-main">&2
-          make -s unittest-main
+          echo "running unit tests (ci)">&2
+          make -s ci
         ;;
         unit-crypto)
           echo "running crypto unit tests">&2
           make -C crypto -s test
         ;;
+        unit-insecure)
+          echo "running install-tools for insecure unit tests">&2
+          make install-tools
+          echo "running insecure unit tests">&2
+          make -C insecure -s test
+        ;;
         unit-integration)
+          echo "running install-tools for integration unit tests">&2
+          make install-tools
           echo "running integration unit tests">&2
           make -C integration -s test
         ;;
