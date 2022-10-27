@@ -31,6 +31,15 @@ var ErrNotAuthorizedForEpoch = fmt.Errorf("we are not an authorized participant 
 // and processes that are epoch-dependent. The manager is responsible for
 // spinning up engines when a new epoch is about to start and spinning down
 // engines for an epoch that has ended.
+//
+// The `epochmgr.Engine` implements the `protocol.Consumer` interface. In particular, it
+// ingests the following notifications from the protocol state:
+//   - EpochSetupPhaseStarted
+//   - EpochTransition
+//
+// As part of the engine starting, it executes pending actions that should have been triggered
+// by protocol events but those events were missed during a crash/restart. See respective
+// consumer methods for further details.
 type Engine struct {
 	events.Noop // satisfy protocol events consumer interface
 
@@ -56,6 +65,7 @@ type Engine struct {
 }
 
 var _ component.Component = (*Engine)(nil)
+var _ protocol.Consumer = (*Engine)(nil)
 
 func New(
 	log zerolog.Logger,
@@ -66,7 +76,6 @@ func New(
 	factory EpochComponentsFactory,
 	heightEvents events.Heights,
 ) (*Engine, error) {
-
 	e := &Engine{
 		log:                          log.With().Str("engine", "epochmgr").Logger(),
 		me:                           me,
@@ -92,23 +101,27 @@ func New(
 
 // Start starts the engine.
 func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
-	// 1 - start engine-scoped workers
+	// (1) start engine-scoped workers
 	e.cm.Start(ctx)
 
-	// 2 - check if we should attempt to vote after startup
-	err := e.checkShouldVoteOnStartup()
+	// (2) Retrieve protocol state as of latest finalized block. We use this state
+	// to catch up on events, whose execution was missed during crash-restart.
+	finalSnapshot := e.state.Final()
+	currentEpoch := finalSnapshot.Epochs().Current()
+	currentEpochCounter, err := currentEpoch.Counter()
+	if err != nil {
+		ctx.Throw(fmt.Errorf("could not get epoch counter: %w", err))
+	}
+
+	// (3) check if we should attempt to vote after startup
+	err = e.checkShouldVoteOnStartup(finalSnapshot)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("could not vote on startup: %w", err))
 	}
 
-	// 3 - start epoch-scoped components
+	// (4) start epoch-scoped components:
 	// set up epoch-scoped epoch managed by this engine for the current epoch
-	epoch := e.state.Final().Epochs().Current()
-	counter, err := epoch.Counter()
-	if err != nil {
-		ctx.Throw(fmt.Errorf("could not get epoch counter: %w", err))
-	}
-	components, err := e.createEpochComponents(epoch)
+	components, err := e.createEpochComponents(currentEpoch)
 	if err != nil {
 		if errors.Is(err, ErrNotAuthorizedForEpoch) {
 			// don't set up consensus components if we aren't authorized in current epoch
@@ -117,7 +130,7 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 		}
 		ctx.Throw(fmt.Errorf("could not create epoch components: %w", err))
 	}
-	err = e.startEpochComponents(ctx, counter, components)
+	err = e.startEpochComponents(ctx, currentEpochCounter, components)
 	if err != nil {
 		// all failures to start epoch components are critical
 		ctx.Throw(fmt.Errorf("could not start epoch components: %w", err))
@@ -129,10 +142,9 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 // checkShouldVoteOnStartup checks whether we should vote, and if so, sends a signal
 // to the worker thread responsible for voting.
 // No errors are expected during normal operation.
-func (e *Engine) checkShouldVoteOnStartup() error {
+func (e *Engine) checkShouldVoteOnStartup(finalSnapshot protocol.Snapshot) error {
 	// check the current phase on startup, in case we are in setup phase
 	// and haven't yet voted for the next root QC
-	finalSnapshot := e.state.Final()
 	phase, err := finalSnapshot.Phase()
 	if err != nil {
 		return fmt.Errorf("could not get epoch phase for finalized snapshot: %w", err)
@@ -179,11 +191,9 @@ func (e *Engine) Done() <-chan struct{} {
 
 // createEpochComponents instantiates and returns epoch-scoped components for
 // the given epoch, using the configured factory.
-//
 // Error returns:
 // - ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
 func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
-
 	state, prop, sync, hot, voteAggregator, timeoutAggregator, err := e.factory.Create(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", epoch, err)
@@ -322,7 +332,6 @@ func (e *Engine) onEpochTransition(ctx irrecoverable.SignalerContext, first *flo
 // can NOT be included by clusters in the new epoch, we MUST continue producing
 // these collections within the previous epoch's clusters.
 func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint64) {
-
 	stopAtHeight := epochMaxHeight + flow.DefaultTransactionExpiry + 1
 	e.log.Info().
 		Uint64("stopping_epoch_max_height", epochMaxHeight).
@@ -355,7 +364,6 @@ func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nex
 // to the engine's internal mapping.
 // No errors are expected during normal operation.
 func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, counter uint64, components *EpochComponents) error {
-
 	epochCtx, cancel, errCh := irrecoverable.WithSignallerAndCancel(engineCtx)
 
 	// start component using its own context
@@ -377,7 +385,6 @@ func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, c
 // this is a no-op and a warning is logged.
 // No errors are expected during normal operation.
 func (e *Engine) stopEpochComponents(counter uint64) error {
-
 	components, exists := e.getEpochComponents(counter)
 	if !exists {
 		e.log.Warn().Msgf("attempted to stop non-existent epoch %d", counter)
