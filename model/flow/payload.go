@@ -10,9 +10,9 @@ type Payload struct {
 	// only the system chunk is executed for this block.
 	Guarantees []*CollectionGuarantee
 	// Seals contains the block seals, for ancestor blocks, included in this payload.
-	// The oldest seal must connect to the existing latest seal in fork extended by this block.
-	// Seals must be internally connected, without seals with duplicate block IDs or heights.
-	// May be empty.
+	// The oldest seal must connect to the latest seal in the fork extended by this block.
+	// Seals must be internally connected, containing no seals with duplicate block IDs or heights.
+	// Seals may be empty.
 	Seals    []*Seal
 	Receipts ExecutionReceiptMetaList
 	Results  ExecutionResultList
