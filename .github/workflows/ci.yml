@@ -66,6 +66,9 @@ jobs:
           cache: true
       - name: Run tidy
         run: make tidy
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: success() || failure()
       - name: Emulator build
         run: make emulator-build
 
@@ -165,10 +168,6 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-#      - name: Run prerequisites
-#        run: |
-#          cd ${{ matrix.name }}
-#          make ${{ matrix.make }}
       - name: Run tests (${{ matrix.name }})
         if: github.actor != 'bors[bot]'
         env:
