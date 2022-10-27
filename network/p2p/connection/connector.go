@@ -140,7 +140,7 @@ func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 		// log if any stream is open on this connection.
 		flowStream := p2putils.FlowStream(conn)
 		if flowStream != nil {
-			lg = lg.With().Str("flow_stream", fmt.Sprintf("%s", flowStream.Protocol())).Logger()
+			lg = lg.With().Str("flow_stream", string(flowStream.Protocol())).Logger()
 		}
 
 		// close the connection with the peer if it is not part of the current fanout
