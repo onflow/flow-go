@@ -7,7 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/slices"

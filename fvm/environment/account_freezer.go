@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 // AccountFreezer disables accounts.
@@ -44,7 +45,7 @@ func (freezer ParseRestrictedAccountFreezer) SetAccountFrozen(
 ) error {
 	return parseRestrict2Arg(
 		freezer.txnState,
-		"SetAccountFrozen",
+		trace.FVMEnvSetAccountFrozen,
 		freezer.impl.SetAccountFrozen,
 		address,
 		frozen)

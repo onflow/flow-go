@@ -5,11 +5,15 @@ package environment
 import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/module/trace"
 )
 
-func parseRestricted(txnState *state.TransactionState, opCode string) error {
+func parseRestricted(
+	txnState *state.TransactionState,
+	spanName trace.SpanName,
+) error {
 	if txnState.IsParseRestricted() {
-		return errors.NewParseRestrictedModeInvalidAccessFailure(opCode)
+		return errors.NewParseRestrictedModeInvalidAccessFailure(spanName)
 	}
 
 	return nil
@@ -19,7 +23,7 @@ func parseRestricted(txnState *state.TransactionState, opCode string) error {
 // cadence is parsing programs.
 //
 // The generic functions are of the form
-//      parseRestrict<x>Arg<y>Ret(txnState, opCode, callback, arg1, ..., argX)
+//      parseRestrict<x>Arg<y>Ret(txnState, spanName, callback, arg1, ..., argX)
 // where the callback expects <x> number of arguments, and <y> number of
 // return values (not counting error). If the callback expects no argument,
 // <x>Arg is omitted, and similarly for return value.
@@ -28,11 +32,11 @@ func parseRestrict1Arg[
 	Arg0T any,
 ](
 	txnState *state.TransactionState,
-	opCode string,
+	spanName trace.SpanName,
 	callback func(Arg0T) error,
 	arg0 Arg0T,
 ) error {
-	err := parseRestricted(txnState, opCode)
+	err := parseRestricted(txnState, spanName)
 	if err != nil {
 		return err
 	}
@@ -45,12 +49,12 @@ func parseRestrict2Arg[
 	Arg1T any,
 ](
 	txnState *state.TransactionState,
-	opCode string,
+	spanName trace.SpanName,
 	callback func(Arg0T, Arg1T) error,
 	arg0 Arg0T,
 	arg1 Arg1T,
 ) error {
-	err := parseRestricted(txnState, opCode)
+	err := parseRestricted(txnState, spanName)
 	if err != nil {
 		return err
 	}
@@ -64,13 +68,13 @@ func parseRestrict3Arg[
 	Arg2T any,
 ](
 	txnState *state.TransactionState,
-	opCode string,
+	spanName trace.SpanName,
 	callback func(Arg0T, Arg1T, Arg2T) error,
 	arg0 Arg0T,
 	arg1 Arg1T,
 	arg2 Arg2T,
 ) error {
-	err := parseRestricted(txnState, opCode)
+	err := parseRestricted(txnState, spanName)
 	if err != nil {
 		return err
 	}
@@ -82,13 +86,13 @@ func parseRestrict1Ret[
 	Ret0T any,
 ](
 	txnState *state.TransactionState,
-	opCode string,
+	spanName trace.SpanName,
 	callback func() (Ret0T, error),
 ) (
 	Ret0T,
 	error,
 ) {
-	err := parseRestricted(txnState, opCode)
+	err := parseRestricted(txnState, spanName)
 	if err != nil {
 		var value0 Ret0T
 		return value0, err
@@ -102,14 +106,14 @@ func parseRestrict1Arg1Ret[
 	Ret0T any,
 ](
 	txnState *state.TransactionState,
-	opCode string,
+	spanName trace.SpanName,
 	callback func(Arg0T) (Ret0T, error),
 	arg0 Arg0T,
 ) (
 	Ret0T,
 	error,
 ) {
-	err := parseRestricted(txnState, opCode)
+	err := parseRestricted(txnState, spanName)
 	if err != nil {
 		var value0 Ret0T
 		return value0, err
@@ -124,7 +128,7 @@ func parseRestrict2Arg1Ret[
 	Ret0T any,
 ](
 	txnState *state.TransactionState,
-	opCode string,
+	spanName trace.SpanName,
 	callback func(Arg0T, Arg1T) (Ret0T, error),
 	arg0 Arg0T,
 	arg1 Arg1T,
@@ -132,7 +136,7 @@ func parseRestrict2Arg1Ret[
 	Ret0T,
 	error,
 ) {
-	err := parseRestricted(txnState, opCode)
+	err := parseRestricted(txnState, spanName)
 	if err != nil {
 		var value0 Ret0T
 		return value0, err
@@ -148,7 +152,7 @@ func parseRestrict3Arg1Ret[
 	Ret0T any,
 ](
 	txnState *state.TransactionState,
-	opCode string,
+	spanName trace.SpanName,
 	callback func(Arg0T, Arg1T, Arg2T) (Ret0T, error),
 	arg0 Arg0T,
 	arg1 Arg1T,
@@ -157,7 +161,7 @@ func parseRestrict3Arg1Ret[
 	Ret0T,
 	error,
 ) {
-	err := parseRestricted(txnState, opCode)
+	err := parseRestricted(txnState, spanName)
 	if err != nil {
 		var value0 Ret0T
 		return value0, err
@@ -174,7 +178,7 @@ func parseRestrict4Arg1Ret[
 	Ret0T any,
 ](
 	txnState *state.TransactionState,
-	opCode string,
+	spanName trace.SpanName,
 	callback func(Arg0T, Arg1T, Arg2T, Arg3T) (Ret0T, error),
 	arg0 Arg0T,
 	arg1 Arg1T,
@@ -184,7 +188,7 @@ func parseRestrict4Arg1Ret[
 	Ret0T,
 	error,
 ) {
-	err := parseRestricted(txnState, opCode)
+	err := parseRestricted(txnState, spanName)
 	if err != nil {
 		var value0 Ret0T
 		return value0, err
@@ -203,7 +207,7 @@ func parseRestrict6Arg1Ret[
 	Ret0T any,
 ](
 	txnState *state.TransactionState,
-	opCode string,
+	spanName trace.SpanName,
 	callback func(Arg0T, Arg1T, Arg2T, Arg3T, Arg4T, Arg5T) (Ret0T, error),
 	arg0 Arg0T,
 	arg1 Arg1T,
@@ -215,7 +219,7 @@ func parseRestrict6Arg1Ret[
 	Ret0T,
 	error,
 ) {
-	err := parseRestricted(txnState, opCode)
+	err := parseRestricted(txnState, spanName)
 	if err != nil {
 		var value0 Ret0T
 		return value0, err
@@ -230,7 +234,7 @@ func parseRestrict1Arg2Ret[
 	Ret1T any,
 ](
 	txnState *state.TransactionState,
-	opCode string,
+	spanName trace.SpanName,
 	callback func(Arg0T) (Ret0T, Ret1T, error),
 	arg0 Arg0T,
 ) (
@@ -238,7 +242,7 @@ func parseRestrict1Arg2Ret[
 	Ret1T,
 	error,
 ) {
-	err := parseRestricted(txnState, opCode)
+	err := parseRestricted(txnState, spanName)
 	if err != nil {
 		var value0 Ret0T
 		var value1 Ret1T
