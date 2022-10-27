@@ -30,6 +30,8 @@ type State struct {
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
+	// cache the root height because it cannot change over the lifecycle of a protocol state instance
+	rootHeight uint64
 }
 
 type BootstrapConfig struct {
@@ -147,6 +149,12 @@ func Bootstrap(
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
 
+	// populate the protocol state cache
+	err = state.populateCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate cache: %w", err)
+	}
+
 	return state, nil
 }
 
@@ -181,10 +189,6 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			err := state.blocks.StoreTx(block)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert root block: %w", err)
-			}
-			err = transaction.WithTx(operation.InsertBlockValidity(blockID, true))(tx)
-			if err != nil {
-				return fmt.Errorf("could not mark root block as valid: %w", err)
 			}
 			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
 			if err != nil {
@@ -505,6 +509,11 @@ func OpenState(
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
+	// populate the protocol state cache
+	err = state.populateCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate cache: %w", err)
+	}
 
 	return state, nil
 }
@@ -581,7 +590,7 @@ func newState(
 	}
 }
 
-// IsBootstrapped returns whether or not the database contains a bootstrapped state
+// IsBootstrapped returns whether the database contains a bootstrapped state
 func IsBootstrapped(db *badger.DB) (bool, error) {
 	var finalized uint64
 	err := db.View(operation.RetrieveFinalizedHeight(&finalized))
@@ -643,6 +652,17 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 		state.metrics.EpochEmergencyFallbackTriggered()
 	}
 
+	return nil
+}
+
+// populateCache is used after opening or bootstrapping the state to populate the cache.
+func (state *State) populateCache() error {
+	var rootHeight uint64
+	err := state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return fmt.Errorf("could not read root block to populate cache: %w", err)
+	}
+	state.rootHeight = rootHeight
 	return nil
 }
 

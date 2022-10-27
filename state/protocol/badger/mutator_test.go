@@ -83,15 +83,17 @@ func TestBootstrapValid(t *testing.T) {
 	})
 }
 
+// TestExtendValid tests the happy path of extending the state with a single block.
+// * BlockFinalized is emitted when the block is finalized
+// * BlockProcessable is emitted when a block's child is inserted
 func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
 
-		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
-		consumer := new(mockprotocol.Consumer)
+		consumer := mockprotocol.NewConsumer(t)
 		distributor.AddConsumer(consumer)
 
 		block, result, seal := unittest.BootstrapFixture(participants)
@@ -106,21 +108,26 @@ func TestExtendValid(t *testing.T) {
 			util.MockReceiptValidator(), util.MockSealValidator(seals))
 		require.NoError(t, err)
 
-		extend := unittest.BlockWithParentFixture(block.Header)
-		extend.Payload.Guarantees = nil
-		extend.Header.PayloadHash = extend.Payload.Hash()
-
-		err = fullState.Extend(context.Background(), extend)
+		// insert block1 on top of the root block
+		block1 := unittest.BlockWithParentFixture(block.Header)
+		err = fullState.Extend(context.Background(), block1)
 		require.NoError(t, err)
 
-		finalCommit, err := state.Final().Commit()
-		require.NoError(t, err)
-		require.Equal(t, seal.FinalState, finalCommit)
+		// we should not emit BlockProcessable for the root block
+		consumer.AssertNotCalled(t, "BlockProcessable", block.Header)
 
-		consumer.On("BlockFinalized", extend.Header).Once()
-		err = fullState.Finalize(context.Background(), extend.ID())
-		require.NoError(t, err)
-		consumer.AssertExpectations(t)
+		t.Run("BlockFinalized event should be emitted when block1 is finalized", func(t *testing.T) {
+			consumer.On("BlockFinalized", block1.Header).Once()
+			err := fullState.Finalize(context.Background(), block1.ID())
+			require.NoError(t, err)
+		})
+
+		t.Run("BlockProcessable event should be emitted when any child of block1 is inserted", func(t *testing.T) {
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			consumer.On("BlockProcessable", block1.Header).Once()
+			err := fullState.Extend(context.Background(), block2)
+			require.NoError(t, err)
+		})
 	})
 }
 
@@ -340,6 +347,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		extend.Header.Height = 1
 		extend.Header.View = 1
 		extend.Header.ParentID = head.ID()
+		extend.Header.ParentView = head.View
 
 		err = state.Extend(context.Background(), &extend)
 		require.NoError(t, err)
@@ -374,6 +382,26 @@ func TestExtendHeightTooLarge(t *testing.T) {
 
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
+	})
+}
+
+// TestExtendInconsistentParentView tests if mutator rejects block with invalid ParentView. ParentView must be consistent
+// with view of block referred by ParentID.
+func TestExtendInconsistentParentView(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		block := unittest.BlockWithParentFixture(head)
+		block.SetPayload(flow.EmptyPayload())
+		// set an invalid parent view
+		block.Header.ParentView++
+
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err))
 	})
 }
 
@@ -567,6 +595,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	// create a event consumer to test epoch transition events
 	consumer := mockprotocol.NewConsumer(t)
 	consumer.On("BlockFinalized", mock.Anything)
+	consumer.On("BlockProcessable", mock.Anything)
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -1476,6 +1505,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
 		protoEventsMock := mockprotocol.NewConsumer(t)
 		protoEventsMock.On("BlockFinalized", mock.Anything)
+		protoEventsMock.On("BlockProcessable", mock.Anything)
 
 		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.MutableState) {
 			head, err := rootSnapshot.Head()
@@ -1533,6 +1563,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
 		protoEventsMock := mockprotocol.NewConsumer(t)
 		protoEventsMock.On("BlockFinalized", mock.Anything)
+		protoEventsMock.On("BlockProcessable", mock.Anything)
 
 		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.MutableState) {
 			head, err := rootSnapshot.Head()
@@ -1632,6 +1663,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
 		protoEventsMock := mockprotocol.NewConsumer(t)
 		protoEventsMock.On("BlockFinalized", mock.Anything)
+		protoEventsMock.On("BlockProcessable", mock.Anything)
 
 		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.MutableState) {
 			head, err := rootSnapshot.Head()
@@ -1723,6 +1755,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 		distributor := events.NewDistributor()
 		consumer := mockprotocol.NewConsumer(t)
 		distributor.AddConsumer(consumer)
+		consumer.On("BlockProcessable", mock.Anything)
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 
@@ -2038,44 +2071,6 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorIs(t, err, realprotocol.ErrClusterNotFound)
 		require.True(t, st.IsInvalidExtensionError(err), err)
-	})
-}
-
-func TestMakeValid(t *testing.T) {
-	t.Run("should trigger BlockProcessable with parent block", func(t *testing.T) {
-		consumer := mockprotocol.NewConsumer(t)
-		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		head, err := rootSnapshot.Head()
-		require.NoError(t, err)
-		util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.MutableState) {
-			// create block2 and block3
-			block2 := unittest.BlockWithParentFixture(head)
-			block2.SetPayload(flow.EmptyPayload())
-			err := state.Extend(context.Background(), block2)
-			require.NoError(t, err)
-
-			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(flow.EmptyPayload())
-			err = state.Extend(context.Background(), block3)
-			require.NoError(t, err)
-
-			consumer.On("BlockProcessable", mock.Anything).Return()
-
-			// make valid on block2
-			err = state.MarkValid(block2.ID())
-			require.NoError(t, err)
-
-			// because the parent block is the root block,
-			// BlockProcessable is not triggered on root block.
-			consumer.AssertNotCalled(t, "BlockProcessable")
-
-			err = state.MarkValid(block3.ID())
-			require.NoError(t, err)
-
-			// because the parent is not a root block, BlockProcessable event should be emitted
-			// block3's parent is block2
-			consumer.AssertCalled(t, "BlockProcessable", block2.Header)
-		})
 	})
 }
 

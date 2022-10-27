@@ -52,7 +52,7 @@ type HotStuffFollowerSuite struct {
 
 	committee  *mockhotstuff.DynamicCommittee
 	headers    *mockstorage.Headers
-	updater    *mockmodule.Finalizer
+	finalizer  *mockmodule.Finalizer
 	verifier   *mockhotstuff.Verifier
 	notifier   *mockhotstuff.FinalizationConsumer
 	rootHeader *flow.Header
@@ -91,10 +91,10 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	// mock storage headers
 	s.headers = &mockstorage.Headers{}
 
-	// mock finalization updater
-	s.updater = &mockmodule.Finalizer{}
+	// mock finalization finalizer
+	s.finalizer = &mockmodule.Finalizer{}
 
-	// mock finalization updater
+	// mock finalization finalizer
 	s.verifier = &mockhotstuff.Verifier{}
 	s.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -107,10 +107,11 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	parentID, err := flow.HexStringToIdentifier("aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70")
 	require.NoError(s.T(), err)
 	s.rootHeader = &flow.Header{
-		ParentID:  parentID,
-		Timestamp: time.Now().UTC(),
-		Height:    21053,
-		View:      52078,
+		ParentID:   parentID,
+		Timestamp:  time.Now().UTC(),
+		Height:     21053,
+		View:       52078,
+		ParentView: 52077,
 	}
 
 	signerIndices, err := signature.EncodeSignersToIndices(identities.NodeIDs(), identities.NodeIDs()[:3])
@@ -136,7 +137,7 @@ func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
 		zerolog.New(os.Stderr),
 		s.committee,
 		s.headers,
-		s.updater,
+		s.finalizer,
 		s.verifier,
 		s.notifier,
 		s.rootHeader,
@@ -153,8 +154,7 @@ func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
 	}
 }
 
-// AfterTest stops follower and asserts that the Follower executed the expected callbacks
-// to s.updater.MakeValid or s.notifier.OnBlockIncorporated
+// AfterTest stops follower and asserts that the Follower executed the expected callbacks.
 func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
 	select {
 	case <-s.follower.Done():
@@ -163,53 +163,54 @@ func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
 		s.T().FailNow() // stops the test
 	}
 	s.notifier.AssertExpectations(s.T())
-	s.updater.AssertExpectations(s.T())
+	s.finalizer.AssertExpectations(s.T())
 }
 
 // TestInitialization verifies that the basic test setup with initialization of the Follower works as expected
 func (s *HotStuffFollowerSuite) TestInitialization() {
-	// we expect no additional calls to s.updater or s.notifier besides what is already specified in BeforeTest
+	// we expect no additional calls to s.finalizer or s.notifier besides what is already specified in BeforeTest
 }
 
 // TestSubmitProposal verifies that when submitting a single valid block (child's root block),
-// the Follower reacts with callbacks to s.updater.MakeValid and s.notifier.OnBlockIncorporated with this new block
+// the Follower reacts with callbacks to s.notifier.OnBlockIncorporated with this new block
 func (s *HotStuffFollowerSuite) TestSubmitProposal() {
 	rootBlockView := s.rootHeader.View
 	nextBlock := s.mockConsensus.extendBlock(rootBlockView+1, s.rootHeader)
 
 	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
-	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
-	s.submitProposal(nextBlock, rootBlockView)
+	s.submitProposal(nextBlock)
 }
 
 // TestFollowerFinalizedBlock verifies that when submitting 2 extra blocks
-// the Follower reacts with callbacks to s.updater.MakeValid or s.notifier.OnBlockIncorporated
+// the Follower reacts with callbacks to s.notifier.OnBlockIncorporated
 // for all the added blocks. Furthermore, the follower should finalize the first submitted block,
-// i.e. call s.updater.MakeFinal and s.notifier.OnFinalizedBlock
+// i.e. call s.finalizer.MakeFinal and s.notifier.OnFinalizedBlock
 func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	expectedFinalized := s.mockConsensus.extendBlock(s.rootHeader.View+1, s.rootHeader)
 	s.notifier.On("OnBlockIncorporated", blockWithID(expectedFinalized.ID())).Return().Once()
-	s.updater.On("MakeValid", blockID(expectedFinalized.ID())).Return(nil).Once()
-	s.submitProposal(expectedFinalized, s.rootHeader.View)
+	s.submitProposal(expectedFinalized)
 
 	// direct 1-chain on top of expectedFinalized
 	nextBlock := s.mockConsensus.extendBlock(expectedFinalized.View+1, expectedFinalized)
 	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
-	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
-	s.submitProposal(nextBlock, expectedFinalized.View)
+	s.submitProposal(nextBlock)
+
+	done := make(chan struct{})
 
 	// indirect 2-chain on top of expectedFinalized
 	lastBlock := nextBlock
 	nextBlock = s.mockConsensus.extendBlock(lastBlock.View+5, lastBlock)
 	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(expectedFinalized.ID())).Return().Once()
-	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
-	s.updater.On("MakeFinal", blockID(expectedFinalized.ID())).Return(nil).Once()
-	s.submitProposal(nextBlock, lastBlock.View)
+	s.finalizer.On("MakeFinal", blockID(expectedFinalized.ID())).Run(func(_ mock.Arguments) {
+		close(done)
+	}).Return(nil).Once()
+	s.submitProposal(nextBlock)
+	unittest.RequireCloseBefore(s.T(), done, time.Second, "expect to close before timeout")
 }
 
 // TestOutOfOrderBlocks verifies that when submitting a variety of blocks with view numbers
-// OUT OF ORDER, the Follower reacts with callbacks to s.updater.MakeValid or s.notifier.OnBlockIncorporated
+// OUT OF ORDER, the Follower reacts with callbacks to s.notifier.OnBlockIncorporated
 // for all the added blocks. Furthermore, we construct the test such that the follower should finalize
 // eventually a bunch of blocks in one go.
 // The following illustrates the tree of submitted blocks, with notation
@@ -261,36 +262,40 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 
 	for _, b := range []*flow.Header{block01, block02, block03, block04, block05, block06, block07, block08, block09, block10, block11, block13, block14, block17, block20} {
 		s.notifier.On("OnBlockIncorporated", blockWithID(b.ID())).Return().Once()
-		s.updater.On("MakeValid", blockID(b.ID())).Return(nil).Once()
 	}
 
 	// now we feed the blocks in some wild view order into the Follower
 	// (Caution: we still have to make sure the parent is known, before we give its child to the Follower)
-	s.submitProposal(block03, rootView)
-	s.submitProposal(block07, rootView+3)
-	s.submitProposal(block11, rootView+7)
-	s.submitProposal(block01, rootView)
-	s.submitProposal(block05, rootView+1)
-	s.submitProposal(block17, rootView+11)
-	s.submitProposal(block09, rootView+5)
-	s.submitProposal(block06, rootView+5)
-	s.submitProposal(block10, rootView+9)
-	s.submitProposal(block04, rootView+3)
-	s.submitProposal(block13, rootView+9)
-	s.submitProposal(block14, rootView+13)
-	s.submitProposal(block08, rootView+7)
-	s.submitProposal(block02, rootView+1)
+	s.submitProposal(block03)
+	s.submitProposal(block07)
+	s.submitProposal(block11)
+	s.submitProposal(block01)
+	s.submitProposal(block05)
+	s.submitProposal(block17)
+	s.submitProposal(block09)
+	s.submitProposal(block06)
+	s.submitProposal(block10)
+	s.submitProposal(block04)
+	s.submitProposal(block13)
+	s.submitProposal(block14)
+	s.submitProposal(block08)
+	s.submitProposal(block02)
+
+	done := make(chan struct{})
 
 	// Block 20 should now finalize the fork up to and including block13
 	s.notifier.On("OnFinalizedBlock", blockWithID(block01.ID())).Return().Once()
-	s.updater.On("MakeFinal", blockID(block01.ID())).Return(nil).Once()
+	s.finalizer.On("MakeFinal", blockID(block01.ID())).Return(nil).Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(block05.ID())).Return().Once()
-	s.updater.On("MakeFinal", blockID(block05.ID())).Return(nil).Once()
+	s.finalizer.On("MakeFinal", blockID(block05.ID())).Return(nil).Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(block09.ID())).Return().Once()
-	s.updater.On("MakeFinal", blockID(block09.ID())).Return(nil).Once()
+	s.finalizer.On("MakeFinal", blockID(block09.ID())).Return(nil).Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(block13.ID())).Return().Once()
-	s.updater.On("MakeFinal", blockID(block13.ID())).Return(nil).Once()
-	s.submitProposal(block20, rootView+14)
+	s.finalizer.On("MakeFinal", blockID(block13.ID())).Run(func(_ mock.Arguments) {
+		close(done)
+	}).Return(nil).Once()
+	s.submitProposal(block20)
+	unittest.RequireCloseBefore(s.T(), done, time.Second, "expect to close before timeout")
 }
 
 // blockWithID returns a testify `argumentMatcher` that only accepts blocks with the given ID
@@ -304,8 +309,8 @@ func blockID(expectedBlockID flow.Identifier) interface{} {
 }
 
 // submitProposal submits the given (proposal, parentView) pair to the Follower.
-func (s *HotStuffFollowerSuite) submitProposal(proposal *flow.Header, parentView uint64) {
-	s.follower.SubmitProposal(proposal, parentView)
+func (s *HotStuffFollowerSuite) submitProposal(proposal *flow.Header) {
+	s.follower.SubmitProposal(model.ProposalFromFlow(proposal))
 }
 
 // MockConsensus is used to generate Blocks for a mocked consensus committee

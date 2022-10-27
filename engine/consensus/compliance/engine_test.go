@@ -78,8 +78,9 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 				Header: unittest.BlockWithParentFixture(cs.head).Header,
 			}
 			cs.headerDB[block.Header.ParentID] = cs.head
-			cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return().Once()
-			cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, cs.head.View)).Return(nil).Once()
+			hotstuffProposal := model.ProposalFromFlow(block.Header)
+			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
+			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
 			err := cs.engine.Process(channels.ConsensusCommittee, originID, &block)
 			cs.Assert().NoError(err)
@@ -95,8 +96,9 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
-		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return().Once()
-		cs.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header, cs.head.View)).Return(nil).Once()
+		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 		err := cs.engine.Process(channels.ConsensusCommittee, originID, proposal)
 		cs.Assert().NoError(err)
 		wg.Done()
@@ -127,6 +129,6 @@ func (cs *EngineSuite) TestOnFinalizedBlock() {
 		Run(func(_ mock.Arguments) { wg.Done() }).
 		Return(uint(0)).Once()
 
-	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
+	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock))
 	unittest.AssertReturnsBefore(cs.T(), wg.Wait, time.Second, "an expected call to block buffer wasn't made")
 }

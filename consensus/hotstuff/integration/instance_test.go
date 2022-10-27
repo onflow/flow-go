@@ -311,7 +311,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			header.Height = parent.Height + 1
 
 			// convert into proposal immediately
-			proposal := model.ProposalFromFlow(header, parent.View)
+			proposal := model.ProposalFromFlow(header)
 
 			// store locally and loop back to engine for processing
 			in.ProcessBlock(proposal)
@@ -350,8 +350,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		},
 	)
 
-	in.finalizer.On("MakeValid", mock.Anything).Return(nil)
-
 	// initialize error handling and logging
 	var err error
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
@@ -370,7 +368,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	require.NoError(t, err)
 
 	// initialize the finalizer
-	rootBlock := model.BlockFromFlow(cfg.Root, 0)
+	rootBlock := model.BlockFromFlow(cfg.Root)
 
 	signerIndices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), in.participants.NodeIDs())
 	require.NoError(t, err, "could not encode signer indices")

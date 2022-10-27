@@ -253,10 +253,8 @@ func (el *EventLoop) loop(ctx context.Context) error {
 }
 
 // SubmitProposal pushes the received block to the proposals channel
-func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) {
+func (el *EventLoop) SubmitProposal(proposal *model.Proposal) {
 	received := time.Now()
-
-	proposal := model.ProposalFromFlow(proposalHeader, parentView)
 
 	select {
 	case el.proposals <- proposal:

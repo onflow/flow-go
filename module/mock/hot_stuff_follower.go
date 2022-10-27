@@ -3,7 +3,7 @@
 package mock
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
+	model "github.com/onflow/flow-go/consensus/hotstuff/model"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -44,9 +44,9 @@ func (_m *HotStuffFollower) Ready() <-chan struct{} {
 	return r0
 }
 
-// SubmitProposal provides a mock function with given fields: proposal, parentView
-func (_m *HotStuffFollower) SubmitProposal(proposal *flow.Header, parentView uint64) {
-	_m.Called(proposal, parentView)
+// SubmitProposal provides a mock function with given fields: proposal
+func (_m *HotStuffFollower) SubmitProposal(proposal *model.Proposal) {
+	_m.Called(proposal)
 }
 
 type mockConstructorTestingTNewHotStuffFollower interface {
