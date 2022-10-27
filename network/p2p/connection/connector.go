@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -146,9 +147,13 @@ func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 		// close the connection with the peer if it is not part of the current fanout
 		err := l.host.Network().ClosePeer(peerID)
 		if err != nil {
-			lg.Error().Err(err).Msg("failed to disconnect from peer")
+			lg.Error().
+				Bool(logging.KeySuspicious, true).
+				Err(err).Msg("failed to disconnect from peer")
 		} else {
-			lg.Warn().Msg("disconnected from peer as it is not part of protocol")
+			lg.Warn().
+				Bool(logging.KeySuspicious, true).
+				Msg("disconnected from peer as it is not part of protocol")
 		}
 	}
 }
