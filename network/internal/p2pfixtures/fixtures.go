@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
@@ -479,9 +480,21 @@ func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.Li
 			require.NoError(t, node.AddPeer(ctx, otherPInfo))
 		}
 	}
+}
 
-	// wait for all nodes to discover each other
-	time.Sleep(time.Second)
+// AddNodesToEachOthersPeerStore adds the dialing address of all nodes to the peer store of all other nodes.
+// However, it does not connect them to each other.
+func AddNodesToEachOthersPeerStore(t *testing.T, nodes []p2p.LibP2PNode, ids flow.IdentityList) {
+	for _, node := range nodes {
+		for i, other := range nodes {
+			if node == other {
+				continue
+			}
+			otherPInfo, err := utils.PeerAddressInfo(*ids[i])
+			require.NoError(t, err)
+			node.Host().Peerstore().AddAddrs(otherPInfo.ID, otherPInfo.Addrs, peerstore.AddressTTL)
+		}
+	}
 }
 
 // EnsureConnected ensures that the given nodes are connected to each other.
@@ -642,15 +655,15 @@ func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes [
 }
 
 // EnsureNoStreamCreationBetweenGroups ensures that no stream is created between the given groups of nodes.
-func EnsureNoStreamCreationBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
+func EnsureNoStreamCreationBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, errorCheckers ...func(*testing.T, error)) {
 	// no stream from groupA -> groupB
-	EnsureNoStreamCreation(t, ctx, groupA, groupB)
+	EnsureNoStreamCreation(t, ctx, groupA, groupB, errorCheckers...)
 	// no stream from groupB -> groupA
-	EnsureNoStreamCreation(t, ctx, groupB, groupA)
+	EnsureNoStreamCreation(t, ctx, groupB, groupA, errorCheckers...)
 }
 
 // EnsureNoStreamCreation ensures that no stream is created "from" the given nodes "to" the given nodes.
-func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode) {
+func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode, errorCheckers ...func(*testing.T, error)) {
 	for _, this := range from {
 		for _, other := range to {
 			if this == other {
@@ -661,6 +674,42 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 			_, err := this.CreateStream(ctx, other.Host().ID())
 			require.Error(t, err)
 			require.True(t, flownet.IsPeerUnreachableError(err))
+
+			// runs the error checkers if any.
+			for _, check := range errorCheckers {
+				check(t, err)
+			}
+		}
+	}
+}
+
+// EnsureStreamCreation ensures that a stream is created between each of the  "from" nodes to each of the "to" nodes.
+func EnsureStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode) {
+	for _, this := range from {
+		for _, other := range to {
+			if this == other {
+				// should not happen, unless the test is misconfigured.
+				require.Fail(t, "node is in both from and to lists")
+			}
+			// stream creation should pass without error
+			s, err := this.CreateStream(ctx, other.Host().ID())
+			require.NoError(t, err)
+			require.NotNil(t, s)
+		}
+	}
+}
+
+// EnsureStreamCreationInBothDirections ensure that between each pair of nodes in the given list, a stream is created in both directions.
+func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
+	for _, this := range nodes {
+		for _, other := range nodes {
+			if this == other {
+				continue
+			}
+			// stream creation should pass without error
+			s, err := this.CreateStream(ctx, other.Host().ID())
+			require.NoError(t, err)
+			require.NotNil(t, s)
 		}
 	}
 }
