@@ -256,7 +256,8 @@ func (s *feldmanVSSstate) ForceDisqualify(participant int) error {
 	return nil
 }
 
-// generates all private and public data by the
+// generateShares is used by the dealer to generate secret polynomial from the input seed
+// and derive all private shares and public data.
 func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	err := seedRelic(seed)
 	if err != nil {
