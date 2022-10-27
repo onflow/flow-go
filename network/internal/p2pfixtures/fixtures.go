@@ -12,6 +12,7 @@ import (
 	addrutil "github.com/libp2p/go-addr-util"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -105,14 +106,8 @@ func NodeFixture(
 		SetResourceManager(resourceManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc)
 
-	if parameters.PeerFilter != nil {
-		filters := []p2p.PeerFilter{parameters.PeerFilter}
-		// set parameters.peerFilter as the default peerFilter for both callbacks
-		connGater := connection.NewConnGater(
-			logger,
-			connection.WithOnInterceptPeerDialFilters(filters),
-			connection.WithOnInterceptSecuredFilters(filters))
-		builder.SetConnectionGater(connGater)
+	if parameters.ConnGater != nil {
+		builder.SetConnectionGater(parameters.ConnGater)
 	}
 
 	if parameters.PeerScoringEnabled {
@@ -151,7 +146,6 @@ type NodeFixtureParameters struct {
 	Key                crypto.PrivateKey
 	Address            string
 	DhtOptions         []dht.Option
-	PeerFilter         p2p.PeerFilter
 	Role               flow.Role
 	Logger             zerolog.Logger
 	PeerScoringEnabled bool
@@ -160,6 +154,7 @@ type NodeFixtureParameters struct {
 	ConnectionPruning  bool                  // peer manager parameter
 	UpdateInterval     time.Duration         // peer manager parameter
 	PeerProvider       p2p.PeersProvider     // peer manager parameter
+	ConnGater          connmgr.ConnectionGater
 }
 
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
@@ -209,9 +204,9 @@ func WithDHTOptions(opts ...dht.Option) NodeFixtureParameterOption {
 	}
 }
 
-func WithPeerFilter(filter p2p.PeerFilter) NodeFixtureParameterOption {
+func WithConnectionGater(connGater connmgr.ConnectionGater) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.PeerFilter = filter
+		p.ConnGater = connGater
 	}
 }
 
