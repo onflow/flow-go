@@ -7,6 +7,9 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
+// ConnectionGater is a copy of the libp2p ConnectionGater interface:
+// https://github.com/libp2p/go-libp2p/blob/master/core/connmgr/gater.go#L54
+// We use it here to generate a mock for testing through testify mock.
 type ConnectionGater interface {
 	InterceptPeerDial(p peer.ID) (allow bool)
 
