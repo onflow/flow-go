@@ -434,7 +434,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 
 	streamHandler1, inbound1 := p2pfixtures.StreamHandlerFixture(t)
-	node1, _ := p2pfixtures.NodeFixture(
+	node1, id1 := p2pfixtures.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
@@ -442,7 +442,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	)
 
 	streamHandler2, inbound2 := p2pfixtures.StreamHandlerFixture(t)
-	node2, _ := p2pfixtures.NodeFixture(
+	node2, id2 := p2pfixtures.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
@@ -451,9 +451,11 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	)
 
 	nodes := []p2p.LibP2PNode{node1, node2}
+	ids := flow.IdentityList{&id1, &id2}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
+	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, []chan string{inbound1, inbound2}, p2pfixtures.LongStringMessageFactoryFixture(t))
 }
 
