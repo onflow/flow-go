@@ -270,15 +270,8 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 		limit = 0
 	}
 
-	// look up the root height so we don't look too far back
-	// initially this is the genesis block height (aka 0).
-	var rootHeight uint64
-	err := m.db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return fmt.Errorf("could not retrieve root block height: %w", err)
-	}
-	if limit < rootHeight {
-		limit = rootHeight
+	if limit < m.rootHeight {
+		limit = m.rootHeight
 	}
 
 	// build a list of all previously used guarantees on this part of the chain
@@ -429,7 +422,13 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 	defer span.End()
 
 	blockID := candidate.ID()
+	parentID := candidate.Header.ParentID
 	latestSealID := last.ID()
+
+	parent, err := m.headers.ByBlockID(parentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
+	}
 
 	// apply any state changes from service events sealed by this block's parent
 	dbUpdates, insertingBlockTriggersEpochFallback, err := m.handleEpochServiceEvents(candidate)
@@ -478,6 +477,12 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 		if insertingBlockTriggersEpochFallback {
 			m.consumer.EpochEmergencyFallbackTriggered()
+		}
+
+		// trigger BlockProcessable for parent blocks above root height
+		if parent.Height > m.rootHeight {
+			// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
+			m.consumer.BlockProcessable(parent)
 		}
 
 		return nil
@@ -999,69 +1004,4 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 		}
 	}
 	return
-}
-
-// MarkValid marks the block as valid in protocol state, and triggers
-// `BlockProcessable` event to notify that its parent block is processable.
-//
-// Why is the parent block processable, not the block itself?
-// because a block having a child block means it has been verified
-// by the majority of consensus participants.
-// Hence, if a block has passed the header validity check, its parent block
-// must have passed both the header validity check and the body validity check.
-// So that consensus followers can skip the block body validity checks and wait
-// for its child to arrive, and if the child passes the header validity check, it means
-// the consensus participants have done a complete check on its parent block,
-// so consensus followers can trust consensus nodes did the right job, and start
-// processing the parent block.
-//
-// NOTE: since a parent can have multiple children, `BlockProcessable` event
-// could be triggered multiple times for the same block.
-// NOTE: BlockProcessable should not be blocking, otherwise, it will block the follower
-func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
-	header, err := m.headers.ByBlockID(blockID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve block header for %x: %w", blockID, err)
-	}
-	parentID := header.ParentID
-	var isParentValid bool
-	err = m.db.View(operation.RetrieveBlockValidity(parentID, &isParentValid))
-	if err != nil {
-		return fmt.Errorf("could not retrieve validity of parent block (%x): %w", parentID, err)
-	}
-	if !isParentValid {
-		return fmt.Errorf("can only mark block as valid whose parent is valid")
-	}
-
-	parent, err := m.headers.ByBlockID(parentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
-	}
-	// root blocks and blocks below the root block are considered as "processed",
-	// so we don't want to trigger `BlockProcessable` event for them.
-	var rootHeight uint64
-	err = m.db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return fmt.Errorf("could not retrieve root block's height: %w", err)
-	}
-
-	err = operation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
-		// insert block validity for this block
-		err = operation.SkipDuplicates(operation.InsertBlockValidity(blockID, true))(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert validity for block (id=%x, height=%d): %w", blockID, header.Height, err)
-		}
-
-		// trigger BlockProcessable for parent blocks above root height
-		if parent.Height > rootHeight {
-			// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
-			m.consumer.BlockProcessable(parent)
-		}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
-	}
-
-	return nil
 }
