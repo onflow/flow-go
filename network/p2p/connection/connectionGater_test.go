@@ -93,7 +93,11 @@ func TestConnectionGating(t *testing.T) {
 	})
 }
 
-func TestConnectionGater_Lifecycle(t *testing.T) {
+// TestConnectionGater_InterceptUpgrade tests the connection gater only upgrades the connections to the allow-listed peers.
+// Upgrading a connection means that the connection is the last phase of the connection establishment process.
+// It means that the connection is ready to be used for sending and receiving messages.
+// It checks that no disallowed peer can upgrade the connection.
+func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	sporkId := unittest.IdentifierFixture()
@@ -143,6 +147,7 @@ func TestConnectionGater_Lifecycle(t *testing.T) {
 		return !ok
 	})
 
+	// we don't inspect connections during "accept" and "dial" phases as the peer IDs are not available at those phases.
 	connectionGater.On("InterceptAddrDial", mock.Anything, mock.Anything).Return(true)
 	connectionGater.On("InterceptAccept", mock.Anything).Return(true)
 
@@ -174,6 +179,9 @@ func TestConnectionGater_Lifecycle(t *testing.T) {
 	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes[1:], inbounds[1:])
 }
 
+// TestConnectionGater_Disallow_Integration tests that when a peer is disallowed, it is disconnected from all other peers, and
+// cannot connect, exchange unicast, or pubsub messages to any other peers.
+// It also checked that the allowed peers can still communicate with each other.
 func TestConnectionGater_Disallow_Integration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
