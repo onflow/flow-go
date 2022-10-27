@@ -497,7 +497,7 @@ func EnsureConnected(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) 
 	}
 }
 
-// EnsureNotConnected ensures that no (bidirectional) connection exists from "from" nodes to "to" nodes.
+// EnsureNotConnected ensures that no connection exists from "from" nodes to "to" nodes.
 func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode) {
 	for _, node := range from {
 		for _, other := range to {
@@ -523,29 +523,31 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 
 	subs := make([]*pubsub.Subscription, len(nodes))
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+	var err error
 	for i, node := range nodes {
-		// this is to make sure that the node is subscribed to the topic before we send the message
-		// hence, we don't check the error.
-		subs[i], _ = node.Subscribe(
+		subs[i], err = node.Subscribe(
 			topic,
 			validator.TopicValidator(
 				unittest.Logger(),
 				unittest.NetworkCodec(),
 				slashingViolationsConsumer,
 				unittest.AllowAllPeerFilter()))
+		require.NoError(t, err)
 	}
 
 	// let subscriptions propagate
 	time.Sleep(1 * time.Second)
 
-	for _, node := range nodes {
-		msg, _ := messageFactory()
-		channel, ok := channels.ChannelFromTopic(topic)
-		require.True(t, ok)
-		data := MustEncodeEvent(t, msg, channel)
+	channel, ok := channels.ChannelFromTopic(topic)
+	require.True(t, ok)
 
+	for _, node := range nodes {
+		// creates a unique message to be published by the node
+		msg, _ := messageFactory()
+		data := MustEncodeEvent(t, msg, channel)
 		require.NoError(t, node.Publish(ctx, topic, data))
 
+		// wait for the message to be received by all nodes
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		SubsMustReceiveMessage(t, ctx, data, subs)
 		cancel()
@@ -557,43 +559,35 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p
 	_, topic := messageFactory()
 
 	subs := make([]*pubsub.Subscription, len(to))
-	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+	svc := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+	tv := validator.TopicValidator(
+		unittest.Logger(),
+		unittest.NetworkCodec(),
+		svc,
+		unittest.AllowAllPeerFilter())
+	var err error
 	for _, node := range from {
-		// this is to make sure that the node is subscribed to the topic before we send the message
-		// hence, we don't check the error.
-		// Also, as the "from" nodes are senders, we don't need to keep the subscription instances.
-		_, _ = node.Subscribe(
-			topic,
-			validator.TopicValidator(
-				unittest.Logger(),
-				unittest.NetworkCodec(),
-				slashingViolationsConsumer,
-				unittest.AllowAllPeerFilter()))
+		_, err = node.Subscribe(topic, tv)
+		require.NoError(t, err)
 	}
 
 	for i, node := range to {
-		// this is to make sure that the node is subscribed to the topic before we send the message
-		// hence, we don't check the error.
-		subs[i], _ = node.Subscribe(
-			topic,
-			validator.TopicValidator(
-				unittest.Logger(),
-				unittest.NetworkCodec(),
-				slashingViolationsConsumer,
-				unittest.AllowAllPeerFilter()))
+		subs[i], err = node.Subscribe(topic, tv)
+		require.NoError(t, err)
 	}
 
 	// let subscriptions propagate
 	time.Sleep(1 * time.Second)
 
 	for _, node := range from {
+		// creates a unique message to be published by the node.
 		msg, _ := messageFactory()
 		channel, ok := channels.ChannelFromTopic(topic)
 		require.True(t, ok)
 		data := MustEncodeEvent(t, msg, channel)
 
+		// ensure the message is NOT received by any of the nodes.
 		require.NoError(t, node.Publish(ctx, topic, data))
-
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		SubsMustNeverReceiveAnyMessage(t, ctx, subs)
 		cancel()
