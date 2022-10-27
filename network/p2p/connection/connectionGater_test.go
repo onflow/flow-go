@@ -146,7 +146,7 @@ func TestConnectionGater_Lifecycle(t *testing.T) {
 	connectionGater.On("InterceptAddrDial", mock.Anything, mock.Anything).Return(true)
 	connectionGater.On("InterceptAccept", mock.Anything).Return(true)
 
-	// blacklists the first node
+	// adds first node to disallowed list
 	disallowedPeerIds[nodes[0].Host().ID()] = struct{}{}
 
 	// starts the nodes
@@ -185,7 +185,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 	ids := flow.IdentityList{}
 	inbounds := make([]chan string, 0, 5)
 
-	blacklist := map[*flow.Identity]struct{}{}
+	disallowedList := map[*flow.Identity]struct{}{}
 
 	for i := 0; i < count; i++ {
 		handler, inbound := p2pfixtures.StreamHandlerFixture(t)
@@ -199,7 +199,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 			p2pfixtures.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
 				list := make(peer.IDSlice, 0)
 				for _, id := range ids {
-					if _, ok := blacklist[id]; ok {
+					if _, ok := disallowedList[id]; ok {
 						continue
 					}
 
@@ -211,11 +211,11 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 				return list
 			}),
 			p2pfixtures.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
-				for id := range blacklist {
+				for id := range disallowedList {
 					bid, err := unittest.PeerIDFromFlowID(id)
 					require.NoError(t, err)
 					if bid == pid {
-						return fmt.Errorf("blacklisted")
+						return fmt.Errorf("disallow-listed")
 					}
 				}
 
@@ -235,26 +235,26 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 	// ensures that all nodes are connected to each other, and they can exchange messages over the pubsub and unicast.
 	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes, inbounds)
 
-	// now we blacklist one of the nodes (the last node).
-	blacklist[ids[len(ids)-1]] = struct{}{}
-	// let peer manager prune the connections to the blacklisted node.
+	// now we add one of the nodes (the last node) to the disallow-list.
+	disallowedList[ids[len(ids)-1]] = struct{}{}
+	// let peer manager prune the connections to the disallow-listed node.
 	time.Sleep(1 * time.Second)
-	// ensures no connection, unicast, or pubsub going to or coming from the blacklisted node.
+	// ensures no connection, unicast, or pubsub going to or coming from the disallow-listed node.
 	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:count-1], nodes[count-1:])
 
-	// now we blacklist another node (the second last node)
-	blacklist[ids[len(ids)-2]] = struct{}{}
-	// let peer manager prune the connections to the blacklisted node.
+	// now we add another node (the second last node) to the disallowed list.
+	disallowedList[ids[len(ids)-2]] = struct{}{}
+	// let peer manager prune the connections to the disallow-listed node.
 	time.Sleep(1 * time.Second)
-	// ensures no connection, unicast, or pubsub going to and coming from the blacklisted nodes.
+	// ensures no connection, unicast, or pubsub going to and coming from the disallow-listed nodes.
 	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:count-2], nodes[count-2:])
-	// ensures that all nodes are other non-black listed nodes can exchange messages over the pubsub and unicast.
+	// ensures that all nodes are other non-disallow-listed nodes can exchange messages over the pubsub and unicast.
 	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes[:count-2], inbounds[:count-2])
 }
 
 // ensureCommunicationSilenceAmongGroups ensures no connection, unicast, or pubsub going to or coming from between the two groups of nodes.
 func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sporkId flow.Identifier, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
-	// ensures no connection, unicast, or pubsub going to the blacklisted nodes
+	// ensures no connection, unicast, or pubsub going to the disallow-listed nodes
 	p2pfixtures.EnsureNotConnectedBetweenGroups(t, ctx, groupA, groupB)
 	p2pfixtures.EnsureNoPubsubExchangeBetweenGroups(t, ctx, groupA, groupB, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
