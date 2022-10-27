@@ -11,12 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/libp2p/go-libp2p/core"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/stretchr/testify/assert"
@@ -551,90 +549,4 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	unittest.RequireNeverClosedWithin(t, blockedCallCh, 1*time.Millisecond,
 		"CreateStream attempt to the unresponsive peer did not block after connecting to good node")
 
-}
-
-// TestConnectionGating tests node allow listing by peer.ID
-func TestConnectionGating(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
-	sporkID := unittest.IdentifierFixture()
-
-	// create 2 nodes
-	node1Peers := make(map[peer.ID]struct{})
-	node1, node1Id := p2pfixtures.NodeFixture(
-		t,
-		sporkID,
-		t.Name(),
-		p2pfixtures.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
-			if _, ok := node1Peers[p]; !ok {
-				return fmt.Errorf("id not found: %s", p.String())
-			}
-			return nil
-		})))
-
-	node2Peers := make(map[peer.ID]struct{})
-	node2, node2Id := p2pfixtures.NodeFixture(
-		t,
-		sporkID, t.Name(),
-		p2pfixtures.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
-			if _, ok := node2Peers[p]; !ok {
-				return fmt.Errorf("id not found: %s", p.String())
-			}
-			return nil
-		})))
-
-	nodes := []p2p.LibP2PNode{node1, node2}
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
-
-	node1Info, err := utils.PeerAddressInfo(node1Id)
-	assert.NoError(t, err)
-
-	node2Info, err := utils.PeerAddressInfo(node2Id)
-	assert.NoError(t, err)
-
-	requireError := func(err error) {
-		require.Error(t, err)
-		require.True(t, errors.Is(err, swarm.ErrGaterDisallowedConnection))
-	}
-
-	t.Run("outbound connection to a not-allowed node is rejected", func(t *testing.T) {
-		// node1 and node2 both have no allowListed peers
-		node1.Host().Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.AddressTTL)
-		_, err := node1.CreateStream(ctx, node2Info.ID)
-		requireError(err)
-		node2.Host().Peerstore().AddAddrs(node1Info.ID, node1Info.Addrs, peerstore.AddressTTL)
-		_, err = node2.CreateStream(ctx, node1Info.ID)
-		requireError(err)
-	})
-
-	t.Run("inbound connection from an allowed node is rejected", func(t *testing.T) {
-
-		// node1 allowlists node2 but node2 does not allowlists node1
-		node1Peers[node2Info.ID] = struct{}{}
-
-		// node1 attempts to connect to node2
-		// node2 should reject the inbound connection
-		node1.Host().Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.AddressTTL)
-		_, err = node1.CreateStream(ctx, node2Info.ID)
-		require.Error(t, err)
-	})
-
-	t.Run("outbound connection to an approved node is allowed", func(t *testing.T) {
-
-		// node1 allowlists node2
-		node1Peers[node2Info.ID] = struct{}{}
-		// node2 allowlists node1
-		node2Peers[node1Info.ID] = struct{}{}
-
-		// node1 should be allowed to connect to node2
-		node1.Host().Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.AddressTTL)
-		_, err = node1.CreateStream(ctx, node2Info.ID)
-		require.NoError(t, err)
-		// node2 should be allowed to connect to node1
-		node2.Host().Peerstore().AddAddrs(node1Info.ID, node1Info.Addrs, peerstore.AddressTTL)
-		_, err = node2.CreateStream(ctx, node1Info.ID)
-		require.NoError(t, err)
-	})
 }
