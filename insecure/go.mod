@@ -6,6 +6,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ipfs/go-datastore v0.6.0
+	github.com/libp2p/go-libp2p v0.23.2
 	github.com/onflow/flow-go v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/rs/zerolog v1.28.0
@@ -14,8 +15,6 @@ require (
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
 )
-
-require github.com/libp2p/go-libp2p v0.22.0
 
 require (
 	cloud.google.com/go v0.100.2 // indirect
@@ -137,7 +136,7 @@ require (
 	github.com/libp2p/go-netroute v0.2.0 // indirect
 	github.com/libp2p/go-openssl v0.1.0 // indirect
 	github.com/libp2p/go-reuseport v0.2.0 // indirect
-	github.com/libp2p/go-yamux/v3 v3.1.2 // indirect
+	github.com/libp2p/go-yamux/v4 v4.0.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/lucas-clemente/quic-go v0.29.1 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
