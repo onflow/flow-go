@@ -6,18 +6,105 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/control"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
+	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestConnectionGater(t *testing.T) {
+func TestConnectionGater_Lifecycle(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	sporkId := unittest.IdentifierFixture()
+	defer cancel()
+
+	count := 5
+	nodes := make([]p2p.LibP2PNode, 0, count)
+	ids := flow.IdentityList{}
+	inbounds := make([]chan string, 0, count)
+
+	blacklist := map[*flow.Identity]struct{}{}
+	connectionGater := mockp2p.NewConnectionGater(t)
+	for i := 0; i < count; i++ {
+		handler, inbound := p2pfixtures.StreamHandlerFixture(t)
+		node, id := p2pfixtures.NodeFixture(
+			t,
+			sporkId,
+			t.Name(),
+			p2pfixtures.WithRole(flow.RoleConsensus),
+			p2pfixtures.WithDefaultStreamHandler(handler),
+			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
+			p2pfixtures.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
+				list := make(peer.IDSlice, 0)
+				for _, id := range ids {
+					if _, ok := blacklist[id]; ok {
+						continue
+					}
+
+					pid, err := unittest.PeerIDFromFlowID(id)
+					require.NoError(t, err)
+
+					list = append(list, pid)
+				}
+				return list
+			}),
+			p2pfixtures.WithConnectionGater(connectionGater))
+
+		nodes = append(nodes, node)
+		ids = append(ids, &id)
+		inbounds = append(inbounds, inbound)
+	}
+
+	connectionGater.On("InterceptSecured", mock.Anything, mock.Anything, mock.Anything).
+		Return(func(dir network.Direction, p peer.ID, addr network.ConnMultiaddrs) bool {
+			for id := range blacklist {
+				bid, err := unittest.PeerIDFromFlowID(id)
+				require.NoError(t, err)
+				if bid == p {
+					return false // blacklisted
+				}
+			}
+			return true
+		})
+
+	connectionGater.On("InterceptPeerDial", mock.Anything).Return(func(p peer.ID) bool {
+		for id := range blacklist {
+			bid, err := unittest.PeerIDFromFlowID(id)
+			require.NoError(t, err)
+			if bid == p {
+				return false // blacklisted
+			}
+		}
+		return true
+	})
+
+	connectionGater.On("InterceptAddrDial", mock.Anything, mock.Anything).Return(true)
+	connectionGater.On("InterceptAccept", mock.Anything).Return(true)
+	connectionGater.On("InterceptUpgraded", mock.Anything).Return(true, control.DisconnectReason(0))
+
+	// blacklists the first node
+	blacklist[ids[0]] = struct{}{}
+
+	// starts the nodes
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 1*time.Second)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 1*time.Second)
+
+	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes[1:], inbounds[1:])
+
+	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:1], nodes[1:])
+}
+
+func TestConnectionGater_Disallow_Integration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	sporkId := unittest.IdentifierFixture()
@@ -53,7 +140,7 @@ func TestConnectionGater(t *testing.T) {
 				}
 				return list
 			}),
-			p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
+			p2pfixtures.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
 				for id := range blacklist {
 					bid, err := unittest.PeerIDFromFlowID(id)
 					require.NoError(t, err)
@@ -63,7 +150,7 @@ func TestConnectionGater(t *testing.T) {
 				}
 
 				return nil
-			}))
+			})))
 
 		nodes = append(nodes, node)
 		ids = append(ids, &id)
