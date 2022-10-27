@@ -642,7 +642,7 @@ func EnsureNoStreamCreationFrom(t *testing.T, ctx context.Context, from []p2p.Li
 		for _, other := range to {
 			if this == other {
 				// should not happen, unless the test is misconfigured.
-				require.Fail(t, fmt.Sprintf("node is in both from and to lists"))
+				require.Fail(t, "node is in both from and to lists")
 			}
 			// stream creation should fail
 			_, err := this.CreateStream(ctx, other.Host().ID())
