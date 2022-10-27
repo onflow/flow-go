@@ -42,6 +42,27 @@ type Environment struct {
 	mock.Mock
 }
 
+// AccountKeysCount provides a mock function with given fields: address
+func (_m *Environment) AccountKeysCount(address common.Address) (uint64, error) {
+	ret := _m.Called(address)
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
+		r0 = rf(address)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // AccountsStorageCapacity provides a mock function with given fields: addresses
 func (_m *Environment) AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error) {
 	ret := _m.Called(addresses)
@@ -86,20 +107,6 @@ func (_m *Environment) AddAccountKey(address common.Address, publicKey *stdlib.P
 	}
 
 	return r0, r1
-}
-
-// AddEncodedAccountKey provides a mock function with given fields: address, publicKey
-func (_m *Environment) AddEncodedAccountKey(address common.Address, publicKey []byte) error {
-	ret := _m.Called(address, publicKey)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Address, []byte) error); ok {
-		r0 = rf(address, publicKey)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // AllocateStorageIndex provides a mock function with given fields: owner
@@ -946,29 +953,6 @@ func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*std
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*stdlib.AccountKey)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
-		r1 = rf(address, index)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// RevokeEncodedAccountKey provides a mock function with given fields: address, index
-func (_m *Environment) RevokeEncodedAccountKey(address common.Address, index int) ([]byte, error) {
-	ret := _m.Called(address, index)
-
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func(common.Address, int) []byte); ok {
-		r0 = rf(address, index)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
 		}
 	}
 
