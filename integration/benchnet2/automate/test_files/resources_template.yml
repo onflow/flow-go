@@ -1,1 +1,1 @@
-  defaults:"200m"
+imagePullPolicy: TEST

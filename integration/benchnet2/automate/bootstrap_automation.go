@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
 	"os"
 	"regexp"
 
@@ -44,12 +43,14 @@ var DEFAULT_CONSENSUS_IMAGE string = "gcr.io/flow-container-registry/consensus:v
 var DEFAULT_EXECUTION_IMAGE string = "gcr.io/flow-container-registry/execution:v0.27.6"
 var DEFAULT_VERIFICATION_IMAGE string = "gcr.io/flow-container-registry/verification:v0.27.6"
 
-func GenerateValuesYaml(inputJsonFilePath string, templatePath string, outputYamlFilePath string, params ...string) {
-	GenerateValuesYamlWithImages(inputJsonFilePath, templatePath, outputYamlFilePath, DEFAULT_ACCESS_IMAGE, DEFAULT_COLLECTION_IMAGE, DEFAULT_CONSENSUS_IMAGE, DEFAULT_EXECUTION_IMAGE, DEFAULT_VERIFICATION_IMAGE)
+// Generates a values file based on a given json and templates
+func GenerateValuesYaml(inputJsonFilePath string, templatePath string, outputYamlFilePath string, branch string, commit string) {
+	GenerateValuesYamlWithImages(inputJsonFilePath, templatePath, outputYamlFilePath, branch, commit, DEFAULT_ACCESS_IMAGE, DEFAULT_COLLECTION_IMAGE, DEFAULT_CONSENSUS_IMAGE, DEFAULT_EXECUTION_IMAGE, DEFAULT_VERIFICATION_IMAGE)
 }
 
-func GenerateValuesYamlWithImages(inputJsonFilePath string, templatePath string, outputYamlFilePath string,
-	accessImage string, collectionImage string, consensusImage string, executionImage string, verificationImage string) {
+// Generates a values file based on a given json and templates, with addtion of selecting image version for nodes
+func GenerateValuesYamlWithImages(inputJsonFilePath string, templatePath string, outputYamlFilePath string, branch string, commit string,
+	accessImage string, collectionImage string, consensusImage string, executionImage string, verificationImage string) error {
 	templateFolder := TEMPLATE_PATH
 	if templatePath != "" {
 		templateFolder = templatePath
@@ -58,21 +59,30 @@ func GenerateValuesYamlWithImages(inputJsonFilePath string, templatePath string,
 	if inputJsonFilePath != "" {
 		nodeInfoJson = inputJsonFilePath
 	}
-	nodesData, nodeConfig := loadNodeJsonData(nodeInfoJson)
+	nodesData, nodeConfig, err := loadNodeJsonData(nodeInfoJson)
+	if err != nil {
+		return err
+	}
 
-	values := buildValuesStruct(templateFolder, nodesData, nodeConfig, accessImage, collectionImage, consensusImage, executionImage, verificationImage)
+	values, err := buildValuesStruct(templateFolder, nodesData, nodeConfig, branch, commit, accessImage, collectionImage, consensusImage, executionImage, verificationImage)
+	if err != nil {
+		return err
+	}
 
-	marshalToYaml(values, outputYamlFilePath)
+	return marshalToYaml(values, outputYamlFilePath)
 }
 
 // Loads node info json file and returns unmarshaled struct and node counts
-func loadNodeJsonData(nodeInfoPath string) (map[string]Node, map[string]int) {
-	jsonFileBytes := textReader(nodeInfoPath)
+func loadNodeJsonData(nodeInfoPath string) (map[string]Node, map[string]int, error) {
+	jsonFileBytes, err := textReader(nodeInfoPath)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	var nodes []Node
-	err := json.Unmarshal(jsonFileBytes, &nodes)
+	err = json.Unmarshal(jsonFileBytes, &nodes)
 	if err != nil {
-		log.Fatal(err)
+		return nil, nil, err
 	}
 
 	var nodeConfig = make(map[string]int)
@@ -92,111 +102,129 @@ func loadNodeJsonData(nodeInfoPath string) (map[string]Node, map[string]int) {
 		nodeConfig[nodeType[0]]++
 	}
 
-	return nodeMap, nodeConfig
+	return nodeMap, nodeConfig, err
 }
 
-func buildValuesStruct(templateFolder string, nodesData map[string]Node, nodeConfig map[string]int,
-	accessImage string, collectionImage string, consensusImage string, executionImage string, verificationImage string) *Values {
-	resources := string(textReader(templateFolder + RESOURCES_TEMPLATE))
-	nodeTypeResources := unmarshalToStruct(resources, &Defaults{}).(*Defaults)
+// Builds and returns values yaml struct
+func buildValuesStruct(templateFolder string, nodesData map[string]Node, nodeConfig map[string]int, branch string, commit string,
+	accessImage string, collectionImage string, consensusImage string, executionImage string, verificationImage string) (*Values, error) {
+	resources, err := textReader(templateFolder + RESOURCES_TEMPLATE)
+	if err != nil {
+		return nil, err
+	}
+	resourcesInterface, err := unmarshalToStruct(resources, &Defaults{})
+	if err != nil {
+		return nil, err
+	}
+	nodeTypeResources := resourcesInterface.(*Defaults)
 
 	accessTemplatePath := templateFolder + ACCESS_TEMPLATE
-	accessNodeMap := nodeStruct("access", accessTemplatePath, accessImage, nodesData, nodeConfig)
+	accessNodeMap, err := nodeStruct("access", accessTemplatePath, accessImage, nodesData, nodeConfig)
+	if err != nil {
+		return nil, err
+	}
 	var accessNodes = NodesDefs{Defaults: *nodeTypeResources, Nodes: accessNodeMap}
 
 	collectionTemplatePath := templateFolder + COLLECTION_TEMPLATE
-	collectionNodeMap := nodeStruct("collection", collectionTemplatePath, collectionImage, nodesData, nodeConfig)
+	collectionNodeMap, err := nodeStruct("collection", collectionTemplatePath, collectionImage, nodesData, nodeConfig)
+	if err != nil {
+		return nil, err
+	}
 	var collectionNodes = NodesDefs{Defaults: *nodeTypeResources, Nodes: collectionNodeMap}
 
 	consensusTemplatePath := templateFolder + CONSENSUS_TEMPLATE
-	consensusNodeMap := nodeStruct("consensus", consensusTemplatePath, consensusImage, nodesData, nodeConfig)
+	consensusNodeMap, err := nodeStruct("consensus", consensusTemplatePath, consensusImage, nodesData, nodeConfig)
+	if err != nil {
+		return nil, err
+	}
 	var consensusNodes = NodesDefs{Defaults: *nodeTypeResources, Nodes: consensusNodeMap}
 
 	executionTemplatePath := templateFolder + EXECUTION_TEMPLATE
-	executionNodeMap := nodeStruct("execution", executionTemplatePath, executionImage, nodesData, nodeConfig)
+	executionNodeMap, err := nodeStruct("execution", executionTemplatePath, executionImage, nodesData, nodeConfig)
+	if err != nil {
+		return nil, err
+	}
 	var executionNodes = NodesDefs{Defaults: *nodeTypeResources, Nodes: executionNodeMap}
 
 	verificationTemplatePath := templateFolder + VERIFICATION_TEMPLATE
-	verificationNodeMap := nodeStruct("verification", verificationTemplatePath, verificationImage, nodesData, nodeConfig)
+	verificationNodeMap, err := nodeStruct("verification", verificationTemplatePath, verificationImage, nodesData, nodeConfig)
 	var verificationNodes = NodesDefs{Defaults: *nodeTypeResources, Nodes: verificationNodeMap}
 
-	return &Values{Branch: "fake-branch", Commit: "123456", Defaults: EmptyStruct{}, Access: accessNodes, Collection: collectionNodes,
-		Consensus: consensusNodes, Execution: executionNodes, Verification: verificationNodes}
+	return &Values{Branch: branch, Commit: commit, Defaults: EmptyStruct{}, Access: accessNodes, Collection: collectionNodes,
+		Consensus: consensusNodes, Execution: executionNodes, Verification: verificationNodes}, err
 }
 
-func nodeStruct(nodeType string, nodeTemplatePath string, imageTag string, nodesData map[string]Node, nodeConfig map[string]int) map[string]NodeDetails {
-	nodeTemplate := createTemplate(nodeTemplatePath)
+func nodeStruct(nodeType string, nodeTemplatePath string, imageTag string, nodesData map[string]Node, nodeConfig map[string]int) (map[string]NodeDetails, error) {
+	nodeTemplate, err := createTemplate(nodeTemplatePath)
+	if err != nil {
+		return nil, err
+	}
 	var nodeMap = make(map[string]NodeDetails)
 
 	for i := 1; i <= nodeConfig[nodeType]; i++ {
 		name := fmt.Sprint(nodeType, i)
 		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: imageTag}
 
-		nodeString := replaceTemplateData(nodeTemplate, replacementData)
-		nodeStruct := unmarshalToStruct(nodeString, &NodeDetails{}).(*NodeDetails)
+		nodeString, err := replaceTemplateData(nodeTemplate, replacementData)
+		if err != nil {
+			return nil, err
+		}
+		nodeInterface, err := unmarshalToStruct([]byte(nodeString), &NodeDetails{})
+		if err != nil {
+			return nil, err
+		}
+		nodeStruct := nodeInterface.(*NodeDetails)
 		nodeStruct.Image = replacementData.ImageTag
 		nodeStruct.NodeID = replacementData.NodeID
 
 		nodeMap[name] = *nodeStruct
 	}
 
-	return nodeMap
+	return nodeMap, err
 }
 
-func textReader(path string) []byte {
-	file, err := os.ReadFile(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return file
+func textReader(path string) ([]byte, error) {
+	return os.ReadFile(path)
 }
 
-func writeYamlBytesToFile(filepath string, yamlData []byte) {
+func writeYamlBytesToFile(filepath string, yamlData []byte) error {
 	file, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	_, err = file.Write(yamlData)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	file.Close()
+	return file.Close()
 }
 
-func replaceTemplateData(template *template.Template, data ReplacementData) string {
+func replaceTemplateData(template *template.Template, data ReplacementData) (string, error) {
 	var doc bytes.Buffer
 	err := template.Execute(&doc, data)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return doc.String()
+	return doc.String(), err
 }
 
-func createTemplate(templatePath string) *template.Template {
-	template, err := template.New("todos").Parse(string(textReader(templatePath)))
+func createTemplate(templatePath string) (*template.Template, error) {
+	templateBytes, err := textReader(templatePath)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-
-	return template
+	return template.New("todos").Parse(string(templateBytes))
 }
 
-func unmarshalToStruct(source string, target interface{}) interface{} {
-	err := yaml.Unmarshal([]byte(source), target)
-	if err != nil {
-		log.Fatal(err)
-	}
+func unmarshalToStruct(source []byte, target interface{}) (interface{}, error) {
+	err := yaml.Unmarshal(source, target)
 
-	return target
+	return target, err
 }
 
-func marshalToYaml(source interface{}, outputFilePath string) {
+func marshalToYaml(source interface{}, outputFilePath string) error {
 	yamlData, err := yaml.Marshal(source)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	writeYamlBytesToFile(outputFilePath, yamlData)
+	return writeYamlBytesToFile(outputFilePath, yamlData)
 }

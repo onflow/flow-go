@@ -15,14 +15,14 @@ func TestSubString(t *testing.T) {
 	expectedUndermatched := "templates_test:\nreplacement1: 1"
 	// expectedOvermatched := "templates_test:\nreplacement1: 1\nreplacement2: 2\nreplacement3: {{.ReplaceThree}}"
 
-	matched := createTemplate("test_files/test_matched_template.yml")
-	undermatched := createTemplate("test_files/test_undermatched_template.yml")
+	matched, _ := createTemplate("test_files/test_matched_template.yml")
+	undermatched, _ := createTemplate("test_files/test_undermatched_template.yml")
 	// overmatched := createTemplate("test_files/test_overmatched_template.yml")
 
 	replacementData := ReplacementData{NodeID: "1", ImageTag: "2"}
 
-	matchedString := replaceTemplateData(matched, replacementData)
-	undermatchedString := replaceTemplateData(undermatched, replacementData)
+	matchedString, _ := replaceTemplateData(matched, replacementData)
+	undermatchedString, _ := replaceTemplateData(undermatched, replacementData)
 	// overmatchedString := replaceTemplateData(overmatched, replacementData)
 
 	require.Equal(t, expectedMatched, matchedString)
@@ -34,14 +34,18 @@ func TestReadYaml(t *testing.T) {
 	filepath := "test_files/test_read.yml"
 	testString := "Test String 123@"
 
-	actualString := string(textReader(filepath))
-	require.Equal(t, actualString, testString)
+	actualString, err := textReader(filepath)
+	require.NoError(t, err)
+	require.Equal(t, string(actualString), testString)
 }
 
 func TestUnmarshal(t *testing.T) {
-	envTemplate := string(textReader(TEST_FILES + ACCESS_TEMPLATE))
+	envTemplate, err := textReader(TEST_FILES + ACCESS_TEMPLATE)
+	require.NoError(t, err)
 
-	envStruct := unmarshalToStruct(envTemplate, &NodeDetails{}).(*NodeDetails)
+	envInterface, err := unmarshalToStruct(envTemplate, &NodeDetails{})
+	envStruct := envInterface.(*NodeDetails)
+	require.NoError(t, err)
 	require.Equal(t, 2, len(envStruct.Args))
 	require.Equal(t, "--bootstrapdir=/bootstrap", envStruct.Args[0])
 	require.Equal(t, "--access", envStruct.Args[1])
@@ -58,9 +62,10 @@ func TestByteFileWrite(t *testing.T) {
 
 	writeYamlBytesToFile(filename, []byte(testString))
 
-	actual := string(textReader(filename))
+	actual, err := textReader(filename)
+	require.NoError(t, err)
 
-	require.Equal(t, testString, actual)
+	require.Equal(t, testString, string(actual))
 
 	deleteFile(filename)
 }
@@ -73,16 +78,18 @@ func TestMarshalFileWrite(t *testing.T) {
 
 	marshalToYaml(resource, filename)
 
-	actual := string(textReader(filename))
+	actual, err := textReader(filename)
+	require.NoError(t, err)
 
-	require.Equal(t, expected, actual)
+	require.Equal(t, expected, string(actual))
 	deleteFile(filename)
 }
 
 func TestLoadJson(t *testing.T) {
 	testJson := TEST_FILES + "sample-infos.pub.json"
 
-	nodesData, nodesConfig := loadNodeJsonData(testJson)
+	nodesData, nodesConfig, err := loadNodeJsonData(testJson)
+	require.NoError(t, err)
 
 	require.Equal(t, 1, nodesConfig["access"])
 	require.Equal(t, 2, nodesConfig["collection"])
@@ -101,7 +108,37 @@ func TestLoadJson(t *testing.T) {
 
 func TestBuildStruct(t *testing.T) {
 	nodeData := make(map[string]Node)
-	nodeData["access1"] = Node{NodeID: "access1_nodeID"}
+	nodeData["access1"] = Node{NodeID: "access1_replacement_nodeID"}
+	nodeData["collection1"] = Node{NodeID: "collection1_replacement_nodeID"}
+	nodeData["consensus1"] = Node{NodeID: "consensus1_replacement_nodeID"}
+	nodeData["execution1"] = Node{NodeID: "execution1_replacement_nodeID"}
+	nodeData["verification1"] = Node{NodeID: "verification1_replacement_nodeID"}
+
+	nodeConfig := make(map[string]int)
+	nodeConfig["access"] = 1
+	nodeConfig["collection"] = 1
+	nodeConfig["consensus"] = 1
+	nodeConfig["execution"] = 1
+	nodeConfig["verification"] = 1
+
+	values, err := buildValuesStruct(TEST_FILES, nodeData, nodeConfig, "test-branch", "test-commit-hash", "accessTestImage", "collectionTestImage", "consensusTestImage", "executionTestImage", "verificationTestImage")
+	require.NoError(t, err)
+
+	require.Equal(t, "test-branch", values.Branch)
+	require.Equal(t, "test-commit-hash", values.Commit)
+
+	require.Equal(t, 1, len(values.Access.Nodes))
+	require.Equal(t, "accessTestImage", values.Access.Nodes["access1"].Image)
+	require.Equal(t, "collectionTestImage", values.Collection.Nodes["collection1"].Image)
+	require.Equal(t, "consensusTestImage", values.Consensus.Nodes["consensus1"].Image)
+	require.Equal(t, "executionTestImage", values.Execution.Nodes["execution1"].Image)
+	require.Equal(t, "verificationTestImage", values.Verification.Nodes["verification1"].Image)
+
+	require.Equal(t, "access1_replacement_nodeID", values.Access.Nodes["access1"].NodeID)
+	require.Equal(t, "collection1_replacement_nodeID", values.Collection.Nodes["collection1"].NodeID)
+	require.Equal(t, "consensus1_replacement_nodeID", values.Consensus.Nodes["consensus1"].NodeID)
+	require.Equal(t, "execution1_replacement_nodeID", values.Execution.Nodes["execution1"].NodeID)
+	require.Equal(t, "verification1_replacement_nodeID", values.Verification.Nodes["verification1"].NodeID)
 }
 
 func deleteFile(filepath string) {
