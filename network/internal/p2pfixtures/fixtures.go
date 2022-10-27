@@ -600,6 +600,14 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p
 	}
 }
 
+// EnsureNoPubsubExchangeBetweenGroups ensures that no pubsub message is exchanged between the given groups of nodes.
+func EnsureNoPubsubExchangeBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+	// ensure no message exchange from group A to group B
+	EnsureNoPubsubMessageExchange(t, ctx, groupA, groupB, messageFactory)
+	// ensure no message exchange from group B to group A
+	EnsureNoPubsubMessageExchange(t, ctx, groupB, groupA, messageFactory)
+}
+
 // EnsureMessageExchangeOverUnicast ensures that the given nodes exchange arbitrary messages on through unicasting (i.e., stream creation).
 // It fails the test if any of the nodes does not receive the message from the other nodes.
 // The "inbounds" parameter specifies the inbound channel of the nodes on which the messages are received.
