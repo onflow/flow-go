@@ -2,7 +2,6 @@ package protocol_test
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"testing"
 
@@ -88,9 +87,7 @@ func TestOrderedSeals(t *testing.T) {
 		for i, seal := range orderedSeals {
 			seal.BlockID = blocks[i].ID()
 			headers.On("ByBlockID", seal.BlockID).Return(blocks[i].Header, nil)
-			fmt.Println(i, seal.ID(), blocks[i].Header.Height)
 		}
-		fmt.Println()
 		unorderedSeals := make([]*flow.Seal, len(orderedSeals))
 		copy(unorderedSeals, orderedSeals)
 		// randomly re-order seals
@@ -99,20 +96,7 @@ func TestOrderedSeals(t *testing.T) {
 		})
 		payload := unittest.PayloadFixture(unittest.WithSeals(unorderedSeals...))
 
-		for i, seal := range unorderedSeals {
-			block, err := headers.ByBlockID(seal.BlockID)
-			require.NoError(t, err)
-			fmt.Println(i, seal.ID(), block.Height)
-		}
-		fmt.Println()
-
 		ordered, err := protocol.OrderedSeals(&payload, headers)
-		for i, seal := range ordered {
-			block, err := headers.ByBlockID(seal.BlockID)
-			require.NoError(t, err)
-			fmt.Println(i, seal.ID(), block.Height)
-		}
-		fmt.Println()
 		require.NoError(t, err)
 		require.Equal(t, orderedSeals, ordered)
 	})
