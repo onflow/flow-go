@@ -3,10 +3,12 @@ package protocol
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/storage"
 )
 
 // IsNodeAuthorizedAt returns whether the node with the given ID is a valid
@@ -112,4 +114,37 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 	}
 
 	return guarantorIDs, nil
+}
+
+// OrderedSeals returns the seals in the input payload in ascending height order.
+// Input payload's seals must form a connected chain without gaps.
+// Expected Error returns during normal operations:
+//   - storage.ErrNotFound if any of the seals references an unknown block
+func OrderedSeals(payload *flow.Payload, headers storage.Headers) ([]*flow.Seal, error) {
+	if len(payload.Seals) == 0 {
+		return nil, nil
+	}
+
+	heights := make([]uint64, len(payload.Seals))
+	minHeight := uint64(math.MaxUint64)
+	for i, seal := range payload.Seals {
+		header, err := headers.ByBlockID(seal.BlockID)
+		if err != nil {
+			return nil, err // storage.ErrNotFound or exception
+		}
+		heights[i] = header.Height
+		if header.Height < minHeight {
+			minHeight = header.Height
+		}
+	}
+
+	// since seals in a valid payload must have consecutive heights we can populate
+	// the ordered output by shifting by minHeight
+	seals := make([]*flow.Seal, len(payload.Seals))
+	for i, seal := range payload.Seals {
+		height := heights[i]
+		seals[height-minHeight] = seal
+	}
+
+	return seals, nil
 }

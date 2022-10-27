@@ -382,6 +382,7 @@ func (m *MutableState) receiptExtend(ctx context.Context, candidate *flow.Block)
 // 95 (sealed) <- 96 <- 97 (finalized) <- 98 <- 99 <- 100
 // Now, if block 101 is extending block 100, and its payload has a seal for 96, then it will
 // be the last sealed for block 101.
+// No errors are expected during normal operation.
 func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
 	payload := candidate.Payload
@@ -392,24 +393,19 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
 
-	// if the payload of the block has seals, then the last seal is the seal for the highest
-	// block
-	if len(payload.Seals) > 0 {
-		var highestHeader *flow.Header
-		for i, seal := range payload.Seals {
-			header, err := m.headers.ByBlockID(seal.BlockID)
-			if err != nil {
-				return nil, state.NewInvalidExtensionErrorf("could not retrieve the header %v for seal: %w", seal.BlockID, err)
-			}
-
-			if i == 0 || header.Height > highestHeader.Height {
-				highestHeader = header
-				last = seal
-			}
-		}
+	// if the payload of the block has no seals, then the last seal is the seal for the highest block
+	if len(payload.Seals) == 0 {
+		return last, nil
 	}
 
-	return last, nil
+	ordered, err := protocol.OrderedSeals(payload, m.headers)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("ordering seals: candidate payload contains seals for unknown block: %s", err.Error())
+		}
+		return nil, fmt.Errorf("unexpected error ordering seals: %w", err)
+	}
+	return ordered[len(ordered)-1], nil
 }
 
 // insert stores the candidate block in the database.
@@ -927,7 +923,16 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 	if err != nil {
 		return nil, fmt.Errorf("could not get parent (id=%x): %w", candidate.Header.ParentID, err)
 	}
-	for _, seal := range parent.Payload.Seals {
+
+	// block payload may not specify seals in order, so order them by block height before processing
+	orderedSeals, err := protocol.OrderedSeals(parent.Payload, m.headers)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
+		}
+		return nil, fmt.Errorf("unexpected error ordering seals: %w", err)
+	}
+	for _, seal := range orderedSeals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
