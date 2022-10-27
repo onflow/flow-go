@@ -42,6 +42,7 @@ func TestKeyConversionValidAlgorithms(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, rtKey)
 	})
+
 	t.Run("invalid sign algo", func(t *testing.T) {
 		t.Parallel()
 
@@ -92,6 +93,7 @@ func TestAccountKeyReader_get_out_of_range(t *testing.T) {
 }
 
 func TestAccountKeyReader_get_key_count(t *testing.T) {
+	t.Parallel()
 	address := bytesToAddress(1, 2, 3, 4)
 
 	identity := func(n uint64) (uint64, error) { return n, nil }
