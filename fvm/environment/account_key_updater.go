@@ -156,7 +156,7 @@ func (updater ParseRestrictedAccountKeyUpdater) AddEncodedAccountKey(
 ) error {
 	return parseRestrict2Arg(
 		updater.txnState,
-		"AddEncodedAccountKey",
+		trace.FVMEnvAddEncodedAccountKey,
 		updater.impl.AddEncodedAccountKey,
 		address,
 		publicKey)
@@ -171,7 +171,7 @@ func (updater ParseRestrictedAccountKeyUpdater) RevokeEncodedAccountKey(
 ) {
 	return parseRestrict2Arg1Ret(
 		updater.txnState,
-		"RevokeEncodedAccountKey",
+		trace.FVMEnvRevokeEncodedAccountKey,
 		updater.impl.RevokeEncodedAccountKey,
 		address,
 		index)
@@ -188,7 +188,7 @@ func (updater ParseRestrictedAccountKeyUpdater) AddAccountKey(
 ) {
 	return parseRestrict4Arg1Ret(
 		updater.txnState,
-		"AddAccountKey",
+		trace.FVMEnvAddAccountKey,
 		updater.impl.AddAccountKey,
 		address,
 		publicKey,
@@ -205,7 +205,7 @@ func (updater ParseRestrictedAccountKeyUpdater) RevokeAccountKey(
 ) {
 	return parseRestrict2Arg1Ret(
 		updater.txnState,
-		"RevokeAccountKey",
+		trace.FVMEnvRevokeAccountKey,
 		updater.impl.RevokeAccountKey,
 		address,
 		keyIndex)
@@ -518,7 +518,8 @@ func (updater *accountKeyUpdater) AddEncodedAccountKey(
 	address runtime.Address,
 	publicKey []byte,
 ) error {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
+	defer updater.tracer.StartSpanFromRoot(
+		trace.FVMEnvAddEncodedAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindAddEncodedAccountKey,
@@ -552,7 +553,7 @@ func (updater *accountKeyUpdater) RevokeEncodedAccountKey(
 	[]byte,
 	error,
 ) {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
+	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRevokeEncodedAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindRevokeEncodedAccountKey,
@@ -611,7 +612,7 @@ func (updater *accountKeyUpdater) RevokeAccountKey(
 	*runtime.AccountKey,
 	error,
 ) {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
+	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRevokeAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindRevokeAccountKey,

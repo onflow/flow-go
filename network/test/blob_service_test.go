@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
 )
 
@@ -83,18 +84,18 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	ids, nodes, mws, networks, _ := GenerateIDsMiddlewaresNetworks(
+	ids, nodes, mws, networks, _ := testutils.GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		suite.numNodes,
 		logger,
 		unittest.NetworkCodec(),
 		mocknetwork.NewViolationsConsumer(suite.T()),
-		WithDHT("blob_service_test", dht.AsServer()),
-		WithPeerUpdateInterval(time.Second),
+		testutils.WithDHT("blob_service_test", dht.AsServer()),
+		testutils.WithPeerUpdateInterval(time.Second),
 	)
 	suite.networks = networks
 
-	StartNodesAndNetworks(signalerCtx, suite.T(), nodes, networks, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, networks, 100*time.Millisecond)
 
 	blobExchangeChannel := channels.Channel("blob-exchange")
 

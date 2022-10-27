@@ -6,21 +6,21 @@ import (
 	"testing"
 	"time"
 
-	mockery "github.com/stretchr/testify/mock"
-
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/codec"
-	"github.com/onflow/flow-go/network/message"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/codec"
+	"github.com/onflow/flow-go/network/internal/messageutils"
+	"github.com/onflow/flow-go/network/internal/testutils"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
@@ -44,7 +44,7 @@ type UnicastAuthorizationTestSuite struct {
 	// receiverID the identity on the mw sending the message
 	receiverID *flow.Identity
 	// providers id providers generated at beginning of a test run
-	providers []*UpdatableIDProvider
+	providers []*testutils.UpdatableIDProvider
 	// cancel is the cancel func from the context that was used to start the middlewares in a test run
 	cancel context.CancelFunc
 	// waitCh is the channel used to wait for the middleware to perform authorization and invoke the slashing
@@ -70,8 +70,8 @@ func (u *UnicastAuthorizationTestSuite) TearDownTest() {
 
 // setupMiddlewaresAndProviders will setup 2 middlewares that will be used as a sender and receiver in each suite test.
 func (u *UnicastAuthorizationTestSuite) setupMiddlewaresAndProviders(slashingViolationsConsumer slashing.ViolationsConsumer) {
-	ids, libP2PNodes, _ := GenerateIDs(u.T(), u.logger, 2)
-	mws, providers := GenerateMiddlewares(u.T(), u.logger, ids, libP2PNodes, unittest.NetworkCodec(), slashingViolationsConsumer)
+	ids, libP2PNodes, _ := testutils.GenerateIDs(u.T(), u.logger, 2)
+	mws, providers := testutils.GenerateMiddlewares(u.T(), u.logger, ids, libP2PNodes, unittest.NetworkCodec(), slashingViolationsConsumer)
 	require.Len(u.T(), ids, 2)
 	require.Len(u.T(), providers, 2)
 	require.Len(u.T(), mws, 2)
@@ -148,7 +148,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := createMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	msg, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
 
 	// send message via unicast
 	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
@@ -200,7 +200,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := createMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	msg, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
 
 	// send message via unicast
 	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
@@ -250,7 +250,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := createMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	msg, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
+
 	// set channel ID to an unauthorized channel for TestMessage
 	msg.ChannelID = channels.ConsensusCommittee.String()
 
@@ -306,7 +307,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := createMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	msg, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
+
 	// manipulate message code byte
 	msg.Payload[0] = invalidMessageCode
 
@@ -363,7 +365,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := createMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	msg, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
+
 	// manipulate message code byte
 	msg.Payload[0] = modifiedMessageCode
 
@@ -381,7 +384,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
 
-	msg, payload := createMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	msg, payload := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
 
 	overlay := &mocknetwork.Overlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
