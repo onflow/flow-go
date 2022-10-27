@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/libp2p/go-libp2p/core"
@@ -556,20 +557,27 @@ func TestConnectionGating(t *testing.T) {
 
 	// create 2 nodes
 	node1Peers := make(map[peer.ID]struct{})
-	node1, node1Id := p2pfixtures.NodeFixture(t, sporkID, "test_connection_gating", p2pfixtures.WithPeerFilter(func(p peer.ID) error {
-		if _, ok := node1Peers[p]; !ok {
-			return fmt.Errorf("id not found: %s", p.String())
-		}
-		return nil
-	}))
+	node1, node1Id := p2pfixtures.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		p2pfixtures.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
+			if _, ok := node1Peers[p]; !ok {
+				return fmt.Errorf("id not found: %s", p.String())
+			}
+			return nil
+		})))
 
 	node2Peers := make(map[peer.ID]struct{})
-	node2, node2Id := p2pfixtures.NodeFixture(t, sporkID, "test_connection_gating", p2pfixtures.WithPeerFilter(func(p peer.ID) error {
-		if _, ok := node2Peers[p]; !ok {
-			return fmt.Errorf("id not found: %s", p.String())
-		}
-		return nil
-	}))
+	node2, node2Id := p2pfixtures.NodeFixture(
+		t,
+		sporkID, t.Name(),
+		p2pfixtures.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
+			if _, ok := node2Peers[p]; !ok {
+				return fmt.Errorf("id not found: %s", p.String())
+			}
+			return nil
+		})))
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
