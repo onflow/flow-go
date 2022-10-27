@@ -394,22 +394,25 @@ func testUnicastOverStream(t *testing.T, opts ...p2pfixtures.NodeFixtureParamete
 	sporkId := unittest.IdentifierFixture()
 
 	streamHandler1, inbound1 := p2pfixtures.StreamHandlerFixture(t)
-	node1, _ := p2pfixtures.NodeFixture(
+	node1, id1 := p2pfixtures.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		append(opts, p2pfixtures.WithDefaultStreamHandler(streamHandler1))...)
 
 	streamHandler2, inbound2 := p2pfixtures.StreamHandlerFixture(t)
-	node2, _ := p2pfixtures.NodeFixture(
+	node2, id2 := p2pfixtures.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		append(opts, p2pfixtures.WithDefaultStreamHandler(streamHandler2))...)
 
 	nodes := []p2p.LibP2PNode{node1, node2}
+	ids := flow.IdentityList{&id1, &id2}
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+
+	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
 	p2pfixtures.EnsureMessageExchangeOverUnicast(
 		t,
