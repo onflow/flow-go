@@ -184,7 +184,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 // ensureCommunicationSilenceAmongGroups ensures no connection, unicast, or pubsub going to or coming from between the two groups of nodes.
 func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sporkId flow.Identifier, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
 	// ensures no connection, unicast, or pubsub going to the blacklisted nodes
-	p2pfixtures.EnsureNotConnected(t, ctx, groupA, groupB)
+	p2pfixtures.EnsureNotConnectedBetweenGroups(t, ctx, groupA, groupB)
 	p2pfixtures.EnsureNoPubsubMessageExchange(t, ctx, groupA, groupB, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic

@@ -509,6 +509,14 @@ func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode
 	}
 }
 
+// EnsureNotConnectedBetweenGroups ensures no connection exists between the given groups of nodes.
+func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
+	// ensure no connection from group A to group B
+	EnsureNotConnected(t, ctx, groupA, groupB)
+	// ensure no connection from group B to group A
+	EnsureNotConnected(t, ctx, groupB, groupA)
+}
+
 // EnsurePubsubMessageExchange ensures that the given nodes exchange the given message on the given channel through pubsub.
 func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
 	_, topic := messageFactory()
