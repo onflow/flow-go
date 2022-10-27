@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/p2p"
+
 	"github.com/ipfs/go-log"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
@@ -71,7 +73,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	var nodes []*p2pnode.Node
+	var nodes []p2p.LibP2PNode
 	suite.ids, nodes, suite.mws, suite.nets, obs = testutils.GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,

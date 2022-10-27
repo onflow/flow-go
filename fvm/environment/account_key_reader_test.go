@@ -15,9 +15,7 @@ import (
 )
 
 func newDummyAccountKeyReader(t *testing.T, keyCount uint64) AccountKeyReader {
-	// maybe i'll be tracer
 	params := DefaultTracerParams()
-	// i'm already tracer
 	tracer := NewTracer(params)
 	meter := mock.NewMeter(t)
 	meter.On("MeterComputation", testMock.Anything, testMock.Anything).Return(nil)
