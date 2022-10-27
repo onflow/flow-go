@@ -26,15 +26,17 @@ type Pattern struct {
 	Match MatchFunc
 	// Map is a function to apply to messages before storing them. If not provided, then the message is stored in its original form.
 	Map MapFunc
+	// Validate is a function to validate a message before storing it. If not provided, then the message is always stored.
+	Validate ValidateFunc
 	// Store is an abstract message store where we will store the message upon receipt.
 	Store MessageStore
 }
 
-type FilterFunc func(*Message) bool
-
 type MatchFunc func(*Message) bool
 
 type MapFunc func(*Message) (*Message, bool)
+
+type ValidateFunc func(*Message) error
 
 type MessageHandler struct {
 	log      zerolog.Logger
@@ -54,6 +56,7 @@ func NewMessageHandler(log zerolog.Logger, notifier Notifier, patterns ...Patter
 // The _first_ matching pattern processes the payload.
 // Returns
 //   - IncompatibleInputTypeError if no matching processor was found
+//   - InvalidInputError if the message failed validation
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) error {
 	msg := &Message{
@@ -63,6 +66,13 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 
 	for _, pattern := range e.patterns {
 		if pattern.Match(msg) {
+			if pattern.Validate != nil {
+				err := pattern.Validate(msg)
+				if err != nil {
+					return NewInvalidInputErrorf("invalid message: %w", err)
+				}
+			}
+
 			var keep bool
 			if pattern.Map != nil {
 				msg, keep = pattern.Map(msg)
@@ -75,7 +85,7 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 			if !ok {
 				e.log.Warn().
 					Str("msg_type", logging.Type(payload)).
-					Hex("origin_id", originID[:]).
+					Hex("origin_id", logging.ID(originID)).
 					Msg("failed to store message - discarding")
 				return nil
 			}

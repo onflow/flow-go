@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine"
@@ -77,6 +78,12 @@ func NewEngine(log zerolog.Logger, capacity int) (*TestEngine, error) {
 				default:
 					return false
 				}
+			},
+			Validate: func(msg *engine.Message) error {
+				if msg.Payload.(*messageA).n == 0 {
+					return errors.New("invalid messageA")
+				}
+				return nil
 			},
 			Store: queueA,
 		},
@@ -369,5 +376,41 @@ func TestUnknownMessageType(t *testing.T) {
 		err := eng.Process(id, unknownType)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, engine.IncompatibleInputTypeError))
+	})
+}
+
+// TestValidate verifies that the message handler returns an
+// InvalidInputError when receiving an invalid message
+func TestValidate(t *testing.T) {
+	id1 := unittest.IdentifierFixture()
+	id2 := unittest.IdentifierFixture()
+	m0 := &messageA{n: 0} // invalid
+	m1 := &messageA{n: 1}
+	m2 := &messageA{n: 2}
+	m3 := &messageA{n: 0} // invalid
+
+	WithEngine(t, func(eng *TestEngine) {
+		err := eng.Process(id1, m0)
+		assert.True(t, engine.IsInvalidInputError(err))
+		time.Sleep(3 * time.Millisecond)
+
+		assert.NoError(t, eng.Process(id2, m1))
+		time.Sleep(3 * time.Millisecond)
+
+		assert.NoError(t, eng.Process(id1, m2))
+		time.Sleep(3 * time.Millisecond)
+
+		err = eng.Process(id2, m3)
+		assert.True(t, engine.IsInvalidInputError(err))
+
+		assert.Eventuallyf(t, func() bool {
+			return eng.MessageCount() == 2
+		}, 2*time.Second, 10*time.Millisecond, "expect %v messages, but go %v messages",
+			2, eng.MessageCount())
+		eng.mu.Lock()
+		defer eng.mu.Unlock()
+
+		assert.Equal(t, m1, eng.messages[0])
+		assert.Equal(t, m2, eng.messages[1])
 	})
 }

@@ -49,6 +49,7 @@ type RequestHandler struct {
 	requestMessageHandler *engine.MessageHandler // message handler responsible for request processing
 
 	queueMissingHeights bool // true if missing heights should be added to download queue
+	maxRequestSize      uint
 }
 
 func NewRequestHandler(
@@ -74,6 +75,13 @@ func NewRequestHandler(
 		queueMissingHeights: queueMissingHeights,
 	}
 
+	// TODO: clean up this logic
+	if core, ok := r.core.(*chainsync.Core); ok {
+		r.maxRequestSize = core.Config.MaxSize
+	} else {
+		r.maxRequestSize = chainsync.DefaultConfig().MaxSize
+	}
+
 	r.setupRequestMessageHandler()
 
 	return r
@@ -84,10 +92,27 @@ func NewRequestHandler(
 func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	err := r.process(originID, event)
 	if err != nil {
+		lg := r.log.With().
+			Hex("origin_id", logging.ID(originID)).
+			Str("channel", channel.String()).
+			Str("message_type", fmt.Sprintf("%T", event)).
+			Logger()
+
 		if engine.IsIncompatibleInputTypeError(err) {
-			r.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			lg.Warn().
+				Bool(logging.KeySuspicious, true).
+				Msg("unsupported message")
 			return nil
 		}
+
+		if engine.IsInvalidInputError(err) {
+			lg.Warn().
+				Err(err).
+				Bool(logging.KeySuspicious, true).
+				Msg("invalid message")
+			return nil
+		}
+
 		return fmt.Errorf("unexpected error while processing engine message: %w", err)
 	}
 	return nil
@@ -96,6 +121,7 @@ func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identif
 // process processes events for the synchronization request handler engine.
 // Error returns:
 //   - IncompatibleInputTypeError if input has unexpected type
+//   - InvalidInputError if the message failed validation
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (r *RequestHandler) process(originID flow.Identifier, event interface{}) error {
 	return r.requestMessageHandler.Process(originID, event)
@@ -120,6 +146,12 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 				}
 				return ok
 			},
+			Validate: func(msg *engine.Message) error {
+				if msg.Payload.(*messages.SyncRequest) == nil {
+					return fmt.Errorf("sync request message is nil")
+				}
+				return nil
+			},
 			Store: r.pendingSyncRequests,
 		},
 		engine.Pattern{
@@ -130,6 +162,18 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 				}
 				return ok
 			},
+			Validate: func(msg *engine.Message) error {
+				req := msg.Payload.(*messages.RangeRequest)
+				if req == nil {
+					return fmt.Errorf("range request message is nil")
+				}
+
+				if req.FromHeight > req.ToHeight {
+					return fmt.Errorf("range request from height (%d) > to height (%d)", req.FromHeight, req.ToHeight)
+				}
+
+				return nil
+			},
 			Store: r.pendingRangeRequests,
 		},
 		engine.Pattern{
@@ -139,6 +183,18 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 					r.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 				}
 				return ok
+			},
+			Validate: func(msg *engine.Message) error {
+				req := msg.Payload.(*messages.BatchRequest)
+				if req == nil {
+					return fmt.Errorf("batch request message is nil")
+				}
+
+				if len(req.BlockIDs) == 0 {
+					return fmt.Errorf("batch request no blocks requested")
+				}
+
+				return nil
 			},
 			Store: r.pendingBatchRequests,
 		},
@@ -192,28 +248,25 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	head := r.finalizedHeader.Get()
 
 	// if we don't have anything to send, we can bail right away
-	if head.Height < req.FromHeight || req.FromHeight > req.ToHeight {
+	if head.Height < req.FromHeight {
 		return nil
 	}
 
-	// enforce client-side max request size
-	var maxSize uint
-	// TODO: clean up this logic
-	if core, ok := r.core.(*chainsync.Core); ok {
-		maxSize = core.Config.MaxSize
-	} else {
-		maxSize = chainsync.DefaultConfig().MaxSize
+	// don't bother looking up heights we haven't finalized
+	if head.Height < req.ToHeight {
+		req.ToHeight = head.Height
 	}
-	maxHeight := req.FromHeight + uint64(maxSize)
+
+	// enforce client-side max request size
+	maxHeight := req.FromHeight + uint64(r.maxRequestSize)
 	if maxHeight < req.ToHeight {
 		logger.Warn().
 			Uint64("from", req.FromHeight).
 			Uint64("to", req.ToHeight).
 			Uint64("size", (req.ToHeight-req.FromHeight)+1).
-			Uint("max_size", maxSize).
+			Uint("max_size", r.maxRequestSize).
 			Bool(logging.KeySuspicious, true).
 			Msg("range request is too large")
-
 		req.ToHeight = maxHeight
 	}
 
@@ -221,10 +274,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	blocks := make([]*flow.Block, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		block, err := r.blocks.ByHeight(height)
-		if errors.Is(err, storage.ErrNotFound) {
-			logger.Error().Uint64("height", height).Msg("skipping unknown heights")
-			break
-		}
+		// all blocks are finalized and should be in the db
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
@@ -257,23 +307,10 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 	logger := r.log.With().Str("origin_id", originID.String()).Logger()
 	logger.Debug().Msg("received new batch request")
 
-	// we should bail and send nothing on empty request
-	if len(req.BlockIDs) == 0 {
-		return nil
-	}
-
-	// TODO: clean up this logic
-	var maxSize uint
-	if core, ok := r.core.(*chainsync.Core); ok {
-		maxSize = core.Config.MaxSize
-	} else {
-		maxSize = chainsync.DefaultConfig().MaxSize
-	}
-
-	if len(req.BlockIDs) > int(maxSize) {
+	if len(req.BlockIDs) > int(r.maxRequestSize) {
 		logger.Warn().
 			Int("size", len(req.BlockIDs)).
-			Uint("max_size", maxSize).
+			Uint("max_size", r.maxRequestSize).
 			Bool(logging.KeySuspicious, true).
 			Msg("batch request is too large")
 	}
@@ -284,7 +321,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 		blockIDs[blockID] = struct{}{}
 
 		// enforce client-side max request size
-		if len(blockIDs) == int(maxSize) {
+		if len(blockIDs) == int(r.maxRequestSize) {
 			break
 		}
 	}
@@ -294,7 +331,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 	for blockID := range blockIDs {
 		block, err := r.blocks.ByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
-			logger.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
+			logger.Debug().Hex("block_id", logging.ID(blockID)).Msg("skipping unknown block")
 			continue
 		}
 		if err != nil {

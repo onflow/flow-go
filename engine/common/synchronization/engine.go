@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // defaultSyncResponseQueueCapacity maximum capacity of sync responses queue
@@ -144,6 +145,12 @@ func (e *Engine) setupResponseMessageHandler() error {
 				}
 				return ok
 			},
+			Validate: func(msg *engine.Message) error {
+				if msg.Payload.(*messages.SyncResponse) == nil {
+					return fmt.Errorf("sync response message is nil")
+				}
+				return nil
+			},
 			Store: e.pendingSyncResponses,
 		},
 		engine.Pattern{
@@ -153,6 +160,32 @@ func (e *Engine) setupResponseMessageHandler() error {
 					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 				}
 				return ok
+			},
+			Validate: func(msg *engine.Message) error {
+				req := msg.Payload.(*messages.BlockResponse)
+				if req == nil {
+					return fmt.Errorf("block response message is nil")
+				}
+
+				if len(req.Blocks) == 0 {
+					return fmt.Errorf("block response is empty")
+				}
+
+				for _, block := range req.Blocks {
+					if block == nil {
+						return fmt.Errorf("block response contains nil block")
+					}
+
+					if block.Header == nil {
+						return fmt.Errorf("block response contains block with nil header")
+					}
+
+					if block.Payload == nil {
+						return fmt.Errorf("block response contains block with nil payload")
+					}
+				}
+
+				return nil
 			},
 			Store: e.pendingBlockResponses,
 		},
@@ -216,10 +249,27 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	err := e.process(originID, event)
 	if err != nil {
+		lg := e.log.With().
+			Hex("origin_id", logging.ID(originID)).
+			Str("channel", channel.String()).
+			Str("message_type", fmt.Sprintf("%T", event)).
+			Logger()
+
 		if engine.IsIncompatibleInputTypeError(err) {
-			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			lg.Warn().
+				Bool(logging.KeySuspicious, true).
+				Msg("unsupported message")
 			return nil
 		}
+
+		if engine.IsInvalidInputError(err) {
+			lg.Warn().
+				Err(err).
+				Bool(logging.KeySuspicious, true).
+				Msg("invalid message")
+			return nil
+		}
+
 		return fmt.Errorf("unexpected error while processing engine message: %w", err)
 	}
 	return nil
@@ -228,6 +278,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 // process processes events for the synchronization engine.
 // Error returns:
 //   - IncompatibleInputTypeError if input has unexpected type
+//   - InvalidInputError if the message failed validation
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
@@ -291,12 +342,6 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
-	// process the blocks one by one
-	if len(res.Blocks) == 0 {
-		e.log.Debug().Msg("received empty block response")
-		return
-	}
-
 	first := res.Blocks[0].Header.Height
 	last := res.Blocks[len(res.Blocks)-1].Header.Height
 	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
@@ -320,19 +365,19 @@ func (e *Engine) checkLoop() {
 		defer poll.Stop()
 	}
 	scan := time.NewTicker(e.scanInterval)
+	defer scan.Stop()
 
-CheckLoop:
 	for {
 		// give the quit channel a priority to be selected
 		select {
 		case <-e.unit.Quit():
-			break CheckLoop
+			return
 		default:
 		}
 
 		select {
 		case <-e.unit.Quit():
-			break CheckLoop
+			return
 		case <-pollChan:
 			e.pollHeight()
 		case <-scan.C:
@@ -342,9 +387,6 @@ CheckLoop:
 			e.sendRequests(participants, ranges, batches)
 		}
 	}
-
-	// some minor cleanup
-	scan.Stop()
 }
 
 // pollHeight will send a synchronization request to three random nodes.
@@ -357,10 +399,12 @@ func (e *Engine) pollHeight() {
 		Nonce:  rand.Uint64(),
 		Height: head.Height,
 	}
+
 	e.log.Debug().
 		Uint64("height", req.Height).
 		Uint64("range_nonce", req.Nonce).
 		Msg("sending sync request")
+
 	err := e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
 	if err != nil {
 		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
@@ -379,16 +423,19 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
+
 		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
 		}
+
 		e.log.Info().
 			Uint64("range_from", req.FromHeight).
 			Uint64("range_to", req.ToHeight).
 			Uint64("range_nonce", req.Nonce).
 			Msg("range requested")
+
 		e.core.RangeRequested(ran)
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 	}
@@ -398,15 +445,18 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 			Nonce:    rand.Uint64(),
 			BlockIDs: batch.BlockIDs,
 		}
+
 		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue
 		}
+
 		e.log.Debug().
 			Strs("block_ids", flow.IdentifierList(batch.BlockIDs).Strings()).
 			Uint64("range_nonce", req.Nonce).
 			Msg("batch requested")
+
 		e.core.BatchRequested(batch)
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 	}

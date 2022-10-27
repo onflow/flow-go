@@ -585,3 +585,51 @@ func (ss *SyncSuite) TestProcessUnsupportedMessageType() {
 	require.Error(ss.T(), err)
 	require.True(ss.T(), engine.IsIncompatibleInputTypeError(err))
 }
+
+func (ss *SyncSuite) TestProcessInvalidData() {
+	var syncReq *messages.SyncRequest
+	var rangeReq *messages.RangeRequest
+	var batchReq *messages.BatchRequest
+	var syncRes *messages.SyncResponse
+	var blockRes *messages.BlockResponse
+
+	tests := map[string]interface{}{
+		"sync request is nil":  syncReq,
+		"range request is nil": rangeReq,
+		"range request with from > to": &messages.RangeRequest{
+			FromHeight: 10,
+			ToHeight:   9,
+		},
+		"batch request is nil": batchReq,
+		"batch request is empty": &messages.BatchRequest{
+			BlockIDs: nil,
+		},
+		"sync response is nil":  syncRes,
+		"block response is nil": blockRes,
+		"block response with nil blocks": &messages.BlockResponse{
+			Blocks: nil,
+		},
+		"block response with nil block header": &messages.BlockResponse{
+			Blocks: []*flow.Block{
+				{},
+			},
+		},
+		"block response with nil block payload": &messages.BlockResponse{
+			Blocks: []*flow.Block{
+				{Header: unittest.BlockHeaderFixture()},
+			},
+		},
+	}
+
+	for name, req := range tests {
+		ss.Run(name, func() {
+			// Process swallows non-fatal errors
+			err := ss.e.Process("ch", unittest.IdentifierFixture(), req)
+			assert.NoError(ss.T(), err)
+
+			// ProcessLocal returns all errors
+			err = ss.e.ProcessLocal(req)
+			assert.True(ss.T(), engine.IsInvalidInputError(err), "should return invalid input error: %v", err)
+		})
+	}
+}
