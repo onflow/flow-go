@@ -647,14 +647,16 @@ func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes [
 	}
 }
 
-func EnsureNoStreamCreation(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
+// EnsureNoStreamCreationBetweenGroups ensures that no stream is created between the given groups of nodes.
+func EnsureNoStreamCreationBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
 	// no stream from groupA -> groupB
-	EnsureNoStreamCreationFrom(t, ctx, groupA, groupB)
+	EnsureNoStreamCreation(t, ctx, groupA, groupB)
 	// no stream from groupB -> groupA
-	EnsureNoStreamCreationFrom(t, ctx, groupB, groupA)
+	EnsureNoStreamCreation(t, ctx, groupB, groupA)
 }
 
-func EnsureNoStreamCreationFrom(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode) {
+// EnsureNoStreamCreation ensures that no stream is created "from" the given nodes "to" the given nodes.
+func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode) {
 	for _, this := range from {
 		for _, other := range to {
 			if this == other {

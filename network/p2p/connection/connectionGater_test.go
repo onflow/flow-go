@@ -189,7 +189,7 @@ func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sp
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
 	})
-	p2pfixtures.EnsureNoStreamCreation(t, ctx, groupA, groupB)
+	p2pfixtures.EnsureNoStreamCreationBetweenGroups(t, ctx, groupA, groupB)
 }
 
 // ensureCommunicationOverAllProtocols ensures that all nodes are connected to each other, and they can exchange messages over the pubsub and unicast.
