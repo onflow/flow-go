@@ -30,14 +30,15 @@ func TestConnectionGater_Lifecycle(t *testing.T) {
 
 	count := 5
 	nodes := make([]p2p.LibP2PNode, 0, count)
-	ids := flow.IdentityList{}
 	inbounds := make([]chan string, 0, count)
 
-	blacklist := map[*flow.Identity]struct{}{}
+	disallowedPeerIds := map[peer.ID]struct{}{}
+	allPeerIds := make(peer.IDSlice, 0, count)
+
 	connectionGater := mockp2p.NewConnectionGater(t)
 	for i := 0; i < count; i++ {
 		handler, inbound := p2pfixtures.StreamHandlerFixture(t)
-		node, id := p2pfixtures.NodeFixture(
+		node, _ := p2pfixtures.NodeFixture(
 			t,
 			sporkId,
 			t.Name(),
@@ -46,62 +47,60 @@ func TestConnectionGater_Lifecycle(t *testing.T) {
 			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
 			p2pfixtures.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
 				list := make(peer.IDSlice, 0)
-				for _, id := range ids {
-					if _, ok := blacklist[id]; ok {
-						continue
+				for _, pid := range allPeerIds {
+					if _, ok := disallowedPeerIds[pid]; !ok {
+						list = append(list, pid)
 					}
-
-					pid, err := unittest.PeerIDFromFlowID(id)
-					require.NoError(t, err)
-
-					list = append(list, pid)
 				}
 				return list
 			}),
 			p2pfixtures.WithConnectionGater(connectionGater))
 
 		nodes = append(nodes, node)
-		ids = append(ids, &id)
+		allPeerIds = append(allPeerIds, node.Host().ID())
 		inbounds = append(inbounds, inbound)
 	}
 
 	connectionGater.On("InterceptSecured", mock.Anything, mock.Anything, mock.Anything).
-		Return(func(dir network.Direction, p peer.ID, addr network.ConnMultiaddrs) bool {
-			for id := range blacklist {
-				bid, err := unittest.PeerIDFromFlowID(id)
-				require.NoError(t, err)
-				if bid == p {
-					return false // blacklisted
-				}
-			}
-			return true
+		Return(func(_ network.Direction, p peer.ID, _ network.ConnMultiaddrs) bool {
+			_, ok := disallowedPeerIds[p]
+			return !ok
 		})
 
 	connectionGater.On("InterceptPeerDial", mock.Anything).Return(func(p peer.ID) bool {
-		for id := range blacklist {
-			bid, err := unittest.PeerIDFromFlowID(id)
-			require.NoError(t, err)
-			if bid == p {
-				return false // blacklisted
-			}
-		}
-		return true
+		_, ok := disallowedPeerIds[p]
+		return !ok
 	})
 
 	connectionGater.On("InterceptAddrDial", mock.Anything, mock.Anything).Return(true)
 	connectionGater.On("InterceptAccept", mock.Anything).Return(true)
-	connectionGater.On("InterceptUpgraded", mock.Anything).Return(true, control.DisconnectReason(0))
 
 	// blacklists the first node
-	blacklist[ids[0]] = struct{}{}
+	disallowedPeerIds[nodes[0].Host().ID()] = struct{}{}
 
 	// starts the nodes
 	p2pfixtures.StartNodes(t, signalerCtx, nodes, 1*time.Second)
 	defer p2pfixtures.StopNodes(t, nodes, cancel, 1*time.Second)
 
-	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes[1:], inbounds[1:])
-
 	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:1], nodes[1:])
+
+	// Checks that only the allowed nodes can establish an upgradable connection.
+	// We intentionally mock this after checking for communication silence.
+	// As no connection to/from a disallowed node should ever reach the upgradable connection stage.
+	connectionGater.On("InterceptUpgraded", mock.Anything).Run(func(args mock.Arguments) {
+		conn, ok := args.Get(0).(network.Conn)
+		require.True(t, ok)
+
+		remote := conn.RemotePeer()
+		_, disallowed := disallowedPeerIds[remote]
+		require.False(t, disallowed)
+
+		local := conn.LocalPeer()
+		_, disallowed = disallowedPeerIds[local]
+		require.False(t, disallowed)
+	}).Return(true, control.DisconnectReason(0))
+
+	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes[1:], inbounds[1:])
 }
 
 func TestConnectionGater_Disallow_Integration(t *testing.T) {
