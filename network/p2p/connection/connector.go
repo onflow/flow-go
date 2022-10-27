@@ -147,13 +147,17 @@ func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 		// close the connection with the peer if it is not part of the current fanout
 		err := l.host.Network().ClosePeer(peerID)
 		if err != nil {
+			// logging with suspicious level as failure to disconnect from a peer can be a security issue.
+			// e.g., failure to disconnect from a malicious peer can lead to a DoS attack.
 			lg.Error().
 				Bool(logging.KeySuspicious, true).
 				Err(err).Msg("failed to disconnect from peer")
 		} else {
+			// logging with suspicious level as we only expect to disconnect from a peer if it is not part of the
+			// protocol state.
 			lg.Warn().
 				Bool(logging.KeySuspicious, true).
-				Msg("disconnected from peer as it is not part of protocol")
+				Msg("disconnected from peer")
 		}
 	}
 }
