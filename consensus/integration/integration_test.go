@@ -22,7 +22,8 @@ func runNodes(signalerCtx irrecoverable.SignalerContext, nodes []*Node) {
 			n.voteAggregator.Start(signalerCtx)
 			n.timeoutAggregator.Start(signalerCtx)
 			n.compliance.Start(signalerCtx)
-			<-util.AllReady(n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync)
+			n.messageHub.Start(signalerCtx)
+			<-util.AllReady(n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync, n.messageHub)
 		}(n)
 	}
 }
@@ -31,7 +32,14 @@ func stopNodes(t *testing.T, cancel context.CancelFunc, nodes []*Node) {
 	stoppingNodes := make([]<-chan struct{}, 0)
 	cancel()
 	for _, n := range nodes {
-		stoppingNodes = append(stoppingNodes, util.AllDone(n.committee, n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync))
+		stoppingNodes = append(stoppingNodes, util.AllDone(
+			n.committee,
+			n.voteAggregator,
+			n.timeoutAggregator,
+			n.compliance,
+			n.sync,
+			n.messageHub,
+		))
 	}
 	unittest.RequireCloseBefore(t, util.AllClosed(stoppingNodes...), time.Second, "requiring nodes to stop")
 }
@@ -41,13 +49,11 @@ func Test3Nodes(t *testing.T) {
 	stopper := NewStopper(5, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	start()
-
-	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
+	runFor(30 * time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -62,13 +68,11 @@ func Test5Nodes(t *testing.T) {
 	stopper := NewStopper(2, 1)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, hub, start := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockNodes(nodes[0]))
 
-	start()
-
-	unittest.RequireCloseBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
+	runFor(30 * time.Second)
 
 	header, err := nodes[0].state.Final().Head()
 	require.NoError(t, err)
@@ -124,7 +128,7 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 		require.NoError(t, err)
 	}
 
-	// reverse all views to start from lower view to higher view
+	// reverse all views to runFor from lower view to higher view
 	low2high := make([]uint64, 0)
 	for i := len(views) - 1; i >= 0; i-- {
 		low2high = append(low2high, views[i])

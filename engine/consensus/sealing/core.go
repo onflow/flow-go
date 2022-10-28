@@ -197,7 +197,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// at this point we have processed all results in range (lastSealedBlock, lastFinalizedBlock].
 	// Now, we add all known results for any valid block that descends from the latest finalized block:
-	validPending, err := finalizedSnapshot.ValidDescendants()
+	validPending, err := finalizedSnapshot.Descendants()
 	if err != nil {
 		return fmt.Errorf("could not retrieve valid pending blocks from finalized snapshot: %w", err)
 	}

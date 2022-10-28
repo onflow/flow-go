@@ -3,12 +3,13 @@ package follower_test
 import (
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/compliance"
@@ -26,16 +27,17 @@ import (
 type Suite struct {
 	suite.Suite
 
-	net      *mocknetwork.Network
-	con      *mocknetwork.Conduit
-	me       *module.Local
-	cleaner  *storage.Cleaner
-	headers  *storage.Headers
-	payloads *storage.Payloads
-	state    *protocol.MutableState
-	snapshot *protocol.Snapshot
-	cache    *module.PendingBlockBuffer
-	follower *module.HotStuffFollower
+	net       *mocknetwork.Network
+	con       *mocknetwork.Conduit
+	me        *module.Local
+	cleaner   *storage.Cleaner
+	headers   *storage.Headers
+	payloads  *storage.Payloads
+	state     *protocol.MutableState
+	snapshot  *protocol.Snapshot
+	cache     *module.PendingBlockBuffer
+	follower  *module.HotStuffFollower
+	validator *hotstuff.Validator
 
 	engine *follower.Engine
 	sync   *module.BlockRequester
@@ -53,6 +55,7 @@ func (suite *Suite) SetupTest() {
 	suite.snapshot = new(protocol.Snapshot)
 	suite.cache = new(module.PendingBlockBuffer)
 	suite.follower = new(module.HotStuffFollower)
+	suite.validator = hotstuff.NewValidator(suite.T())
 	suite.sync = new(module.BlockRequester)
 
 	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
@@ -64,7 +67,8 @@ func (suite *Suite) SetupTest() {
 	suite.cache.On("Size", mock.Anything).Return(uint(0))
 
 	metrics := metrics.NewNoopCollector()
-	eng, err := follower.New(zerolog.Logger{},
+	eng, err := follower.New(
+		unittest.Logger(),
 		suite.net,
 		suite.me,
 		metrics,
@@ -75,6 +79,7 @@ func (suite *Suite) SetupTest() {
 		suite.state,
 		suite.cache,
 		suite.follower,
+		suite.validator,
 		suite.sync,
 		trace.NewNoopTracer())
 	require.Nil(suite.T(), err)
@@ -132,8 +137,12 @@ func (suite *Suite) TestHandleProposal() {
 	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
+
 	// the parent is the last finalized state
 	suite.snapshot.On("Head").Return(parent.Header, nil)
+	// the block passes hotstuff validation
+	suite.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	// we should be able to extend the state with the block
 	suite.state.On("Extend", mock.Anything, &block).Return(nil).Once()
 	// we should be able to get the parent header by its ID
@@ -141,7 +150,7 @@ func (suite *Suite) TestHandleProposal() {
 	// we do not have any children cached
 	suite.cache.On("ByParentID", block.ID()).Return(nil, false)
 	// the proposal should be forwarded to the follower
-	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once()
+	suite.follower.On("SubmitProposal", hotstuffProposal).Once()
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
@@ -176,39 +185,38 @@ func (suite *Suite) TestHandleProposalSkipProposalThreshold() {
 	suite.cache.AssertNotCalled(suite.T(), "Add", originID, mock.Anything)
 }
 
+// TestHandleProposalWithPendingChildren tests processing a block which has a pending
+// child cached.
+//   - the block should be processed
+//   - the cached child block should also be processed
 func (suite *Suite) TestHandleProposalWithPendingChildren() {
 
 	originID := unittest.IdentifierFixture()
-	parent := unittest.BlockFixture()
-	block := unittest.BlockFixture()
-	child := unittest.BlockFixture()
+	parent := unittest.BlockFixture()                       // already processed and incorporated block
+	block := unittest.BlockWithParentFixture(parent.Header) // block which is passed as input to the engine
+	child := unittest.BlockWithParentFixture(block.Header)  // block which is already cached
 
-	parent.Header.Height = 9
-	block.Header.Height = 10
-	child.Header.Height = 11
-
-	block.Header.ParentID = parent.ID()
-	child.Header.ParentID = block.ID()
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	childHotstuffProposal := model.ProposalFromFlow(child.Header)
 
 	// the parent is the last finalized state
-	suite.snapshot.On("Head").Return(parent.Header, nil).Once()
-	suite.snapshot.On("Head").Return(block.Header, nil).Once()
+	suite.snapshot.On("Head").Return(parent.Header, nil)
 
-	// both parent and child not in cache
-	// suite.cache.On("ByID", child.ID()).Return(nil, false).Once()
-	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
-	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
+	suite.cache.On("ByID", mock.Anything).Return(nil, false)
 	// first time calling, assume it's not there
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
-	// should extend state with new block
-	suite.state.On("Extend", mock.Anything, &block).Return(nil).Once()
-	suite.state.On("Extend", mock.Anything, &child).Return(nil).Once()
+	// both blocks pass HotStuff validation
+	suite.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	suite.validator.On("ValidateProposal", childHotstuffProposal).Return(nil)
+	// should extend state with the input block, and the child
+	suite.state.On("Extend", mock.Anything, block).Return(nil).Once()
+	suite.state.On("Extend", mock.Anything, child).Return(nil).Once()
 	// we have already received and stored the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
 	suite.headers.On("ByBlockID", block.ID()).Return(block.Header, nil).Once()
 	// should submit to follower
-	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once()
-	suite.follower.On("SubmitProposal", child.Header, block.Header.View).Once()
+	suite.follower.On("SubmitProposal", hotstuffProposal).Once()
+	suite.follower.On("SubmitProposal", childHotstuffProposal).Once()
 
 	// we have one pending child cached
 	pending := []*flow.PendingBlock{
@@ -223,9 +231,9 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.cache.On("DropForParent", block.ID()).Once()
 
 	// submit the block proposal
-	proposal := unittest.ProposalFromBlock(&block)
+	proposal := unittest.ProposalFromBlock(block)
 	err := suite.engine.Process(channels.ReceiveBlocks, originID, proposal)
-	assert.Nil(suite.T(), err)
+	assert.NoError(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())
 }

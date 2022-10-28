@@ -52,7 +52,7 @@ func TestThreeInstances(t *testing.T) {
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 1.5, happyPathMaxRoundFailures, 0)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 1.5, happyPathMaxRoundFailures, 0, safeTimeout)
 	require.NoError(t, err)
 
 	// set up three instances that are exactly the same
@@ -72,7 +72,7 @@ func TestThreeInstances(t *testing.T) {
 	}
 
 	// connect the communicators of the instances together
-	Connect(instances)
+	Connect(t, instances)
 
 	// start the instances and wait for them to finish
 	var wg sync.WaitGroup
@@ -116,7 +116,7 @@ func TestSevenInstances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 1.5, happyPathMaxRoundFailures, 0)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 1.5, happyPathMaxRoundFailures, 0, safeTimeout)
 	require.NoError(t, err)
 
 	// set up five instances that work fully
@@ -145,7 +145,7 @@ func TestSevenInstances(t *testing.T) {
 	}
 
 	// connect the communicators of the instances together
-	Connect(instances)
+	Connect(t, instances)
 
 	// start all seven instances and wait for them to wrap up
 	var wg sync.WaitGroup

@@ -40,6 +40,7 @@ type mockComponents struct {
 	hotstuff          *mockmodule.HotStuff
 	voteAggregator    *mockhotstuff.VoteAggregator
 	timeoutAggregator *mockhotstuff.TimeoutAggregator
+	messageHub        *mockcomponent.Component
 }
 
 func newMockComponents() *mockComponents {
@@ -51,17 +52,20 @@ func newMockComponents() *mockComponents {
 		hotstuff:          new(mockmodule.HotStuff),
 		voteAggregator:    new(mockhotstuff.VoteAggregator),
 		timeoutAggregator: new(mockhotstuff.TimeoutAggregator),
+		messageHub:        new(mockcomponent.Component),
 	}
 	unittest.ReadyDoneify(components.prop)
 	unittest.ReadyDoneify(components.sync)
 	unittest.ReadyDoneify(components.hotstuff)
 	unittest.ReadyDoneify(components.voteAggregator)
 	unittest.ReadyDoneify(components.timeoutAggregator)
+	unittest.ReadyDoneify(components.messageHub)
 
 	components.prop.On("Start", mock.Anything)
 	components.hotstuff.On("Start", mock.Anything)
 	components.voteAggregator.On("Start", mock.Anything)
 	components.timeoutAggregator.On("Start", mock.Anything)
+	components.messageHub.On("Start", mock.Anything)
 
 	return components
 }
@@ -133,6 +137,7 @@ func (suite *Suite) SetupTest() {
 			func(epoch realprotocol.Epoch) hotstuff.TimeoutAggregator {
 				return suite.ComponentsForEpoch(epoch).timeoutAggregator
 			},
+			func(epoch realprotocol.Epoch) component.Component { return suite.ComponentsForEpoch(epoch).messageHub },
 			func(epoch realprotocol.Epoch) error { return nil },
 		)
 
@@ -236,7 +241,7 @@ func (suite *Suite) MockAsUnauthorizedNode() {
 	suite.factory = new(epochmgr.EpochComponentsFactory)
 	suite.factory.
 		On("Create", mock.Anything).
-		Return(nil, nil, nil, nil, nil, nil, ErrNotAuthorizedForEpoch)
+		Return(nil, nil, nil, nil, nil, nil, nil, ErrNotAuthorizedForEpoch)
 
 	var err error
 	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights)

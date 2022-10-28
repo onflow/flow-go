@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"context"
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -46,6 +47,8 @@ type LivenessData struct {
 //		   case <other events>
 //		}
 //	}
+//
+// Not concurrency safe.
 type PaceMaker interface {
 
 	// CurView returns the current view.
@@ -74,8 +77,12 @@ type PaceMaker interface {
 	TimeoutChannel() <-chan time.Time
 
 	// Start starts the PaceMaker (i.e. the timeout for the configured starting value for view).
-	Start()
+	// CAUTION: EventHandler is not concurrency safe. The Start method must
+	// be executed by the same goroutine that also calls the other business logic
+	// methods, or concurrency safety has to be implemented externally.
+	Start(ctx context.Context)
 
-	// BlockRateDelay
+	// BlockRateDelay returns the minimal wait time for broadcasting a proposal, measured from
+	// the point in time when the primary (locally) enters the respective view.
 	BlockRateDelay() time.Duration
 }

@@ -174,11 +174,6 @@ func (f *Forks) UnverifiedAddProposal(proposal *model.Proposal) error {
 	if err != nil {
 		return fmt.Errorf("updating consensus state failed: %w", err)
 	}
-	// TODO(active-pacemaker) we can remove MakeValid when QC validation occurs in compliance layer
-	err = f.finalizationCallback.MakeValid(block.BlockID)
-	if err != nil {
-		return fmt.Errorf("MakeValid fails in other component: %w", err)
-	}
 	f.notifier.OnBlockIncorporated(block)
 	return nil
 }

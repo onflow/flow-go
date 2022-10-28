@@ -65,25 +65,21 @@ type Snapshot interface {
 	// For all other snapshots, the sealing segment contains at least 2 blocks.
 	//
 	// NOTE 3: It is often the case that a block inside the segment will contain
-	// an execution receipt in it's payload that references an execution result
+	// an execution receipt in its payload that references an execution result
 	// missing from the payload. These missing execution results are stored on the
 	// flow.SealingSegment.ExecutionResults field.
 	SealingSegment() (*flow.SealingSegment, error)
 
-	// Descendants returns the IDs of all descendants of the Head block. The IDs
-	// are ordered such that parents are included before their children. These
-	// are NOT guaranteed to have been validated by HotStuff.
+	// Descendants returns the IDs of all descendants of the Head block.
+	// The IDs are ordered such that parents are included before their children.
+	// Since all blocks are fully validated before being inserted to the state,
+	// all returned blocks are validated.
+	// No errors are expected under normal operation.
 	Descendants() ([]flow.Identifier, error)
 
-	// ValidDescendants returns the IDs of all descendants of the Head block.
-	// The IDs are ordered such that parents are included before their children. Includes
-	// only blocks that have been validated by HotStuff.
-	ValidDescendants() ([]flow.Identifier, error)
-
-	// RandomSource returns the source of randomness derived from the
-	// Head block.
+	// RandomSource returns the source of randomness derived from the Head block.
 	// NOTE: not to be confused with the epoch source of randomness!
-	// error returns:
+	// Error returns:
 	//  * NoValidChildBlockError indicates that no valid child block is known
 	//    (which contains the block's source of randomness)
 	//  * unexpected errors should be considered symptoms of internal bugs

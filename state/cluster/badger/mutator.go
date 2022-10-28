@@ -36,7 +36,12 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 	return mutableState, nil
 }
 
+// Extend validates that the given cluster block passes compliance rules, then inserts
+// it to the cluster state.
 // TODO (Ramtin) pass context here
+// Expected errors during normal operations:
+//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) Extend(block *cluster.Block) error {
 
 	blockID := block.ID()
@@ -81,6 +86,12 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		parent, err := m.headers.ByBlockID(header.ParentID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
+		}
+
+		// extending block must have correct parent view
+		if header.ParentView != parent.View {
+			return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
+				header.ParentView, parent.View)
 		}
 
 		// the extending block must increase height by 1 from parent

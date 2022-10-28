@@ -42,6 +42,7 @@ func TestHeaderFingerprint(t *testing.T) {
 		PayloadHash        flow.Identifier
 		Timestamp          uint64
 		View               uint64
+		ParentView         uint64
 		ParentVoterIndices []byte
 		ParentVoterSigData crypto.Signature
 		ProposerID         flow.Identifier
@@ -55,6 +56,7 @@ func TestHeaderFingerprint(t *testing.T) {
 		PayloadHash:        decoded.PayloadHash,
 		Timestamp:          time.Unix(0, int64(decoded.Timestamp)).UTC(),
 		View:               decoded.View,
+		ParentView:         decoded.ParentView,
 		ParentVoterIndices: decoded.ParentVoterIndices,
 		ParentVoterSigData: decoded.ParentVoterSigData,
 		ProposerID:         decoded.ProposerID,

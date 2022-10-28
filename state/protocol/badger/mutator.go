@@ -193,6 +193,10 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 		return state.NewInvalidExtensionErrorf("candidate built for invalid chain (candidate: %s, parent: %s)",
 			header.ChainID, parent.ChainID)
 	}
+	if header.ParentView != parent.View {
+		return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
+			header.ParentView, parent.View)
+	}
 	if header.Height != parent.Height+1 {
 		return state.NewInvalidExtensionErrorf("candidate built with invalid height (candidate: %d, parent: %d)",
 			header.Height, parent.Height)
@@ -266,15 +270,8 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 		limit = 0
 	}
 
-	// look up the root height so we don't look too far back
-	// initially this is the genesis block height (aka 0).
-	var rootHeight uint64
-	err := m.db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return fmt.Errorf("could not retrieve root block height: %w", err)
-	}
-	if limit < rootHeight {
-		limit = rootHeight
+	if limit < m.rootHeight {
+		limit = m.rootHeight
 	}
 
 	// build a list of all previously used guarantees on this part of the chain
@@ -425,10 +422,16 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 	defer span.End()
 
 	blockID := candidate.ID()
+	parentID := candidate.Header.ParentID
 	latestSealID := last.ID()
 
+	parent, err := m.headers.ByBlockID(parentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
+	}
+
 	// apply any state changes from service events sealed by this block's parent
-	dbUpdates, insertingBlockTriggersEpochFallback, err := m.handleEpochServiceEvents(candidate)
+	dbUpdates, err := m.handleEpochServiceEvents(candidate)
 	if err != nil {
 		return fmt.Errorf("could not process service events: %w", err)
 	}
@@ -455,14 +458,6 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 			return fmt.Errorf("could not index new block: %w", err)
 		}
 
-		// if applicable, flag that epoch fallback has been triggered
-		if insertingBlockTriggersEpochFallback {
-			err = transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered(blockID))(tx)
-			if err != nil {
-				return fmt.Errorf("could not set epoch fallback triggered flag: %w", err)
-			}
-		}
-
 		// apply any optional DB operations from service events
 		for _, apply := range dbUpdates {
 			err := apply(tx)
@@ -477,10 +472,9 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		return fmt.Errorf("could not execute state extension: %w", err)
 	}
 
-	if insertingBlockTriggersEpochFallback {
-		// emit protocol events after database transaction succeeds
-		m.consumer.EpochEmergencyFallbackTriggered()
-		m.metrics.EpochEmergencyFallbackTriggered()
+	// trigger BlockProcessable for parent blocks above root height
+	if parent.Height > m.rootHeight {
+		m.consumer.BlockProcessable(parent)
 	}
 
 	return nil
@@ -626,9 +620,9 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		return fmt.Errorf("could not persist finalization operations for block (%x): %w", blockID, err)
 	}
 
-	// Emit protocol events after database transaction succeeds. Event delivery is guaranteed, 
+	// Emit protocol events after database transaction succeeds. Event delivery is guaranteed,
 	// _except_ in case of a crash. Hence, when recovering from a crash, consumers need to deduce
-	// from the state whether they have missed events and re-execute the respective actions. 
+	// from the state whether they have missed events and re-execute the respective actions.
 	m.consumer.BlockFinalized(header)
 	for _, emit := range events {
 		emit()
@@ -656,25 +650,31 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 // epochFallbackTriggeredByFinalizedBlock checks whether finalizing the input block
 // would trigger epoch emergency fallback mode. In particular, we trigger epoch
-// fallback mode when finalizing a block B when:
-//  1. B is the first finalized block with view greater than or equal to the epoch
-//     commitment deadline for the current epoch.
-//  2. The next epoch has not been committed as of B.
+// fallback mode while finalizing block B in either of the following cases:
+//  1. B is the head of a fork in which epoch fallback was tentatively triggered,
+//     due to incorporating an invalid service event.
+//  2. (a) B is the first finalized block with view greater than or equal to the epoch
+//     commitment deadline for the current epoch AND
+//     (b) the next epoch has not been committed as of B.
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // See protocol.Params for more details on the epoch commitment deadline.
 //
 // No errors are expected during normal operation.
 func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Header, epochStatus *flow.EpochStatus, currentEpochSetup *flow.EpochSetup) (bool, error) {
+	// 1. Epoch fallback is tentatively triggered on this fork
+	if epochStatus.InvalidServiceEventIncorporated {
+		return true, nil
+	}
 
-	// 1. determine whether block B is past the epoch commitment deadline
+	// 2.(a) determine whether block B is past the epoch commitment deadline
 	safetyThreshold, err := m.Params().EpochCommitSafetyThreshold()
 	if err != nil {
 		return false, fmt.Errorf("could not get epoch commit safety threshold: %w", err)
 	}
 	blockExceedsDeadline := block.View+safetyThreshold >= currentEpochSetup.FinalView
 
-	// 2. determine whether the next epoch is committed w.r.t. block B
+	// 2.(b) determine whether the next epoch is committed w.r.t. block B
 	currentEpochPhase, err := epochStatus.Phase()
 	if err != nil {
 		return false, fmt.Errorf("could not get current epoch phase: %w", err)
@@ -825,45 +825,38 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 // As the parent was a valid extension of the chain, by induction, the parent
 // satisfies all consistency requirements of the protocol.
 //
-// Return values:
-//  1. EpochStatus for `block`
-//  2. boolean flag indicating whether we are in EECC
-//
+// Returns the EpochStatus for the input block.
 // No error returns are expected under normal operations
-func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, bool, error) {
+func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered bool) (*flow.EpochStatus, error) {
 	parentStatus, err := m.epoch.statuses.ByBlockID(block.ParentID)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not retrieve epoch state for parent: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch state for parent: %w", err)
 	}
 	parentSetup, err := m.epoch.setups.ByID(parentStatus.CurrentEpoch.SetupID)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not retrieve EpochSetup event for parent: %w", err)
-	}
-	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
-	if err != nil {
-		return nil, false, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
+		return nil, fmt.Errorf("could not retrieve EpochSetup event for parent: %w", err)
 	}
 
 	// Case 1 or 2b (still in parent block's epoch or epoch fallback triggered):
 	if block.View <= parentSetup.FinalView || epochFallbackTriggered {
 		// IMPORTANT: copy the status to avoid modifying the parent status in the cache
-		return parentStatus.Copy(), epochFallbackTriggered, nil
+		return parentStatus.Copy(), nil
 	}
 
 	// Case 2a (first block of new epoch):
 	// sanity check: parent's epoch Preparation should be completed and have EpochSetup and EpochCommit events
 	if parentStatus.NextEpoch.SetupID == flow.ZeroID {
-		return nil, false, fmt.Errorf("missing setup event for starting next epoch")
+		return nil, fmt.Errorf("missing setup event for starting next epoch")
 	}
 	if parentStatus.NextEpoch.CommitID == flow.ZeroID {
-		return nil, false, fmt.Errorf("missing commit event for starting next epoch")
+		return nil, fmt.Errorf("missing commit event for starting next epoch")
 	}
 	epochStatus, err := flow.NewEpochStatus(
 		parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
 		parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
 		flow.ZeroID, flow.ZeroID,
 	)
-	return epochStatus, epochFallbackTriggered, err
+	return epochStatus, err
 
 }
 
@@ -885,6 +878,7 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, bool
 // with MarkValid. Because of this, any change to the protocol state introduced
 // by a service event emitted in A would only become visible when querying D or
 // later (D's children).
+// TODO(active-pacemaker) update docs here (remove reference to MarkValid) https://github.com/dapperlabs/flow-go/issues/6254
 //
 // This method will only apply service-event-induced state changes when the
 // input block has the form of block D (ie. has a parent, which contains a seal
@@ -895,25 +889,20 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, bool
 //     this method returns a slice of Badger operations to apply while storing the block.
 //     This includes an operation to index the epoch status for every block, and
 //     operations to insert service events for blocks that include them.
-//   - insertingCandidateTriggersEpochFallback - if inserting this block causes epoch
-//     fallback mode to be triggered, this is true. This causes flag to be set in the
-//     database and a protocol event to be emitted. This can only be true for at most
-//     one block for a given database instance.
 //
 // No errors are expected during normal operation.
-// TODO: we should only consider an incorporated service fatal, and trigger EECC, on finalization of block D https://github.com/dapperlabs/flow-go/issues/6316
-func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
-	dbUpdates []func(*transaction.Tx) error,
-	insertingCandidateTriggersEpochFallback bool,
-	err error,
-) {
-	epochStatus, isEpochFallbackTriggered, err := m.epochStatus(candidate.Header)
+func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdates []func(*transaction.Tx) error, err error) {
+	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
-		return nil, false, fmt.Errorf("could not determine epoch status for candidate block: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
+	}
+	epochStatus, err := m.epochStatus(candidate.Header, epochFallbackTriggered)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine epoch status for candidate block: %w", err)
 	}
 	activeSetup, err := m.epoch.setups.ByID(epochStatus.CurrentEpoch.SetupID)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not retrieve current epoch setup event: %w", err)
+		return nil, fmt.Errorf("could not retrieve current epoch setup event: %w", err)
 	}
 
 	// always persist the candidate's epoch status
@@ -923,8 +912,8 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 	dbUpdates = append(dbUpdates, m.epoch.statuses.StoreTx(blockID, epochStatus))
 
 	// never process service events after epoch fallback is triggered
-	if isEpochFallbackTriggered {
-		return dbUpdates, false, nil
+	if epochStatus.InvalidServiceEventIncorporated || epochFallbackTriggered {
+		return dbUpdates, nil
 	}
 
 	// We apply service events from blocks which are sealed by this block's PARENT.
@@ -936,27 +925,27 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 	// chain finalization should halt.
 	parent, err := m.blocks.ByID(candidate.Header.ParentID)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not get parent (id=%x): %w", candidate.Header.ParentID, err)
+		return nil, fmt.Errorf("could not get parent (id=%x): %w", candidate.Header.ParentID, err)
 	}
 	for _, seal := range parent.Payload.Seals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
-			return nil, false, fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
+			return nil, fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
 		}
 
 		for _, event := range result.ServiceEvents {
 
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
-
 				// validate the service event
 				err := isValidExtendingEpochSetup(ev, activeSetup, epochStatus)
-				if protocol.IsInvalidServiceEventError(err) {
-					// we have observed an invalid service event, which triggers epoch fallback mode
-					return dbUpdates, true, nil
-				}
 				if err != nil {
-					return nil, false, fmt.Errorf("unexpected error validating EpochSetup service event: %w", err)
+					if protocol.IsInvalidServiceEventError(err) {
+						// we have observed an invalid service event, which triggers epoch fallback mode
+						epochStatus.InvalidServiceEventIncorporated = true
+						return dbUpdates, nil
+					}
+					return nil, fmt.Errorf("unexpected error validating EpochSetup service event: %w", err)
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
@@ -966,19 +955,33 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 				dbUpdates = append(dbUpdates, m.epoch.setups.StoreTx(ev))
 
 			case *flow.EpochCommit:
+				// if we receive an EpochCommit event, we must have already observed an EpochSetup event
+				// => otherwise, we have observed an EpochCommit without corresponding EpochSetup, which triggers epoch fallback mode
+				if epochStatus.NextEpoch.SetupID == flow.ZeroID {
+					epochStatus.InvalidServiceEventIncorporated = true
+					return dbUpdates, nil
+				}
 
+				// if we have observed an EpochSetup event, we must be able to retrieve it from the database
+				// => otherwise, this is a symptom of bug or data corruption since this component sets the SetupID field
 				extendingSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
-					return nil, false, state.NewInvalidExtensionErrorf("could not retrieve next epoch setup: %s", err)
+					if errors.Is(err, storage.ErrNotFound) {
+						return nil, fmt.Errorf("unexpected failure to retrieve EpochSetup (id=%x) stored in EpochStatus for block %x: %w",
+							epochStatus.NextEpoch.SetupID, blockID, err)
+					}
+					return nil, fmt.Errorf("unexpected error retrieving next epoch setup: %w", err)
 				}
+
 				// validate the service event
 				err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
-				if protocol.IsInvalidServiceEventError(err) {
-					// we have observed an invalid service event, which triggers epoch fallback mode
-					return dbUpdates, true, nil
-				}
 				if err != nil {
-					return nil, false, fmt.Errorf("unexpected error validating EpochCommit service event: %w", err)
+					if protocol.IsInvalidServiceEventError(err) {
+						// we have observed an invalid service event, which triggers epoch fallback mode
+						epochStatus.InvalidServiceEventIncorporated = true
+						return dbUpdates, nil
+					}
+					return nil, fmt.Errorf("unexpected error validating EpochCommit service event: %w", err)
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
@@ -988,76 +991,9 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 				dbUpdates = append(dbUpdates, m.epoch.commits.StoreTx(ev))
 
 			default:
-				return nil, false, fmt.Errorf("invalid service event type: %s", event.Type)
+				return nil, fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
 			}
 		}
 	}
 	return
-}
-
-// MarkValid marks the block as valid in protocol state, and triggers
-// `BlockProcessable` event to notify that its parent block is processable.
-//
-// Why is the parent block processable, not the block itself?
-// because a block having a child block means it has been verified
-// by the majority of consensus participants.
-// Hence, if a block has passed the header validity check, its parent block
-// must have passed both the header validity check and the body validity check.
-// So that consensus followers can skip the block body validity checks and wait
-// for its child to arrive, and if the child passes the header validity check, it means
-// the consensus participants have done a complete check on its parent block,
-// so consensus followers can trust consensus nodes did the right job, and start
-// processing the parent block.
-//
-// NOTE: since a parent can have multiple children, `BlockProcessable` event
-// could be triggered multiple times for the same block.
-// NOTE: BlockProcessable should not be blocking, otherwise, it will block the follower
-func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
-	header, err := m.headers.ByBlockID(blockID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve block header for %x: %w", blockID, err)
-	}
-	parentID := header.ParentID
-	var isParentValid bool
-	err = m.db.View(operation.RetrieveBlockValidity(parentID, &isParentValid))
-	if err != nil {
-		return fmt.Errorf("could not retrieve validity of parent block (%x): %w", parentID, err)
-	}
-	if !isParentValid {
-		return fmt.Errorf("can only mark block as valid whose parent is valid")
-	}
-
-	parent, err := m.headers.ByBlockID(parentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
-	}
-	// root blocks and blocks below the root block are considered as "processed",
-	// so we don't want to trigger `BlockProcessable` event for them.
-	var rootHeight uint64
-	err = m.db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return fmt.Errorf("could not retrieve root block's height: %w", err)
-	}
-
-	err = operation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
-		// insert block validity for this block
-		err = operation.SkipDuplicates(operation.InsertBlockValidity(blockID, true))(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert validity for block (id=%x, height=%d): %w", blockID, header.Height, err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
-	}
-
-	// skip emitting BlockProcessable for root block, as it is always processable
-	if parent.Height > rootHeight {
-		// emit protocol events after database transaction succeeds
-		// event delivery is not guaranteed, consumer needs to fetch missing events.
-		m.consumer.BlockProcessable(parent)
-	}
-
-	return nil
 }

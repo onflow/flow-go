@@ -32,7 +32,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	fblock := unittest.BlockFixture()
 	fblock.Header.ProposerID = identities[0].NodeID
 	fblock.Header.View = view
-	block := model.BlockFromFlow(fblock.Header, 10)
+	block := model.BlockFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	epochCounter := uint64(3)
@@ -132,7 +132,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 
 	fblock := unittest.BlockFixture()
 	fblock.Header.View = view
-	block := model.BlockFromFlow(fblock.Header, 10)
+	block := model.BlockFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	epochCounter := uint64(3)
@@ -194,7 +194,7 @@ func Test_VerifyQC_EmptySigners(t *testing.T) {
 	verifier := NewCombinedVerifier(committee, packer)
 
 	header := unittest.BlockHeaderFixture()
-	block := model.BlockFromFlow(header, header.View-1)
+	block := model.BlockFromFlow(header)
 	sigData := unittest.QCSigDataFixture()
 
 	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block.View, block.BlockID)

@@ -47,13 +47,11 @@ func TestUnweightedNode(t *testing.T) {
 		10_000,
 	)
 
-	nodes, hub, start := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	start()
-
-	unittest.AssertClosesBefore(t, stopper.stopped, 60*time.Second)
+	runFor(60 * time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -83,13 +81,11 @@ func TestStaticEpochTransition(t *testing.T) {
 		4,
 	)
 
-	nodes, hub, start := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	start()
-
-	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
+	runFor(30 * time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -138,13 +134,11 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 		4,
 	)
 
-	nodes, hub, start := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	start()
-
-	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
+	runFor(30 * time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -189,13 +183,11 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 		4,
 	)
 
-	nodes, hub, start := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	start()
-
-	unittest.AssertClosesBefore(t, stopper.stopped, 60*time.Second)
+	runFor(60 * time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)

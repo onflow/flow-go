@@ -87,8 +87,7 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 }
 
 func (el *EventLoop) loop(ctx context.Context) error {
-
-	err := el.eventHandler.Start()
+	err := el.eventHandler.Start(ctx) // must be called by the same go-routine that also executes the business logic!
 	if err != nil {
 		return fmt.Errorf("could not start event handler: %w", err)
 	}
@@ -254,10 +253,8 @@ func (el *EventLoop) loop(ctx context.Context) error {
 }
 
 // SubmitProposal pushes the received block to the proposals channel
-func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) {
+func (el *EventLoop) SubmitProposal(proposal *model.Proposal) {
 	received := time.Now()
-
-	proposal := model.ProposalFromFlow(proposalHeader, parentView)
 
 	select {
 	case el.proposals <- proposal:

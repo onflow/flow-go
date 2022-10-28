@@ -1,6 +1,8 @@
 package hotstuff
 
 import (
+	"time"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -49,6 +51,7 @@ type FinalizationConsumer interface {
 //   - handle repetition of the same events (with some processing overhead).
 type Consumer interface {
 	FinalizationConsumer
+	CommunicatorConsumer
 
 	// OnEventProcessed notifications are produced by the EventHandler when it is done processing
 	// and hands control back to the EventLoop to wait for the next event.
@@ -90,19 +93,6 @@ type Consumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64)
-
-	// OnProposingBlock notifications are produced by the EventHandler when the replica, as
-	// leader for the respective view, proposing a block.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnProposingBlock(proposal *model.Proposal)
-
-	// OnVoting notifications are produced by the EventHandler when the replica votes for a block.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnVoting(vote *model.Vote)
 
 	// OnQcConstructedFromVotes notifications are produced by the VoteAggregator
 	// component, whenever it constructs a QC from votes.
@@ -233,4 +223,32 @@ type TimeoutCollectorConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnNewTcDiscovered(certificate *flow.TimeoutCertificate)
+}
+
+// CommunicatorConsumer consumes outbound notifications produced by HotStuff and it's components.
+// Notifications allow the HotStuff core algorithm to communicate with the other actors of the consensus process.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
+type CommunicatorConsumer interface {
+	// OnOwnVote notifies about intent to send a vote for the given parameters to the specified recipient.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier)
+
+	// OnOwnTimeout notifies about intent to broadcast the given timeout object(TO) to all actors of the consensus process.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnOwnTimeout(timeout *model.TimeoutObject)
+
+	// OnOwnProposal notifies about intent to broadcast the given block proposal to all actors of
+	// the consensus process.
+	// delay is to hold the proposal before broadcasting it. Useful to control the block production rate.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time)
 }
