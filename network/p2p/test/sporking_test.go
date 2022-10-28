@@ -7,11 +7,11 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/network/p2p/utils"
 

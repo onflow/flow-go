@@ -24,7 +24,7 @@ import (
 
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
 
-	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	routing "github.com/libp2p/go-libp2p/core/routing"
 

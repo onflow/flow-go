@@ -1,9 +1,9 @@
 package subscription
 
 import (
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
-	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
-	pb "github.com/yhassanzadeh13/go-libp2p-pubsub/pb"
 
 	"github.com/onflow/flow-go/module"
 	p2putils "github.com/onflow/flow-go/network/p2p/utils"

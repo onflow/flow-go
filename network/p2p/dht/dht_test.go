@@ -6,11 +6,11 @@ import (
 	"time"
 
 	golog "github.com/ipfs/go-log"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
