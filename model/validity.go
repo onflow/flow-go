@@ -5,7 +5,9 @@ import (
 	"fmt"
 )
 
-// StructureInvalidError is returned by a StructureValidator if the
+// StructureInvalidError is returned by a model implementing StructureValidator
+// if the model is structurally or syntactically invalid. For example, if a
+// required field is nil or malformed.
 type StructureInvalidError struct {
 	err error
 }
@@ -32,6 +34,7 @@ func IsStructureInvalidError(err error) bool {
 // StructureValidator is a model type which exposes a method to validate basic structural
 // validity of a message or model. This DOES NOT enforce business logic rules,
 // it only enforces that required fields are non-nil and no fields are malformed.
+// If a message fails structure validation, the sender can be slashed.
 type StructureValidator interface {
 	// StructureValid validates the model's basic structural validity: all required fields
 	// are non-nil and well-formed. It does NOT enforce business logic rules.
