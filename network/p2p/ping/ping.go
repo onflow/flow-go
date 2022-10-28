@@ -163,6 +163,9 @@ func (ps *Service) Ping(ctx context.Context, peerID peer.ID) (message.PingRespon
 
 	targetInfo := peer.AddrInfo{ID: peerID}
 
+	ps.host.ConnManager().Protect(targetInfo.ID, "ping")
+	defer ps.host.ConnManager().Unprotect(targetInfo.ID, "ping")
+
 	// connect to the target node
 	err := ps.host.Connect(ctx, targetInfo)
 	if err != nil {
