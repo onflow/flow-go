@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"github.com/onflow/flow-go/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -47,9 +48,44 @@ type BlockResponse struct {
 	Blocks []*flow.Block
 }
 
-// ClusterBlockResponse is the same thing as BlockResponse, but for cluster
-// consensus.
+var _ model.StructureValidator = (*BlockResponse)(nil)
+
+// StructureValid checks basic structural validity of the message and ensures no required fields are nil.
+func (m *BlockResponse) StructureValid() error {
+	for _, b := range m.Blocks {
+		if b == nil {
+			return model.NewStructureInvalidError("nil block")
+		}
+		if b.Header == nil {
+			return model.NewStructureInvalidError("nil block header")
+		}
+		if b.Payload == nil {
+			return model.NewStructureInvalidError("nil block payload")
+		}
+	}
+	return nil
+}
+
+// ClusterBlockResponse is the same thing as BlockResponse, but for cluster consensus.
 type ClusterBlockResponse struct {
 	Nonce  uint64
 	Blocks []*cluster.Block
+}
+
+var _ model.StructureValidator = (*ClusterBlockResponse)(nil)
+
+// StructureValid checks basic structural validity of the message and ensures no required fields are nil.
+func (m *ClusterBlockResponse) StructureValid() error {
+	for _, b := range m.Blocks {
+		if b == nil {
+			return model.NewStructureInvalidError("nil block")
+		}
+		if b.Header == nil {
+			return model.NewStructureInvalidError("nil block header")
+		}
+		if b.Payload == nil {
+			return model.NewStructureInvalidError("nil block payload")
+		}
+	}
+	return nil
 }

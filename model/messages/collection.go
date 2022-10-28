@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"github.com/onflow/flow-go/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -30,6 +31,17 @@ type CollectionResponse struct {
 type ClusterBlockProposal struct {
 	Header  *flow.Header
 	Payload *cluster.Payload
+}
+
+// StructureValid checks basic structural validity of the message and ensures no required fields are nil.
+func (m *ClusterBlockProposal) StructureValid() error {
+	if m.Header == nil {
+		return model.NewStructureInvalidError("nil block header")
+	}
+	if m.Payload == nil {
+		return model.NewStructureInvalidError("nil block payload")
+	}
+	return nil
 }
 
 // ClusterBlockVote is a vote for a proposed block in collection node cluster
