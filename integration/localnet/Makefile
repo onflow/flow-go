@@ -107,11 +107,11 @@ tps-ci-smoke:
 tps-test-ci:
 	$(MAKE) -e COLLECTION=5 VERIFICATION=5 NCLUSTERS=5 init
 	$(MAKE) start-thin
+	$(MAKE) unlock-data
 	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps $(TPS_INIT) -max-tps $(TPS_MAX) -duration $(TPS_DURATION)
 	$(MAKE) stop
 
-.PHONY: clean-data
-clean-data:
+.PHONY: unlock-data
+unlock-data:
 	DOCKER_BUILDKIT=1 docker build -t environment-clean ../../cmd
 	docker run --mount=type=bind,source="$(CURRENT_DIRECTORY)"/data,target=/data environment-clean chmod -R 777 /data
-	rm -rf ./data
