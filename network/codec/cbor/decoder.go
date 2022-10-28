@@ -7,6 +7,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
+	"github.com/onflow/flow-go/model"
 	"github.com/onflow/flow-go/network/codec"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
@@ -17,8 +18,10 @@ type Decoder struct {
 }
 
 // Decode will decode the next CBOR value from the stream.
+// If the CBOR value decodes to a Go type which implements model.StructureValidator
+// this function will validate the Go type's structure using this method.
 // Expected error returns during normal operations:
-//   - codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
+//   - codec.ErrUnknownMsgCode if message code byte does not match any of the configured message codes.
 //   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 func (d *Decoder) Decode() (interface{}, error) {
 
@@ -42,6 +45,18 @@ func (d *Decoder) Decode() (interface{}, error) {
 	//binstat.Leave(bs2)
 	if err != nil {
 		return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
+	}
+
+	// TODO consider downsides of having this here:
+	//  - performance?
+	//  - surface area for unexpected errors from many StructureValidator impls?
+	if validatable, ok := msgInterface.(model.StructureValidator); ok {
+		if err := validatable.StructureValid(); err != nil {
+			if model.IsStructureInvalidError(err) {
+				return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
+			}
+			return nil, fmt.Errorf("unexpected error validating structure of decoded message with type: %s: %w", what, err)
+		}
 	}
 
 	return msgInterface, nil

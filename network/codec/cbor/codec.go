@@ -9,6 +9,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
+	"github.com/onflow/flow-go/model"
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec"
@@ -18,8 +19,7 @@ import (
 var defaultDecMode, _ = cbor.DecOptions{ExtraReturnErrors: cbor.ExtraDecErrorUnknownField}.DecMode()
 
 // Codec represents a CBOR codec for our network.
-type Codec struct {
-}
+type Codec struct{}
 
 // NewCodec creates a new CBOR codec.
 func NewCodec() *Codec {
@@ -85,7 +85,7 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 // NOTE: 'envelope' contains 'code' & serialized / encoded 'v'.
 // i.e.  1st byte is 'code' and remaining bytes are CBOR encoded 'v'.
 // Expected error returns during normal operations:
-//   - codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
+//   - codec.ErrMsgUnmarshal if message code byte does not match any of the configured message codes.
 //   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
@@ -105,6 +105,18 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 	//binstat.Leave(bs2)
 	if err != nil {
 		return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
+	}
+
+	// TODO consider downsides of having this here:
+	//  - performance?
+	//  - surface area for unexpected errors from many StructureValidator impls?
+	if validatable, ok := msgInterface.(model.StructureValidator); ok {
+		if err := validatable.StructureValid(); err != nil {
+			if model.IsStructureInvalidError(err) {
+				return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
+			}
+			return nil, fmt.Errorf("unexpected error validating structure of decoded message with type: %s: %w", what, err)
+		}
 	}
 
 	return msgInterface, nil
