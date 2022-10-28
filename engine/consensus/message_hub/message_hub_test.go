@@ -2,6 +2,7 @@ package message_hub
 
 import (
 	"context"
+	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"math/rand"
 	"sync"
 	"testing"
@@ -54,7 +55,7 @@ type MessageHubSuite struct {
 	hotstuff          *module.HotStuff
 	voteAggregator    *hotstuff.VoteAggregator
 	timeoutAggregator *hotstuff.TimeoutAggregator
-	compliance        *mocknetwork.MessageProcessor
+	compliance        *mockconsensus.Compliance
 	snapshot          *protocol.Snapshot
 
 	ctx    irrecoverable.SignalerContext
@@ -85,7 +86,7 @@ func (s *MessageHubSuite) SetupTest() {
 	s.hotstuff = module.NewHotStuff(s.T())
 	s.voteAggregator = hotstuff.NewVoteAggregator(s.T())
 	s.timeoutAggregator = hotstuff.NewTimeoutAggregator(s.T())
-	s.compliance = mocknetwork.NewMessageProcessor(s.T())
+	s.compliance = mockconsensus.NewCompliance(s.T())
 
 	// set up protocol state mock
 	s.state = &protocol.MutableState{}

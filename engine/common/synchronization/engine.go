@@ -4,6 +4,7 @@ package synchronization
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/engine/consensus"
 	"math/rand"
 	"time"
 
@@ -41,7 +42,7 @@ type Engine struct {
 	me      module.Local
 	con     network.Conduit
 	blocks  storage.Blocks
-	comp    network.MessageProcessor
+	comp    consensus.Compliance
 
 	pollInterval         time.Duration
 	scanInterval         time.Duration
@@ -63,7 +64,7 @@ func New(
 	net network.Network,
 	me module.Local,
 	blocks storage.Blocks,
-	comp network.MessageProcessor,
+	comp consensus.Compliance,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
 	participantsProvider identifier.IdentifierProvider,
@@ -309,15 +310,10 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 			continue
 		}
 		// forward the block to the compliance engine for validation and processing
-		// we use the network.MessageProcessor interface here because the block is un-validated
-		// NOTE: although we set originID=me, this message is untrusted
-		err := e.comp.Process(channels.SyncCommittee, e.me.NodeID(), &events.SyncedBlock{
+		e.comp.OnSyncedBlock(&events.SyncedBlock{
 			OriginID: originID,
 			Block:    block,
 		})
-		if err != nil {
-			e.log.Err(err).Msg("received unexpected error from compliance engine")
-		}
 	}
 }
 
