@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
-	fvmmock "github.com/onflow/flow-go/fvm/mock"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -1293,7 +1293,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		fvm.WithCadenceLogging(true),
 	)
 
-	blocks := new(fvmmock.Blocks)
+	blocks := new(envMock.Blocks)
 
 	block1 := unittest.BlockFixture()
 	block2 := unittest.BlockWithParentFixture(block1.Header)
