@@ -1157,7 +1157,6 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	suite.blocks.
 		On("ByID", header.ID()).
 		Return(&expected, nil)
-	//Once()
 
 	backend := New(
 		suite.state,
