@@ -6,6 +6,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/onflow/flow-go/module"
 )
 
 const (
@@ -33,12 +35,20 @@ type NetworkCollector struct {
 	dnsLookupRequestDroppedCount prometheus.Counter
 	routingTableSize             prometheus.Gauge
 
+	// TODO: encapsulate these in a separate GossipSub collector.
+	gossipSubReceivedIHaveCount prometheus.Counter
+	gossipSubReceivedIWantCount prometheus.Counter
+	gossipSubReceivedGraftCount prometheus.Counter
+	gossipSubReceivedPruneCount prometheus.Counter
+
 	// authorization, rate limiting metrics
 	unAuthorizedMessagesCount       *prometheus.CounterVec
 	rateLimitedUnicastMessagesCount *prometheus.CounterVec
 
 	prefix string
 }
+
+var _ module.NetworkMetrics = (*NetworkCollector)(nil)
 
 type NetworkCollectorOpt func(*NetworkCollector)
 
@@ -223,6 +233,38 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelRateLimitReason},
 	)
 
+	nc.gossipSubReceivedIHaveCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "gossipsub_received_ihave_total",
+			Help:      "number of received ihave messages from gossipsub protocol",
+		})
+
+	nc.gossipSubReceivedIWantCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "gossipsub_received_iwant_total",
+			Help:      "number of received iwant messages from gossipsub protocol",
+		})
+
+	nc.gossipSubReceivedGraftCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "gossipsub_received_graft_total",
+			Help:      "number of received graft messages from gossipsub protocol",
+		})
+
+	nc.gossipSubReceivedPruneCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "gossipsub_received_prune_total",
+			Help:      "number of received prune messages from gossipsub protocol",
+		})
+
 	return nc
 }
 
@@ -325,4 +367,20 @@ func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense 
 // OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
 func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string) {
 	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
+}
+
+func (nc *NetworkCollector) OnIWantReceived() {
+	nc.gossipSubReceivedIWantCount.Inc()
+}
+
+func (nc *NetworkCollector) OnIHaveReceived() {
+	nc.gossipSubReceivedIHaveCount.Inc()
+}
+
+func (nc *NetworkCollector) OnGraftReceived() {
+	nc.gossipSubReceivedGraftCount.Inc()
+}
+
+func (nc *NetworkCollector) OnPruneReceived() {
+	nc.gossipSubReceivedPruneCount.Inc()
 }

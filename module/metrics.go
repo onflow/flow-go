@@ -38,10 +38,18 @@ type NetworkSecurityMetrics interface {
 	OnRateLimitedUnicastMessage(role, msgType, topic, reason string)
 }
 
+type GossipSubRouterMetrics interface {
+	OnIWantReceived()
+	OnIHaveReceived()
+	OnGraftReceived()
+	OnPruneReceived()
+}
+
 type NetworkMetrics interface {
 	ResolverMetrics
 	DHTMetrics
 	NetworkSecurityMetrics
+	GossipSubRouterMetrics
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
 

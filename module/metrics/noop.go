@@ -11,13 +11,6 @@ import (
 
 type NoopCollector struct{}
 
-var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
-
-func NewNoopCollector() *NoopCollector {
-	nc := &NoopCollector{}
-	return nc
-}
-
 func (nc *NoopCollector) Peers(prefix string, n int)                                             {}
 func (nc *NoopCollector) Wantlist(prefix string, n int)                                          {}
 func (nc *NoopCollector) BlobsReceived(prefix string, n uint64)                                  {}
@@ -213,3 +206,14 @@ func (nc *NoopCollector) RangeRequested(ran chainsync.Range)                    
 func (nc *NoopCollector) BatchRequested(batch chainsync.Batch)                                  {}
 func (nc *NoopCollector) OnUnauthorizedMessage(role, msgType, topic, offense string)            {}
 func (nc *NoopCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string)       {}
+func (nc *NoopCollector) OnIWantReceived()                                                      {}
+func (nc *NoopCollector) OnIHaveReceived()                                                      {}
+func (nc *NoopCollector) OnGraftReceived()                                                      {}
+func (nc *NoopCollector) OnPruneReceived()                                                      {}
+
+var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
+
+func NewNoopCollector() *NoopCollector {
+	nc := &NoopCollector{}
+	return nc
+}
