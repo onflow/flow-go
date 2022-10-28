@@ -47,9 +47,6 @@ func (d *Decoder) Decode() (interface{}, error) {
 		return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
 	}
 
-	// TODO consider downsides of having this here:
-	//  - performance?
-	//  - surface area for unexpected errors from many StructureValidator impls?
 	if validatable, ok := msgInterface.(model.StructureValidator); ok {
 		if err := validatable.StructureValid(); err != nil {
 			if model.IsStructureInvalidError(err) {
