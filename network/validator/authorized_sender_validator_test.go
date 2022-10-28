@@ -348,9 +348,3 @@ func (s *TestAuthorizedSenderValidatorSuite) getIdentity(id *flow.Identity) func
 		return id, true
 	}
 }
-
-//func (s *TestAuthorizedSenderValidatorSuite) getAuthorizedMessageConfig(role flow.Role) message.MsgAuthConfig {
-//	//for _, config := range s.allMsgConfigs {
-//	//	if config.
-//	//}
-//}
