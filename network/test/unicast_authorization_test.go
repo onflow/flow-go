@@ -430,7 +430,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
 		return u.providers[0].Identities(filter.Any)
 	}, nil)
-	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(u.senderID, true)
+	overlay.On("Identity", expectedSenderPeerID).Return(u.senderID, true)
 
 	// message will be rejected so assert overlay never receives it
 	defer overlay.AssertNotCalled(u.T(), "Receive", u.senderID.NodeID, mock.AnythingOfType("*message.Message"))
