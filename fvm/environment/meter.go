@@ -42,6 +42,7 @@ const (
 	ComputationKindUpdateAccountContractCode
 	ComputationKindValidatePublicKey
 	ComputationKindValueExists
+	ComputationKindAccountKeysCount
 )
 
 type Meter interface {

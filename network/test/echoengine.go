@@ -13,6 +13,7 @@ import (
 	mockcomponent "github.com/onflow/flow-go/module/component/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/testutils"
 )
 
 // EchoEngine is a simple engine that is used for testing the correctness of
@@ -21,19 +22,19 @@ import (
 type EchoEngine struct {
 	sync.RWMutex
 	t        *testing.T
-	con      network.Conduit        // used to directly communicate with the network
-	originID flow.Identifier        // used to keep track of the id of the sender of the messages
-	event    chan interface{}       // used to keep track of the events that the node receives
-	channel  chan channels.Channel  // used to keep track of the channels that events are received on
-	received chan struct{}          // used as an indicator on reception of messages for testing
-	echomsg  string                 // used as a fix string to be included in the reply echos
-	seen     map[string]int         // used to track the seen events
-	echo     bool                   // used to enable or disable echoing back the recvd message
-	send     ConduitSendWrapperFunc // used to provide play and plug wrapper around its conduit
+	con      network.Conduit                  // used to directly communicate with the network
+	originID flow.Identifier                  // used to keep track of the id of the sender of the messages
+	event    chan interface{}                 // used to keep track of the events that the node receives
+	channel  chan channels.Channel            // used to keep track of the channels that events are received on
+	received chan struct{}                    // used as an indicator on reception of messages for testing
+	echomsg  string                           // used as a fix string to be included in the reply echos
+	seen     map[string]int                   // used to track the seen events
+	echo     bool                             // used to enable or disable echoing back the recvd message
+	send     testutils.ConduitSendWrapperFunc // used to provide play and plug wrapper around its conduit
 	mockcomponent.Component
 }
 
-func NewEchoEngine(t *testing.T, net network.Network, cap int, channel channels.Channel, echo bool, send ConduitSendWrapperFunc) *EchoEngine {
+func NewEchoEngine(t *testing.T, net network.Network, cap int, channel channels.Channel, echo bool, send testutils.ConduitSendWrapperFunc) *EchoEngine {
 	te := &EchoEngine{
 		t:        t,
 		echomsg:  "this is an echo",

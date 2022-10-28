@@ -43,7 +43,7 @@ func NewAuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer
 // If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
 // Authorization config is defined in message.MsgAuthConfig.
 func (av *AuthorizedSenderValidator) Validate(from peer.ID, msg interface{}, channel channels.Channel, isUnicast bool) (string, error) {
-	// NOTE: messages from unstaked nodes should be rejected by the libP2P node topic validator
+	// NOTE: Gossipsub messages from unstaked nodes should be rejected by the libP2P node topic validator
 	// before they reach message validators. If a message from a unstaked peer gets to this point
 	// something terrible went wrong.
 	identity, ok := av.getIdentity(from)

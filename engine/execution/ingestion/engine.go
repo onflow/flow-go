@@ -601,10 +601,6 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	// TODO: Ramtin - comment out for now
-	// e.metrics.FinishBlockReceivedToExecuted(executableBlock.ID())
-	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
-
 	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, *executableBlock.StartState)
 	if errors.Is(err, storage.ErrDataMismatch) {
 		e.log.Fatal().Err(err).Msg("fatal: trying to store different results for the same block")
@@ -656,7 +652,14 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
-	e.metrics.ExecutionBlockExecuted(time.Since(startedAt), computationResult.ComputationUsed, len(computationResult.TransactionResults), len(computationResult.ExecutableBlock.CompleteCollections))
+	compUsed, memUsed := computationResult.BlockComputationAndMemoryUsed()
+	eventCounts, eventSize := computationResult.BlockEventCountsAndSize()
+	e.metrics.ExecutionBlockExecuted(time.Since(startedAt),
+		compUsed, memUsed,
+		eventCounts, eventSize,
+		len(computationResult.TransactionResults),
+		len(computationResult.ExecutableBlock.CompleteCollections),
+	)
 	for computationKind, intensity := range computationResult.ComputationIntensities {
 		e.metrics.ExecutionBlockExecutionEffortVectorComponent(computationKind.String(), intensity)
 	}
@@ -1199,7 +1202,7 @@ func (e *Engine) saveExecutionResults(
 			block.Header.ParentID, err)
 	}
 
-	endState, chdps, executionResult, err := execution.GenerateExecutionResultAndChunkDataPacks(previousErID, startState, result)
+	endState, chdps, executionResult, err := execution.GenerateExecutionResultAndChunkDataPacks(e.metrics, previousErID, startState, result)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build chunk data pack: %w", err)
 	}

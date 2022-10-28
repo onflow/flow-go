@@ -16,11 +16,15 @@ package environment
 import (
     "github.com/onflow/flow-go/fvm/errors"
     "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/module/trace"
 )
 
-func parseRestricted(txnState *state.TransactionState, opCode string) error {
+func parseRestricted(
+    txnState *state.TransactionState,
+    spanName trace.SpanName,
+) error {
     if txnState.IsParseRestricted() {
-        return errors.NewParseRestrictedModeInvalidAccessFailure(opCode)
+        return errors.NewParseRestrictedModeInvalidAccessFailure(spanName)
     }
 
     return nil
@@ -30,7 +34,7 @@ func parseRestricted(txnState *state.TransactionState, opCode string) error {
 // cadence is parsing programs.
 //
 // The generic functions are of the form
-//      parseRestrict<x>Arg<y>Ret(txnState, opCode, callback, arg1, ..., argX)
+//      parseRestrict<x>Arg<y>Ret(txnState, spanName, callback, arg1, ..., argX)
 // where the callback expects <x> number of arguments, and <y> number of
 // return values (not counting error). If the callback expects no argument,
 // <x>Arg is omitted, and similarly for return value.`
@@ -81,7 +85,7 @@ func generateWrapper(numArgs int, numRets int, content *FileContent) {
 	push()
 
 	l("txnState *state.TransactionState,")
-	l("opCode string,")
+	l("spanName trace.SpanName,")
 
 	callbackRet := "error"
 	if numRets > 0 {
@@ -115,7 +119,7 @@ func generateWrapper(numArgs int, numRets int, content *FileContent) {
 	// Generate parse restrict check
 	//
 
-	l("err := parseRestricted(txnState, opCode)")
+	l("err := parseRestricted(txnState, spanName)")
 	l("if err != nil {")
 	push()
 

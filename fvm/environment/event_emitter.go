@@ -64,7 +64,7 @@ func NewParseRestrictedEventEmitter(
 func (emitter ParseRestrictedEventEmitter) EmitEvent(event cadence.Event) error {
 	return parseRestrict1Arg(
 		emitter.txnState,
-		"EmitEvent",
+		trace.FVMEnvEmitEvent,
 		emitter.impl.EmitEvent,
 		event)
 }
