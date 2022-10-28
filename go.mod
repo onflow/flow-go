@@ -48,6 +48,7 @@ require (
 	github.com/libp2p/go-libp2p v0.22.0
 	github.com/libp2p/go-libp2p-kad-dht v0.18.0
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
+    github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221028171020-19b4efd116aa
 	github.com/libp2p/go-libp2p-tls v0.4.1
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-base32 v0.0.4 // indirect
@@ -77,7 +78,6 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
-	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221028171020-19b4efd116aa
 	go.opentelemetry.io/otel v1.8.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.8.0
 	go.opentelemetry.io/otel/sdk v1.8.0
@@ -265,6 +265,7 @@ require (
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221028171020-19b4efd116aa // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	go.opencensus.io v0.23.0 // indirect
