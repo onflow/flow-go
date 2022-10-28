@@ -103,7 +103,6 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedS
 // TestValidatorCallback_AuthorizedUnicastOnChannel checks that AuthorizedSenderValidator.Validate does not return an error
 // for messages sent via unicast that are authorized to be sent via unicast.
 func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedUnicastOnChannel() {
-	fmt.Println(len(s.authorizedUnicastOnChannel))
 	for _, c := range s.authorizedUnicastOnChannel {
 		str := fmt.Sprintf("role (%s) should be authorized to send message type (%s) on channel (%s) via unicast", c.Identity.Role, c.MessageStr, c.Channel)
 		s.Run(str, func() {
