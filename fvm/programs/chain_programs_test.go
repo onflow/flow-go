@@ -39,16 +39,19 @@ func TestChainPrograms(t *testing.T) {
 	loc1 := testLocation("0a")
 	prog1 := &interpreter.Program{}
 
-	txn, err := block1.NewTransactionPrograms(0, 0)
+	txn, err := block1.NewOCCBlockItem(0, 0)
 	require.NoError(t, err)
 
-	txn.Set(loc1, prog1, nil)
+	txn.Set(loc1, ProgramEntry{
+		Program: prog1,
+		State:   nil,
+	})
 	err = txn.Commit()
 	require.NoError(t, err)
 
-	foundProg, _, ok := block1.GetForTestingOnly(loc1)
-	require.True(t, ok)
-	require.Same(t, prog1, foundProg)
+	foundProgramEntry := block1.GetForTestingOnly(loc1)
+	require.NotNil(t, foundProgramEntry)
+	require.Same(t, prog1, foundProgramEntry.Program)
 
 	//
 	// Creating a BlockPrograms from parent
@@ -63,20 +66,23 @@ func TestChainPrograms(t *testing.T) {
 	loc2 := testLocation("0b")
 	prog2 := &interpreter.Program{}
 
-	txn, err = block2.NewTransactionPrograms(0, 0)
+	txn, err = block2.NewOCCBlockItem(0, 0)
 	require.NoError(t, err)
 
-	txn.Set(loc2, prog2, nil)
+	txn.Set(loc2, ProgramEntry{
+		Program: prog2,
+		State:   nil,
+	})
 	err = txn.Commit()
 	require.NoError(t, err)
 
-	foundProg, _, ok = block2.GetForTestingOnly(loc1)
-	require.True(t, ok)
-	require.Same(t, prog1, foundProg)
+	foundProgramEntry = block2.GetForTestingOnly(loc1)
+	require.NotNil(t, foundProgramEntry)
+	require.Same(t, prog1, foundProgramEntry.Program)
 
-	foundProg, _, ok = block2.GetForTestingOnly(loc2)
-	require.True(t, ok)
-	require.Same(t, prog2, foundProg)
+	foundProgramEntry = block2.GetForTestingOnly(loc2)
+	require.NotNil(t, foundProgramEntry)
+	require.Same(t, prog2, foundProgramEntry.Program)
 
 	//
 	// Reuse exising BlockPrograms in cache
@@ -88,13 +94,13 @@ func TestChainPrograms(t *testing.T) {
 	foundBlock = programs.Get(blockId1)
 	require.Same(t, block1, foundBlock)
 
-	foundProg, _, ok = block1.GetForTestingOnly(loc1)
-	require.True(t, ok)
-	require.Same(t, prog1, foundProg)
+	foundProgramEntry = block1.GetForTestingOnly(loc1)
+	require.NotNil(t, foundProgramEntry)
+	require.Same(t, prog1, foundProgramEntry.Program)
 
 	// writes to block2 did't poplute block1.
-	_, _, ok = block1.GetForTestingOnly(loc2)
-	require.False(t, ok)
+	foundProgramEntry = block1.GetForTestingOnly(loc2)
+	require.Nil(t, foundProgramEntry)
 
 	//
 	// Test eviction
@@ -108,23 +114,23 @@ func TestChainPrograms(t *testing.T) {
 	require.NotSame(t, block1, block3)
 	require.NotSame(t, block2, block3)
 
-	foundProg, _, ok = block3.GetForTestingOnly(loc1)
-	require.True(t, ok)
-	require.Same(t, prog1, foundProg)
+	foundProgram := block3.GetForTestingOnly(loc1)
+	require.NotNil(t, foundProgram)
+	require.Same(t, prog1, foundProgram.Program)
 
-	foundProg, _, ok = block3.GetForTestingOnly(loc2)
-	require.True(t, ok)
-	require.Same(t, prog2, foundProg)
+	foundProgram = block3.GetForTestingOnly(loc2)
+	require.NotNil(t, foundProgram)
+	require.Same(t, prog2, foundProgram.Program)
 
 	// block1 forces block2 to evict
 	foundBlock = programs.GetOrCreateBlockPrograms(blockId1, flow.ZeroID)
 	require.NotSame(t, block1, foundBlock)
 
-	_, _, ok = foundBlock.GetForTestingOnly(loc1)
-	require.False(t, ok)
+	foundProgram = foundBlock.GetForTestingOnly(loc1)
+	require.Nil(t, foundProgram)
 
-	_, _, ok = foundBlock.GetForTestingOnly(loc2)
-	require.False(t, ok)
+	foundProgram = foundBlock.GetForTestingOnly(loc2)
+	require.Nil(t, foundProgram)
 
 	block1 = foundBlock
 
@@ -138,13 +144,13 @@ func TestChainPrograms(t *testing.T) {
 	require.NotSame(t, block2, scriptBlock)
 	require.NotSame(t, block3, scriptBlock)
 
-	foundProg, _, ok = scriptBlock.GetForTestingOnly(loc1)
-	require.True(t, ok)
-	require.Same(t, prog1, foundProg)
+	foundProgram = scriptBlock.GetForTestingOnly(loc1)
+	require.NotNil(t, foundProgram)
+	require.Same(t, prog1, foundProgram.Program)
 
-	foundProg, _, ok = scriptBlock.GetForTestingOnly(loc2)
-	require.True(t, ok)
-	require.Same(t, prog2, foundProg)
+	foundProgram = scriptBlock.GetForTestingOnly(loc2)
+	require.NotNil(t, foundProgram)
+	require.Same(t, prog2, foundProgram.Program)
 
 	foundBlock = programs.Get(blockId3)
 	require.Same(t, block3, foundBlock)

@@ -70,7 +70,7 @@ func (chain *ChainPrograms) GetOrCreateBlockPrograms(
 	var current *BlockPrograms
 	parentEntry, ok := chain.lru.Get(parentBlockId)
 	if ok {
-		current = parentEntry.(*BlockPrograms).NewChildBlockPrograms()
+		current = parentEntry.(*BlockPrograms).NewChildOCCBlock()
 	} else {
 		current = NewEmptyBlockPrograms()
 	}
@@ -84,7 +84,7 @@ func (chain *ChainPrograms) NewBlockProgramsForScript(
 ) *BlockPrograms {
 	block := chain.Get(currentBlockId)
 	if block != nil {
-		return block.NewChildBlockPrograms()
+		return block.NewChildOCCBlock()
 	}
 
 	return NewEmptyBlockPrograms()

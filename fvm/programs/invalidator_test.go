@@ -12,7 +12,7 @@ type testInvalidator struct {
 	invalidateName string
 }
 
-func (invalidator testInvalidator) ShouldInvalidatePrograms() bool {
+func (invalidator testInvalidator) ShouldInvalidateItems() bool {
 	return invalidator.invalidateAll ||
 		invalidator.invalidateName != ""
 }
@@ -24,77 +24,77 @@ func (invalidator testInvalidator) ShouldInvalidateEntry(
 		invalidator.invalidateName == entry.Location.Name
 }
 
-func TestModifiedSetsInvalidator(t *testing.T) {
-	invalidator := ModifiedSetsInvalidator{}
+func TestOCCProgramsInvalidator(t *testing.T) {
+	invalidator := OCCProgramsInvalidator{}
 
-	require.False(t, invalidator.ShouldInvalidatePrograms())
+	require.False(t, invalidator.ShouldInvalidateItems())
 	require.False(t, invalidator.ShouldInvalidateEntry(ProgramEntry{}))
 
-	invalidator = ModifiedSetsInvalidator{
+	invalidator = OCCProgramsInvalidator{
 		ContractUpdateKeys: []ContractUpdateKey{
 			{}, // For now, the entry's value does not matter.
 		},
 		FrozenAccounts: nil,
 	}
 
-	require.True(t, invalidator.ShouldInvalidatePrograms())
+	require.True(t, invalidator.ShouldInvalidateItems())
 	require.True(t, invalidator.ShouldInvalidateEntry(ProgramEntry{}))
 
-	invalidator = ModifiedSetsInvalidator{
+	invalidator = OCCProgramsInvalidator{
 		ContractUpdateKeys: nil,
 		FrozenAccounts: []common.Address{
 			{}, // For now, the entry's value does not matter
 		},
 	}
 
-	require.True(t, invalidator.ShouldInvalidatePrograms())
+	require.True(t, invalidator.ShouldInvalidateItems())
 	require.True(t, invalidator.ShouldInvalidateEntry(ProgramEntry{}))
 }
 
 func TestChainedInvalidator(t *testing.T) {
-	var chain chainedInvalidators
-	require.False(t, chain.ShouldInvalidatePrograms())
+	var chain chainedOCCInvalidators[ProgramEntry]
+	require.False(t, chain.ShouldInvalidateItems())
 	require.False(t, chain.ShouldInvalidateEntry(ProgramEntry{}))
 
-	chain = chainedInvalidators{}
-	require.False(t, chain.ShouldInvalidatePrograms())
+	chain = chainedOCCInvalidators[ProgramEntry]{}
+	require.False(t, chain.ShouldInvalidateItems())
 	require.False(t, chain.ShouldInvalidateEntry(ProgramEntry{}))
 
-	chain = chainedInvalidators{
+	chain = chainedOCCInvalidators[ProgramEntry]{
 		{
-			Invalidator:   testInvalidator{},
-			executionTime: 1,
+			OCCInvalidator: testInvalidator{},
+			executionTime:  1,
 		},
 		{
-			Invalidator:   testInvalidator{},
-			executionTime: 2,
+			OCCInvalidator: testInvalidator{},
+			executionTime:  2,
 		},
 		{
-			Invalidator:   testInvalidator{},
-			executionTime: 3,
+			OCCInvalidator: testInvalidator{},
+			executionTime:  3,
 		},
 	}
-	require.False(t, chain.ShouldInvalidatePrograms())
+	require.False(t, chain.ShouldInvalidateItems())
 
-	chain = chainedInvalidators{
+	chain = chainedOCCInvalidators[ProgramEntry]{
 		{
-			Invalidator:   testInvalidator{invalidateName: "1"},
-			executionTime: 1,
+			OCCInvalidator: testInvalidator{invalidateName: "1"},
+			executionTime:  1,
 		},
 		{
-			Invalidator:   testInvalidator{invalidateName: "3a"},
-			executionTime: 3,
+			OCCInvalidator: testInvalidator{invalidateName: "3a"},
+			executionTime:  3,
 		},
 		{
-			Invalidator:   testInvalidator{invalidateName: "3b"},
-			executionTime: 3,
+			OCCInvalidator: testInvalidator{invalidateName: "3b"},
+			executionTime:  3,
 		},
 		{
-			Invalidator:   testInvalidator{invalidateName: "7"},
-			executionTime: 7,
+			OCCInvalidator: testInvalidator{invalidateName: "7"},
+			executionTime:  7,
 		},
 	}
-	require.True(t, chain.ShouldInvalidatePrograms())
+	require.True(t, chain.ShouldInvalidateItems())
 
 	for _, name := range []string{"1", "3a", "3b", "7"} {
 		entry := ProgramEntry{
