@@ -39,6 +39,14 @@ type Environment interface {
 
 	// SystemContracts
 	AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error)
+	CheckPayerBalanceAndGetMaxTxFees(
+		payer flow.Address,
+		inclusionEffort uint64,
+		executionEffort uint64,
+	) (
+		cadence.Value,
+		error,
+	)
 	DeductTransactionFees(
 		payer flow.Address,
 		inclusionEffort uint64,
