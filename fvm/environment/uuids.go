@@ -33,7 +33,7 @@ func NewParseRestrictedUUIDGenerator(
 func (generator ParseRestrictedUUIDGenerator) GenerateUUID() (uint64, error) {
 	return parseRestrict1Ret(
 		generator.txnState,
-		"GenerateUUID",
+		trace.FVMEnvGenerateUUID,
 		generator.impl.GenerateUUID)
 }
 

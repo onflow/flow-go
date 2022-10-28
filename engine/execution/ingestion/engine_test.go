@@ -1172,6 +1172,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	e := Engine{
 		execState: execState,
 		tracer:    trace.NewNoopTracer(),
+		metrics:   metrics.NewNoopCollector(),
 		me:        me,
 	}
 

@@ -29,6 +29,11 @@ const (
 // it holds draft of updates and captures
 // all register touches
 type State struct {
+	// NOTE: A committed state is no longer accessible.  It can however be
+	// re-attached to another transaction and be committed (for cached result
+	// bookkeeping purpose).
+	committed bool
+
 	view             View
 	meter            *meter.Meter
 	updatedAddresses map[flow.Address]struct{}
@@ -100,6 +105,7 @@ type StateOption func(st *State) *State
 func NewState(view View, params StateParameters) *State {
 	m := meter.NewMeter(params.MeterParameters)
 	return &State{
+		committed:        false,
 		view:             view,
 		meter:            m,
 		updatedAddresses: make(map[flow.Address]struct{}),
@@ -110,6 +116,7 @@ func NewState(view View, params StateParameters) *State {
 // NewChild generates a new child state
 func (s *State) NewChild() *State {
 	return &State{
+		committed:        false,
 		view:             s.view.NewChild(),
 		meter:            s.meter.NewChild(),
 		updatedAddresses: make(map[flow.Address]struct{}),
@@ -124,6 +131,10 @@ func (s *State) InteractionUsed() uint64 {
 
 // Get returns a register value given owner and key
 func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, error) {
+	if s.committed {
+		return nil, fmt.Errorf("cannot Get on a committed state")
+	}
+
 	var value []byte
 	var err error
 
@@ -150,6 +161,10 @@ func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, e
 
 // Set updates state delta with a register update
 func (s *State) Set(owner, key string, value flow.RegisterValue, enforceLimit bool) error {
+	if s.committed {
+		return fmt.Errorf("cannot Set on a committed state")
+	}
+
 	if enforceLimit {
 		if err := s.checkSize(owner, key, value); err != nil {
 			return err
@@ -179,18 +194,12 @@ func (s *State) Set(owner, key string, value flow.RegisterValue, enforceLimit bo
 	return nil
 }
 
-// Delete deletes a register
-func (s *State) Delete(owner, key string, enforceLimit bool) error {
-	return s.Set(owner, key, nil, enforceLimit)
-}
-
-// Touch touches a register
-func (s *State) Touch(owner, key string) error {
-	return s.view.Touch(owner, key)
-}
-
 // MeterComputation meters computation usage
 func (s *State) MeterComputation(kind common.ComputationKind, intensity uint) error {
+	if s.committed {
+		return fmt.Errorf("cannot MeterComputation on a committed state")
+	}
+
 	return s.meter.MeterComputation(kind, intensity)
 }
 
@@ -211,6 +220,10 @@ func (s *State) TotalComputationLimit() uint {
 
 // MeterMemory meters memory usage
 func (s *State) MeterMemory(kind common.MemoryKind, intensity uint) error {
+	if s.committed {
+		return fmt.Errorf("cannot MeterMemory on a committed state")
+	}
+
 	return s.meter.MeterMemory(kind, intensity)
 }
 
@@ -230,6 +243,10 @@ func (s *State) TotalMemoryLimit() uint {
 }
 
 func (s *State) MeterEmittedEvent(byteSize uint64) error {
+	if s.committed {
+		return fmt.Errorf("cannot MeterEmittedEvent on a committed state")
+	}
+
 	return s.meter.MeterEmittedEvent(byteSize)
 }
 
@@ -239,6 +256,10 @@ func (s *State) TotalEmittedEventBytes() uint64 {
 
 // MergeState applies the changes from a the given view to this view.
 func (s *State) MergeState(other *State) error {
+	if s.committed {
+		return fmt.Errorf("cannot MergeState on a committed state")
+	}
+
 	err := s.view.MergeView(other.view)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)

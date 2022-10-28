@@ -47,7 +47,7 @@ func (store ParseRestrictedValueStore) GetValue(
 ) {
 	return parseRestrict2Arg1Ret(
 		store.txnState,
-		"GetValue",
+		trace.FVMEnvGetValue,
 		store.impl.GetValue,
 		owner,
 		key)
@@ -60,7 +60,7 @@ func (store ParseRestrictedValueStore) SetValue(
 ) error {
 	return parseRestrict3Arg(
 		store.txnState,
-		"SetValue",
+		trace.FVMEnvSetValue,
 		store.impl.SetValue,
 		owner,
 		key,
@@ -76,7 +76,7 @@ func (store ParseRestrictedValueStore) ValueExists(
 ) {
 	return parseRestrict2Arg1Ret(
 		store.txnState,
-		"ValueExists",
+		trace.FVMEnvValueExists,
 		store.impl.ValueExists,
 		owner,
 		key)
@@ -90,7 +90,7 @@ func (store ParseRestrictedValueStore) AllocateStorageIndex(
 ) {
 	return parseRestrict1Arg1Ret(
 		store.txnState,
-		"AllocateStorageIndex",
+		trace.FVMEnvAllocateStorageIndex,
 		store.impl.AllocateStorageIndex,
 		owner)
 }
@@ -205,6 +205,8 @@ func (store *valueStore) AllocateStorageIndex(
 	atree.StorageIndex,
 	error,
 ) {
+	defer store.tracer.StartSpanFromRoot(trace.FVMEnvAllocateStorageIndex).End()
+
 	err := store.meter.MeterComputation(ComputationKindAllocateStorageIndex, 1)
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf(
