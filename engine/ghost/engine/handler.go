@@ -71,7 +71,17 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 	// sometimes, it fails to deliver the message to the target without returning any error.
 	// This becomes one of the big factors contributing to the tests flakeiness.
 	err = conduit.Publish(event, flowIDs...)
-	
+	if err != nil {
+		h.log.Error().
+			Err(err).
+			Interface("event", event).
+			Str("flow_ids", fmt.Sprintf("%v", flowIDs)).
+			Str("target_ids", fmt.Sprintf("%v", targetIDs)).
+			Msg("error publishing message")
+
+		return nil, err
+	}
+
 	return new(empty.Empty), nil
 }
 
