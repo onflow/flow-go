@@ -15,6 +15,8 @@ type SyncedBlock struct {
 	Block    *flow.Block
 }
 
+var _ model.StructureValidator = (*SyncedBlock)(nil)
+
 // StructureValid checks basic structural validity of the message and ensures no required fields are nil.
 func (m *SyncedBlock) StructureValid() error {
 	if m.Block.Header == nil {
@@ -34,6 +36,8 @@ type SyncedClusterBlock struct {
 	OriginID flow.Identifier
 	Block    *cluster.Block
 }
+
+var _ model.StructureValidator = (*SyncedClusterBlock)(nil)
 
 // StructureValid checks basic structural validity of the message and ensures no required fields are nil.
 func (m *SyncedClusterBlock) StructureValid() error {

@@ -33,6 +33,8 @@ type ClusterBlockProposal struct {
 	Payload *cluster.Payload
 }
 
+var _ model.StructureValidator = (*ClusterBlockProposal)(nil)
+
 // StructureValid checks basic structural validity of the message and ensures no required fields are nil.
 func (m *ClusterBlockProposal) StructureValid() error {
 	if m.Header == nil {

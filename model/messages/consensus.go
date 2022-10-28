@@ -23,6 +23,8 @@ func (m *BlockProposal) StructureValid() error {
 	return nil
 }
 
+var _ model.StructureValidator = (*BlockProposal)(nil)
+
 // BlockVote is part of the consensus protocol and represents a consensus node
 // voting on the proposal of the leader of a given round.
 type BlockVote struct {
