@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
+	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec"

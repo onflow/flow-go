@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
+	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"

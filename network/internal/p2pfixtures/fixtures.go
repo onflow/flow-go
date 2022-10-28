@@ -9,7 +9,6 @@ import (
 
 	addrutil "github.com/libp2p/go-addr-util"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -19,6 +18,7 @@ import (
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"

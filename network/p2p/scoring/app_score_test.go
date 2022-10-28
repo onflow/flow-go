@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"

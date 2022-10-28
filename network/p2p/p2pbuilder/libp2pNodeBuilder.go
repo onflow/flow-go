@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -21,6 +19,8 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
+	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
+	pb "github.com/yhassanzadeh13/go-libp2p-pubsub/pb"
 
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"

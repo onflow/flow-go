@@ -3,10 +3,10 @@ package corruptnet
 import (
 	"context"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
+	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
