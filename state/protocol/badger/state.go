@@ -705,6 +705,11 @@ func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error 
 	return nil
 }
 
+// isEpochEmergencyFallbackTriggered checks whether epoch fallback has been globally triggered.
+// Returns:
+// * (true, nil) if epoch fallback is triggered
+// * (false, nil) if epoch fallback is not triggered (including if the flag is not set)
+// * (false, err) if an unexpected error occurs
 func (state *State) isEpochEmergencyFallbackTriggered() (bool, error) {
 	var triggered bool
 	err := state.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
