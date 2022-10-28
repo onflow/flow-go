@@ -79,6 +79,14 @@ type LoggerHook struct {
 	mu   *sync.Mutex
 }
 
+// Reset resets the logs
+func (hook LoggerHook) Reset() {
+	hook.mu.Lock()
+	defer hook.mu.Unlock()
+
+	hook.logs.Reset()
+}
+
 // Logs returns the logs as a string
 func (hook LoggerHook) Logs() string {
 	hook.mu.Lock()

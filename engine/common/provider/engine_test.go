@@ -451,3 +451,61 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 	require.NoError(t, err)
 	unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 }
+
+func TestProcessInvalidData(t *testing.T) {
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
+
+	identities := unittest.IdentityListFixture(8)
+	selector := filter.HasNodeID(identities.NodeIDs()...)
+
+	state := protocol.NewState(t)
+	net := mocknetwork.NewNetwork(t)
+	con := mocknetwork.NewConduit(t)
+	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
+	me := mockmodule.NewLocal(t)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
+	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
+
+	logger, hook := unittest.HookedLogger()
+
+	e, err := provider.New(
+		logger,
+		metrics.NewNoopCollector(),
+		net,
+		me,
+		state,
+		requestQueue,
+		provider.DefaultRequestProviderWorkers,
+		channels.TestNetworkChannel,
+		selector,
+		nil)
+	require.NoError(t, err)
+
+	e.Start(ctx)
+	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, e)
+
+	var entityReq *messages.EntityRequest
+
+	tests := map[string]interface{}{
+		"entity request is nil": entityReq,
+		"entity request is empty": &messages.EntityRequest{
+			EntityIDs: nil,
+		},
+	}
+
+	for name, req := range tests {
+		t.Run(name, func(t *testing.T) {
+			// Process swallows non-fatal errors
+			err := e.Process(channels.TestNetworkChannel, unittest.IdentifierFixture(), req)
+			assert.NoError(t, err)
+
+			assert.Contains(t, hook.Logs(), "invalid message")
+			hook.Reset()
+		})
+	}
+
+	cancel()
+	unittest.RequireComponentsDoneBefore(t, 100*time.Millisecond, e)
+}

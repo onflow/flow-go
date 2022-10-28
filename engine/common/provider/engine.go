@@ -88,14 +88,20 @@ func New(
 			// Provider engine only expects EntityRequest.
 			// Other message types are discarded by Match.
 			Match: func(message *engine.Message) bool {
-				request, ok := message.Payload.(*messages.EntityRequest)
-				if ok {
-					log.Info().
-						Str("entity_ids", fmt.Sprintf("%v", request.EntityIDs)).
-						Hex("origin_id", logging.ID(message.OriginID)).
-						Msg("entity request received")
-				}
+				_, ok := message.Payload.(*messages.EntityRequest)
 				return ok
+			},
+			Validate: func(msg *engine.Message) error {
+				req := msg.Payload.(*messages.EntityRequest)
+				if req == nil {
+					return fmt.Errorf("entity request message is nil")
+				}
+
+				if len(req.EntityIDs) == 0 {
+					return fmt.Errorf("entity request no entities requested")
+				}
+
+				return nil
 			},
 			// Map is called on messages that are Match(ed) successfully, i.e.,
 			// EntityRequest.
@@ -165,15 +171,27 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 
 	err := e.requestHandler.Process(originID, event)
 	if err != nil {
+		lg := e.log.With().
+			Hex("origin_id", logging.ID(originID)).
+			Str("channel", channel.String()).
+			Str("message_type", logging.Type(event)).
+			Logger()
+
 		if engine.IsIncompatibleInputTypeError(err) {
-			e.log.Warn().
-				Hex("origin_id", logging.ID(originID)).
-				Str("channel", channel.String()).
-				Str("event", fmt.Sprintf("%+v", event)).
+			lg.Warn().
 				Bool(logging.KeySuspicious, true).
-				Msg("received unsupported message type")
+				Msg("unsupported message")
 			return nil
 		}
+
+		if engine.IsInvalidInputError(err) {
+			lg.Warn().
+				Err(err).
+				Bool(logging.KeySuspicious, true).
+				Msg("invalid message")
+			return nil
+		}
+
 		return fmt.Errorf("unexpected error while processing engine event: %w", err)
 	}
 
@@ -188,33 +206,34 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
 
-	lg := e.log.With().Str("origin_id", request.OriginId.String()).Logger()
+	lg := e.log.With().Str("origin_id", request.OriginID.String()).Logger()
 
 	lg.Debug().
-		Strs("entity_ids", flow.IdentifierList(request.EntityIds).Strings()).
+		Strs("entity_ids", flow.IdentifierList(request.EntityIDs).Strings()).
 		Msg("entity request received")
 
 	// TODO: add reputation system to punish nodes for malicious behaviour (spam / repeated requests)
 
 	// then, we try to get the current identity of the requester and check it against the filter
 	// for the handler to make sure the requester is authorized for this resource
+	// TODO: given the authorizedSenderValidator, is this still needed?
 	requesters, err := e.state.Final().Identities(filter.And(
 		e.selector,
-		filter.HasNodeID(request.OriginId)),
+		filter.HasNodeID(request.OriginID)),
 	)
 	if err != nil {
 		return fmt.Errorf("could not get requesters: %w", err)
 	}
 	if len(requesters) == 0 {
-		return engine.NewInvalidInputErrorf("invalid requester origin (%x)", request.OriginId)
+		return engine.NewInvalidInputErrorf("invalid requester origin (%x)", request.OriginID)
 	}
 
 	// try to retrieve each entity and skip missing ones
-	entities := make([]flow.Entity, 0, len(request.EntityIds))
-	entityIDs := make([]flow.Identifier, 0, len(request.EntityIds))
+	entities := make([]flow.Entity, 0, len(request.EntityIDs))
+	entityIDs := make([]flow.Identifier, 0, len(request.EntityIDs))
 	seen := make(map[flow.Identifier]struct{})
-	for _, entityID := range request.EntityIds {
-		// skip requesting duplicate entity IDs
+	for _, entityID := range request.EntityIDs {
+		// skip duplicate entity IDs
 		if _, ok := seen[entityID]; ok {
 			lg.Warn().
 				Str("entity_id", entityID.String()).
@@ -222,6 +241,7 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 				Msg("duplicate entity ID in entity request")
 			continue
 		}
+		seen[entityID] = struct{}{}
 
 		entity, err := e.retrieve(entityID)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -235,7 +255,6 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 		}
 		entities = append(entities, entity)
 		entityIDs = append(entityIDs, entityID)
-		seen[entityID] = struct{}{}
 	}
 
 	// encode all of the entities
@@ -259,7 +278,7 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 		EntityIDs: entityIDs,
 		Blobs:     blobs,
 	}
-	err = e.con.Unicast(res, request.OriginId)
+	err = e.con.Unicast(res, request.OriginID)
 	if err != nil {
 		return engine.NewNetworkTransmissionErrorf("could not send entity response: %w", err)
 	}
@@ -311,17 +330,16 @@ func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 		}
 
 		req := &internal.EntityRequest{
-			OriginId:  msg.OriginID,
-			EntityIds: requestEvent.EntityIDs,
+			OriginID:  msg.OriginID,
+			EntityIDs: requestEvent.EntityIDs,
 			Nonce:     requestEvent.Nonce,
 		}
 
-		lg := e.log.With().
-			Hex("origin_id", logging.ID(req.OriginId)).
-			Str("requested_entity_ids", fmt.Sprintf("%v", req.EntityIds)).Logger()
-
+		lg := e.log.With().Hex("origin_id", logging.ID(req.OriginID)).Logger()
 		lg.Trace().Msg("processor is queuing entity request for processing")
+
 		e.requestChannel <- req
+
 		lg.Trace().Msg("processor queued up entity request for processing")
 	}
 }
@@ -335,10 +353,10 @@ func (e *Engine) processEntityRequestWorker(ctx irrecoverable.SignalerContext, r
 			e.log.Trace().Msg("processing entity request worker terminated")
 			return
 		}
-		lg := e.log.With().
-			Hex("origin_id", logging.ID(request.OriginId)).
-			Str("requested_entity_ids", fmt.Sprintf("%v", request.EntityIds)).Logger()
+
+		lg := e.log.With().Hex("origin_id", logging.ID(request.OriginID)).Logger()
 		lg.Trace().Msg("worker picked up entity request for processing")
+
 		err := e.onEntityRequest(request)
 		if err != nil {
 			if engine.IsInvalidInputError(err) || engine.IsNetworkTransmissionError(err) {

@@ -95,7 +95,7 @@ func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identif
 		lg := r.log.With().
 			Hex("origin_id", logging.ID(originID)).
 			Str("channel", channel.String()).
-			Str("message_type", fmt.Sprintf("%T", event)).
+			Str("message_type", logging.Type(event)).
 			Logger()
 
 		if engine.IsIncompatibleInputTypeError(err) {
