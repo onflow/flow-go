@@ -40,11 +40,12 @@ type Engine interface {
 	Process(channel channels.Channel, originID flow.Identifier, event interface{}) error
 }
 
-// MessageProcessor represents a component which receives messages from the
-// networking layer. Since these messages come from other nodes, which may
-// be Byzantine, implementations must expect and handle arbitrary message inputs
-// (including invalid message types, malformed messages, etc.). Because of this,
-// node-internal messages should NEVER be submitted to a component using Process.
+// MessageProcessor represents a component which receives messages from the networking layer.
+// Since these messages come from other nodes, which may be Byzantine, implementations must expect
+// and handle arbitrary message inputs (including invalid message types, malformed messages, etc.).
+// Because of this, node-internal messages should NEVER be submitted to a component using Process.
+// If a message type implements model.StructureValidator, MessageProcessor implementations may
+// assume that Process will only be invoked for messages which pass structural validation checks.
 type MessageProcessor interface {
 	Process(channel channels.Channel, originID flow.Identifier, message interface{}) error
 }
