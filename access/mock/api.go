@@ -247,6 +247,20 @@ func (_m *API) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flo
 	return r0, r1
 }
 
+// GetBlockStatus provides a mock function with given fields: ctx, id
+func (_m *API) GetBlockStatus(ctx context.Context, id flow.Identifier) flow.BlockStatus {
+	ret := _m.Called(ctx, id)
+
+	var r0 flow.BlockStatus
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) flow.BlockStatus); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Get(0).(flow.BlockStatus)
+	}
+
+	return r0
+}
+
 // GetCollectionByID provides a mock function with given fields: ctx, id
 func (_m *API) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error) {
 	ret := _m.Called(ctx, id)

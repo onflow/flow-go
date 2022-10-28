@@ -106,7 +106,8 @@ func (h *Handler) GetLatestBlock(
 	if err != nil {
 		return nil, err
 	}
-	return h.blockResponse(block, req.GetFullBlockResponse())
+	status := h.api.GetBlockStatus(ctx, block.ID())
+	return h.blockResponse(block, req.GetFullBlockResponse(), status)
 }
 
 // GetBlockByHeight gets a block by height.
@@ -118,7 +119,8 @@ func (h *Handler) GetBlockByHeight(
 	if err != nil {
 		return nil, err
 	}
-	return h.blockResponse(block, req.GetFullBlockResponse())
+	status := h.api.GetBlockStatus(ctx, block.ID())
+	return h.blockResponse(block, req.GetFullBlockResponse(), status)
 }
 
 // GetBlockByID gets a block by ID.
@@ -134,7 +136,8 @@ func (h *Handler) GetBlockByID(
 	if err != nil {
 		return nil, err
 	}
-	return h.blockResponse(block, req.GetFullBlockResponse())
+	status := h.api.GetBlockStatus(ctx, block.ID())
+	return h.blockResponse(block, req.GetFullBlockResponse(), status)
 }
 
 // GetCollectionByID gets a collection by ID.
@@ -489,7 +492,7 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 	return executionResultToMessages(result)
 }
 
-func (h *Handler) blockResponse(block *flow.Block, fullResponse bool) (*access.BlockResponse, error) {
+func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.Header)
 	if err != nil {
 		return nil, err
@@ -505,7 +508,8 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool) (*access.B
 		msg = convert.BlockToMessageLight(block)
 	}
 	return &access.BlockResponse{
-		Block: msg,
+		Block:       msg,
+		BlockStatus: entities.BlockStatus(status),
 	}, nil
 }
 

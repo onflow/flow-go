@@ -58,3 +58,15 @@ func (b *backendBlockDetails) GetBlockByHeight(_ context.Context, height uint64)
 
 	return block, nil
 }
+
+func (b *backendBlockDetails) GetBlockStatus(_ context.Context, id flow.Identifier) flow.BlockStatus {
+	block, err := b.blocks.ByID(id)
+	if err != nil {
+		return flow.BlockStatusExecuted
+	}
+	_, err = b.blocks.ByHeight(block.Header.Height + 1)
+	if err != nil {
+		return flow.BlockStatusFinalized
+	}
+	return flow.BlockStatusSealed
+}

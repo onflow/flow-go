@@ -65,3 +65,22 @@ type PendingBlock struct {
 	Header   *Header
 	Payload  *Payload
 }
+
+// BlockStatus represents the status of a block.
+type BlockStatus int
+
+const (
+	// BlockStatusUnknown indicates that the block status is not known.
+	BlockStatusUnknown BlockStatus = iota
+	// BlockStatusFinalized is the status of a finalized block.
+	BlockStatusFinalized
+	// BlockStatusExecuted is the status of an executed block.
+	BlockStatusExecuted
+	// BlockStatusSealed is the status of a sealed block.
+	BlockStatusSealed
+)
+
+// String returns the string representation of a transaction status.
+func (s BlockStatus) String() string {
+	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_EXECUTED", "BLOCK_SEALED"}[s]
+}

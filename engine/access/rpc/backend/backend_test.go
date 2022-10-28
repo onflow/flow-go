@@ -1156,8 +1156,8 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 	suite.blocks.
 		On("ByID", header.ID()).
-		Return(&expected, nil).
-		Once()
+		Return(&expected, nil)
+	//Once()
 
 	backend := New(
 		suite.state,
@@ -1186,6 +1186,11 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 	// make sure we got the latest header
 	suite.Require().Equal(expected, *actual)
+
+	height := expected.Header.Height + 1
+	suite.blocks.On("ByHeight", height).Return(&expected, nil)
+	status := backend.GetBlockStatus(context.Background(), actual.ID())
+	suite.Assert().Equal(status, flow.BlockStatusSealed)
 
 	suite.assertAllExpectations()
 }
