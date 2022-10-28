@@ -9,7 +9,7 @@ shopt -s extglob
 
 echo "test category (test-setup):" $TEST_CATEGORY>&2
 
-case $TEST_CATEGORY in integration-ghost|integration-mvp|integration-network|integration-epochs|integration-access|integration-collection|integration-consensus|integration-execution|integration-verification)
+case $TEST_CATEGORY in integration-bft|integration-ghost|integration-mvp|integration-network|integration-epochs|integration-access|integration-collection|integration-consensus|integration-execution|integration-verification)
   echo "running make crypto_setup_gopath">&2
   make crypto_setup_gopath
   echo "running make docker-build-flow">&2
