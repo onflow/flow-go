@@ -12,7 +12,7 @@ type Payload struct {
 	// Seals contains the block seals, for ancestor blocks, included in this payload.
 	// The oldest seal must connect to the latest seal in the fork extended by this block.
 	// Seals must be internally connected, containing no seals with duplicate block IDs or heights.
-	// Seals may be empty.
+	// Seals may be empty, and may be in any order.
 	Seals    []*Seal
 	Receipts ExecutionReceiptMetaList
 	Results  ExecutionResultList
