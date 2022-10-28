@@ -316,14 +316,22 @@ func TestProcessMessageMultiAll(t *testing.T) {
 	WithEngine(t, func(eng *TestEngine) {
 		count := 100
 		for i := 0; i < count; i++ {
-			require.NoError(t, eng.Process(unittest.IdentifierFixture(), &messageA{n: i}))
+			err := eng.Process(unittest.IdentifierFixture(), &messageA{n: i})
+			if i == 0 {
+				// n == 0 is invalid for messageA
+				require.True(t, engine.IsInvalidInputError(err))
+			} else {
+				require.NoError(t, err)
+			}
 		}
 
+		expectedCount := count - 1
+
 		require.Eventuallyf(t, func() bool {
-			return eng.MessageCount() == count
+			return eng.MessageCount() == expectedCount
 		}, 2*time.Second, 10*time.Millisecond, "expect %v messages, but go %v messages",
-			count, eng.MessageCount())
-		require.Equal(t, count, eng.MessageCount())
+			expectedCount, eng.MessageCount())
+		require.Equal(t, expectedCount, eng.MessageCount())
 	})
 }
 
@@ -353,16 +361,24 @@ func TestProcessMessageMultiConcurrent(t *testing.T) {
 		for i := 0; i < count; i++ {
 			sent.Add(1)
 			go func(i int) {
-				require.NoError(t, eng.Process(unittest.IdentifierFixture(), &messageA{n: i}))
+				err := eng.Process(unittest.IdentifierFixture(), &messageA{n: i})
+				if i == 0 {
+					// n == 0 is invalid for messageA
+					require.True(t, engine.IsInvalidInputError(err))
+				} else {
+					require.NoError(t, err)
+				}
 				sent.Done()
 			}(i)
 		}
 		sent.Wait()
 
+		expectedCount := count - 1
+
 		require.Eventuallyf(t, func() bool {
-			return eng.MessageCount() == count
+			return eng.MessageCount() == expectedCount
 		}, 2*time.Second, 10*time.Millisecond, "expect %v messages, but go %v messages",
-			count, eng.MessageCount())
+			expectedCount, eng.MessageCount())
 	})
 }
 

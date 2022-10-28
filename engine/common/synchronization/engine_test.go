@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -163,6 +164,7 @@ func (ss *SyncSuite) SetupTest() {
 
 	// set up sync core
 	ss.core = &module.SyncCore{}
+	ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
 
 	// initialize the engine
 	log := zerolog.New(io.Discard)
@@ -180,7 +182,11 @@ func (ss *SyncSuite) SetupTest() {
 				filter.Not(filter.HasNodeID(ss.me.NodeID())),
 			),
 			idCache,
-		))
+		),
+		// avoid having these run during tests
+		WithPollInterval(10*time.Minute),
+		WithScanInterval(10*time.Minute),
+	)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e
@@ -349,14 +355,9 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			},
 		)
 
-		// Rebuild sync core with a smaller max size
-		var err error
-		config := synccore.DefaultConfig()
-		config.MaxSize = 2
-		ss.e.requestHandler.core, err = synccore.New(ss.e.log, config, metrics.NewNoopCollector())
-		require.NoError(ss.T(), err)
+		ss.e.requestHandler.maxRequestSize = 2
 
-		err = ss.e.requestHandler.onRangeRequest(originID, req)
+		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "valid range request exceeding max size should still pass")
 	})
 }
@@ -418,22 +419,20 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		}
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
+				// check response contains the first 2 blocks
 				res := args.Get(0).(*messages.BlockResponse)
-				assert.ElementsMatch(ss.T(), []*flow.Block{ss.blockIDs[req.BlockIDs[0]], ss.blockIDs[req.BlockIDs[1]]}, res.Blocks, "response should contain right block")
+				assert.ElementsMatch(ss.T(), []*flow.Block{ss.blockIDs[req.BlockIDs[0]], ss.blockIDs[req.BlockIDs[1]]}, res.Blocks, "response should contain correct blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+
+				// check response is sent to original requester
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
 			},
 		)
 
-		// Rebuild sync core with a smaller max size
-		var err error
-		config := synccore.DefaultConfig()
-		config.MaxSize = 2
-		ss.e.requestHandler.core, err = synccore.New(ss.e.log, config, metrics.NewNoopCollector())
-		require.NoError(ss.T(), err)
+		ss.e.requestHandler.maxRequestSize = 2
 
-		err = ss.e.requestHandler.onBatchRequest(originID, req)
+		err := ss.e.requestHandler.onBatchRequest(originID, req)
 		require.NoError(ss.T(), err, "valid batch request exceeding max size should still pass")
 	})
 }
