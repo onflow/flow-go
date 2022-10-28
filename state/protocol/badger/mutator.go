@@ -466,16 +466,15 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 			}
 		}
 
-		// trigger BlockProcessable for parent blocks above root height
-		if parent.Height > m.rootHeight {
-			// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
-			m.consumer.BlockProcessable(parent)
-		}
-
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("could not execute state extension: %w", err)
+	}
+
+	// trigger BlockProcessable for parent blocks above root height
+	if parent.Height > m.rootHeight {
+		m.consumer.BlockProcessable(parent)
 	}
 
 	return nil
@@ -615,17 +614,18 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			}
 		}
 
-		// emit protocol events within the scope of the Badger transaction to
-		// guarantee at-least-once delivery
-		// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
-		m.consumer.BlockFinalized(header)
-		for _, emit := range events {
-			emit()
-		}
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("could not persist finalization operations for block (%x): %w", blockID, err)
+	}
+
+	// Emit protocol events after database transaction succeeds. Event delivery is guaranteed,
+	// _except_ in case of a crash. Hence, when recovering from a crash, consumers need to deduce
+	// from the state whether they have missed events and re-execute the respective actions.
+	m.consumer.BlockFinalized(header)
+	for _, emit := range events {
+		emit()
 	}
 
 	// update sealed/finalized block metrics
