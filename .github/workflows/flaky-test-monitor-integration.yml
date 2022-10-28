@@ -23,20 +23,20 @@ jobs:
       fail-fast: false
       matrix:
         test-category:
-          - unit
+#          - unit
           - unit-crypto
-          - unit-insecure
-          - unit-integration
-          - integration-bft
-          - integration-mvp
-          - integration-ghost
-          - integration-network
-          - integration-epochs
-          - integration-access
-          - integration-collection
-          - integration-consensus
-          - integration-execution
-          - integration-verification
+#          - unit-insecure
+#          - unit-integration
+#          - integration-bft
+#          - integration-mvp
+#          - integration-ghost
+#          - integration-network
+#          - integration-epochs
+#          - integration-access
+#          - integration-collection
+#          - integration-consensus
+#          - integration-execution
+#          - integration-verification
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
       COMMIT_SHA: ${{ github.sha }}
@@ -72,3 +72,6 @@ jobs:
       env:
         JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
         COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      if: success() || failure()
