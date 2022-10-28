@@ -134,10 +134,6 @@ func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 		peerInfo := l.host.Network().Peerstore().PeerInfo(peerID)
 		lg := l.log.With().Str("remote_peer", peerInfo.String()).Logger()
 
-		// log the protected status of the connection
-		protected := l.host.ConnManager().IsProtected(peerID, "")
-		lg = lg.With().Bool("protected", protected).Logger()
-
 		// log if any stream is open on this connection.
 		flowStream := p2putils.FlowStream(conn)
 		if flowStream != nil {
