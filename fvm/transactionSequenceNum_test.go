@@ -31,9 +31,11 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		tx.SetProposalKey(address, 0, 0)
 		proc := fvm.Transaction(&tx, 0)
 
+		errs := errors.NewErrorsCollector()
+
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
-		err = seqChecker.Process(fvm.Context{}, proc, txnState, nil)
-		require.NoError(t, err)
+		seqChecker.Process(fvm.Context{}, proc, txnState, nil, errs)
+		require.NoError(t, errs.ErrorOrNil())
 
 		// get fetch the sequence number and it should be updated
 		key, err := accounts.GetPublicKey(address, 0)
@@ -57,8 +59,11 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		tx.SetProposalKey(address, 0, 2)
 		proc := fvm.Transaction(&tx, 0)
 
+		errs := errors.NewErrorsCollector()
+
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
-		err = seqChecker.Process(fvm.Context{}, proc, txnState, nil)
+		seqChecker.Process(fvm.Context{}, proc, txnState, nil, errs)
+		err = errs.ErrorOrNil()
 		require.Error(t, err)
 		require.True(t, errors.HasErrorCode(err, errors.ErrCodeInvalidProposalSeqNumberError))
 
@@ -84,9 +89,11 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		tx.SetProposalKey(flow.HexToAddress("2222"), 0, 0)
 		proc := fvm.Transaction(&tx, 0)
 
+		errs := errors.NewErrorsCollector()
+
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
-		err = seqChecker.Process(fvm.Context{}, proc, txnState, nil)
-		require.Error(t, err)
+		seqChecker.Process(fvm.Context{}, proc, txnState, nil, errs)
+		require.Error(t, errs.ErrorOrNil())
 
 		// get fetch the sequence number and check it to be unchanged
 		key, err := accounts.GetPublicKey(address, 0)

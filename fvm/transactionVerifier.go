@@ -36,13 +36,13 @@ func (v *TransactionVerifier) Process(
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
 	_ *programs.TransactionPrograms,
-) error {
+	errorsCollector *errors.ErrorsCollector,
+) {
 	err := v.verifyTransaction(proc, ctx, txnState)
 	if err != nil {
-		return fmt.Errorf("transaction verification failed: %w", err)
+		errorsCollector.Collect(
+			fmt.Errorf("transaction verification failed: %w", err))
 	}
-
-	return nil
 }
 
 func (v *TransactionVerifier) verifyTransaction(

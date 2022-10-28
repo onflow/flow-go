@@ -28,7 +28,8 @@ func (i TransactionInvoker) Process(
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
 	programs *programsCache.TransactionPrograms,
-) error {
+	errs *errors.ErrorsCollector,
+) {
 
 	txIDStr := proc.ID.String()
 	span := proc.StartSpanFromProcTraceSpan(ctx.Tracer, trace.FVMExecuteTransaction)
@@ -38,28 +39,28 @@ func (i TransactionInvoker) Process(
 	defer span.End()
 
 	nestedTxnId, beginErr := txnState.BeginNestedTransaction()
-	if beginErr != nil {
-		return beginErr
+	if errs.Collect(beginErr).CollectedFailure() {
+		return
 	}
 
 	var modifiedSets programsCache.ModifiedSetsInvalidator
 
-	errs := errors.NewErrorsCollector()
-
 	env := NewTransactionEnvironment(ctx, txnState, programs, proc.Transaction, proc.TxIndex, span)
 
-	var txError error
-	modifiedSets, txError = i.normalExecution(proc, txnState, env)
-	if errs.Collect(txError).CollectedFailure() {
-		return errs.ErrorOrNil()
+	if !errs.CollectedError() {
+		var txError error
+		modifiedSets, txError = i.normalExecution(proc, txnState, env)
+		if errs.Collect(txError).CollectedFailure() {
+			return
+		}
 	}
 
 	if errs.CollectedError() {
 		modifiedSets = programsCache.ModifiedSetsInvalidator{}
 
-		fatalErr := i.errorExecution(proc, txnState, nestedTxnId, env, errs)
-		if fatalErr != nil {
-			return fatalErr
+		i.errorExecution(proc, txnState, nestedTxnId, env, errs)
+		if errs.CollectedFailure() {
+			return
 		}
 	}
 
@@ -70,8 +71,6 @@ func (i TransactionInvoker) Process(
 		env,
 		programs,
 		modifiedSets))
-
-	return errs.ErrorOrNil()
 }
 
 func (i TransactionInvoker) deductTransactionFees(
@@ -198,7 +197,7 @@ func (i TransactionInvoker) errorExecution(
 	nestedTxnId state.NestedTransactionId,
 	env environment.Environment,
 	errs *errors.ErrorsCollector,
-) error {
+) {
 	txnState.DisableAllLimitEnforcements()
 	defer txnState.EnableAllLimitEnforcements()
 
@@ -212,7 +211,7 @@ func (i TransactionInvoker) errorExecution(
 	// drop delta since transaction failed
 	restartErr := txnState.RestartNestedTransaction(nestedTxnId)
 	if errs.Collect(restartErr).CollectedFailure() {
-		return errs.ErrorOrNil()
+		return
 	}
 
 	// try to deduct fees again, to get the fee deduction events
@@ -225,17 +224,12 @@ func (i TransactionInvoker) errorExecution(
 			Msg("transaction fee deduction executed with error")
 
 		if errs.Collect(feesError).CollectedFailure() {
-			return errs.ErrorOrNil()
+			return
 		}
 
 		// drop delta
-		restartErr = txnState.RestartNestedTransaction(nestedTxnId)
-		if errs.Collect(restartErr).CollectedFailure() {
-			return errs.ErrorOrNil()
-		}
+		errs.Collect(txnState.RestartNestedTransaction(nestedTxnId))
 	}
-
-	return nil
 }
 
 func (i TransactionInvoker) commit(

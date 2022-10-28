@@ -30,7 +30,8 @@ type TransactionProcessor interface {
 		*TransactionProcedure,
 		*state.TransactionState,
 		*programs.TransactionPrograms,
-	) error
+		*errors.ErrorsCollector,
+	)
 }
 
 type TransactionProcedure struct {
@@ -71,20 +72,23 @@ func (proc *TransactionProcedure) Run(
 	txnState *state.TransactionState,
 	programs *programs.TransactionPrograms,
 ) error {
+	errorsCollector := errors.NewErrorsCollector()
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(ctx, proc, txnState, programs)
-		txErr, failure := errors.SplitErrorTypes(err)
-		if failure != nil {
-			// log the full error path
-			ctx.Logger.Err(err).Msg("fatal error when execution a transaction")
-			return failure
-		}
-
-		if txErr != nil {
-			proc.Err = txErr
-			// TODO we should not break here we should continue for fee deductions
+		p.Process(ctx, proc, txnState, programs, errorsCollector)
+		if errorsCollector.CollectedFailure() {
 			break
 		}
+	}
+
+	txErr, failure := errors.SplitErrorTypes(errorsCollector.ErrorOrNil())
+	if failure != nil {
+		// log the full error path
+		ctx.Logger.Err(failure).Msg("fatal error when execution a transaction")
+		return failure
+	}
+
+	if txErr != nil {
+		proc.Err = txErr
 	}
 
 	return nil

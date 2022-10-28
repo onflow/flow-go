@@ -52,8 +52,11 @@ func TestTransactionVerification(t *testing.T) {
 		tx.PayloadSignatures = []flow.TransactionSignature{sig, sig}
 		proc := fvm.Transaction(&tx, 0)
 
+		errs := errors.NewErrorsCollector()
+
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
+		txVerifier.Process(fvm.Context{}, proc, txnState, nil, errs)
+		err = errs.ErrorOrNil()
 		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), "duplicate signatures are provided for the same key"))
 	})
@@ -72,8 +75,11 @@ func TestTransactionVerification(t *testing.T) {
 		tx.EnvelopeSignatures = []flow.TransactionSignature{sig}
 		proc := fvm.Transaction(&tx, 0)
 
+		errs := errors.NewErrorsCollector()
+
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
+		txVerifier.Process(fvm.Context{}, proc, txnState, nil, errs)
+		err = errs.ErrorOrNil()
 		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), "duplicate signatures are provided for the same key"))
 	})
@@ -106,10 +112,14 @@ func TestTransactionVerification(t *testing.T) {
 		tx.EnvelopeSignatures = []flow.TransactionSignature{sig2}
 
 		proc := fvm.Transaction(&tx, 0)
-		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
-		require.Error(t, err)
 
+		errs := errors.NewErrorsCollector()
+
+		txVerifier := fvm.NewTransactionVerifier(1000)
+		txVerifier.Process(fvm.Context{}, proc, txnState, nil, errs)
+
+		err = errs.ErrorOrNil()
+		require.Error(t, err)
 		require.True(t, errors.IsInvalidEnvelopeSignatureError(err))
 	})
 
@@ -141,10 +151,14 @@ func TestTransactionVerification(t *testing.T) {
 		tx.EnvelopeSignatures = []flow.TransactionSignature{sig2}
 
 		proc := fvm.Transaction(&tx, 0)
-		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
-		require.Error(t, err)
 
+		errs := errors.NewErrorsCollector()
+
+		txVerifier := fvm.NewTransactionVerifier(1000)
+		txVerifier.Process(fvm.Context{}, proc, txnState, nil, errs)
+
+		err = errs.ErrorOrNil()
+		require.Error(t, err)
 		require.True(t, errors.IsInvalidPayloadSignatureError(err))
 	})
 
@@ -173,8 +187,13 @@ func TestTransactionVerification(t *testing.T) {
 		tx.EnvelopeSignatures = []flow.TransactionSignature{sig2}
 
 		proc := fvm.Transaction(&tx, 0)
+
+		errs := errors.NewErrorsCollector()
+
 		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(fvm.Context{}, proc, txnState, nil)
+		txVerifier.Process(fvm.Context{}, proc, txnState, nil, errs)
+
+		err = errs.ErrorOrNil()
 		require.Error(t, err)
 
 		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
@@ -202,68 +221,76 @@ func TestTransactionVerification(t *testing.T) {
 		require.False(t, frozen)
 
 		// Authorizers
+		errs := errors.NewErrorsCollector()
 		tx := fvm.Transaction(&flow.TransactionBody{
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 		}, 0)
-		err = txChecker.Process(fvm.Context{}, tx, st, nil)
-		require.NoError(t, err)
+		txChecker.Process(fvm.Context{}, tx, st, nil, errs)
+		require.NoError(t, errs.ErrorOrNil())
 
+		errs = errors.NewErrorsCollector()
 		tx = fvm.Transaction(&flow.TransactionBody{
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 			Authorizers: []flow.Address{notFrozenAddress},
 		}, 0)
-		err = txChecker.Process(fvm.Context{}, tx, st, nil)
-		require.NoError(t, err)
+		txChecker.Process(fvm.Context{}, tx, st, nil, errs)
+		require.NoError(t, errs.ErrorOrNil())
 
+		errs = errors.NewErrorsCollector()
 		tx = fvm.Transaction(&flow.TransactionBody{
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 			Authorizers: []flow.Address{frozenAddress},
 		}, 0)
-		err = txChecker.Process(fvm.Context{}, tx, st, nil)
-		require.Error(t, err)
+		txChecker.Process(fvm.Context{}, tx, st, nil, errs)
+		require.Error(t, errs.ErrorOrNil())
 
 		// all addresses must not be frozen
+		errs = errors.NewErrorsCollector()
 		tx = fvm.Transaction(&flow.TransactionBody{
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 			Authorizers: []flow.Address{frozenAddress, notFrozenAddress},
 		}, 0)
-		err = txChecker.Process(fvm.Context{}, tx, st, nil)
-		require.Error(t, err)
+		txChecker.Process(fvm.Context{}, tx, st, nil, errs)
+		require.Error(t, errs.ErrorOrNil())
 
 		// Payer should be part of authorizers account, but lets check it separately for completeness
 
+		errs = errors.NewErrorsCollector()
 		tx = fvm.Transaction(&flow.TransactionBody{
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 		}, 0)
-		err = txChecker.Process(fvm.Context{}, tx, st, nil)
-		require.NoError(t, err)
+		txChecker.Process(fvm.Context{}, tx, st, nil, errs)
+		require.NoError(t, errs.ErrorOrNil())
 
+		errs = errors.NewErrorsCollector()
 		tx = fvm.Transaction(&flow.TransactionBody{
 			Payer:       frozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 		}, 0)
-		err = txChecker.Process(fvm.Context{}, tx, st, nil)
-		require.Error(t, err)
+		txChecker.Process(fvm.Context{}, tx, st, nil, errs)
+		require.Error(t, errs.ErrorOrNil())
 
 		// Proposal account
 
+		errs = errors.NewErrorsCollector()
 		tx = fvm.Transaction(&flow.TransactionBody{
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: frozenAddress},
 		}, 0)
-		err = txChecker.Process(fvm.Context{}, tx, st, nil)
-		require.Error(t, err)
+		txChecker.Process(fvm.Context{}, tx, st, nil, errs)
+		require.Error(t, errs.ErrorOrNil())
 
+		errs = errors.NewErrorsCollector()
 		tx = fvm.Transaction(&flow.TransactionBody{
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 		}, 0)
-		err = txChecker.Process(fvm.Context{}, tx, st, nil)
-		require.NoError(t, err)
+		txChecker.Process(fvm.Context{}, tx, st, nil, errs)
+		require.NoError(t, errs.ErrorOrNil())
 	})
 }

@@ -923,7 +923,7 @@ func (b *BootstrapProcedure) invokeMetaTransaction(
 		WithTransactionFeesEnabled(false),
 	)
 
-	err := invoker.Process(ctx, tx, txnState, programs)
-	txErr, fatalErr := errors.SplitErrorTypes(err)
-	return txErr, fatalErr
+	errs := errors.NewErrorsCollector()
+	invoker.Process(ctx, tx, txnState, programs, errs)
+	return errors.SplitErrorTypes(errs.ErrorOrNil())
 }

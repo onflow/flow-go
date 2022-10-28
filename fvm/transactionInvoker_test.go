@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -46,8 +47,9 @@ func TestSafetyCheck(t *testing.T) {
 		txnPrograms, err := blockPrograms.NewTransactionPrograms(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, txnState, txnPrograms)
-		require.Error(t, err)
+		errs := errors.NewErrorsCollector()
+		txInvoker.Process(context, proc, txnState, txnPrograms, errs)
+		require.Error(t, errs.ErrorOrNil())
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
@@ -79,8 +81,9 @@ func TestSafetyCheck(t *testing.T) {
 		txnPrograms, err := blockPrograms.NewTransactionPrograms(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, txnState, txnPrograms)
-		require.Error(t, err)
+		errs := errors.NewErrorsCollector()
+		txInvoker.Process(context, proc, txnState, txnPrograms, errs)
+		require.Error(t, errs.ErrorOrNil())
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")

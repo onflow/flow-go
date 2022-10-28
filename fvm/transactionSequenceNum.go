@@ -22,13 +22,13 @@ func (c *TransactionSequenceNumberChecker) Process(
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
 	_ *programs.TransactionPrograms,
-) error {
+	errorsCollector *errors.ErrorsCollector,
+) {
 	err := c.checkAndIncrementSequenceNumber(proc, ctx, txnState)
 	if err != nil {
-		return fmt.Errorf("checking sequence number failed: %w", err)
+		errorsCollector.Collect(
+			fmt.Errorf("checking sequence number failed: %w", err))
 	}
-
-	return nil
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
