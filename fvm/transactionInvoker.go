@@ -42,7 +42,7 @@ func (i TransactionInvoker) Process(
 		return beginErr
 	}
 
-	var modifiedSets programsCache.ModifiedSetsInvalidator
+	var modifiedSets programsCache.OCCProgramsInvalidator
 
 	errs := errors.NewErrorsCollector()
 
@@ -55,7 +55,7 @@ func (i TransactionInvoker) Process(
 	}
 
 	if errs.CollectedError() {
-		modifiedSets = programsCache.ModifiedSetsInvalidator{}
+		modifiedSets = programsCache.OCCProgramsInvalidator{}
 
 		fatalErr := i.errorExecution(proc, txnState, nestedTxnId, env, errs)
 		if fatalErr != nil {
@@ -136,7 +136,7 @@ func (i TransactionInvoker) normalExecution(
 	txnState *state.TransactionState,
 	env environment.Environment,
 ) (
-	modifiedSets programsCache.ModifiedSetsInvalidator,
+	modifiedSets programsCache.OCCProgramsInvalidator,
 	err error,
 ) {
 	rt := env.BorrowCadenceRuntime()
@@ -244,7 +244,7 @@ func (i TransactionInvoker) commit(
 	nestedTxnId state.NestedTransactionId,
 	env environment.Environment,
 	programs *programsCache.TransactionPrograms,
-	modifiedSets programsCache.ModifiedSetsInvalidator,
+	modifiedSets programsCache.OCCProgramsInvalidator,
 ) error {
 	if txnState.NumNestedTransactions() > 1 {
 		// This is a fvm internal programming error.  We forgot to call Commit

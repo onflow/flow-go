@@ -60,7 +60,7 @@ type Environment interface {
 	// modules (i.e., ContractUpdater) to the state transaction, and return
 	// corresponding modified sets invalidator.
 	FlushPendingUpdates() (
-		programs.ModifiedSetsInvalidator,
+		programs.OCCProgramsInvalidator,
 		error,
 	)
 

@@ -75,29 +75,32 @@ func (vm *VirtualMachine) Run(
 	}
 
 	var txnPrograms *programs.TransactionPrograms
-	var err error
 	switch proc.Type() {
 	case ScriptProcedureType:
-		txnPrograms, err = blockPrograms.NewSnapshotReadTransactionPrograms(
+		snapshotReadTxn, err := blockPrograms.NewSnapshotReadOCCBlockItem(
 			proc.InitialSnapshotTime(),
 			proc.ExecutionTime())
+		if err != nil {
+			return err
+		}
+		txnPrograms = programs.NewTransactionPrograms(*snapshotReadTxn)
 	case TransactionProcedureType, BootstrapProcedureType:
-		txnPrograms, err = blockPrograms.NewTransactionPrograms(
+		normTxn, err := blockPrograms.NewOCCBlockItem(
 			proc.InitialSnapshotTime(),
 			proc.ExecutionTime())
+		if err != nil {
+			return err
+		}
+		txnPrograms = programs.NewTransactionPrograms(*normTxn)
 	default:
 		return fmt.Errorf("invalid proc type: %v", proc.Type())
-	}
-
-	if err != nil {
-		return fmt.Errorf("error creating transaction programs: %w", err)
 	}
 
 	meterParams := meter.DefaultParameters().
 		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
 		WithMemoryLimit(proc.MemoryLimit(ctx))
 
-	meterParams, err = getEnvironmentMeterParameters(
+	meterParams, err := getEnvironmentMeterParameters(
 		ctx,
 		v,
 		txnPrograms,
@@ -164,7 +167,7 @@ func (vm *VirtualMachine) GetAccount(
 		blockPrograms = programs.NewEmptyBlockPrograms()
 	}
 
-	txnPrograms, err := blockPrograms.NewSnapshotReadTransactionPrograms(
+	occTxnPrograms, err := blockPrograms.NewSnapshotReadOCCBlockItem(
 		programs.EndOfBlockExecutionTime,
 		programs.EndOfBlockExecutionTime)
 	if err != nil {
@@ -173,6 +176,7 @@ func (vm *VirtualMachine) GetAccount(
 			err)
 	}
 
+	txnPrograms := programs.NewTransactionPrograms(*occTxnPrograms)
 	env := NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
 	account, err := env.GetAccount(address)
 	if err != nil {

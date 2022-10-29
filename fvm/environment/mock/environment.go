@@ -338,14 +338,14 @@ func (_m *Environment) Events() []flow.Event {
 }
 
 // FlushPendingUpdates provides a mock function with given fields:
-func (_m *Environment) FlushPendingUpdates() (programs.ModifiedSetsInvalidator, error) {
+func (_m *Environment) FlushPendingUpdates() (programs.OCCProgramsInvalidator, error) {
 	ret := _m.Called()
 
-	var r0 programs.ModifiedSetsInvalidator
-	if rf, ok := ret.Get(0).(func() programs.ModifiedSetsInvalidator); ok {
+	var r0 programs.OCCProgramsInvalidator
+	if rf, ok := ret.Get(0).(func() programs.OCCProgramsInvalidator); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(programs.ModifiedSetsInvalidator)
+		r0 = ret.Get(0).(programs.OCCProgramsInvalidator)
 	}
 
 	var r1 error

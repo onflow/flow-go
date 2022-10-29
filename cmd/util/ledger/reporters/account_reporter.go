@@ -150,11 +150,12 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	)
 	accounts := environment.NewAccounts(txnState)
 
-	txnPrograms, err := blockPrograms.NewSnapshotReadTransactionPrograms(0, 0)
+	occTxnPrograms, err := blockPrograms.NewSnapshotReadOCCBlockItem(0, 0)
 	if err != nil {
 		panic(err)
 	}
 
+	txnPrograms := programs.NewTransactionPrograms(*occTxnPrograms)
 	env := fvm.NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
 
 	return &balanceProcessor{
