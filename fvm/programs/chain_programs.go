@@ -11,6 +11,11 @@ import (
 
 const DefaultProgramsCacheSize = 1000
 
+type BlockRuntimeItem struct {
+	Programs      *BlockPrograms
+	MeterSettings *BlockMeterSettings
+}
+
 // ChainPrograms is a cache of BlockPrograms databases used for speeding up
 // cadence execution.
 //
@@ -37,10 +42,10 @@ func NewChainPrograms(chainCacheSize uint) (*ChainPrograms, error) {
 
 func (chain *ChainPrograms) unsafeGet(
 	currentBlockId flow.Identifier,
-) *BlockPrograms {
+) *BlockRuntimeItem {
 	currentEntry, ok := chain.lru.Get(currentBlockId)
 	if ok {
-		return currentEntry.(*BlockPrograms)
+		return currentEntry.(*BlockRuntimeItem)
 	}
 
 	return nil
@@ -48,7 +53,7 @@ func (chain *ChainPrograms) unsafeGet(
 
 func (chain *ChainPrograms) Get(
 	currentBlockId flow.Identifier,
-) *BlockPrograms {
+) *BlockRuntimeItem {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
@@ -58,7 +63,7 @@ func (chain *ChainPrograms) Get(
 func (chain *ChainPrograms) GetOrCreateBlockPrograms(
 	currentBlockId flow.Identifier,
 	parentBlockId flow.Identifier,
-) *BlockPrograms {
+) *BlockRuntimeItem {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
@@ -67,25 +72,37 @@ func (chain *ChainPrograms) GetOrCreateBlockPrograms(
 		return currentEntry
 	}
 
-	var current *BlockPrograms
+	var currentPrograms *BlockPrograms
+	var currentMeterSettings *BlockMeterSettings
+
 	parentEntry, ok := chain.lru.Get(parentBlockId)
 	if ok {
-		current = parentEntry.(*BlockPrograms).NewChildOCCBlock()
+		currentPrograms = parentEntry.(*BlockRuntimeItem).Programs.NewChildOCCBlock()
+		currentMeterSettings = parentEntry.(*BlockRuntimeItem).MeterSettings.NewChildBlockMeterSettings()
 	} else {
-		current = NewEmptyBlockPrograms()
+		currentPrograms = NewEmptyBlockPrograms()
+		currentMeterSettings = NewBlockMeterSettings()
 	}
 
-	chain.lru.Add(currentBlockId, current)
+	current := &BlockRuntimeItem{
+		Programs:      currentPrograms,
+		MeterSettings: currentMeterSettings,
+	}
+
+	chain.lru.Add(currentBlockId, *current)
 	return current
 }
 
-func (chain *ChainPrograms) NewBlockProgramsForScript(
+func (chain *ChainPrograms) NewBlockRuntimeItemForScript(
 	currentBlockId flow.Identifier,
-) *BlockPrograms {
+) *BlockRuntimeItem {
 	block := chain.Get(currentBlockId)
 	if block != nil {
-		return block.NewChildOCCBlock()
+		return &BlockRuntimeItem{
+			Programs:      block.Programs.NewChildOCCBlock(),
+			MeterSettings: block.MeterSettings.NewChildBlockMeterSettings(),
+		}
 	}
 
-	return NewEmptyBlockPrograms()
+	return &BlockRuntimeItem{}
 }

@@ -16,15 +16,23 @@ type BlockMeterSettings struct {
 	cachedState *state.State
 }
 
-func NewBlockMeterSettings(txnPrograms *TransactionPrograms) *BlockMeterSettings {
+func NewBlockMeterSettings() *BlockMeterSettings {
 	occBlockItem, err := NewEmptyOCCBlock[int, meter.MeterParameters]().
 		NewOCCBlockItem(0, 0)
 	if err != nil {
 		return nil
 	}
 	return &BlockMeterSettings{
-		txnPrograms: txnPrograms,
+		txnPrograms: nil,
 		cachedValue: occBlockItem,
+	}
+}
+
+func (block *BlockMeterSettings) NewChildBlockMeterSettings() *BlockMeterSettings {
+	return &BlockMeterSettings{
+		txnPrograms: block.txnPrograms,
+		cachedValue: block.cachedValue,
+		cachedState: block.cachedState,
 	}
 }
 

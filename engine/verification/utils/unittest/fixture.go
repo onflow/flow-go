@@ -265,7 +265,8 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
-		programs := programs.NewEmptyBlockPrograms()
+		blockPrograms := programs.NewEmptyBlockPrograms()
+		meterSettings := programs.NewBlockMeterSettings()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := new(mocktracker.Storage)
@@ -323,7 +324,10 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			CompleteCollections: completeColls,
 			StartState:          &startStateCommitment,
 		}
-		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, programs)
+		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, &programs.BlockRuntimeItem{
+			Programs:      blockPrograms,
+			MeterSettings: meterSettings,
+		})
 		require.NoError(t, err)
 		serviceEvents = make([]flow.ServiceEvent, 0, len(computationResult.ServiceEvents))
 		for _, event := range computationResult.ServiceEvents {

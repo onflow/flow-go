@@ -100,12 +100,39 @@ func (vm *VirtualMachine) Run(
 		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
 		WithMemoryLimit(proc.MemoryLimit(ctx))
 
-	meterParams, err := getEnvironmentMeterParameters(
-		ctx,
-		v,
-		txnPrograms,
-		meterParams,
-	)
+	var err error
+	if ctx.MeterSettings != nil {
+		// this is where we link
+		ctx.MeterSettings.SetCurrentTransactionProgram(txnPrograms)
+
+		// retrieve
+		retrievedMeterParams, err0 := ctx.MeterSettings.GetOrRetrive(
+			v,
+			func(ts *state.TransactionState) (meter.MeterParameters, error) {
+				return getEnvironmentMeterParameters(
+					ctx,
+					v,
+					txnPrograms,
+					meterParams,
+				)
+			},
+			state.DefaultParameters(),
+		)
+		if err0 != nil {
+			err = err0
+
+		} else {
+			meterParams = *retrievedMeterParams
+		}
+
+	} else {
+		meterParams, err = getEnvironmentMeterParameters(
+			ctx,
+			v,
+			txnPrograms,
+			meterParams,
+		)
+	}
 	if err != nil {
 		return fmt.Errorf("error gettng environment meter parameters: %w", err)
 	}

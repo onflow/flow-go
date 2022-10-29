@@ -49,7 +49,7 @@ type BlockComputer interface {
 		context.Context,
 		*entity.ExecutableBlock,
 		state.View,
-		*programs.BlockPrograms,
+		*programs.BlockRuntimeItem,
 	) (
 		*execution.ComputationResult,
 		error,
@@ -107,7 +107,7 @@ func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
 	stateView state.View,
-	program *programs.BlockPrograms,
+	blockRuntimeItem *programs.BlockRuntimeItem,
 ) (*execution.ComputationResult, error) {
 
 	span, _, isSampled := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
@@ -116,7 +116,7 @@ func (e *blockComputer) ExecuteBlock(
 	}
 	defer span.End()
 
-	results, err := e.executeBlock(ctx, span, block, stateView, program)
+	results, err := e.executeBlock(ctx, span, block, stateView, blockRuntimeItem)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -131,7 +131,7 @@ func (e *blockComputer) executeBlock(
 	blockSpan otelTrace.Span,
 	block *entity.ExecutableBlock,
 	stateView state.View,
-	programs *programs.BlockPrograms,
+	blockRuntimeItem *programs.BlockRuntimeItem,
 ) (*execution.ComputationResult, error) {
 
 	// check the start state is set
@@ -142,11 +142,15 @@ func (e *blockComputer) executeBlock(
 	blockCtx := fvm.NewContextFromParent(
 		e.vmCtx,
 		fvm.WithBlockHeader(block.Block.Header),
-		fvm.WithBlockPrograms(programs))
+		fvm.WithBlockPrograms(blockRuntimeItem.Programs),
+		fvm.WithBlockMeterSettings(blockRuntimeItem.MeterSettings),
+	)
 	systemChunkCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
 		fvm.WithBlockHeader(block.Block.Header),
-		fvm.WithBlockPrograms(programs))
+		fvm.WithBlockPrograms(blockRuntimeItem.Programs),
+		fvm.WithBlockMeterSettings(blockRuntimeItem.MeterSettings),
+	)
 	collections := block.Collections()
 
 	res := execution.NewEmptyComputationResult(block)

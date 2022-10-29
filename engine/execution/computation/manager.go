@@ -204,11 +204,13 @@ func (e *Manager) ExecuteScript(
 	defer cancel()
 
 	script := fvm.NewScriptWithContextAndArgs(code, requestCtx, arguments...)
+	childBlockRuntimeItem := e.programsCache.NewBlockRuntimeItemForScript(blockHeader.ID())
 	blockCtx := fvm.NewContextFromParent(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
-		fvm.WithBlockPrograms(
-			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
+		fvm.WithBlockPrograms(childBlockRuntimeItem.Programs),
+		fvm.WithBlockMeterSettings(childBlockRuntimeItem.MeterSettings),
+	)
 
 	err := func() (err error) {
 
@@ -335,7 +337,7 @@ func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, vie
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
 		fvm.WithBlockPrograms(
-			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
+			e.programsCache.NewBlockRuntimeItemForScript(blockHeader.ID()).Programs))
 
 	account, err := e.vm.GetAccount(blockCtx, address, view)
 	if err != nil {

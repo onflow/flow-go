@@ -28,6 +28,7 @@ type Context struct {
 	ScriptProcessors      []ScriptProcessor
 
 	BlockPrograms *programs.BlockPrograms
+	MeterSettings *programs.BlockMeterSettings
 
 	environment.EnvironmentParams
 }
@@ -307,6 +308,13 @@ func WithReusableCadenceRuntimePool(
 func WithBlockPrograms(programs *programs.BlockPrograms) Option {
 	return func(ctx Context) Context {
 		ctx.BlockPrograms = programs
+		return ctx
+	}
+}
+
+func WithBlockMeterSettings(meterSettings *programs.BlockMeterSettings) Option {
+	return func(ctx Context) Context {
+		ctx.MeterSettings = meterSettings
 		return ctx
 	}
 }

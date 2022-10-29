@@ -318,7 +318,7 @@ func (block *OCCBlock[TKey, TVal]) NewOCCBlockItem(
 
 func (item *OCCBlockItem[TKey, TVal]) Get(
 	key TKey,
-) *TVal {
+) *TVal { // TODO: no pointer?
 	/*
 		_, ok := location.(common.AddressLocation)
 		if !ok {
