@@ -61,33 +61,40 @@ func TestRequestQueue_Put(t *testing.T) {
 func TestRequestQueue_PutAtMaxCapacity(t *testing.T) {
 	limit := uint(10)
 	q := NewRequestHeap(limit)
+
 	messages := make(map[flow.Identifier]*engine.Message)
-	for i := uint(0); i < limit; i++ {
-		msg := &engine.Message{
+	var lastMsg *engine.Message // tracks the last message that we added to the heap
+	for i := uint(0); i < limit+1; i++ {
+		lastMsg = &engine.Message{
 			OriginID: unittest.IdentifierFixture(),
 			Payload:  unittest.IdentifierFixture(),
 		}
-		require.True(t, q.Put(msg))
-		messages[msg.OriginID] = msg
+		messages[lastMsg.OriginID] = lastMsg
+		require.True(t, q.Put(lastMsg))
 	}
-	newMsg := &engine.Message{
-		OriginID: unittest.IdentifierFixture(),
-		Payload:  unittest.BlockFixture(),
-	}
-	require.True(t, q.Put(newMsg))
 
-	ejectedCount := 0
-	for {
+	// We have inserted 11 elements into the heap with capacity 10. The heap should now store
+	// 10 of these elements. By convention, the last-inserted element should be stored (no
+	// ejecting the just stored element).
+	lastMessagePopped := false
+	for k := uint(0); k < limit; k++ {
 		m, ok := q.Get()
-		if !ok {
-			break
-		}
+		require.True(t, ok)
+
 		expectedMessage, found := messages[m.OriginID]
-		if !found {
-			ejectedCount++
-		} else {
-			require.Equal(t, m, expectedMessage)
+		require.True(t, found)
+		require.Equal(t, m, expectedMessage)
+		if m == lastMsg {
+			lastMessagePopped = true
 		}
+
+		delete(messages, m.OriginID)
 	}
-	require.Equal(t, 1, ejectedCount)
+
+	// We now have removed 10 out of 11 elements from `messages`. What remains in the map
+	// is that one message that the heap ejected. By convention, the heap should always eject first
+	// before accepting a new element. Therefore, the last-inserted element ('lastMsg') should have
+	// been popped from the heap in the for-loop, i.e. `lastMessagePopped` is expected to be true.
+	require.Equal(t, 1, len(messages))
+	require.True(t, lastMessagePopped)
 }
