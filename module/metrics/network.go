@@ -211,7 +211,7 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Subsystem: subsystemAuth,
 			Name:      nc.prefix + "unauthorized_messages_count",
 			Help:      "number of messages that failed authorization validation",
-		}, []string{LabelNodeRole, LabelMessage, LabelChannel},
+		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelViolationReason},
 	)
 
 	nc.rateLimitedUnicastMessagesCount = promauto.NewCounterVec(
