@@ -820,6 +820,26 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	unittest.RequireNeverReturnBefore(m.T(), msgRcvdFun, 2*time.Second, "message received unexpectedly")
 }
 
+func createMessageWithPayload(t *testing.T, originID flow.Identifier, targetID flow.Identifier, channel channels.Channel, payload interface{}) (*message.Message, interface{}) {
+	codec := unittest.NetworkCodec()
+	b, err := codec.Encode(payload)
+	require.NoError(t, err)
+
+	eventID, err := p2p.EventId(channel, b)
+	require.NoError(t, err)
+
+	m := &message.Message{
+		ChannelID: channel.String(),
+		EventID:   eventID,
+		OriginID:  originID[:],
+		TargetIDs: [][]byte{targetID[:]},
+		Payload:   b,
+		Type:      p2p.MessageType(payload),
+	}
+
+	return m, payload
+}
+
 func (m *MiddlewareTestSuite) stopMiddlewares() {
 	m.mwCancel()
 
