@@ -60,8 +60,6 @@ install-mock-generators:
     go install github.com/vektra/mockery/v2@v2.13.1; \
     go install github.com/golang/mock/mockgen@v1.3.1;
 
-############################################################################################
-
 .PHONY: install-tools
 install-tools: crypto_setup_gopath check-go-version install-mock-generators
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.49.0; \
@@ -70,6 +68,12 @@ install-tools: crypto_setup_gopath check-go-version install-mock-generators
 	go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
 	go install golang.org/x/tools/cmd/stringer@master;
+
+.PHONY: verify-mocks
+verify-mocks: generate-mocks
+	git diff --exit-code
+
+############################################################################################
 
 .PHONY: emulator-build
 emulator-build:
@@ -114,10 +118,6 @@ generate: generate-proto generate-mocks generate-fvm-env-wrappers
 .PHONY: generate-proto
 generate-proto:
 	prototool generate protobuf
-
-.PHONY: verify-mocks
-verify-mocks: generate-mocks
-	git diff --exit-code
 
 .PHONY: generate-fvm-env-wrappers
 generate-fvm-env-wrappers:
