@@ -66,9 +66,9 @@ jobs:
           cache: true
       - name: Run tidy
         run: make tidy
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        if: success() || failure()
+#      - name: Setup tmate session
+#        uses: mxschmitt/action-tmate@v3
+#        if: success() || failure()
       - name: Emulator build
         run: make emulator-build
 
