@@ -95,6 +95,7 @@ func (s *Suite) SetupTest() {
 
 	s.ctx, s.cancel, s.errs = irrecoverable.WithSignallerAndCancel(context.Background())
 	s.engine.Start(s.ctx)
+	unittest.RequireCloseBefore(s.T(), s.engine.Ready(), time.Second, "engine failed to start")
 }
 
 // TearDownTest stops the engine and checks there are no errors thrown to the SignallerContext.

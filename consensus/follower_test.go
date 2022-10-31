@@ -1,6 +1,8 @@
 package consensus_test
 
 import (
+	"context"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"os"
 	"testing"
 	"time"
@@ -50,18 +52,21 @@ func TestHotStuffFollower(t *testing.T) {
 type HotStuffFollowerSuite struct {
 	suite.Suite
 
-	committee  *mockhotstuff.DynamicCommittee
-	headers    *mockstorage.Headers
-	finalizer  *mockmodule.Finalizer
-	verifier   *mockhotstuff.Verifier
-	notifier   *mockhotstuff.FinalizationConsumer
-	rootHeader *flow.Header
-	rootQC     *flow.QuorumCertificate
-	finalized  *flow.Header
-	pending    []*flow.Header
-	follower   *hotstuff.FollowerLoop
-
+	committee     *mockhotstuff.DynamicCommittee
+	headers       *mockstorage.Headers
+	finalizer     *mockmodule.Finalizer
+	verifier      *mockhotstuff.Verifier
+	notifier      *mockhotstuff.FinalizationConsumer
+	rootHeader    *flow.Header
+	rootQC        *flow.QuorumCertificate
+	finalized     *flow.Header
+	pending       []*flow.Header
+	follower      *hotstuff.FollowerLoop
 	mockConsensus *MockConsensus
+
+	ctx    irrecoverable.SignalerContext
+	cancel context.CancelFunc
+	errs   <-chan error
 }
 
 // SetupTest initializes all the components needed for the Follower.
@@ -92,16 +97,16 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	s.headers = &mockstorage.Headers{}
 
 	// mock finalization finalizer
-	s.finalizer = &mockmodule.Finalizer{}
+	s.finalizer = mockmodule.NewFinalizer(s.T())
 
 	// mock finalization finalizer
-	s.verifier = &mockhotstuff.Verifier{}
-	s.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	s.verifier.On("VerifyTC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	s.verifier = mockhotstuff.NewVerifier(s.T())
+	s.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	s.verifier.On("VerifyTC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	// mock consumer for finalization notifications
-	s.notifier = &mockhotstuff.FinalizationConsumer{}
+	s.notifier = mockhotstuff.NewFinalizationConsumer(s.T())
 
 	// root block and QC
 	parentID, err := flow.HexStringToIdentifier("aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70")
@@ -147,23 +152,15 @@ func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
 	)
 	require.NoError(s.T(), err)
 
-	select {
-	case <-s.follower.Ready():
-	case <-time.After(time.Second):
-		s.T().Error("timeout on waiting for follower start")
-	}
+	s.ctx, s.cancel, s.errs = irrecoverable.WithSignallerAndCancel(context.Background())
+	s.follower.Start(s.ctx)
+	unittest.RequireCloseBefore(s.T(), s.follower.Ready(), time.Second, "follower failed to start")
 }
 
 // AfterTest stops follower and asserts that the Follower executed the expected callbacks.
 func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
-	select {
-	case <-s.follower.Done():
-	case <-time.After(time.Second):
-		s.T().Error("timeout on waiting for expected Follower shutdown")
-		s.T().FailNow() // stops the test
-	}
-	s.notifier.AssertExpectations(s.T())
-	s.finalizer.AssertExpectations(s.T())
+	s.cancel()
+	unittest.RequireCloseBefore(s.T(), s.follower.Done(), time.Second, "follower failed to stop")
 }
 
 // TestInitialization verifies that the basic test setup with initialization of the Follower works as expected
