@@ -33,7 +33,7 @@ func TestBandWidthRateLimiter_Allow(t *testing.T) {
 		b[i] = byte('X')
 	}
 
-	msg, _ := messageutils.CreateMessage(t, unittest.IdentifierFixture(), channels.TestNetworkChannel, string(b))
+	msg, _, _ := messageutils.CreateMessage(t, unittest.IdentifierFixture(), unittest.IdentifierFixture(), channels.TestNetworkChannel, string(b))
 
 	allowed := bandwidthRateLimiter.Allow(peerID, msg)
 	require.True(t, allowed)
@@ -78,7 +78,7 @@ func TestBandWidthRateLimiter_IsRateLimited(t *testing.T) {
 
 	require.False(t, bandwidthRateLimiter.IsRateLimited(peerID))
 
-	msg, _ := messageutils.CreateMessage(t, unittest.IdentifierFixture(), channels.TestNetworkChannel, string(b))
+	msg, _, _ := messageutils.CreateMessage(t, unittest.IdentifierFixture(), unittest.IdentifierFixture(), channels.TestNetworkChannel, string(b))
 	allowed := bandwidthRateLimiter.Allow(peerID, msg)
 	require.False(t, allowed)
 	require.True(t, bandwidthRateLimiter.IsRateLimited(peerID))
