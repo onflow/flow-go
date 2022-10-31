@@ -192,6 +192,7 @@ const (
 	FVMEnvSetAccountFrozen           SpanName = "fvm.env.setAccountFrozen"
 	FVMEnvAddAccountKey              SpanName = "fvm.env.addAccountKey"
 	FVMEnvAddEncodedAccountKey       SpanName = "fvm.env.addEncodedAccountKey"
+	FVMEnvAccountKeysCount           SpanName = "fvm.env.accountKeysCount"
 	FVMEnvGetAccountKey              SpanName = "fvm.env.getAccountKey"
 	FVMEnvRevokeAccountKey           SpanName = "fvm.env.revokeAccountKey"
 	FVMEnvRevokeEncodedAccountKey    SpanName = "fvm.env.revokeEncodedAccountKey"

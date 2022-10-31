@@ -15,6 +15,27 @@ type AccountKeyReader struct {
 	mock.Mock
 }
 
+// AccountKeysCount provides a mock function with given fields: address
+func (_m *AccountKeyReader) AccountKeysCount(address common.Address) (uint64, error) {
+	ret := _m.Called(address)
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
+		r0 = rf(address)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetAccountKey provides a mock function with given fields: address, keyIndex
 func (_m *AccountKeyReader) GetAccountKey(address common.Address, keyIndex int) (*stdlib.AccountKey, error) {
 	ret := _m.Called(address, keyIndex)
