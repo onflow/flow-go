@@ -2,7 +2,6 @@ package message_hub
 
 import (
 	"context"
-	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"math/rand"
 	"sync"
 	"testing"
@@ -16,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"

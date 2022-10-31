@@ -1,7 +1,6 @@
 package synchronization
 
 import (
-	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"io"
 	"math/rand"
 	"testing"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
+	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"

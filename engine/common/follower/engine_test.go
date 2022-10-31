@@ -2,7 +2,6 @@ package follower_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/model/events"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/irrecoverable"

@@ -4,7 +4,6 @@ package synchronization
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/consensus"
 	"math/rand"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
