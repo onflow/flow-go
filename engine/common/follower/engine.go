@@ -11,13 +11,17 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state"
@@ -26,29 +30,39 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// helper type used to pass originID and block through FIFO queue
+type inboundBlock struct {
+	originID flow.Identifier
+	block    *messages.BlockProposal
+}
+
+// defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
+const defaultBlockQueueCapacity = 10_000
+
 // Engine follows and maintains the local copy of the protocol state. It is a
 // passive (read-only) version of the compliance engine. The compliance engine
 // is employed by consensus nodes (active consensus participants) where the
 // Follower engine is employed by all other node roles.
-// TODO use ComponentManager, message queues https://github.com/dapperlabs/flow-go/issues/6173
 type Engine struct {
-	unit           *engine.Unit
-	log            zerolog.Logger
-	config         compliance.Config
-	me             module.Local
-	engMetrics     module.EngineMetrics
-	mempoolMetrics module.MempoolMetrics
-	cleaner        storage.Cleaner
-	headers        storage.Headers
-	payloads       storage.Payloads
-	state          protocol.MutableState
-	pending        module.PendingBlockBuffer
-	follower       module.HotStuffFollower
-	validator      hotstuff.Validator
-	con            network.Conduit
-	sync           module.BlockRequester
-	tracer         module.Tracer
-	channel        channels.Channel
+	*component.ComponentManager
+	log                   zerolog.Logger
+	config                compliance.Config
+	me                    module.Local
+	engMetrics            module.EngineMetrics
+	mempoolMetrics        module.MempoolMetrics
+	cleaner               storage.Cleaner
+	headers               storage.Headers
+	payloads              storage.Payloads
+	state                 protocol.MutableState
+	pending               module.PendingBlockBuffer
+	follower              module.HotStuffFollower
+	validator             hotstuff.Validator
+	con                   network.Conduit
+	sync                  module.BlockRequester
+	tracer                module.Tracer
+	channel               channels.Channel
+	pendingBlocks         *fifoqueue.FifoQueue // queues for processing inbound blocks
+	pendingBlocksNotifier engine.Notifier
 }
 
 type Option func(*Engine)
@@ -70,6 +84,7 @@ func WithChannel(channel channels.Channel) Option {
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
+var _ component.Component = (*Engine)(nil)
 
 func New(
 	log zerolog.Logger,
@@ -88,23 +103,32 @@ func New(
 	tracer module.Tracer,
 	opts ...Option,
 ) (*Engine, error) {
+	// FIFO queue for block proposals
+	pendingBlocks, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for inbound blocks: %w", err)
+	}
+
 	e := &Engine{
-		unit:           engine.NewUnit(),
-		log:            log.With().Str("engine", "follower").Logger(),
-		config:         compliance.DefaultConfig(),
-		me:             me,
-		engMetrics:     engMetrics,
-		mempoolMetrics: mempoolMetrics,
-		cleaner:        cleaner,
-		headers:        headers,
-		payloads:       payloads,
-		state:          state,
-		pending:        pending,
-		follower:       follower,
-		validator:      validator,
-		sync:           sync,
-		tracer:         tracer,
-		channel:        channels.ReceiveBlocks,
+		log:                   log.With().Str("engine", "follower").Logger(),
+		config:                compliance.DefaultConfig(),
+		me:                    me,
+		engMetrics:            engMetrics,
+		mempoolMetrics:        mempoolMetrics,
+		cleaner:               cleaner,
+		headers:               headers,
+		payloads:              payloads,
+		state:                 state,
+		pending:               pending,
+		follower:              follower,
+		validator:             validator,
+		sync:                  sync,
+		tracer:                tracer,
+		channel:               channels.ReceiveBlocks,
+		pendingBlocks:         pendingBlocks,
+		pendingBlocksNotifier: engine.NewNotifier(),
 	}
 
 	for _, apply := range opts {
@@ -117,89 +141,111 @@ func New(
 	}
 	e.con = con
 
+	e.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(e.processBlocksLoop).
+		Build()
+
 	return e, nil
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For consensus engine, this is true once the underlying consensus
-// algorithm has started.
+// Start starts follower loop, then the follower engine worker threads.
+func (e *Engine) Start(signalerContext irrecoverable.SignalerContext) {
+	e.log.Info().Msg("starting follower loop")
+	e.follower.Start(signalerContext)
+	e.log.Info().Msg("follower loop started")
+	e.ComponentManager.Start(signalerContext)
+	e.log.Info().Msg("follower engine started")
+}
+
+// Ready returns a ready channel that is closed once the engine has fully started.
+// For the follower engine, we wait for follower logic to start.
 func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready(func() {
-		<-e.follower.Ready()
-	})
+	// NOTE: this will create long-lived goroutines each time Ready is called
+	// Since Ready is called infrequently, that is OK. If the call frequency changes, change this code.
+	return util.AllReady(e.ComponentManager, e.follower)
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// For the consensus engine, we wait for hotstuff to finish.
+// For the follower engine, we wait for follower logic to finish.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(func() {
-		<-e.follower.Done()
-	})
-}
-
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(e.me.NodeID(), event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.Process(channel, originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(e.me.NodeID(), event)
-	})
+	// NOTE: this will create long-lived goroutines each time Done is called
+	// Since Done is called infrequently, that is OK. If the call frequency changes, change this code.
+	return util.AllDone(e.ComponentManager, e.follower)
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
+// TODO(active-pacemaker): As part of https://github.com/dapperlabs/flow-go/issues/6424 update process
+// to accept events.SyncedBlock only through trusted interface instead of general one.
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
+	switch msg := message.(type) {
+	case *events.SyncedBlock:
+		return e.onSyncedBlock(originID, msg)
+	case *messages.BlockProposal:
+		e.onBlockProposal(originID, msg)
+	case *messages.BlockResponse:
+		e.onBlockResponse(originID, msg)
+	default:
+		e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
+	}
+	return nil
 }
 
-func (e *Engine) process(originID flow.Identifier, input interface{}) error {
-	switch v := input.(type) {
-	case *messages.BlockResponse:
-		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockResponse)
-		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockResponse)
-		e.unit.Lock()
-		defer e.unit.Unlock()
-		return e.onBlockResponse(originID, v)
-	case *events.SyncedBlock:
-		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
-		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlock)
-		e.unit.Lock()
-		defer e.unit.Unlock()
-		return e.onSyncedBlock(originID, v)
-	case *messages.BlockProposal:
-		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
-		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
-		e.unit.Lock()
-		defer e.unit.Unlock()
-		return e.onBlockProposal(originID, v)
-	default:
-		return fmt.Errorf("invalid event type (%T)", input)
+// processBlocksLoop processes available block, vote, and timeout messages as they are queued.
+func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	doneSignal := ctx.Done()
+	newMessageSignal := e.pendingBlocksNotifier.Channel()
+	for {
+		select {
+		case <-doneSignal:
+			return
+		case <-newMessageSignal:
+			err := e.processQueuedBlocks() // no errors expected during normal operations
+			if err != nil {
+				ctx.Throw(err)
+			}
+		}
 	}
 }
 
+// processQueuedBlocks processes any available messages until the message queue is empty.
+// Only returns when all inbound queues are empty (or the engine is terminated).
+// No errors are expected during normal operation. All returned exceptions are potential
+// symptoms of internal state corruption and should be fatal.
+func (e *Engine) processQueuedBlocks() error {
+	for {
+		msg, ok := e.pendingBlocks.Pop()
+		if ok {
+			in := msg.(inboundBlock)
+			err := e.processBlockProposal(in.originID, in.block)
+			if err != nil {
+				return fmt.Errorf("could not handle block proposal: %w", err)
+			}
+			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
+			continue
+		}
+
+		// when there are no more messages in the queue, back to the processBlocksLoop to wait
+		// for the next incoming message to arrive.
+		return nil
+	}
+}
+
+// onBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
+func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) {
+	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
+	// queue as proposal
+	in := inboundBlock{originID, proposal}
+	if e.pendingBlocks.Push(in) {
+		e.pendingBlocksNotifier.Notify()
+	}
+}
+
+// onSyncedBlock performs processing of incoming block by pushing into queue and notifying worker.
 func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBlock) error {
+	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
 
 	// a block that is synced has to come locally, from the synchronization engine
 	// the block itself will contain the proposer to indicate who created it
@@ -207,32 +253,37 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 		return fmt.Errorf("synced block with non-local origin (local: %x, origin: %x)", e.me.NodeID(), originID)
 	}
 
-	// process as proposal
-	proposal := &messages.BlockProposal{
+	// queue as proposal
+	in := inboundBlock{originID, &messages.BlockProposal{
 		Header:  synced.Block.Header,
 		Payload: synced.Block.Payload,
+	}}
+	if e.pendingBlocks.Push(in) {
+		e.pendingBlocksNotifier.Notify()
 	}
-	return e.onBlockProposal(originID, proposal)
+	return nil
 }
 
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) error {
-	for i, block := range res.Blocks {
+// onSyncedBlock performs processing of incoming block response by splitting it into separate blocks, pushing them into queue
+// and notifying worker.
+// TODO: consider handling block response separately as this is a continuous block range.
+func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
+	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockResponse)
+	for _, block := range res.Blocks {
 		proposal := &messages.BlockProposal{
 			Header:  block.Header,
 			Payload: block.Payload,
 		}
 
-		// process block proposal
-		if err := e.onBlockProposal(originID, proposal); err != nil {
-			return fmt.Errorf("fail to process the block at index %v in a range block response that contains %v blocks: %w", i, len(res.Blocks), err)
-		}
+		in := inboundBlock{originID, proposal}
+		e.pendingBlocks.Push(in)
 	}
-
-	return nil
+	e.pendingBlocksNotifier.Notify()
 }
 
-// onBlockProposal handles incoming block proposals.
-func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+// processBlockProposal handles incoming block proposals.
+// No errors are expected during normal operations.
+func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
 	defer span.End()

@@ -37,7 +37,7 @@ func createNodes(
 	conIdentities flow.IdentityList,
 	currentEpochSetup flow.EpochSetup,
 	nextEpochSetup flow.EpochSetup,
-	firstBlockID flow.Identifier) ([]*node, flow.IdentityList) {
+	firstBlock *flow.Header) ([]*node, flow.IdentityList) {
 
 	// We need to initialise the nodes with a list of identities that contain
 	// all roles, otherwise there would be an error initialising the first epoch
@@ -53,7 +53,7 @@ func createNodes(
 			whiteboard,
 			currentEpochSetup,
 			nextEpochSetup,
-			firstBlockID))
+			firstBlock))
 	}
 
 	return nodes, conIdentities
@@ -70,7 +70,7 @@ func createNode(
 	whiteboard *whiteboard,
 	currentSetup flow.EpochSetup,
 	nextSetup flow.EpochSetup,
-	firstBlock flow.Identifier) *node {
+	firstBlock *flow.Header) *node {
 
 	core := testutil.GenericNodeFromParticipants(t, hub, id, ids, chainID)
 	core.Log = zerolog.New(os.Stdout).Level(zerolog.WarnLevel)
@@ -108,7 +108,7 @@ func createNode(
 	snapshot.On("Phase").Return(flow.EpochPhaseStaking, nil)
 	snapshot.On("Head").Return(firstBlock, nil)
 	state := new(protocolmock.MutableState)
-	state.On("AtBlockID", firstBlock).Return(snapshot)
+	state.On("AtBlockID", firstBlock.ID()).Return(snapshot)
 	state.On("Final").Return(snapshot)
 	core.State = state
 
@@ -242,7 +242,7 @@ func TestWithWhiteboard(t *testing.T) {
 		conIdentities,
 		currentEpochSetup,
 		nextEpochSetup,
-		firstBlock.ID())
+		firstBlock)
 
 	for _, n := range nodes {
 		n.Ready()

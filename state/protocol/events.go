@@ -8,14 +8,23 @@ import (
 // can be propagated to other components via an implementation of this interface.
 // Collectively, these are referred to as "Protocol Events".
 //
-// Protocol events are guaranteed to be delivered at least once. Subscribers must
-// handle multiple deliveries.
+// Protocol events are delivered immediately after the database transaction
+// committing the corresponding state change completes successfully.
+// This means that events are delivered exactly once, while the system is running.
+// Events may not be delivered during crashes and restarts, but any missed events
+// are guaranteed to be reflected in the Protocol State upon restarting.
+// Components consuming protocol events which cannot tolerate missed events
+// must implement initialization logic which accounts for any missed events.
+//
+// EXAMPLE:
+// Suppose block A is finalized at height 100. If the BlockFinalized(A) event is
+// dropped due to a crash, then when the node restarts, the latest finalized block
+// in the Protocol State is guaranteed to be A.
 //
 // CAUTION: Protocol event subscriber callbacks are invoked synchronously in the
 // critical path of protocol state mutations. Most subscribers should immediately
 // spawn a goroutine to handle the notification to avoid blocking protocol state
 // progression, especially for frequent protocol events (eg. BlockFinalized).
-// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 //
 // NOTE: the epoch-related callbacks are only called once the fork containing
 // the relevant event has been finalized.
@@ -26,11 +35,14 @@ type Consumer interface {
 	// of this callback must handle repeated calls for the same block.
 	BlockFinalized(block *flow.Header)
 
-	// BlockProcessable is called when a correct block is encountered
-	// that is ready to be processed (i.e. it is connected to the finalized
-	// chain and its source of randomness is available).
+	// BlockProcessable is called when a correct block is encountered that is
+	// ready to be processed (i.e. it is connected to the finalized chain and
+	// its source of randomness is available). BlockProcessable is never emitted
+	// for the root block, as the root block is always processable.
 	// Formally, this callback is informationally idempotent. I.e. the consumer
 	// of this callback must handle repeated calls for the same block.
+	// TODO trigger this on block insertion (used to be on MarkValid)
+	//  - don't trigger for root block or below
 	BlockProcessable(block *flow.Header)
 
 	// EpochTransition is called when we transition to a new epoch. This is

@@ -1,6 +1,8 @@
 package consensus_test
 
 import (
+	"context"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"os"
 	"testing"
 	"time"
@@ -50,18 +52,21 @@ func TestHotStuffFollower(t *testing.T) {
 type HotStuffFollowerSuite struct {
 	suite.Suite
 
-	committee  *mockhotstuff.DynamicCommittee
-	headers    *mockstorage.Headers
-	updater    *mockmodule.Finalizer
-	verifier   *mockhotstuff.Verifier
-	notifier   *mockhotstuff.FinalizationConsumer
-	rootHeader *flow.Header
-	rootQC     *flow.QuorumCertificate
-	finalized  *flow.Header
-	pending    []*flow.Header
-	follower   *hotstuff.FollowerLoop
-
+	committee     *mockhotstuff.DynamicCommittee
+	headers       *mockstorage.Headers
+	finalizer     *mockmodule.Finalizer
+	verifier      *mockhotstuff.Verifier
+	notifier      *mockhotstuff.FinalizationConsumer
+	rootHeader    *flow.Header
+	rootQC        *flow.QuorumCertificate
+	finalized     *flow.Header
+	pending       []*flow.Header
+	follower      *hotstuff.FollowerLoop
 	mockConsensus *MockConsensus
+
+	ctx    irrecoverable.SignalerContext
+	cancel context.CancelFunc
+	errs   <-chan error
 }
 
 // SetupTest initializes all the components needed for the Follower.
@@ -91,17 +96,17 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	// mock storage headers
 	s.headers = &mockstorage.Headers{}
 
-	// mock finalization updater
-	s.updater = &mockmodule.Finalizer{}
+	// mock finalization finalizer
+	s.finalizer = mockmodule.NewFinalizer(s.T())
 
-	// mock finalization updater
-	s.verifier = &mockhotstuff.Verifier{}
-	s.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	s.verifier.On("VerifyTC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	// mock finalization finalizer
+	s.verifier = mockhotstuff.NewVerifier(s.T())
+	s.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	s.verifier.On("VerifyTC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	// mock consumer for finalization notifications
-	s.notifier = &mockhotstuff.FinalizationConsumer{}
+	s.notifier = mockhotstuff.NewFinalizationConsumer(s.T())
 
 	// root block and QC
 	parentID, err := flow.HexStringToIdentifier("aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70")
@@ -137,7 +142,7 @@ func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
 		zerolog.New(os.Stderr),
 		s.committee,
 		s.headers,
-		s.updater,
+		s.finalizer,
 		s.verifier,
 		s.notifier,
 		s.rootHeader,
@@ -147,56 +152,44 @@ func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
 	)
 	require.NoError(s.T(), err)
 
-	select {
-	case <-s.follower.Ready():
-	case <-time.After(time.Second):
-		s.T().Error("timeout on waiting for follower start")
-	}
+	s.ctx, s.cancel, s.errs = irrecoverable.WithSignallerAndCancel(context.Background())
+	s.follower.Start(s.ctx)
+	unittest.RequireCloseBefore(s.T(), s.follower.Ready(), time.Second, "follower failed to start")
 }
 
-// AfterTest stops follower and asserts that the Follower executed the expected callbacks
-// to s.updater.MakeValid or s.notifier.OnBlockIncorporated
+// AfterTest stops follower and asserts that the Follower executed the expected callbacks.
 func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
-	select {
-	case <-s.follower.Done():
-	case <-time.After(time.Second):
-		s.T().Error("timeout on waiting for expected Follower shutdown")
-		s.T().FailNow() // stops the test
-	}
-	s.notifier.AssertExpectations(s.T())
-	s.updater.AssertExpectations(s.T())
+	s.cancel()
+	unittest.RequireCloseBefore(s.T(), s.follower.Done(), time.Second, "follower failed to stop")
 }
 
 // TestInitialization verifies that the basic test setup with initialization of the Follower works as expected
 func (s *HotStuffFollowerSuite) TestInitialization() {
-	// we expect no additional calls to s.updater or s.notifier besides what is already specified in BeforeTest
+	// we expect no additional calls to s.finalizer or s.notifier besides what is already specified in BeforeTest
 }
 
 // TestSubmitProposal verifies that when submitting a single valid block (child's root block),
-// the Follower reacts with callbacks to s.updater.MakeValid and s.notifier.OnBlockIncorporated with this new block
+// the Follower reacts with callbacks to s.notifier.OnBlockIncorporated with this new block
 func (s *HotStuffFollowerSuite) TestSubmitProposal() {
 	rootBlockView := s.rootHeader.View
 	nextBlock := s.mockConsensus.extendBlock(rootBlockView+1, s.rootHeader)
 
 	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
-	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
 	s.submitProposal(nextBlock)
 }
 
 // TestFollowerFinalizedBlock verifies that when submitting 2 extra blocks
-// the Follower reacts with callbacks to s.updater.MakeValid or s.notifier.OnBlockIncorporated
+// the Follower reacts with callbacks to s.notifier.OnBlockIncorporated
 // for all the added blocks. Furthermore, the follower should finalize the first submitted block,
-// i.e. call s.updater.MakeFinal and s.notifier.OnFinalizedBlock
+// i.e. call s.finalizer.MakeFinal and s.notifier.OnFinalizedBlock
 func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	expectedFinalized := s.mockConsensus.extendBlock(s.rootHeader.View+1, s.rootHeader)
 	s.notifier.On("OnBlockIncorporated", blockWithID(expectedFinalized.ID())).Return().Once()
-	s.updater.On("MakeValid", blockID(expectedFinalized.ID())).Return(nil).Once()
 	s.submitProposal(expectedFinalized)
 
 	// direct 1-chain on top of expectedFinalized
 	nextBlock := s.mockConsensus.extendBlock(expectedFinalized.View+1, expectedFinalized)
 	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
-	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
 	s.submitProposal(nextBlock)
 
 	done := make(chan struct{})
@@ -206,8 +199,7 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	nextBlock = s.mockConsensus.extendBlock(lastBlock.View+5, lastBlock)
 	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(expectedFinalized.ID())).Return().Once()
-	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
-	s.updater.On("MakeFinal", blockID(expectedFinalized.ID())).Run(func(_ mock.Arguments) {
+	s.finalizer.On("MakeFinal", blockID(expectedFinalized.ID())).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Return(nil).Once()
 	s.submitProposal(nextBlock)
@@ -215,7 +207,7 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 }
 
 // TestOutOfOrderBlocks verifies that when submitting a variety of blocks with view numbers
-// OUT OF ORDER, the Follower reacts with callbacks to s.updater.MakeValid or s.notifier.OnBlockIncorporated
+// OUT OF ORDER, the Follower reacts with callbacks to s.notifier.OnBlockIncorporated
 // for all the added blocks. Furthermore, we construct the test such that the follower should finalize
 // eventually a bunch of blocks in one go.
 // The following illustrates the tree of submitted blocks, with notation
@@ -267,7 +259,6 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 
 	for _, b := range []*flow.Header{block01, block02, block03, block04, block05, block06, block07, block08, block09, block10, block11, block13, block14, block17, block20} {
 		s.notifier.On("OnBlockIncorporated", blockWithID(b.ID())).Return().Once()
-		s.updater.On("MakeValid", blockID(b.ID())).Return(nil).Once()
 	}
 
 	// now we feed the blocks in some wild view order into the Follower
@@ -291,13 +282,13 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 
 	// Block 20 should now finalize the fork up to and including block13
 	s.notifier.On("OnFinalizedBlock", blockWithID(block01.ID())).Return().Once()
-	s.updater.On("MakeFinal", blockID(block01.ID())).Return(nil).Once()
+	s.finalizer.On("MakeFinal", blockID(block01.ID())).Return(nil).Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(block05.ID())).Return().Once()
-	s.updater.On("MakeFinal", blockID(block05.ID())).Return(nil).Once()
+	s.finalizer.On("MakeFinal", blockID(block05.ID())).Return(nil).Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(block09.ID())).Return().Once()
-	s.updater.On("MakeFinal", blockID(block09.ID())).Return(nil).Once()
+	s.finalizer.On("MakeFinal", blockID(block09.ID())).Return(nil).Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(block13.ID())).Return().Once()
-	s.updater.On("MakeFinal", blockID(block13.ID())).Run(func(_ mock.Arguments) {
+	s.finalizer.On("MakeFinal", blockID(block13.ID())).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Return(nil).Once()
 	s.submitProposal(block20)

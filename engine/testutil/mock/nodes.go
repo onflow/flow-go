@@ -227,6 +227,7 @@ func (en ExecutionNode) Ready(ctx context.Context) {
 	// new interface.
 	irctx, _ := irrecoverable.WithSignaler(ctx)
 	en.ReceiptsEngine.Start(irctx)
+	en.FollowerEngine.Start(irctx)
 
 	<-util.AllReady(
 		en.Ledger,
