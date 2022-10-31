@@ -2,7 +2,6 @@ package follower_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"testing"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -196,14 +196,19 @@ func (s *Suite) TestHandleProposalSkipProposalThreshold() {
 
 	block.Header.Height = final.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
 
+	done := make(chan struct{})
+
 	// not in cache or storage
 	s.cache.On("ByID", block.ID()).Return(nil, false).Once()
-	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
+	s.headers.On("ByBlockID", block.ID()).Run(func(_ mock.Arguments) {
+		close(done)
+	}).Return(nil, realstorage.ErrNotFound).Once()
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
 	err := s.engine.Process(channels.ReceiveBlocks, originID, proposal)
 	assert.NoError(s.T(), err)
+	unittest.AssertClosesBefore(s.T(), done, time.Second)
 
 	// block should be dropped - not added to state or cache
 	s.state.AssertNotCalled(s.T(), "Extend", mock.Anything)

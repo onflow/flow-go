@@ -1,18 +1,21 @@
 package hotstuff
 
 import (
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module"
 	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// FollowerLoop implements interface FollowerLoop
-// TODO: should implement component.Component interface
+// FollowerLoop implements interface module.HotStuffFollower.
+// FollowerLoop buffers all incoming events to the hotstuff FollowerLogic, and feeds FollowerLogic one event at a time
+// using a worker thread.
+// Concurrency safe.
 type FollowerLoop struct {
 	*component.ComponentManager
 	log           zerolog.Logger
@@ -21,6 +24,7 @@ type FollowerLoop struct {
 }
 
 var _ component.Component = (*FollowerLoop)(nil)
+var _ module.HotStuffFollower = (*FollowerLoop)(nil)
 
 // NewFollowerLoop creates an instance of EventLoop
 func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*FollowerLoop, error) {

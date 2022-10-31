@@ -4,24 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/util"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state"
@@ -43,7 +43,6 @@ const defaultBlockQueueCapacity = 10_000
 // passive (read-only) version of the compliance engine. The compliance engine
 // is employed by consensus nodes (active consensus participants) where the
 // Follower engine is employed by all other node roles.
-// TODO use ComponentManager, message queues https://github.com/dapperlabs/flow-go/issues/6173
 type Engine struct {
 	*component.ComponentManager
 	log                   zerolog.Logger
@@ -85,6 +84,7 @@ func WithChannel(channel channels.Channel) Option {
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
+var _ component.Component = (*Engine)(nil)
 
 func New(
 	log zerolog.Logger,
@@ -106,10 +106,9 @@ func New(
 	// FIFO queue for block proposals
 	pendingBlocks, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { mempoolMetrics.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
+		return nil, fmt.Errorf("failed to create queue for inbound blocks: %w", err)
 	}
 
 	e := &Engine{
@@ -174,6 +173,10 @@ func (e *Engine) Done() <-chan struct{} {
 	return util.AllDone(e.ComponentManager, e.follower)
 }
 
+// Process processes the given event from the node with the given origin ID in
+// a blocking manner. It returns the potential processing error when done.
+// TODO(active-pacemaker): As part of https://github.com/dapperlabs/flow-go/issues/6424 update process
+// to accept events.SyncedBlock only through trusted interface instead of general one.
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *events.SyncedBlock:
@@ -230,6 +233,7 @@ func (e *Engine) processQueuedBlocks() error {
 	}
 }
 
+// onBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
 	// queue as proposal
@@ -239,6 +243,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 }
 
+// onSyncedBlock performs processing of incoming block by pushing into queue and notifying worker.
 func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBlock) error {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
 
@@ -259,6 +264,9 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 	return nil
 }
 
+// onSyncedBlock performs processing of incoming block response by splitting it into separate blocks, pushing them into queue
+// and notifying worker.
+// TODO: consider handling block response separately as this is a continuous block range.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockResponse)
 	for _, block := range res.Blocks {
@@ -274,6 +282,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 }
 
 // processBlockProposal handles incoming block proposals.
+// No errors are expected during normal operations.
 func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
