@@ -7,7 +7,6 @@ on:
     branches:
       - staging
       - trying
-      - misha/3419-libp2p-pubsub-fork
 
 env:
   GO_VERSION: 1.19
