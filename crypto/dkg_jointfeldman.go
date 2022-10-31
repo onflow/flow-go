@@ -222,7 +222,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	// key is initially uniformly distributed over the 2^255 possible values. We can argue that
 	// the known uniformity-bias caused by malicious dealers in Joint-Feldman does not weaken
 	// the likelihood of generating an identity key to practical probabilities.
-	if C.bn_is_zero((*C.bn_st)(jointx)) != valid {
+	if (jointx).isZero() {
 		return nil, nil, nil, dkgFailureErrorf("private key share is identity and is therefore invalid")
 	}
 	if Y.isIdentity {

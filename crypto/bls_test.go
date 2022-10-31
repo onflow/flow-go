@@ -359,7 +359,7 @@ func TestBLSAggregateSignatures(t *testing.T) {
 // Aggregate n public keys and their respective private keys and compare
 // the public key of the aggregated private key is equal to the aggregated
 // public key
-func TestAggregatePubKeys(t *testing.T) {
+func TestBLSAggregatePubKeys(t *testing.T) {
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)

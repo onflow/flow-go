@@ -337,7 +337,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 	}
 
 	// check point is non-infinity and cache it
-	pk.isIdentity = C.ep2_is_infty((*C.ep2_st)(&pk.point)) != valid
+	pk.isIdentity = (&pk.point).isInfinity()
 
 	return &pk, nil
 }
@@ -394,7 +394,7 @@ func (sk *prKeyBLSBLS12381) computePublicKey() {
 	generatorScalarMultG2(&newPk.point, &sk.scalar)
 
 	// cache the identity comparison
-	newPk.isIdentity = C.bn_is_zero((*C.bn_st)(&sk.scalar)) != valid
+	newPk.isIdentity = (&sk.scalar).isZero()
 
 	sk.pk = &newPk
 }
@@ -449,7 +449,7 @@ func newPubKeyBLSBLS12381(p *pointG2) *pubKeyBLSBLS12381 {
 		}
 		// cache the identity comparison for a faster check
 		// during signature verifications
-		key.isIdentity = C.ep2_is_infty((*C.ep2_st)(p)) != valid
+		key.isIdentity = p.isInfinity()
 		return key
 	}
 	return &pubKeyBLSBLS12381{}
