@@ -180,7 +180,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 			OriginID: originID,
 			Block:    &block,
 		}
-		s.compliance.On("Process", channel, s.myID, syncedBlockMsg).Return(nil).Once()
+		s.compliance.On("OnSyncedBlock", syncedBlockMsg).Return(nil).Once()
 		err := s.hub.Process(channel, originID, syncedBlockMsg)
 		require.NoError(s.T(), err)
 
@@ -188,7 +188,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 			Header:  block.Header,
 			Payload: block.Payload,
 		}
-		s.compliance.On("Process", channel, s.myID, blockProposalMsg).Return(nil).Once()
+		s.compliance.On("OnBlockProposal", blockProposalMsg).Return(nil).Once()
 		err = s.hub.Process(channel, originID, blockProposalMsg)
 		require.NoError(s.T(), err)
 	})
