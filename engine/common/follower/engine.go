@@ -264,7 +264,7 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 	return nil
 }
 
-// onSyncedBlock performs processing of incoming block response by splitting it into separate blocks, pushing them into queue
+// onBlockResponse performs processing of incoming block response by splitting it into separate blocks, pushing them into queue
 // and notifying worker.
 // TODO: consider handling block response separately as this is a continuous block range.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
