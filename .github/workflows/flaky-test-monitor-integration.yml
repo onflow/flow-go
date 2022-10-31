@@ -70,6 +70,3 @@ jobs:
       env:
         JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
         COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
-      if: success() || failure()
