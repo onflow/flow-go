@@ -15,12 +15,11 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p/utils"
 
-	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/messageutils"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
-	"github.com/onflow/flow-go/network/message"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -304,15 +303,8 @@ func testOneToKMessagingFails(ctx context.Context,
 }
 
 func createTestMessage(t *testing.T) []byte {
-	b, err := unittest.NetworkCodec().Encode(&libp2pmessage.TestMessage{
-		Text: "hello",
-	})
-	require.NoError(t, err)
+	msg, _, _ := messageutils.CreateMessage(t, unittest.IdentifierFixture(), unittest.IdentifierFixture(), channels.TestNetworkChannel, "hello")
 
-	msg := &message.Message{
-		ChannelID: channels.TestNetworkChannel.String(),
-		Payload:   b,
-	}
 	payload, err := msg.Marshal()
 	require.NoError(t, err)
 
