@@ -431,9 +431,18 @@ func (sk *prKeyBLSBLS12381) String() string {
 }
 
 // pubKeyBLSBLS12381 is the public key of BLS using BLS12_381,
-// it implements PublicKey
+// it implements PublicKey.
 type pubKeyBLSBLS12381 struct {
-	// public key data
+	// The package guarantees an instance is only created with a point
+	// on the correct G2 subgroup. No membership check is needed when the
+	// instance is used in any BLS function.
+	// However, an instance can be created with an infinity point. Although
+	// infinity is a valid G2 point, some BLS functions fail (return false)
+	// when used with an infinity point. The package caches the infinity
+	// comparison in pubKeyBLSBLS12381 for a faster check. The package makes
+	// sure the comparison is performed after an instance is created.
+	//
+	// public key G2 point
 	point pointG2
 	// G2 identity check cache
 	isIdentity bool
