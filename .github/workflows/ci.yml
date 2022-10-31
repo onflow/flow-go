@@ -172,7 +172,7 @@ jobs:
         if: github.actor != 'bors[bot]'
         env:
           RACE_DETECTOR: ${{ matrix.race }}
-        # run `make test` inside each module's root
+        # run `make1` target before running `make2` target inside each module's root
         run: |
           make ${{ matrix.make1 }}
           cd ${{ matrix.name }}

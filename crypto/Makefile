@@ -39,7 +39,10 @@ non_relic_tests:
 
 # runs all tests of the crypto package 
 .PHONY: test
-test: setup relic_tests non_relic_tests
+test: setup test_main
+
+.PHONY: test_main
+test_main: relic_tests non_relic_tests
 
 ############################################################################################
 

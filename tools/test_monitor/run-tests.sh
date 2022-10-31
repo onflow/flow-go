@@ -23,29 +23,31 @@ then
     fi
 
   echo "running $TEST_CATEGORY tests">&2
-
-  make -C integration -s ${BASH_REMATCH[1]}-tests
+  make crypto_setup_gopath
+  make docker-build-flow
+  make -C integration -s ${BASH_REMATCH[1]}-tests > test-output
 else
     case $TEST_CATEGORY in
         unit)
+          make install-tools
+          make verify-mocks
           echo "running unit tests (ci)">&2
-          make -s ci
+          make -s unittest-main > test-output
         ;;
         unit-crypto)
+          make -C crypto -s setup
           echo "running crypto unit tests">&2
-          make -C crypto -s test
+          make -C crypto -s test_main > test-output
         ;;
         unit-insecure)
-          echo "running install-tools for insecure unit tests">&2
           make install-tools
           echo "running insecure unit tests">&2
-          make -C insecure -s test
+          make -C insecure -s test > test-output
         ;;
         unit-integration)
-          echo "running install-tools for integration unit tests">&2
           make install-tools
           echo "running integration unit tests">&2
-          make -C integration -s test
+          make -C integration -s test > test-output
         ;;
         *)
           echo "unrecognized test category (run-tests):" $TEST_CATEGORY>&2

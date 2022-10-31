@@ -58,11 +58,11 @@ jobs:
     - name: Get commit date
       id: commit_date
       run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
-    - name: Test setup
-      run: ./tools/test_monitor/test-setup.sh
+#    - name: Test setup
+#      run: ./tools/test_monitor/test-setup.sh
     - name: Run tests
       continue-on-error: true
-      run: ./tools/test_monitor/run-tests.sh > test-output
+      run: ./tools/test_monitor/run-tests.sh
       env:
         TEST_FLAKY: true
         JSON_OUTPUT: true
