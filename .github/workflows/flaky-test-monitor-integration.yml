@@ -23,20 +23,20 @@ jobs:
       fail-fast: false
       matrix:
         test-category:
-#          - unit
+          - unit
           - unit-crypto
-#          - unit-insecure
-#          - unit-integration
-#          - integration-bft
-#          - integration-mvp
-#          - integration-ghost
-#          - integration-network
-#          - integration-epochs
-#          - integration-access
-#          - integration-collection
-#          - integration-consensus
-#          - integration-execution
-#          - integration-verification
+          - unit-insecure
+          - unit-integration
+          - integration-bft
+          - integration-mvp
+          - integration-ghost
+          - integration-network
+          - integration-epochs
+          - integration-access
+          - integration-collection
+          - integration-consensus
+          - integration-execution
+          - integration-verification
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
       COMMIT_SHA: ${{ github.sha }}
