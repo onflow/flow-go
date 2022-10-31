@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/consensus"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
@@ -85,6 +86,7 @@ func WithChannel(channel channels.Channel) Option {
 
 var _ network.MessageProcessor = (*Engine)(nil)
 var _ component.Component = (*Engine)(nil)
+var _ consensus.Compliance = (*Engine)(nil)
 
 func New(
 	log zerolog.Logger,
@@ -173,14 +175,33 @@ func (e *Engine) Done() <-chan struct{} {
 	return util.AllDone(e.ComponentManager, e.follower)
 }
 
+// OnBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
+func (e *Engine) OnBlockProposal(proposal *messages.BlockProposal) {
+	e.onBlockProposal(e.me.NodeID(), proposal)
+}
+
+// OnSyncedBlock performs processing of incoming block by pushing into queue and notifying worker.
+func (e *Engine) OnSyncedBlock(synced *events.SyncedBlock) {
+	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
+	// a block that is synced has to come locally, from the synchronization engine
+	// the block itself will contain the proposer to indicate who created it
+
+	// queue as proposal
+	in := inboundBlock{synced.OriginID, &messages.BlockProposal{
+		Header:  synced.Block.Header,
+		Payload: synced.Block.Payload,
+	}}
+	if e.pendingBlocks.Push(in) {
+		e.pendingBlocksNotifier.Notify()
+	}
+}
+
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-// TODO(active-pacemaker): As part of https://github.com/dapperlabs/flow-go/issues/6424 update process
-// to accept events.SyncedBlock only through trusted interface instead of general one.
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *events.SyncedBlock:
-		return e.onSyncedBlock(originID, msg)
+		return fmt.Errorf("synced blocks should be feed using dedicated interface")
 	case *messages.BlockProposal:
 		e.onBlockProposal(originID, msg)
 	case *messages.BlockResponse:
@@ -243,28 +264,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 }
 
-// onSyncedBlock performs processing of incoming block by pushing into queue and notifying worker.
-func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBlock) error {
-	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
-
-	// a block that is synced has to come locally, from the synchronization engine
-	// the block itself will contain the proposer to indicate who created it
-	if originID != e.me.NodeID() {
-		return fmt.Errorf("synced block with non-local origin (local: %x, origin: %x)", e.me.NodeID(), originID)
-	}
-
-	// queue as proposal
-	in := inboundBlock{originID, &messages.BlockProposal{
-		Header:  synced.Block.Header,
-		Payload: synced.Block.Payload,
-	}}
-	if e.pendingBlocks.Push(in) {
-		e.pendingBlocksNotifier.Notify()
-	}
-	return nil
-}
-
-// onSyncedBlock performs processing of incoming block response by splitting it into separate blocks, pushing them into queue
+// onBlockResponse performs processing of incoming block response by splitting it into separate blocks, pushing them into queue
 // and notifying worker.
 // TODO: consider handling block response separately as this is a continuous block range.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
