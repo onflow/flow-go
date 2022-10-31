@@ -26,7 +26,7 @@ then
   make crypto_setup_gopath
   make docker-build-flow
   echo "running $TEST_CATEGORY tests">&2
-  make -C integration ${BASH_REMATCH[1]}-tests > test-output
+  make -C integration -s ${BASH_REMATCH[1]}-tests > test-output
 else
     case $TEST_CATEGORY in
         unit)
@@ -34,25 +34,25 @@ else
           make install-tools
           make verify-mocks
           echo "running unit tests">&2
-          make unittest-main > test-output
+          make -s unittest-main > test-output
         ;;
         unit-crypto)
           echo "preparing crypto unit tests">&2
           make -C crypto setup
           echo "running crypto unit tests">&2
-          make -C crypto test_main > test-output
+          make -C crypto -s test_main > test-output
         ;;
         unit-insecure)
           echo "preparing insecure unit tests">&2
           make install-tools
           echo "running insecure unit tests">&2
-          make -C insecure test > test-output
+          make -C insecure -s test > test-output
         ;;
         unit-integration)
           echo "preparing integration unit tests">&2
           make install-tools
           echo "running integration unit tests">&2
-          make -C integration test > test-output
+          make -C integration -s test > test-output
         ;;
         *)
           echo "unrecognized test category (run-tests):" $TEST_CATEGORY>&2
