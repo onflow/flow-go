@@ -54,7 +54,7 @@ jobs:
         skip-cache: true
 
   tidy:
-    name: Tidy
+    name: Tidy Emulator
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
