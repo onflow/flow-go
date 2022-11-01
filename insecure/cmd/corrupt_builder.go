@@ -39,7 +39,7 @@ func (cnb *CorruptNodeBuilder) Initialize() error {
 	return nil
 }
 
-func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
+func (cnb *CorruptNodeBuilder) enqueueNetworkingLayer() {
 	cnb.FlowNodeBuilder.OverrideComponent(cmd.LibP2PNodeComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()
 		if cnb.FlowNodeBuilder.BaseConfig.BindAddr != cmd.NotSet {
