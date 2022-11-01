@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -138,6 +139,12 @@ func (c *Config) SetBlockRateDelay(delay time.Duration) error {
 			return updatable_configs.NewValidationErrorf("invalid block rate delay: %w", err)
 		}
 		return fmt.Errorf("unexpected error validating block rate delay: %w", err)
+	}
+	// sanity check: log a warning if we set block rate delay above min timeout
+	// it is valid to want to do this, to significantly slow the block rate, but
+	// only in edge cases
+	if c.MinReplicaTimeout < float64(delay.Milliseconds()) {
+		log.Warn().Msgf("CAUTION: setting block rate delay to %s, above min timeout %s - this will degrade performance!")
 	}
 	c.BlockRateDelayMS.Store(float64(delay.Milliseconds()))
 	return nil
