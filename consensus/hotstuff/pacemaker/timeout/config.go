@@ -144,7 +144,7 @@ func (c *Config) SetBlockRateDelay(delay time.Duration) error {
 	// it is valid to want to do this, to significantly slow the block rate, but
 	// only in edge cases
 	if c.MinReplicaTimeout < float64(delay.Milliseconds()) {
-		log.Warn().Msgf("CAUTION: setting block rate delay to %s, above min timeout %s - this will degrade performance!")
+		log.Warn().Msgf("CAUTION: setting block rate delay to %s, above min timeout %dms - this will degrade performance!", delay.String(), int64(c.MinReplicaTimeout))
 	}
 	c.BlockRateDelayMS.Store(float64(delay.Milliseconds()))
 	return nil
