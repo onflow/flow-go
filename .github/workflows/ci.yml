@@ -184,8 +184,7 @@ jobs:
         # run `make1` target before running `make2` target inside each module's root
         run: |
           make ${{ matrix.make1 }}
-          cd ${{ matrix.name }}
-          make ${{ matrix.make2 }}          
+          make -C ${{ matrix.name }} ${{ matrix.make2 }}
       - name: Run tests (Bors)
         if: github.actor == 'bors[bot]'
         uses: nick-invision/retry@v2
@@ -194,8 +193,7 @@ jobs:
           max_attempts: ${{ matrix.retries }}
           command: |
             make ${{ matrix.make1 }}
-            cd ${{ matrix.name }}
-            make ${{ matrix.make2 }}
+            make -C ${{ matrix.name }} ${{ matrix.make2 }}
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
         with:
