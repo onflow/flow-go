@@ -2,7 +2,6 @@ package validator
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -133,7 +132,7 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 			// slash peer if message contains unknown message code byte
 			slashingViolationsConsumer.OnUnknownMsgTypeError(violation(from, channel, err))
 			return pubsub.ValidationReject
-		case codec.IsErrMsgUnmarshal(err) || errors.Is(err, codec.ErrInvalidEncoding):
+		case codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err):
 			// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
 			slashingViolationsConsumer.OnInvalidMsgError(violation(from, channel, err))
 			return pubsub.ValidationReject

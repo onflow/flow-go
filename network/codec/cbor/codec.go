@@ -90,7 +90,7 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 //   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 	if len(data) == 0 {
-		return nil, codec.ErrInvalidEncoding
+		return nil, codec.NewInvalidEncodingErr(fmt.Errorf("empty data"))
 	}
 
 	if len(data) == 0 {
