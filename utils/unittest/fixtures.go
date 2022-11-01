@@ -1,14 +1,19 @@
 package unittest
 
 import (
+	"context"
 	crand "crypto/rand"
 	"fmt"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
+	"github.com/rs/zerolog"
 	"math/rand"
 	"testing"
 	"time"
 
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
@@ -35,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -2149,4 +2155,32 @@ func EngineMessageFixtures(count int) []*engine.Message {
 		messages = append(messages, EngineMessageFixture())
 	}
 	return messages
+}
+
+// AllowAllTopicValidator pubsub validator func that does not perform any validation, it will only attempt to decode the message and update the
+// rawMsg.ValidatorData needed for further processing by the middleware receive loop. Malformed messages that fail to unmarshal or decode will result
+// in a pubsub.ValidationReject result returned.
+func AllowAllTopicValidator(lg zerolog.Logger, c network.Codec) pubsub.ValidatorEx {
+	return func(ctx context.Context, from peer.ID, rawMsg *pubsub.Message) pubsub.ValidationResult {
+		var msg message.Message
+		err := msg.Unmarshal(rawMsg.Data)
+		if err != nil {
+			lg.Err(err).Msg("could not unmarshal raw message data")
+			return pubsub.ValidationReject
+		}
+
+		decodedMsgPayload, err := c.Decode(msg.Payload)
+		if err != nil {
+			lg.Err(err).Msg("could not decode message payload")
+			return pubsub.ValidationReject
+		}
+
+		rawMsg.ValidatorData = validator.TopicValidatorData{
+			Message:           &msg,
+			DecodedMsgPayload: decodedMsgPayload,
+			From:              from,
+		}
+
+		return pubsub.ValidationAccept
+	}
 }

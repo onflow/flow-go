@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -194,4 +195,29 @@ func TestConnGater(t *testing.T) {
 	node2Peers[node1Info.ID] = struct{}{}
 	_, err = node1.CreateStream(ctx, node2Info.ID)
 	assert.NoError(t, err, "connection should not be blocked")
+}
+
+// TestNode_HasSubscription checks that when a node subscribes to a topic HasSubscription should return true.
+func TestNode_HasSubscription(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	sporkID := unittest.IdentifierFixture()
+	node, _ := p2pfixtures.NodeFixture(t, sporkID, "test_has_subscription")
+
+	p2pfixtures.StartNode(t, signalerCtx, node, 100*time.Millisecond)
+	defer p2pfixtures.StopNode(t, node, cancel, 100*time.Millisecond)
+
+	topicValidator := unittest.AllowAllTopicValidator(unittest.Logger(), unittest.NetworkCodec())
+
+	// create test topic
+	topic := channels.TopicFromChannel(channels.TestNetworkChannel, unittest.IdentifierFixture())
+	_, err := node.Subscribe(topic, topicValidator)
+	require.NoError(t, err)
+
+	require.True(t, node.HasSubscription(topic))
+
+	// create topic with no subscription
+	topic = channels.TopicFromChannel(channels.ConsensusCommittee, unittest.IdentifierFixture())
+	require.False(t, node.HasSubscription(topic))
 }
