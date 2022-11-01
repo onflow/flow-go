@@ -72,6 +72,10 @@ func TestConnectionGating(t *testing.T) {
 	})
 
 	t.Run("inbound connection from an allowed node is rejected", func(t *testing.T) {
+		// for an inbound connection to be established both nodes should be in each other's allow-lists.
+		// the connection gater on the dialing node is checking the allow-list upon dialing.
+		// the connection gater on the listening node is checking the allow-list upon accepting the connection.
+
 		// add node2 to node1's allow list, but not the other way around.
 		node1Peers[node2.Host().ID()] = struct{}{}
 
