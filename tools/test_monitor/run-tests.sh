@@ -40,7 +40,7 @@ else
           echo "preparing crypto unit tests">&2
           make -C crypto setup
           echo "running crypto unit tests">&2
-          make -C crypto -s test_main > test-output
+          make -C crypto -s unittest > test-output
         ;;
         unit-insecure)
           echo "preparing insecure unit tests">&2
