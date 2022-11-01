@@ -5,7 +5,6 @@ package middleware
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -542,7 +541,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
 	}
-	if codec.IsErrMsgUnmarshal(err) || errors.Is(err, codec.ErrInvalidEncoding) {
+	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
 		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
 		m.slashingViolationsConsumer.OnInvalidMsgError(violation)

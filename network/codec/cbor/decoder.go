@@ -29,11 +29,11 @@ func (d *Decoder) Decode() (interface{}, error) {
 	err := d.dec.Decode(&data)
 	//binstat.LeaveVal(bs1, int64(len(data)))
 	if err != nil {
-		return nil, fmt.Errorf("could not decode message: %w", err)
+		return nil, codec.NewInvalidEncodingErr(err)
 	}
 
 	if len(data) == 0 {
-		return nil, codec.ErrInvalidEncoding
+		return nil, codec.NewInvalidEncodingErr(fmt.Errorf("empty data"))
 	}
 
 	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
