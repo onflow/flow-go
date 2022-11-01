@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -31,16 +32,65 @@ func NewTransactionVerifier(keyWeightThreshold int) *TransactionVerifier {
 	}
 }
 
-func (v *TransactionVerifier) Process(
+func (v *TransactionVerifier) NewExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
 	_ *programs.TransactionPrograms,
+) TransactionExecutor {
+	return newAuthorizationCheckExecutor(
+		ctx,
+		proc,
+		txnState,
+		v.KeyWeightThreshold)
+}
+
+func (v *TransactionVerifier) Process(
+	ctx Context,
+	proc *TransactionProcedure,
+	txnState *state.TransactionState,
+	txnPrograms *programs.TransactionPrograms,
 ) error {
+	return run(v.NewExecutor(ctx, proc, txnState, txnPrograms))
+}
+
+type authorizationCheckExecutor struct {
+	proc     *TransactionProcedure
+	txnState *state.TransactionState
+
+	keyWeightThreshold int
+
+	tracer module.Tracer
+}
+
+func newAuthorizationCheckExecutor(
+	ctx Context,
+	proc *TransactionProcedure,
+	txnState *state.TransactionState,
+	keyWeightThreshold int,
+) *authorizationCheckExecutor {
+	return &authorizationCheckExecutor{
+		proc:               proc,
+		txnState:           txnState,
+		keyWeightThreshold: keyWeightThreshold,
+		tracer:             ctx.Tracer,
+	}
+}
+
+func (*authorizationCheckExecutor) Preprocess() error {
+	// Does nothing.
+	return nil
+}
+
+func (*authorizationCheckExecutor) Cleanup() {
+	// Does nothing.
+}
+
+func (executor *authorizationCheckExecutor) Execute() error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error
-	txnState.RunWithAllLimitsDisabled(func() {
-		err = v.verifyTransaction(proc, ctx, txnState)
+	executor.txnState.RunWithAllLimitsDisabled(func() {
+		err = executor.verifyTransaction()
 	})
 	if err != nil {
 		return fmt.Errorf("transaction verification failed: %w", err)
@@ -49,43 +99,42 @@ func (v *TransactionVerifier) Process(
 	return nil
 }
 
-func (v *TransactionVerifier) verifyTransaction(
-	proc *TransactionProcedure,
-	ctx Context,
-	txnState *state.TransactionState,
-) error {
-	span := proc.StartSpanFromProcTraceSpan(ctx.Tracer, trace.FVMVerifyTransaction)
+func (executor *authorizationCheckExecutor) verifyTransaction() error {
+	span := executor.proc.StartSpanFromProcTraceSpan(
+		executor.tracer,
+		trace.FVMVerifyTransaction)
 	span.SetAttributes(
-		attribute.String("transaction.ID", proc.ID.String()),
+		attribute.String("transaction.ID", executor.proc.ID.String()),
 	)
 	defer span.End()
 
-	tx := proc.Transaction
-	accounts := environment.NewAccounts(txnState)
+	tx := executor.proc.Transaction
+	accounts := environment.NewAccounts(executor.txnState)
 	if tx.Payer == flow.EmptyAddress {
-		return errors.NewInvalidAddressErrorf(tx.Payer, "payer address is invalid")
+		return errors.NewInvalidAddressErrorf(
+			tx.Payer,
+			"payer address is invalid")
 	}
 
 	var err error
 	var payloadWeights map[flow.Address]int
 	var proposalKeyVerifiedInPayload bool
 
-	err = v.checkSignatureDuplications(tx)
+	err = executor.checkSignatureDuplications(tx)
 	if err != nil {
 		return err
 	}
 
-	err = v.checkAccountsAreNotFrozen(tx, accounts)
+	err = executor.checkAccountsAreNotFrozen(tx, accounts)
 	if err != nil {
 		return err
 	}
 
-	if v.KeyWeightThreshold < 0 {
+	if executor.keyWeightThreshold < 0 {
 		return nil
 	}
 
-	payloadWeights, proposalKeyVerifiedInPayload, err = v.verifyAccountSignatures(
-		txnState,
+	payloadWeights, proposalKeyVerifiedInPayload, err = executor.verifyAccountSignatures(
 		accounts,
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
@@ -99,8 +148,7 @@ func (v *TransactionVerifier) verifyTransaction(
 	var envelopeWeights map[flow.Address]int
 	var proposalKeyVerifiedInEnvelope bool
 
-	envelopeWeights, proposalKeyVerifiedInEnvelope, err = v.verifyAccountSignatures(
-		txnState,
+	envelopeWeights, proposalKeyVerifiedInEnvelope, err = executor.verifyAccountSignatures(
 		accounts,
 		tx.EnvelopeSignatures,
 		tx.EnvelopeMessage(),
@@ -114,8 +162,9 @@ func (v *TransactionVerifier) verifyTransaction(
 
 	proposalKeyVerified := proposalKeyVerifiedInPayload || proposalKeyVerifiedInEnvelope
 	if !proposalKeyVerified {
-		err := fmt.Errorf("either the payload or the envelope should provide proposal signatures")
-		return errors.NewInvalidProposalSignatureError(tx.ProposalKey, err)
+		return errors.NewInvalidProposalSignatureError(
+			tx.ProposalKey,
+			fmt.Errorf("either the payload or the envelope should provide proposal signatures"))
 	}
 
 	for _, addr := range tx.Authorizers {
@@ -126,29 +175,28 @@ func (v *TransactionVerifier) verifyTransaction(
 			continue
 		}
 		// hasSufficientKeyWeight
-		if !v.hasSufficientKeyWeight(payloadWeights, addr) {
+		if !executor.hasSufficientKeyWeight(payloadWeights, addr) {
 			return errors.NewAccountAuthorizationErrorf(
 				addr,
 				"authorizer account does not have sufficient signatures (%d < %d)",
 				payloadWeights[addr],
-				v.KeyWeightThreshold)
+				executor.keyWeightThreshold)
 		}
 	}
 
-	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer) {
+	if !executor.hasSufficientKeyWeight(envelopeWeights, tx.Payer) {
 		// TODO change this to payer error (needed for fees)
 		return errors.NewAccountAuthorizationErrorf(
 			tx.Payer,
 			"payer account does not have sufficient signatures (%d < %d)",
 			envelopeWeights[tx.Payer],
-			v.KeyWeightThreshold)
+			executor.keyWeightThreshold)
 	}
 
 	return nil
 }
 
-func (v *TransactionVerifier) verifyAccountSignatures(
-	txnState *state.TransactionState,
+func (executor *authorizationCheckExecutor) verifyAccountSignatures(
 	accounts environment.Accounts,
 	signatures []flow.TransactionSignature,
 	message []byte,
@@ -167,11 +215,17 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 		if err != nil {
 			return nil, false, errorBuilder(txSig, err)
 		}
-		err = v.verifyAccountSignature(accountKey, txSig, message, errorBuilder)
+		err = executor.verifyAccountSignature(
+			accountKey,
+			txSig,
+			message,
+			errorBuilder)
 		if err != nil {
 			return nil, false, err
 		}
-		if !proposalKeyVerified && v.sigIsForProposalKey(txSig, proposalKey) {
+		if !proposalKeyVerified &&
+			executor.sigIsForProposalKey(txSig, proposalKey) {
+
 			proposalKeyVerified = true
 		}
 
@@ -188,7 +242,7 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 //
 // An error is returned if the account does not contain a public key that
 // correctly verifies the signature against the given message.
-func (v *TransactionVerifier) verifyAccountSignature(
+func (executor *authorizationCheckExecutor) verifyAccountSignature(
 	accountKey flow.AccountPublicKey,
 	txSig flow.TransactionSignature,
 	message []byte,
@@ -216,21 +270,24 @@ func (v *TransactionVerifier) verifyAccountSignature(
 	return errorBuilder(txSig, fmt.Errorf("signature is not valid"))
 }
 
-func (v *TransactionVerifier) hasSufficientKeyWeight(
+func (executor *authorizationCheckExecutor) hasSufficientKeyWeight(
 	weights map[flow.Address]int,
 	address flow.Address,
 ) bool {
-	return weights[address] >= v.KeyWeightThreshold
+	return weights[address] >= executor.keyWeightThreshold
 }
 
-func (v *TransactionVerifier) sigIsForProposalKey(
+func (executor *authorizationCheckExecutor) sigIsForProposalKey(
 	txSig flow.TransactionSignature,
 	proposalKey flow.ProposalKey,
 ) bool {
-	return txSig.Address == proposalKey.Address && txSig.KeyIndex == proposalKey.KeyIndex
+	return txSig.Address == proposalKey.Address &&
+		txSig.KeyIndex == proposalKey.KeyIndex
 }
 
-func (v *TransactionVerifier) checkSignatureDuplications(tx *flow.TransactionBody) error {
+func (executor *authorizationCheckExecutor) checkSignatureDuplications(
+	tx *flow.TransactionBody,
+) error {
 	type uniqueKey struct {
 		address flow.Address
 		index   uint64
@@ -256,7 +313,7 @@ func (v *TransactionVerifier) checkSignatureDuplications(tx *flow.TransactionBod
 	return nil
 }
 
-func (v *TransactionVerifier) checkAccountsAreNotFrozen(
+func (executor *authorizationCheckExecutor) checkAccountsAreNotFrozen(
 	tx *flow.TransactionBody,
 	accounts environment.Accounts,
 ) error {

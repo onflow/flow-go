@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -17,16 +18,57 @@ func NewTransactionSequenceNumberChecker() *TransactionSequenceNumberChecker {
 	return &TransactionSequenceNumberChecker{}
 }
 
-func (c *TransactionSequenceNumberChecker) Process(
+func (c *TransactionSequenceNumberChecker) NewExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
 	_ *programs.TransactionPrograms,
+) TransactionExecutor {
+	return newSequenceNumberCheckExecutor(ctx, proc, txnState)
+}
+
+func (c *TransactionSequenceNumberChecker) Process(
+	ctx Context,
+	proc *TransactionProcedure,
+	txnState *state.TransactionState,
+	txnPrograms *programs.TransactionPrograms,
 ) error {
+	return run(c.NewExecutor(ctx, proc, txnState, txnPrograms))
+}
+
+type sequenceNumberCheckExecutor struct {
+	proc     *TransactionProcedure
+	txnState *state.TransactionState
+
+	tracer module.Tracer
+}
+
+func newSequenceNumberCheckExecutor(
+	ctx Context,
+	proc *TransactionProcedure,
+	txnState *state.TransactionState,
+) *sequenceNumberCheckExecutor {
+	return &sequenceNumberCheckExecutor{
+		proc:     proc,
+		txnState: txnState,
+		tracer:   ctx.Tracer,
+	}
+}
+
+func (*sequenceNumberCheckExecutor) Preprocess() error {
+	// Does nothing.
+	return nil
+}
+
+func (*sequenceNumberCheckExecutor) Cleanup() {
+	// Does nothing.
+}
+
+func (executor *sequenceNumberCheckExecutor) Execute() error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error
-	txnState.RunWithAllLimitsDisabled(func() {
-		err = c.checkAndIncrementSequenceNumber(proc, ctx, txnState)
+	executor.txnState.RunWithAllLimitsDisabled(func() {
+		err = executor.checkAndIncrementSequenceNumber()
 	})
 
 	if err != nil {
@@ -36,32 +78,32 @@ func (c *TransactionSequenceNumberChecker) Process(
 	return nil
 }
 
-func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
-	proc *TransactionProcedure,
-	ctx Context,
-	txnState *state.TransactionState,
-) error {
+func (executor *sequenceNumberCheckExecutor) checkAndIncrementSequenceNumber() error {
 
-	defer proc.StartSpanFromProcTraceSpan(ctx.Tracer, trace.FVMSeqNumCheckTransaction).End()
+	defer executor.proc.StartSpanFromProcTraceSpan(
+		executor.tracer,
+		trace.FVMSeqNumCheckTransaction).End()
 
-	nestedTxnId, err := txnState.BeginNestedTransaction()
+	nestedTxnId, err := executor.txnState.BeginNestedTransaction()
 	if err != nil {
 		return err
 	}
 
 	defer func() {
-		_, commitError := txnState.Commit(nestedTxnId)
+		_, commitError := executor.txnState.Commit(nestedTxnId)
 		if commitError != nil {
 			panic(commitError)
 		}
 	}()
 
-	accounts := environment.NewAccounts(txnState)
-	proposalKey := proc.Transaction.ProposalKey
+	accounts := environment.NewAccounts(executor.txnState)
+	proposalKey := executor.proc.Transaction.ProposalKey
 
 	var accountKey flow.AccountPublicKey
 
-	accountKey, err = accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
+	accountKey, err = accounts.GetPublicKey(
+		proposalKey.Address,
+		proposalKey.KeyIndex)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(proposalKey, err)
 	}
@@ -76,14 +118,19 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
-		return errors.NewInvalidProposalSeqNumberError(proposalKey, accountKey.SeqNumber)
+		return errors.NewInvalidProposalSeqNumberError(
+			proposalKey,
+			accountKey.SeqNumber)
 	}
 
 	accountKey.SeqNumber++
 
-	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
+	_, err = accounts.SetPublicKey(
+		proposalKey.Address,
+		proposalKey.KeyIndex,
+		accountKey)
 	if err != nil {
-		restartError := txnState.RestartNestedTransaction(nestedTxnId)
+		restartError := executor.txnState.RestartNestedTransaction(nestedTxnId)
 		if restartError != nil {
 			panic(restartError)
 		}

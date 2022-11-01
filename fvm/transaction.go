@@ -24,7 +24,31 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 	}
 }
 
+type TransactionExecutor interface {
+	Preprocess() error
+	Execute() error
+	Cleanup()
+}
+
+func run(executor TransactionExecutor) error {
+	defer executor.Cleanup()
+
+	err := executor.Preprocess()
+	if err != nil {
+		return err
+	}
+
+	return executor.Execute()
+}
+
 type TransactionProcessor interface {
+	NewExecutor(
+		Context,
+		*TransactionProcedure,
+		*state.TransactionState,
+		*programs.TransactionPrograms,
+	) TransactionExecutor
+
 	Process(
 		Context,
 		*TransactionProcedure,

@@ -24,15 +24,22 @@ func NewTransactionInvoker() TransactionInvoker {
 	return TransactionInvoker{}
 }
 
+func (i TransactionInvoker) NewExecutor(
+	ctx Context,
+	proc *TransactionProcedure,
+	txnState *state.TransactionState,
+	programs *programsCache.TransactionPrograms,
+) TransactionExecutor {
+	return newInvocationExecutor(ctx, proc, txnState, programs)
+}
+
 func (i TransactionInvoker) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
 	programs *programsCache.TransactionPrograms,
 ) error {
-	executor := newInvocationExecutor(ctx, proc, txnState, programs)
-	defer executor.Cleanup()
-	return executor.Process()
+	return run(i.NewExecutor(ctx, proc, txnState, programs))
 }
 
 type invocationExecutor struct {
@@ -81,7 +88,12 @@ func (executor *invocationExecutor) Cleanup() {
 	executor.span.End()
 }
 
-func (executor *invocationExecutor) Process() error {
+func (executor *invocationExecutor) Preprocess() error {
+	// TODO(patrick): move programs parsing into preprocessing
+	return nil
+}
+
+func (executor *invocationExecutor) Execute() error {
 	var beginErr error
 	executor.nestedTxnId, beginErr = executor.txnState.BeginNestedTransaction()
 	if beginErr != nil {
