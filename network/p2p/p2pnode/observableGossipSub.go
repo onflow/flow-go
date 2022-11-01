@@ -5,13 +5,15 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
+
+	"github.com/onflow/flow-go/module"
 )
 
 type ObservableGossipSubRouter struct {
 	router *pubsub.GossipSubRouter
 }
 
-func NewObservableGossipSub(h host.Host) *ObservableGossipSubRouter {
+func NewObservableGossipSub(h host.Host, metrics module.GossipSubRouterMetrics) *ObservableGossipSubRouter {
 	return &ObservableGossipSubRouter{
 		router: pubsub.DefaultGossipSubRouter(h),
 	}
@@ -44,6 +46,7 @@ func (o *ObservableGossipSubRouter) AcceptFrom(id peer.ID) pubsub.AcceptStatus {
 }
 
 func (o *ObservableGossipSubRouter) HandleRPC(rpc *pubsub.RPC) {
+
 	o.router.HandleRPC(rpc)
 }
 
