@@ -384,18 +384,11 @@ func (n *Network) genNetworkMessage(channel channels.Channel, event interface{},
 		emTargets = append(emTargets, tempID[:])
 	}
 
-	// get origin ID
-	selfID := n.me.NodeID()
-	originID := selfID[:]
-
 	// cast event to a libp2p.Message
 	msg := &message.Message{
 		ChannelID: channel.String(),
 		TargetIDs: emTargets,
 		Payload:   payload,
-
-		// TODO: these fields should be derived by the receiver and removed from the message
-		OriginID: originID,
 	}
 
 	return msg, nil
