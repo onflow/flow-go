@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/onflow/flow-go/module/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/utils"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -208,7 +210,12 @@ func TestNode_HasSubscription(t *testing.T) {
 	p2pfixtures.StartNode(t, signalerCtx, node, 100*time.Millisecond)
 	defer p2pfixtures.StopNode(t, node, cancel, 100*time.Millisecond)
 
-	topicValidator := unittest.AllowAllTopicValidator(unittest.Logger(), unittest.NetworkCodec())
+	logger := unittest.Logger()
+	met := mock.NewNetworkMetrics(t)
+
+	topicValidator := validator.TopicValidator(logger, unittest.NetworkCodec(), unittest.NetworkSlashingViolationsConsumer(logger, met), func(id peer.ID) error {
+		return nil
+	})
 
 	// create test topic
 	topic := channels.TopicFromChannel(channels.TestNetworkChannel, unittest.IdentifierFixture())
