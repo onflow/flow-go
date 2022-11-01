@@ -25,7 +25,6 @@ func (l *Ledger) CollectStats(payloadCallBack func(payload *ledger.Payload)) (*L
 	for _, trie := range tries {
 		for itr := flattener.NewUniqueNodeIterator(trie.RootNode(), visitedNodes); itr.Next(); {
 			n := itr.Value()
-
 			if n.IsLeaf() {
 				payload := n.Payload()
 				leafNodeCounter++
@@ -33,7 +32,6 @@ func (l *Ledger) CollectStats(payloadCallBack func(payload *ledger.Payload)) (*L
 			} else {
 				interimNodeCounter++
 			}
-
 			visitedNodes[n] = totalNodeCounter
 			totalNodeCounter++
 		}
