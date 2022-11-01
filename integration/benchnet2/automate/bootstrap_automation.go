@@ -4,12 +4,28 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"os"
 	"regexp"
+	"text/template"
 
 	"github.com/go-yaml/yaml"
 )
+
+type Template struct {
+	template string
+	jsonData string
+}
+
+func NewTemplate(jsonData string, templatePath string) Template {
+	return Template{
+		jsonData: jsonData,
+		template: templatePath,
+	}
+}
+
+func (t *Template) Apply() string {
+	return "foo"
+}
 
 // Node struct which to unmarshal the node-info into
 type Node struct {

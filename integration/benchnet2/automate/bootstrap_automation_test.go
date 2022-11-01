@@ -1,11 +1,13 @@
 package automate
 
 import (
+	"fmt"
+	"github.com/stretchr/testify/require"
 	"log"
 	"os"
+	"path/filepath"
 	"testing"
-
-	"github.com/stretchr/testify/require"
+	"text/template"
 )
 
 var TEST_FILES string = "test_files/"
@@ -154,4 +156,52 @@ func TestTemplating(t *testing.T) {
 
 func TestTemplating2(t *testing.T) {
 	GenerateValues("", "", "values.yml", "test branch", "test_commit", "AccessImage", "CollectionImage", "ConsensusImage", "ExecutionImage", "VerificationImage")
+}
+
+const DataPath = "./testdata/data/"
+const TemplatesPath = "./testdata/templates/"
+const ExpectedTemplatesPath = "./testdata/expected/"
+
+func TestTemplate_Simple(t *testing.T) {
+	dataBytes, err := os.ReadFile(filepath.Join(DataPath, "test.json"))
+	require.NoError(t, err)
+	fileStr := string(dataBytes)
+	fmt.Println("fileStr=", fileStr)
+
+	// load template
+	templateBytes, err := os.ReadFile(filepath.Join(TemplatesPath, "test1.yml"))
+	require.NoError(t, err)
+	templateStr := string(templateBytes)
+	fmt.Println("templateStr=", templateStr)
+
+	//load expected template
+	expectedTemplateBytes, err := os.ReadFile(filepath.Join(ExpectedTemplatesPath, "test1.yml"))
+	require.NoError(t, err)
+	expectedOutputStr := string(expectedTemplateBytes)
+	fmt.Println("expectedOutputStr=", expectedOutputStr)
+
+	templ := NewTemplate(filepath.Join(DataPath, "test.json"), filepath.Join(TemplatesPath, "test1.yml"))
+	actualOutput := templ.Apply()
+	require.Equal(t, expectedOutputStr, actualOutput)
+
+	//dataStr := string(data)
+
+	//
+	// template.New("foo").Parse(templateBytes.)
+
+	//load child
+
+	//insert into parent
+	//check parent has child template
+
+	sweaters := Inventory{"wool", 17}
+	tmpl, err := template.New("test").Parse("{{.Count}} items are made of {{.Material}}")
+	require.NoError(t, err)
+	err = tmpl.Execute(os.Stdout, sweaters)
+	require.NoError(t, err)
+}
+
+type Inventory struct {
+	Material string
+	Count    uint
 }
