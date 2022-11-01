@@ -12,10 +12,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestCodecDecode(t *testing.T) {
+func TestCodec_Decode(t *testing.T) {
+	t.Parallel()
+
 	c := cbor.NewCodec()
 
 	t.Run("decodes message successfully", func(t *testing.T) {
+		t.Parallel()
+
 		header := unittest.BlockHeaderFixture()
 		data := &messages.BlockProposal{Header: header}
 
@@ -28,16 +32,20 @@ func TestCodecDecode(t *testing.T) {
 	})
 
 	t.Run("returns error when data is empty", func(t *testing.T) {
+		t.Parallel()
+
 		decoded, err := c.Decode(nil)
 		assert.Nil(t, decoded)
-		assert.ErrorIs(t, err, codec.ErrInvalidEncoding)
+		assert.True(t, codec.IsErrInvalidEncoding(err))
 
 		decoded, err = c.Decode([]byte{})
 		assert.Nil(t, decoded)
-		assert.ErrorIs(t, err, codec.ErrInvalidEncoding)
+		assert.True(t, codec.IsErrInvalidEncoding(err))
 	})
 
 	t.Run("returns error when message code is invalid", func(t *testing.T) {
+		t.Parallel()
+
 		decoded, err := c.Decode([]byte{codec.CodeMin})
 		assert.Nil(t, decoded)
 		assert.True(t, codec.IsErrUnknownMsgCode(err))
@@ -56,12 +64,16 @@ func TestCodecDecode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - empty", func(t *testing.T) {
+		t.Parallel()
+
 		decoded, err := c.Decode([]byte{codec.CodeBlockProposal})
 		assert.Nil(t, decoded)
 		assert.True(t, codec.IsErrMsgUnmarshal(err))
 	})
 
 	t.Run("returns error when unmarshalling fails - wrong type", func(t *testing.T) {
+		t.Parallel()
+
 		header := unittest.BlockHeaderFixture()
 		data := &messages.BlockProposal{Header: header}
 
@@ -76,6 +88,8 @@ func TestCodecDecode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - corrupt", func(t *testing.T) {
+		t.Parallel()
+
 		header := unittest.BlockHeaderFixture()
 		data := &messages.BlockProposal{Header: header}
 
