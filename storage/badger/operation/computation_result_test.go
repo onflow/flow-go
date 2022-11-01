@@ -247,8 +247,7 @@ func generateComputationResult(t *testing.T) *execution.ComputationResult {
 				ComputationUsed: 1,
 			},
 		},
-		ComputationUsed: 0,
-		StateReads:      0,
+		TransactionResultIndex: []int{1, 1, 2, 2},
 		TrieUpdates: []*ledger.TrieUpdate{
 			trieUpdate1,
 			trieUpdate2,
