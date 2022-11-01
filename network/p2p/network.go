@@ -378,34 +378,17 @@ func (n *Network) genNetworkMessage(channel channels.Channel, event interface{},
 	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
 	//defer binstat.Leave(bs)
 
-	eventId, err := EventId(channel, payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate event id for message: %x", err)
-	}
-
 	var emTargets [][]byte
 	for _, targetID := range targetIDs {
 		tempID := targetID // avoid capturing loop variable
 		emTargets = append(emTargets, tempID[:])
 	}
 
-	// get origin ID
-	selfID := n.me.NodeID()
-	originID := selfID[:]
-
-	// get message type from event type and remove the asterisk prefix if present
-	msgType := MessageType(event)
-
 	// cast event to a libp2p.Message
 	msg := &message.Message{
 		ChannelID: channel.String(),
 		TargetIDs: emTargets,
 		Payload:   payload,
-
-		// TODO: these fields should be derived by the receiver and removed from the message
-		EventID:  eventId,
-		OriginID: originID,
-		Type:     msgType,
 	}
 
 	return msg, nil

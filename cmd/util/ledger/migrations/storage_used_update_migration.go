@@ -123,7 +123,7 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 					// not an address
 					continue
 				}
-				if id.Key == state.KeyAccountStatus {
+				if id.Key == state.AccountStatusKey {
 					storageUsedPayloadChan <- accountStorageUsedPayload{
 						Address: id.Owner,
 						Index:   p.Index,
@@ -187,7 +187,7 @@ Loop:
 			log.Error().Err(err).Msg("error converting key to register ID")
 			return nil, err
 		}
-		if id.Key != state.KeyAccountStatus {
+		if id.Key != state.AccountStatusKey {
 			return nil, fmt.Errorf("this is not a status register")
 		}
 
