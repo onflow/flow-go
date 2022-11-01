@@ -776,6 +776,9 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 	}
 
+	exeNode.finalizationDistributor = pubsub.NewFinalizationDistributor()
+	exeNode.finalizationDistributor.AddConsumer(exeNode.checkerEng)
+
 	// creates a consensus follower with ingestEngine as the notifier
 	// so that it gets notified upon each new finalized block
 	exeNode.followerCore, err = consensus.NewFollower(
@@ -810,9 +813,6 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 	// initialize the verifier for the protocol consensus
 	verifier := verification.NewCombinedVerifier(exeNode.committee, packer)
 	validator := validator.New(exeNode.committee, verifier)
-
-	exeNode.finalizationDistributor = pubsub.NewFinalizationDistributor()
-	exeNode.finalizationDistributor.AddConsumer(exeNode.checkerEng)
 
 	var err error
 	exeNode.followerEng, err = followereng.New(
