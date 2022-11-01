@@ -263,18 +263,18 @@ func (suite *Suite) TestGetEventsForBlockIDsCancelled() {
 
 			// expect one call to lookup events for each block ID
 			// cancel here
-			suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).
-				Run(func(args mock.Arguments) {
+
+			runFn := func(args mock.Arguments) {}
+			if i == cancelAfter {
+				runFn = func(args mock.Arguments) {
 					lastBlockHandled()
-				}).Return(eventsForBlock, nil).Once()
+				}
+			}
+			suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).
+				Run(runFn).Return(eventsForBlock, nil).Once()
 
 			// expect one call to lookup each block
 			suite.headers.On("ByBlockID", id).Return(block.Header, nil).Once()
-		} else {
-			// no more calls after cancellation
-			suite.commits.On("ByBlockID", id).Return(nil, nil).Times(0)
-			suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(eventsForBlock, nil).Times(0)
-			suite.headers.On("ByBlockID", id).Return(block.Header, nil).Times(0)
 		}
 	}
 
@@ -308,9 +308,12 @@ func (suite *Suite) TestGetEventsForBlockIDsCancelled() {
 	_, err := handler.GetEventsForBlockIDs(ctx, req)
 
 	suite.Require().Error(err)
+	suite.Require().Equal(context.Canceled, err)
 
 	// check that appropriate storage calls were made
 	suite.events.AssertExpectations(suite.T())
+	suite.commits.AssertExpectations(suite.T())
+	suite.headers.AssertExpectations(suite.T())
 }
 
 // Test GetAccountAtBlockID tests the GetAccountAtBlockID API call
