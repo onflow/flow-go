@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strings"
 	"text/template"
 
 	"github.com/go-yaml/yaml"
@@ -49,12 +50,13 @@ func (t *Template) Apply() string {
 	tmpl, err := template.New("test").Parse(templateStr)
 	tmpl = template.Must(tmpl, err)
 
-	err = tmpl.Execute(os.Stdout, dataMap)
+	buf := new(strings.Builder)
+
+	err = tmpl.Execute(buf, dataMap)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	return "foo"
+	return buf.String()
 }
 
 // Node struct which to unmarshal the node-info into
