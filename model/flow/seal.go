@@ -2,7 +2,9 @@
 
 package flow
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // A Seal is produced when an Execution Result (referenced by `ResultID`) for
 // particular block (referenced by `BlockID`) is committed into the chain.

@@ -19,13 +19,7 @@ var _ model.StructureValidator = (*SyncedBlock)(nil)
 
 // StructureValid checks basic structural validity of the message and ensures no required fields are nil.
 func (m *SyncedBlock) StructureValid() error {
-	if m.Block.Header == nil {
-		return model.NewStructureInvalidError("nil block header")
-	}
-	if m.Block.Payload == nil {
-		return model.NewStructureInvalidError("nil block payload")
-	}
-	return nil
+	return m.Block.StructureValid()
 }
 
 // SyncedClusterBlock is an internal message passed from the chainsync engine to the consensus message hub.
@@ -41,11 +35,5 @@ var _ model.StructureValidator = (*SyncedClusterBlock)(nil)
 
 // StructureValid checks basic structural validity of the message and ensures no required fields are nil.
 func (m *SyncedClusterBlock) StructureValid() error {
-	if m.Block.Header == nil {
-		return model.NewStructureInvalidError("nil block header")
-	}
-	if m.Block.Payload == nil {
-		return model.NewStructureInvalidError("nil block payload")
-	}
-	return nil
+	return m.Block.StructureValid()
 }

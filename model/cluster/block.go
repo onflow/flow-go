@@ -3,6 +3,9 @@
 package cluster
 
 import (
+	"fmt"
+
+	"github.com/onflow/flow-go/model"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -29,6 +32,19 @@ func Genesis() *Block {
 type Block struct {
 	Header  *flow.Header
 	Payload *Payload
+}
+
+func (b *Block) StructureValid() error {
+	if b == nil {
+		return model.NewStructureInvalidError("nil cluster block")
+	}
+	if err := b.Header.StructureValid(); err != nil {
+		return fmt.Errorf("invalid cluster header: %w", err)
+	}
+	if err := b.Payload.StructureValid(); err != nil {
+		return fmt.Errorf("invalid cluster payload: %w", err)
+	}
+	return nil
 }
 
 // ID returns the ID of the underlying block header.

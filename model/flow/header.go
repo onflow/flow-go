@@ -7,6 +7,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
 
+	"github.com/onflow/flow-go/model"
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -74,6 +75,13 @@ func (h Header) Body() interface{} {
 		ProposerID:         h.ProposerID,
 		LastViewTCID:       h.LastViewTC.ID(),
 	}
+}
+
+func (h *Header) StructureValid() error {
+	if h == nil {
+		return model.NewStructureInvalidError("nil header")
+	}
+	return nil
 }
 
 func (h Header) Fingerprint() []byte {

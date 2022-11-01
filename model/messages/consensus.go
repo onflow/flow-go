@@ -14,11 +14,11 @@ type BlockProposal struct {
 
 // StructureValid checks basic structural validity of the message and ensures no required fields are nil.
 func (m *BlockProposal) StructureValid() error {
-	if m.Header == nil {
-		return model.NewStructureInvalidError("nil block header")
+	if err := m.Header.StructureValid(); err != nil {
+		return err
 	}
-	if m.Payload == nil {
-		return model.NewStructureInvalidError("nil block payload")
+	if err := m.Payload.StructureValid(); err != nil {
+		return err
 	}
 	return nil
 }

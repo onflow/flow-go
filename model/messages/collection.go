@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -37,11 +39,11 @@ var _ model.StructureValidator = (*ClusterBlockProposal)(nil)
 
 // StructureValid checks basic structural validity of the message and ensures no required fields are nil.
 func (m *ClusterBlockProposal) StructureValid() error {
-	if m.Header == nil {
-		return model.NewStructureInvalidError("nil block header")
+	if err := m.Header.StructureValid(); err != nil {
+		return fmt.Errorf("invalid cluster block header: %w", err)
 	}
-	if m.Payload == nil {
-		return model.NewStructureInvalidError("nil block payload")
+	if err := m.Payload.StructureValid(); err != nil {
+		return fmt.Errorf("invalid cluster block payload: %w", err)
 	}
 	return nil
 }

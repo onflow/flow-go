@@ -2,6 +2,12 @@
 
 package flow
 
+import (
+	"fmt"
+
+	"github.com/onflow/flow-go/model"
+)
+
 func Genesis(chainID ChainID) *Block {
 
 	// create the raw content for the genesis block
@@ -34,6 +40,19 @@ func Genesis(chainID ChainID) *Block {
 type Block struct {
 	Header  *Header
 	Payload *Payload
+}
+
+func (b *Block) StructureValid() error {
+	if b == nil {
+		return model.NewStructureInvalidError("nil block")
+	}
+	if err := b.Header.StructureValid(); err != nil {
+		return fmt.Errorf("invalid block header: %w", err)
+	}
+	if err := b.Payload.StructureValid(); err != nil {
+		return fmt.Errorf("invalid block payload: %w", err)
+	}
+	return nil
 }
 
 // SetPayload sets the payload and updates the payload hash.

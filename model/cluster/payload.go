@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"github.com/onflow/flow-go/model"
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -25,6 +26,18 @@ type Payload struct {
 	// members. It is invalid for any non-root block to have an empty reference
 	// block ID.
 	ReferenceBlockID flow.Identifier
+}
+
+func (p *Payload) StructureValid() error {
+	if p == nil {
+		return model.NewStructureInvalidError("nil cluster payload")
+	}
+	for _, tx := range p.Collection.Transactions {
+		if tx == nil {
+			return model.NewStructureInvalidError("nil transaction")
+		}
+	}
+	return nil
 }
 
 // EmptyPayload returns a payload with an empty collection and the given

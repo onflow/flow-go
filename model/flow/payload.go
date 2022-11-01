@@ -2,6 +2,8 @@ package flow
 
 import (
 	"encoding/json"
+
+	"github.com/onflow/flow-go/model"
 )
 
 // Payload is the actual content of each block.
@@ -38,6 +40,33 @@ func (p Payload) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct{ payloadAlias }{
 		payloadAlias: payloadAlias(p),
 	})
+}
+
+func (p *Payload) StructureValid() error {
+	if p == nil {
+		return model.NewStructureInvalidError("nil payload")
+	}
+	for _, guarantee := range p.Guarantees {
+		if guarantee == nil {
+			return model.NewStructureInvalidError("contains nil guarantee")
+		}
+	}
+	for _, seal := range p.Seals {
+		if seal == nil {
+			return model.NewStructureInvalidError("contains nil seal")
+		}
+	}
+	for _, receipt := range p.Receipts {
+		if receipt == nil {
+			return model.NewStructureInvalidError("contains nil receipt")
+		}
+	}
+	for _, result := range p.Results {
+		if result == nil {
+			return model.NewStructureInvalidError("contains nil result")
+		}
+	}
+	return nil
 }
 
 // Hash returns the root hash of the payload.
