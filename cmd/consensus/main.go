@@ -14,8 +14,6 @@ import (
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/admin/commands"
-	admincommon "github.com/onflow/flow-go/admin/commands/common"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
@@ -100,30 +98,29 @@ func main() {
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
-		err                          error
-		mutableState                 protocol.MutableState
-		beaconPrivateKey             *encodable.RandomBeaconPrivKey
-		guarantees                   mempool.Guarantees
-		receipts                     mempool.ExecutionTree
-		seals                        mempool.IncorporatedResultSeals
-		pendingReceipts              mempool.PendingReceipts
-		prov                         *provider.Engine
-		receiptRequester             *requester.Engine
-		syncCore                     *chainsync.Core
-		comp                         *compliance.Engine
-		conMetrics                   module.ConsensusMetrics
-		mainMetrics                  module.HotstuffMetrics
-		receiptValidator             module.ReceiptValidator
-		chunkAssigner                *chmodule.ChunkAssigner
-		finalizationDistributor      *pubsub.FinalizationDistributor
-		dkgBrokerTunnel              *dkgmodule.BrokerTunnel
-		blockTimer                   protocol.BlockTimer
-		finalizedHeader              *synceng.FinalizedHeaderCache
-		hotstuffModules              *consensus.HotstuffModules
-		dkgState                     *bstorage.DKGState
-		safeBeaconKeys               *bstorage.SafeBeaconPrivateKeys
-		adminCmdSetRequiredApprovals commands.AdminCommand
-		getSealingConfigs            module.SealingConfigsGetter
+		err                     error
+		mutableState            protocol.MutableState
+		beaconPrivateKey        *encodable.RandomBeaconPrivKey
+		guarantees              mempool.Guarantees
+		receipts                mempool.ExecutionTree
+		seals                   mempool.IncorporatedResultSeals
+		pendingReceipts         mempool.PendingReceipts
+		prov                    *provider.Engine
+		receiptRequester        *requester.Engine
+		syncCore                *chainsync.Core
+		comp                    *compliance.Engine
+		conMetrics              module.ConsensusMetrics
+		mainMetrics             module.HotstuffMetrics
+		receiptValidator        module.ReceiptValidator
+		chunkAssigner           *chmodule.ChunkAssigner
+		finalizationDistributor *pubsub.FinalizationDistributor
+		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
+		blockTimer              protocol.BlockTimer
+		finalizedHeader         *synceng.FinalizedHeaderCache
+		hotstuffModules         *consensus.HotstuffModules
+		dkgState                *bstorage.DKGState
+		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
+		getSealingConfigs       module.SealingConfigsGetter
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -186,14 +183,13 @@ func main() {
 			safeBeaconKeys = bstorage.NewSafeBeaconPrivateKeys(dkgState)
 			return nil
 		}).
-		Module("requiredApprovalsForSealConstruction setter", func(node *cmd.NodeConfig) error {
+		Module("updatable sealing config", func(node *cmd.NodeConfig) error {
 			setter, err := updatable_configs.NewSealingConfigs(
 				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
 				chunkAlpha,
 				emergencySealing,
 			)
-
 			if err != nil {
 				return err
 			}
@@ -203,15 +199,10 @@ func main() {
 
 			// admin tool is the only instance that have access to the setter interface, therefore, is
 			// the only module can change this config
-			adminCmdSetRequiredApprovals = admincommon.NewSetRequiredApprovalsForSealingCommand(setter)
-
-			return nil
-		}).
-		AdminCommand("set-required-approvals-for-sealing", func(node *cmd.NodeConfig) commands.AdminCommand {
-			return adminCmdSetRequiredApprovals
-		}).
-		AdminCommand("get-required-approvals-for-sealing", func(node *cmd.NodeConfig) commands.AdminCommand {
-			return admincommon.NewGetRequiredApprovalsForSealingCommand(getSealingConfigs)
+			err = node.ConfigManager.RegisterUintConfig("consensus-required-approvals-for-sealing",
+				setter.RequireApprovalsForSealConstructionDynamicValue,
+				setter.SetRequiredApprovalsForSealingConstruction)
+			return err
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
@@ -652,6 +643,7 @@ func main() {
 				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
 				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
 				consensus.WithBlockRateDelay(blockRateDelay),
+				consensus.WithConfigRegistrar(node.ConfigManager),
 			}
 
 			if !startupTime.IsZero() {
