@@ -706,6 +706,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		GenericNode:         node,
 		MutableState:        followerState,
 		IngestionEngine:     ingestionEngine,
+		FollowerCore:        followerCore,
 		FollowerEngine:      followerEng,
 		SyncEngine:          syncEngine,
 		ExecutionEngine:     computation,

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -17,6 +16,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
