@@ -218,7 +218,7 @@ func (h *handler) GetRegisterAtBlockID(
 	return res, nil
 }
 
-func (h *handler) GetEventsForBlockIDs(_ context.Context,
+func (h *handler) GetEventsForBlockIDs(ctx context.Context,
 	req *execution.GetEventsForBlockIDsRequest) (*execution.GetEventsForBlockIDsResponse, error) {
 
 	// validate request
@@ -237,26 +237,32 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 
 	// collect all the events and create a EventsResponse_Result for each block
 	for i, bID := range flowBlockIDs {
-		// Check if block has been executed
-		if _, err := h.commits.ByBlockID(bID); err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				return nil, status.Errorf(codes.NotFound, "state commitment for block ID %s does not exist", bID)
-			}
-			return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", bID)
-		}
-
-		// lookup events
-		blockEvents, err := h.events.ByBlockIDEventType(bID, flow.EventType(eType))
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
-		}
-
-		result, err := h.eventResult(bID, blockEvents)
-		if err != nil {
+		select {
+		case <-ctx.Done():
+			err := ctx.Err()
+			h.log.Info().Err(err).Msg("GetEventsForBlockIDs cancelled")
 			return nil, err
-		}
-		results[i] = result
+		default:
+			// Check if block has been executed
+			if _, err := h.commits.ByBlockID(bID); err != nil {
+				if errors.Is(err, storage.ErrNotFound) {
+					return nil, status.Errorf(codes.NotFound, "state commitment for block ID %s does not exist", bID)
+				}
+				return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", bID)
+			}
 
+			// lookup events
+			blockEvents, err := h.events.ByBlockIDEventType(bID, flow.EventType(eType))
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
+			}
+
+			result, err := h.eventResult(bID, blockEvents)
+			if err != nil {
+				return nil, err
+			}
+			results[i] = result
+		}
 	}
 
 	return &execution.GetEventsForBlockIDsResponse{
