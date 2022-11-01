@@ -12,7 +12,6 @@ import (
 
 type ExecutionCollector struct {
 	tracer                                 module.Tracer
-	stateReadsPerBlock                     prometheus.Histogram
 	totalExecutedBlocksCounter             prometheus.Counter
 	totalExecutedCollectionsCounter        prometheus.Counter
 	totalExecutedTransactionsCounter       prometheus.Counter
