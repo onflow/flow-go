@@ -269,6 +269,7 @@ func main() {
 			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
+			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			// creates a consensus follower with noop consumer as the notifier
 			followerCore, err = consensus.NewFollower(
 				node.Logger,
@@ -297,7 +298,6 @@ func main() {
 
 			validator := validator.New(mainConsensusCommittee, verifier)
 
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			followerEng, err = followereng.New(
 				node.Logger,
 				node.Network,

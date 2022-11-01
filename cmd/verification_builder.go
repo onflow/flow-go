@@ -340,10 +340,23 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
+			finalizationDistributor = pubsub.NewFinalizationDistributor()
+			finalizationDistributor.AddConsumer(blockConsumer)
+
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err = flowconsensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finalizationDistributor, node.RootBlock.Header,
-				node.RootQC, finalized, pending)
+			followerCore, err = flowconsensus.NewFollower(
+				node.Logger,
+				committee,
+				node.Storage.Headers,
+				final,
+				verifier,
+				finalizationDistributor,
+				node.RootBlock.Header,
+				node.RootQC,
+				finalized,
+				pending,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
@@ -358,9 +371,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(committee, packer)
 			validator := validator.New(committee, verifier)
-
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
-			finalizationDistributor.AddConsumer(blockConsumer)
 
 			var err error
 			followerEng, err = follower.New(
