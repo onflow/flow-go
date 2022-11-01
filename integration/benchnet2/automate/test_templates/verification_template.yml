@@ -1,0 +1,28 @@
+args:
+  - --bootstrapdir=/bootstrap
+  - --datadir=/data/protocol
+  - --secretsdir=/data/secret
+  - --loglevel=INFO
+  - --bind=0.0.0.0:3569
+  - --profiler-enabled=false
+  - --profile-uploader-enabled=false
+  - --tracer-enabled=false
+  - --profiler-dir=/profiler
+  - --profiler-interval=2m
+  - --nodeid={{.NodeID}}
+  - --chunk-alpha=1
+env:
+  - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+    value: http://tempo:4317
+  - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+    value: "true"
+  - name: OTEL_RESOURCE_ATTRIBUTES
+    value: network
+  - name: BINSTAT_ENABLE
+    value: ""
+  - name: BINSTAT_LEN_WHAT
+    value: ""
+  - name: BINSTAT_DMP_NAME
+    value: ""
+  - name: BINSTAT_DMP_PATH
+    value: ""

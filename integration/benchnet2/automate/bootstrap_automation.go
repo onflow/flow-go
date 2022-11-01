@@ -21,10 +21,20 @@ type Node struct {
 	StakingPubKey string `json:"StakingPubKey"`
 }
 
-// ReplacementData struct which contains all data replacements for templates
-type ReplacementData struct {
+// ReplacementNodeData struct which contains all data replacements for templates
+type ReplacementNodeData struct {
 	NodeID   string
 	ImageTag string
+}
+
+type ReplacementValues struct {
+	Branch       string
+	Commit       string
+	Access       map[string]string
+	Collection   map[string]string
+	Consensus    map[string]string
+	Execution    map[string]string
+	Verification map[string]string
 }
 
 var DEFAULT_NODE_INFO_PATH = "../bootstrap/public-root-information/node-infos.pub.json"
@@ -163,7 +173,7 @@ func nodeStruct(nodeType string, nodeTemplatePath string, imageTag string, nodes
 
 	for i := 1; i <= nodeConfig[nodeType]; i++ {
 		name := fmt.Sprint(nodeType, i)
-		replacementData := ReplacementData{NodeID: nodesData[name].NodeID, ImageTag: imageTag}
+		replacementData := ReplacementNodeData{NodeID: nodesData[name].NodeID, ImageTag: imageTag}
 
 		nodeString, err := replaceTemplateData(nodeTemplate, replacementData)
 		if err != nil {
@@ -201,7 +211,7 @@ func writeYamlBytesToFile(filepath string, yamlData []byte) error {
 	return file.Close()
 }
 
-func replaceTemplateData(template *template.Template, data ReplacementData) (string, error) {
+func replaceTemplateData(template *template.Template, data interface{}) (string, error) {
 	var doc bytes.Buffer
 	err := template.Execute(&doc, data)
 	return doc.String(), err
@@ -228,3 +238,123 @@ func marshalToYaml(source interface{}, outputFilePath string) error {
 	}
 	return writeYamlBytesToFile(outputFilePath, yamlData)
 }
+
+func iterateTemplates() {
+	folder := "test_templates/"
+	testTemp, _ := createTemplate(folder + "template_test.yml")
+	testmap := make(map[string]string)
+	teststring := make(map[string]ReplacementNodeData)
+
+	testmap["one"] = "Map1"
+	testmap["two"] = "Map2"
+
+	teststring["one"] = ReplacementNodeData{NodeID: "oneID", ImageTag: "oneImage"}
+	teststring["two"] = ReplacementNodeData{NodeID: "twoID", ImageTag: "twoImage"}
+
+	testslice := []string{"1234", "abce"}
+
+	testData := testingStruct{Branch: "replacement branch", Testmap: testmap, Teststring: teststring, Testslice: testslice}
+
+	var doc bytes.Buffer
+	err := testTemp.Execute(&doc, testData)
+
+	fmt.Println(err)
+	fmt.Println(doc.String())
+}
+
+func GenerateValues(inputJsonFilePath string, templatePath string, outputYamlFilePath string, branch string, commit string,
+	accessImage string, collectionImage string, consensusImage string, executionImage string, verificationImage string) error {
+	templateFolder := "test_templates/"
+	if templatePath != "" {
+		templateFolder = templatePath
+	}
+	nodeInfoJson := DEFAULT_NODE_INFO_PATH
+	if inputJsonFilePath != "" {
+		nodeInfoJson = inputJsonFilePath
+	}
+
+	nodesData, nodeConfig, err := loadNodeJsonData(nodeInfoJson)
+	if err != nil {
+		return err
+	}
+
+	valuesData, err := buildValues(templateFolder, nodesData, nodeConfig, "branch", "commit", accessImage, collectionImage, consensusImage, executionImage, verificationImage)
+	if err != nil {
+		return err
+	}
+
+	valuesTemplate, err := createTemplate(templateFolder + "values_template.yml")
+	if err != nil {
+		return err
+	}
+	values, err := replaceTemplateData(valuesTemplate, valuesData)
+	if err != nil {
+		return err
+	}
+
+	return writeYamlBytesToFile("values.yml", []byte(values))
+}
+
+func buildValues(templateFolder string, nodesData map[string]Node, nodesConfig map[string]int, branch string, commit string,
+	accessImage string, collectionImage string, consensusImage string, executionImage string, verificationImage string) (ReplacementValues, error) {
+	accessTemplatePath := templateFolder + ACCESS_TEMPLATE
+	accessNodes, err := buildNodes("access", accessTemplatePath, accessImage, nodesData, nodesConfig)
+	if err != nil {
+		return ReplacementValues{}, err
+	}
+
+	collectionTemplatePath := templateFolder + COLLECTION_TEMPLATE
+	collectionNodes, err := buildNodes("collection", collectionTemplatePath, collectionImage, nodesData, nodesConfig)
+	if err != nil {
+		return ReplacementValues{}, err
+	}
+
+	consensusTemplatePath := templateFolder + CONSENSUS_TEMPLATE
+	consensusNodes, err := buildNodes("consensus", consensusTemplatePath, consensusImage, nodesData, nodesConfig)
+	if err != nil {
+		return ReplacementValues{}, err
+	}
+
+	executionTemplatePath := templateFolder + EXECUTION_TEMPLATE
+	executionNodes, err := buildNodes("execution", executionTemplatePath, executionImage, nodesData, nodesConfig)
+	if err != nil {
+		return ReplacementValues{}, err
+	}
+
+	verificationTemplatePath := templateFolder + VERIFICATION_TEMPLATE
+	verificationNodes, err := buildNodes("verification", verificationTemplatePath, verificationImage, nodesData, nodesConfig)
+
+	return ReplacementValues{Branch: branch, Commit: commit, Access: accessNodes, Collection: collectionNodes, Consensus: consensusNodes, Execution: executionNodes, Verification: verificationNodes}, err
+}
+
+func buildNodes(nodeType string, nodeTemplatePath string, imageTag string, nodesData map[string]Node, nodeConfig map[string]int) (map[string]string, error) {
+	nodeTemplate, err := createTemplate(nodeTemplatePath)
+	if err != nil {
+		return nil, err
+	}
+	var nodeMap = make(map[string]string)
+
+	for i := 1; i <= nodeConfig[nodeType]; i++ {
+		name := fmt.Sprint(nodeType, i)
+		key := name + ":"
+		replacementData := ReplacementNodeData{NodeID: nodesData[name].NodeID, ImageTag: imageTag}
+
+		nodeString, err := replaceTemplateData(nodeTemplate, replacementData)
+		if err != nil {
+			return nil, err
+		}
+		nodeMap[key] = nodeString
+	}
+
+	return nodeMap, err
+}
+
+type testingStruct struct {
+	Branch     string
+	Testmap    map[string]string
+	Teststring map[string]ReplacementNodeData
+	Testslice  []string
+}
+
+// # test1: {{range.testmap}}{{$index}}{{.}}
+// # test2: {{range.teststring}}{{if $index == "one"}}{{.NodeID}}

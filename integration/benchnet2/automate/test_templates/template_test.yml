@@ -1,0 +1,6 @@
+branch: {{.Branch}}
+# Commit must be a string
+commit: commit
+test2: {{range $key, $element := .Teststring}}
+  {{$key}}
+    {{$element.NodeID}}{{end}}

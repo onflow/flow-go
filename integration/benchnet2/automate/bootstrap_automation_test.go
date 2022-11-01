@@ -19,7 +19,7 @@ func TestSubString(t *testing.T) {
 	undermatched, _ := createTemplate("test_files/test_undermatched_template.yml")
 	// overmatched := createTemplate("test_files/test_overmatched_template.yml")
 
-	replacementData := ReplacementData{NodeID: "1", ImageTag: "2"}
+	replacementData := ReplacementNodeData{NodeID: "1", ImageTag: "2"}
 
 	matchedString, _ := replaceTemplateData(matched, replacementData)
 	undermatchedString, _ := replaceTemplateData(undermatched, replacementData)
@@ -146,4 +146,12 @@ func deleteFile(filepath string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func TestTemplating(t *testing.T) {
+	iterateTemplates()
+}
+
+func TestTemplating2(t *testing.T) {
+	GenerateValues("", "", "values.yml", "test branch", "test_commit", "AccessImage", "CollectionImage", "ConsensusImage", "ExecutionImage", "VerificationImage")
 }
