@@ -24,14 +24,14 @@ type HotstuffModules struct {
 }
 
 type ParticipantConfig struct {
-	StartupTime                time.Time                    // the time when consensus participant enters first view
-	TimeoutInitial             time.Duration                // the initial timeout for the pacemaker
-	TimeoutMinimum             time.Duration                // the minimum timeout for the pacemaker
-	TimeoutAggregationFraction float64                      // the percentage part of the timeout period reserved for vote aggregation
-	TimeoutIncreaseFactor      float64                      // the factor at which the timeout grows when timeouts occur
-	TimeoutDecreaseFactor      float64                      // the factor at which the timeout grows when timeouts occur
-	BlockRateDelay             time.Duration                // a delay to broadcast block proposal in order to control the block production rate
-	Registerer                 updatable_configs.Registerer // optional: for registering HotStuff configs as dynamically configurable
+	StartupTime                time.Time                   // the time when consensus participant enters first view
+	TimeoutInitial             time.Duration               // the initial timeout for the pacemaker
+	TimeoutMinimum             time.Duration               // the minimum timeout for the pacemaker
+	TimeoutAggregationFraction float64                     // the percentage part of the timeout period reserved for vote aggregation
+	TimeoutIncreaseFactor      float64                     // the factor at which the timeout grows when timeouts occur
+	TimeoutDecreaseFactor      float64                     // the factor at which the timeout grows when timeouts occur
+	BlockRateDelay             time.Duration               // a delay to broadcast block proposal in order to control the block production rate
+	Registrar                  updatable_configs.Registrar // optional: for registering HotStuff configs as dynamically configurable
 }
 
 func DefaultParticipantConfig() ParticipantConfig {
@@ -43,7 +43,7 @@ func DefaultParticipantConfig() ParticipantConfig {
 		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
 		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
 		BlockRateDelay:             defTimeout.GetBlockRateDelay(),
-		Registerer:                 nil,
+		Registrar:                  nil,
 	}
 	return cfg
 }
@@ -92,8 +92,8 @@ func WithBlockRateDelay(delay time.Duration) Option {
 	}
 }
 
-func WithConfigRegisterer(reg updatable_configs.Registerer) Option {
+func WithConfigRegistrar(reg updatable_configs.Registrar) Option {
 	return func(cfg *ParticipantConfig) {
-		cfg.Registerer = reg
+		cfg.Registrar = reg
 	}
 }

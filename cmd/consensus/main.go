@@ -643,7 +643,7 @@ func main() {
 				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
 				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
 				consensus.WithBlockRateDelay(blockRateDelay),
-				consensus.WithConfigRegisterer(node.ConfigManager),
+				consensus.WithConfigRegistrar(node.ConfigManager),
 			}
 
 			if !startupTime.IsZero() {
