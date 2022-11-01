@@ -2,7 +2,6 @@ package consensus_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"os"
 	"testing"
 	"time"
@@ -20,6 +19,7 @@ import (
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -163,7 +163,7 @@ func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
 	unittest.RequireCloseBefore(s.T(), s.follower.Done(), time.Second, "follower failed to stop")
 	select {
 	case err := <-s.errs:
-		assert.NoError(cs.T(), err)
+		require.NoError(s.T(), err)
 	default:
 	}
 }

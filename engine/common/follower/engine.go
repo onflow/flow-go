@@ -183,8 +183,6 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, mes
 		return e.onSyncedBlock(originID, msg)
 	case *messages.BlockProposal:
 		e.onBlockProposal(originID, msg)
-	case *messages.BlockResponse:
-		e.onBlockResponse(originID, msg)
 	default:
 		e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
 	}
@@ -262,23 +260,6 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 		e.pendingBlocksNotifier.Notify()
 	}
 	return nil
-}
-
-// onBlockResponse performs processing of incoming block response by splitting it into separate blocks, pushing them into queue
-// and notifying worker.
-// TODO: consider handling block response separately as this is a continuous block range.
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
-	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockResponse)
-	for _, block := range res.Blocks {
-		proposal := &messages.BlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		}
-
-		in := inboundBlock{originID, proposal}
-		e.pendingBlocks.Push(in)
-	}
-	e.pendingBlocksNotifier.Notify()
 }
 
 // processBlockProposal handles incoming block proposals.
