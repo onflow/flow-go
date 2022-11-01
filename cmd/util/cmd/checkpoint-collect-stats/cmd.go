@@ -110,7 +110,7 @@ func run(*cobra.Command, []string) {
 
 		key, err = p.Key()
 		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot loading the key: %w", err)
+			log.Fatal().Err(err).Msgf("cannot load the key: %w", err)
 		}
 
 		size = p.Size()
@@ -211,41 +211,35 @@ func run(*cobra.Command, []string) {
 func getType(key ledger.Key) string {
 	k := key.KeyParts[1].Value
 	kstr := string(k)
-	// cadence controlled registers
+
 	if atree.LedgerKeyIsSlabKey(kstr) {
 		return "slab"
 	}
-	if kstr == "storage" {
-		return "account's cadence storage domain map"
-	}
-	if kstr == "private" {
-		return "account's cadence private domain map"
-	}
-	if kstr == "public" {
-		return "account's cadence public domain map"
-	}
-	if kstr == "contract" {
-		return "account's cadence contract domain map"
-	}
 
-	// fvm controlled registers
+	switch kstr {
+	case "storage":
+		return "account's cadence storage domain map"
+	case "private":
+		return "account's cadence private domain map"
+	case "public":
+		return "account's cadence public domain map"
+	case "contract":
+		return "account's cadence contract domain map"
+	case state.KeyContractNames:
+		return "contract names"
+	case state.KeyAccountStatus:
+		return "account status"
+	case "uuid":
+		return "uuid generator state"
+	case "account_address_state":
+		return "address generator state"
+	}
+	// other fvm registers
 	if bytes.HasPrefix(k, []byte("public_key_")) {
 		return "public key"
 	}
-	if kstr == state.KeyContractNames {
-		return "contract names"
-	}
 	if bytes.HasPrefix(k, []byte(state.KeyCode)) {
 		return "contract content"
-	}
-	if kstr == state.KeyAccountStatus {
-		return "account status"
-	}
-	if kstr == "uuid" {
-		return "uuid generator state"
-	}
-	if kstr == "account_address_state" {
-		return "address generator state"
 	}
 	return "others"
 }
