@@ -56,6 +56,7 @@ type UnicastAuthorizationTestSuite struct {
 
 // TestUnicastAuthorizationTestSuite runs all the test methods in this test suit
 func TestUnicastAuthorizationTestSuite(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(UnicastAuthorizationTestSuite))
 }
 

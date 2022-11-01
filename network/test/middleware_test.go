@@ -755,12 +755,6 @@ func (m *MiddlewareTestSuite) TestMessageFieldsOverriden_Publish() {
 			close(ch)
 		})
 
-	// initially subscribe the nodes to the channel
-	for _, mw := range m.mws {
-		err := mw.Subscribe(testChannel)
-		require.NoError(m.Suite.T(), err)
-	}
-
 	// set up waiting for m.size pubsub tags indicating a mesh has formed
 	for i := 0; i < m.size; i++ {
 		select {
