@@ -37,12 +37,13 @@ non_relic_tests:
 ############################################################################################
 # CAUTION: DO NOT MODIFY THIS TARGET! DOING SO WILL BREAK THE FLAKY TEST MONITOR
 
-# runs all tests of the crypto package 
+# sets up the crypto module and runs all tests
 .PHONY: test
-test: setup test_main
+test: setup unittest
 
-.PHONY: test_main
-test_main: relic_tests non_relic_tests
+# runs the unit tests of the module (assumes the module was set up)
+.PHONY: unittest
+unittest: relic_tests non_relic_tests
 
 ############################################################################################
 

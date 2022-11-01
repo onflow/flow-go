@@ -155,7 +155,7 @@ jobs:
         include:
           - name: crypto
             make1: -C crypto setup
-            make2: test_main
+            make2: unittest
             retries: 1
             race: 1
           - name: insecure
