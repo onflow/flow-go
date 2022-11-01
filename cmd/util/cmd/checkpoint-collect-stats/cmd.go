@@ -46,15 +46,19 @@ func init() {
 }
 
 type PayloadStats struct {
-	TotalPayloadSize           uint64 `json:"total_payload_size"`
-	TotalPayloadValueSize      uint64 `json:"total_payload_value_size"`
-	TotalPayloadEncodedKeySize uint64 `json:"total_payload_encoded_key_byte_size"`
-	TotalPayloadSizeOfTypeSlab uint64 `json:"total_payload_size_of_type_slab"`
+	TotalPayloadSize                uint64 `json:"total_payload_size"`
+	TotalPayloadValueSize           uint64 `json:"total_payload_value_size"`
+	TotalPayloadEncodedKeySize      uint64 `json:"total_payload_encoded_key_byte_size"`
+	TotalPayloadSizeOfTypeSlab      uint64 `json:"total_payload_size_of_type_slab"`
+	TotalPayloadValueSizeOfTypeSlab uint64 `json:"total_payload_value_size_of_type_slab"`
+	SlabCounts                      uint64 `json:"slab_counts"`
 }
 
+// TODO payload by type (array)
+
 type Stats struct {
-	ledgerStats  *complete.LedgerStats
-	payloadStats *PayloadStats
+	LedgerStats  *complete.LedgerStats
+	PayloadStats *PayloadStats
 }
 
 func run(*cobra.Command, []string) {
@@ -92,20 +96,25 @@ func run(*cobra.Command, []string) {
 	memAllocAfter := debug.GetHeapAllocsBytes()
 	log.Info().Msgf("the checkpoint is loaded, mem usage: %d", memAllocAfter-memAllocBefore)
 
-	var totalPayloadSize, totalPayloadValueSize, totalPayloadSizeSlabOnly uint64
+	var totalPayloadSize, totalPayloadValueSize,
+		slabcounts,
+		totalPayloadSizeSlabOnly, totalPayloadValueSizeSlabOnly uint64
 	var value ledger.Value
 	var key ledger.Key
 	var valueSize int
 
 	ledgerStats, err := led.CollectStats(func(p *ledger.Payload) {
-		totalPayloadSize += uint64(p.Size())
+		size := p.Size()
+		totalPayloadSize += uint64(size)
 		value = p.Value()
 		valueSize = value.Size()
 		totalPayloadValueSize += uint64(valueSize)
 		key, _ = p.Key()
 		// slab types
 		if atree.LedgerKeyIsSlabKey(string(key.KeyParts[1].Value)) {
-			totalPayloadSizeSlabOnly += uint64(valueSize)
+			slabcounts++
+			totalPayloadValueSizeSlabOnly += uint64(valueSize)
+			totalPayloadSizeSlabOnly += uint64(size)
 			return
 		}
 	})
@@ -115,12 +124,14 @@ func run(*cobra.Command, []string) {
 	}
 
 	stats := &Stats{
-		ledgerStats: ledgerStats,
-		payloadStats: &PayloadStats{
-			TotalPayloadSize:           totalPayloadSize,
-			TotalPayloadValueSize:      totalPayloadValueSize,
-			TotalPayloadEncodedKeySize: totalPayloadSize - totalPayloadValueSize,
-			TotalPayloadSizeOfTypeSlab: totalPayloadSizeSlabOnly,
+		LedgerStats: ledgerStats,
+		PayloadStats: &PayloadStats{
+			TotalPayloadSize:                totalPayloadSize,
+			TotalPayloadValueSize:           totalPayloadValueSize,
+			TotalPayloadEncodedKeySize:      totalPayloadSize - totalPayloadValueSize,
+			TotalPayloadSizeOfTypeSlab:      totalPayloadSizeSlabOnly,
+			TotalPayloadValueSizeOfTypeSlab: totalPayloadValueSizeSlabOnly,
+			SlabCounts:                      slabcounts,
 		},
 	}
 
