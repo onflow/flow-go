@@ -314,6 +314,14 @@ func (n *Node) Publish(ctx context.Context, topic channels.Topic, data []byte) e
 	return nil
 }
 
+// HasSubscription returns true if the node currently has an active subscription to the topic.
+func (n *Node) HasSubscription(topic channels.Topic) bool {
+	n.Lock()
+	defer n.Unlock()
+	_, ok := n.subs[topic]
+	return ok
+}
+
 // Host returns pointer to host object of node.
 func (n *Node) Host() host.Host {
 	return n.host
