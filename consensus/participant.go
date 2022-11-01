@@ -123,8 +123,8 @@ func NewParticipant(
 	modules.QCCreatedDistributor.AddConsumer(loop.SubmitTrustedQC)
 
 	// register dynamically updatable configs
-	if cfg.Registerer != nil {
-		err = cfg.Registerer.RegisterDurationConfig("hotstuff-block-rate-delay", timeoutConfig.GetBlockRateDelay, timeoutConfig.SetBlockRateDelay)
+	if cfg.Registrar != nil {
+		err = cfg.Registrar.RegisterDurationConfig("hotstuff-block-rate-delay", timeoutConfig.GetBlockRateDelay, timeoutConfig.SetBlockRateDelay)
 		if err != nil {
 			return nil, fmt.Errorf("failed to register block rate delay config: %w", err)
 		}

@@ -41,7 +41,7 @@ type (
 // ADDING A NEW TYPE:
 // If you need to add a new configurable config field with a type not below:
 //  1. Add a new setter and getter type below
-//  2. Add a Register*Config method to the Registerer interface and Manager implementation below
+//  2. Add a Register*Config method to the Registrar interface and Manager implementation below
 //  3. Add a TestManager_Register*Config test to the manager_test.go file.
 
 type (
@@ -114,14 +114,14 @@ func (m *Manager) AllFields() []Field {
 	return fields
 }
 
-var _ Registerer = (*Manager)(nil)
+var _ Registrar = (*Manager)(nil)
 
-// Registerer provides an interface for registering config fields which can be
+// Registrar provides an interface for registering config fields which can be
 // dynamically updated while the node is running.
 // Configs must have globally unique names. Setter functions are responsible for
 // enforcing component-specific validation rules, and returning a ValidationError
 // if the new config value is invalid.
-type Registerer interface {
+type Registrar interface {
 	// RegisterBoolConfig registers a new bool config.
 	// Returns ErrAlreadyRegistered if a config is already registered with name.
 	RegisterBoolConfig(name string, get GetBoolConfigFunc, set SetBoolConfigFunc) error
