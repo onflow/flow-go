@@ -14,13 +14,17 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestDecoderDecode(t *testing.T) {
+func TestDecoder_Decode(t *testing.T) {
+	t.Parallel()
+
 	c := cbor.NewCodec()
 
 	header := unittest.BlockHeaderFixture()
 	blockProposal := &messages.BlockProposal{Header: header}
 
 	t.Run("decodes message successfully", func(t *testing.T) {
+		t.Parallel()
+
 		var buf bytes.Buffer
 
 		err := c.NewEncoder(&buf).Encode(blockProposal)
@@ -32,15 +36,19 @@ func TestDecoderDecode(t *testing.T) {
 	})
 
 	t.Run("returns error when data is empty", func(t *testing.T) {
+		t.Parallel()
+
 		var buf bytes.Buffer
 		// empty buffer
 
 		decoded, err := c.NewDecoder(&buf).Decode()
 		assert.Nil(t, decoded)
-		assert.ErrorContains(t, err, "could not decode message")
+		assert.True(t, codec.IsErrInvalidEncoding(err))
 	})
 
 	t.Run("returns error when data is empty - nil byte", func(t *testing.T) {
+		t.Parallel()
+
 		var buf bytes.Buffer
 
 		// nil byte
@@ -48,10 +56,12 @@ func TestDecoderDecode(t *testing.T) {
 
 		decoded, err := c.NewDecoder(&buf).Decode()
 		assert.Nil(t, decoded)
-		assert.ErrorContains(t, err, "could not decode message")
+		assert.True(t, codec.IsErrInvalidEncoding(err))
 	})
 
 	t.Run("returns error when data is empty - cbor nil", func(t *testing.T) {
+		t.Parallel()
+
 		var buf bytes.Buffer
 
 		// explicit cbor encoding of nil
@@ -60,10 +70,12 @@ func TestDecoderDecode(t *testing.T) {
 
 		decoded, err := c.NewDecoder(&buf).Decode()
 		assert.Nil(t, decoded)
-		assert.ErrorIs(t, err, codec.ErrInvalidEncoding)
+		assert.True(t, codec.IsErrInvalidEncoding(err))
 	})
 
 	t.Run("returns error when data is empty - cbor empty []byte", func(t *testing.T) {
+		t.Parallel()
+
 		var buf bytes.Buffer
 
 		// explicit cbor encoding of an empty byte slice
@@ -72,52 +84,39 @@ func TestDecoderDecode(t *testing.T) {
 
 		decoded, err := c.NewDecoder(&buf).Decode()
 		assert.Nil(t, decoded)
-		assert.ErrorIs(t, err, codec.ErrInvalidEncoding)
+		assert.True(t, codec.IsErrInvalidEncoding(err))
 	})
 
 	t.Run("returns error when message code is invalid", func(t *testing.T) {
+		t.Parallel()
+
 		var buf bytes.Buffer
 
-		// code == min
-		err := cborcodec.NewCodec().NewEncoder(&buf).Encode([]byte{codec.CodeMin})
-		require.NoError(t, err)
+		// the first byte is the message code, the remaining bytes are the message
+		// in this test, only the first byte is set since there should be an error after reading
+		// the invalid code
+		datas := [][]byte{
+			{codec.CodeMin - 1}, // code < min
+			{codec.CodeMin},     // code == min
+			{codec.CodeMax},     // code == max
+			{codec.CodeMax + 1}, // code > max
+		}
 
-		decoded, err := c.NewDecoder(&buf).Decode()
-		assert.Nil(t, decoded)
-		assert.True(t, codec.IsErrUnknownMsgCode(err))
+		for i := range datas {
+			err := cborcodec.NewCodec().NewEncoder(&buf).Encode(datas[i])
+			require.NoError(t, err)
 
-		buf.Reset()
+			decoded, err := c.NewDecoder(&buf).Decode()
+			assert.Nil(t, decoded)
+			assert.True(t, codec.IsErrUnknownMsgCode(err))
 
-		// code == max
-		err = cborcodec.NewCodec().NewEncoder(&buf).Encode([]byte{codec.CodeMax})
-		require.NoError(t, err)
-
-		decoded, err = c.NewDecoder(&buf).Decode()
-		assert.Nil(t, decoded)
-		assert.True(t, codec.IsErrUnknownMsgCode(err))
-
-		buf.Reset()
-
-		// code < min
-		err = cborcodec.NewCodec().NewEncoder(&buf).Encode([]byte{codec.CodeMin - 1})
-		require.NoError(t, err)
-
-		decoded, err = c.NewDecoder(&buf).Decode()
-		assert.Nil(t, decoded)
-		assert.True(t, codec.IsErrUnknownMsgCode(err))
-
-		buf.Reset()
-
-		// code > max
-		err = cborcodec.NewCodec().NewEncoder(&buf).Encode([]byte{codec.CodeMax + 1})
-		require.NoError(t, err)
-
-		decoded, err = c.NewDecoder(&buf).Decode()
-		assert.Nil(t, decoded)
-		assert.True(t, codec.IsErrUnknownMsgCode(err))
+			buf.Reset()
+		}
 	})
 
 	t.Run("returns error when unmarshalling fails - empty", func(t *testing.T) {
+		t.Parallel()
+
 		var buf bytes.Buffer
 
 		err := cborcodec.NewCodec().NewEncoder(&buf).Encode([]byte{codec.CodeBlockProposal})
@@ -129,6 +128,8 @@ func TestDecoderDecode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - wrong type", func(t *testing.T) {
+		t.Parallel()
+
 		// first encode the message to bytes with an incorrect type
 		var data bytes.Buffer
 		_ = data.WriteByte(codec.CodeCollectionGuarantee)
@@ -148,6 +149,8 @@ func TestDecoderDecode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - corrupt", func(t *testing.T) {
+		t.Parallel()
+
 		// first encode the message to bytes
 		var data bytes.Buffer
 		_ = data.WriteByte(codec.CodeBlockProposal)
