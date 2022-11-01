@@ -18,6 +18,7 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -1363,6 +1364,17 @@ func ChunkDataResponseMsgFixture(chunkID flow.Identifier, opts ...func(*messages
 	return cdp
 }
 
+// WithApproximateSize sets the ChunkDataResponse to be approximately bytes in size.
+func WithApproximateSize(bytes uint64) func(*messages.ChunkDataResponse) {
+	return func(request *messages.ChunkDataResponse) {
+		// 1 tx fixture is approximately 350 bytes
+		txCount := bytes / 350
+		collection := CollectionFixture(int(txCount) + 1)
+		pack := ChunkDataPackFixture(request.ChunkDataPack.ChunkID, WithChunkDataPackCollection(&collection))
+		request.ChunkDataPack = *pack
+	}
+}
+
 // ChunkDataResponseMessageListFixture creates a list of chunk data response messages each with a single-transaction collection, and random chunk ID.
 func ChunkDataResponseMessageListFixture(chunkIDs flow.IdentifierList) []*messages.ChunkDataResponse {
 	lst := make([]*messages.ChunkDataResponse, 0, len(chunkIDs))
@@ -2122,4 +2134,19 @@ func PeerIDFromFlowID(identity *flow.Identity) (peer.ID, error) {
 	}
 
 	return peerID, nil
+}
+
+func EngineMessageFixture() *engine.Message {
+	return &engine.Message{
+		OriginID: IdentifierFixture(),
+		Payload:  RandomBytes(10),
+	}
+}
+
+func EngineMessageFixtures(count int) []*engine.Message {
+	messages := make([]*engine.Message, 0, count)
+	for i := 0; i < count; i++ {
+		messages = append(messages, EngineMessageFixture())
+	}
+	return messages
 }

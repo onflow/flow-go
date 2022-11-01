@@ -58,7 +58,7 @@ type Engine struct {
 	metrics                module.ExecutionMetrics
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	chdpRequestHandler     *engine.MessageHandler
-	chdpRequestQueue       mempool.ChunkDataPackMessageStore
+	chdpRequestQueue       engine.MessageStore
 
 	// buffered channel for ChunkDataRequest workers to pick
 	// requests and process.
@@ -78,7 +78,7 @@ func New(
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
-	chunkDataPackRequestQueue mempool.ChunkDataPackMessageStore,
+	chunkDataPackRequestQueue engine.MessageStore,
 	chdpRequestWorkers uint,
 	chunkDataPackQueryTimeout time.Duration,
 	chunkDataPackDeliveryTimeout time.Duration,
@@ -166,7 +166,7 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovelerWorker(ctx irrecovera
 		select {
 		case <-e.chdpRequestHandler.GetNotifier():
 			// there is at list a single chunk data pack request queued up.
-			e.shovelChunkDataPackRequests()
+			e.processAvailableMesssages(ctx)
 		case <-ctx.Done():
 			// close the internal channel, the workers will drain the channel before exiting
 			close(e.chdpRequestChannel)
@@ -176,20 +176,33 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovelerWorker(ctx irrecovera
 	}
 }
 
-// shovelChunkDataPackRequests is a blocking method that reads all queued ChunkDataRequests till the queue gets empty.
+// processAvailableMesssages is a blocking method that reads all queued ChunkDataRequests till the queue gets empty.
 // Each ChunkDataRequest is processed by a single concurrent worker. However, there are limited number of such workers.
 // If there is no worker available for a request, the method blocks till one is available.
-func (e *Engine) shovelChunkDataPackRequests() {
+func (e *Engine) processAvailableMesssages(ctx irrecoverable.SignalerContext) {
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		msg, ok := e.chdpRequestQueue.Get()
 		if !ok {
 			// no more requests, return
 			return
 		}
 
+		chunkId, ok := msg.Payload.(flow.Identifier)
+		if !ok {
+			// should never happen.
+			// if it does happen, it means there is a bug in the queue implementation.
+			ctx.Throw(fmt.Errorf("invalid chunk id type in chunk data pack request queue: %T", msg.Payload))
+		}
+
 		request := &mempool.ChunkDataPackRequest{
 			RequesterId: msg.OriginID,
-			ChunkId:     msg.Payload.(flow.Identifier),
+			ChunkId:     chunkId,
 		}
 		lg := e.log.With().
 			Hex("chunk_id", logging.ID(request.ChunkId)).

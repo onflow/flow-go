@@ -7,6 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/p2p"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
+
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mocktestify "github.com/stretchr/testify/mock"
@@ -19,9 +22,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -191,7 +193,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 		p2pfixtures.WithRole(flow.RoleVerification))
 
 	ids := flow.IdentityList{&conId, &verId1, &verId2}
-	nodes := []*p2pnode.Node{conNode, verNode1, verNode2}
+	nodes := []p2p.LibP2PNode{conNode, verNode1, verNode2}
 
 	provider := id.NewFixedIdentityProvider(ids)
 	idProvider.On("ByPeerID", mocktestify.Anything).Return(
@@ -209,27 +211,29 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
 
+	topicValidator := flowpubsub.TopicValidator(unittest.Logger(), unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter())
+
 	// consensus node subscribes to the block topic.
-	conSub, err := conNode.Subscribe(blockTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	conSub, err := conNode.Subscribe(blockTopic, topicValidator)
 	require.NoError(t, err)
 
 	// both verification nodes subscribe to the blocks and chunks topic (because they are allowed to).
-	ver1SubBlocks, err := verNode1.Subscribe(blockTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	ver1SubBlocks, err := verNode1.Subscribe(blockTopic, topicValidator)
 	require.NoError(t, err)
 
-	ver1SubChunks, err := verNode1.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	ver1SubChunks, err := verNode1.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), topicValidator)
 	require.NoError(t, err)
 
-	ver2SubBlocks, err := verNode2.Subscribe(blockTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	ver2SubBlocks, err := verNode2.Subscribe(blockTopic, topicValidator)
 	require.NoError(t, err)
 
-	ver2SubChunks, err := verNode2.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	ver2SubChunks, err := verNode2.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), topicValidator)
 	require.NoError(t, err)
 
 	// wait for the subscriptions to be established
 	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
-	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture())
+	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 	// consensus node publishes a proposal
 	require.NoError(t, conNode.Publish(ctx, blockTopic, proposalMsg))
 
@@ -240,7 +244,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	// now consensus node is doing something very bad!
 	// it is subscribing to a channel that it is not supposed to subscribe to.
-	conSubChunks, err := conNode.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), slashingViolationsConsumer)
+	conSubChunks, err := conNode.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), topicValidator)
 	require.NoError(t, err)
 
 	// let's wait for a bit to subscription propagate.
@@ -249,7 +253,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// consensus node publishes another proposal, but this time, it should not reach verification node.
 	// since upon an unauthorized subscription, verification node should have slashed consensus node on
 	// the GossipSub scoring protocol.
-	proposalMsg = p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture())
+	proposalMsg = p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 	// publishes a message to the topic.
 	require.NoError(t, conNode.Publish(ctx, blockTopic, proposalMsg))
 
@@ -262,7 +266,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	chunkDataPackRequestMsg := p2pfixtures.MustEncodeEvent(t, &messages.ChunkDataRequest{
 		ChunkID: unittest.IdentifierFixture(),
 		Nonce:   rand.Uint64(),
-	})
+	}, channels.RequestChunks)
 	require.NoError(t, verNode1.Publish(ctx, channels.TopicFromChannel(channels.RequestChunks, sporkId), chunkDataPackRequestMsg))
 
 	ctx1s, cancel1s = context.WithTimeout(ctx, 1*time.Second)

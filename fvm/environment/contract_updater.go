@@ -105,7 +105,7 @@ func (updater ParseRestrictedContractUpdater) UpdateAccountContractCode(
 ) error {
 	return parseRestrict3Arg(
 		updater.txnState,
-		"UpdateAccountContractCode",
+		trace.FVMEnvUpdateAccountContractCode,
 		updater.impl.UpdateAccountContractCode,
 		address,
 		name,
@@ -118,7 +118,7 @@ func (updater ParseRestrictedContractUpdater) RemoveAccountContractCode(
 ) error {
 	return parseRestrict2Arg(
 		updater.txnState,
-		"RemoveAccountContractCode",
+		trace.FVMEnvRemoveAccountContractCode,
 		updater.impl.RemoveAccountContractCode,
 		address,
 		name)
