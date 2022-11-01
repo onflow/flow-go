@@ -154,8 +154,8 @@ jobs:
       matrix:
         include:
           - name: crypto
-            make1: no-op
-            make2: test
+            make1: -C crypto setup
+            make2: test_main
             retries: 1
             race: 1
           - name: insecure
