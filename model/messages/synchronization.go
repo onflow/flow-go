@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -52,15 +54,12 @@ var _ model.StructureValidator = (*BlockResponse)(nil)
 
 // StructureValid checks basic structural validity of the message and ensures no required fields are nil.
 func (m *BlockResponse) StructureValid() error {
+	if len(m.Blocks) == 0 {
+		return model.NewStructureInvalidError("empty block response")
+	}
 	for _, b := range m.Blocks {
-		if b == nil {
-			return model.NewStructureInvalidError("nil block")
-		}
-		if b.Header == nil {
-			return model.NewStructureInvalidError("nil block header")
-		}
-		if b.Payload == nil {
-			return model.NewStructureInvalidError("nil block payload")
+		if err := b.StructureValid(); err != nil {
+			return fmt.Errorf("response contains invalid block: %w", err)
 		}
 	}
 	return nil
@@ -76,15 +75,12 @@ var _ model.StructureValidator = (*ClusterBlockResponse)(nil)
 
 // StructureValid checks basic structural validity of the message and ensures no required fields are nil.
 func (m *ClusterBlockResponse) StructureValid() error {
+	if len(m.Blocks) == 0 {
+		return model.NewStructureInvalidError("empty block response")
+	}
 	for _, b := range m.Blocks {
-		if b == nil {
-			return model.NewStructureInvalidError("nil block")
-		}
-		if b.Header == nil {
-			return model.NewStructureInvalidError("nil block header")
-		}
-		if b.Payload == nil {
-			return model.NewStructureInvalidError("nil block payload")
+		if err := b.StructureValid(); err != nil {
+			return fmt.Errorf("response contains invalid block: %w", err)
 		}
 	}
 	return nil
