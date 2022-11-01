@@ -512,6 +512,16 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			return
 		}
 
+		// ignore messages if node does not have subscription to topic
+		topic := channels.TopicFromChannel(channels.Channel(msg.ChannelID), m.rootBlockID)
+		if !m.libP2PNode.HasSubscription(topic) {
+			log.Warn().
+				Bool(logging.KeySuspicious, true).
+				Str("channel_id", msg.ChannelID).
+				Msg("dropping unicast message for topic node is not currently subscribed to")
+			return
+		}
+
 		// check if unicast messages have reached rate limit before processing next message
 		if !m.unicastRateLimiters.MessageAllowed(remotePeer) {
 			return
