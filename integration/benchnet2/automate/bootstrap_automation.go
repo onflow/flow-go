@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"text/template"
@@ -24,6 +25,35 @@ func NewTemplate(jsonData string, templatePath string) Template {
 }
 
 func (t *Template) Apply() string {
+
+	//load data values
+	dataBytes, err := os.ReadFile(t.jsonData)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// map json data to a map, so it can be decoded by template engine
+	// https://stackoverflow.com/a/38437140/5719544
+	dataMap := map[string]interface{}{}
+	if err := json.Unmarshal([]byte(dataBytes), &dataMap); err != nil {
+		panic(err)
+	}
+
+	// load template
+	templateBytes, err := os.ReadFile(t.template)
+	if err != nil {
+		log.Fatal(err)
+	}
+	templateStr := string(templateBytes)
+
+	tmpl, err := template.New("test").Parse(templateStr)
+	tmpl = template.Must(tmpl, err)
+
+	err = tmpl.Execute(os.Stdout, dataMap)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return "foo"
 }
 
