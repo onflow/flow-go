@@ -202,9 +202,7 @@ func (lib *cryptoLibrary) VerifySignature(
 ) {
 	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
 
-	err := lib.meter.MeterComputation(
-		ComputationKindVerifySignature,
-		1)
+	err := lib.meter.MeterComputation(ComputationKindVerifySignature, 1)
 	if err != nil {
 		return false, fmt.Errorf("verify signature failed: %w", err)
 	}
@@ -228,9 +226,7 @@ func (lib *cryptoLibrary) VerifySignature(
 func (lib *cryptoLibrary) ValidatePublicKey(pk *runtime.PublicKey) error {
 	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvValidatePublicKey).End()
 
-	err := lib.meter.MeterComputation(
-		ComputationKindValidatePublicKey,
-		1)
+	err := lib.meter.MeterComputation(ComputationKindValidatePublicKey, 1)
 	if err != nil {
 		return fmt.Errorf("validate public key failed: %w", err)
 	}
@@ -247,7 +243,10 @@ func (lib *cryptoLibrary) BLSVerifyPOP(
 ) {
 	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvBLSVerifyPOP).End()
 
-	// TODO(patrick): meter computation
+	err := lib.meter.MeterComputation(ComputationKindBLSVerifyPOP, 1)
+	if err != nil {
+		return false, fmt.Errorf("BLSVerifyPOP failed: %w", err)
+	}
 
 	return crypto.VerifyPOP(pk, sig)
 }
@@ -260,7 +259,10 @@ func (lib *cryptoLibrary) BLSAggregateSignatures(
 ) {
 	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvBLSAggregateSignatures).End()
 
-	// TODO(patrick): meter computation
+	err := lib.meter.MeterComputation(ComputationKindBLSAggregateSignatures, 1)
+	if err != nil {
+		return nil, fmt.Errorf("BLSAggregateSignatures failed: %w", err)
+	}
 
 	return crypto.AggregateSignatures(sigs)
 }
@@ -273,7 +275,10 @@ func (lib *cryptoLibrary) BLSAggregatePublicKeys(
 ) {
 	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvBLSAggregatePublicKeys).End()
 
-	// TODO(patrick): meter computation
+	err := lib.meter.MeterComputation(ComputationKindBLSAggregatePublicKeys, 1)
+	if err != nil {
+		return nil, fmt.Errorf("BLSAggregatePublicKeys failed: %w", err)
+	}
 
 	return crypto.AggregatePublicKeys(keys)
 }
