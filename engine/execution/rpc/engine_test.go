@@ -230,6 +230,92 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	})
 }
 
+// TestGetEventsForBlockIDs tests the GetEventsForBlockIDs API call when context gets cancelled
+func (suite *Suite) TestGetEventsForBlockIDsCancelled() {
+
+	totalBlocks := 6
+	cancelAfter := 3 // cancel after getting handling block 4 (0-basedindex )
+	eventsPerBlock := 5
+
+	blockIDs := make([][]byte, totalBlocks)
+
+	var lastBlockHandled func()
+
+	// setup the events storage mock
+	for i := range blockIDs {
+		block := unittest.BlockFixture()
+		block.Header.Height = uint64(i)
+		id := block.ID()
+		blockIDs[i] = id[:]
+
+		eventsForBlock := make([]flow.Event, eventsPerBlock)
+		eventMessages := make([]*entities.Event, eventsPerBlock)
+
+		if i <= cancelAfter {
+			for j := range eventsForBlock {
+				e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0)
+				eventsForBlock[j] = e
+				eventMessages[j] = convert.EventToMessage(e)
+			}
+			// expect one call to lookup result for each block ID
+			//suite.exeResults.On("ByBlockID", id).Return(nil, nil).Once()
+			suite.commits.On("ByBlockID", id).Return(nil, nil).Once()
+
+			// expect one call to lookup events for each block ID
+			// cancel here
+
+			runFn := func(args mock.Arguments) {}
+			if i == cancelAfter {
+				runFn = func(args mock.Arguments) {
+					lastBlockHandled()
+				}
+			}
+			suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).
+				Run(runFn).Return(eventsForBlock, nil).Once()
+
+			// expect one call to lookup each block
+			suite.headers.On("ByBlockID", id).Return(block.Header, nil).Once()
+		}
+	}
+
+	// create the handler
+	handler := &handler{
+		headers:            suite.headers,
+		events:             suite.events,
+		exeResults:         suite.exeResults,
+		transactionResults: suite.txResults,
+		commits:            suite.commits,
+		chain:              flow.Mainnet,
+	}
+
+	concoctReq := func(errType string, blockIDs [][]byte) *execution.GetEventsForBlockIDsRequest {
+		return &execution.GetEventsForBlockIDsRequest{
+			Type:     errType,
+			BlockIds: blockIDs,
+		}
+	}
+
+	// create a valid API request
+	req := concoctReq(string(flow.EventAccountCreated), blockIDs)
+
+	ctx, cancelFn := context.WithCancel(context.Background())
+
+	lastBlockHandled = func() {
+		cancelFn()
+	}
+
+	// execute the GetEventsForBlockIDs call
+	_, err := handler.GetEventsForBlockIDs(ctx, req)
+
+	suite.Require().Error(err)
+	suite.Require().Equal(context.Canceled, err)
+
+	// check that appropriate storage calls were made
+	suite.events.AssertExpectations(suite.T())
+	suite.commits.AssertExpectations(suite.T())
+	suite.headers.AssertExpectations(suite.T())
+}
+
 // Test GetAccountAtBlockID tests the GetAccountAtBlockID API call
 func (suite *Suite) TestGetAccountAtBlockID() {
 
