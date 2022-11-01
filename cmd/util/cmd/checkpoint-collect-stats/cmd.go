@@ -37,7 +37,6 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-
 	Cmd.Flags().StringVar(&flagCheckpoint, "checkpoint", "",
 		"checkpoint file to read")
 	_ = Cmd.MarkFlagRequired("checkpoint")
@@ -45,7 +44,6 @@ func init() {
 	Cmd.Flags().StringVar(&flagOutputDir, "output-dir", "",
 		"Directory to write checkpoint stats to")
 	_ = Cmd.MarkFlagRequired("output-dir")
-
 }
 
 type Stats struct {
@@ -73,37 +71,11 @@ type RegisterStatsByTypes struct {
 
 type sizesByType map[string][]float64
 
-func getType(key ledger.Key) string {
-	k := key.KeyParts[1].Value
-	kstr := string(k)
-	if atree.LedgerKeyIsSlabKey(kstr) {
-		return "slab"
-	}
-	if bytes.HasPrefix(k, []byte("public_key_")) {
-		return "public key"
-	}
-	if kstr == state.KeyContractNames {
-		return "contract names"
-	}
-	if bytes.HasPrefix(k, []byte(state.KeyCode)) {
-		return "contract content"
-	}
-	if kstr == state.KeyAccountStatus {
-		return "account status"
-	}
-	return "others"
-}
-
 func run(*cobra.Command, []string) {
 
 	defer profile.Start(profile.MemProfile).Stop()
 
 	log.Info().Msgf("loading checkpoint %v", flagCheckpoint)
-
-	const (
-		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
-		checkpointsToKeep  = 1
-	)
 
 	memAllocBefore := debug.GetHeapAllocsBytes()
 
@@ -115,8 +87,7 @@ func run(*cobra.Command, []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msgf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
-
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, math.MaxInt, 1, atomic.NewBool(false))
 	if err != nil {
 		log.Fatal().Err(err).Msgf("cannot create compactor: %w", err)
 	}
@@ -163,7 +134,7 @@ func run(*cobra.Command, []string) {
 			log.Fatal().Err(err).Msgf("cannot compute the min of values: %w", err)
 		}
 
-		percentile25, err := stats.Percentile(values, 0.25)
+		percentile25, err := stats.Percentile(values, 25)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot compute the 25th percentile of values: %w", err)
 		}
@@ -173,12 +144,12 @@ func run(*cobra.Command, []string) {
 			log.Fatal().Err(err).Msgf("cannot compute the median of values: %w", err)
 		}
 
-		percentile75, err := stats.Percentile(values, 0.75)
+		percentile75, err := stats.Percentile(values, 75)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot compute the 75th percentile of values: %w", err)
 		}
 
-		percentile95, err := stats.Percentile(values, 0.95)
+		percentile95, err := stats.Percentile(values, 95)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot compute the 95th percentile of values: %w", err)
 		}
@@ -235,4 +206,46 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("could not write result json to the file: %w", err)
 	}
 	writer.Flush()
+}
+
+func getType(key ledger.Key) string {
+	k := key.KeyParts[1].Value
+	kstr := string(k)
+	// cadence controlled registers
+	if atree.LedgerKeyIsSlabKey(kstr) {
+		return "slab"
+	}
+	if kstr == "storage" {
+		return "account's cadence storage domain map"
+	}
+	if kstr == "private" {
+		return "account's cadence private domain map"
+	}
+	if kstr == "public" {
+		return "account's cadence public domain map"
+	}
+	if kstr == "contract" {
+		return "account's cadence contract domain map"
+	}
+
+	// fvm controlled registers
+	if bytes.HasPrefix(k, []byte("public_key_")) {
+		return "public key"
+	}
+	if kstr == state.KeyContractNames {
+		return "contract names"
+	}
+	if bytes.HasPrefix(k, []byte(state.KeyCode)) {
+		return "contract content"
+	}
+	if kstr == state.KeyAccountStatus {
+		return "account status"
+	}
+	if kstr == "uuid" {
+		return "uuid generator state"
+	}
+	if kstr == "account_address_state" {
+		return "address generator state"
+	}
+	return "others"
 }
