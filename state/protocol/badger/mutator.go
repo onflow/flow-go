@@ -104,7 +104,14 @@ func NewFullConsensusState(
 // Instead, the consensus follower relies on the consensus participants to
 // validate the full payload. Therefore, a follower a QC (i.e. a child block) as
 // proof that a block is valid.
+// Expected errors during normal operations:
+//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error {
+
+	if err := candidate.StructureValid(); err != nil {
+		return state.NewInvalidExtensionErrorf("invalid block structure: %w", err)
+	}
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
@@ -132,7 +139,14 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 
 // Extend extends the protocol state of a CONSENSUS PARTICIPANT. It checks
 // the validity of the _entire block_ (header and full payload).
+// Expected errors during normal operations:
+//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error {
+
+	if err := candidate.StructureValid(); err != nil {
+		return state.NewInvalidExtensionErrorf("invalid block structure: %w", err)
+	}
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
@@ -172,6 +186,9 @@ func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error 
 
 // headerExtend verifies the validity of the block header (excluding verification of the
 // consensus rules). Specifically, we check that the block connects to the last finalized block.
+// Expected errors during normal operations:
+//   - state.InvalidExtensionError in case the header is invalid
+//   - state.OutdatedExtensionError in case the header is orphaned
 func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 	// FIRST: We do some initial cheap sanity checks, like checking the payload
 	// hash is consistent
@@ -254,6 +271,8 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 // guaranteeExtend verifies the validity of the collection guarantees that are
 // included in the block. Specifically, we check for expired collections and
 // duplicated collections (also including ancestor blocks).
+// Expected errors during normal operations:
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckGuarantees)
@@ -336,6 +355,8 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 
 // sealExtend checks the compliance of the payload seals. Returns last seal that form a chain for
 // candidate block.
+// Expected errors during normal operations:
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*flow.Seal, error) {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
@@ -356,6 +377,9 @@ func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*
 //   - No seal has been included for the respective block in this particular fork
 //
 // We require the receipts to be sorted by block height (within a payload).
+//
+// Expected errors during normal operations:
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckReceipts)
@@ -382,6 +406,8 @@ func (m *MutableState) receiptExtend(ctx context.Context, candidate *flow.Block)
 // 95 (sealed) <- 96 <- 97 (finalized) <- 98 <- 99 <- 100
 // Now, if block 101 is extending block 100, and its payload has a seal for 96, then it will
 // be the last sealed for block 101.
+// Expected errors during normal operations:
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
 	payload := candidate.Payload
@@ -416,6 +442,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 // The `candidate` block _must be valid_ (otherwise, the state will be corrupted).
 // dbUpdates contains other database operations which must be applied atomically
 // with inserting the block.
+// No errors are expected during normal operation.
 func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
@@ -483,6 +510,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 // Finalize marks the specified block as finalized.
 // This method only finalizes one block at a time.
 // Hence, the parent of `blockID` has to be the last finalized block.
+// No errors are expected during normal operation.
 func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) error {
 
 	// preliminaries: start tracer and retrieve full block

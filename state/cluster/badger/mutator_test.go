@@ -247,6 +247,12 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 	suite.Assert().Error(err)
 }
 
+func (suite *MutatorSuite) TestExtend_InvalidStructure() {
+	err := suite.state.Extend(nil)
+	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
+}
+
 func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 	block := suite.Block()
 	// change the block height

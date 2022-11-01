@@ -44,8 +44,11 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) Extend(block *cluster.Block) error {
 
-	blockID := block.ID()
+	if err := block.StructureValid(); err != nil {
+		return state.NewInvalidExtensionErrorf("invalid block structure: %w", err)
+	}
 
+	blockID := block.ID()
 	span, ctx, _ := m.tracer.StartCollectionSpan(context.Background(), blockID, trace.COLClusterStateMutatorExtend)
 	defer span.End()
 

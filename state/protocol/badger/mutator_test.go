@@ -336,6 +336,25 @@ func TestExtendMissingParent(t *testing.T) {
 	})
 }
 
+func TestExtend_StructureInvalid(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+
+	t.Run("mutable state", func(t *testing.T) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+			err := state.Extend(context.Background(), nil)
+			require.Error(t, err)
+			require.True(t, st.IsInvalidExtensionError(err))
+		})
+	})
+	t.Run("follower state", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
+			err := state.Extend(context.Background(), nil)
+			require.Error(t, err)
+			require.True(t, st.IsInvalidExtensionError(err))
+		})
+	})
+}
+
 func TestExtendHeightTooSmall(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
