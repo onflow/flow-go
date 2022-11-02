@@ -170,16 +170,22 @@ const ExpectedTemplatesPath = "./testdata/expected/"
 
 func TestApply_DataTable(t *testing.T) {
 	testDataMap := map[string]testData{
-		"simple1": {
+		"test1": {
 			templatePath:     filepath.Join(TemplatesPath, "test1.yml"),
 			dataPath:         filepath.Join(DataPath, "test1.json"),
 			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "test1.yml"),
 		},
 
-		"simple2": {
+		"access template": {
 			templatePath:     filepath.Join(TemplatesPath, "access_template.yml"),
 			dataPath:         filepath.Join(DataPath, "access_template.json"),
 			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "access_template.yml"),
+		},
+
+		"values full": {
+			templatePath:     filepath.Join(TemplatesPath, "values1.yml"),
+			dataPath:         filepath.Join(DataPath, "values1.json"),
+			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "values1.yml"),
 		},
 	}
 
