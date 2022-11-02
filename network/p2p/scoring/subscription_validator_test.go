@@ -213,6 +213,9 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	topicValidator := flowpubsub.TopicValidator(unittest.Logger(), unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter())
 
+	// wait for the subscriptions to be established
+	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+
 	// consensus node subscribes to the block topic.
 	conSub, err := conNode.Subscribe(blockTopic, topicValidator)
 	require.NoError(t, err)
@@ -230,8 +233,8 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	ver2SubChunks, err := verNode2.Subscribe(channels.TopicFromChannel(channels.RequestChunks, sporkId), topicValidator)
 	require.NoError(t, err)
 
-	// wait for the subscriptions to be established
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	// let the subscriptions be established
+	time.Sleep(2 * time.Second)
 
 	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 	// consensus node publishes a proposal
