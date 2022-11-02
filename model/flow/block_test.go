@@ -97,7 +97,6 @@ func TestOrderingChangesHash(t *testing.T) {
 func TestBlock_Status(t *testing.T) {
 	statuses := map[flow.BlockStatus]string{
 		flow.BlockStatusUnknown:   "BLOCK_UNKNOWN",
-		flow.BlockStatusExecuted:  "BLOCK_EXECUTED",
 		flow.BlockStatusFinalized: "BLOCK_FINALIZED",
 		flow.BlockStatusSealed:    "BLOCK_SEALED",
 	}
