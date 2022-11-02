@@ -1,0 +1,26 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+)
+import "github.com/onflow/flow-go/integration/benchnet2/automate"
+
+// sample test run
+// go run cmd/main.go --data "./testdata/data/test1.json" --template "./testdata/templates/test1.yml"
+func main() {
+	dataFlag := flag.String("data", "", "Path to JSON data.")
+	templateFlag := flag.String("template", "", "Path to template file.")
+	flag.Parse()
+
+	if *dataFlag == "" || *templateFlag == "" {
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	template := automate.NewTemplate(*dataFlag, *templateFlag)
+	actualOutput := template.Apply()
+	fmt.Println("output written out")
+	fmt.Println("output=", actualOutput)
+}
