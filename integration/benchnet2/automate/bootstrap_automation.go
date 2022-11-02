@@ -46,6 +46,7 @@ func (t *Template) Apply() string {
 		log.Fatal(err)
 	}
 	templateStr := string(templateBytes)
+	templateStr = strings.Trim(templateStr, "\t \n")
 
 	tmpl, err := template.New("test").Parse(templateStr)
 	tmpl = template.Must(tmpl, err)

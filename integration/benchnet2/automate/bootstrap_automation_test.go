@@ -161,25 +161,39 @@ const DataPath = "./testdata/data/"
 const TemplatesPath = "./testdata/templates/"
 const ExpectedTemplatesPath = "./testdata/expected/"
 
-func TestTemplate_Simple1(t *testing.T) {
-	//load expected template
-	expectedTemplateBytes, err := os.ReadFile(filepath.Join(ExpectedTemplatesPath, "test1.yml"))
-	require.NoError(t, err)
-	expectedOutputStr := string(expectedTemplateBytes)
+func TestApply_DataTable(t *testing.T) {
+	testDataMap := map[string]testData{
+		"simple1": {
+			templatePath:     filepath.Join(TemplatesPath, "test1.yml"),
+			dataPath:         filepath.Join(DataPath, "test.json"),
+			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "test1.yml"),
+		},
 
-	templ := NewTemplate(filepath.Join(DataPath, "test.json"), filepath.Join(TemplatesPath, "test1.yml"))
-	actualOutput := templ.Apply()
-	require.Equal(t, expectedOutputStr, actualOutput)
+		"simple2": {
+			templatePath:     filepath.Join(TemplatesPath, "access_template.yml"),
+			dataPath:         filepath.Join(DataPath, "access_template.json"),
+			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "access_template.yml"),
+		},
+	}
+
+	for k, testData := range testDataMap {
+		t.Run(k, func(t *testing.T) {
+			//load expected template
+			expectedTemplateBytes, err := os.ReadFile(testData.expectedTemplate)
+			require.NoError(t, err)
+			expectedOutputStr := string(expectedTemplateBytes)
+			expectedOutputStr = strings.Trim(expectedOutputStr, "\t \n")
+
+			templ := NewTemplate(testData.dataPath, testData.templatePath)
+			actualOutput := templ.Apply()
+			require.Equal(t, expectedOutputStr, actualOutput)
+		})
+	}
+
 }
 
-func TestTemplate_Simple2(t *testing.T) {
-	//load expected template
-	expectedTemplateBytes, err := os.ReadFile(filepath.Join(ExpectedTemplatesPath, "access_template.yml"))
-	require.NoError(t, err)
-	expectedOutputStr := string(expectedTemplateBytes)
-	expectedOutputStr = strings.Trim(expectedOutputStr, "\t \n")
-
-	templ := NewTemplate(filepath.Join(DataPath, "access_template.json"), filepath.Join(TemplatesPath, "access_template.yml"))
-	actualOutput := templ.Apply()
-	require.Equal(t, expectedOutputStr, actualOutput)
+type testData struct {
+	templatePath     string
+	dataPath         string
+	expectedTemplate string
 }
