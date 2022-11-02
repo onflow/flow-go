@@ -69,7 +69,7 @@ func addAccountKey(
 	publicKeyA, cadencePublicKey := newAccountKey(t, privateKey)
 
 	txBody := flow.NewTransactionBody().
-		SetScript([]byte(addAccountKeyTransactionV2)).
+		SetScript([]byte(addAccountKeyTransaction)).
 		AddArgument(cadencePublicKey).
 		AddAuthorizer(address)
 
@@ -155,7 +155,7 @@ transaction {
 }
 `
 
-const addAccountKeyTransactionV2 = `
+const addAccountKeyTransaction = `
 transaction(key: [UInt8]) {
   prepare(signer: AuthAccount) {
     let publicKey = PublicKey(
@@ -171,7 +171,7 @@ transaction(key: [UInt8]) {
 }
 `
 
-const addMultipleAccountKeysTransactionV2 = `
+const addMultipleAccountKeysTransaction = `
 transaction(key1: [UInt8], key2: [UInt8]) {
   prepare(signer: AuthAccount) {
     for key in [key1, key2] {
@@ -490,7 +490,7 @@ func TestAddAccountKey(t *testing.T) {
 				publicKeyA, cadencePublicKey := newAccountKey(t, privateKey)
 
 				txBody := flow.NewTransactionBody().
-					SetScript([]byte(addAccountKeyTransactionV2)).
+					SetScript([]byte(addAccountKeyTransaction)).
 					AddArgument(cadencePublicKey).
 					AddAuthorizer(address)
 
@@ -532,7 +532,7 @@ func TestAddAccountKey(t *testing.T) {
 				publicKey2, publicKey2Arg := newAccountKey(t, privateKey)
 
 				txBody := flow.NewTransactionBody().
-					SetScript([]byte(addAccountKeyTransactionV2)).
+					SetScript([]byte(addAccountKeyTransaction)).
 					AddArgument(publicKey2Arg).
 					AddAuthorizer(address)
 
@@ -574,7 +574,7 @@ func TestAddAccountKey(t *testing.T) {
 				require.NoError(t, err)
 
 				txBody := flow.NewTransactionBody().
-					SetScript([]byte(addAccountKeyTransactionV2)).
+					SetScript([]byte(addAccountKeyTransaction)).
 					AddArgument(invalidPublicKeyArg).
 					AddAuthorizer(address)
 
@@ -613,7 +613,7 @@ func TestAddAccountKey(t *testing.T) {
 				publicKey2, publicKey2Arg := newAccountKey(t, privateKey2)
 
 				txBody := flow.NewTransactionBody().
-					SetScript([]byte(addMultipleAccountKeysTransactionV2)).
+					SetScript([]byte(addMultipleAccountKeysTransaction)).
 					AddArgument(publicKey1Arg).
 					AddArgument(publicKey2Arg).
 					AddAuthorizer(address)
