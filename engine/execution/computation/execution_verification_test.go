@@ -64,7 +64,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			`pub contract Foo {
 				pub event FooEvent(x: Int, y: Int)
 
-				pub fun event() { 
+				pub fun emitFoo() {
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -75,7 +75,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			transaction {
 				prepare() {}
 				execute {
-					Foo.event()
+					Foo.emitFoo()
 				}
 			}`, chain.ServiceAddress())),
 		}
@@ -105,7 +105,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			`pub contract Foo {
 				pub event FooEvent(x: Int, y: Int)
 
-				pub fun event() { 
+				pub fun emitFoo() {
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -116,7 +116,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			transaction {
 				prepare() {}
 				execute {
-					Foo.event()
+					Foo.emitFoo()
 				}
 			}`, chain.ServiceAddress())),
 		}
