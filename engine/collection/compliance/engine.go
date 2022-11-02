@@ -2,7 +2,6 @@ package compliance
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -11,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"

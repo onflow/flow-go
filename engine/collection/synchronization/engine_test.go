@@ -1,6 +1,7 @@
 package synchronization
 
 import (
+	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	"io"
 	"math/rand"
 	"testing"
@@ -49,7 +50,7 @@ type SyncSuite struct {
 	snapshot     *cluster.Snapshot
 	params       *cluster.Params
 	blocks       *storage.ClusterBlocks
-	comp         *mocknetwork.Engine
+	comp         *mockcollection.Compliance
 	core         *module.SyncCore
 	e            *Engine
 }
@@ -151,7 +152,7 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up compliance engine mock
-	ss.comp = &mocknetwork.Engine{}
+	ss.comp = mockcollection.NewCompliance(ss.T())
 
 	// set up sync core
 	ss.core = &module.SyncCore{}

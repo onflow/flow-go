@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
@@ -57,7 +58,7 @@ type MessageHubSuite struct {
 	hotstuff          *module.HotStuff
 	voteAggregator    *hotstuff.VoteAggregator
 	timeoutAggregator *hotstuff.TimeoutAggregator
-	compliance        *mocknetwork.MessageProcessor
+	compliance        *mockcollection.Compliance
 	snapshot          *clusterstate.Snapshot
 
 	ctx    irrecoverable.SignalerContext
@@ -88,7 +89,7 @@ func (s *MessageHubSuite) SetupTest() {
 	s.hotstuff = module.NewHotStuff(s.T())
 	s.voteAggregator = hotstuff.NewVoteAggregator(s.T())
 	s.timeoutAggregator = hotstuff.NewTimeoutAggregator(s.T())
-	s.compliance = mocknetwork.NewMessageProcessor(s.T())
+	s.compliance = mockcollection.NewCompliance(s.T())
 
 	// set up proto state mock
 	protoEpoch := &protocol.Epoch{}
