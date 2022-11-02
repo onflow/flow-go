@@ -206,10 +206,10 @@ func (nc *NoopCollector) RangeRequested(ran chainsync.Range)                    
 func (nc *NoopCollector) BatchRequested(batch chainsync.Batch)                                  {}
 func (nc *NoopCollector) OnUnauthorizedMessage(role, msgType, topic, offense string)            {}
 func (nc *NoopCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string)       {}
-func (nc *NoopCollector) OnIWantReceived()                                                      {}
-func (nc *NoopCollector) OnIHaveReceived()                                                      {}
-func (nc *NoopCollector) OnGraftReceived()                                                      {}
-func (nc *NoopCollector) OnPruneReceived()                                                      {}
+func (nc *NoopCollector) OnIWantReceived(string)                                                {}
+func (nc *NoopCollector) OnIHaveReceived(string)                                                {}
+func (nc *NoopCollector) OnGraftReceived(string)                                                {}
+func (nc *NoopCollector) OnPruneReceived(string)                                                {}
 
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 
