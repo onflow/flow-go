@@ -4,6 +4,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/engine/collection/message_hub"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
@@ -35,7 +36,7 @@ func (f *MessageHubFactory) Create(
 	clusterState cluster.State,
 	payloads storage.ClusterPayloads,
 	hotstuff module.HotStuff,
-	compliance network.MessageProcessor,
+	compliance collection.Compliance,
 	hotstuffModules *consensus.HotstuffModules,
 ) (*message_hub.MessageHub, error) {
 	return message_hub.NewMessageHub(
