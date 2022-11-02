@@ -25,7 +25,7 @@ func NewTemplate(jsonData string, templatePath string) Template {
 	}
 }
 
-func (t *Template) Apply() string {
+func (t *Template) Apply(outputToFile bool) string {
 
 	//load data values
 	dataBytes, err := os.ReadFile(t.jsonData)
@@ -57,6 +57,17 @@ func (t *Template) Apply() string {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	if outputToFile {
+		// create the file
+		f, err := os.Create("values.yml")
+		if err != nil {
+			fmt.Println(err)
+		}
+		defer f.Close()
+		f.WriteString(buf.String())
+	}
+
 	return buf.String()
 }
 

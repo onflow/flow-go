@@ -185,7 +185,7 @@ func TestApply_DataTable(t *testing.T) {
 			expectedOutputStr = strings.Trim(expectedOutputStr, "\t \n")
 
 			templ := NewTemplate(testData.dataPath, testData.templatePath)
-			actualOutput := templ.Apply()
+			actualOutput := templ.Apply(false)
 			require.Equal(t, expectedOutputStr, actualOutput)
 		})
 	}
