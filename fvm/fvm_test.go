@@ -1894,11 +1894,19 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 
 				script := fvm.Script([]byte(`
-					pub fun main(account: Address, k: [UInt8]) {
+					pub fun main(account: Address, key: [UInt8]) {
 						let acc = getAuthAccount(account)
-						acc.addPublicKey(k)
-					}`,
-				)).WithArguments(
+						let publicKey = PublicKey(
+							publicKey: key,
+							signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+						)
+						acc.keys.add(
+							publicKey: publicKey,
+							hashAlgorithm: HashAlgorithm.SHA3_256,
+							weight: 1000.0
+						)
+					}
+				`)).WithArguments(
 					jsoncdc.MustEncode(address),
 					jsoncdc.MustEncode(testutil.BytesToCadenceArray(
 						privateKey.PublicKey().Encode(),
@@ -1934,7 +1942,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				script := fvm.Script([]byte(`
 				pub fun main(account: Address) {
 					let acc = getAuthAccount(account)
-					acc.removePublicKey(0)
+					acc.keys.revoke(keyIndex: 0)
 				}`,
 				)).WithArguments(
 					jsoncdc.MustEncode(address),

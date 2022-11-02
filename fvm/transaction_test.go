@@ -69,7 +69,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		code := fmt.Sprintf(`
 			transaction {
-				prepare(auth: AuthAccount) {
+				prepare(signer: AuthAccount) {
 					setAccountFrozen(0x%s, true)
 				}
 			}
@@ -179,7 +179,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		freezeTx := fmt.Sprintf(`
 				transaction {
-					prepare(auth: AuthAccount) {
+					prepare(signer: AuthAccount) {
 						setAccountFrozen(0x%s, true)
 					}
 				}
@@ -321,7 +321,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		freezeTx := fmt.Sprintf(`
 				transaction {
-					prepare(auth: AuthAccount) {
+					prepare(signer: AuthAccount) {
 						setAccountFrozen(0x%s, true)
 					}
 				}
@@ -400,7 +400,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		codeAccount := fmt.Sprintf(`
 			transaction {
-				prepare(auth: AuthAccount) {}
+				prepare(signer: AuthAccount) {}
 				execute {
 					setAccountFrozen(0x%s, true)
 				}
@@ -409,7 +409,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		codeService := fmt.Sprintf(`
 			transaction {
-				prepare(auth: AuthAccount) {}
+				prepare(signer: AuthAccount) {}
 				execute {
 					setAccountFrozen(0x%s, true)
 				}
@@ -481,7 +481,7 @@ func TestAccountFreezing(t *testing.T) {
 		// deploy code to accounts
 		whateverCode := []byte(`
 			transaction {
-				prepare(auth: AuthAccount) {
+				prepare(signer: AuthAccount) {
 					log("Szczebrzeszyn")
 				}
 			}
@@ -501,7 +501,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		freezeTx := fmt.Sprintf(`
 				transaction {
-					prepare(auth: AuthAccount) {
+					prepare(signer: AuthAccount) {
 						setAccountFrozen(0x%s, true)
 					}
 				}
