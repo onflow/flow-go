@@ -314,7 +314,8 @@ func (exeNode *ExecutionNode) LoadBlobService(
 	// this configures peer manager to wait for the blobservice to be ready before starting
 	exeNode.blobserviceDependable.Init(bs)
 
-	return exeNode.blobService, nil
+	// blob service's lifecycle is managed by the network layer
+	return &module.NoopReadyDoneAware{}, nil
 }
 
 func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
