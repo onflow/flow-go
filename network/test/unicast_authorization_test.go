@@ -146,7 +146,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
+	msg, _, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
 
 	// send message via unicast
 	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
@@ -196,7 +196,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
+	msg, _, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
 
 	// send message via unicast
 	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
@@ -244,7 +244,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
+	msg, _, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
 
 	// set channel ID to an unauthorized channel for TestMessage
 	msg.ChannelID = channels.ConsensusCommittee.String()
@@ -299,7 +299,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
+	msg, _, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
 
 	// manipulate message code byte
 	msg.Payload[0] = invalidMessageCode
@@ -355,7 +355,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	u.startMiddlewares(overlay)
 
-	msg, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
+	msg, _, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
 
 	// manipulate message code byte
 	msg.Payload[0] = modifiedMessageCode
@@ -374,7 +374,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
 
-	msg, payload := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
+	msg, expectedMsg, payload := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
 
 	overlay := mocknetwork.NewOverlay(u.T())
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
@@ -386,7 +386,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(u.senderID, true)
 
 	// we should receive the message on our overlay, at this point close the waitCh
-	overlay.On("Receive", u.senderID.NodeID, msg, payload).Return(nil).
+	overlay.On("Receive", u.senderID.NodeID, expectedMsg, payload).Return(nil).
 		Once().
 		Run(func(args mockery.Arguments) {
 			close(u.waitCh)
@@ -446,7 +446,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 
 	// messages.BlockProposal is not authorized to be sent via unicast over the ConsensusCommittee channel
 	payload := unittest.ProposalFixture()
-	msg, _ := createMessageWithPayload(u.T(), u.senderID.NodeID, u.receiverID.NodeID, channels.ConsensusCommittee, payload)
+	msg, _, _ := messageutils.CreateMessageWithPayload(u.T(), u.senderID.NodeID, u.receiverID.NodeID, channels.ConsensusCommittee, payload)
 
 	// send message via unicast
 	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)

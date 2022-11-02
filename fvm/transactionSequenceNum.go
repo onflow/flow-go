@@ -23,7 +23,12 @@ func (c *TransactionSequenceNumberChecker) Process(
 	txnState *state.TransactionState,
 	_ *programs.TransactionPrograms,
 ) error {
-	err := c.checkAndIncrementSequenceNumber(proc, ctx, txnState)
+	// TODO(Janez): verification is part of inclusion fees, not execution fees.
+	var err error
+	txnState.RunWithAllLimitsDisabled(func() {
+		err = c.checkAndIncrementSequenceNumber(proc, ctx, txnState)
+	})
+
 	if err != nil {
 		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
@@ -56,13 +61,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	var accountKey flow.AccountPublicKey
 
-	// TODO(Janez): move disabling limits out of the sequence number verifier. Verifier should not be metered anyway.
-	// TODO(Janez): verification is part of inclusion fees, not execution fees.
-
-	// Skip checking limits when getting the public key
-	txnState.RunWithAllLimitsDisabled(func() {
-		accountKey, err = accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
-	})
+	accountKey, err = accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(proposalKey, err)
 	}
@@ -82,10 +81,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	accountKey.SeqNumber++
 
-	// Skip checking limits when setting the public key sequence number
-	txnState.RunWithAllLimitsDisabled(func() {
-		_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
-	})
+	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {
 		restartError := txnState.RestartNestedTransaction(nestedTxnId)
 		if restartError != nil {
