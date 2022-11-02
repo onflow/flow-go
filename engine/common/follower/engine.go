@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state"
@@ -150,31 +149,6 @@ func New(
 	return e, nil
 }
 
-// Start starts follower loop, then the follower engine worker threads.
-func (e *Engine) Start(signalerContext irrecoverable.SignalerContext) {
-	e.log.Info().Msg("starting follower loop")
-	e.follower.Start(signalerContext)
-	e.log.Info().Msg("follower loop started")
-	e.ComponentManager.Start(signalerContext)
-	e.log.Info().Msg("follower engine started")
-}
-
-// Ready returns a ready channel that is closed once the engine has fully started.
-// For the follower engine, we wait for follower logic to start.
-func (e *Engine) Ready() <-chan struct{} {
-	// NOTE: this will create long-lived goroutines each time Ready is called
-	// Since Ready is called infrequently, that is OK. If the call frequency changes, change this code.
-	return util.AllReady(e.ComponentManager, e.follower)
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-// For the follower engine, we wait for follower logic to finish.
-func (e *Engine) Done() <-chan struct{} {
-	// NOTE: this will create long-lived goroutines each time Done is called
-	// Since Done is called infrequently, that is OK. If the call frequency changes, change this code.
-	return util.AllDone(e.ComponentManager, e.follower)
-}
-
 // OnBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
 func (e *Engine) OnBlockProposal(proposal *messages.BlockProposal) {
 	e.onBlockProposal(e.me.NodeID(), proposal)
@@ -204,8 +178,6 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, mes
 		return fmt.Errorf("synced blocks should be feed using dedicated interface")
 	case *messages.BlockProposal:
 		e.onBlockProposal(originID, msg)
-	case *messages.BlockResponse:
-		e.onBlockResponse(originID, msg)
 	default:
 		e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
 	}
@@ -262,23 +234,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	if e.pendingBlocks.Push(in) {
 		e.pendingBlocksNotifier.Notify()
 	}
-}
-
-// onBlockResponse performs processing of incoming block response by splitting it into separate blocks, pushing them into queue
-// and notifying worker.
-// TODO: consider handling block response separately as this is a continuous block range.
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
-	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockResponse)
-	for _, block := range res.Blocks {
-		proposal := &messages.BlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		}
-
-		in := inboundBlock{originID, proposal}
-		e.pendingBlocks.Push(in)
-	}
-	e.pendingBlocksNotifier.Notify()
 }
 
 // processBlockProposal handles incoming block proposals.

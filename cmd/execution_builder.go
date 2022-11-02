@@ -126,7 +126,8 @@ type ExecutionNode struct {
 	pendingBlocks                 *buffer.PendingBlocks // used in follower engine
 	deltas                        *ingestion.Deltas
 	syncEngine                    *synchronization.Engine
-	followerEng                   *followereng.Engine // to sync blocks from consensus nodes
+	followerCore                  *hotstuff.FollowerLoop // follower hotstuff logic
+	followerEng                   *followereng.Engine    // to sync blocks from consensus nodes
 	computationManager            *computation.Manager
 	collectionRequester           *requester.Engine
 	ingestionEng                  *ingestion.Engine
@@ -181,6 +182,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("provider engine", exeNode.LoadProviderEngine).
 		Component("checker engine", exeNode.LoadCheckerEngine).
 		Component("ingestion engine", exeNode.LoadIngestionEngine).
+		Component("consensus committee", exeNode.LoadConsensusCommittee).
+		Component("follower core", exeNode.LoadFollowerCore).
 		Component("follower engine", exeNode.LoadFollowerEngine).
 		Component("collection requester engine", exeNode.LoadCollectionRequesterEngine).
 		Component("receipt provider engine", exeNode.LoadReceiptProviderEngine).
@@ -735,19 +738,12 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	return exeNode.ingestionEng, err
 }
 
-func (exeNode *ExecutionNode) LoadFollowerEngine(
+func (exeNode *ExecutionNode) LoadConsensusCommittee(
 	node *NodeConfig,
 ) (
 	module.ReadyDoneAware,
 	error,
 ) {
-	// initialize cleaner for DB
-	cleaner := storage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
-	// create a finalizer that handles updating the protocol
-	// state when the follower detects newly finalized blocks
-	final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, exeNode.followerState, node.Tracer)
-
 	// initialize consensus committee's membership state
 	// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 	// Note: node.Me.NodeID() is not part of the consensus exeNode.committee
@@ -758,10 +754,22 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 	node.ProtocolEvents.AddConsumer(committee)
 	exeNode.committee = committee
 
+	return committee, nil
+}
+
+func (exeNode *ExecutionNode) LoadFollowerCore(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	// create a finalizer that handles updating the protocol
+	// state when the follower detects newly finalized blocks
+	final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, exeNode.followerState, node.Tracer)
+
 	packer := signature.NewConsensusSigDataPacker(exeNode.committee)
 	// initialize the verifier for the protocol consensus
 	verifier := verification.NewCombinedVerifier(exeNode.committee, packer)
-	validator := validator.New(committee, verifier)
 
 	finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 	if err != nil {
@@ -773,11 +781,40 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 
 	// creates a consensus follower with ingestEngine as the notifier
 	// so that it gets notified upon each new finalized block
-	followerCore, err := consensus.NewFollower(node.Logger, exeNode.committee, node.Storage.Headers, final, verifier, exeNode.finalizationDistributor, node.RootBlock.Header, node.RootQC, finalized, pending)
+	exeNode.followerCore, err = consensus.NewFollower(
+		node.Logger,
+		exeNode.committee,
+		node.Storage.Headers,
+		final,
+		verifier,
+		exeNode.finalizationDistributor,
+		node.RootBlock.Header,
+		node.RootQC,
+		finalized,
+		pending,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower core logic: %w", err)
 	}
 
+	return exeNode.followerCore, nil
+}
+
+func (exeNode *ExecutionNode) LoadFollowerEngine(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	// initialize cleaner for DB
+	cleaner := storage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+
+	packer := signature.NewConsensusSigDataPacker(exeNode.committee)
+	// initialize the verifier for the protocol consensus
+	verifier := verification.NewCombinedVerifier(exeNode.committee, packer)
+	validator := validator.New(exeNode.committee, verifier)
+
+	var err error
 	exeNode.followerEng, err = followereng.New(
 		node.Logger,
 		node.Network,
@@ -789,7 +826,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Storage.Payloads,
 		exeNode.followerState,
 		exeNode.pendingBlocks,
-		followerCore,
+		exeNode.followerCore,
 		validator,
 		exeNode.syncCore,
 		node.Tracer,

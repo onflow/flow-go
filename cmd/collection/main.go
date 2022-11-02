@@ -16,6 +16,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
@@ -82,6 +83,7 @@ func main() {
 		push              *pusher.Engine
 		ing               *ingest.Engine
 		mainChainSyncCore *chainsync.Core
+		followerCore      *hotstuff.FollowerLoop // follower hotstuff logic
 		followerEng       *followereng.Engine
 		colMetrics        module.CollectionMetrics
 		err               error
@@ -256,30 +258,20 @@ func main() {
 			node.ProtocolEvents.AddConsumer(mainConsensusCommittee)
 			return mainConsensusCommittee, err
 		}).
-		Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
-			// initialize cleaner for DB
-			cleaner := storagekv.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
+		Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
 			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
-
-			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
-			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
-
-			validator := validator.New(mainConsensusCommittee, verifier)
-
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
-
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
-
+			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
+			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			// creates a consensus follower with noop consumer as the notifier
-			followerCore, err := consensus.NewFollower(
+			followerCore, err = consensus.NewFollower(
 				node.Logger,
 				mainConsensusCommittee,
 				node.Storage.Headers,
@@ -294,6 +286,17 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
+			return followerCore, nil
+		}).
+		Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// initialize cleaner for DB
+			cleaner := storagekv.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+
+			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
+
+			validator := validator.New(mainConsensusCommittee, verifier)
 
 			followerEng, err = followereng.New(
 				node.Logger,

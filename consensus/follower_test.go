@@ -161,6 +161,11 @@ func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
 func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
 	s.cancel()
 	unittest.RequireCloseBefore(s.T(), s.follower.Done(), time.Second, "follower failed to stop")
+	select {
+	case err := <-s.errs:
+		require.NoError(s.T(), err)
+	default:
+	}
 }
 
 // TestInitialization verifies that the basic test setup with initialization of the Follower works as expected

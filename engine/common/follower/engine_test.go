@@ -94,9 +94,6 @@ func (s *Suite) SetupTest() {
 
 	s.engine = eng
 
-	s.follower.On("Start", mock.Anything).Once()
-	unittest.ReadyDoneify(s.follower)
-
 	s.ctx, s.cancel, s.errs = irrecoverable.WithSignallerAndCancel(context.Background())
 	s.engine.Start(s.ctx)
 	unittest.RequireCloseBefore(s.T(), s.engine.Ready(), time.Second, "engine failed to start")
