@@ -133,11 +133,11 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 	)
 }
 
-func (reusable *ReusableCadenceRuntime) ExecuteTransaction(
+func (reusable *ReusableCadenceRuntime) NewTransactionExecutor(
 	script runtime.Script,
 	location common.Location,
-) error {
-	return reusable.Runtime.ExecuteTransaction(
+) runtime.Executor {
+	return reusable.Runtime.NewTransactionExecutor(
 		script,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
