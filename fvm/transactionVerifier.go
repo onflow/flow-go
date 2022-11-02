@@ -37,7 +37,11 @@ func (v *TransactionVerifier) Process(
 	txnState *state.TransactionState,
 	_ *programs.TransactionPrograms,
 ) error {
-	err := v.verifyTransaction(proc, ctx, txnState)
+	// TODO(Janez): verification is part of inclusion fees, not execution fees.
+	var err error
+	txnState.RunWithAllLimitsDisabled(func() {
+		err = v.verifyTransaction(proc, ctx, txnState)
+	})
 	if err != nil {
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
@@ -71,16 +75,7 @@ func (v *TransactionVerifier) verifyTransaction(
 		return err
 	}
 
-	// TODO(Janez): move disabling limits out of the verifier. Verifier should not be metered anyway.
-	// TODO(Janez): verification is part of inclusion fees, not execution fees.
-
-	// check accounts uses the state, but if the limits are too low, this might fail.
-	// we shouldn't fail here if the limits are too low as fee deduction won't happen
-	txnState.RunWithAllLimitsDisabled(
-		func() {
-			err = v.checkAccountsAreNotFrozen(tx, accounts)
-		},
-	)
+	err = v.checkAccountsAreNotFrozen(tx, accounts)
 	if err != nil {
 		return err
 	}
@@ -152,21 +147,6 @@ func (v *TransactionVerifier) verifyTransaction(
 	return nil
 }
 
-// getPublicKey skips checking limits when getting the public key
-func (v *TransactionVerifier) getPublicKey(
-	txnState *state.TransactionState,
-	accounts environment.Accounts,
-	address flow.Address,
-	keyIndex uint64,
-) (pub flow.AccountPublicKey, err error) {
-	txnState.RunWithAllLimitsDisabled(
-		func() {
-			pub, err = accounts.GetPublicKey(address, keyIndex)
-		},
-	)
-	return
-}
-
 func (v *TransactionVerifier) verifyAccountSignatures(
 	txnState *state.TransactionState,
 	accounts environment.Accounts,
@@ -183,7 +163,7 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 
 	for _, txSig := range signatures {
 
-		accountKey, err := v.getPublicKey(txnState, accounts, txSig.Address, txSig.KeyIndex)
+		accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyIndex)
 		if err != nil {
 			return nil, false, errorBuilder(txSig, err)
 		}

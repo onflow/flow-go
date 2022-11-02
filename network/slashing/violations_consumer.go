@@ -19,6 +19,10 @@ type ViolationsConsumer interface {
 	// OnSenderEjectedError logs an error for sender ejected error
 	OnSenderEjectedError(violation *Violation)
 
+	// OnUnauthorizedUnicastOnChannel logs an error for messages unauthorized to be sent via unicast
+	OnUnauthorizedUnicastOnChannel(violation *Violation)
+
+	// OnUnexpectedError logs an error for unknown errors
 	OnUnexpectedError(violation *Violation)
 }
 
