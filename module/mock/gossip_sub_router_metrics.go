@@ -9,24 +9,24 @@ type GossipSubRouterMetrics struct {
 	mock.Mock
 }
 
-// OnGraftReceived provides a mock function with given fields:
-func (_m *GossipSubRouterMetrics) OnGraftReceived(string) {
-	_m.Called()
+// OnGraftReceived provides a mock function with given fields: topic
+func (_m *GossipSubRouterMetrics) OnGraftReceived(topic string) {
+	_m.Called(topic)
 }
 
-// OnIHaveReceived provides a mock function with given fields:
-func (_m *GossipSubRouterMetrics) OnIHaveReceived(string) {
-	_m.Called()
+// OnIHaveReceived provides a mock function with given fields: topic
+func (_m *GossipSubRouterMetrics) OnIHaveReceived(topic string) {
+	_m.Called(topic)
 }
 
-// OnIWantReceived provides a mock function with given fields:
-func (_m *GossipSubRouterMetrics) OnIWantReceived(string) {
-	_m.Called()
+// OnIWantReceived provides a mock function with given fields: topic
+func (_m *GossipSubRouterMetrics) OnIWantReceived(topic string) {
+	_m.Called(topic)
 }
 
-// OnPruneReceived provides a mock function with given fields:
-func (_m *GossipSubRouterMetrics) OnPruneReceived(string) {
-	_m.Called()
+// OnPruneReceived provides a mock function with given fields: topic
+func (_m *GossipSubRouterMetrics) OnPruneReceived(topic string) {
+	_m.Called(topic)
 }
 
 type mockConstructorTestingTNewGossipSubRouterMetrics interface {
