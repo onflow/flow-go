@@ -1,7 +1,6 @@
 package synchronization
 
 import (
-	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	"io"
 	"math/rand"
 	"testing"
@@ -14,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
+	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
@@ -364,8 +364,8 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	ss.core.On("HandleBlock", unprocessable.Header).Return(false)
 	res.Blocks = append(res.Blocks, &unprocessable)
 
-	ss.comp.On("Process", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		res := args.Get(2).(*events.SyncedClusterBlock)
+	ss.comp.On("OnSyncedClusterBlock", mock.Anything).Run(func(args mock.Arguments) {
+		res := args.Get(0).(*events.SyncedClusterBlock)
 		ss.Assert().Equal(&processable, res.Block)
 		ss.Assert().Equal(originID, res.OriginID)
 	}).Return(nil)
