@@ -4,8 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/onflow/flow-go/integration/benchnet2/automate"
 )
-import "github.com/onflow/flow-go/integration/benchnet2/automate"
 
 // sample test run
 // go run cmd/main.go --data "./testdata/data/test1.json" --template "./testdata/templates/test1.yml" --file=true

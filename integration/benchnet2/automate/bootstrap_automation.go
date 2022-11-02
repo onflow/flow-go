@@ -58,6 +58,8 @@ func (t *Template) Apply(outputToFile bool) string {
 		log.Fatal(err)
 	}
 
+	//output := buf.String()
+
 	if outputToFile {
 		// create the file
 		f, err := os.Create("values.yml")
@@ -65,7 +67,11 @@ func (t *Template) Apply(outputToFile bool) string {
 			fmt.Println(err)
 		}
 		defer f.Close()
-		f.WriteString(buf.String())
+
+		_, e := f.WriteString(buf.String())
+		if e != nil {
+			log.Fatal(e)
+		}
 	}
 
 	return buf.String()
@@ -115,7 +121,10 @@ var DEFAULT_VERIFICATION_IMAGE string = "gcr.io/flow-container-registry/verifica
 
 // Generates a values file based on a given json and templates
 func GenerateValuesYaml(inputJsonFilePath string, templatePath string, outputYamlFilePath string, branch string, commit string) {
-	GenerateValuesYamlWithImages(inputJsonFilePath, templatePath, outputYamlFilePath, branch, commit, DEFAULT_ACCESS_IMAGE, DEFAULT_COLLECTION_IMAGE, DEFAULT_CONSENSUS_IMAGE, DEFAULT_EXECUTION_IMAGE, DEFAULT_VERIFICATION_IMAGE)
+	e := GenerateValuesYamlWithImages(inputJsonFilePath, templatePath, outputYamlFilePath, branch, commit, DEFAULT_ACCESS_IMAGE, DEFAULT_COLLECTION_IMAGE, DEFAULT_CONSENSUS_IMAGE, DEFAULT_EXECUTION_IMAGE, DEFAULT_VERIFICATION_IMAGE)
+	if e != nil {
+		log.Fatal(e)
+	}
 }
 
 // Generates a values file based on a given json and templates, with addtion of selecting image version for nodes

@@ -1,12 +1,13 @@
 package automate
 
 import (
-	"github.com/stretchr/testify/require"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var TEST_FILES string = "test_files/"
@@ -61,7 +62,10 @@ func TestByteFileWrite(t *testing.T) {
 	testString := "yaml: some data\nline2: 123\n"
 	filename := "test_file_write.yml"
 
-	writeYamlBytesToFile(filename, []byte(testString))
+	e := writeYamlBytesToFile(filename, []byte(testString))
+	if e != nil {
+		log.Fatal(e)
+	}
 
 	actual, err := textReader(filename)
 	require.NoError(t, err)
@@ -77,7 +81,10 @@ func TestMarshalFileWrite(t *testing.T) {
 	expected := "cpu: Intel\nmemory: 128GB\n"
 	filename := "test_marshal_write.yml"
 
-	marshalToYaml(resource, filename)
+	e := marshalToYaml(resource, filename)
+	if e != nil {
+		log.Fatal(e)
+	}
 
 	actual, err := textReader(filename)
 	require.NoError(t, err)
@@ -154,7 +161,7 @@ func TestTemplating(t *testing.T) {
 }
 
 func TestTemplating2(t *testing.T) {
-	GenerateValues("", "", "values.yml", "test branch", "test_commit", "AccessImage", "CollectionImage", "ConsensusImage", "ExecutionImage", "VerificationImage")
+	require.NoError(t, GenerateValues("", "", "values.yml", "test branch", "test_commit", "AccessImage", "CollectionImage", "ConsensusImage", "ExecutionImage", "VerificationImage"))
 }
 
 const DataPath = "./testdata/data/"
