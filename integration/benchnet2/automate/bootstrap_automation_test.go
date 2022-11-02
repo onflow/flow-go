@@ -165,7 +165,7 @@ func TestApply_DataTable(t *testing.T) {
 	testDataMap := map[string]testData{
 		"simple1": {
 			templatePath:     filepath.Join(TemplatesPath, "test1.yml"),
-			dataPath:         filepath.Join(DataPath, "test.json"),
+			dataPath:         filepath.Join(DataPath, "test1.json"),
 			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "test1.yml"),
 		},
 
