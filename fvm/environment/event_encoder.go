@@ -2,6 +2,7 @@ package environment
 
 import (
 	"bytes"
+	"sync"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -14,6 +15,7 @@ type EventEncoder interface {
 type CadenceEventEncoder struct {
 	buffer  *bytes.Buffer
 	encoder *jsoncdc.Encoder
+	sync.Mutex
 }
 
 func NewCadenceEventEncoder() *CadenceEventEncoder {
@@ -25,8 +27,11 @@ func NewCadenceEventEncoder() *CadenceEventEncoder {
 }
 
 func (e *CadenceEventEncoder) Encode(event cadence.Event) ([]byte, error) {
-	e.buffer.Reset()
 
+	e.Lock()
+	defer e.Unlock()
+
+	e.buffer.Reset()
 	err := e.encoder.Encode(event)
 	if err != nil {
 		return nil, err
