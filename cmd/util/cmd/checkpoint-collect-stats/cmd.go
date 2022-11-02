@@ -225,9 +225,9 @@ func getType(key ledger.Key) string {
 		return "account's cadence public domain map"
 	case "contract":
 		return "account's cadence contract domain map"
-	case state.KeyContractNames:
+	case state.ContractNamesKey:
 		return "contract names"
-	case state.KeyAccountStatus:
+	case state.AccountStatusKey:
 		return "account status"
 	case "uuid":
 		return "uuid generator state"
@@ -238,7 +238,7 @@ func getType(key ledger.Key) string {
 	if bytes.HasPrefix(k, []byte("public_key_")) {
 		return "public key"
 	}
-	if bytes.HasPrefix(k, []byte(state.KeyCode)) {
+	if bytes.HasPrefix(k, []byte(state.CodeKeyPrefix)) {
 		return "contract content"
 	}
 	return "others"
