@@ -27,6 +27,11 @@ func (_m *ViolationsConsumer) OnUnAuthorizedSenderError(violation *slashing.Viol
 	_m.Called(violation)
 }
 
+// OnUnauthorizedUnicastOnChannel provides a mock function with given fields: violation
+func (_m *ViolationsConsumer) OnUnauthorizedUnicastOnChannel(violation *slashing.Violation) {
+	_m.Called(violation)
+}
+
 // OnUnexpectedError provides a mock function with given fields: violation
 func (_m *ViolationsConsumer) OnUnexpectedError(violation *slashing.Violation) {
 	_m.Called(violation)
