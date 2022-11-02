@@ -1,11 +1,11 @@
 package automate
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/require"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -161,14 +161,25 @@ const DataPath = "./testdata/data/"
 const TemplatesPath = "./testdata/templates/"
 const ExpectedTemplatesPath = "./testdata/expected/"
 
-func TestTemplate_Simple(t *testing.T) {
+func TestTemplate_Simple1(t *testing.T) {
 	//load expected template
 	expectedTemplateBytes, err := os.ReadFile(filepath.Join(ExpectedTemplatesPath, "test1.yml"))
 	require.NoError(t, err)
 	expectedOutputStr := string(expectedTemplateBytes)
-	fmt.Println("expectedOutputStr=", expectedOutputStr)
 
 	templ := NewTemplate(filepath.Join(DataPath, "test.json"), filepath.Join(TemplatesPath, "test1.yml"))
+	actualOutput := templ.Apply()
+	require.Equal(t, expectedOutputStr, actualOutput)
+}
+
+func TestTemplate_Simple2(t *testing.T) {
+	//load expected template
+	expectedTemplateBytes, err := os.ReadFile(filepath.Join(ExpectedTemplatesPath, "access_template.yml"))
+	require.NoError(t, err)
+	expectedOutputStr := string(expectedTemplateBytes)
+	expectedOutputStr = strings.Trim(expectedOutputStr, "\t \n")
+
+	templ := NewTemplate(filepath.Join(DataPath, "access_template.json"), filepath.Join(TemplatesPath, "access_template.yml"))
 	actualOutput := templ.Apply()
 	require.Equal(t, expectedOutputStr, actualOutput)
 }
