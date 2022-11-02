@@ -34,6 +34,7 @@ const defaultBlockQueueCapacity = 10_000
 // node-internal notifications, and manages the worker routines processing the inbound events,
 // and forwards outbound messages to the networking layer.
 // `compliance.Core` implements the actual compliance logic.
+// Implements consensus.Compliance interface.
 type Engine struct {
 	log                   zerolog.Logger
 	mempoolMetrics        module.MempoolMetrics
@@ -187,6 +188,8 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	}
 }
 
+// OnBlockProposal feeds a new block proposal into the processing pipeline.
+// Incoming proposals are queued and eventually dispatched by worker.
 func (e *Engine) OnBlockProposal(proposal *messages.BlockProposal) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
 	if e.pendingBlocks.Push(inboundBlock{proposal.Header.ProposerID, proposal}) {
@@ -194,6 +197,8 @@ func (e *Engine) OnBlockProposal(proposal *messages.BlockProposal) {
 	}
 }
 
+// OnSyncedBlock feeds a block obtained from sync proposal into the processing pipeline.
+// Incoming proposals are queued and eventually dispatched by worker.
 func (e *Engine) OnSyncedBlock(syncedBlock *events.SyncedBlock) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
 	inBlock := inboundBlock{

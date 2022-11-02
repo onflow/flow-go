@@ -43,6 +43,7 @@ const defaultBlockQueueCapacity = 10_000
 // passive (read-only) version of the compliance engine. The compliance engine
 // is employed by consensus nodes (active consensus participants) where the
 // Follower engine is employed by all other node roles.
+// Implements consensus.Compliance interface.
 type Engine struct {
 	*component.ComponentManager
 	log                   zerolog.Logger
@@ -84,7 +85,6 @@ func WithChannel(channel channels.Channel) Option {
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
-var _ component.Component = (*Engine)(nil)
 var _ consensus.Compliance = (*Engine)(nil)
 
 func New(
