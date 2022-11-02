@@ -1,6 +1,6 @@
 branch: {{.Branch}}
 # Commit must be a string
 commit: commit
-test2: {{range $key, $element := .Teststring}}
+test2: {{range $key, $element := .Testmap}}
   {{$key}}
-    {{$element.NodeID}}{{end}}
+    {{$element.Temp}}{{end}}

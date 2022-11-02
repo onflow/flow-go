@@ -1,0 +1,9 @@
+{
+    "Branch": "test branch",
+    "Commit": "test commit",
+    "AccessImageTag": "Access Image Tag",
+    "CollectionImageTag": "Collection Image Tag",
+    "ConsensusImageTag": "Consensus Image Tag",
+    "ExecutionImageTag": "Execution Image Tag",
+    "VerificationImageTag": "Verification Image Tag"
+}

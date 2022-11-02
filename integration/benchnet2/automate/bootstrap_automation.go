@@ -26,10 +26,22 @@ type ReplacementNodeData struct {
 	NodeID   string
 	ImageTag string
 }
+type ReplacementNodeJsonData struct {
+	NodeID  string
+	DataMap map[string]string
+}
 
 type ReplacementValues struct {
 	Branch       string
 	Commit       string
+	Access       map[string]string
+	Collection   map[string]string
+	Consensus    map[string]string
+	Execution    map[string]string
+	Verification map[string]string
+}
+type ReplacementJsonValues struct {
+	DataMap      map[string]string
 	Access       map[string]string
 	Collection   map[string]string
 	Consensus    map[string]string
@@ -113,6 +125,47 @@ func loadNodeJsonData(nodeInfoPath string) (map[string]Node, map[string]int, err
 	}
 
 	return nodeMap, nodeConfig, err
+}
+
+func loadAllData(nodeInfoPath string, dataPath string) (map[string]Node, map[string]int, map[string]string, error) {
+	jsonFileBytes, err := textReader(nodeInfoPath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	dataFileBytes, err := textReader(dataPath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var nodes []Node
+	err = json.Unmarshal(jsonFileBytes, &nodes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var data map[string]string
+	err = json.Unmarshal(dataFileBytes, &data)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var nodeConfig = make(map[string]int)
+	nodeConfig["access"] = 0
+	nodeConfig["collection"] = 0
+	nodeConfig["consensus"] = 0
+	nodeConfig["execution"] = 0
+	nodeConfig["verification"] = 0
+
+	nodeMap := map[string]Node{}
+	nodeNameRe := regexp.MustCompile(`\w{6,}\d{1,3}`)
+	for _, node := range nodes {
+		name := nodeNameRe.FindStringSubmatch(node.Address)
+		nodeMap[name[0]] = node
+		nodeConfig[node.Role]++
+	}
+
+	return nodeMap, nodeConfig, data, err
 }
 
 // Builds and returns values yaml struct
@@ -242,7 +295,7 @@ func marshalToYaml(source interface{}, outputFilePath string) error {
 func iterateTemplates() {
 	folder := "test_templates/"
 	testTemp, _ := createTemplate(folder + "template_test.yml")
-	testmap := make(map[string]string)
+	testmap := make(map[string]interface{})
 	teststring := make(map[string]ReplacementNodeData)
 
 	testmap["one"] = "Map1"
@@ -257,6 +310,33 @@ func iterateTemplates() {
 
 	var doc bytes.Buffer
 	err := testTemp.Execute(&doc, testData)
+
+	fmt.Println(err)
+	fmt.Println(doc.String())
+}
+
+func innerTemplates() {
+	folder := "test_templates/"
+	testTemp, _ := createTemplate(folder + "template_test.yml")
+	testmap := make(map[string]interface{})
+	listmap := make(map[string]interface{})
+
+	innerMap := make(map[string]string)
+	innerMap["Temp"] = "Testing {{.NodeID}} inner templates"
+	innerMap["NodeID"] = "InnerNodeID1"
+
+	innerMap2 := make(map[string]string)
+	innerMap2["Temp"] = "Testing {{.NodeID}} inner templates two"
+	innerMap2["NodeID"] = "InnerNodeID2"
+
+	listmap["Node1"] = innerMap
+	listmap["Node2"] = innerMap2
+
+	testmap["Branch"] = "Test Branch"
+	testmap["Testmap"] = listmap
+
+	var doc bytes.Buffer
+	err := testTemp.Execute(&doc, testmap)
 
 	fmt.Println(err)
 	fmt.Println(doc.String())
@@ -279,6 +359,38 @@ func GenerateValues(inputJsonFilePath string, templatePath string, outputYamlFil
 	}
 
 	valuesData, err := buildValues(templateFolder, nodesData, nodeConfig, "branch", "commit", accessImage, collectionImage, consensusImage, executionImage, verificationImage)
+	if err != nil {
+		return err
+	}
+
+	valuesTemplate, err := createTemplate(templateFolder + "values_template.yml")
+	if err != nil {
+		return err
+	}
+	values, err := replaceTemplateData(valuesTemplate, valuesData)
+	if err != nil {
+		return err
+	}
+
+	return writeYamlBytesToFile("values.yml", []byte(values))
+}
+
+func GenerateValuesWithJson(inputJsonFilePath string, templatePath string, outputYamlFilePath string, dataJsonFilePath string) error {
+	templateFolder := "test_templates/"
+	if templatePath != "" {
+		templateFolder = templatePath
+	}
+	nodeInfoJson := DEFAULT_NODE_INFO_PATH
+	if inputJsonFilePath != "" {
+		nodeInfoJson = inputJsonFilePath
+	}
+
+	nodesData, nodeConfig, dataMap, err := loadAllData(nodeInfoJson, dataJsonFilePath)
+	if err != nil {
+		return err
+	}
+
+	valuesData, err := buildValuesWithJson(templateFolder, nodesData, nodeConfig, dataMap)
 	if err != nil {
 		return err
 	}
@@ -327,6 +439,37 @@ func buildValues(templateFolder string, nodesData map[string]Node, nodesConfig m
 	return ReplacementValues{Branch: branch, Commit: commit, Access: accessNodes, Collection: collectionNodes, Consensus: consensusNodes, Execution: executionNodes, Verification: verificationNodes}, err
 }
 
+func buildValuesWithJson(templateFolder string, nodesData map[string]Node, nodesConfig map[string]int, dataMap map[string]string) (ReplacementJsonValues, error) {
+	accessTemplatePath := templateFolder + ACCESS_TEMPLATE
+	accessNodes, err := buildNodesWithJson("access", accessTemplatePath, nodesData, nodesConfig, dataMap)
+	if err != nil {
+		return ReplacementJsonValues{}, err
+	}
+
+	collectionTemplatePath := templateFolder + COLLECTION_TEMPLATE
+	collectionNodes, err := buildNodesWithJson("collection", collectionTemplatePath, nodesData, nodesConfig, dataMap)
+	if err != nil {
+		return ReplacementJsonValues{}, err
+	}
+
+	consensusTemplatePath := templateFolder + CONSENSUS_TEMPLATE
+	consensusNodes, err := buildNodesWithJson("consensus", consensusTemplatePath, nodesData, nodesConfig, dataMap)
+	if err != nil {
+		return ReplacementJsonValues{}, err
+	}
+
+	executionTemplatePath := templateFolder + EXECUTION_TEMPLATE
+	executionNodes, err := buildNodesWithJson("execution", executionTemplatePath, nodesData, nodesConfig, dataMap)
+	if err != nil {
+		return ReplacementJsonValues{}, err
+	}
+
+	verificationTemplatePath := templateFolder + VERIFICATION_TEMPLATE
+	verificationNodes, err := buildNodesWithJson("verification", verificationTemplatePath, nodesData, nodesConfig, dataMap)
+
+	return ReplacementJsonValues{DataMap: dataMap, Access: accessNodes, Collection: collectionNodes, Consensus: consensusNodes, Execution: executionNodes, Verification: verificationNodes}, err
+}
+
 func buildNodes(nodeType string, nodeTemplatePath string, imageTag string, nodesData map[string]Node, nodeConfig map[string]int) (map[string]string, error) {
 	nodeTemplate, err := createTemplate(nodeTemplatePath)
 	if err != nil {
@@ -349,12 +492,31 @@ func buildNodes(nodeType string, nodeTemplatePath string, imageTag string, nodes
 	return nodeMap, err
 }
 
+func buildNodesWithJson(nodeType string, nodeTemplatePath string, nodesData map[string]Node, nodeConfig map[string]int, dataMap map[string]string) (map[string]string, error) {
+	nodeTemplate, err := createTemplate(nodeTemplatePath)
+	if err != nil {
+		return nil, err
+	}
+	var nodeMap = make(map[string]string)
+
+	for i := 1; i <= nodeConfig[nodeType]; i++ {
+		name := fmt.Sprint(nodeType, i)
+		key := name + ":"
+		replacementData := ReplacementNodeJsonData{NodeID: nodesData[name].NodeID, DataMap: dataMap}
+
+		nodeString, err := replaceTemplateData(nodeTemplate, replacementData)
+		if err != nil {
+			return nil, err
+		}
+		nodeMap[key] = nodeString
+	}
+
+	return nodeMap, err
+}
+
 type testingStruct struct {
 	Branch     string
-	Testmap    map[string]string
+	Testmap    map[string]interface{}
 	Teststring map[string]ReplacementNodeData
 	Testslice  []string
 }
-
-// # test1: {{range.testmap}}{{$index}}{{.}}
-// # test2: {{range.teststring}}{{if $index == "one"}}{{.NodeID}}

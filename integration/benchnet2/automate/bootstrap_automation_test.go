@@ -155,3 +155,7 @@ func TestTemplating(t *testing.T) {
 func TestTemplating2(t *testing.T) {
 	GenerateValues("", "", "values.yml", "test branch", "test_commit", "AccessImage", "CollectionImage", "ConsensusImage", "ExecutionImage", "VerificationImage")
 }
+
+func TestInnerTemplates(t *testing.T) {
+	innerTemplates()
+}
