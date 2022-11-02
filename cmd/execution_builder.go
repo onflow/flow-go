@@ -191,9 +191,9 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
-		Component("provider engine", exeNode.LoadProviderEngine).
 		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
 		Component("S3 block data uploader", exeNode.LoadS3BlockDataUploader).
+		Component("provider engine", exeNode.LoadProviderEngine).
 		Component("checker engine", exeNode.LoadCheckerEngine).
 		Component("ingestion engine", exeNode.LoadIngestionEngine).
 		Component("follower engine", exeNode.LoadFollowerEngine).
