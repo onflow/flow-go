@@ -10,12 +10,14 @@ import (
 )
 
 type ObservableGossipSubRouter struct {
-	router *pubsub.GossipSubRouter
+	router  *pubsub.GossipSubRouter
+	metrics module.GossipSubRouterMetrics
 }
 
 func NewObservableGossipSub(h host.Host, metrics module.GossipSubRouterMetrics) *ObservableGossipSubRouter {
 	return &ObservableGossipSubRouter{
-		router: pubsub.DefaultGossipSubRouter(h),
+		router:  pubsub.DefaultGossipSubRouter(h),
+		metrics: metrics,
 	}
 }
 
