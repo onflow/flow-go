@@ -66,20 +66,8 @@ jobs:
           cache: true
       - name: Run tidy
         run: make tidy
-
-  emulator:
-    name: Emulator Build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Emulator build
-        run: make emulator-build
+      - name: Emulator no relic check
+        run: make emulator-norelic-check
 
   shell-check:
     name: ShellCheck

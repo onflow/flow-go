@@ -75,8 +75,8 @@ verify-mocks: generate-mocks
 
 ############################################################################################
 
-.PHONY: emulator-build
-emulator-build:
+.PHONY: emulator-norelic-check
+emulator-norelic-check:
 	# test the fvm package compiles with Relic library disabled (required for the emulator build)
 	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
 
