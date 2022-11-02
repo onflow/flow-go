@@ -19,7 +19,4 @@ type ExecutionDataRequester interface {
 
 	// AddOnExecutionDataFetchedConsumer adds a callback to be called when a new ExecutionData is received
 	AddOnExecutionDataFetchedConsumer(fn ExecutionDataReceivedCallback)
-
-	// GetLastProcessedIndex returns the last processed index
-	GetLastProcessedIndex() uint64
 }

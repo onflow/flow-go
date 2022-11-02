@@ -37,20 +37,6 @@ func (_m *ExecutionDataRequester) Done() <-chan struct{} {
 	return r0
 }
 
-// GetLastProcessedIndex provides a mock function with given fields:
-func (_m *ExecutionDataRequester) GetLastProcessedIndex() uint64 {
-	ret := _m.Called()
-
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	return r0
-}
-
 // OnBlockFinalized provides a mock function with given fields: _a0
 func (_m *ExecutionDataRequester) OnBlockFinalized(_a0 *model.Block) {
 	_m.Called(_a0)

@@ -20,14 +20,7 @@ type BlockEntry struct {
 }
 
 // ExecutionDataReader provides an abstraction for consumers to read blocks as job.
-type ExecutionDataReader interface {
-	AddContext(ctx irrecoverable.SignalerContext)
-	AtIndex(height uint64) (module.Job, error)
-	Head() (uint64, error)
-}
-
-// ExecutionDataReaderImpl provides an implementation of ExecutionDataReader
-type ExecutionDataReaderImpl struct {
+type ExecutionDataReader struct {
 	downloader execution_data.Downloader
 	headers    storage.Headers
 	results    storage.ExecutionResults
@@ -49,8 +42,8 @@ func NewExecutionDataReader(
 	seals storage.Seals,
 	fetchTimeout time.Duration,
 	highestAvailableHeight func() uint64,
-) *ExecutionDataReaderImpl {
-	return &ExecutionDataReaderImpl{
+) *ExecutionDataReader {
+	return &ExecutionDataReader{
 		downloader:             downloader,
 		headers:                headers,
 		results:                results,
@@ -63,13 +56,13 @@ func NewExecutionDataReader(
 // AddContext adds a context to the execution data reader
 // TODO: this is an anti-pattern, refactor this to accept a context in AtIndex instead of storing
 // it on the struct.
-func (r *ExecutionDataReaderImpl) AddContext(ctx irrecoverable.SignalerContext) {
+func (r *ExecutionDataReader) AddContext(ctx irrecoverable.SignalerContext) {
 	r.ctx = ctx
 }
 
 // AtIndex returns the block entry job at the given height, or storage.ErrNotFound.
 // Any other error is unexpected
-func (r *ExecutionDataReaderImpl) AtIndex(height uint64) (module.Job, error) {
+func (r *ExecutionDataReader) AtIndex(height uint64) (module.Job, error) {
 	if r.ctx == nil {
 		return nil, fmt.Errorf("execution data reader is not initialized")
 	}
@@ -92,13 +85,13 @@ func (r *ExecutionDataReaderImpl) AtIndex(height uint64) (module.Job, error) {
 }
 
 // Head returns the highest consecutive block height with downloaded execution data
-func (r *ExecutionDataReaderImpl) Head() (uint64, error) {
+func (r *ExecutionDataReader) Head() (uint64, error) {
 	return r.highestAvailableHeight(), nil
 }
 
 // getExecutionData returns the ExecutionData for the given block height.
 // This is used by the execution data reader to get the ExecutionData for a block.
-func (r *ExecutionDataReaderImpl) getExecutionData(signalCtx irrecoverable.SignalerContext, height uint64) (*execution_data.BlockExecutionData, error) {
+func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerContext, height uint64) (*execution_data.BlockExecutionData, error) {
 	header, err := r.headers.ByHeight(height)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup header for height %d: %w", height, err)

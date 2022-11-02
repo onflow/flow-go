@@ -264,10 +264,6 @@ func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_sync
 	e.consumers = append(e.consumers, fn)
 }
 
-func (e *executionDataRequester) GetLastProcessedIndex() uint64 {
-	return e.blockConsumer.LastProcessedIndex()
-}
-
 // runBlockConsumer runs the blockConsumer component
 func (e *executionDataRequester) runBlockConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	err := util.WaitClosed(ctx, e.downloader.Ready())
