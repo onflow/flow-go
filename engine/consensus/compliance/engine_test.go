@@ -34,13 +34,9 @@ type EngineSuite struct {
 
 func (cs *EngineSuite) SetupTest() {
 	cs.CommonSuite.SetupTest()
-	cs.hotstuff.On("Start", mock.Anything)
-	cs.hotstuff.On("Ready", mock.Anything).Return(unittest.ClosedChannel()).Maybe()
-	cs.hotstuff.On("Done", mock.Anything).Return(unittest.ClosedChannel()).Maybe()
 
 	e, err := NewEngine(unittest.Logger(), cs.me, cs.core)
 	require.NoError(cs.T(), err)
-	e.WithConsensus(cs.hotstuff)
 	cs.engine = e
 
 	cs.ctx, cs.cancel, cs.errs = irrecoverable.WithSignallerAndCancel(context.Background())

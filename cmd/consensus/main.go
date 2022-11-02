@@ -628,7 +628,7 @@ func main() {
 
 			return util.MergeReadyDone(voteAggregator, timeoutAggregator), nil
 		}).
-		Component("consensus compliance engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder
 			var build module.Builder
 			build, err = builder.NewBuilder(
@@ -652,7 +652,6 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialized block builder: %w", err)
 			}
-
 			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
 
 			opts := []consensus.Option{
@@ -665,12 +664,27 @@ func main() {
 			if !startupTime.IsZero() {
 				opts = append(opts, consensus.WithStartupTime(startupTime))
 			}
-
 			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, err
 			}
 
+			// initialize hotstuff consensus algorithm
+			hot, err = consensus.NewParticipant(
+				node.Logger,
+				mainMetrics,
+				build,
+				finalizedBlock,
+				pending,
+				hotstuffModules,
+				opts...,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
+			}
+			return hot, nil
+		}).
+		Component("consensus compliance engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the entity database accessors
 			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 
@@ -689,6 +703,7 @@ func main() {
 				proposals,
 				syncCore,
 				hotstuffModules.Validator,
+				hot,
 				hotstuffModules.VoteAggregator,
 				hotstuffModules.TimeoutAggregator,
 				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
@@ -707,21 +722,6 @@ func main() {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
-			// initialize hotstuff consensus algorithm
-			hot, err = consensus.NewParticipant(
-				node.Logger,
-				mainMetrics,
-				build,
-				finalizedBlock,
-				pending,
-				hotstuffModules,
-				opts...,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
-			}
-
-			comp = comp.WithConsensus(hot)
 			finalizationDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
 
 			return comp, nil
