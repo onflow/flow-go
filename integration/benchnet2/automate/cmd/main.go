@@ -23,6 +23,5 @@ func main() {
 
 	template := automate.NewTemplate(*dataFlag, *templateFlag)
 	actualOutput := template.Apply(*fileOutputFlag)
-	fmt.Println("output written out")
 	fmt.Println("output=", actualOutput)
 }
