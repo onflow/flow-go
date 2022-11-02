@@ -94,7 +94,7 @@ access:
         - --profiler-dir=/profiler
         - --profiler-interval=2m
         - "--bind=0.0.0.0:3569"
-        - --nodeid=7dd7ad2565841c803d898be0b7723e6ea8348eac44a4d8e4a0b7ebe0d9c8304b
+        - --nodeid={{.node_id2}}
         - --rpc-addr=0.0.0.0:9000
         - --secure-rpc-addr=0.0.0.0:9001
         - --http-addr=0.0.0.0:8000
@@ -120,7 +120,7 @@ access:
         - name: BINSTAT_DMP_PATH
           value: ""
       image: gcr.io/flow-container-registry/access:v0.27.6
-      nodeId: 7dd7ad2565841c803d898be0b7723e6ea8348eac44a4d8e4a0b7ebe0d9c8304b
+      nodeId: {{.node_id2}}
 collection:
   defaults:
     imagePullPolicy: Always
