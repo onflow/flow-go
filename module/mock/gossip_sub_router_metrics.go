@@ -24,6 +24,21 @@ func (_m *GossipSubRouterMetrics) OnIWantReceived(count int) {
 	_m.Called(count)
 }
 
+// OnIncomingRpcAcceptedFully provides a mock function with given fields:
+func (_m *GossipSubRouterMetrics) OnIncomingRpcAcceptedFully() {
+	_m.Called()
+}
+
+// OnIncomingRpcAcceptedOnlyForControlMessages provides a mock function with given fields:
+func (_m *GossipSubRouterMetrics) OnIncomingRpcAcceptedOnlyForControlMessages() {
+	_m.Called()
+}
+
+// OnIncomingRpcRejected provides a mock function with given fields:
+func (_m *GossipSubRouterMetrics) OnIncomingRpcRejected() {
+	_m.Called()
+}
+
 // OnPruneReceived provides a mock function with given fields: count
 func (_m *GossipSubRouterMetrics) OnPruneReceived(count int) {
 	_m.Called(count)
