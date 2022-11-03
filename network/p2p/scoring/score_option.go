@@ -218,7 +218,7 @@ func defaultAppSpecificScoreFunction(logger zerolog.Logger, idProvider module.Id
 			return MinAppSpecificPenalty
 		}
 
-		logger.Trace().
+		lg.Trace().
 			Msg("rewarding well-behaved non-access node peer with maximum reward value")
 		return MaxAppSpecificReward
 	}
