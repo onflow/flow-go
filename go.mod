@@ -62,7 +62,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220720151516-797b149ceaaa
 	github.com/onflow/flow-go-sdk v0.29.0
 	github.com/onflow/flow-go/crypto v0.24.4
-	github.com/onflow/flow/protobuf/go/flow v0.3.1
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221102042130-5911d2519908
 	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
