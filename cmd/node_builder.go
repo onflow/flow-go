@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/state/protocol"
@@ -276,6 +277,7 @@ func DefaultBaseConfig() *BaseConfig {
 			UnicastBandwidthBurstLimit:      middleware.LargeMsgMaxUnicastMsgSize,
 			UnicastRateLimitLockoutDuration: 10,
 			UnicastRateLimitDryRun:          true,
+			DNSCacheTTL:              dns.DefaultTimeToLive,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
