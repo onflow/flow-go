@@ -361,9 +361,9 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 			return nil, errors.New("failed to create ComputationResult upload status store")
 		}
 
-		computation.SetUploaderEnabled(true)
-
 		exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, retryableUploader)
+
+		computation.SetUploaderEnabled(true)
 
 		return retryableUploader, nil
 	}
