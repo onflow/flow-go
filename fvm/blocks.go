@@ -5,10 +5,12 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// TODO(patrick): rm once flow-emulator is updated
+// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/229
+// is merged and integrated.
 type Blocks = environment.Blocks
 
-// TODO(patrick): rm once flow-emulator is updated
+// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/229
+// is merged and integrated.
 func NewBlockFinder(storage storage.Headers) Blocks {
 	return environment.NewBlockFinder(storage)
 }
