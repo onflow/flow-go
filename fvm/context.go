@@ -25,7 +25,6 @@ type Context struct {
 	MaxStateInteractionSize           uint64
 
 	TransactionProcessors []TransactionProcessor
-	ScriptProcessors      []ScriptProcessor
 
 	BlockPrograms *programs.BlockPrograms
 
@@ -69,9 +68,6 @@ func defaultContext() Context {
 			NewTransactionVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionInvoker(),
-		},
-		ScriptProcessors: []ScriptProcessor{
-			NewScriptInvoker(),
 		},
 		EnvironmentParams: environment.DefaultEnvironmentParams(),
 	}
@@ -307,6 +303,14 @@ func WithReusableCadenceRuntimePool(
 func WithBlockPrograms(programs *programs.BlockPrograms) Option {
 	return func(ctx Context) Context {
 		ctx.BlockPrograms = programs
+		return ctx
+	}
+}
+
+// WithEventEncoder sets events encoder to be used for encoding events emitted during execution
+func WithEventEncoder(encoder environment.EventEncoder) Option {
+	return func(ctx Context) Context {
+		ctx.EventEncoder = encoder
 		return ctx
 	}
 }

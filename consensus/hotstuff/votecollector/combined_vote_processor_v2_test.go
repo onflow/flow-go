@@ -465,7 +465,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 
 		// lists to track signers that actually contributed their signatures
 		var (
-			aggregatedStakingSigners []flow.Identifier
+			aggregatedStakingSigners flow.IdentifierList
 		)
 
 		// need separate locks to safely update vectors of voted signers
@@ -481,7 +481,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		// mock expected calls to aggregators and reconstructor
 		combinedSigs := unittest.SignaturesFixture(2)
 		stakingAggregator.On("Aggregate").Return(
-			func() []flow.Identifier {
+			func() flow.IdentifierList {
 				stakingAggregatorLock.Lock()
 				defer stakingAggregatorLock.Unlock()
 				return aggregatedStakingSigners
@@ -491,7 +491,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		reconstructor.On("Reconstruct").Return(combinedSigs[1], nil).Once()
 
 		// mock expected call to Packer
-		mergedSignerIDs := make([]flow.Identifier, 0)
+		mergedSignerIDs := make(flow.IdentifierList, 0)
 		packedSigData := unittest.RandomBytes(128)
 		pcker := &mockhotstuff.Packer{}
 		pcker.On("Pack", block.View, mock.Anything).Run(func(args mock.Arguments) {
@@ -681,7 +681,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 
 		// mock expected calls to aggregator and reconstructor
 		combinedSigs := unittest.SignaturesFixture(2)
-		stakingAggregator.On("Aggregate").Return([]flow.Identifier(stakingSigners.NodeIDs()), []byte(combinedSigs[0]), nil).Once()
+		stakingAggregator.On("Aggregate").Return(stakingSigners.NodeIDs(), []byte(combinedSigs[0]), nil).Once()
 		reconstructor.On("Reconstruct").Return(combinedSigs[1], nil).Once()
 
 		// mock expected call to Packer

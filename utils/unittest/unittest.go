@@ -3,6 +3,7 @@ package unittest
 import (
 	"encoding/json"
 	"math"
+	"math/rand"
 	"os"
 	"os/exec"
 	"regexp"
@@ -16,13 +17,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/network/slashing"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 )
 
@@ -325,12 +325,6 @@ func RunWithTempDir(t testing.TB, f func(string)) {
 	f(dbDir)
 }
 
-// Useful for debugging purpose
-func RunWithTempDirWithoutRemove(t testing.TB, f func(string)) {
-	dbDir := TempDir(t)
-	f(dbDir)
-}
-
 func badgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB, error)) *badger.DB {
 	opts := badger.
 		DefaultOptions(dir).
@@ -441,6 +435,16 @@ func CrashTestWithExpectedStatus(
 	// expect logger.Fatal() message to be pushed to stdout
 	outStr := string(outBytes)
 	require.Contains(t, outStr, expectedErrorMsg)
+}
+
+// GenerateRandomStringWithLen returns a string of random alpha characters of the provided length
+func GenerateRandomStringWithLen(commentLen uint) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	bytes := make([]byte, commentLen)
+	for i := range bytes {
+		bytes[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(bytes)
 }
 
 // NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware

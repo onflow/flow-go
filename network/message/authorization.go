@@ -9,6 +9,14 @@ import (
 
 var authorizationConfigs map[string]MsgAuthConfig
 
+type ChannelAuthConfig struct {
+	// AuthorizedRoles list of roles authorized to send this message on the channel
+	AuthorizedRoles flow.RoleList
+
+	// AllowedUnicast indicates whether this message is allowed to be sent on the channel via unicast
+	AllowedUnicast bool
+}
+
 // MsgAuthConfig contains authorization information for a specific flow message. The authorization
 // is represented as a map from network channel -> list of all roles allowed to send the message on
 // the channel.
@@ -18,7 +26,7 @@ type MsgAuthConfig struct {
 	// Type is a func that returns a new instance of message type.
 	Type func() interface{}
 	// Config is the mapping of network channel to list of authorized flow roles.
-	Config map[channels.Channel]flow.RoleList
+	Config map[channels.Channel]ChannelAuthConfig
 }
 
 // EnsureAuthorized checks if the specified role is authorized to send the message on the provided channel and
@@ -26,14 +34,18 @@ type MsgAuthConfig struct {
 // Expected error returns during normal operations:
 //   - ErrUnauthorizedMessageOnChannel: the channel is not included in the message's list of authorized channels
 //   - ErrUnauthorizedRole: the role is not included in the message's list of authorized roles for the provided channel
-func (m MsgAuthConfig) EnsureAuthorized(role flow.Role, channel channels.Channel) error {
-	authorizedRoles, ok := m.Config[channel]
+func (m MsgAuthConfig) EnsureAuthorized(role flow.Role, channel channels.Channel, isUnicast bool) error {
+	channelAuthConfig, ok := m.Config[channel]
 	if !ok {
 		return ErrUnauthorizedMessageOnChannel
 	}
 
-	if !authorizedRoles.Contains(role) {
+	if !channelAuthConfig.AuthorizedRoles.Contains(role) {
 		return ErrUnauthorizedRole
+	}
+
+	if isUnicast && !channelAuthConfig.AllowedUnicast {
+		return ErrUnauthorizedUnicastOnChannel
 	}
 
 	return nil
@@ -48,9 +60,15 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.BlockProposal)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.ConsensusCommittee: {flow.RoleConsensus},
-			channels.PushBlocks:         {flow.RoleConsensus}, // channel alias ReceiveBlocks = PushBlocks
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.ConsensusCommittee: {
+				AuthorizedRoles: flow.RoleList{flow.RoleConsensus},
+				AllowedUnicast:  false,
+			},
+			channels.PushBlocks: {
+				AuthorizedRoles: flow.RoleList{flow.RoleConsensus},
+				AllowedUnicast:  false,
+			}, // channel alias ReceiveBlocks = PushBlocks
 		},
 	}
 	authorizationConfigs[BlockVote] = MsgAuthConfig{
@@ -58,8 +76,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.BlockVote)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.ConsensusCommittee: {flow.RoleConsensus},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.ConsensusCommittee: {
+				AuthorizedRoles: flow.RoleList{flow.RoleConsensus},
+				AllowedUnicast:  true,
+			},
 		},
 	}
 	authorizationConfigs[TimeoutObject] = MsgAuthConfig{
@@ -78,9 +99,15 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.SyncRequest)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.SyncCommittee:     flow.Roles(),
-			channels.SyncClusterPrefix: {flow.RoleCollection},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.SyncCommittee: {
+				AuthorizedRoles: flow.Roles(),
+				AllowedUnicast:  false,
+			},
+			channels.SyncClusterPrefix: {
+				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
+				AllowedUnicast:  false,
+			},
 		},
 	}
 	authorizationConfigs[SyncResponse] = MsgAuthConfig{
@@ -88,9 +115,15 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.SyncResponse)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.SyncCommittee:     {flow.RoleConsensus},
-			channels.SyncClusterPrefix: {flow.RoleCollection},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.SyncCommittee: {
+				AuthorizedRoles: flow.RoleList{flow.RoleConsensus},
+				AllowedUnicast:  true,
+			},
+			channels.SyncClusterPrefix: {
+				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
+				AllowedUnicast:  true,
+			},
 		},
 	}
 	authorizationConfigs[RangeRequest] = MsgAuthConfig{
@@ -98,9 +131,15 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.RangeRequest)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.SyncCommittee:     flow.Roles(),
-			channels.SyncClusterPrefix: {flow.RoleCollection},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.SyncCommittee: {
+				AuthorizedRoles: flow.Roles(),
+				AllowedUnicast:  false,
+			},
+			channels.SyncClusterPrefix: {
+				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
+				AllowedUnicast:  false,
+			},
 		},
 	}
 	authorizationConfigs[BatchRequest] = MsgAuthConfig{
@@ -108,9 +147,15 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.BatchRequest)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.SyncCommittee:     flow.Roles(),
-			channels.SyncClusterPrefix: {flow.RoleCollection},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.SyncCommittee: {
+				AuthorizedRoles: flow.Roles(),
+				AllowedUnicast:  false,
+			},
+			channels.SyncClusterPrefix: {
+				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
+				AllowedUnicast:  false,
+			},
 		},
 	}
 	authorizationConfigs[BlockResponse] = MsgAuthConfig{
@@ -118,8 +163,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.BlockResponse)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.SyncCommittee: {flow.RoleConsensus},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.SyncCommittee: {
+				AuthorizedRoles: flow.RoleList{flow.RoleConsensus},
+				AllowedUnicast:  true,
+			},
 		},
 	}
 
@@ -129,8 +177,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.ClusterBlockProposal)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.ConsensusClusterPrefix: {flow.RoleCollection},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.ConsensusClusterPrefix: {
+				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
+				AllowedUnicast:  false,
+			},
 		},
 	}
 	authorizationConfigs[ClusterBlockVote] = MsgAuthConfig{
@@ -138,8 +189,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.ClusterBlockVote)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.ConsensusClusterPrefix: {flow.RoleCollection},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.ConsensusClusterPrefix: {
+				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
+				AllowedUnicast:  true,
+			},
 		},
 	}
 	authorizationConfigs[ClusterTimeoutObject] = MsgAuthConfig{
@@ -156,8 +210,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.ClusterBlockResponse)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.SyncClusterPrefix: {flow.RoleCollection},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.SyncClusterPrefix: {
+				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
+				AllowedUnicast:  true,
+			},
 		},
 	}
 
@@ -167,8 +224,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(flow.CollectionGuarantee)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.PushGuarantees: {flow.RoleCollection}, // channel alias ReceiveGuarantees = PushGuarantees
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.PushGuarantees: {
+				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
+				AllowedUnicast:  false,
+			}, // channel alias ReceiveGuarantees = PushGuarantees
 		},
 	}
 	authorizationConfigs[TransactionBody] = MsgAuthConfig{
@@ -176,8 +236,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(flow.TransactionBody)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.PushTransactions: {flow.RoleCollection}, // channel alias ReceiveTransactions = PushTransactions
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.PushTransactions: {
+				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
+				AllowedUnicast:  false,
+			}, // channel alias ReceiveTransactions = PushTransactions
 		},
 	}
 
@@ -187,8 +250,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(flow.ExecutionReceipt)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.PushReceipts: {flow.RoleExecution}, // channel alias ReceiveReceipts = PushReceipts
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.PushReceipts: {
+				AuthorizedRoles: flow.RoleList{flow.RoleExecution},
+				AllowedUnicast:  false,
+			}, // channel alias ReceiveReceipts = PushReceipts
 		},
 	}
 	authorizationConfigs[ResultApproval] = MsgAuthConfig{
@@ -196,8 +262,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(flow.ResultApproval)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.PushApprovals: {flow.RoleVerification}, // channel alias ReceiveApprovals = PushApprovals
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.PushApprovals: {
+				AuthorizedRoles: flow.RoleList{flow.RoleVerification},
+				AllowedUnicast:  false,
+			}, // channel alias ReceiveApprovals = PushApprovals
 		},
 	}
 
@@ -207,8 +276,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.ChunkDataRequest)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.RequestChunks: {flow.RoleVerification}, // channel alias RequestChunks = ProvideChunks
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.RequestChunks: {
+				AuthorizedRoles: flow.RoleList{flow.RoleVerification},
+				AllowedUnicast:  false,
+			}, // channel alias RequestChunks = ProvideChunks
 		},
 	}
 	authorizationConfigs[ChunkDataResponse] = MsgAuthConfig{
@@ -216,8 +288,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.ChunkDataResponse)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.ProvideChunks: {flow.RoleExecution}, // channel alias RequestChunks = ProvideChunks
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.ProvideChunks: {
+				AuthorizedRoles: flow.RoleList{flow.RoleExecution},
+				AllowedUnicast:  true,
+			}, // channel alias RequestChunks = ProvideChunks
 		},
 	}
 
@@ -227,8 +302,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.ApprovalRequest)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.RequestApprovalsByChunk: {flow.RoleConsensus}, // channel alias ProvideApprovalsByChunk  = RequestApprovalsByChunk
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.RequestApprovalsByChunk: {
+				AuthorizedRoles: flow.RoleList{flow.RoleConsensus},
+				AllowedUnicast:  false,
+			}, // channel alias ProvideApprovalsByChunk  = RequestApprovalsByChunk
 		},
 	}
 	authorizationConfigs[ApprovalResponse] = MsgAuthConfig{
@@ -236,9 +314,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.ApprovalResponse)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.ProvideApprovalsByChunk: {flow.RoleVerification}, // channel alias ProvideApprovalsByChunk  = RequestApprovalsByChunk
-
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.ProvideApprovalsByChunk: {
+				AuthorizedRoles: flow.RoleList{flow.RoleVerification},
+				AllowedUnicast:  true,
+			}, // channel alias ProvideApprovalsByChunk  = RequestApprovalsByChunk
 		},
 	}
 
@@ -248,9 +328,15 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.EntityRequest)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.RequestReceiptsByBlockID: {flow.RoleConsensus},
-			channels.RequestCollections:       {flow.RoleAccess, flow.RoleExecution},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.RequestReceiptsByBlockID: {
+				AuthorizedRoles: flow.RoleList{flow.RoleConsensus},
+				AllowedUnicast:  true,
+			},
+			channels.RequestCollections: {
+				AuthorizedRoles: flow.RoleList{flow.RoleAccess, flow.RoleExecution},
+				AllowedUnicast:  true,
+			},
 		},
 	}
 	authorizationConfigs[EntityResponse] = MsgAuthConfig{
@@ -258,9 +344,15 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.EntityResponse)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.ProvideReceiptsByBlockID: {flow.RoleExecution},
-			channels.ProvideCollections:       {flow.RoleCollection},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.ProvideReceiptsByBlockID: {
+				AuthorizedRoles: flow.RoleList{flow.RoleExecution},
+				AllowedUnicast:  true,
+			},
+			channels.ProvideCollections: {
+				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
+				AllowedUnicast:  true,
+			},
 		},
 	}
 
@@ -270,9 +362,15 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(message.TestMessage)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.TestNetworkChannel: flow.Roles(),
-			channels.TestMetricsChannel: flow.Roles(),
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.TestNetworkChannel: {
+				AuthorizedRoles: flow.Roles(),
+				AllowedUnicast:  true,
+			},
+			channels.TestMetricsChannel: {
+				AuthorizedRoles: flow.Roles(),
+				AllowedUnicast:  true,
+			},
 		},
 	}
 
@@ -282,8 +380,11 @@ func initializeMessageAuthConfigsMap() {
 		Type: func() interface{} {
 			return new(messages.DKGMessage)
 		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.DKGCommittee: {flow.RoleConsensus},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.DKGCommittee: {
+				AuthorizedRoles: flow.RoleList{flow.RoleConsensus},
+				AllowedUnicast:  true,
+			},
 		},
 	}
 }

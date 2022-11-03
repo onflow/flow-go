@@ -22,23 +22,23 @@ type facadeEnvironment struct {
 	*ProgramLogger
 	EventEmitter
 
-	*UnsafeRandomGenerator
-	*CryptoLibrary
+	UnsafeRandomGenerator
+	CryptoLibrary
 
-	*BlockInfo
-	*AccountInfo
+	BlockInfo
+	AccountInfo
 	TransactionInfo
 
-	*ValueStore
+	ValueStore
 
 	*SystemContracts
 
-	*UUIDGenerator
+	UUIDGenerator
 
 	AccountCreator
 	AccountFreezer
 
-	*AccountKeyReader
+	AccountKeyReader
 	AccountKeyUpdater
 
 	*ContractReader
@@ -46,6 +46,7 @@ type facadeEnvironment struct {
 	*Programs
 
 	accounts Accounts
+	txnState *state.TransactionState
 }
 
 func newFacadeEnvironment(
@@ -131,6 +132,7 @@ func newFacadeEnvironment(
 			programs),
 
 		accounts: accounts,
+		txnState: txnState,
 	}
 
 	env.Runtime.SetEnvironment(env)
@@ -144,18 +146,22 @@ func newScriptFacadeEnvironment(
 	txnState *state.TransactionState,
 	programs TransactionPrograms,
 ) *facadeEnvironment {
-	return newFacadeEnvironment(
+	env := newFacadeEnvironment(
 		params,
 		txnState,
 		programs,
 		NewCancellableMeter(ctx, txnState))
+
+	env.addParseRestrictedChecks()
+
+	return env
 }
 
 func newTransactionFacadeEnvironment(
 	params EnvironmentParams,
 	txnState *state.TransactionState,
 	programs TransactionPrograms,
-) Environment {
+) *facadeEnvironment {
 	env := newFacadeEnvironment(
 		params,
 		txnState,
@@ -206,7 +212,58 @@ func newTransactionFacadeEnvironment(
 		txnState,
 		env)
 
+	env.addParseRestrictedChecks()
+
 	return env
+}
+
+func (env *facadeEnvironment) addParseRestrictedChecks() {
+	// NOTE: Cadence can access Programs, ContractReader, Meter and
+	// ProgramLogger while it is parsing programs; all other access are
+	// unexpected and are potentially program cache invalidation bugs.
+	//
+	// Also note that Tracer and SystemContracts are unguarded since these are
+	// not accessible by Cadence.
+
+	env.AccountCreator = NewParseRestrictedAccountCreator(
+		env.txnState,
+		env.AccountCreator)
+	env.AccountFreezer = NewParseRestrictedAccountFreezer(
+		env.txnState,
+		env.AccountFreezer)
+	env.AccountInfo = NewParseRestrictedAccountInfo(
+		env.txnState,
+		env.AccountInfo)
+	env.AccountKeyReader = NewParseRestrictedAccountKeyReader(
+		env.txnState,
+		env.AccountKeyReader)
+	env.AccountKeyUpdater = NewParseRestrictedAccountKeyUpdater(
+		env.txnState,
+		env.AccountKeyUpdater)
+	env.BlockInfo = NewParseRestrictedBlockInfo(
+		env.txnState,
+		env.BlockInfo)
+	env.ContractUpdater = NewParseRestrictedContractUpdater(
+		env.txnState,
+		env.ContractUpdater)
+	env.CryptoLibrary = NewParseRestrictedCryptoLibrary(
+		env.txnState,
+		env.CryptoLibrary)
+	env.EventEmitter = NewParseRestrictedEventEmitter(
+		env.txnState,
+		env.EventEmitter)
+	env.TransactionInfo = NewParseRestrictedTransactionInfo(
+		env.txnState,
+		env.TransactionInfo)
+	env.UnsafeRandomGenerator = NewParseRestrictedUnsafeRandomGenerator(
+		env.txnState,
+		env.UnsafeRandomGenerator)
+	env.UUIDGenerator = NewParseRestrictedUUIDGenerator(
+		env.txnState,
+		env.UUIDGenerator)
+	env.ValueStore = NewParseRestrictedValueStore(
+		env.txnState,
+		env.ValueStore)
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (

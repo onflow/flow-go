@@ -211,7 +211,10 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 	// the block is invalid; log as error as we desire honest participation
 	// ToDo: potential slashing
 	if engine.IsInvalidInputError(err) {
-		c.log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+		c.log.Warn().
+			Err(err).
+			Bool(logging.KeySuspicious, true).
+			Msg("received invalid block from other node (potential slashing evidence?)")
 		return nil
 	}
 	if err != nil {

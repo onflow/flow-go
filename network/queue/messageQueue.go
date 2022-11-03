@@ -37,7 +37,7 @@ func (mq *MessageQueue) Insert(message interface{}) error {
 	// determine the message priority
 	priority, err := mq.priorityFunc(message)
 	if err != nil {
-		return fmt.Errorf("failed to dervie message priority: %w", err)
+		return fmt.Errorf("failed to derive message priority: %w", err)
 	}
 
 	// create the queue item

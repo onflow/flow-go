@@ -37,7 +37,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
-		requestQueue := queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector())
+		requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 		e, err := New(
 			unittest.Logger(),
@@ -77,7 +77,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.NoError(t, e.Process(channels.RequestChunks, originID, req))
 
 		require.Eventually(t, func() bool {
-			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
+			_, ok := requestQueue.Get() // ensuring all requests have been picked up from the queue.
+			return !ok
 		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()
@@ -96,7 +97,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
-		requestQueue := queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector())
+		requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 		e, err := New(
 			unittest.Logger(),
@@ -135,7 +136,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.NoError(t, e.Process(channels.RequestChunks, originID, req))
 
 		require.Eventually(t, func() bool {
-			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
+			_, ok := requestQueue.Get() // ensuring all requests have been picked up from the queue.
+			return !ok
 		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()
@@ -154,7 +156,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
-		requestQueue := queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector())
+		requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 		e, err := New(
 			unittest.Logger(),
@@ -193,7 +195,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.NoError(t, e.Process(channels.RequestChunks, originID, req))
 
 		require.Eventually(t, func() bool {
-			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
+			_, ok := requestQueue.Get() // ensuring all requests have been picked up from the queue.
+			return !ok
 		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()
@@ -213,7 +216,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
 
 		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(nil, errors.New("not found!"))
-		requestQueue := queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector())
+		requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 		e, err := New(
 			unittest.Logger(),
@@ -247,7 +250,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
 
 		require.Eventually(t, func() bool {
-			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
+			_, ok := requestQueue.Get() // ensuring all requests have been picked up from the queue.
+			return !ok
 		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()
@@ -266,7 +270,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
-		requestQueue := queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector())
+		requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 		e, err := New(
 			unittest.Logger(),
@@ -317,7 +321,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
 
 		require.Eventually(t, func() bool {
-			return requestQueue.Size() == uint(0) // ensuring all requests have been picked up from the queue.
+			_, ok := requestQueue.Get() // ensuring all requests have been picked up from the queue.
+			return !ok
 		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()
@@ -335,7 +340,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
-		requestQueue := queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector())
+		requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 		e, err := New(
 			unittest.Logger(),
@@ -388,13 +393,15 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
 
 		require.Eventually(t, func() bool {
-			return requestQueue.Size() == uint(0) // ensuring first request has been picked up from the queue.
+			_, ok := requestQueue.Get() // ensuring first request has been picked up from the queue.
+			return !ok
 		}, 1*time.Second, 100*time.Millisecond)
 		currentAuthorizedState.Store(false)
 
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
 		require.Eventually(t, func() bool {
-			return requestQueue.Size() == uint(0) // ensuring second request has been picked up from the queue as well.
+			_, ok := requestQueue.Get() // ensuring second request has been picked up from the queue as well.
+			return !ok
 		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()

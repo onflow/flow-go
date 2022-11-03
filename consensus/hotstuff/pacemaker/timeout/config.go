@@ -1,9 +1,14 @@
 package timeout
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/rs/zerolog/log"
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/module/updatable_configs"
 )
 
 // Config contains the configuration parameters for a Truncated Exponential Backoff,
@@ -23,7 +28,7 @@ type Config struct {
 	// on hot path of execution. After exceeding this value we will start increasing timeout values.
 	HappyPathMaxRoundFailures uint64
 	// BlockRateDelayMS is a delay to broadcast the proposal in order to control block production rate [MILLISECONDS]
-	BlockRateDelayMS float64
+	BlockRateDelayMS *atomic.Float64
 }
 
 var DefaultConfig = NewDefaultConfig()
@@ -86,8 +91,8 @@ func NewConfig(
 	if timeoutAdjustmentFactor <= 1 {
 		return Config{}, model.NewConfigurationErrorf("timeoutAdjustmentFactor must be strictly bigger than 1")
 	}
-	if blockRateDelay < 0 {
-		return Config{}, model.NewConfigurationErrorf("blockRateDelay must be must be non-negative")
+	if err := validBlockRateDelay(blockRateDelay); err != nil {
+		return Config{}, err
 	}
 
 	tc := Config{
@@ -95,7 +100,43 @@ func NewConfig(
 		MaxReplicaTimeout:         float64(maxReplicaTimeout.Milliseconds()),
 		TimeoutAdjustmentFactor:   timeoutAdjustmentFactor,
 		HappyPathMaxRoundFailures: happyPathMaxRoundFailures,
-		BlockRateDelayMS:          float64(blockRateDelay.Milliseconds()),
+		BlockRateDelayMS:          atomic.NewFloat64(float64(blockRateDelay.Milliseconds())),
 	}
 	return tc, nil
+}
+
+// validBlockRateDelay validates a block rate delay config.
+// Returns model.ConfigurationError for invalid config inputs.
+func validBlockRateDelay(blockRateDelay time.Duration) error {
+	if blockRateDelay < 0 {
+		return model.NewConfigurationErrorf("blockRateDelay must be must be non-negative")
+	}
+	return nil
+}
+
+// GetBlockRateDelay returns the block rate delay as a Duration. This is used by
+// the dynamic config manager.
+func (c *Config) GetBlockRateDelay() time.Duration {
+	ms := c.BlockRateDelayMS.Load()
+	return time.Millisecond * time.Duration(ms)
+}
+
+// SetBlockRateDelay sets the block rate delay. It is used to modify this config
+// value while HotStuff is running.
+// Returns updatable_configs.ValidationError if the new value is invalid.
+func (c *Config) SetBlockRateDelay(delay time.Duration) error {
+	if err := validBlockRateDelay(delay); err != nil {
+		if model.IsConfigurationError(err) {
+			return updatable_configs.NewValidationErrorf("invalid block rate delay: %w", err)
+		}
+		return fmt.Errorf("unexpected error validating block rate delay: %w", err)
+	}
+	// sanity check: log a warning if we set block rate delay above min timeout
+	// it is valid to want to do this, to significantly slow the block rate, but
+	// only in edge cases
+	if c.MinReplicaTimeout < float64(delay.Milliseconds()) {
+		log.Warn().Msgf("CAUTION: setting block rate delay to %s, above min timeout %dms - this will degrade performance!", delay.String(), int64(c.MinReplicaTimeout))
+	}
+	c.BlockRateDelayMS.Store(float64(delay.Milliseconds()))
+	return nil
 }

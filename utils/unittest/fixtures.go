@@ -19,6 +19,7 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -902,7 +903,7 @@ func HashFixture(size int) hash.Hash {
 	return hash
 }
 
-func IdentifierListFixture(n int) []flow.Identifier {
+func IdentifierListFixture(n int) flow.IdentifierList {
 	list := make([]flow.Identifier, n)
 	for i := 0; i < n; i++ {
 		list[i] = IdentifierFixture()
@@ -1388,6 +1389,17 @@ func ChunkDataResponseMsgFixture(chunkID flow.Identifier, opts ...func(*messages
 	}
 
 	return cdp
+}
+
+// WithApproximateSize sets the ChunkDataResponse to be approximately bytes in size.
+func WithApproximateSize(bytes uint64) func(*messages.ChunkDataResponse) {
+	return func(request *messages.ChunkDataResponse) {
+		// 1 tx fixture is approximately 350 bytes
+		txCount := bytes / 350
+		collection := CollectionFixture(int(txCount) + 1)
+		pack := ChunkDataPackFixture(request.ChunkDataPack.ChunkID, WithChunkDataPackCollection(&collection))
+		request.ChunkDataPack = *pack
+	}
 }
 
 // ChunkDataResponseMessageListFixture creates a list of chunk data response messages each with a single-transaction collection, and random chunk ID.
@@ -2136,7 +2148,7 @@ func NewSealingConfigs(val uint) module.SealingConfigsSetter {
 	if err != nil {
 		panic(err)
 	}
-	_, err = instance.SetRequiredApprovalsForSealingConstruction(val)
+	err = instance.SetRequiredApprovalsForSealingConstruction(val)
 	if err != nil {
 		panic(err)
 	}
@@ -2156,4 +2168,19 @@ func PeerIDFromFlowID(identity *flow.Identity) (peer.ID, error) {
 	}
 
 	return peerID, nil
+}
+
+func EngineMessageFixture() *engine.Message {
+	return &engine.Message{
+		OriginID: IdentifierFixture(),
+		Payload:  RandomBytes(10),
+	}
+}
+
+func EngineMessageFixtures(count int) []*engine.Message {
+	messages := make([]*engine.Message, 0, count)
+	for i := 0; i < count; i++ {
+		messages = append(messages, EngineMessageFixture())
+	}
+	return messages
 }

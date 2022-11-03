@@ -401,7 +401,10 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 		// the block is invalid; log as error as we desire honest participation
 		// ToDo: potential slashing
 		if state.IsInvalidExtensionError(err) {
-			log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+			log.Warn().
+				Err(err).
+				Bool(logging.KeySuspicious, true).
+				Msg("received invalid block from other node (potential slashing evidence?)")
 			return nil
 		}
 

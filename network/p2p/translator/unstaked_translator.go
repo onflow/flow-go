@@ -8,9 +8,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
-// PublicNetworkIDTranslator implements an IDTranslator which translates IDs for peers
+// PublicNetworkIDTranslator implements an `p2p.IDTranslator` which translates IDs for peers
 // on the unstaked network.
 // On the unstaked network, a Flow ID is derived from a peer ID by extracting the public
 // key from the peer ID, dropping the first byte (parity byte), and using the remaining
@@ -25,6 +26,10 @@ func NewPublicNetworkIDTranslator() *PublicNetworkIDTranslator {
 	return &PublicNetworkIDTranslator{}
 }
 
+var _ p2p.IDTranslator = (*PublicNetworkIDTranslator)(nil)
+
+// GetPeerID returns the peer ID for the given Flow ID.
+// TODO: implement BFT-compliant error handling -> https://github.com/onflow/flow-go/blob/master/CodingConventions.md
 func (t *PublicNetworkIDTranslator) GetPeerID(flowID flow.Identifier) (peer.ID, error) {
 	data := append([]byte{0x02}, flowID[:]...)
 
@@ -42,6 +47,8 @@ func (t *PublicNetworkIDTranslator) GetPeerID(flowID flow.Identifier) (peer.ID, 
 	return pid, nil
 }
 
+// GetFlowID returns the Flow ID for the given peer ID.
+// TODO: implement BFT-compliant error handling -> https://github.com/onflow/flow-go/blob/master/CodingConventions.md
 func (t *PublicNetworkIDTranslator) GetFlowID(peerID peer.ID) (flow.Identifier, error) {
 	pk, err := peerID.ExtractPublicKey()
 	if err != nil {

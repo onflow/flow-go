@@ -231,6 +231,10 @@ func (es *committedEpoch) DKG() (protocol.DKG, error) {
 // NewSetupEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup event. Epoch information available after the setup phase will
 // not be accessible in the resulting epoch instance.
+// Error returns:
+// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func NewSetupEpoch(setupEvent *flow.EpochSetup) (*Epoch, error) {
 	convertible := &setupEpoch{
 		setupEvent: setupEvent,
@@ -240,6 +244,11 @@ func NewSetupEpoch(setupEvent *flow.EpochSetup) (*Epoch, error) {
 
 // NewCommittedEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup and EpochCommit event.
+// Error returns:
+// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+// * protocol.ErrEpochNotCommitted - if the epoch has not been committed.
+// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) (*Epoch, error) {
 	convertible := &committedEpoch{
 		setupEpoch: setupEpoch{

@@ -417,6 +417,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
+		"--execution-data-dir=/data/execution-data",
 	)
 
 	service.Volumes = append(
@@ -446,6 +447,8 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",
 		"--log-tx-time-to-finalized-executed",
+		"--execution-data-sync-enabled=true",
+		"--execution-data-dir=/data/execution-data",
 	)
 
 	service.Ports = []string{
@@ -501,6 +504,7 @@ func defaultService(role, dataDir, profilerDir string, i int) Service {
 			fmt.Sprintf("--tracer-enabled=%t", tracing),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
+			fmt.Sprintf("--admin-addr=0.0.0.0:%d", AdminToolPort),
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),

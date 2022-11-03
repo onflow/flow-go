@@ -64,7 +64,7 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 		wrongSk := invalidSK(t)
 		result, err := SPOCKVerifyAgainstData(wrongSk.PublicKey(), s, data, kmac)
 		require.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.False(t, result)
 	})
 }
@@ -141,17 +141,17 @@ func TestSPOCKProveVerify(t *testing.T) {
 
 		pr, err := SPOCKProve(wrongSk, data, kmac)
 		require.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.Nil(t, pr)
 
 		result, err := SPOCKVerify(wrongSk.PublicKey(), pr1, sk2.PublicKey(), pr2)
 		require.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.False(t, result)
 
 		result, err = SPOCKVerify(sk1.PublicKey(), pr1, wrongSk.PublicKey(), pr2)
 		require.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.False(t, result)
 	})
 }
