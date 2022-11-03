@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/chainsync"
@@ -43,7 +44,7 @@ type Engine struct {
 	me           module.Local
 	participants flow.IdentityList
 	con          network.Conduit
-	comp         network.MessageProcessor // compliance layer engine
+	comp         collection.Compliance // compliance layer engine
 
 	pollInterval time.Duration
 	scanInterval time.Duration
@@ -66,7 +67,7 @@ func New(
 	participants flow.IdentityList,
 	state cluster.State,
 	blocks storage.ClusterBlocks,
-	comp network.MessageProcessor,
+	comp collection.Compliance,
 	core module.SyncCore,
 	opts ...commonsync.OptionFunc,
 ) (*Engine, error) {
@@ -310,10 +311,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 		// forward the block to the compliance engine for validation and processing
 		// we use the network.MessageProcessor interface here because the block is un-validated
 		// NOTE: although we set originID=me, this message is untrusted
-		err := e.comp.Process(channels.SyncCluster(block.Header.ChainID), e.me.NodeID(), synced)
-		if err != nil {
-			e.log.Err(err).Msg("received unexpected error from compliance engine")
-		}
+		e.comp.OnSyncedClusterBlock(synced)
 	}
 }
 
