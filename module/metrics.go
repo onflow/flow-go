@@ -38,10 +38,23 @@ type NetworkSecurityMetrics interface {
 	OnRateLimitedUnicastMessage(role, msgType, topic, reason string)
 }
 
+// GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
+// It mostly collects the metrics related to the control message exchange between nodes over the GossipSub protocol.
 type GossipSubRouterMetrics interface {
+	// OnIWantReceived tracks the number of IWANT messages received by the node from other nodes.
+	// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.
 	OnIWantReceived(count int)
+
+	// OnIHaveReceived tracks the number of IHAVE messages received by the node from other nodes.
+	// iHave is a control message that is sent by a node to another node to indicate that it has a new gossiped message.
 	OnIHaveReceived(count int)
+
+	// OnGraftReceived tracks the number of GRAFT messages received by the node from other nodes.
+	// GRAFT is a control message of GossipSub protocol that connects two nodes over a topic directly as gossip partners.
 	OnGraftReceived(count int)
+
+	// OnPruneReceived tracks the number of PRUNE messages received by the node from other nodes.
+	// PRUNE is a control message of GossipSub protocol that disconnects two nodes over a topic.
 	OnPruneReceived(count int)
 }
 
