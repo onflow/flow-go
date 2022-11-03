@@ -53,6 +53,7 @@ func (o *ObservableGossipSubRouter) AcceptFrom(id peer.ID) pubsub.AcceptStatus {
 func (o *ObservableGossipSubRouter) HandleRPC(rpc *pubsub.RPC) {
 	ctl := rpc.GetControl()
 	if ctl == nil {
+		o.logger.Warn().Msg("received rpc with no control message")
 		return
 	}
 
@@ -67,12 +68,12 @@ func (o *ObservableGossipSubRouter) HandleRPC(rpc *pubsub.RPC) {
 		Int("iWantCount", iWantCount).
 		Int("graftCount", graftCount).
 		Int("pruneCount", pruneCount).
-		Msg("received control message")
+		Msg("received rpc with control messages")
 
-	o.metrics.OnIHaveReceived(len(ctl.GetIhave()))
-	o.metrics.OnIWantReceived(len(ctl.GetIwant()))
-	o.metrics.OnGraftReceived(len(ctl.GetGraft()))
-	o.metrics.OnPruneReceived(len(ctl.GetPrune()))
+	o.metrics.OnIHaveReceived(iHaveCount)
+	o.metrics.OnIWantReceived(iWantCount)
+	o.metrics.OnGraftReceived(graftCount)
+	o.metrics.OnPruneReceived(pruneCount)
 
 	o.router.HandleRPC(rpc)
 }
