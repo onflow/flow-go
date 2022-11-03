@@ -107,13 +107,13 @@ func NewResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCac
 func (r *Resolver) processIPAddrLookups(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
-	r.logger.Trace().Msg("processing ip worker started")
+	r.logger.Debug().Msg("processing ip worker started")
 
 	for {
 		select {
 		case req := <-r.ipRequests:
 			lg := r.logger.With().Str("domain", req.domain).Logger()
-			lg.Trace().Msg("ip domain request picked for resolving")
+			lg.Debug().Msg("ip domain request picked for resolving")
 			_, err := r.lookupResolverForIPAddr(ctx, req.domain)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
@@ -123,9 +123,9 @@ func (r *Resolver) processIPAddrLookups(ctx irrecoverable.SignalerContext, ready
 				}
 				lg.Error().Err(err).Msg("resolving ip address faced an error")
 			}
-			lg.Trace().Msg("ip domain resolved successfully")
+			lg.Debug().Msg("ip domain resolved successfully")
 		case <-ctx.Done():
-			r.logger.Trace().Msg("processing ip worker terminated")
+			r.logger.Debug().Msg("processing ip worker terminated")
 			return
 		}
 	}
@@ -133,13 +133,13 @@ func (r *Resolver) processIPAddrLookups(ctx irrecoverable.SignalerContext, ready
 
 func (r *Resolver) processTxtLookups(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
-	r.logger.Trace().Msg("processing txt worker started")
+	r.logger.Debug().Msg("processing txt worker started")
 
 	for {
 		select {
 		case req := <-r.txtRequests:
 			lg := r.logger.With().Str("domain", req.txt).Logger()
-			lg.Trace().Msg("txt domain picked for resolving")
+			lg.Debug().Msg("txt domain picked for resolving")
 			_, err := r.lookupResolverForTXTRecord(ctx, req.txt)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
@@ -149,9 +149,9 @@ func (r *Resolver) processTxtLookups(ctx irrecoverable.SignalerContext, ready co
 				}
 				lg.Error().Err(err).Msg("resolving txt domain faced an error")
 			}
-			lg.Trace().Msg("txt domain resolved successfully")
+			lg.Debug().Msg("txt domain resolved successfully")
 		case <-ctx.Done():
-			r.logger.Trace().Msg("processing txt worker terminated")
+			r.logger.Debug().Msg("processing txt worker terminated")
 			return
 		}
 	}
@@ -181,7 +181,7 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 		Bool("cache_fresh", result.fresh).
 		Bool("locked_for_resolving", result.locked).Logger()
 
-	lg.Trace().Msg("ip lookup request arrived")
+	lg.Debug().Msg("ip lookup request arrived")
 
 	if !result.exists {
 		r.collector.OnDNSCacheMiss()
@@ -189,14 +189,14 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 	}
 
 	if !result.fresh && result.locked {
-		lg.Trace().Msg("ip expired, but a resolving is in progress, returning expired one for now")
+		lg.Debug().Msg("ip expired, but a resolving is in progress, returning expired one for now")
 		return result.addresses, nil
 	}
 
 	if !result.fresh && r.c.shouldResolveIP(domain) && !util.CheckClosed(r.cm.ShutdownSignal()) {
 		select {
 		case r.ipRequests <- &lookupIPRequest{domain}:
-			lg.Trace().Msg("ip lookup request queued for resolving")
+			lg.Debug().Msg("ip lookup request queued for resolving")
 		default:
 			lg.Warn().Msg("ip lookup request queue is full, dropping request")
 			r.collector.OnDNSLookupRequestDropped()
@@ -244,7 +244,7 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 		Bool("cache_fresh", result.fresh).
 		Bool("locked_for_resolving", result.locked).Logger()
 
-	lg.Trace().Msg("txt lookup request arrived")
+	lg.Debug().Msg("txt lookup request arrived")
 
 	if !result.exists {
 		r.collector.OnDNSCacheMiss()
@@ -252,14 +252,14 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 	}
 
 	if !result.fresh && result.locked {
-		lg.Trace().Msg("txt expired, but a resolving is in progress, returning expired one for now")
+		lg.Debug().Msg("txt expired, but a resolving is in progress, returning expired one for now")
 		return result.records, nil
 	}
 
 	if !result.fresh && r.c.shouldResolveTXT(txt) && !util.CheckClosed(r.cm.ShutdownSignal()) {
 		select {
 		case r.txtRequests <- &lookupTXTRequest{txt}:
-			lg.Trace().Msg("ip lookup request queued for resolving")
+			lg.Debug().Msg("ip lookup request queued for resolving")
 		default:
 			lg.Warn().Msg("txt lookup request queue is full, dropping request")
 			r.collector.OnDNSLookupRequestDropped()
