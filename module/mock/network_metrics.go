@@ -123,6 +123,11 @@ func (_m *NetworkMetrics) OnPruneReceived(count int) {
 	_m.Called(count)
 }
 
+// OnPublishedGossipMessagesReceived provides a mock function with given fields: count
+func (_m *NetworkMetrics) OnPublishedGossipMessagesReceived(count int) {
+	_m.Called(count)
+}
+
 // OnRateLimitedUnicastMessage provides a mock function with given fields: role, msgType, topic, reason
 func (_m *NetworkMetrics) OnRateLimitedUnicastMessage(role string, msgType string, topic string, reason string) {
 	_m.Called(role, msgType, topic, reason)

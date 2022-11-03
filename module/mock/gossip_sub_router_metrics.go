@@ -44,6 +44,11 @@ func (_m *GossipSubRouterMetrics) OnPruneReceived(count int) {
 	_m.Called(count)
 }
 
+// OnPublishedGossipMessagesReceived provides a mock function with given fields: count
+func (_m *GossipSubRouterMetrics) OnPublishedGossipMessagesReceived(count int) {
+	_m.Called(count)
+}
+
 type mockConstructorTestingTNewGossipSubRouterMetrics interface {
 	mock.TestingT
 	Cleanup(func())
