@@ -360,10 +360,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("service events are emitted", func(t *testing.T) {
 		execCtx := fvm.NewContext(
 			fvm.WithServiceEventCollectionEnabled(),
-			fvm.WithTransactionProcessors(
-				// we don't need to check signatures or sequence numbers
-				fvm.NewTransactionInvoker(),
-			),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		)
 
 		collectionCount := 2
@@ -553,9 +551,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("failing transactions do not store programs", func(t *testing.T) {
 		execCtx := fvm.NewContext(
-			fvm.WithTransactionProcessors(
-				fvm.NewTransactionInvoker(),
-			),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		)
 
 		address := common.Address{0x1}

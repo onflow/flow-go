@@ -21,8 +21,8 @@ import (
 type TransactionInvoker struct {
 }
 
-func NewTransactionInvoker() TransactionInvoker {
-	return TransactionInvoker{}
+func NewTransactionInvoker() *TransactionInvoker {
+	return &TransactionInvoker{}
 }
 
 func (i TransactionInvoker) Process(
