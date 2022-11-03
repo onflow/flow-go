@@ -61,8 +61,8 @@ func (o *ObservableGossipSubRouter) HandleRPC(rpc *pubsub.RPC) {
 	graftCount := len(ctl.GetGraft())
 	pruneCount := len(ctl.GetPrune())
 
-	o.logger.Trace().
-		Str("peer_id", ).
+	// TODO: add peer id of the sender to the log (currently unavailable in the RPC).
+	o.logger.Debug().
 		Int("iHaveCount", iHaveCount).
 		Int("iWantCount", iWantCount).
 		Int("graftCount", graftCount).
@@ -87,4 +87,8 @@ func (o *ObservableGossipSubRouter) Join(topic string) {
 
 func (o *ObservableGossipSubRouter) Leave(topic string) {
 	o.router.Leave(topic)
+}
+
+func (o *ObservableGossipSubRouter) WithDefaultTagTracer() pubsub.Option {
+	return o.router.WithDefaultTagTracer()
 }
