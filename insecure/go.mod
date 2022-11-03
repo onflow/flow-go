@@ -172,7 +172,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220720151516-797b149ceaaa // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
 	github.com/onflow/flow-go-sdk v0.29.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.3.1 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221102042130-5911d2519908 // indirect
 	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8 // indirect
 	github.com/onflow/sdks v0.4.4 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
