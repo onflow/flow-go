@@ -10,22 +10,22 @@ type GossipSubRouterMetrics struct {
 }
 
 // OnGraftReceived provides a mock function with given fields: topic
-func (_m *GossipSubRouterMetrics) OnGraftReceived(topic string) {
-	_m.Called(topic)
+func (_m *GossipSubRouterMetrics) OnGraftReceived(count int) {
+	_m.Called(count)
 }
 
 // OnIHaveReceived provides a mock function with given fields: topic
-func (_m *GossipSubRouterMetrics) OnIHaveReceived(topic string) {
-	_m.Called(topic)
+func (_m *GossipSubRouterMetrics) OnIHaveReceived(count int) {
+	_m.Called(count)
 }
 
 // OnIWantReceived provides a mock function with given fields: topic
-func (_m *GossipSubRouterMetrics) OnIWantReceived(topic string) {
-	_m.Called(topic)
+func (_m *GossipSubRouterMetrics) OnIWantReceived(count int) {
+	_m.Called(count)
 }
 
 // OnPruneReceived provides a mock function with given fields: topic
-func (_m *GossipSubRouterMetrics) OnPruneReceived(topic string) {
+func (_m *GossipSubRouterMetrics) OnPruneReceived(count int) {
 	_m.Called(topic)
 }
 

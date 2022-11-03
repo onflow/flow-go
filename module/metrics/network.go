@@ -36,10 +36,10 @@ type NetworkCollector struct {
 	routingTableSize             prometheus.Gauge
 
 	// TODO: encapsulate these in a separate GossipSub collector.
-	gossipSubReceivedIHaveCount *prometheus.CounterVec
-	gossipSubReceivedIWantCount *prometheus.CounterVec
-	gossipSubReceivedGraftCount *prometheus.CounterVec
-	gossipSubReceivedPruneCount *prometheus.CounterVec
+	gossipSubReceivedIHaveCount prometheus.Counter
+	gossipSubReceivedIWantCount prometheus.Counter
+	gossipSubReceivedGraftCount prometheus.Counter
+	gossipSubReceivedPruneCount prometheus.Counter
 
 	// authorization, rate limiting metrics
 	unAuthorizedMessagesCount       *prometheus.CounterVec
@@ -233,40 +233,40 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelRateLimitReason},
 	)
 
-	nc.gossipSubReceivedIHaveCount = promauto.NewCounterVec(
+	nc.gossipSubReceivedIHaveCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "gossipsub_received_ihave_total",
 			Help:      "number of received ihave messages from gossipsub protocol",
-		}, []string{LabelChannel},
+		},
 	)
 
-	nc.gossipSubReceivedIWantCount = promauto.NewCounterVec(
+	nc.gossipSubReceivedIWantCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "gossipsub_received_iwant_total",
 			Help:      "number of received iwant messages from gossipsub protocol",
-		}, []string{LabelMessage},
+		},
 	)
 
-	nc.gossipSubReceivedGraftCount = promauto.NewCounterVec(
+	nc.gossipSubReceivedGraftCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "gossipsub_received_graft_total",
 			Help:      "number of received graft messages from gossipsub protocol",
-		}, []string{LabelChannel},
+		},
 	)
 
-	nc.gossipSubReceivedPruneCount = promauto.NewCounterVec(
+	nc.gossipSubReceivedPruneCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "gossipsub_received_prune_total",
 			Help:      "number of received prune messages from gossipsub protocol",
-		}, []string{LabelChannel},
+		},
 	)
 
 	return nc
@@ -373,18 +373,18 @@ func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic, re
 	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
 }
 
-func (nc *NetworkCollector) OnIWantReceived(topic string) {
-	nc.gossipSubReceivedIWantCount.WithLabelValues(topic).Inc()
+func (nc *NetworkCollector) OnIWantReceived(count int) {
+	nc.gossipSubReceivedIWantCount.Add(float64(count))
 }
 
-func (nc *NetworkCollector) OnIHaveReceived(topic string) {
-	nc.gossipSubReceivedIHaveCount.WithLabelValues(topic).Inc()
+func (nc *NetworkCollector) OnIHaveReceived(count int) {
+	nc.gossipSubReceivedIHaveCount.Add(float64(count))
 }
 
-func (nc *NetworkCollector) OnGraftReceived(topic string) {
-	nc.gossipSubReceivedGraftCount.WithLabelValues(topic).Inc()
+func (nc *NetworkCollector) OnGraftReceived(count int) {
+	nc.gossipSubReceivedGraftCount.Add(float64(count))
 }
 
-func (nc *NetworkCollector) OnPruneReceived(topic string) {
-	nc.gossipSubReceivedPruneCount.WithLabelValues(topic).Inc()
+func (nc *NetworkCollector) OnPruneReceived(count int) {
+	nc.gossipSubReceivedPruneCount.Add(float64(count))
 }

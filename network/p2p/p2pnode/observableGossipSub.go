@@ -5,6 +5,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 )
@@ -12,11 +13,13 @@ import (
 type ObservableGossipSubRouter struct {
 	router  *pubsub.GossipSubRouter
 	metrics module.GossipSubRouterMetrics
+	logger  zerolog.Logger
 }
 
-func NewObservableGossipSub(h host.Host, metrics module.GossipSubRouterMetrics) *ObservableGossipSubRouter {
+func NewObservableGossipSub(h host.Host, metrics module.GossipSubRouterMetrics, logger zerolog.Logger) *ObservableGossipSubRouter {
 	return &ObservableGossipSubRouter{
 		router:  pubsub.DefaultGossipSubRouter(h),
+		logger:  logger.With().Str("module", "observable-gossipsub-router").Logger(),
 		metrics: metrics,
 	}
 }
@@ -48,6 +51,28 @@ func (o *ObservableGossipSubRouter) AcceptFrom(id peer.ID) pubsub.AcceptStatus {
 }
 
 func (o *ObservableGossipSubRouter) HandleRPC(rpc *pubsub.RPC) {
+	ctl := rpc.GetControl()
+	if ctl == nil {
+		return
+	}
+
+	iHaveCount := len(ctl.GetIhave())
+	iWantCount := len(ctl.GetIwant())
+	graftCount := len(ctl.GetGraft())
+	pruneCount := len(ctl.GetPrune())
+
+	o.logger.Trace().
+		Str("peer_id", ).
+		Int("iHaveCount", iHaveCount).
+		Int("iWantCount", iWantCount).
+		Int("graftCount", graftCount).
+		Int("pruneCount", pruneCount).
+		Msg("received control message")
+
+	o.metrics.OnIHaveReceived(len(ctl.GetIhave()))
+	o.metrics.OnIWantReceived(len(ctl.GetIwant()))
+	o.metrics.OnGraftReceived(len(ctl.GetGraft()))
+	o.metrics.OnPruneReceived(len(ctl.GetPrune()))
 
 	o.router.HandleRPC(rpc)
 }

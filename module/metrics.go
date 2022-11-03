@@ -39,10 +39,10 @@ type NetworkSecurityMetrics interface {
 }
 
 type GossipSubRouterMetrics interface {
-	OnIWantReceived(topic string)
-	OnIHaveReceived(topic string)
-	OnGraftReceived(topic string)
-	OnPruneReceived(topic string)
+	OnIWantReceived(count int)
+	OnIHaveReceived(count int)
+	OnGraftReceived(count int)
+	OnPruneReceived(count int)
 }
 
 type NetworkMetrics interface {
