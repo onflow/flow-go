@@ -2,7 +2,6 @@ package factories
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module/chainsync"
 
 	"github.com/rs/zerolog"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection/compliance"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/chainsync"
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/cluster"
