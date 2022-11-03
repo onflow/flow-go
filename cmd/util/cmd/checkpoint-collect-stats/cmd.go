@@ -81,15 +81,15 @@ func run(*cobra.Command, []string) {
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, &metrics.NoopCollector{}, flagCheckpoint, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot create WAL: %w", err)
+		log.Fatal().Err(err).Msg("cannot create WAL")
 	}
 	led, err := complete.NewLedger(diskWal, complete.DefaultCacheSize, &metrics.NoopCollector{}, log.Logger, 0)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
+		log.Fatal().Err(err).Msg("cannot create ledger from write-a-head logs and checkpoints")
 	}
 	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, math.MaxInt, 1, atomic.NewBool(false))
 	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot create compactor: %w", err)
+		log.Fatal().Err(err).Msg("cannot create compactor")
 	}
 	<-compactor.Ready()
 	defer func() {
@@ -126,37 +126,37 @@ func run(*cobra.Command, []string) {
 
 		sum, err := stats.Sum(values)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot compute the sum of values: %w", err)
+			log.Fatal().Err(err).Msg("cannot compute the sum of values")
 		}
 
 		min, err := stats.Min(values)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot compute the min of values: %w", err)
+			log.Fatal().Err(err).Msg("cannot compute the min of values")
 		}
 
 		percentile25, err := stats.Percentile(values, 25)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot compute the 25th percentile of values: %w", err)
+			log.Fatal().Err(err).Msg("cannot compute the 25th percentile of values")
 		}
 
 		median, err := stats.Median(values)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot compute the median of values: %w", err)
+			log.Fatal().Err(err).Msg("cannot compute the median of values")
 		}
 
 		percentile75, err := stats.Percentile(values, 75)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot compute the 75th percentile of values: %w", err)
+			log.Fatal().Err(err).Msg("cannot compute the 75th percentile of values")
 		}
 
 		percentile95, err := stats.Percentile(values, 95)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot compute the 95th percentile of values: %w", err)
+			log.Fatal().Err(err).Msg("cannot compute the 95th percentile of values")
 		}
 
 		max, err := stats.Max(values)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot compute the max of values: %w", err)
+			log.Fatal().Err(err).Msg("cannot compute the max of values")
 		}
 
 		statsByTypes = append(statsByTypes,
@@ -174,7 +174,7 @@ func run(*cobra.Command, []string) {
 	}
 
 	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to collect stats: %w", err)
+		log.Fatal().Err(err).Msg("failed to collect stats")
 	}
 
 	stats := &Stats{
@@ -199,11 +199,11 @@ func run(*cobra.Command, []string) {
 
 	jsonData, err := json.Marshal(stats)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not create a json obj for ledger stats: %w", err)
+		log.Fatal().Err(err).Msg("could not create a json obj for ledger stats")
 	}
 	_, err = writer.WriteString(string(jsonData) + "\n")
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not write result json to the file: %w", err)
+		log.Fatal().Err(err).Msg("could not write result json to the file")
 	}
 	writer.Flush()
 }
