@@ -231,14 +231,11 @@ func (s *TransactionState) CommitParseRestricted(
 // transaction may be resume via Resume.
 //
 // WARNING: Pause and Resume are intended for implementing continuation passing
-// style behavior for the transaction invoker, with the assumption that no
-// other transaction processor modify the state (other than the spock and
-// metering). The paused nested transaction should not be reused across
-// transactions.  IT IS NOT SAFE TO PAUSE A NESTED TRANSACTION IN GENERAL SINCE
-// THAT COULD LEAD TO PHANTOM READS.
-//
-// TODO(patrick): Sequence number is modified by the verify tx processor.  Make
-// sure it doesn't interfere with transaction invoker pause / resumption.
+// style behavior for the transaction invoker, with the assumption that the
+// transaction processors access disjoint sets of states prior to transaction
+// invoker resumption.  The paused nested transaction should not be reused
+// across transactions.  IT IS NOT SAFE TO PAUSE A NESTED TRANSACTION IN
+// GENERAL SINCE THAT COULD LEAD TO PHANTOM READS.
 func (s *TransactionState) Pause(
 	expectedId NestedTransactionId,
 ) (
