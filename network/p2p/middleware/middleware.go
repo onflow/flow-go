@@ -5,6 +5,7 @@ package middleware
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -66,6 +67,11 @@ const (
 
 var (
 	_ network.Middleware = (*Middleware)(nil)
+
+	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
+	// the middleware receives a message via unicast but does not have a corresponding subscription for
+	// the channel in that message.
+	ErrUnicastMsgWithoutSub = errors.New("middleware does not have subscription for the channel ID indicated in the unicast message received")
 )
 
 // Middleware handles the input & output on the direct connections we have to
@@ -513,12 +519,11 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 
 		// ignore messages if node does not have subscription to topic
-		topic := channels.TopicFromChannel(channels.Channel(msg.ChannelID), m.rootBlockID)
+		channel := channels.Channel(msg.ChannelID)
+		topic := channels.TopicFromChannel(channel, m.rootBlockID)
 		if !m.libP2PNode.HasSubscription(topic) {
-			log.Warn().
-				Bool(logging.KeySuspicious, true).
-				Str("channel_id", msg.ChannelID).
-				Msg("dropping unicast message for topic node is not currently subscribed to")
+			violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, IsUnicast: true, Err: ErrUnicastMsgWithoutSub}
+			m.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
 			return
 		}
 
