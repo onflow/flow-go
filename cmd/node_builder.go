@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
@@ -259,6 +260,7 @@ func DefaultBaseConfig() *BaseConfig {
 			// are no longer part of protocol state.
 			NetworkConnectionPruning: connection.ConnectionPruningEnabled,
 			PeerScoringEnabled:       scoring.DefaultPeerScoringEnabled,
+			DNSCacheTTL:              dns.DefaultTimeToLive,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
