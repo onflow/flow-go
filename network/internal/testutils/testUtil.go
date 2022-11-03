@@ -12,6 +12,7 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	p2pNetwork "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -488,4 +489,13 @@ func NewResourceManager(t *testing.T) p2pNetwork.ResourceManager {
 	require.NoError(t, err)
 
 	return rm
+}
+
+// NewConnectionGater creates a new connection gater for testing with given allow listing filter.
+func NewConnectionGater(allowListFilter p2p.PeerFilter) connmgr.ConnectionGater {
+	filters := []p2p.PeerFilter{allowListFilter}
+	return connection.NewConnGater(
+		unittest.Logger(),
+		connection.WithOnInterceptPeerDialFilters(filters),
+		connection.WithOnInterceptSecuredFilters(filters))
 }

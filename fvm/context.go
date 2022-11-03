@@ -25,7 +25,6 @@ type Context struct {
 	MaxStateInteractionSize           uint64
 
 	TransactionProcessors []TransactionProcessor
-	ScriptProcessors      []ScriptProcessor
 
 	BlockPrograms *programs.BlockPrograms
 
@@ -69,9 +68,6 @@ func defaultContext() Context {
 			NewTransactionVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionInvoker(),
-		},
-		ScriptProcessors: []ScriptProcessor{
-			NewScriptInvoker(),
 		},
 		EnvironmentParams: environment.DefaultEnvironmentParams(),
 	}

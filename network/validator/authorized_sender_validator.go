@@ -53,7 +53,7 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, msg interface{}, cha
 		return "", ErrIdentityUnverified
 	}
 
-	msgType, err := av.isAuthorizedSender(identity, channel, msg)
+	msgType, err := av.isAuthorizedSender(identity, channel, msg, isUnicast)
 
 	switch {
 	case err == nil:
@@ -69,7 +69,11 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, msg interface{}, cha
 	case errors.Is(err, ErrSenderEjected):
 		violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
 		av.slashingViolationsConsumer.OnSenderEjectedError(violation)
-		return msgType, ErrSenderEjected
+		return msgType, err
+	case errors.Is(err, message.ErrUnauthorizedUnicastOnChannel):
+		violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
+		av.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
+		return msgType, err
 	default:
 		// this condition should never happen and indicates there's a bug
 		// don't crash as a result of external inputs since that creates a DoS vector
@@ -104,7 +108,7 @@ func (av *AuthorizedSenderValidator) PubSubMessageValidator(channel channels.Cha
 //   - message.ErrUnknownMsgType if message auth config us not found for the msg
 //   - message.ErrUnauthorizedMessageOnChannel if msg is not authorized to be sent on channel
 //   - message.ErrUnauthorizedRole if sender role is not authorized to send msg
-func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}) (string, error) {
+func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}, isUnicast bool) (string, error) {
 	if identity.Ejected {
 		return "", ErrSenderEjected
 	}
@@ -120,7 +124,7 @@ func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity,
 		channel = channels.Channel(prefix)
 	}
 
-	if err := conf.EnsureAuthorized(identity.Role, channel); err != nil {
+	if err := conf.EnsureAuthorized(identity.Role, channel, isUnicast); err != nil {
 		return conf.Name, err
 	}
 

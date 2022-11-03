@@ -44,23 +44,22 @@ func NewSealingConfigs(
 	}, nil
 }
 
-// SetRequiredApprovalsForSealingConstruction takes a new value and returns the old value
-// if the new value is valid.  otherwise returns an error,
-// and the value is not updated (equivalent to no-op)
-func (r *sealingConfigs) SetRequiredApprovalsForSealingConstruction(requiredApprovalsForSealConstruction uint) (uint, error) {
+// SetRequiredApprovalsForSealingConstruction takes a new config value and updates the config
+// if the new value is valid.
+// Returns ValidationError if the new value results in an invalid sealing config.
+func (r *sealingConfigs) SetRequiredApprovalsForSealingConstruction(requiredApprovalsForSealConstruction uint) error {
 	err := validation.ValidateRequireApprovals(
 		requiredApprovalsForSealConstruction,
 		r.requiredApprovalsForSealVerification,
 		r.chunkAlpha,
 	)
 	if err != nil {
-		return 0, err
+		return NewValidationErrorf("invalid: %w", err)
 	}
 
-	from := uint(r.requiredApprovalsForSealConstruction.Load())
 	r.requiredApprovalsForSealConstruction.Store(uint32(requiredApprovalsForSealConstruction))
 
-	return from, nil
+	return nil
 }
 
 // RequireApprovalsForSealConstructionDynamicValue gets the latest value of requiredApprovalsForSealConstruction

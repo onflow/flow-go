@@ -105,24 +105,15 @@ func (reader *accountKeyReader) GetAccountKey(
 		return formatErr(err)
 	}
 
-	accountAddress := flow.Address(address)
-
-	ok, err := reader.accounts.Exists(accountAddress)
-	if err != nil {
-		return formatErr(err)
-	}
-
-	if !ok {
-		return formatErr(errors.NewAccountNotFoundError(accountAddress))
-	}
-
 	// Don't return an error for invalid key indices
 	if keyIndex < 0 {
 		return nil, nil
 	}
 
-	var publicKey flow.AccountPublicKey
-	publicKey, err = reader.accounts.GetPublicKey(
+	accountAddress := flow.Address(address)
+
+	// address verification is also done in this step
+	accountPublicKey, err := reader.accounts.GetPublicKey(
 		accountAddress,
 		uint64(keyIndex))
 	if err != nil {
@@ -138,7 +129,7 @@ func (reader *accountKeyReader) GetAccountKey(
 	}
 
 	// Prepare the account key to return
-	runtimeAccountKey, err := FlowToRuntimeAccountKey(publicKey)
+	runtimeAccountKey, err := FlowToRuntimeAccountKey(accountPublicKey)
 	if err != nil {
 		return formatErr(err)
 	}
@@ -160,15 +151,7 @@ func (reader *accountKeyReader) AccountKeysCount(address runtime.Address) (uint6
 
 	accountAddress := flow.Address(address)
 
-	ok, err := reader.accounts.Exists(accountAddress)
-	if err != nil {
-		return formatErr(err)
-	}
-
-	if !ok {
-		return formatErr(errors.NewAccountNotFoundError(accountAddress))
-	}
-
+	// address verification is also done in this step
 	return reader.accounts.GetPublicKeyCount(accountAddress)
 }
 

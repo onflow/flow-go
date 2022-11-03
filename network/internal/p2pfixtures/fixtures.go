@@ -1,8 +1,10 @@
 package p2pfixtures
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -10,9 +12,11 @@ import (
 	addrutil "github.com/libp2p/go-addr-util"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
@@ -25,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/internal/testutils"
@@ -34,6 +39,7 @@ import (
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -106,14 +112,8 @@ func NodeFixture(
 		SetResourceManager(resourceManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc)
 
-	if parameters.PeerFilter != nil {
-		filters := []p2p.PeerFilter{parameters.PeerFilter}
-		// set parameters.peerFilter as the default peerFilter for both callbacks
-		connGater := connection.NewConnGater(
-			logger,
-			connection.WithOnInterceptPeerDialFilters(filters),
-			connection.WithOnInterceptSecuredFilters(filters))
-		builder.SetConnectionGater(connGater)
+	if parameters.ConnGater != nil {
+		builder.SetConnectionGater(parameters.ConnGater)
 	}
 
 	if parameters.PeerScoringEnabled {
@@ -122,6 +122,11 @@ func NodeFixture(
 			scoreOptionParams = append(scoreOptionParams, scoring.WithAppSpecificScoreFunction(parameters.AppSpecificScore))
 		}
 		builder.EnableGossipSubPeerScoring(parameters.IdProvider, scoreOptionParams...)
+	}
+
+	if parameters.UpdateInterval != 0 {
+		require.NotNil(t, parameters.PeerProvider)
+		builder.SetPeerManagerOptions(parameters.ConnectionPruning, parameters.UpdateInterval)
 	}
 
 	n, err := builder.Build()
@@ -134,6 +139,10 @@ func NodeFixture(
 	ip, port, err := n.GetIPPort()
 	require.NoError(t, err)
 	identity.Address = ip + ":" + port
+
+	if parameters.PeerProvider != nil {
+		n.WithPeersProvider(parameters.PeerProvider)
+	}
 	return n, *identity
 }
 
@@ -143,12 +152,15 @@ type NodeFixtureParameters struct {
 	Key                crypto.PrivateKey
 	Address            string
 	DhtOptions         []dht.Option
-	PeerFilter         p2p.PeerFilter
 	Role               flow.Role
 	Logger             zerolog.Logger
 	PeerScoringEnabled bool
 	IdProvider         module.IdentityProvider
 	AppSpecificScore   func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
+	ConnectionPruning  bool                  // peer manager parameter
+	UpdateInterval     time.Duration         // peer manager parameter
+	PeerProvider       p2p.PeersProvider     // peer manager parameter
+	ConnGater          connmgr.ConnectionGater
 }
 
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
@@ -163,6 +175,14 @@ func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParam
 func WithDefaultStreamHandler(handler network.StreamHandler) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.HandlerFunc = handler
+	}
+}
+
+func WithPeerManagerEnabled(connectionPruning bool, updateInterval time.Duration, peerProvider p2p.PeersProvider) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.ConnectionPruning = connectionPruning
+		p.UpdateInterval = updateInterval
+		p.PeerProvider = peerProvider
 	}
 }
 
@@ -190,9 +210,9 @@ func WithDHTOptions(opts ...dht.Option) NodeFixtureParameterOption {
 	}
 }
 
-func WithPeerFilter(filter p2p.PeerFilter) NodeFixtureParameterOption {
+func WithConnectionGater(connGater connmgr.ConnectionGater) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.PeerFilter = filter
+		p.ConnGater = connGater
 	}
 }
 
@@ -221,6 +241,12 @@ func StartNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []p2p.Lib
 	for _, node := range nodes {
 		node.Start(ctx)
 		rdas = append(rdas, node)
+
+		if peerManager := node.PeerManagerComponent(); peerManager != (*connection.PeerManager)(nil) {
+			// we need to start the peer manager post the node startup (if such component exists).
+			peerManager.Start(ctx)
+			rdas = append(rdas, peerManager)
+		}
 	}
 	unittest.RequireComponentsReadyBefore(t, timeout, rdas...)
 }
@@ -464,7 +490,257 @@ func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.Li
 			require.NoError(t, node.AddPeer(ctx, otherPInfo))
 		}
 	}
+}
 
-	// wait for all nodes to discover each other
-	time.Sleep(time.Second)
+// AddNodesToEachOthersPeerStore adds the dialing address of all nodes to the peer store of all other nodes.
+// However, it does not connect them to each other.
+func AddNodesToEachOthersPeerStore(t *testing.T, nodes []p2p.LibP2PNode, ids flow.IdentityList) {
+	for _, node := range nodes {
+		for i, other := range nodes {
+			if node == other {
+				continue
+			}
+			otherPInfo, err := utils.PeerAddressInfo(*ids[i])
+			require.NoError(t, err)
+			node.Host().Peerstore().AddAddrs(otherPInfo.ID, otherPInfo.Addrs, peerstore.AddressTTL)
+		}
+	}
+}
+
+// EnsureConnected ensures that the given nodes are connected to each other.
+// It fails the test if any of the nodes is not connected to any other node.
+func EnsureConnected(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
+	for _, node := range nodes {
+		for _, other := range nodes {
+			if node == other {
+				continue
+			}
+			require.NoError(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
+		}
+	}
+}
+
+// EnsureNotConnected ensures that no connection exists from "from" nodes to "to" nodes.
+func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode) {
+	for _, node := range from {
+		for _, other := range to {
+			if node == other {
+				require.Fail(t, "overlapping nodes in from and to lists")
+			}
+			require.Error(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
+		}
+	}
+}
+
+// EnsureNotConnectedBetweenGroups ensures no connection exists between the given groups of nodes.
+func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
+	// ensure no connection from group A to group B
+	EnsureNotConnected(t, ctx, groupA, groupB)
+	// ensure no connection from group B to group A
+	EnsureNotConnected(t, ctx, groupB, groupA)
+}
+
+// EnsurePubsubMessageExchange ensures that the given nodes exchange the given message on the given channel through pubsub.
+func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+	_, topic := messageFactory()
+
+	subs := make([]*pubsub.Subscription, len(nodes))
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+	var err error
+	for i, node := range nodes {
+		subs[i], err = node.Subscribe(
+			topic,
+			validator.TopicValidator(
+				unittest.Logger(),
+				unittest.NetworkCodec(),
+				slashingViolationsConsumer,
+				unittest.AllowAllPeerFilter()))
+		require.NoError(t, err)
+	}
+
+	// let subscriptions propagate
+	time.Sleep(1 * time.Second)
+
+	channel, ok := channels.ChannelFromTopic(topic)
+	require.True(t, ok)
+
+	for _, node := range nodes {
+		// creates a unique message to be published by the node
+		msg, _ := messageFactory()
+		data := MustEncodeEvent(t, msg, channel)
+		require.NoError(t, node.Publish(ctx, topic, data))
+
+		// wait for the message to be received by all nodes
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		SubsMustReceiveMessage(t, ctx, data, subs)
+		cancel()
+	}
+}
+
+// EnsureNoPubsubMessageExchange ensures that the no pubsub message is exchanged "from" the given nodes "to" the given nodes.
+func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+	_, topic := messageFactory()
+
+	subs := make([]*pubsub.Subscription, len(to))
+	svc := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+	tv := validator.TopicValidator(
+		unittest.Logger(),
+		unittest.NetworkCodec(),
+		svc,
+		unittest.AllowAllPeerFilter())
+	var err error
+	for _, node := range from {
+		_, err = node.Subscribe(topic, tv)
+		require.NoError(t, err)
+	}
+
+	for i, node := range to {
+		subs[i], err = node.Subscribe(topic, tv)
+		require.NoError(t, err)
+	}
+
+	// let subscriptions propagate
+	time.Sleep(1 * time.Second)
+
+	for _, node := range from {
+		// creates a unique message to be published by the node.
+		msg, _ := messageFactory()
+		channel, ok := channels.ChannelFromTopic(topic)
+		require.True(t, ok)
+		data := MustEncodeEvent(t, msg, channel)
+
+		// ensure the message is NOT received by any of the nodes.
+		require.NoError(t, node.Publish(ctx, topic, data))
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		SubsMustNeverReceiveAnyMessage(t, ctx, subs)
+		cancel()
+	}
+}
+
+// EnsureNoPubsubExchangeBetweenGroups ensures that no pubsub message is exchanged between the given groups of nodes.
+func EnsureNoPubsubExchangeBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+	// ensure no message exchange from group A to group B
+	EnsureNoPubsubMessageExchange(t, ctx, groupA, groupB, messageFactory)
+	// ensure no message exchange from group B to group A
+	EnsureNoPubsubMessageExchange(t, ctx, groupB, groupA, messageFactory)
+}
+
+// EnsureMessageExchangeOverUnicast ensures that the given nodes exchange arbitrary messages on through unicasting (i.e., stream creation).
+// It fails the test if any of the nodes does not receive the message from the other nodes.
+// The "inbounds" parameter specifies the inbound channel of the nodes on which the messages are received.
+// The "messageFactory" parameter specifies the function that creates unique messages to be sent.
+func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, inbounds []chan string, messageFactory func() string) {
+	for _, this := range nodes {
+		msg := messageFactory()
+
+		// send the message to all other nodes
+		for _, other := range nodes {
+			if this == other {
+				continue
+			}
+			s, err := this.CreateStream(ctx, other.Host().ID())
+			require.NoError(t, err)
+			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+			_, err = rw.WriteString(msg)
+			require.NoError(t, err)
+
+			// Flush the stream
+			require.NoError(t, rw.Flush())
+		}
+
+		// wait for the message to be received by all other nodes
+		for i, other := range nodes {
+			if this == other {
+				continue
+			}
+
+			select {
+			case rcv := <-inbounds[i]:
+				require.Equal(t, msg, rcv)
+			case <-time.After(3 * time.Second):
+				require.Fail(t, fmt.Sprintf("did not receive message from node %d", i))
+			}
+		}
+	}
+}
+
+// EnsureNoStreamCreationBetweenGroups ensures that no stream is created between the given groups of nodes.
+func EnsureNoStreamCreationBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, errorCheckers ...func(*testing.T, error)) {
+	// no stream from groupA -> groupB
+	EnsureNoStreamCreation(t, ctx, groupA, groupB, errorCheckers...)
+	// no stream from groupB -> groupA
+	EnsureNoStreamCreation(t, ctx, groupB, groupA, errorCheckers...)
+}
+
+// EnsureNoStreamCreation ensures that no stream is created "from" the given nodes "to" the given nodes.
+func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode, errorCheckers ...func(*testing.T, error)) {
+	for _, this := range from {
+		for _, other := range to {
+			if this == other {
+				// should not happen, unless the test is misconfigured.
+				require.Fail(t, "node is in both from and to lists")
+			}
+			// stream creation should fail
+			_, err := this.CreateStream(ctx, other.Host().ID())
+			require.Error(t, err)
+			require.True(t, flownet.IsPeerUnreachableError(err))
+
+			// runs the error checkers if any.
+			for _, check := range errorCheckers {
+				check(t, err)
+			}
+		}
+	}
+}
+
+// EnsureStreamCreation ensures that a stream is created between each of the  "from" nodes to each of the "to" nodes.
+func EnsureStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode) {
+	for _, this := range from {
+		for _, other := range to {
+			if this == other {
+				// should not happen, unless the test is misconfigured.
+				require.Fail(t, "node is in both from and to lists")
+			}
+			// stream creation should pass without error
+			s, err := this.CreateStream(ctx, other.Host().ID())
+			require.NoError(t, err)
+			require.NotNil(t, s)
+		}
+	}
+}
+
+// EnsureStreamCreationInBothDirections ensure that between each pair of nodes in the given list, a stream is created in both directions.
+func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
+	for _, this := range nodes {
+		for _, other := range nodes {
+			if this == other {
+				continue
+			}
+			// stream creation should pass without error
+			s, err := this.CreateStream(ctx, other.Host().ID())
+			require.NoError(t, err)
+			require.NotNil(t, s)
+		}
+	}
+}
+
+// StreamHandlerFixture returns a stream handler that writes the received message to the given channel.
+func StreamHandlerFixture(t *testing.T) (func(s network.Stream), chan string) {
+	ch := make(chan string, 1) // channel to receive messages
+
+	return func(s network.Stream) {
+		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+		str, err := rw.ReadString('\n')
+		require.NoError(t, err)
+		ch <- str
+	}, ch
+}
+
+// LongStringMessageFactoryFixture returns a function that creates a long unique string message.
+func LongStringMessageFactoryFixture(t *testing.T) func() string {
+	return func() string {
+		msg := "this is an intentionally long MESSAGE to be bigger than buffer size of most of stream compressors"
+		require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
+		return fmt.Sprintf("%s %d \n", msg, time.Now().UnixNano()) // add timestamp to make sure we don't send the same message twice
+	}
 }
