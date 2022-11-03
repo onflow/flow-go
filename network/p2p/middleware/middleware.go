@@ -58,7 +58,7 @@ const (
 
 	// DefaultUnicastTimeout is the default maximum time to wait for a default unicast request to complete
 	// assuming at least a 1mb/sec connection
-	DefaultUnicastTimeout = 5 * time.Second
+	DefaultUnicastTimeout = 20 * time.Second
 
 	// LargeMsgUnicastTimeout is the maximum time to wait for a unicast request to complete for large message size
 	LargeMsgUnicastTimeout = 1000 * time.Second
