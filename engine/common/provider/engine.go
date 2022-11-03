@@ -133,9 +133,6 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityRequest)
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
 
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
 	switch msg := message.(type) {
 	case *messages.EntityRequest:
 		return e.onEntityRequest(originID, msg)
