@@ -63,7 +63,7 @@ func (c *cache) resolveIPCache(domain string) *ipResolutionResult {
 			locked:    false,
 		}
 	}
-	c.logger.Trace().
+	c.logger.Debug().
 		Str("domain", domain).
 		Str("address", fmt.Sprintf("%v", record.Addresses)).
 		Int64("record_timestamp", record.Timestamp).
@@ -103,7 +103,7 @@ func (c *cache) resolveTXTCache(txt string) *txtResolutionResult {
 			locked:  false,
 		}
 	}
-	c.logger.Trace().
+	c.logger.Debug().
 		Str("txt", txt).
 		Str("address", fmt.Sprintf("%v", record.Records)).
 		Int64("record_timestamp", record.Timestamp).
@@ -145,7 +145,7 @@ func (c *cache) updateIPCache(domain string, addr []net.IPAddr) {
 	}
 
 	ipSize, txtSize := c.dCache.Size()
-	lg.Trace().
+	lg.Debug().
 		Int64("timestamp", timestamp).
 		Uint("ip_size", ipSize).
 		Uint("txt_size", txtSize).
@@ -166,7 +166,7 @@ func (c *cache) updateTXTCache(txt string, record []string) {
 	}
 
 	ipSize, txtSize := c.dCache.Size()
-	lg.Trace().
+	lg.Debug().
 		Int64("timestamp", timestamp).
 		Uint("ip_size", ipSize).
 		Uint("txt_size", txtSize).
@@ -184,7 +184,7 @@ func (c *cache) shouldResolveIP(domain string) bool {
 		return false
 	}
 
-	lg.Trace().Bool("locked", locked).Msg("attempt on locking ip domain")
+	lg.Debug().Bool("locked", locked).Msg("attempt on locking ip domain")
 	return locked
 }
 
@@ -199,7 +199,7 @@ func (c *cache) shouldResolveTXT(txt string) bool {
 		return false
 	}
 
-	lg.Trace().Bool("locked", locked).Msg("attempt on locking txt domain")
+	lg.Debug().Bool("locked", locked).Msg("attempt on locking txt domain")
 	return locked
 }
 
