@@ -46,10 +46,35 @@ func (o *ObservableGossipSubRouter) EnoughPeers(topic string, suggested int) boo
 	return o.router.EnoughPeers(topic, suggested)
 }
 
+// AcceptFrom is invoked on any incoming message before pushing it to the validation pipeline
+// or processing control information.
+// Allows routers with internal scoring to vet peers before committing any processing resources
+// to the message and implement an effective graylist and react to validation queue overload.
 func (o *ObservableGossipSubRouter) AcceptFrom(id peer.ID) pubsub.AcceptStatus {
-	return o.router.AcceptFrom(id)
+	acceptStatus := o.router.AcceptFrom(id)
+	lg := o.logger.With().Str("peer", id.String()).Logger()
+	switch acceptStatus {
+	case pubsub.AcceptAll:
+		lg.Debug().Msg("accepting all messages from peer")
+		o.metrics.OnIncomingRpcAcceptedFully()
+
+	case pubsub.AcceptControl:
+		lg.Debug().Msg("accepting only control messages from peer")
+		o.metrics.OnIncomingRpcAcceptedOnlyForControlMessages()
+
+	case pubsub.AcceptNone:
+		lg.Debug().Msg("accepting no messages from peer")
+		o.metrics.OnIncomingRpcRejected()
+
+	default:
+		lg.Warn().Msg("unknown accept status")
+	}
+
+	return acceptStatus
 }
 
+// HandleRPC is invoked to process control messages in the RPC envelope.
+// It is invoked after subscriptions and payload messages have been processed.
 func (o *ObservableGossipSubRouter) HandleRPC(rpc *pubsub.RPC) {
 	ctl := rpc.GetControl()
 	if ctl == nil {
