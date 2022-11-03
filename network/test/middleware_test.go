@@ -250,6 +250,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
 	newMw.Start(irrecoverableCtx)
+	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
 
 	require.NoError(m.T(), newMw.Subscribe(testChannel))
 
@@ -342,6 +343,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
 	newMw.Start(irrecoverableCtx)
+	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
 
 	require.NoError(m.T(), newMw.Subscribe(testChannel))
 
@@ -612,7 +614,6 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 
 	// subscribe to channels.ProvideChunks so that the message is not dropped
 	require.NoError(m.T(), targetMW.Subscribe(channels.ProvideChunks))
-	msg, _, _ := messageutils.CreateMessage(m.T(), sourceNode, targetNode, testChannel, "")
 
 	// creates a network payload with a size greater than the default max size using a known large message type
 	targetSize := uint64(middleware.DefaultMaxUnicastMsgSize) + 1000
