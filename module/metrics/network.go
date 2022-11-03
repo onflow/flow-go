@@ -43,6 +43,7 @@ type NetworkCollector struct {
 	gossipSubIncomingRpcAcceptedFullyCount       prometheus.Counter
 	gossipSubIncomingRpcAcceptedOnlyControlCount prometheus.Counter
 	gossipSubIncomingRpcRejectedCount            prometheus.Counter
+	gossipSubReceivedPublishMessageCount         prometheus.Counter
 
 	// authorization, rate limiting metrics
 	unAuthorizedMessagesCount       *prometheus.CounterVec
@@ -299,6 +300,15 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		},
 	)
 
+	nc.gossipSubReceivedPublishMessageCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "gossipsub_received_publish_message_total",
+			Help:      "number of received publish messages from gossipsub protocol",
+		},
+	)
+
 	return nc
 }
 
@@ -447,4 +457,10 @@ func (nc *NetworkCollector) OnIncomingRpcAcceptedOnlyForControlMessages() {
 // This happens mostly when the RPC is coming from a low-scored peer based on the peer scoring module of GossipSub.
 func (nc *NetworkCollector) OnIncomingRpcRejected() {
 	nc.gossipSubIncomingRpcRejectedCount.Inc()
+}
+
+// OnPublishedGossipMessagesReceived tracks the number of gossip messages received by the node from other nodes over an
+// RPC message.
+func (nc *NetworkCollector) OnPublishedGossipMessagesReceived(count int) {
+	nc.gossipSubReceivedPublishMessageCount.Add(float64(count))
 }

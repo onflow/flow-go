@@ -82,10 +82,12 @@ func (o *ObservableGossipSubRouter) HandleRPC(rpc *pubsub.RPC) {
 		return
 	}
 
+	rpc.GetPublish()
 	iHaveCount := len(ctl.GetIhave())
 	iWantCount := len(ctl.GetIwant())
 	graftCount := len(ctl.GetGraft())
 	pruneCount := len(ctl.GetPrune())
+	includedMessages := len(rpc.GetPublish())
 
 	// TODO: add peer id of the sender to the log (currently unavailable in the RPC).
 	o.logger.Debug().
@@ -93,12 +95,14 @@ func (o *ObservableGossipSubRouter) HandleRPC(rpc *pubsub.RPC) {
 		Int("iWantCount", iWantCount).
 		Int("graftCount", graftCount).
 		Int("pruneCount", pruneCount).
+		Int("included_message_count", includedMessages).
 		Msg("received rpc with control messages")
 
 	o.metrics.OnIHaveReceived(iHaveCount)
 	o.metrics.OnIWantReceived(iWantCount)
 	o.metrics.OnGraftReceived(graftCount)
 	o.metrics.OnPruneReceived(pruneCount)
+	o.metrics.OnPublishedGossipMessagesReceived(includedMessages)
 
 	o.router.HandleRPC(rpc)
 }

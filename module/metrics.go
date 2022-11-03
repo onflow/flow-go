@@ -57,21 +57,25 @@ type GossipSubRouterMetrics interface {
 	// This happens mostly when the RPC is coming from a low-scored peer based on the peer scoring module of GossipSub.
 	OnIncomingRpcRejected()
 
-	// OnIWantReceived tracks the number of IWANT messages received by the node from other nodes.
+	// OnIWantReceived tracks the number of IWANT messages received by the node from other nodes over an RPC message.
 	// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.
 	OnIWantReceived(count int)
 
-	// OnIHaveReceived tracks the number of IHAVE messages received by the node from other nodes.
+	// OnIHaveReceived tracks the number of IHAVE messages received by the node from other nodes over an RPC message.
 	// iHave is a control message that is sent by a node to another node to indicate that it has a new gossiped message.
 	OnIHaveReceived(count int)
 
-	// OnGraftReceived tracks the number of GRAFT messages received by the node from other nodes.
+	// OnGraftReceived tracks the number of GRAFT messages received by the node from other nodes over an RPC message.
 	// GRAFT is a control message of GossipSub protocol that connects two nodes over a topic directly as gossip partners.
 	OnGraftReceived(count int)
 
-	// OnPruneReceived tracks the number of PRUNE messages received by the node from other nodes.
+	// OnPruneReceived tracks the number of PRUNE messages received by the node from other nodes over an RPC message.
 	// PRUNE is a control message of GossipSub protocol that disconnects two nodes over a topic.
 	OnPruneReceived(count int)
+
+	// OnPublishedGossipMessagesReceived tracks the number of gossip messages received by the node from other nodes over an
+	// RPC message.
+	OnPublishedGossipMessagesReceived(count int)
 }
 
 type NetworkMetrics interface {

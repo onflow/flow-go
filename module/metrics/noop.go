@@ -213,6 +213,7 @@ func (nc *NoopCollector) OnPruneReceived(int)                                   
 func (nc *NoopCollector) OnIncomingRpcAcceptedFully()                                           {}
 func (nc *NoopCollector) OnIncomingRpcAcceptedOnlyForControlMessages()                          {}
 func (nc *NoopCollector) OnIncomingRpcRejected()                                                {}
+func (nc *NoopCollector) OnPublishedGossipMessagesReceived(count int)                           {}
 
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)
