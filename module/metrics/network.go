@@ -40,6 +40,7 @@ type NetworkCollector struct {
 	gossipSubReceivedIWantCount prometheus.Counter
 	gossipSubReceivedGraftCount prometheus.Counter
 	gossipSubReceivedPruneCount prometheus.Counter
+	gossipSubReceivedRpcCount   prometheus.Counter
 
 	// authorization, rate limiting metrics
 	unAuthorizedMessagesCount       *prometheus.CounterVec
@@ -269,6 +270,15 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		},
 	)
 
+	nc.gossipSubReceivedRpcCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "gossipsub_received_rpc_total",
+			Help:      "number of received rpc messages from gossipsub protocol",
+		},
+	)
+
 	return nc
 }
 
@@ -373,18 +383,32 @@ func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic, re
 	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
 }
 
+// OnIWantReceived tracks the number of IWANT messages received by the node from other nodes.
+// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.
 func (nc *NetworkCollector) OnIWantReceived(count int) {
 	nc.gossipSubReceivedIWantCount.Add(float64(count))
 }
 
+// OnIHaveReceived tracks the number of IHAVE messages received by the node from other nodes.
+// iHave is a control message that is sent by a node to another node to indicate that it has a new gossiped message.
 func (nc *NetworkCollector) OnIHaveReceived(count int) {
 	nc.gossipSubReceivedIHaveCount.Add(float64(count))
 }
 
+// OnGraftReceived tracks the number of GRAFT messages received by the node from other nodes.
+// GRAFT is a control message of GossipSub protocol that connects two nodes over a topic directly as gossip partners.
 func (nc *NetworkCollector) OnGraftReceived(count int) {
 	nc.gossipSubReceivedGraftCount.Add(float64(count))
 }
 
+// OnPruneReceived tracks the number of PRUNE messages received by the node from other nodes.
+// PRUNE is a control message of GossipSub protocol that disconnects two nodes over a topic.
 func (nc *NetworkCollector) OnPruneReceived(count int) {
 	nc.gossipSubReceivedPruneCount.Add(float64(count))
+}
+
+// OnRpcReceived tracks the number of RPC messages received by the node.
+// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, etc.
+func (nc *NetworkCollector) OnRpcReceived() {
+	nc.gossipSubReceivedRpcCount.Inc()
 }

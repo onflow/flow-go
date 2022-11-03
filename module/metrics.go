@@ -41,6 +41,10 @@ type NetworkSecurityMetrics interface {
 // GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
 // It mostly collects the metrics related to the control message exchange between nodes over the GossipSub protocol.
 type GossipSubRouterMetrics interface {
+	// OnRpcReceived tracks the number of RPC messages received by the node.
+	// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, etc.
+	OnRpcReceived()
+
 	// OnIWantReceived tracks the number of IWANT messages received by the node from other nodes.
 	// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.
 	OnIWantReceived(count int)
