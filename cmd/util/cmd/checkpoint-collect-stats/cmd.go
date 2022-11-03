@@ -16,6 +16,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/atree"
+
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
