@@ -857,7 +857,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	metrics := new(modulemock.ExecutionMetrics)
 	expectedNumberOfEvents := 2
-	expectedEventSize := 912
+	expectedEventSize := 911
 	metrics.On("ExecutionCollectionExecuted",
 		mock.Anything, // duration
 		mock.Anything, // computation used
@@ -865,7 +865,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		expectedNumberOfEvents,
 		expectedEventSize,
 		49,   // expected number of registers touched
-		3404, // expected number of bytes written
+		3403, // expected number of bytes written
 		1).   // expected number of transactions
 		Return(nil).
 		Times(1) // system collection
