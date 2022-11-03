@@ -5,7 +5,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// Noop is a no-op implementation of protocol.Events.
+// Noop is a no-op implementation of protocol.Consumer.
 type Noop struct{}
 
 var _ protocol.Consumer = (*Noop)(nil)

@@ -17,7 +17,7 @@ func TestConstructor(t *testing.T) {
 	require.Equal(t, float64(2000), c.MaxReplicaTimeout)
 	require.Equal(t, float64(1.5), c.TimeoutAdjustmentFactor)
 	require.Equal(t, uint64(3), c.HappyPathMaxRoundFailures)
-	require.Equal(t, float64(1000), c.BlockRateDelayMS)
+	require.Equal(t, float64(1000), c.BlockRateDelayMS.Load())
 	require.Equal(t, float64(2000), c.MaxTimeoutObjectRebroadcastInterval)
 
 	// should not allow negative minReplicaTimeout
@@ -50,7 +50,7 @@ func TestDefaultConfig(t *testing.T) {
 	c := NewDefaultConfig()
 
 	require.Equal(t, float64(3000), c.MinReplicaTimeout)
-	require.Equal(t, float64(1.2), c.TimeoutAdjustmentFactor)
+	require.Equal(t, 1.2, c.TimeoutAdjustmentFactor)
 	require.Equal(t, uint64(6), c.HappyPathMaxRoundFailures)
-	require.Equal(t, float64(0), c.BlockRateDelayMS)
+	require.Equal(t, float64(0), c.BlockRateDelayMS.Load())
 }

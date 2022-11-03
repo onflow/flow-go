@@ -1,6 +1,7 @@
 package connection_test
 
 import (
+	"context"
 	"math/rand"
 	"os"
 	"sync"
@@ -15,10 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
-
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -52,6 +53,9 @@ func (suite *PeerManagerTestSuite) generatePeerIDs(n int) peer.IDSlice {
 // TestUpdatePeers tests that updatePeers calls the connector with the expected list of ids to connect and disconnect
 // from. The tests are cumulative and ordered.
 func (suite *PeerManagerTestSuite) TestUpdatePeers() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// create some test ids
 	pids := suite.generatePeerIDs(10)
 
@@ -65,13 +69,14 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		Return(nil)
 
 	// create the peer manager (but don't start it)
-	pm := connection.NewPeerManager(suite.log, connection.DefaultPeerUpdateInterval, func() peer.IDSlice {
+	pm := connection.NewPeerManager(suite.log, connection.DefaultPeerUpdateInterval, connector)
+	pm.SetPeersProvider(func() peer.IDSlice {
 		return pids
-	}, connector)
+	})
 
 	// very first call to updatepeer
 	suite.Run("updatePeers only connects to all peers the first time", func() {
-		pm.ForceUpdatePeers()
+		pm.ForceUpdatePeers(ctx)
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 1)
 	})
 
@@ -81,7 +86,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		newPIDs := suite.generatePeerIDs(1)
 		pids = append(pids, newPIDs...)
 
-		pm.ForceUpdatePeers()
+		pm.ForceUpdatePeers(ctx)
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 2)
 	})
 
@@ -90,7 +95,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		// delete an id
 		pids = removeRandomElement(pids)
 
-		pm.ForceUpdatePeers()
+		pm.ForceUpdatePeers(ctx)
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 3)
 	})
 
@@ -104,7 +109,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		newPIDs := suite.generatePeerIDs(2)
 		pids = append(pids, newPIDs...)
 
-		pm.ForceUpdatePeers()
+		pm.ForceUpdatePeers(ctx)
 
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 4)
 	})
@@ -118,6 +123,11 @@ func removeRandomElement(pids peer.IDSlice) peer.IDSlice {
 
 // TestPeriodicPeerUpdate tests that the peer manager runs periodically
 func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
 	// create some test ids
 	pids := suite.generatePeerIDs(10)
 
@@ -138,10 +148,12 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	}).Return(nil)
 
 	peerUpdateInterval := 10 * time.Millisecond
-	pm := connection.NewPeerManager(suite.log, peerUpdateInterval, func() peer.IDSlice {
+	pm := connection.NewPeerManager(suite.log, peerUpdateInterval, connector)
+	pm.SetPeersProvider(func() peer.IDSlice {
 		return pids
-	}, connector)
+	})
 
+	pm.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 2*peerUpdateInterval,
@@ -150,6 +162,11 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 
 // TestOnDemandPeerUpdate tests that the peer update can be requested on demand and in between the periodic runs
 func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
 	// create some test ids
 	pids := suite.generatePeerIDs(10)
 
@@ -174,9 +191,11 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 		}
 	}).Return(nil)
 
-	pm := connection.NewPeerManager(suite.log, peerUpdateInterval, func() peer.IDSlice {
+	pm := connection.NewPeerManager(suite.log, peerUpdateInterval, connector)
+	pm.SetPeersProvider(func() peer.IDSlice {
 		return pids
-	}, connector)
+	})
+	pm.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second,
@@ -193,6 +212,11 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 
 // TestConcurrentOnDemandPeerUpdate tests that concurrent on-demand peer update request never block
 func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
 	// create some test ids
 	pids := suite.generatePeerIDs(10)
 
@@ -206,11 +230,14 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	connector.On("UpdatePeers", mock.Anything, mock.Anything).Return(nil).
 		WaitUntil(connectPeerGate) // blocks call for connectPeerGate channel
-	pm := connection.NewPeerManager(suite.log, peerUpdateInterval, func() peer.IDSlice {
+	pm := connection.NewPeerManager(suite.log, peerUpdateInterval, connector)
+	pm.SetPeersProvider(func() peer.IDSlice {
 		return pids
-	}, connector)
+	})
 
 	// start the peer manager
+	pm.Start(signalerCtx)
+
 	// this should trigger the first update and which will block on the ConnectPeers to return
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 

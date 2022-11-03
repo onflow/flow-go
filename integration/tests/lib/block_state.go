@@ -17,6 +17,7 @@ const blockStateTimeout = 120 * time.Second
 type BlockState struct {
 	sync.RWMutex
 	blocksByID        map[flow.Identifier]*messages.BlockProposal
+	blocksByHeight    map[uint64][]*messages.BlockProposal
 	finalizedByHeight map[uint64]*messages.BlockProposal
 	highestFinalized  uint64
 	highestProposed   uint64
@@ -27,6 +28,7 @@ func NewBlockState() *BlockState {
 	return &BlockState{
 		RWMutex:           sync.RWMutex{},
 		blocksByID:        make(map[flow.Identifier]*messages.BlockProposal),
+		blocksByHeight:    make(map[uint64][]*messages.BlockProposal),
 		finalizedByHeight: make(map[uint64]*messages.BlockProposal),
 	}
 }
@@ -36,6 +38,7 @@ func (bs *BlockState) Add(t *testing.T, b *messages.BlockProposal) {
 	defer bs.Unlock()
 
 	bs.blocksByID[b.Header.ID()] = b
+	bs.blocksByHeight[b.Header.Height] = append(bs.blocksByHeight[b.Header.Height], b)
 	if b.Header.Height > bs.highestProposed {
 		bs.highestProposed = b.Header.Height
 	}
@@ -71,6 +74,28 @@ func (bs *BlockState) WaitForBlockById(t *testing.T, blockId flow.Identifier) *m
 		fmt.Sprintf("did not receive requested block id (%x) within %v seconds", blockId, blockStateTimeout))
 
 	return blockProposal
+}
+
+// WaitForBlocksByHeight waits until a block at height is observed, and returns all observed blocks at that height.
+func (bs *BlockState) WaitForBlocksByHeight(t *testing.T, height uint64) []*messages.BlockProposal {
+	var blockProposals []*messages.BlockProposal
+
+	require.Eventually(t, func() bool {
+		bs.RLock()
+		defer bs.RUnlock()
+
+		if blocks, ok := bs.blocksByHeight[height]; !ok || len(blocks) == 0 {
+			t.Logf("%v pending for blocks height: %x\n", time.Now().UTC(), height)
+			return false
+		} else {
+			blockProposals = blocks
+			return true
+		}
+
+	}, blockStateTimeout, 100*time.Millisecond,
+		fmt.Sprintf("did not receive requested blocks height (%d) within %v seconds", height, blockStateTimeout))
+
+	return blockProposals
 }
 
 // processAncestors checks whether ancestors of block are within the confirming height, and finalizes

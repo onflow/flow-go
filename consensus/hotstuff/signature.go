@@ -86,7 +86,7 @@ type WeightedSignatureAggregator interface {
 	// Expected errors during normal operations:
 	//  - model.InsufficientSignaturesError if no signatures have been added yet
 	//  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
-	Aggregate() ([]flow.Identifier, []byte, error)
+	Aggregate() (flow.IdentifierList, []byte, error)
 }
 
 // TimeoutSignatureAggregator aggregates timeout signatures for one particular view.
@@ -134,8 +134,8 @@ type TimeoutSignatureAggregator interface {
 // BlockSignatureData is an intermediate struct for Packer to pack the
 // aggregated signature data into raw bytes or unpack from raw bytes.
 type BlockSignatureData struct {
-	StakingSigners               []flow.Identifier
-	RandomBeaconSigners          []flow.Identifier
+	StakingSigners               flow.IdentifierList
+	RandomBeaconSigners          flow.IdentifierList
 	AggregatedStakingSig         []byte // if BLS is used, this is equivalent to crypto.Signature
 	AggregatedRandomBeaconSig    []byte // if BLS is used, this is equivalent to crypto.Signature
 	ReconstructedRandomBeaconSig crypto.Signature

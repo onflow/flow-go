@@ -25,11 +25,10 @@ type Context struct {
 	MaxStateInteractionSize           uint64
 
 	TransactionProcessors []TransactionProcessor
-	ScriptProcessors      []ScriptProcessor
 
 	BlockPrograms *programs.BlockPrograms
 
-	EnvironmentParams
+	environment.EnvironmentParams
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -70,10 +69,7 @@ func defaultContext() Context {
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionInvoker(),
 		},
-		ScriptProcessors: []ScriptProcessor{
-			NewScriptInvoker(),
-		},
-		EnvironmentParams: DefaultEnvironmentParams(),
+		EnvironmentParams: environment.DefaultEnvironmentParams(),
 	}
 }
 
@@ -307,6 +303,14 @@ func WithReusableCadenceRuntimePool(
 func WithBlockPrograms(programs *programs.BlockPrograms) Option {
 	return func(ctx Context) Context {
 		ctx.BlockPrograms = programs
+		return ctx
+	}
+}
+
+// WithEventEncoder sets events encoder to be used for encoding events emitted during execution
+func WithEventEncoder(encoder environment.EventEncoder) Option {
+	return func(ctx Context) Context {
+		ctx.EventEncoder = encoder
 		return ctx
 	}
 }

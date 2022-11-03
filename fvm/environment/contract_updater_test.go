@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
-	stateMock "github.com/onflow/flow-go/fvm/mock/state"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -375,7 +375,7 @@ func TestContract_ContractUpdate(t *testing.T) {
 }
 
 func TestContract_DeterministicErrorOnCommit(t *testing.T) {
-	mockAccounts := &stateMock.Accounts{}
+	mockAccounts := &envMock.Accounts{}
 
 	mockAccounts.On("ContractExists", mock.Anything, mock.Anything).
 		Return(false, nil)
