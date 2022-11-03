@@ -70,7 +70,7 @@ func (o *ObservableGossipSubRouter) HandleRPC(rpc *pubsub.RPC) {
 		Int("pruneCount", pruneCount).
 		Msg("received rpc with control messages")
 
-	o.metrics.OnRpcReceived()
+	o.metrics.OnRpcReceived(0)
 	o.metrics.OnIHaveReceived(iHaveCount)
 	o.metrics.OnIWantReceived(iWantCount)
 	o.metrics.OnGraftReceived(graftCount)

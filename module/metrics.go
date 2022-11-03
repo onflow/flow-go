@@ -41,9 +41,21 @@ type NetworkSecurityMetrics interface {
 // GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
 // It mostly collects the metrics related to the control message exchange between nodes over the GossipSub protocol.
 type GossipSubRouterMetrics interface {
-	// OnRpcReceived tracks the number of RPC messages received by the node.
-	// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, etc.
-	OnRpcReceived()
+	// OnIncomingRpcAcceptedFully tracks the number of RPC messages received by the node that are fully accepted.
+	// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, as well as the actual messages.
+	// A fully accepted RPC means that all the control messages are accepted and all the messages are accepted.
+	OnIncomingRpcAcceptedFully()
+
+	// OnIncomingRpcAcceptedOnlyForControlMessages tracks the number of RPC messages received by the node that are accepted
+	// only for the control messages, i.e., only for the included IHAVE, IWANT, GRAFT, PRUNE. However, the actual messages
+	// included in the RPC are not accepted.
+	// This happens mostly when the validation pipeline of GossipSub is throttled, and cannot accept more actual messages for
+	// validation.
+	OnIncomingRpcAcceptedOnlyForControlMessages()
+
+	// OnIncomingRpcRejected tracks the number of RPC messages received by the node that are rejected.
+	// This happens mostly when the RPC is coming from a low-scored peer based on the peer scoring module of GossipSub.
+	OnIncomingRpcRejected()
 
 	// OnIWantReceived tracks the number of IWANT messages received by the node from other nodes.
 	// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.

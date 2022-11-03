@@ -36,11 +36,13 @@ type NetworkCollector struct {
 	routingTableSize             prometheus.Gauge
 
 	// TODO: encapsulate these in a separate GossipSub collector.
-	gossipSubReceivedIHaveCount prometheus.Counter
-	gossipSubReceivedIWantCount prometheus.Counter
-	gossipSubReceivedGraftCount prometheus.Counter
-	gossipSubReceivedPruneCount prometheus.Counter
-	gossipSubReceivedRpcCount   prometheus.Counter
+	gossipSubReceivedIHaveCount                  prometheus.Counter
+	gossipSubReceivedIWantCount                  prometheus.Counter
+	gossipSubReceivedGraftCount                  prometheus.Counter
+	gossipSubReceivedPruneCount                  prometheus.Counter
+	gossipSubIncomingRpcAcceptedFullyCount       prometheus.Counter
+	gossipSubIncomingRpcAcceptedOnlyControlCount prometheus.Counter
+	gossipSubIncomingRpcRejectedCount            prometheus.Counter
 
 	// authorization, rate limiting metrics
 	unAuthorizedMessagesCount       *prometheus.CounterVec
@@ -270,12 +272,30 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		},
 	)
 
-	nc.gossipSubReceivedRpcCount = promauto.NewCounter(
+	nc.gossipSubIncomingRpcAcceptedFullyCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      nc.prefix + "gossipsub_received_rpc_total",
-			Help:      "number of received rpc messages from gossipsub protocol",
+			Name:      nc.prefix + "gossipsub_incoming_rpc_accepted_fully_total",
+			Help:      "number of incoming rpc messages accepted fully by gossipsub protocol",
+		},
+	)
+
+	nc.gossipSubIncomingRpcAcceptedOnlyControlCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "gossipsub_incoming_rpc_accepted_only_control_total",
+			Help:      "number of incoming rpc messages accepted only control messages by gossipsub protocol",
+		},
+	)
+
+	nc.gossipSubIncomingRpcRejectedCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "gossipsub_incoming_rpc_rejected_total",
+			Help:      "number of incoming rpc messages rejected by gossipsub protocol",
 		},
 	)
 
@@ -407,8 +427,24 @@ func (nc *NetworkCollector) OnPruneReceived(count int) {
 	nc.gossipSubReceivedPruneCount.Add(float64(count))
 }
 
-// OnRpcReceived tracks the number of RPC messages received by the node.
-// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, etc.
-func (nc *NetworkCollector) OnRpcReceived() {
-	nc.gossipSubReceivedRpcCount.Inc()
+// OnIncomingRpcAcceptedFully tracks the number of RPC messages received by the node that are fully accepted.
+// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, as well as the actual messages.
+// A fully accepted RPC means that all the control messages are accepted and all the messages are accepted.
+func (nc *NetworkCollector) OnIncomingRpcAcceptedFully() {
+	nc.gossipSubIncomingRpcAcceptedFullyCount.Inc()
+}
+
+// OnIncomingRpcAcceptedOnlyForControlMessages tracks the number of RPC messages received by the node that are accepted
+// only for the control messages, i.e., only for the included IHAVE, IWANT, GRAFT, PRUNE. However, the actual messages
+// included in the RPC are not accepted.
+// This happens mostly when the validation pipeline of GossipSub is throttled, and cannot accept more actual messages for
+// validation.
+func (nc *NetworkCollector) OnIncomingRpcAcceptedOnlyForControlMessages() {
+	nc.gossipSubIncomingRpcAcceptedOnlyControlCount.Inc()
+}
+
+// OnIncomingRpcRejected tracks the number of RPC messages received by the node that are rejected.
+// This happens mostly when the RPC is coming from a low-scored peer based on the peer scoring module of GossipSub.
+func (nc *NetworkCollector) OnIncomingRpcRejected() {
+	nc.gossipSubIncomingRpcRejectedCount.Inc()
 }
