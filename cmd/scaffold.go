@@ -604,26 +604,29 @@ func (fnb *FlowNodeBuilder) createProfileUploader() (profiler.Uploader, error) {
 	}
 }
 
-func (fnb *FlowNodeBuilder) initProfiler() {
-	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
-	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
-
-	uploader, err := fnb.createProfileUploader()
-	if err != nil {
-		fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
-		uploader = &profiler.NoopUploader{}
-	}
-
-	profiler, err := profiler.New(
-		fnb.Logger,
-		uploader,
-		fnb.BaseConfig.profilerDir,
-		fnb.BaseConfig.profilerInterval,
-		fnb.BaseConfig.profilerDuration,
-		fnb.BaseConfig.profilerEnabled,
-	)
-	fnb.MustNot(err).Msg("could not initialize profiler")
+func (fnb *FlowNodeBuilder) EnqueueProfiler() {
 	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
+		runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
+
+		uploader, err := fnb.createProfileUploader()
+		if err != nil {
+			fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
+			uploader = &profiler.NoopUploader{}
+		}
+
+		profiler, err := profiler.New(
+			fnb.Logger,
+			uploader,
+			fnb.BaseConfig.profilerDir,
+			fnb.BaseConfig.profilerInterval,
+			fnb.BaseConfig.profilerDuration,
+			fnb.BaseConfig.profilerEnabled,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize profiler: %w", err)
+		}
+
 		return profiler, nil
 	})
 }
@@ -1410,6 +1413,7 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 		}
 	}
 
+	fnb.EnqueueProfiler()
 	fnb.EnqueueTracer()
 
 	return nil
@@ -1473,8 +1477,6 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	fnb.initState()
-
-	fnb.initProfiler()
 
 	fnb.initFvmOptions()
 
