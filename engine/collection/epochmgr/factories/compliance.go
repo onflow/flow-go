@@ -2,6 +2,7 @@ package factories
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module/chainsync"
 
 	"github.com/rs/zerolog"
 
@@ -59,6 +60,8 @@ func (f *ComplianceEngineFactory) Create(
 	clusterState cluster.MutableState,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
+	syncCore *chainsync.Core,
+	hot module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
 	validator hotstuff.Validator,
@@ -73,7 +76,9 @@ func (f *ComplianceEngineFactory) Create(
 		headers,
 		clusterState,
 		cache,
+		syncCore,
 		validator,
+		hot,
 		voteAggregator,
 		timeoutAggregator,
 		f.complianceOpts...,

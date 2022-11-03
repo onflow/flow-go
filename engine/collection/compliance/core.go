@@ -53,7 +53,9 @@ func NewCore(
 	headers storage.Headers,
 	state clusterkv.MutableState,
 	pending module.PendingClusterBlockBuffer,
+	sync module.BlockRequester,
 	validator hotstuff.Validator,
+	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
 	opts ...compliance.Opt,
@@ -73,8 +75,8 @@ func NewCore(
 		headers:           headers,
 		state:             state,
 		pending:           pending,
-		sync:              nil, // use `WithSync`
-		hotstuff:          nil, // use `WithConsensus`
+		sync:              sync,
+		hotstuff:          hotstuff,
 		validator:         validator,
 		voteAggregator:    voteAggregator,
 		timeoutAggregator: timeoutAggregator,

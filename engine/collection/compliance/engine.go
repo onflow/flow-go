@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -95,53 +94,6 @@ func NewEngine(
 	eng.Component = eng.cm
 
 	return eng, nil
-}
-
-// WithConsensus adds the consensus algorithm to the engine. This must be
-// called before the engine can start.
-func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
-	e.core.hotstuff = hot
-	return e
-}
-
-// WithSync adds the block requester to the engine. This must be
-// called before the engine can start.
-func (e *Engine) WithSync(sync module.BlockRequester) *Engine {
-	e.core.sync = sync
-	return e
-}
-
-func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
-	if e.core.hotstuff == nil {
-		ctx.Throw(fmt.Errorf("must initialize compliance engine with hotstuff engine"))
-	}
-	if e.core.sync == nil {
-		ctx.Throw(fmt.Errorf("must initialize compliance engine with sync engine"))
-	}
-
-	e.log.Info().Msg("starting hotstuff")
-	e.core.hotstuff.Start(ctx)
-	e.log.Info().Msg("hotstuff started")
-
-	e.log.Info().Msg("starting compliance engine")
-	e.Component.Start(ctx)
-	e.log.Info().Msg("compliance engine started")
-}
-
-// Ready returns a ready channel that is closed once the engine has fully started.
-// For the consensus engine, we wait for hotstuff to start.
-func (e *Engine) Ready() <-chan struct{} {
-	// NOTE: this will create long-lived goroutines each time Ready is called
-	// Since Ready is called infrequently, that is OK. If the call frequency changes, change this code.
-	return util.AllReady(e.cm, e.core.hotstuff)
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-// For the consensus engine, we wait for hotstuff to finish.
-func (e *Engine) Done() <-chan struct{} {
-	// NOTE: this will create long-lived goroutines each time Done is called
-	// Since Done is called infrequently, that is OK. If the call frequency changes, change this code.
-	return util.AllDone(e.cm, e.core.hotstuff)
 }
 
 // processBlocksLoop processes available blocks as they are queued.

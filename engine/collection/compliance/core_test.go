@@ -175,16 +175,15 @@ func (cs *CommonSuite) SetupTest() {
 		cs.headers,
 		cs.state,
 		cs.pending,
+		cs.sync,
 		cs.validator,
+		cs.hotstuff,
 		cs.voteAggregator,
 		cs.timeoutAggregator,
 	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	cs.core = core
-	// assign engine with consensus & synchronization
-	cs.core.hotstuff = cs.hotstuff
-	cs.core.sync = cs.sync
 }
 
 func (cs *CoreSuite) TestOnBlockProposalValidParent() {
