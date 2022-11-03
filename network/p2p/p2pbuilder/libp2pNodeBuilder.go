@@ -95,6 +95,7 @@ type LibP2PNodeBuilder struct {
 	addr                        string
 	networkKey                  fcrypto.PrivateKey
 	logger                      zerolog.Logger
+	metrics                     module.NetworkMetrics
 	basicResolver               madns.BasicResolver
 	subscriptionFilter          pubsub.SubscriptionFilter
 	resourceManager             network.ResourceManager
@@ -111,12 +112,14 @@ type LibP2PNodeBuilder struct {
 
 func NewNodeBuilder(
 	logger zerolog.Logger,
+	metrics module.NetworkMetrics,
 	addr string,
 	networkKey fcrypto.PrivateKey,
 	sporkID flow.Identifier,
 ) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:     logger,
+		metrics:    metrics,
 		sporkID:    sporkID,
 		addr:       addr,
 		networkKey: networkKey,
@@ -264,7 +267,9 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
 			}
 
-			pubSub, err := pubsub.NewGossipSub(ctx, h, psOpts...)
+			psRouter := p2pnode.NewObservableGossipSub(h, builder.metrics, builder.logger)
+			psOpts = append(psOpts, psRouter.WithDefaultTagTracer())
+			pubSub, err := pubsub.NewGossipSubWithRouter(ctx, h, psRouter, psOpts...)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
 			}
@@ -392,7 +397,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)),
 	)
 
-	builder := NewNodeBuilder(log, address, flowKey, sporkId).
+	builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
