@@ -88,24 +88,24 @@ func (_m *NetworkMetrics) OnDNSLookupRequestDropped() {
 	_m.Called()
 }
 
-// OnGraftReceived provides a mock function with given fields: topic
+// OnGraftReceived provides a mock function with given fields: count
 func (_m *NetworkMetrics) OnGraftReceived(count int) {
 	_m.Called(count)
 }
 
-// OnIHaveReceived provides a mock function with given fields: topic
+// OnIHaveReceived provides a mock function with given fields: count
 func (_m *NetworkMetrics) OnIHaveReceived(count int) {
 	_m.Called(count)
 }
 
-// OnIWantReceived provides a mock function with given fields: topic
+// OnIWantReceived provides a mock function with given fields: count
 func (_m *NetworkMetrics) OnIWantReceived(count int) {
 	_m.Called(count)
 }
 
-// OnPruneReceived provides a mock function with given fields: topic
+// OnPruneReceived provides a mock function with given fields: count
 func (_m *NetworkMetrics) OnPruneReceived(count int) {
-	_m.Called(topic)
+	_m.Called(count)
 }
 
 // OnRateLimitedUnicastMessage provides a mock function with given fields: role, msgType, topic, reason
