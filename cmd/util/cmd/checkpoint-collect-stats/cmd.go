@@ -110,7 +110,7 @@ func run(*cobra.Command, []string) {
 
 		key, err = p.Key()
 		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot load the key: %w", err)
+			log.Fatal().Err(err).Msg("cannot load the key")
 		}
 
 		size = p.Size()
@@ -190,7 +190,7 @@ func run(*cobra.Command, []string) {
 
 	fi, err := os.Create(path)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to create path: %w", err)
+		log.Fatal().Err(err).Msg("failed to create path")
 	}
 	defer fi.Close()
 
