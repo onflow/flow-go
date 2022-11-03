@@ -286,6 +286,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	var providerID flow.Identifier
 	var entityIDs []flow.Identifier
 
+	// Lock here, and to unlock before calling Unicast
 	e.unit.Lock()
 	e.log.Debug().Int("num_entities", len(e.items)).Msg("selecting entities")
 	for entityID, item := range e.items {
