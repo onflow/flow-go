@@ -363,6 +363,8 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 
 		exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, retryableUploader)
 
+		computation.SetUploaderEnabled(true)
+
 		return retryableUploader, nil
 	}
 
@@ -405,6 +407,8 @@ func (exeNode *ExecutionNode) LoadS3BlockDataUploader(
 		// We are not enabling RetryableUploader for S3 uploader for now. When we need upload
 		// retry for multiple uploaders, we will need to use different BadgerDB key prefix.
 		exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, asyncUploader)
+
+		computation.SetUploaderEnabled(true)
 
 		return asyncUploader, nil
 	}
