@@ -1381,6 +1381,7 @@ func (e *Engine) fetchCollection(blockID flow.Identifier, height uint64, guarant
 	// queue the collection to be requested from one of the guarantors
 	e.request.EntityByID(guarantee.ID(), filter.And(
 		filter.HasNodeID(guarantors...),
+		filter.OnlyDapper,
 	))
 
 	return nil
