@@ -93,7 +93,7 @@ access:
         - --tracer-enabled=false
         - --profiler-dir=/profiler
         - --profiler-interval=2m
-        - "--bind=0.0.0.0:3569"
+        - --bind=0.0.0.0:3569
         - --nodeid={{.node_id2}}
         - --rpc-addr=0.0.0.0:9000
         - --secure-rpc-addr=0.0.0.0:9001
