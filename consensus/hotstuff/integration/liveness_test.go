@@ -17,7 +17,7 @@ import (
 
 // pacemaker timeout
 // if your laptop is fast enough, 10 ms is enough
-const pmTimeout = 60 * time.Millisecond
+const pmTimeout = 100 * time.Millisecond
 
 // maxTimeoutRebroadcast specifies how often the PaceMaker rebroadcasts
 // its timeout object in case there is no progress. We keep the value
