@@ -35,7 +35,7 @@ func (t *Template) Apply(outputToFile bool) string {
 
 	// map json data to a map, so it can be decoded by template engine
 	// https://stackoverflow.com/a/38437140/5719544
-	dataMap := map[string]interface{}{}
+	var dataMap []map[string]interface{}
 	if err := json.Unmarshal([]byte(dataBytes), &dataMap); err != nil {
 		panic(err)
 	}
