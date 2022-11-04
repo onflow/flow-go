@@ -25,6 +25,7 @@ import (
 // related entities. It is important that the retrieve function return a
 // `storage.ErrNotFound` error if the entity does not exist locally; otherwise,
 // the logic will error and not send responses when failing to retrieve entities.
+// This method must be concurrency safe.
 type RetrieveFunc func(flow.Identifier) (flow.Entity, error)
 
 // Engine is a generic provider engine, handling the fulfillment of entity
@@ -132,9 +133,6 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 
 	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityRequest)
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
-
-	e.unit.Lock()
-	defer e.unit.Unlock()
 
 	switch msg := message.(type) {
 	case *messages.EntityRequest:

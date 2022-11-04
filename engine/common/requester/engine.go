@@ -275,11 +275,6 @@ PollLoop:
 
 func (e *Engine) dispatchRequest() (bool, error) {
 
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
-	e.log.Debug().Int("num_entities", len(e.items)).Msg("selecting entities")
-
 	// get the current top-level set of valid providers
 	providers, err := e.state.Final().Identities(e.selector)
 	if err != nil {
@@ -290,6 +285,10 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	now := time.Now().UTC()
 	var providerID flow.Identifier
 	var entityIDs []flow.Identifier
+
+	// Lock here, and to unlock before calling Unicast
+	e.unit.Lock()
+	e.log.Debug().Int("num_entities", len(e.items)).Msg("selecting entities")
 	for entityID, item := range e.items {
 
 		// if the item should not be requested yet, ignore
@@ -326,6 +325,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		if providerID == flow.ZeroID {
 			providers = providers.Filter(item.ExtraSelector)
 			if len(providers) == 0 {
+				e.unit.Unlock()
 				return false, fmt.Errorf("no valid providers available")
 			}
 			providerID = providers.Sample(1)[0].NodeID
@@ -356,6 +356,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			break
 		}
 	}
+	e.unit.Unlock()
 
 	// if there are no items to request, return
 	if len(entityIDs) == 0 {
@@ -383,7 +384,9 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("could not send request: %w", err)
 	}
+	e.unit.Lock()
 	e.requests[req.Nonce] = req
+	e.unit.Unlock()
 
 	if e.log.Debug().Enabled() {
 		e.log.Debug().
