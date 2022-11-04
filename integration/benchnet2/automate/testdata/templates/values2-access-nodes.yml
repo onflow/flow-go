@@ -1,4 +1,4 @@
-# from https://github.com/onflow/flow-go/blob/fa60c8f96b4a22f0f252c4b82a5dc4bbf54128c1/integration/localnet/values.yml
+{{range $val := .}}# from https://github.com/onflow/flow-go/blob/fa60c8f96b4a22f0f252c4b82a5dc4bbf54128c1/integration/localnet/values.yml
 branch: fake-branch
 # Commit must be a string
 commit: "123456"
@@ -43,6 +43,7 @@ access:
         targetPort: admin
     storage: 1G
   nodes:
+
     access1:
       args:
         - --bootstrapdir=/bootstrap
@@ -55,7 +56,7 @@ access:
         - --profiler-dir=/profiler
         - --profiler-interval=2m
         - --bind=0.0.0.0:3569
-        - --nodeid={{.node_id}}
+        - --nodeid={{$val.node_id}}
         - --rpc-addr=0.0.0.0:9000
         - --secure-rpc-addr=0.0.0.0:9001
         - --http-addr=0.0.0.0:8000
@@ -81,7 +82,8 @@ access:
         - name: BINSTAT_DMP_PATH
           value: ""
       image: gcr.io/flow-container-registry/access:v0.27.6
-      nodeId: {{.node_id}}
+      nodeId: {{$val.node_id}}
+
     access2:
       args:
         - --bootstrapdir=/bootstrap
@@ -94,13 +96,13 @@ access:
         - --profiler-dir=/profiler
         - --profiler-interval=2m
         - --bind=0.0.0.0:3569
-        - --nodeid={{.node_id2}}
+        - --nodeid={{$val.node_id2}}
         - --rpc-addr=0.0.0.0:9000
         - --secure-rpc-addr=0.0.0.0:9001
         - --http-addr=0.0.0.0:8000
         - --collection-ingress-port=9000
         - --supports-observer=true
-        - "--public-network-address=0.0.0.0:1234"
+        - --public-network-address=0.0.0.0:1234
         - --log-tx-time-to-finalized
         - --log-tx-time-to-executed
         - --log-tx-time-to-finalized-executed
@@ -120,7 +122,8 @@ access:
         - name: BINSTAT_DMP_PATH
           value: ""
       image: gcr.io/flow-container-registry/access:v0.27.6
-      nodeId: {{.node_id2}}
+      nodeId: {{$val.node_id2}}
+
 collection:
   defaults:
     imagePullPolicy: Always
@@ -699,4 +702,4 @@ verification:
         - name: BINSTAT_DMP_PATH
           value: ""
       image: gcr.io/flow-container-registry/verification:v0.27.6
-      nodeId: 4c61796e65204c616672616e636500d8948997c9da4f49de7c997ebcdd44d55e
+      nodeId: 4c61796e65204c616672616e636500d8948997c9da4f49de7c997ebcdd44d55e{{end}}

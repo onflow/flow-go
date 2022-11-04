@@ -187,12 +187,12 @@ func TestApply_DataTable(t *testing.T) {
 			dataPath:         filepath.Join(DataPath, "values1-original.json"),
 			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "values1.yml"),
 		},
-		//
-		//"values full - access nodes - separate node ids": {
-		//	templatePath:     filepath.Join(TemplatesPath, "values2-access-nodes.yml"),
-		//	dataPath:         filepath.Join(DataPath, "values2-access-nodes.json"),
-		//	expectedTemplate: filepath.Join(ExpectedTemplatesPath, "values1.yml"),
-		//},
+
+		"values full - access nodes - separate node ids": {
+			templatePath:     filepath.Join(TemplatesPath, "values2-access-nodes.yml"),
+			dataPath:         filepath.Join(DataPath, "values2-access-nodes.json"),
+			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "values1.yml"),
+		},
 
 		"values full - access nodes - loop": {
 			templatePath:     filepath.Join(TemplatesPath, "values3-access-nodes-loop.yml"),
