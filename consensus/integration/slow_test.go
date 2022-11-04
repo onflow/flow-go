@@ -12,8 +12,6 @@ import (
 
 // TestMessagesLost verifies if a node lost some messages, it's still able to catch up.
 func TestMessagesLost(t *testing.T) {
-	// TODO(active-pacemaker)
-	//unittest.SkipUnless(t, unittest.TEST_TODO, "fails on CI, need to investigate why")
 	stopper := NewStopper(30, 0)
 	participantsData := createConsensusIdentities(t, 4)
 	rootSnapshot := createRootSnapshot(t, participantsData)
@@ -31,8 +29,6 @@ func TestMessagesLost(t *testing.T) {
 
 // TestMessagesLostAcrossNetwork verifies if each receiver lost 10% messages, the network can still reach consensus.
 func TestMessagesLostAcrossNetwork(t *testing.T) {
-	// TODO(active-pacemaker)
-	//unittest.SkipUnless(t, unittest.TEST_TODO, "fails on CI, need to investigate why")
 	stopper := NewStopper(10, 0)
 	participantsData := createConsensusIdentities(t, 4)
 	rootSnapshot := createRootSnapshot(t, participantsData)
@@ -52,8 +48,6 @@ func TestMessagesLostAcrossNetwork(t *testing.T) {
 // delayed. Due to the delay, some proposals might be orphaned. The message delay is sampled
 // for each message from the interval [0.1*hotstuffTimeout, 0.5*hotstuffTimeout].
 func TestDelay(t *testing.T) {
-	// TODO(active-pacemaker)
-	//unittest.SkipUnless(t, unittest.TEST_TODO, "fails on CI, need to investigate why")
 	stopper := NewStopper(30, 0)
 	participantsData := createConsensusIdentities(t, 4)
 	rootSnapshot := createRootSnapshot(t, participantsData)
@@ -72,8 +66,6 @@ func TestDelay(t *testing.T) {
 // TestOneNodeBehind verifies that if one node (here node 0) consistently experiences a significant
 // delay receiving messages beyond the hotstuff timeout, the committee still can reach consensus.
 func TestOneNodeBehind(t *testing.T) {
-	// TODO(active-pacemaker)
-	//unittest.SkipUnless(t, unittest.TEST_TODO, "fails on CI, need to investigate why")
 	stopper := NewStopper(30, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
