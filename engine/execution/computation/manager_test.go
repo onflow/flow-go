@@ -198,6 +198,9 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		tracer:        trace.NewNoopTracer(),
 	}
 
+	SetUploaderEnabled(true)
+	defer SetUploaderEnabled(false)
+
 	view := delta.NewView(state2.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
 	blockView := view.NewChild()
 
