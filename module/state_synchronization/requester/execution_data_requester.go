@@ -126,7 +126,7 @@ type executionDataRequester struct {
 	results storage.ExecutionResults
 	seals   storage.Seals
 
-	executionDataReader *jobs.ExecutionDataReaderImpl
+	executionDataReader *jobs.ExecutionDataReader
 
 	// Notifiers for queue consumers
 	finalizationNotifier engine.Notifier

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,6 +35,7 @@ import (
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/follower"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -43,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
@@ -119,7 +120,6 @@ type AccessNodeConfig struct {
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
-	stateStreamListenAddr        string
 	baseOptions                  []cmd.Option
 
 	PublicNetworkConfig PublicNetworkConfig
@@ -142,6 +142,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		rpcConf: rpc.Config{
 			UnsecureGRPCListenAddr:    "0.0.0.0:9000",
 			SecureGRPCListenAddr:      "0.0.0.0:9001",
+			StateStreamListenAddr:     "",
 			HTTPListenAddr:            "0.0.0.0:8000",
 			RESTListenAddr:            "",
 			CollectionAddr:            "",
@@ -178,7 +179,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
-		stateStreamListenAddr: "",
 	}
 }
 
@@ -560,9 +560,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.UintVar(&builder.executionGRPCPort, "execution-ingress-port", defaultConfig.executionGRPCPort, "the grpc ingress port for all execution nodes")
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
+		flags.StringVar(&builder.rpcConf.StateStreamListenAddr, "state-stream-addr", defaultConfig.rpcConf.StateStreamListenAddr, "the address the state stream server listens on (if empty the server will not be started)")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
 		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
-		flags.StringVar(&builder.stateStreamListenAddr, "state-stream-addr", defaultConfig.stateStreamListenAddr, "the address the state stream server listens on (if empty the server will not be started)")
 		flags.StringVarP(&builder.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
 		flags.StringVarP(&builder.ExecutionNodeAddress, "script-addr", "s", defaultConfig.ExecutionNodeAddress, "the address (of the execution node) forward the script to")
 		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
@@ -570,6 +570,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
 		flags.UintVar(&builder.rpcConf.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
+		flags.IntVar(&builder.rpcConf.MaxBlockMsgSize, "max-block-msg-size", defaultConfig.rpcConf.MaxBlockMsgSize, "maximum size for a gRPC message containing block execution data")
 		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.BoolVar(&builder.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")
@@ -934,19 +935,33 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionDataRequester()
-		if builder.stateStreamListenAddr != "" {
-			builder.Component("state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		if builder.rpcConf.StateStreamListenAddr != "" {
+			builder.Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				conf := state_stream.Config{
-					ListenAddr:        builder.stateStreamListenAddr,
-					MaxMsgSize:        builder.rpcConf.MaxMsgSize,
+					ListenAddr:        builder.rpcConf.StateStreamListenAddr,
+					MaxBlockMsgSize:   builder.rpcConf.MaxBlockMsgSize,
 					RpcMetricsEnabled: builder.rpcMetricsEnabled,
 				}
+
+				datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
+				err := os.MkdirAll(datastoreDir, 0700)
+				if err != nil {
+					return nil, fmt.Errorf("could not create or find exec data blobstore directory: %w", err)
+				}
+
+				ds, err := badger.NewDatastore(datastoreDir, &badger.DefaultOptions)
+				if err != nil {
+					return nil, fmt.Errorf("could not create datastore object: %w", err)
+				}
+
+				bs := blobs.NewBlobstore(ds)
 				builder.StateStreamEng = state_stream.NewEng(
 					conf,
+					bs,
+					execution_data.DefaultSerializer,
 					node.Storage.Headers,
 					node.Storage.Seals,
 					node.Storage.Results,
-					builder.ExecutionDataDownloader,
 					node.Logger,
 					node.RootChainID,
 					builder.apiRatelimits,

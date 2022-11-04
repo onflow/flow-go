@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -14,10 +16,8 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/testutils"
+	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
-	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -25,11 +25,9 @@ import (
 type Suite struct {
 	suite.Suite
 
-	blocks     *storagemock.Blocks
-	headers    *storagemock.Headers
-	seals      *storagemock.Seals
-	results    *storagemock.ExecutionResults
-	downloader *downloadermock.Downloader
+	headers *storagemock.Headers
+	seals   *storagemock.Seals
+	results *storagemock.ExecutionResults
 }
 
 func TestHandler(t *testing.T) {
@@ -38,21 +36,17 @@ func TestHandler(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
-	header := unittest.BlockHeaderFixture()
-	params := new(protocol.Params)
-	params.On("Root").Return(header, nil)
-	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
 	suite.seals = new(storagemock.Seals)
 	suite.results = new(storagemock.ExecutionResults)
-
-	suite.downloader = new(downloadermock.Downloader)
 }
 
 func (suite *Suite) TestGetExecutionDataByBlockID() {
 
 	// create the handler with the mock
-	client := New(suite.headers, suite.seals, suite.results, suite.downloader)
+	bs := blobs.NewBlobstore(dssync.MutexWrap(datastore.NewMapDatastore()))
+	eds := execution_data.NewExecutionDataStore(bs, execution_data.DefaultSerializer)
+	client := New(suite.headers, suite.seals, suite.results, eds)
 
 	// mock parameters
 	ctx := context.Background()
@@ -80,18 +74,25 @@ func (suite *Suite) TestGetExecutionDataByBlockID() {
 	suite.seals.On("FinalizedSealForBlock", blockHeader.ID()).Return(seals, nil)
 	suite.results.On("ByID", seals.ResultID).Return(results, nil)
 	suite.Run("happy path TestGetExecutionDataByBlockID success", func() {
-		suite.downloader.On("Download", ctx, results.ExecutionDataID).Return(execData, nil).Once()
+		resID, err := eds.AddExecutionData(ctx, execData)
+		assert.NoError(suite.T(), err)
+		results.ExecutionDataID = resID
 		res, err := client.GetExecutionDataByBlockID(ctx, blockHeader.ID())
-		suite.downloader.AssertExpectations(suite.T())
 		assert.Equal(suite.T(), execDataRes, res)
 		assert.NoError(suite.T(), err)
 	})
 
 	suite.Run("missing exec data for TestGetExecutionDataByBlockID failure", func() {
-		suite.downloader.On("Download", ctx, results.ExecutionDataID).Return(nil, storage.ErrNotFound).Once()
-		_, err := client.GetExecutionDataByBlockID(ctx, blockHeader.ID())
+		execDataRes, err := client.GetExecutionDataByBlockID(ctx, blockHeader.ID())
 		suite.Require().Error(err)
+		assert.Nil(suite.T(), execDataRes)
+		var blobNotFoundError *execution_data.BlobNotFoundError
+		assert.ErrorAs(suite.T(), err, &blobNotFoundError)
 	})
+
+	suite.headers.AssertExpectations(suite.T())
+	suite.seals.AssertExpectations(suite.T())
+	suite.results.AssertExpectations(suite.T())
 }
 
 func generateChunkExecutionData(t *testing.T, minSerializedSize uint64) *execution_data.ChunkExecutionData {

@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -20,7 +21,7 @@ import (
 // Config defines the configurable options for the ingress server.
 type Config struct {
 	ListenAddr        string
-	MaxMsgSize        int  // in bytes
+	MaxBlockMsgSize   int  // in bytes
 	RpcMetricsEnabled bool // enable GRPC metrics
 }
 
@@ -43,23 +44,24 @@ type Engine struct {
 // New returns a new ingress server.
 func NewEng(
 	config Config,
+	bs blobs.Blobstore,
+	serializer execution_data.Serializer,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
-	execDownloader execution_data.Downloader,
 	log zerolog.Logger,
 	chainID flow.ChainID,
-	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
+	apiRatelimits map[string]int,  // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
 ) *Engine {
-	if config.MaxMsgSize == 0 {
-		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
+	if config.MaxBlockMsgSize == 0 {
+		config.MaxBlockMsgSize = grpcutils.DefaultMaxMsgSize
 	}
 
 	// create a GRPC server to serve GRPC clients
 	grpcOpts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(config.MaxMsgSize),
-		grpc.MaxSendMsgSize(config.MaxMsgSize),
+		grpc.MaxRecvMsgSize(config.MaxBlockMsgSize),
+		grpc.MaxSendMsgSize(config.MaxBlockMsgSize),
 	}
 
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
@@ -81,7 +83,9 @@ func NewEng(
 
 	server := grpc.NewServer(grpcOpts...)
 
-	backend := New(headers, seals, results, execDownloader)
+	execDataStore := execution_data.NewExecutionDataStore(bs, serializer)
+
+	backend := New(headers, seals, results, execDataStore)
 
 	e := &Engine{
 		unit:    engine.NewUnit(),

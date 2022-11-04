@@ -19,23 +19,23 @@ type API interface {
 }
 
 type StateStreamBackend struct {
-	headers        storage.Headers
-	seals          storage.Seals
-	results        storage.ExecutionResults
-	execDownloader execution_data.Downloader
+	headers       storage.Headers
+	seals         storage.Seals
+	results       storage.ExecutionResults
+	execDataStore execution_data.ExecutionDataStore
 }
 
 func New(
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
-	execDownloader execution_data.Downloader,
+	execDataStore execution_data.ExecutionDataStore,
 ) *StateStreamBackend {
 	return &StateStreamBackend{
-		headers:        headers,
-		seals:          seals,
-		results:        results,
-		execDownloader: execDownloader,
+		headers:       headers,
+		seals:         seals,
+		results:       results,
+		execDataStore: execDataStore,
 	}
 }
 
@@ -55,7 +55,7 @@ func (s *StateStreamBackend) GetExecutionDataByBlockID(ctx context.Context, bloc
 		return nil, convertStorageError(err)
 	}
 
-	blockExecData, err := s.execDownloader.Download(ctx, result.ExecutionDataID)
+	blockExecData, err := s.execDataStore.GetExecutionData(ctx, result.ExecutionDataID)
 	if err != nil {
 		return nil, err
 	}

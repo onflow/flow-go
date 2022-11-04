@@ -33,12 +33,14 @@ import (
 type Config struct {
 	UnsecureGRPCListenAddr    string                           // the non-secure GRPC server address as ip:port
 	SecureGRPCListenAddr      string                           // the secure GRPC server address as ip:port
+	StateStreamListenAddr     string                           // the state stream GRPC server address as ip:port
 	TransportCredentials      credentials.TransportCredentials // the secure GRPC credentials
 	HTTPListenAddr            string                           // the HTTP web proxy address as ip:port
 	RESTListenAddr            string                           // the REST server address as ip:port (if empty the REST server will not be started)
 	CollectionAddr            string                           // the address of the upstream collection node
 	HistoricalAccessAddrs     string                           // the list of all access nodes from previous spork
 	MaxMsgSize                int                              // GRPC max message size
+	MaxBlockMsgSize           int                              // GRPC max message size for block execution data
 	ExecutionClientTimeout    time.Duration                    // execution API GRPC client timeout
 	CollectionClientTimeout   time.Duration                    // collection API GRPC client timeout
 	ConnectionPoolSize        uint                             // size of the cache for storing collection and execution connections
