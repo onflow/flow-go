@@ -99,13 +99,16 @@ void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len) {
     }
 }
 
-// imports an array of ep2_st from an array of bytes
-// the length matching is supposed to be already done
+// The function imports an array of ep2_st from an array of bytes
+// the length matching is supposed to be already done.
+//
+// It returns RLC_OK if reading all the vector succeeded and RLC_ERR 
+// otherwise.
 int ep2_vector_read_bin(ep2_st* A, const byte* src, const int len){
     const int size = (G2_BYTES/(G2_SERIALIZATION+1));
     byte* p = (byte*) src;
     for (int i=0; i<len; i++){
-        int read_ret = ep2_read_bin_compact(&A[i], p, size);
+        int read_ret = ep2_read_bin_compact(&A[i], p, size); // returns RLC_OK or RLC_ERR
         if (read_ret != RLC_OK)
             return read_ret;
         p += size;

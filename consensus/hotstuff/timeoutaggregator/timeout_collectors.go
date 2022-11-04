@@ -37,12 +37,14 @@ func NewTimeoutCollectors(log zerolog.Logger, lowestRetainedView uint64, collect
 
 // GetOrCreateCollector retrieves the hotstuff.TimeoutCollector for the specified
 // view or creates one if none exists.
-//  -  (collector, true, nil) if no collector can be found by the view, and a new collector was created.
-//  -  (collector, false, nil) if the collector can be found by the view
-//  -  (nil, false, error) if running into any exception creating the timeout collector state machine
+//   - (collector, true, nil) if no collector can be found by the view, and a new collector was created.
+//   - (collector, false, nil) if the collector can be found by the view
+//   - (nil, false, error) if running into any exception creating the timeout collector state machine
+//
 // Expected error returns during normal operations:
-//  * mempool.BelowPrunedThresholdError if view is below the pruning threshold
-//  * model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known, this error
+//   - mempool.BelowPrunedThresholdError if view is below the pruning threshold
+//   - model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known, this error
+//
 // can be returned from factory method.
 func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutCollector, bool, error) {
 	cachedCollector, hasCachedCollector, err := t.getCollector(view)
@@ -77,7 +79,7 @@ func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutC
 // getCollector retrieves hotstuff.TimeoutCollector from local cache in concurrent safe way.
 // Performs check for lowestRetainedView.
 // Expected error returns during normal operations:
-//  * mempool.BelowPrunedThresholdError - in case view is lower than lowestRetainedView
+//   - mempool.BelowPrunedThresholdError - in case view is lower than lowestRetainedView
 func (t *TimeoutCollectors) getCollector(view uint64) (hotstuff.TimeoutCollector, bool, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()

@@ -1,27 +1,29 @@
 package notifications
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/utils/logging"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // TelemetryConsumer implements the hotstuff.Consumer interface.
 // consumes outbound notifications produced by the The HotStuff state machine.
 // For this purpose, the TelemetryConsumer enriches the state machine's notifications:
-//   * the goal is to identify all events as belonging together that were emitted during
+//   - The goal is to identify all events as belonging together that were emitted during
 //     a path through the state machine.
-//   * A path through the state machine begins when:
-//      - a vote is received
-//      - a block is received
-//      - a new view is started
-//      - a timeout is processed
-//   * Each path through the state machine is identified by a unique id.
+//   - A path through the state machine begins when:
+//     -- a vote is received
+//     -- a block is received
+//     -- a new view is started
+//     -- a timeout is processed
+//   - Each path through the state machine is identified by a unique id.
+//
 // Generally, the TelemetryConsumer could export the collected data to a variety of backends.
 // For now, we export the data to a logger.
 //
@@ -132,28 +134,25 @@ func (t *TelemetryConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate,
 		Msg("OnTcTriggeredViewChange")
 }
 
-func (t *TelemetryConsumer) OnProposingBlock(proposal *model.Proposal) {
-	block := proposal.Block
-	step := t.pathHandler.NextStep()
-	step.
-		Uint64("block_view", block.View).
-		Hex("block_id", logging.ID(block.BlockID)).
-		Hex("block_proposer_id", logging.ID(block.ProposerID)).
-		Time("block_time", block.Timestamp)
-	if block.QC != nil {
-		step.
-			Uint64("qc_block_view", block.QC.View).
-			Hex("qc_block_id", logging.ID(block.QC.BlockID))
-	}
-	step.Msg("OnProposingBlock")
+func (t *TelemetryConsumer) OnOwnVote(blockID flow.Identifier, view uint64, _ []byte, recipientID flow.Identifier) {
+	t.pathHandler.NextStep().
+		Uint64("voted_block_view", view).
+		Hex("voted_block_id", logging.ID(blockID)).
+		Hex("recipient_id", logging.ID(recipientID)).
+		Msg("OnOwnVote")
 }
 
-func (t *TelemetryConsumer) OnVoting(vote *model.Vote) {
-	t.pathHandler.NextStep().
-		Uint64("voted_block_view", vote.View).
-		Hex("voted_block_id", vote.BlockID[:]).
-		Hex("voter_id", vote.SignerID[:]).
-		Msg("OnVoting")
+func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+	step := t.pathHandler.NextStep()
+	step.
+		Uint64("block_view", proposal.View).
+		Hex("block_id", logging.ID(proposal.ID())).
+		Hex("block_proposer_id", logging.ID(proposal.ProposerID)).
+		Time("block_time", proposal.Timestamp).
+		//Uint64("qc_block_view", proposal).
+		Hex("qc_block_id", logging.ID(proposal.ParentID)).
+		Time("targetPublicationTime", targetPublicationTime)
+	step.Msg("OnOwnProposal")
 }
 
 func (t *TelemetryConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {

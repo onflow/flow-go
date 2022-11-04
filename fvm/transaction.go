@@ -1,11 +1,7 @@
 package fvm
 
 import (
-	"fmt"
-	"runtime/debug"
-	"strings"
-
-	"github.com/opentracing/opentracing-go"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -13,57 +9,52 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO(patrick): pass in initial snapshot time when we start supporting
+// speculative pre-processing / execution.
 func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
 	return &TransactionProcedure{
-		ID:          tx.ID(),
-		Transaction: tx,
-		TxIndex:     txIndex,
+		ID:                     tx.ID(),
+		Transaction:            tx,
+		InitialSnapshotTxIndex: txIndex,
+		TxIndex:                txIndex,
 	}
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, *Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) error
+	Process(
+		Context,
+		*TransactionProcedure,
+		*state.TransactionState,
+		*programs.TransactionPrograms,
+	) error
 }
 
 type TransactionProcedure struct {
-	ID              flow.Identifier
-	Transaction     *flow.TransactionBody
-	TxIndex         uint32
+	ID                     flow.Identifier
+	Transaction            *flow.TransactionBody
+	InitialSnapshotTxIndex uint32
+	TxIndex                uint32
+
 	Logs            []string
 	Events          []flow.Event
 	ServiceEvents   []flow.Event
 	ComputationUsed uint64
 	MemoryEstimate  uint64
 	Err             errors.Error
-	Retried         int
-	TraceSpan       opentracing.Span
+	TraceSpan       otelTrace.Span
 }
 
-func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
+func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
 	proc.TraceSpan = traceSpan
 }
 
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateHolder, programs *programs.Programs) error {
-
-	defer func() {
-		if r := recover(); r != nil {
-
-			if strings.Contains(fmt.Sprintf("%v", r), errors.ErrCodeLedgerIntractionLimitExceededError.String()) {
-				ctx.Logger.Error().Str("trace", string(debug.Stack())).Msg("VM LedgerIntractionLimitExceeded panic")
-				proc.Err = errors.NewLedgerIntractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
-				return
-			}
-
-			panic(r)
-		}
-	}()
-
-	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
-		st.SetPayerIsServiceAccount()
-	}
-
+func (proc *TransactionProcedure) Run(
+	ctx Context,
+	txnState *state.TransactionState,
+	programs *programs.TransactionPrograms,
+) error {
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, &ctx, proc, st, programs)
+		err := p.Process(ctx, proc, txnState, programs)
 		txErr, failure := errors.SplitErrorTypes(err)
 		if failure != nil {
 			// log the full error path
@@ -99,17 +90,32 @@ func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
 }
 
 func (proc *TransactionProcedure) MemoryLimit(ctx Context) uint64 {
-	// TODO for BFT (enforce max computation limit, already checked by collection nodes)
+	// TODO for BFT (enforce max memory limit, already checked by collection nodes)
 	// TODO let user select a lower limit for memory (when its part of fees)
 
 	memoryLimit := ctx.MemoryLimit // TODO use the one set by tx
-	// if the memory limit is set to zero by user, fallback to the gas limit set by the context
+	// if the context memory limit is also zero, fallback to the default memory limit
 	if memoryLimit == 0 {
-		memoryLimit = ctx.MemoryLimit
-		// if the context memory limit is also zero, fallback to the default memory limit
-		if memoryLimit == 0 {
-			memoryLimit = DefaultMemoryLimit
-		}
+		memoryLimit = DefaultMemoryLimit
 	}
 	return memoryLimit
+}
+
+func (proc *TransactionProcedure) ShouldDisableMemoryAndInteractionLimits(
+	ctx Context,
+) bool {
+	return ctx.DisableMemoryAndInteractionLimits ||
+		proc.Transaction.Payer == ctx.Chain.ServiceAddress()
+}
+
+func (TransactionProcedure) Type() ProcedureType {
+	return TransactionProcedureType
+}
+
+func (proc *TransactionProcedure) InitialSnapshotTime() programs.LogicalTime {
+	return programs.LogicalTime(proc.InitialSnapshotTxIndex)
+}
+
+func (proc *TransactionProcedure) ExecutionTime() programs.LogicalTime {
+	return programs.LogicalTime(proc.TxIndex)
 }

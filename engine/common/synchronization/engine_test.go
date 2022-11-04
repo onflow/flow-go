@@ -1,7 +1,7 @@
 package synchronization
 
 import (
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"testing"
 	"time"
@@ -12,19 +12,21 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/network/p2p/cache"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
+	synccore "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	synccore "github.com/onflow/flow-go/module/synchronization"
 	netint "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/network/p2p"
 	protocolint "github.com/onflow/flow-go/state/protocol"
 	protocolEvents "github.com/onflow/flow-go/state/protocol/events"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -50,7 +52,7 @@ type SyncSuite struct {
 	state        *protocol.State
 	snapshot     *protocol.Snapshot
 	blocks       *storage.Blocks
-	comp         *mocknetwork.Engine
+	comp         *mocknetwork.MessageProcessor
 	core         *module.SyncCore
 	e            *Engine
 }
@@ -79,7 +81,7 @@ func (ss *SyncSuite) SetupTest() {
 	// set up the network module mock
 	ss.net = &mocknetwork.Network{}
 	ss.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
+		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return ss.con
 		},
 		nil,
@@ -156,20 +158,20 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up compliance engine mock
-	ss.comp = &mocknetwork.Engine{}
-	ss.comp.On("SubmitLocal", mock.Anything).Return()
+	ss.comp = &mocknetwork.MessageProcessor{}
+	ss.comp.On("Process", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// set up sync core
 	ss.core = &module.SyncCore{}
 
 	// initialize the engine
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 	metrics := metrics.NewNoopCollector()
 
 	finalizedHeader, err := NewFinalizedHeaderCache(log, ss.state, pubsub.NewFinalizationDistributor())
 	require.NoError(ss.T(), err, "could not create finalized snapshot cache")
 
-	idCache, err := p2p.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
+	idCache, err := cache.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
 	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedHeader,
 		id.NewIdentityFilterIdentifierProvider(
@@ -415,12 +417,11 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	ss.core.On("HandleBlock", unprocessable.Header).Return(false)
 	res.Blocks = append(res.Blocks, &unprocessable)
 
-	ss.comp.On("SubmitLocal", mock.Anything).Run(func(args mock.Arguments) {
+	ss.comp.On("Process", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		res := args.Get(0).(*events.SyncedBlock)
 		ss.Assert().Equal(&processable, res.Block)
 		ss.Assert().Equal(originID, res.OriginID)
-	},
-	)
+	})
 
 	ss.e.onBlockResponse(originID, res)
 	ss.comp.AssertExpectations(ss.T())
@@ -489,7 +490,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 			Height: uint64(1000 + i),
 		}
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
-		require.NoError(ss.T(), ss.e.Process(netint.SyncCommittee, originID, msg))
+		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, msg))
 	}
 
 	finalHeight := ss.head.Height
@@ -504,7 +505,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
-		require.NoError(ss.T(), ss.e.Process(netint.SyncCommittee, originID, msg))
+		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, msg))
 	}
 
 	// give at least some time to process items

@@ -94,7 +94,7 @@ import (
 * This example -- on a GCP Linux box -- launches 6 identical go-routines, 3 times, with `gomaxprocs=1` & then `=8`.
 
 ```
-$ pushd binstat ; GO111MODULE=on go test -v -vv ./... 2>&1 | perl -lane 's~\\n~\n~g; s~"time".*?,~~g; print;' ; popd
+$ pushd binstat ; go test -v -vv ./... 2>&1 | perl -lane 's~\\n~\n~g; s~"time".*?,~~g; print;' ; popd
 ...
 === RUN   TestWithPprof
 ...

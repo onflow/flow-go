@@ -91,12 +91,13 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 //
 // Note that we don't explicitly check that sealed results satisfy the sub-graph
 // check. Nevertheless, correctness in this regard is guaranteed because:
-//  * We only allow seals that correspond to ExecutionReceipts that were
-//    incorporated in this fork.
-//  * We only include ExecutionReceipts whose results pass the sub-graph check
-//    (as part of ReceiptValidator).
+//   - We only allow seals that correspond to ExecutionReceipts that were
+//     incorporated in this fork.
+//   - We only include ExecutionReceipts whose results pass the sub-graph check
+//     (as part of ReceiptValidator).
+//
 // => Therefore, only seals whose results pass the sub-graph check will be
-//    allowed.
+// allowed.
 func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
 	payload := candidate.Payload
@@ -177,7 +178,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	}
 
 	// We do _not_ add the results from the candidate block's own payload to incorporatedResults.
-	// That's because a result requires to be added to a bock first in order to determine
+	// That's because a result requires to be added to a block first in order to determine
 	// its chunk assignment for verification. Therefore a seal can only be added in the
 	// next block or after. In other words, a receipt and its seal can't be the same block.
 

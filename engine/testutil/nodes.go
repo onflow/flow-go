@@ -4,13 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -46,6 +52,8 @@ import (
 	vereq "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -54,7 +62,12 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
+	exedatatracker "github.com/onflow/flow-go/module/executiondatasync/tracker"
+	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -63,16 +76,16 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
-	state_synchronization "github.com/onflow/flow-go/module/state_synchronization/mock"
-	chainsync "github.com/onflow/flow-go/module/synchronization"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
@@ -157,11 +170,12 @@ func GenericNodeWithStateFixture(t testing.TB,
 	net := stub.NewNetwork(t, identity.NodeID, hub)
 
 	parentCtx, cancel := context.WithCancel(context.Background())
-	ctx, _ := irrecoverable.WithSignaler(parentCtx)
+	ctx, errs := irrecoverable.WithSignaler(parentCtx)
 
 	return testmock.GenericNode{
 		Ctx:            ctx,
 		Cancel:         cancel,
+		Errs:           errs,
 		Log:            log,
 		Metrics:        metrics,
 		Tracer:         tracer,
@@ -261,7 +275,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		coll, err := collections.ByID(collID)
 		return coll, err
 	}
-	providerEngine, err := provider.New(node.Log, node.Metrics, node.Net, node.Me, node.State, network.ProvideCollections, selector, retrieve)
+	providerEngine, err := provider.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.ProvideCollections, selector, retrieve)
 	require.NoError(t, err)
 
 	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
@@ -280,10 +294,11 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Tracer,
 		node.Metrics,
 		pusherEngine,
+		node.Log,
 	)
 	require.NoError(t, err)
 
-	proposalFactory, err := factories.NewProposalEngineFactory(
+	complianceEngineFactory, err := factories.NewComplianceEngineFactory(
 		node.Log,
 		node.Net,
 		node.Me,
@@ -311,9 +326,15 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.PublicDB,
 		node.State,
 		createMetrics,
-		consensus.WithInitialTimeout(time.Second*2),
 	)
 	require.NoError(t, err)
+
+	messageHubFactory := factories.NewMessageHubFactory(
+		node.Log,
+		node.Net,
+		node.Me,
+		node.State,
+	)
 
 	factory := factories.NewEpochComponentsFactory(
 		node.Me,
@@ -321,8 +342,9 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		builderFactory,
 		clusterStateFactory,
 		hotstuffFactory,
-		proposalFactory,
+		complianceEngineFactory,
 		syncFactory,
+		messageHubFactory,
 	)
 
 	rootQCVoter := new(mockmodule.ClusterRootQCVoter)
@@ -378,7 +400,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.Nil(t, err)
 
 	// request receipts from execution nodes
-	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, network.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
+	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
@@ -501,11 +523,21 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	metricsCollector := &metrics.NoopCollector{}
 
-	diskWal, err := wal.NewDiskWAL(node.Log.With().Str("subcomponent", "wal").Logger(), nil, metricsCollector, dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+	const (
+		capacity           = 100
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+	diskWal, err := wal.NewDiskWAL(node.Log.With().Str("subcomponent", "wal").Logger(), nil, metricsCollector, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(t, err)
 
-	ls, err := completeLedger.NewLedger(diskWal, 100, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
+	ls, err := completeLedger.NewLedger(diskWal, capacity, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
+
+	compactor, err := completeLedger.NewCompactor(ls, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	require.NoError(t, err)
+
+	<-compactor.Ready() // Need to start compactor here because BootstrapLedger() updates ledger state.
 
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
@@ -527,35 +559,49 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	requestEngine, err := requester.New(
 		node.Log, node.Metrics, node.Net, node.Me, node.State,
-		network.RequestCollections,
+		channels.RequestCollections,
 		filter.HasRole(flow.RoleCollection),
 		func() flow.Entity { return &flow.Collection{} },
 	)
 	require.NoError(t, err)
 
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metricsCollector, checkAuthorizedAtBlock, 10, 10,
+		node.Log,
+		node.Tracer,
+		node.Net,
+		node.State,
+		execState,
+		metricsCollector,
+		checkAuthorizedAtBlock,
+		queue.NewChunkDataPackRequestQueue(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
+		executionprovider.DefaultChunkDataPackRequestWorker,
+		executionprovider.DefaultChunkDataPackQueryTimeout,
+		executionprovider.DefaultChunkDataPackDeliveryTimeout,
 	)
 	require.NoError(t, err)
 
-	rt := fvm.NewInterpreterRuntime()
-
-	vm := fvm.NewVirtualMachine(rt)
-
-	blockFinder := fvm.NewBlockFinder(node.Headers)
+	blockFinder := environment.NewBlockFinder(node.Headers)
 
 	vmCtx := fvm.NewContext(
-		node.Log,
+		fvm.WithLogger(node.Log),
 		fvm.WithChain(node.ChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 	)
 	committer := committer.NewLedgerViewCommitter(ls, node.Tracer)
 
-	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn exedatatracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
 
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
-	edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
+	prov := exedataprovider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
 
 	computationEngine, err := computation.New(
 		node.Log,
@@ -563,15 +609,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Tracer,
 		node.Me,
 		node.State,
-		vm,
 		vmCtx,
-		computation.DefaultProgramsCacheSize,
 		committer,
-		computation.DefaultScriptLogThreshold,
-		computation.DefaultScriptExecutionTimeLimit,
 		nil,
-		eds,
-		edCache,
+		prov,
+		computation.ComputationConfig{
+			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			ScriptLogThreshold:       computation.DefaultScriptLogThreshold,
+			ScriptExecutionTimeLimit: computation.DefaultScriptExecutionTimeLimit,
+		},
 	)
 	require.NoError(t, err)
 
@@ -611,6 +657,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		false,
 		checkAuthorizedAtBlock,
 		false,
+		nil,
+		nil,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
@@ -618,18 +666,21 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	node.ProtocolEvents.AddConsumer(ingestionEngine)
 
 	followerCore, finalizer := createFollowerCore(t, &node, followerState, finalizationDistributor, rootHead, rootQC)
+	// mock out hotstuff validator
+	validator := new(mockhotstuff.Validator)
+	validator.On("ValidateProposal", mock.Anything).Return(nil)
 
 	// initialize cleaner for DB
 	cleaner := storage.NewCleaner(node.Log, node.PublicDB, node.Metrics, flow.DefaultValueLogGCFrequency)
 
 	followerEng, err := follower.New(node.Log, node.Net, node.Me, node.Metrics, node.Metrics, cleaner,
-		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, syncCore, node.Tracer)
+		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, validator, syncCore, node.Tracer)
 	require.NoError(t, err)
 
 	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
 	require.NoError(t, err)
 
-	idCache, err := p2p.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
+	idCache, err := cache.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
 	require.NoError(t, err, "could not create finalized snapshot cache")
 	syncEngine, err := synchronization.New(
 		node.Log,
@@ -661,14 +712,14 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		RequestEngine:       requestEngine,
 		ReceiptsEngine:      pusherEngine,
 		BadgerDB:            node.PublicDB,
-		VM:                  vm,
+		VM:                  computationEngine.VM(),
 		ExecutionState:      execState,
 		Ledger:              ls,
 		LevelDbDir:          dbDir,
 		Collections:         collectionsStorage,
 		Finalizer:           finalizer,
 		MyExecutionReceipts: myReceipts,
-		DiskWAL:             diskWal,
+		Compactor:           compactor,
 	}
 }
 
@@ -857,14 +908,12 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.VerifierEngine == nil {
-		rt := fvm.NewInterpreterRuntime()
+		vm := fvm.NewVM()
 
-		vm := fvm.NewVirtualMachine(rt)
-
-		blockFinder := fvm.NewBlockFinder(node.Headers)
+		blockFinder := environment.NewBlockFinder(node.Headers)
 
 		vmCtx := fvm.NewContext(
-			node.Log,
+			fvm.WithLogger(node.Log),
 			fvm.WithChain(node.ChainID.Chain()),
 			fvm.WithBlocks(blockFinder),
 		)

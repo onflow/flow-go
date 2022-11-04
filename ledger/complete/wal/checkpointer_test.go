@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"math"
 	"math/rand"
 	"os"
 	"path"
@@ -15,43 +15,57 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var (
+const (
 	numInsPerStep      = 2
 	keyNumberOfParts   = 10
 	keyPartMinByteSize = 1
 	keyPartMaxByteSize = 100
 	valueMaxByteSize   = 2 << 16 //16kB
 	size               = 10
-	metricsCollector   = &metrics.NoopCollector{}
-	logger             = zerolog.Logger{}
 	segmentSize        = 32 * 1024
 	pathByteSize       = 32
 	pathFinderVersion  = uint8(complete.DefaultPathFinderVersion)
+)
+
+var (
+	logger           = zerolog.Logger{}
+	metricsCollector = &metrics.NoopCollector{}
 )
 
 func Test_WAL(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
+		const (
+			checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+			checkpointsToKeep  = 1
+		)
+
 		diskWal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, realWAL.SegmentSize)
 		require.NoError(t, err)
 
 		led, err := complete.NewLedger(diskWal, size*10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
+
+		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), size, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+		require.NoError(t, err)
+
+		<-compactor.Ready()
 
 		var state = led.InitialState()
 
@@ -63,42 +77,40 @@ func Test_WAL(t *testing.T) {
 
 		for i := 0; i < size; i++ {
 
-			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-			values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+			keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+			values := testutils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
 			update, err := ledger.NewUpdate(state, keys, values)
 			require.NoError(t, err)
 			state, _, err = led.Set(update)
 			require.NoError(t, err)
 
-			fmt.Printf("Updated with %x\n", state)
-
 			data := make(map[string]ledger.Value, len(keys))
 			for j, key := range keys {
-				data[string(encoding.EncodeKey(&key))] = values[j]
+				data[string(ledger.EncodeKey(&key))] = values[j]
 			}
 
 			savedData[string(state[:])] = data
 		}
 
-		<-diskWal.Done()
 		<-led.Done()
+		<-compactor.Done()
 
 		diskWal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, realWAL.SegmentSize)
 		require.NoError(t, err)
 		led2, err := complete.NewLedger(diskWal2, (size*10)+10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
+		compactor2 := fixtures.NewNoopCompactor(led2) // noop compactor is used because no write is needed.
+		<-compactor2.Ready()
 
 		// random map iteration order is a benefit here
 		for state, data := range savedData {
 
 			keys := make([]ledger.Key, 0, len(data))
 			for keyString := range data {
-				key, err := encoding.DecodeKey([]byte(keyString))
+				key, err := ledger.DecodeKey([]byte(keyString))
 				require.NoError(t, err)
 				keys = append(keys, *key)
 			}
-
-			fmt.Printf("Querying with %x\n", state)
 
 			var ledgerState ledger.State
 			copy(ledgerState[:], state)
@@ -108,12 +120,12 @@ func Test_WAL(t *testing.T) {
 			require.NoError(t, err)
 
 			for i, key := range keys {
-				assert.Equal(t, data[string(encoding.EncodeKey(&key))], values[i])
+				assert.Equal(t, data[string(ledger.EncodeKey(&key))], values[i])
 			}
 		}
 
-		<-diskWal2.Done()
 		<-led2.Done()
+		<-compactor2.Done()
 	})
 }
 
@@ -140,15 +152,15 @@ func Test_Checkpointing(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
-				values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+				keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
+				values := testutils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
 				update, err := ledger.NewUpdate(ledger.State(rootHash), keys, values)
 				require.NoError(t, err)
 
 				trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
 				require.NoError(t, err)
 
-				err = wal.RecordUpdate(trieUpdate)
+				_, _, err = wal.RecordUpdate(trieUpdate)
 				require.NoError(t, err)
 
 				rootHash, err := f.Update(trieUpdate)
@@ -252,15 +264,15 @@ func Test_Checkpointing(t *testing.T) {
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.Equal(t, data[path].Value, values1[i])
-					require.Equal(t, data[path].Value, values2[i])
-					require.Equal(t, data[path].Value, values3[i])
+					require.Equal(t, data[path].Value(), values1[i])
+					require.Equal(t, data[path].Value(), values2[i])
+					require.Equal(t, data[path].Value(), values3[i])
 				}
 			}
 		})
 
-		keys2 := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-		values2 := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+		keys2 := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+		values2 := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 		t.Run("create segment after checkpoint", func(t *testing.T) {
 
 			//require.NoFileExists(t, path.Join(dir, "00000011"))
@@ -277,7 +289,7 @@ func Test_Checkpointing(t *testing.T) {
 			trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
 			require.NoError(t, err)
 
-			err = wal4.RecordUpdate(trieUpdate)
+			_, _, err = wal4.RecordUpdate(trieUpdate)
 			require.NoError(t, err)
 
 			rootHash, err = f.Update(trieUpdate)
@@ -440,15 +452,15 @@ func TestCheckpointFileError(t *testing.T) {
 
 		// create WAL
 
-		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
-		values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+		keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
+		values := testutils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
 		update, err := ledger.NewUpdate(ledger.State(trie.EmptyTrieRootHash()), keys, values)
 		require.NoError(t, err)
 
 		trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
 		require.NoError(t, err)
 
-		err = wal.RecordUpdate(trieUpdate)
+		_, _, err = wal.RecordUpdate(trieUpdate)
 		require.NoError(t, err)
 
 		// some buffer time of the checkpointer to run
@@ -520,11 +532,11 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 
 		emptyTrie := trie.NewEmptyMTrie()
 
-		p1 := utils.PathByUint8(0)
-		v1 := utils.LightPayload8('A', 'a')
+		p1 := testutils.PathByUint8(0)
+		v1 := testutils.LightPayload8('A', 'a')
 
-		p2 := utils.PathByUint8(1)
-		v2 := utils.LightPayload8('B', 'b')
+		p2 := testutils.PathByUint8(1)
+		v2 := testutils.LightPayload8('B', 'b')
 
 		paths := []ledger.Path{p1, p2}
 		payloads := []ledger.Payload{*v1, *v2}
@@ -534,7 +546,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 
 		someHash := updatedTrie.RootNode().LeftChild().Hash() // Hash of left child
 
-		file, err := ioutil.TempFile(dir, "temp-checkpoint")
+		file, err := os.CreateTemp(dir, "temp-checkpoint")
 		filepath := file.Name()
 		require.NoError(t, err)
 
@@ -552,7 +564,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 		})
 
 		t.Run("detects modified data", func(t *testing.T) {
-			b, err := ioutil.ReadFile(filepath)
+			b, err := os.ReadFile(filepath)
 			require.NoError(t, err)
 
 			index := bytes.Index(b, someHash[:])

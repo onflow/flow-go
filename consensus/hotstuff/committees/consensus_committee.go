@@ -187,6 +187,8 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	return com, nil
 }
 
+// Identities returns the identities of all authorized consensus participants at the given block.
+// The order of the identities is the canonical order.
 func (c *Consensus) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error) {
 	il, err := c.state.AtBlockID(blockID).Identities(filter.IsVotingConsensusCommitteeMember)
 	return il, err
@@ -210,9 +212,9 @@ func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identif
 // the given view.
 //
 // Error returns:
-//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   - model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
-//   * unspecific error in case of unexpected problems and bugs
+//   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) IdentitiesByEpoch(view uint64) (flow.IdentityList, error) {
 	epochInfo, err := c.staticEpochInfoByView(view)
 	if err != nil {
@@ -225,12 +227,11 @@ func (c *Consensus) IdentitiesByEpoch(view uint64) (flow.IdentityList, error) {
 // contains the given view.
 //
 // Error returns:
-//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   - model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
-//   * model.InvalidSignerError if nodeID was not listed by the Epoch Setup event as an
+//   - model.InvalidSignerError if nodeID was not listed by the Epoch Setup event as an
 //     authorized consensus participants.
-//   * unspecific error in case of unexpected problems and bugs
-//
+//   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.Identity, error) {
 	epochInfo, err := c.staticEpochInfoByView(view)
 	if err != nil {
@@ -246,9 +247,9 @@ func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.
 // LeaderForView returns the node ID of the leader for the given view.
 //
 // Error returns:
-//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   - model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
-//   * unspecific error in case of unexpected problems and bugs
+//   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 
 	epochInfo, err := c.staticEpochInfoByView(view)
@@ -273,9 +274,9 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 // and is computed based on the initial committee weights.
 //
 // Error returns:
-//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   - model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
-//   * unspecific error in case of unexpected problems and bugs
+//   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) QuorumThresholdForView(view uint64) (uint64, error) {
 	epochInfo, err := c.staticEpochInfoByView(view)
 	if err != nil {
@@ -302,9 +303,9 @@ func (c *Consensus) TimeoutThresholdForView(view uint64) (uint64, error) {
 // DKG returns the DKG for epoch which includes the given view.
 //
 // Error returns:
-//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   - model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
-//   * unspecific error in case of unexpected problems and bugs
+//   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
 	epochInfo, err := c.staticEpochInfoByView(view)
 	if err != nil {
@@ -363,7 +364,7 @@ func (c *Consensus) onEpochEmergencyFallbackTriggered() error {
 	// the core logic is protected by an atomic bool.
 	// although it is only valid for epoch fallback to be triggered once per spork,
 	// we must account for repeated delivery of protocol events.
-	if !c.isEpochFallbackHandled.CAS(false, true) {
+	if !c.isEpochFallbackHandled.CompareAndSwap(false, true) {
 		return nil
 	}
 
@@ -404,8 +405,8 @@ func (c *Consensus) onEpochEmergencyFallbackTriggered() error {
 // view, we will attempt to cache the next epoch.
 //
 // Error returns:
-//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known
-//   * unspecific error in case of unexpected problems and bugs
+//   - model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known
+//   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error) {
 
 	// look for an epoch matching this view for which we have already pre-computed

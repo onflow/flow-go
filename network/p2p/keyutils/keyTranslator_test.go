@@ -6,9 +6,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcec"
-	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/btcsuite/btcd/btcec/v2"
+	lcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

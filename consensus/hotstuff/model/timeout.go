@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -61,4 +63,23 @@ func (t *TimeoutObject) ID() flow.Identifier {
 
 func (t *TimeoutObject) String() string {
 	return fmt.Sprintf("View: %d, HighestQC.View: %d, LastViewTC: %v", t.View, t.NewestQC.View, t.LastViewTC)
+}
+
+// LogContext returns a `zerolog.Contex` including the most important properties of the TC:
+//   - view number that this TC is for
+//   - view and ID of the block that the included QC points to
+//   - [optional] if the TC also includes a TC for the prior view, i.e. `LastViewTC` ≠ nil:
+//     the new of `LastViewTC` and the view that `LastViewTC.NewestQC` is for
+func (t *TimeoutObject) LogContext(logger zerolog.Logger) zerolog.Context {
+	logContext := logger.With().
+		Uint64("timeout_newest_qc_view", t.NewestQC.View).
+		Hex("timeout_newest_qc_block_id", t.NewestQC.BlockID[:]).
+		Uint64("timeout_view", t.View)
+
+	if t.LastViewTC != nil {
+		logContext.
+			Uint64("last_view_tc_view", t.LastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", t.LastViewTC.NewestQC.View)
+	}
+	return logContext
 }

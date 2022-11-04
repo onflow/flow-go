@@ -59,11 +59,7 @@ func (s *Suite) MetricsPort() string {
 }
 
 func (s *Suite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", s.T().Name()).
-		Logger()
-	s.log = logger
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 
 	blockRateFlag := "--block-rate-delay=1ms"
@@ -75,7 +71,6 @@ func (s *Suite) SetupTest() {
 	for _, nodeID := range s.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 			testnet.WithAdditionalFlag(blockRateFlag),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)

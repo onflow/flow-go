@@ -29,7 +29,6 @@ func NewParticipant(
 	log zerolog.Logger,
 	metrics module.HotstuffMetrics,
 	builder module.Builder,
-	communicator hotstuff.Communicator,
 	finalized *flow.Header,
 	pending []*flow.Header,
 	modules *HotstuffModules,
@@ -39,12 +38,12 @@ func NewParticipant(
 	// initialize the default configuration
 	defTimeout := timeout.DefaultConfig
 	cfg := ParticipantConfig{
-		TimeoutInitial:        time.Duration(defTimeout.ReplicaTimeout) * time.Millisecond,
-		TimeoutMinimum:        time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
-		TimeoutMaximum:        time.Duration(defTimeout.MaxReplicaTimeout) * time.Millisecond,
-		TimeoutIncreaseFactor: defTimeout.TimeoutIncrease,
-		TimeoutDecreaseFactor: defTimeout.TimeoutDecrease,
-		BlockRateDelay:        time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
+		TimeoutMinimum:                      time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
+		TimeoutMaximum:                      time.Duration(defTimeout.MaxReplicaTimeout) * time.Millisecond,
+		TimeoutAdjustmentFactor:             defTimeout.TimeoutAdjustmentFactor,
+		HappyPathMaxRoundFailures:           defTimeout.HappyPathMaxRoundFailures,
+		BlockRateDelay:                      time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
+		MaxTimeoutObjectRebroadcastInterval: time.Duration(defTimeout.MaxTimeoutObjectRebroadcastInterval) * time.Millisecond,
 	}
 
 	// apply the configuration options
@@ -64,12 +63,12 @@ func NewParticipant(
 
 	// initialize the timeout config
 	timeoutConfig, err := timeout.NewConfig(
-		cfg.TimeoutInitial,
 		cfg.TimeoutMinimum,
 		cfg.TimeoutMaximum,
-		cfg.TimeoutIncreaseFactor,
-		cfg.TimeoutDecreaseFactor,
+		cfg.TimeoutAdjustmentFactor,
+		cfg.HappyPathMaxRoundFailures,
 		cfg.BlockRateDelay,
+		cfg.MaxTimeoutObjectRebroadcastInterval,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeout config: %w", err)
@@ -101,7 +100,6 @@ func NewParticipant(
 		producer,
 		modules.Forks,
 		modules.Persist,
-		communicator,
 		modules.Committee,
 		modules.VoteAggregator,
 		modules.TimeoutAggregator,
@@ -166,12 +164,6 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 		return makeRootBlockQC(rootHeader, rootQC), nil
 	}
 
-	// get the parent for the latest finalized block
-	parent, err := headers.ByBlockID(final.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get parent for finalized: %w", err)
-	}
-
 	// find a valid child of the finalized block in order to get its QC
 	children, err := headers.ByParentID(final.ID())
 	if err != nil {
@@ -182,11 +174,11 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 		return nil, fmt.Errorf("finalized block has no children")
 	}
 
-	child := model.BlockFromFlow(children[0], final.View)
+	child := model.BlockFromFlow(children[0])
 
 	// create the root block to use
 	trustedRoot := &forks.BlockQC{
-		Block: model.BlockFromFlow(final, parent.View),
+		Block: model.BlockFromFlow(final),
 		QC:    child.QC,
 	}
 

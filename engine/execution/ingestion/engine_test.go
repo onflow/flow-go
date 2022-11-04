@@ -15,10 +15,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	engineCommon "github.com/onflow/flow-go/network"
-
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -33,6 +32,7 @@ import (
 	module "github.com/onflow/flow-go/module/mocks"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	stateProtocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -146,7 +146,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	request.EXPECT().Force().Return().AnyTimes()
 
-	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	net.EXPECT().Register(gomock.Eq(channels.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
 	deltas, err := NewDeltas(1000)
 	require.NoError(t, err)
@@ -178,6 +178,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		false,
 		checkAuthorizedAtBlock,
 		false,
+		nil,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -572,7 +574,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 
 		blockASnapshot.On("Head").Return(&blockA, nil)
 		blockCSnapshot.On("Head").Return(blockC.Block.Header, nil)
-		blockCSnapshot.On("ValidDescendants").Return(nil, nil)
+		blockCSnapshot.On("Descendants").Return(nil, nil)
 
 		ctx.state.On("AtHeight", blockC.Height()).Return(blockCSnapshot)
 
@@ -1214,7 +1216,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	request := module.NewMockRequester(ctrl)
 	syncConduit := &mocknetwork.Conduit{}
 	var engine *Engine
-	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	net.EXPECT().Register(gomock.Eq(channels.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
@@ -1265,6 +1267,8 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		false,
 		checkAuthorizedAtBlock,
 		false,
+		nil,
+		nil,
 	)
 
 	require.NoError(t, err)
@@ -1509,4 +1513,36 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 			blockH.ID()},
 			pending)
 	})
+}
+
+func TestRetryableUploader(t *testing.T) {
+	testRetryableUploader := new(FakeRetryableUploader)
+
+	engine := &Engine{
+		uploaders: []uploader.Uploader{testRetryableUploader},
+	}
+
+	err := engine.retryUpload()
+	assert.Nil(t, err)
+
+	require.True(t, testRetryableUploader.RetryUploadCalled())
+}
+
+// FakeRetryableUploader is one RetryableUploader for testing purposes.
+type FakeRetryableUploader struct {
+	uploader.RetryableUploaderWrapper
+	retryUploadCalled bool
+}
+
+func (f *FakeRetryableUploader) Upload(_ *execution.ComputationResult) error {
+	return nil
+}
+
+func (f *FakeRetryableUploader) RetryUpload() error {
+	f.retryUploadCalled = true
+	return nil
+}
+
+func (f *FakeRetryableUploader) RetryUploadCalled() bool {
+	return f.retryUploadCalled
 }

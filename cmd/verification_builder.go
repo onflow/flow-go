@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recoveryprotocol "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -24,13 +25,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -88,7 +89,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		processedBlockHeight *badger.ConsumerProgress // used in block consumer
 		chunkQueue           *badger.ChunksQueue      // used in chunk consumer
 
-		syncCore                *synchronization.Core // used in follower engine
+		syncCore                *chainsync.Core       // used in follower engine
 		pendingBlocks           *buffer.PendingBlocks // used in follower engine
 		assignerEngine          *assigner.Engine      // the assigner engine
 		fetcherEngine           *fetcher.Engine       // the fetcher engine
@@ -187,15 +188,18 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", func(node *NodeConfig) error {
 			var err error
 
-			syncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
-			rt := fvm.NewInterpreterRuntime()
-			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
+			vm := fvm.NewVM()
+			fvmOptions := append(
+				[]fvm.Option{fvm.WithLogger(node.Logger)},
+				node.FvmOptions...,
+			)
+			vmCtx := fvm.NewContext(fvmOptions...)
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 			approvalStorage := badger.NewResultApprovals(node.Metrics.Cache, node.DB)
 			verifierEng, err = verifier.New(
@@ -330,6 +334,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			packer := hotsignature.NewConsensusSigDataPacker(committee)
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(committee, packer)
+			validator := validator.New(committee, verifier)
 
 			finalized, pending, err := recoveryprotocol.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
@@ -359,9 +364,10 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				followerState,
 				pendingBlocks,
 				followerCore,
+				validator,
 				syncCore,
 				node.Tracer,
-				compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+				follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)

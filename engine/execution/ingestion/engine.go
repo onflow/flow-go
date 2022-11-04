@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -23,12 +24,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
@@ -66,6 +69,8 @@ type Engine struct {
 	syncFast               bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	pauseExecution         bool
+	executionDataPruner    *pruner.Pruner
+	uploaders              []uploader.Uploader
 }
 
 func New(
@@ -91,6 +96,8 @@ func New(
 	syncFast bool,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pauseExecution bool,
+	pruner *pruner.Pruner,
+	uploaders []uploader.Uploader,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -123,10 +130,12 @@ func New(
 		syncFast:               syncFast,
 		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
 		pauseExecution:         pauseExecution,
+		executionDataPruner:    pruner,
+		uploaders:              uploaders,
 	}
 
 	// move to state syncing engine
-	syncConduit, err := net.Register(network.SyncExecution, &eng)
+	syncConduit, err := net.Register(channels.SyncExecution, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register execution blockSync engine: %w", err)
 	}
@@ -140,6 +149,12 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	if !e.pauseExecution {
+		if computation.GetUploaderEnabled() {
+			if err := e.retryUpload(); err != nil {
+				e.log.Warn().Msg("failed to re-upload all ComputationResults")
+			}
+		}
+
 		err := e.reloadUnexecutedBlocks()
 		if err != nil {
 			e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
@@ -168,7 +183,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -182,7 +197,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 	return fmt.Errorf("ingestion error does not process local events")
 }
 
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -251,7 +266,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 }
 
 func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
-	pendings, err := finalized.ValidDescendants()
+	pendings, err := finalized.Descendants()
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending blocks: %w", err)
 	}
@@ -400,7 +415,8 @@ func (e *Engine) reloadBlock(
 
 // BlockProcessable handles the new verified blocks (blocks that
 // have passed consensus validation) received from the consensus nodes
-// Note: BlockProcessable might be called multiple times for the same block.
+// NOTE: BlockProcessable might be called multiple times for the same block.
+// NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
 func (e *Engine) BlockProcessable(b *flow.Header) {
 
 	// when the flag is on, no block will be executed. Useful for EN to serve
@@ -435,7 +451,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
 
 	span, _, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
-	defer span.Finish()
+	defer span.End()
 
 	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
 	if err != nil {
@@ -567,7 +583,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	startedAt := time.Now()
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
-	defer span.Finish()
+	defer span.End()
 
 	view := e.execState.NewView(*executableBlock.StartState)
 
@@ -639,6 +655,10 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	err = e.onBlockExecuted(executableBlock, finalState)
 	if err != nil {
 		e.log.Err(err).Msg("failed in process block's children")
+	}
+
+	if e.executionDataPruner != nil {
+		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
 	}
 }
 
@@ -811,7 +831,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 	collID := collection.ID()
 
 	span, _, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
-	defer span.Finish()
+	defer span.End()
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
@@ -891,17 +911,22 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 // executed, the chained structure allows us to only check the head of each queue to see if
 // any block becomes executable.
 // for instance we have one queue whose head is A:
-// A <- B <- C
-//   ^- D <- E
+//
+//	A <- B <- C
+//	  ^- D <- E
+//
 // If we receive E <- F, then we will add it to the queue:
-// A <- B <- C
-//   ^- D <- E <- F
+//
+//	A <- B <- C
+//	  ^- D <- E <- F
+//
 // Even through there are 6 blocks, we only need to check if block A becomes executable.
 // when the parent block isn't in the queue, we add it as a new queue. for instance, if
 // we receive H <- G, then the queues will become:
-// A <- B <- C
-//   ^- D <- E
-// G
+//
+//	A <- B <- C
+//	  ^- D <- E
+//	G
 func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool, bool) {
 	for _, queue := range queues.All() {
 		if stored, isNew := queue.TryAdd(blockify); stored {
@@ -1115,7 +1140,7 @@ func (e *Engine) handleComputationResult(
 ) (flow.StateCommitment, *flow.ExecutionReceipt, error) {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEHandleComputationResult)
-	defer span.Finish()
+	defer span.End()
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
@@ -1147,7 +1172,7 @@ func (e *Engine) saveExecutionResults(
 ) (*flow.ExecutionReceipt, error) {
 
 	span, childCtx := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
-	defer span.Finish()
+	defer span.End()
 
 	originalState := startState
 
@@ -1230,6 +1255,16 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 				Msg("extensive log: executed tx content")
 		}
 	}
+}
+
+func (e *Engine) retryUpload() (err error) {
+	for _, u := range e.uploaders {
+		switch retryableUploaderWraper := u.(type) {
+		case uploader.RetryableUploaderWrapper:
+			err = retryableUploaderWraper.RetryUpload()
+		}
+	}
+	return err
 }
 
 func GenerateExecutionReceipt(

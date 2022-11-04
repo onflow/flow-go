@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -32,10 +33,9 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
-	"github.com/onflow/flow-go/fvm"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/finalizer/consensus"
@@ -69,6 +69,7 @@ type GenericNode struct {
 	// context and cancel function used to start/stop components
 	Ctx    irrecoverable.SignalerContext
 	Cancel context.CancelFunc
+	Errs   <-chan error
 
 	Log            zerolog.Logger
 	Metrics        *metrics.NoopCollector
@@ -131,8 +132,13 @@ type CollectionNode struct {
 	EpochManagerEngine *epochmgr.Engine
 }
 
-func (n CollectionNode) Ready() <-chan struct{} {
+func (n CollectionNode) Start(t *testing.T) {
+	go unittest.FailOnIrrecoverableError(t, n.Ctx.Done(), n.Errs)
 	n.IngestionEngine.Start(n.Ctx)
+	n.EpochManagerEngine.Start(n.Ctx)
+}
+
+func (n CollectionNode) Ready() <-chan struct{} {
 	return util.AllReady(
 		n.PusherEngine,
 		n.ProviderEngine,
@@ -204,9 +210,9 @@ type ExecutionNode struct {
 	ReceiptsEngine      *executionprovider.Engine
 	FollowerEngine      *followereng.Engine
 	SyncEngine          *synchronization.Engine
-	DiskWAL             *wal.DiskWAL
+	Compactor           *complete.Compactor
 	BadgerDB            *badger.DB
-	VM                  *fvm.VirtualMachine
+	VM                  computer.VirtualMachine
 	ExecutionState      state.ExecutionState
 	Ledger              ledger.Ledger
 	LevelDbDir          string
@@ -215,7 +221,13 @@ type ExecutionNode struct {
 	MyExecutionReceipts storage.MyExecutionReceipts
 }
 
-func (en ExecutionNode) Ready() {
+func (en ExecutionNode) Ready(ctx context.Context) {
+	// TODO: receipt engine has been migrated to the new component interface, hence
+	// is using Start. Other engines' startup should be refactored once migrated to
+	// new interface.
+	irctx, _ := irrecoverable.WithSignaler(ctx)
+	en.ReceiptsEngine.Start(irctx)
+
 	<-util.AllReady(
 		en.Ledger,
 		en.ReceiptsEngine,
@@ -223,12 +235,15 @@ func (en ExecutionNode) Ready() {
 		en.FollowerEngine,
 		en.RequestEngine,
 		en.SyncEngine,
-		en.DiskWAL,
 	)
 }
 
-func (en ExecutionNode) Done() {
-	util.AllDone(
+func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
+	// to stop all components running with a component manager.
+	cancelFunc()
+
+	// to stop all (deprecated) ready-done-aware
+	<-util.AllDone(
 		en.IngestionEngine,
 		en.IngestionEngine,
 		en.ReceiptsEngine,
@@ -236,7 +251,7 @@ func (en ExecutionNode) Done() {
 		en.FollowerEngine,
 		en.RequestEngine,
 		en.SyncEngine,
-		en.DiskWAL,
+		en.Compactor,
 	)
 	os.RemoveAll(en.LevelDbDir)
 	en.GenericNode.Done()

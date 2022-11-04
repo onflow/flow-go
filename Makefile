@@ -5,6 +5,10 @@ COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
 VERSION := $(shell git describe --tags --abbrev=2 --match "v*" --match "secure-cadence*" 2>/dev/null)
 
+# By default, this will run all tests in all packages, but we have a way to override this in CI so that we can
+# dynamically split up CI jobs into smaller jobs that can be run in parallel
+GO_TEST_PACKAGES := ./...
+
 # Image tag: if image tag is not set, set it with version (or short commit if empty)
 ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${VERSION}
@@ -53,24 +57,24 @@ cmd/util/util:
 .PHONY: unittest-main
 unittest-main:
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
+	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(GO_TEST_PACKAGES)
 
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    GO111MODULE=on go install github.com/vektra/mockery/v2@v2.13.0; \
-    GO111MODULE=on go install github.com/golang/mock/mockgen@v1.3.1;
+    go install github.com/vektra/mockery/v2@v2.13.1; \
+    go install github.com/golang/mock/mockgen@v1.3.1;
 
 ############################################################################################
 
 .PHONY: install-tools
 install-tools: crypto_setup_tests crypto_setup_gopath check-go-version install-mock-generators
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.46.2; \
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.49.0; \
 	cd ${GOPATH}; \
-	GO111MODULE=on go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
-	GO111MODULE=on go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
-	GO111MODULE=on go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
-	GO111MODULE=on go install golang.org/x/tools/cmd/stringer@master;
+	go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
+	go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
+	go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
+	go install golang.org/x/tools/cmd/stringer@master;
 
 .PHONY: unittest
 unittest: unittest-main
@@ -80,10 +84,15 @@ unittest: unittest-main
 .PHONY: emulator-build
 emulator-build:
 	# test the fvm package compiles with Relic library disabled (required for the emulator build)
-	cd ./fvm && GO111MODULE=on go test ./... -run=NoTestHasThisPrefix
+	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
+
+.PHONY: emulator-build
+fuzz-fvm:
+	# run fuzz tests in the fvm package
+	cd ./fvm && go test -fuzz=Fuzz -run ^$$ --tags relic
 
 .PHONY: test
-test: generate-mocks emulator-build unittest
+test: verify-mocks emulator-build unittest
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -116,48 +125,57 @@ generate: generate-proto generate-mocks
 generate-proto:
 	prototool generate protobuf
 
+.PHONY: verify-mocks
+verify-mocks: generate-mocks
+	git diff --exit-code
+
 .PHONY: generate-mocks
-generate-mocks:
-	GO111MODULE=on mockery --name '(Connector|PingInfoProvider)' --dir=network/p2p --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
-	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
-	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Local,Requester
-	GO111MODULE=on mockgen -destination=network/mocknetwork/engine.go -package=mocknetwork github.com/onflow/flow-go/network Engine
-	GO111MODULE=on mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network Network
-	GO111MODULE=on mockery --name '(ExecutionDataService|ExecutionDataCIDCache|ExecutionDataRequester)' --dir=module/state_synchronization --case=underscore --output="./module/state_synchronization/mock" --outpkg="state_synchronization"
-	GO111MODULE=on mockery --name 'ExecutionState' --dir=engine/execution/state --case=underscore --output="engine/execution/state/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name 'BlockComputer' --dir=engine/execution/computation/computer --case=underscore --output="engine/execution/computation/computer/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name 'ComputationManager' --dir=engine/execution/computation --case=underscore --output="engine/execution/computation/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name 'EpochComponentsFactory' --dir=engine/collection/epochmgr --case=underscore --output="engine/collection/epochmgr/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name 'Backend' --dir=engine/collection/rpc --case=underscore --output="engine/collection/rpc/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name 'ProviderEngine' --dir=engine/execution/provider --case=underscore --output="engine/execution/provider/mock" --outpkg="mock"
-	(cd ./crypto && GO111MODULE=on mockery --name 'PublicKey' --case=underscore --output="../module/mock" --outpkg="mock")
-	GO111MODULE=on mockery --name '.*' --dir=state/cluster --case=underscore --output="state/cluster/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir=module --case=underscore --tags="relic" --output="./module/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir=module/mempool --case=underscore --output="./module/mempool/mock" --outpkg="mempool"
-	GO111MODULE=on mockery --name '.*' --dir=module/component --case=underscore --output="./module/component/mock" --outpkg="component"
-	GO111MODULE=on mockery --name '.*' --dir=network --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
-	GO111MODULE=on mockery --name '.*' --dir=storage --case=underscore --output="./storage/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir="state/protocol" --case=underscore --output="state/protocol/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir="state/protocol/events" --case=underscore --output="./state/protocol/events/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir=engine/execution/computation/computer --case=underscore --output="./engine/execution/computation/computer/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir=engine/execution/state --case=underscore --output="./engine/execution/state/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir=engine/consensus --case=underscore --output="./engine/consensus/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir=engine/consensus/approvals --case=underscore --output="./engine/consensus/approvals/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir=fvm --case=underscore --output="./fvm/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir=fvm/state --case=underscore --output="./fvm/mock/state" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir=ledger --case=underscore --output="./ledger/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name 'SubscriptionManager' --dir=network/ --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
-	GO111MODULE=on mockery --name 'Vertex' --dir="./module/forest" --case=underscore --output="./module/forest/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir="./consensus/hotstuff" --case=underscore --output="./consensus/hotstuff/mocks" --outpkg="mocks"
-	GO111MODULE=on mockery --name '.*' --dir="./engine/access/wrapper" --case=underscore --output="./engine/access/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name 'API' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/backend" --case=underscore --output="./engine/access/rpc/backend/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name 'IngestRPC' --dir="./engine/execution/ingestion" --case=underscore --tags relic --output="./engine/execution/ingestion/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
-	GO111MODULE=on mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
-	GO111MODULE=on mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
-	GO111MODULE=on mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
-	GO111MODULE=on mockery --name '.*' --dir=./cmd/util/ledger/reporters --case=underscore --output="./cmd/util/ledger/reporters/mock" --outpkg="mock"
+generate-mocks: install-mock-generators
+	mockery --name '(Connector|PingInfoProvider)' --dir=network/p2p --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
+	mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
+	mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Local,Requester
+	mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network Network
+	mockery --name='.*' --dir=integration/benchmark/mocksiface --case=underscore --output="integration/benchmark/mock" --outpkg="mock"
+	mockery --name=ExecutionDataStore --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
+	mockery --name=Downloader --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
+	mockery --name 'ExecutionDataRequester' --dir=module/state_synchronization --case=underscore --output="./module/state_synchronization/mock" --outpkg="state_synchronization"
+	mockery --name 'ExecutionState' --dir=engine/execution/state --case=underscore --output="engine/execution/state/mock" --outpkg="mock"
+	mockery --name 'BlockComputer' --dir=engine/execution/computation/computer --case=underscore --output="engine/execution/computation/computer/mock" --outpkg="mock"
+	mockery --name 'ComputationManager' --dir=engine/execution/computation --case=underscore --output="engine/execution/computation/mock" --outpkg="mock"
+	mockery --name 'EpochComponentsFactory' --dir=engine/collection/epochmgr --case=underscore --output="engine/collection/epochmgr/mock" --outpkg="mock"
+	mockery --name 'Backend' --dir=engine/collection/rpc --case=underscore --output="engine/collection/rpc/mock" --outpkg="mock"
+	mockery --name 'ProviderEngine' --dir=engine/execution/provider --case=underscore --output="engine/execution/provider/mock" --outpkg="mock"
+	(cd ./crypto && mockery --name 'PublicKey' --case=underscore --output="../module/mock" --outpkg="mock")
+	mockery --name '.*' --dir=state/cluster --case=underscore --output="state/cluster/mock" --outpkg="mock"
+	mockery --name '.*' --dir=module --case=underscore --tags="relic" --output="./module/mock" --outpkg="mock"
+	mockery --name '.*' --dir=module/mempool --case=underscore --output="./module/mempool/mock" --outpkg="mempool"
+	mockery --name '.*' --dir=module/component --case=underscore --output="./module/component/mock" --outpkg="component"
+	mockery --name '.*' --dir=network --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
+	mockery --name '.*' --dir=storage --case=underscore --output="./storage/mock" --outpkg="mock"
+	mockery --name '.*' --dir="state/protocol" --case=underscore --output="state/protocol/mock" --outpkg="mock"
+	mockery --name '.*' --dir="state/protocol/events" --case=underscore --output="./state/protocol/events/mock" --outpkg="mock"
+	mockery --name '.*' --dir=engine/execution/computation/computer --case=underscore --output="./engine/execution/computation/computer/mock" --outpkg="mock"
+	mockery --name '.*' --dir=engine/execution/state --case=underscore --output="./engine/execution/state/mock" --outpkg="mock"
+	mockery --name '.*' --dir=engine/consensus --case=underscore --output="./engine/consensus/mock" --outpkg="mock"
+	mockery --name '.*' --dir=engine/consensus/approvals --case=underscore --output="./engine/consensus/approvals/mock" --outpkg="mock"
+	mockery --name '.*' --dir=fvm --case=underscore --output="./fvm/mock" --outpkg="mock"
+	mockery --name '.*' --dir=fvm/environment --case=underscore --output="./fvm/environment/mock" --outpkg="mock"
+	mockery --name '.*' --dir=fvm/state --case=underscore --output="./fvm/mock/state" --outpkg="mock"
+	mockery --name '.*' --dir=ledger --case=underscore --output="./ledger/mock" --outpkg="mock"
+	mockery --name 'ViolationsConsumer' --dir=network/slashing --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
+	mockery --name 'Vertex' --dir="./module/forest" --case=underscore --output="./module/forest/mock" --outpkg="mock"
+	mockery --name '.*' --dir="./consensus/hotstuff" --case=underscore --output="./consensus/hotstuff/mocks" --outpkg="mocks"
+	mockery --name '.*' --dir="./engine/access/wrapper" --case=underscore --output="./engine/access/mock" --outpkg="mock"
+	mockery --name 'API' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
+	mockery --name 'API' --dir="./engine/protocol" --case=underscore --output="./engine/protocol/mock" --outpkg="mock"
+	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/backend" --case=underscore --output="./engine/access/rpc/backend/mock" --outpkg="mock"
+	mockery --name 'IngestRPC' --dir="./engine/execution/ingestion" --case=underscore --tags relic --output="./engine/execution/ingestion/mock" --outpkg="mock"
+	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
+	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
+	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
+	mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
+	mockery --name '.*' --dir=./cmd/util/ledger/reporters --case=underscore --output="./cmd/util/ledger/reporters/mock" --outpkg="mock"
+	mockery --name 'Storage' --dir=module/executiondatasync/tracker --case=underscore --output="module/executiondatasync/tracker/mock" --outpkg="mocktracker"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -170,12 +188,12 @@ tidy:
 
 .PHONY: lint
 lint: tidy
-	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
+	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic ./...
 
 .PHONY: fix-lint
 fix-lint:
-	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
+	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic --fix ./...
 
 # Runs unit tests, SKIP FOR NOW linter, coverage
@@ -197,7 +215,7 @@ ci-benchmark: install-tools
 # Runs unit tests, test coverage, lint in Docker (for mac)
 .PHONY: docker-ci
 docker-ci:
-	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
+	docker run --env RACE_DETECTOR=$(RACE_DETECTOR) --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
 		-v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
@@ -326,7 +344,7 @@ tool-transit: docker-build-bootstrap-transit
 
 .PHONY: docker-build-loader
 docker-build-loader:
-	docker build -f ./integration/loader/Dockerfile --build-arg TARGET=./loader --target production \
+	docker build -f ./integration/benchmark/cmd/manual/Dockerfile --build-arg TARGET=./benchmark/cmd/manual --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
@@ -472,10 +490,17 @@ PHONY: tool-remove-execution-fork
 tool-remove-execution-fork: docker-build-remove-execution-fork
 	docker container create --name remove-execution-fork $(CONTAINER_REGISTRY)/remove-execution-fork:latest;docker container cp remove-execution-fork:/bin/app ./remove-execution-fork;docker container rm remove-execution-fork
 
-# Check if the go version is 1.16 or higher. flow-go only supports go 1.16 and up.
 .PHONY: check-go-version
 check-go-version:
-	go version | grep '1.1[6-9]'
+	@bash -c '\
+		MINGOVERSION=1.18; \
+		function ver { printf "%d%03d%03d%03d" $$(echo "$$1" | tr . " "); }; \
+		GOVER=$$(go version | sed -rne "s/.* go([0-9.]+).*/\1/p" ); \
+		if [ "$$(ver $$GOVER)" -lt "$$(ver $$MINGOVERSION)" ]; then \
+			echo "go $$GOVER is too old. flow-go only supports go $$MINGOVERSION and up."; \
+			exit 1; \
+		fi; \
+		'
 
 #----------------------------------------------------------------------
 # CD COMMANDS

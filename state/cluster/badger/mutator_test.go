@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
@@ -253,6 +254,18 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 
 	err := suite.state.Extend(&block)
 	suite.Assert().Error(err)
+}
+
+// TestExtend_InvalidParentView tests if mutator rejects block with invalid ParentView. ParentView must be consistent
+// with view of block referred by ParentID.
+func (suite *MutatorSuite) TestExtend_InvalidParentView() {
+	block := suite.Block()
+	// change the block parent view
+	block.Header.ParentView--
+
+	err := suite.state.Extend(&block)
+	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_DuplicateTxInPayload() {

@@ -19,10 +19,11 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	synccore "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
-	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
 )
@@ -42,7 +43,7 @@ type Engine struct {
 	me           module.Local
 	participants flow.IdentityList
 	con          network.Conduit
-	comp         network.Engine // compliance layer engine
+	comp         network.MessageProcessor // compliance layer engine
 
 	pollInterval time.Duration
 	scanInterval time.Duration
@@ -65,7 +66,7 @@ func New(
 	participants flow.IdentityList,
 	state cluster.State,
 	blocks storage.ClusterBlocks,
-	comp network.Engine,
+	comp network.MessageProcessor,
 	core module.SyncCore,
 	opts ...commonsync.OptionFunc,
 ) (*Engine, error) {
@@ -105,7 +106,7 @@ func New(
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(network.ChannelSyncCluster(chainID), e)
+	con, err := net.Register(channels.SyncCluster(chainID), e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -202,7 +203,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	err := e.Process(channel, originID, event)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("internal error processing event")
@@ -216,7 +217,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	err := e.process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
@@ -230,8 +231,8 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 
 // process processes events for the synchronization engine.
 // Error returns:
-//  * IncompatibleInputTypeError if input has unexpected type
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+//   - IncompatibleInputTypeError if input has unexpected type
+//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
@@ -306,7 +307,13 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 			OriginID: originID,
 			Block:    block,
 		}
-		e.comp.SubmitLocal(synced)
+		// forward the block to the compliance engine for validation and processing
+		// we use the network.MessageProcessor interface here because the block is un-validated
+		// NOTE: although we set originID=me, this message is untrusted
+		err := e.comp.Process(channels.SyncCluster(block.Header.ChainID), e.me.NodeID(), synced)
+		if err != nil {
+			e.log.Err(err).Msg("received unexpected error from compliance engine")
+		}
 	}
 }
 

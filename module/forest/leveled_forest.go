@@ -32,12 +32,12 @@ type VertexList []*vertexContainer
 type VertexSet map[flow.Identifier]*vertexContainer
 
 // vertexContainer holds information about a tree vertex. Internally, we distinguish between
-// * FULL container: has non-nil value for vertex.
-//   Used for vertices, which have been added to the tree.
-// * EMPTY container: has NIL value for vertex.
-//   Used for vertices, which have NOT been added to the tree, but are
-//   referenced by vertices in the tree. An empty container is converted to a
-//   full container when the respective vertex is added to the tree
+//   - FULL container: has non-nil value for vertex.
+//     Used for vertices, which have been added to the tree.
+//   - EMPTY container: has NIL value for vertex.
+//     Used for vertices, which have NOT been added to the tree, but are
+//     referenced by vertices in the tree. An empty container is converted to a
+//     full container when the respective vertex is added to the tree
 type vertexContainer struct {
 	id       flow.Identifier
 	level    uint64
@@ -230,24 +230,29 @@ func (f *LevelledForest) getOrCreateVertexContainer(id flow.Identifier, level ui
 
 // VerifyVertex verifies that adding vertex `v` would yield a valid Levelled Forest.
 // Specifically, we verify that _all_ of the following conditions are satisfied:
-// (1) `v.Level()` must be strictly larger than the level that `v` reports
+//
+//  1. `v.Level()` must be strictly larger than the level that `v` reports
 //     for its parent (maintains an acyclic graph).
-// (2) If a vertex with the same ID as `v.VertexID()` exists in the graph or is
+//
+//  2. If a vertex with the same ID as `v.VertexID()` exists in the graph or is
 //     referenced by another vertex within the graph, the level must be identical.
 //     (In other words, we don't have vertices with the same ID but different level)
-// (3) Let `ParentLevel`, `ParentID` denote the level, ID that `v` reports for its parent.
+//
+//  3. Let `ParentLevel`, `ParentID` denote the level, ID that `v` reports for its parent.
 //     If a vertex with `ParentID` exists (or is referenced by other vertices as their parent),
 //     we require that the respective level is identical to `ParentLevel`.
+//
 // Notes:
-//  * If `v.Level()` has already been pruned, adding it to the forest is a NoOp.
-//    Hence, any vertex with level below the pruning threshold automatically passes.
-//  * By design, the LevelledForest does _not_ touch the parent information for vertices
-//    that are on the lowest retained level. Thereby, it is possible to initialize the
-//    LevelledForest with a root vertex at the lowest retained level, without this root
-//    needing to have a parent. Furthermore, the root vertex can be at level 0 and in
-//    absence of a parent still satisfy the condition that any parent must be of lower level
-//    (mathematical principle of vacuous truth) without the implementation needing to worry
-//    about unsigned integer underflow.
+//   - If `v.Level()` has already been pruned, adding it to the forest is a NoOp.
+//     Hence, any vertex with level below the pruning threshold automatically passes.
+//   - By design, the LevelledForest does _not_ touch the parent information for vertices
+//     that are on the lowest retained level. Thereby, it is possible to initialize the
+//     LevelledForest with a root vertex at the lowest retained level, without this root
+//     needing to have a parent. Furthermore, the root vertex can be at level 0 and in
+//     absence of a parent still satisfy the condition that any parent must be of lower level
+//     (mathematical principle of vacuous truth) without the implementation needing to worry
+//     about unsigned integer underflow.
+//
 // Error returns:
 // * InvalidVertexError if the input vertex is invalid for insertion to the forest.
 func (f *LevelledForest) VerifyVertex(v Vertex) error {

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -75,7 +74,7 @@ func moveMachineAcctRun(cmd *cobra.Command, args []string) {
 	// identities with machine accounts
 	machineAcctIdentities := identities.Filter(filter.HasRole(flow.RoleCollection, flow.RoleConsensus))
 
-	machineAcctFiles, err := ioutil.ReadDir(flagMachineAccountsSrcDir)
+	machineAcctFiles, err := os.ReadDir(flagMachineAccountsSrcDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read machine account dir")
 	}

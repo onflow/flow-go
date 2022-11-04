@@ -4,19 +4,20 @@ import (
 	"fmt"
 
 	"github.com/ipfs/go-datastore"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 type RelayNetwork struct {
 	originNet      network.Network
 	destinationNet network.Network
 	logger         zerolog.Logger
-	channels       network.ChannelList
+	channels       map[channels.Channel]channels.Channel
 }
 
 var _ network.Network = (*RelayNetwork)(nil)
@@ -25,7 +26,7 @@ func NewRelayNetwork(
 	originNetwork network.Network,
 	destinationNetwork network.Network,
 	logger zerolog.Logger,
-	channels []network.Channel,
+	channels map[channels.Channel]channels.Channel,
 ) *RelayNetwork {
 	return &RelayNetwork{
 		originNet:      originNetwork,
@@ -35,12 +36,14 @@ func NewRelayNetwork(
 	}
 }
 
-func (r *RelayNetwork) Register(channel network.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
-	if !r.channels.Contains(channel) {
+func (r *RelayNetwork) Register(channel channels.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
+	// Only relay configured channels
+	dstChannel, ok := r.channels[channel]
+	if !ok {
 		return r.originNet.Register(channel, messageProcessor)
 	}
 
-	relayer, err := NewRelayer(r.destinationNet, channel, messageProcessor)
+	relayer, err := NewRelayer(r.destinationNet, dstChannel, messageProcessor)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to register relayer on origin network: %w", err)
@@ -69,7 +72,7 @@ func (r *RelayNetwork) Done() <-chan struct{} {
 	return util.AllDone(r.originNet, r.destinationNet)
 }
 
-func (r *RelayNetwork) RegisterBlobService(channel network.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
+func (r *RelayNetwork) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
 	return r.originNet.RegisterBlobService(channel, store, opts...)
 }
 

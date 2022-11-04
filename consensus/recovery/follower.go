@@ -15,16 +15,16 @@ import (
 // instance to recover its state from before the restart.
 func Follower(
 	log zerolog.Logger,
-	finalizer hotstuff.Forks,
+	forks hotstuff.Forks,
 	validator hotstuff.Validator,
 	finalized *flow.Header,
 	pending []*flow.Header,
 ) error {
 	return Recover(log, finalized, pending, validator, func(proposal *model.Proposal) error {
-		// add it to finalizer
-		err := finalizer.AddProposal(proposal)
+		// add it to forks
+		err := forks.AddProposal(proposal)
 		if err != nil {
-			return fmt.Errorf("could not add block to finalizer: %w", err)
+			return fmt.Errorf("could not add block to forks: %w", err)
 		}
 		log.Debug().
 			Uint64("block_view", proposal.Block.View).
