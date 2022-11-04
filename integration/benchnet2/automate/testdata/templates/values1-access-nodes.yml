@@ -45,26 +45,26 @@ access:
   nodes:
     access1:
       args:
-        - "--bootstrapdir=/bootstrap"
-        - "--datadir=/data/protocol"
-        - "--secretsdir=/data/secret"
-        - "--loglevel=INFO"
-        - "--profiler-enabled=false"
-        - "--profile-uploader-enabled=false"
-        - "--tracer-enabled=false"
-        - "--profiler-dir=/profiler"
-        - "--profiler-interval=2m"
-        - "--bind=0.0.0.0:3569"
-        - "--nodeid={{.node_id}}"
-        - "--rpc-addr=0.0.0.0:9000"
-        - "--secure-rpc-addr=0.0.0.0:9001"
-        - "--http-addr=0.0.0.0:8000"
-        - "--collection-ingress-port=9000"
-        - "--supports-observer=true"
-        - "--public-network-address=0.0.0.0:1234"
-        - "--log-tx-time-to-finalized"
-        - "--log-tx-time-to-executed"
-        - "--log-tx-time-to-finalized-executed"
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --loglevel=INFO
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --bind=0.0.0.0:3569
+        - --nodeid={{.node_id}}
+        - --rpc-addr=0.0.0.0:9000
+        - --secure-rpc-addr=0.0.0.0:9001
+        - --http-addr=0.0.0.0:8000
+        - --collection-ingress-port=9000
+        - --supports-observer=true
+        - --public-network-address=0.0.0.0:1234
+        - --log-tx-time-to-finalized
+        - --log-tx-time-to-executed
+        - --log-tx-time-to-finalized-executed
       env:
         - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
           value: http://tempo:4317
