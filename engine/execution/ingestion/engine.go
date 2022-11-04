@@ -1060,7 +1060,10 @@ func (e *Engine) matchOrRequestCollections(
 			return fmt.Errorf("could not find guarantors: %w", err)
 		}
 		// queue the collection to be requested from one of the guarantors
-		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantors...))
+		e.request.EntityByID(guarantee.ID(), filter.And(
+			filter.HasNodeID(guarantors...),
+			filter.OnlyDapper,
+		))
 		actualRequested++
 	}
 
