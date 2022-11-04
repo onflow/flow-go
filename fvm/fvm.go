@@ -44,7 +44,7 @@ type Procedure interface {
 	Run(
 		ctx Context,
 		txnState *state.TransactionState,
-		programs *programs.TransactionPrograms,
+		derivedTxnData *programs.DerivedTransactionData,
 	) error
 
 	ComputationLimit(ctx Context) uint64
@@ -85,21 +85,21 @@ func (vm *VirtualMachine) Run(
 	proc Procedure,
 	v state.View,
 ) error {
-	blockPrograms := ctx.BlockPrograms
-	if blockPrograms == nil {
-		blockPrograms = programs.NewEmptyBlockProgramsWithTransactionOffset(
+	derivedBlockData := ctx.DerivedBlockData
+	if derivedBlockData == nil {
+		derivedBlockData = programs.NewEmptyDerivedBlockDataWithTransactionOffset(
 			uint32(proc.ExecutionTime()))
 	}
 
-	var txnPrograms *programs.TransactionPrograms
+	var derivedTxnData *programs.DerivedTransactionData
 	var err error
 	switch proc.Type() {
 	case ScriptProcedureType:
-		txnPrograms, err = blockPrograms.NewSnapshotReadTransactionPrograms(
+		derivedTxnData, err = derivedBlockData.NewSnapshotReadDerivedTransactionData(
 			proc.InitialSnapshotTime(),
 			proc.ExecutionTime())
 	case TransactionProcedureType, BootstrapProcedureType:
-		txnPrograms, err = blockPrograms.NewTransactionPrograms(
+		derivedTxnData, err = derivedBlockData.NewDerivedTransactionData(
 			proc.InitialSnapshotTime(),
 			proc.ExecutionTime())
 	default:
@@ -107,7 +107,7 @@ func (vm *VirtualMachine) Run(
 	}
 
 	if err != nil {
-		return fmt.Errorf("error creating transaction programs: %w", err)
+		return fmt.Errorf("error creating derived transaction data: %w", err)
 	}
 
 	meterParams := meter.DefaultParameters().
@@ -117,7 +117,7 @@ func (vm *VirtualMachine) Run(
 	meterParams, err = getEnvironmentMeterParameters(
 		ctx,
 		v,
-		txnPrograms,
+		derivedTxnData,
 		meterParams,
 	)
 	if err != nil {
@@ -142,18 +142,18 @@ func (vm *VirtualMachine) Run(
 			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
-	err = proc.Run(ctx, txnState, txnPrograms)
+	err = proc.Run(ctx, txnState, derivedTxnData)
 	if err != nil {
 		return err
 	}
 
-	// Note: it is safe to skip committing the parsed programs for non-normal
+	// Note: it is safe to skip committing derived data for non-normal
 	// transactions (i.e., bootstrap and script) since these do not invalidate
-	// programs.
+	// derived data entries.
 	if proc.Type() == TransactionProcedureType {
-		// NOTE: It is not safe to ignore txnPrograms' commit error for
-		// transactions that trigger programs invalidation.
-		return txnPrograms.Commit()
+		// NOTE: It is not safe to ignore derivedTxnData' commit error for
+		// transactions that trigger derived data invalidation.
+		return derivedTxnData.Commit()
 	}
 
 	return nil
@@ -176,21 +176,21 @@ func (vm *VirtualMachine) GetAccount(
 			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
 	)
 
-	blockPrograms := ctx.BlockPrograms
-	if blockPrograms == nil {
-		blockPrograms = programs.NewEmptyBlockPrograms()
+	derivedBlockData := ctx.DerivedBlockData
+	if derivedBlockData == nil {
+		derivedBlockData = programs.NewEmptyDerivedBlockData()
 	}
 
-	txnPrograms, err := blockPrograms.NewSnapshotReadTransactionPrograms(
+	derviedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
 		programs.EndOfBlockExecutionTime,
 		programs.EndOfBlockExecutionTime)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"error creating transaction programs for GetAccount: %w",
+			"error creating derived transaction data for GetAccount: %w",
 			err)
 	}
 
-	env := NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
+	env := NewScriptEnv(context.Background(), ctx, txnState, derviedTxnData)
 	account, err := env.GetAccount(address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {

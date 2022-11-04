@@ -51,7 +51,7 @@ func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(num)
 	require.NoError(b, err)
 
-	addresses, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
+	addresses, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
 	require.NoError(b, err)
 
 	accs := &testAccounts{
@@ -73,10 +73,10 @@ func mustFundAccounts(
 	execCtx fvm.Context,
 	accs *testAccounts,
 ) {
-	blockPrograms := programs.NewEmptyBlockPrograms()
+	derivedBlockData := programs.NewEmptyDerivedBlockData()
 	execCtx = fvm.NewContextFromParent(
 		execCtx,
-		fvm.WithBlockPrograms(blockPrograms))
+		fvm.WithDerivedBlockData(derivedBlockData))
 
 	var err error
 	for _, acc := range accs.accounts {
@@ -87,7 +87,7 @@ func mustFundAccounts(
 
 		tx := fvm.Transaction(
 			transferTx,
-			blockPrograms.NextTxIndexForTestingOnly())
+			derivedBlockData.NextTxIndexForTestingOnly())
 		err = vm.Run(execCtx, tx, ledger)
 		require.NoError(b, err)
 		require.NoError(b, tx.Err)
@@ -145,15 +145,15 @@ func BenchmarkComputeBlock(b *testing.B) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), tracer, zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(b, err)
 
-	programsCache, err := programs.NewChainPrograms(
-		programs.DefaultProgramsCacheSize)
+	derivedChainData, err := programs.NewDerivedChainData(
+		programs.DefaultDerivedDataCacheSize)
 	require.NoError(b, err)
 
 	engine := &Manager{
-		blockComputer: blockComputer,
-		tracer:        tracer,
-		me:            me,
-		programsCache: programsCache,
+		blockComputer:    blockComputer,
+		tracer:           tracer,
+		me:               me,
+		derivedChainData: derivedChainData,
 	}
 
 	view := delta.NewView(ledger.Get)

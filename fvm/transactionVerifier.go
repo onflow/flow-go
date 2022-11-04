@@ -35,7 +35,7 @@ func (v *TransactionVerifier) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	_ *programs.TransactionPrograms,
+	_ *programs.DerivedTransactionData,
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error

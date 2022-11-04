@@ -14,8 +14,8 @@ type invalidatableEntry[TVal any] struct {
 	isInvalid bool // Guarded by BlockDerivedData' lock.
 }
 
-// BlockDerivedData is a simple fork-aware OCC database for "caching" given types
-// of data for a particular block.
+// BlockDerivedData is a rudimentary fork-aware OCC database table for
+// "caching" a given type of data for a particular block.
 //
 // Since data are derived from external source, the database need not be
 // durable and can be recreated on the fly.
@@ -52,7 +52,9 @@ type TransactionDerivedData[TKey comparable, TVal any] struct {
 	invalidators              chainedDerivedDataInvalidators[TKey, TVal]
 }
 
-func newEmptyBlockDerivedData[TKey comparable, TVal any](latestCommit LogicalTime) *BlockDerivedData[TKey, TVal] {
+func newEmptyBlockDerivedData[TKey comparable, TVal any](
+	latestCommit LogicalTime,
+) *BlockDerivedData[TKey, TVal] {
 	return &BlockDerivedData[TKey, TVal]{
 		items:                     map[TKey]*invalidatableEntry[TVal]{},
 		latestCommitExecutionTime: latestCommit,

@@ -235,7 +235,7 @@ func Bootstrap(
 func (b *BootstrapProcedure) NewExecutor(
 	ctx Context,
 	txnState *state.TransactionState,
-	_ *programs.TransactionPrograms,
+	_ *programs.DerivedTransactionData,
 ) ProcedureExecutor {
 	return newBootstrapExecutor(b.BootstrapParams, ctx, txnState)
 }
@@ -243,9 +243,9 @@ func (b *BootstrapProcedure) NewExecutor(
 func (b *BootstrapProcedure) Run(
 	ctx Context,
 	txnState *state.TransactionState,
-	txnPrograms *programs.TransactionPrograms,
+	derivedTxnData *programs.DerivedTransactionData,
 ) error {
-	return run(b.NewExecutor(ctx, txnState, txnPrograms))
+	return run(b.NewExecutor(ctx, txnState, derivedTxnData))
 }
 
 func (proc *BootstrapProcedure) ComputationLimit(_ Context) uint64 {
@@ -899,11 +899,11 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		WithTransactionFeesEnabled(false),
 	)
 
-	// use new programs for each meta transaction.
-	// It's not necessary to use a program cache during bootstrapping and most transactions are contract deploys anyway.
+	// use new derived transaction data for each meta transaction.
+	// It's not necessary to cache during bootstrapping and most transactions are contract deploys anyway.
 	prog, err := programs.
-		NewEmptyBlockPrograms().
-		NewTransactionPrograms(0, 0)
+		NewEmptyDerivedBlockData().
+		NewDerivedTransactionData(0, 0)
 
 	if err != nil {
 		return nil, err

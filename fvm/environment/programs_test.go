@@ -114,7 +114,7 @@ func Test_Programs(t *testing.T) {
 	txnState := state.NewTransactionState(mainView, state.DefaultParameters())
 
 	vm := fvm.NewVirtualMachine()
-	programs := programsStorage.NewEmptyBlockPrograms()
+	derivedTxnData := programsStorage.NewEmptyDerivedBlockData()
 
 	accounts := environment.NewAccounts(txnState)
 
@@ -137,7 +137,7 @@ func Test_Programs(t *testing.T) {
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithCadenceLogging(true),
-		fvm.WithBlockPrograms(programs))
+		fvm.WithDerivedBlockData(derivedTxnData))
 
 	var contractAView *delta.View = nil
 	var contractBView *delta.View = nil
@@ -151,7 +151,7 @@ func Test_Programs(t *testing.T) {
 		// deploy contract A0
 		procContractA0 := fvm.Transaction(
 			contractDeployTx("A", contractA0Code, addressA),
-			programs.NextTxIndexForTestingOnly())
+			derivedTxnData.NextTxIndexForTestingOnly())
 		err = vm.Run(context, procContractA0, mainView)
 		require.NoError(t, err)
 
@@ -163,7 +163,7 @@ func Test_Programs(t *testing.T) {
 		// deploy contract A
 		procContractA := fvm.Transaction(
 			updateContractTx("A", contractACode, addressA),
-			programs.NextTxIndexForTestingOnly())
+			derivedTxnData.NextTxIndexForTestingOnly())
 		err = vm.Run(context, procContractA, mainView)
 		require.NoError(t, err)
 		require.NoError(t, procContractA.Err)
@@ -180,7 +180,7 @@ func Test_Programs(t *testing.T) {
 		// deploy contract A
 		procContractA := fvm.Transaction(
 			contractDeployTx("A", contractACode, addressA),
-			programs.NextTxIndexForTestingOnly())
+			derivedTxnData.NextTxIndexForTestingOnly())
 		err := vm.Run(context, procContractA, mainView)
 		require.NoError(t, err)
 
@@ -189,7 +189,7 @@ func Test_Programs(t *testing.T) {
 		// run a TX using contract A
 		procCallA := fvm.Transaction(
 			callTx("A", addressA),
-			programs.NextTxIndexForTestingOnly())
+			derivedTxnData.NextTxIndexForTestingOnly())
 
 		loadedCode := false
 		viewExecA := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
@@ -209,7 +209,7 @@ func Test_Programs(t *testing.T) {
 		// Make sure the code has been loaded from storage
 		require.True(t, loadedCode)
 
-		entry := programs.GetForTestingOnly(contractALocation)
+		entry := derivedTxnData.GetForTestingOnly(contractALocation)
 		require.NotNil(t, entry)
 
 		// type assertion for further inspections
@@ -236,7 +236,7 @@ func Test_Programs(t *testing.T) {
 
 		procCallA = fvm.Transaction(
 			callTx("A", addressA),
-			programs.NextTxIndexForTestingOnly())
+			derivedTxnData.NextTxIndexForTestingOnly())
 
 		err = vm.Run(context, procCallA, viewExecA2)
 		require.NoError(t, err)
@@ -257,12 +257,12 @@ func Test_Programs(t *testing.T) {
 		// deploy contract B
 		procContractB := fvm.Transaction(
 			contractDeployTx("B", contractBCode, addressB),
-			programs.NextTxIndexForTestingOnly())
+			derivedTxnData.NextTxIndexForTestingOnly())
 		err := vm.Run(context, procContractB, mainView)
 		require.NoError(t, err)
 
-		entryA := programs.GetForTestingOnly(contractALocation)
-		entryB := programs.GetForTestingOnly(contractBLocation)
+		entryA := derivedTxnData.GetForTestingOnly(contractALocation)
+		entryB := derivedTxnData.GetForTestingOnly(contractBLocation)
 
 		require.Nil(t, entryA)
 		require.Nil(t, entryB)
@@ -277,7 +277,7 @@ func Test_Programs(t *testing.T) {
 		// run a TX using contract B
 		procCallB := fvm.Transaction(
 			callTx("B", addressB),
-			programs.NextTxIndexForTestingOnly())
+			derivedTxnData.NextTxIndexForTestingOnly())
 
 		viewExecB = delta.NewView(mainView.Peek)
 
@@ -286,7 +286,7 @@ func Test_Programs(t *testing.T) {
 
 		require.Contains(t, procCallB.Logs, "\"hello from B but also hello from A\"")
 
-		entry := programs.GetForTestingOnly(contractALocation)
+		entry := derivedTxnData.GetForTestingOnly(contractALocation)
 		require.NotNil(t, entry)
 
 		// state should be essentially the same as one which we got in tx with contract A
@@ -295,7 +295,7 @@ func Test_Programs(t *testing.T) {
 
 		compareViews(t, contractAView, deltaA)
 
-		entryB := programs.GetForTestingOnly(contractBLocation)
+		entryB := derivedTxnData.GetForTestingOnly(contractBLocation)
 		require.NotNil(t, entryB)
 
 		// program B should contain all the registers used by program A, as it depends on it
@@ -337,7 +337,7 @@ func Test_Programs(t *testing.T) {
 
 		procCallB = fvm.Transaction(
 			callTx("B", addressB),
-			programs.NextTxIndexForTestingOnly())
+			derivedTxnData.NextTxIndexForTestingOnly())
 
 		err = vm.Run(context, procCallB, viewExecB2)
 		require.NoError(t, err)
@@ -364,7 +364,7 @@ func Test_Programs(t *testing.T) {
 		// run a TX using contract A
 		procCallA := fvm.Transaction(
 			callTx("A", addressA),
-			programs.NextTxIndexForTestingOnly())
+			derivedTxnData.NextTxIndexForTestingOnly())
 
 		err = vm.Run(context, procCallA, viewExecA)
 		require.NoError(t, err)
@@ -384,13 +384,13 @@ func Test_Programs(t *testing.T) {
 		// deploy contract C
 		procContractC := fvm.Transaction(
 			contractDeployTx("C", contractCCode, addressC),
-			programs.NextTxIndexForTestingOnly())
+			derivedTxnData.NextTxIndexForTestingOnly())
 		err := vm.Run(context, procContractC, mainView)
 		require.NoError(t, err)
 
-		entryA := programs.GetForTestingOnly(contractALocation)
-		entryB := programs.GetForTestingOnly(contractBLocation)
-		entryC := programs.GetForTestingOnly(contractCLocation)
+		entryA := derivedTxnData.GetForTestingOnly(contractALocation)
+		entryB := derivedTxnData.GetForTestingOnly(contractBLocation)
+		entryC := derivedTxnData.GetForTestingOnly(contractCLocation)
 
 		require.Nil(t, entryA)
 		require.Nil(t, entryB)
@@ -401,7 +401,7 @@ func Test_Programs(t *testing.T) {
 	t.Run("importing C should chain-import B and A", func(t *testing.T) {
 		procCallC := fvm.Transaction(
 			callTx("C", addressC),
-			programs.NextTxIndexForTestingOnly())
+			derivedTxnData.NextTxIndexForTestingOnly())
 
 		viewExecC := delta.NewView(mainView.Peek)
 
@@ -411,7 +411,7 @@ func Test_Programs(t *testing.T) {
 		require.Contains(t, procCallC.Logs, "\"hello from C, hello from B but also hello from A\"")
 
 		// program A is the same
-		entryA := programs.GetForTestingOnly(contractALocation)
+		entryA := derivedTxnData.GetForTestingOnly(contractALocation)
 		require.NotNil(t, entryA)
 
 		require.IsType(t, entryA.State.View(), &delta.View{})
@@ -419,7 +419,7 @@ func Test_Programs(t *testing.T) {
 		compareViews(t, contractAView, deltaA)
 
 		// program B is the same
-		entryB := programs.GetForTestingOnly(contractBLocation)
+		entryB := derivedTxnData.GetForTestingOnly(contractBLocation)
 		require.NotNil(t, entryB)
 
 		require.IsType(t, entryB.State.View(), &delta.View{})

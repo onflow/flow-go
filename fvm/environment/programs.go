@@ -14,11 +14,11 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// TODO(patrick): remove and switch to *programs.TransactionPrograms once
+// TODO(patrick): remove and switch to *programs.DerivedTransactionData once
 // https://github.com/onflow/flow-emulator/pull/229 is integrated.
-type TransactionPrograms interface {
-	Get(loc common.AddressLocation) (*interpreter.Program, *state.State, bool)
-	Set(loc common.AddressLocation, prog *interpreter.Program, state *state.State)
+type DerivedTransactionData interface {
+	GetProgram(loc common.AddressLocation) (*interpreter.Program, *state.State, bool)
+	SetProgram(loc common.AddressLocation, prog *interpreter.Program, state *state.State)
 }
 
 // Programs manages operations around cadence program parsing.
@@ -34,7 +34,7 @@ type Programs struct {
 	txnState *state.TransactionState
 	accounts Accounts
 
-	transactionPrograms TransactionPrograms
+	derivedTxnData DerivedTransactionData
 
 	// NOTE: non-address programs are not reusable across transactions, hence
 	// they are kept out of the derived data database.
@@ -47,15 +47,15 @@ func NewPrograms(
 	meter Meter,
 	txnState *state.TransactionState,
 	accounts Accounts,
-	transactionPrograms TransactionPrograms,
+	derivedTxnData DerivedTransactionData,
 ) *Programs {
 	return &Programs{
-		tracer:              tracer,
-		meter:               meter,
-		txnState:            txnState,
-		accounts:            accounts,
-		transactionPrograms: transactionPrograms,
-		nonAddressPrograms:  make(map[common.Location]*interpreter.Program),
+		tracer:             tracer,
+		meter:              meter,
+		txnState:           txnState,
+		accounts:           accounts,
+		derivedTxnData:     derivedTxnData,
+		nonAddressPrograms: make(map[common.Location]*interpreter.Program),
 	}
 }
 
@@ -82,7 +82,7 @@ func (programs *Programs) set(
 		return err
 	}
 
-	programs.transactionPrograms.Set(address, program, state)
+	programs.derivedTxnData.SetProgram(address, program, state)
 	return nil
 }
 
@@ -103,7 +103,7 @@ func (programs *Programs) get(
 		return program, ok
 	}
 
-	program, state, has := programs.transactionPrograms.Get(address)
+	program, state, has := programs.derivedTxnData.GetProgram(address)
 	if has {
 		err := programs.txnState.AttachAndCommit(state)
 		if err != nil {

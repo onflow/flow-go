@@ -29,17 +29,17 @@ func (i TransactionInvoker) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	programs *programsCache.TransactionPrograms,
+	derivedTxnData *programsCache.DerivedTransactionData,
 ) error {
-	executor := newInvocationExecutor(ctx, proc, txnState, programs)
+	executor := newInvocationExecutor(ctx, proc, txnState, derivedTxnData)
 	defer executor.Cleanup()
 	return executor.Process()
 }
 
 type invocationExecutor struct {
-	proc     *TransactionProcedure
-	txnState *state.TransactionState
-	programs *programsCache.TransactionPrograms
+	proc           *TransactionProcedure
+	txnState       *state.TransactionState
+	derivedTxnData *programsCache.DerivedTransactionData
 
 	span otelTrace.Span
 	env  environment.Environment
@@ -56,7 +56,7 @@ func newInvocationExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	programs *programsCache.TransactionPrograms,
+	derivedTxnData *programsCache.DerivedTransactionData,
 ) *invocationExecutor {
 	span := proc.StartSpanFromProcTraceSpan(
 		ctx.Tracer,
@@ -66,7 +66,7 @@ func newInvocationExecutor(
 	env := NewTransactionEnvironment(
 		ctx,
 		txnState,
-		programs,
+		derivedTxnData,
 		proc.Transaction,
 		proc.TxIndex,
 		span)
@@ -74,7 +74,7 @@ func newInvocationExecutor(
 	return &invocationExecutor{
 		proc:           proc,
 		txnState:       txnState,
-		programs:       programs,
+		derivedTxnData: derivedTxnData,
 		span:           span,
 		env:            env,
 		errs:           errors.NewErrorsCollector(),
@@ -287,10 +287,10 @@ func (executor *invocationExecutor) commit(
 		executor.proc.ServiceEvents,
 		executor.env.ServiceEvents()...)
 
-	// based on the contract and frozen account updates we decide how to
-	// clean up the programs for failed transactions we also do the same as
-	// transaction without any deployed contracts
-	executor.programs.AddInvalidator(modifiedSets)
+	// Based on various (e.g., contract and frozen account) updates, we decide
+	// how to clean up the derived data.  For failed transactions we also do
+	// the same as a successful transaction without any updates.
+	executor.derivedTxnData.AddInvalidator(modifiedSets)
 
 	_, commitErr := executor.txnState.Commit(executor.nestedTxnId)
 	if commitErr != nil {
