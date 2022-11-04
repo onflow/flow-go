@@ -172,8 +172,8 @@ func TestAccountFreezing(t *testing.T) {
 			Address: common.MustBytesToAddress(address[:]),
 			Name:    "Whatever",
 		}
-		_, _, found := programsStorage.GetForTestingOnly(cadenceAddr)
-		require.True(t, found)
+		entry := programsStorage.GetForTestingOnly(cadenceAddr)
+		require.NotNil(t, entry)
 
 		// freeze account
 
@@ -195,8 +195,8 @@ func TestAccountFreezing(t *testing.T) {
 
 		// verify cache is evicted
 
-		_, _, found = programsStorage.GetForTestingOnly(cadenceAddr)
-		require.False(t, found)
+		entry = programsStorage.GetForTestingOnly(cadenceAddr)
+		require.Nil(t, entry)
 
 		// loading code from frozen account triggers error
 

@@ -40,11 +40,6 @@ export DOCKER_BUILDKIT := 1
 crypto_setup_gopath:
 	bash crypto_setup.sh
 
-# setup the crypto package in the current repo folder: needed to test the crypto package itself in `unittest` target
-.PHONY: crypto_setup_tests
-crypto_setup_tests:
-	$(MAKE) -C crypto setup
-
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
@@ -65,10 +60,8 @@ install-mock-generators:
     go install github.com/vektra/mockery/v2@v2.13.1; \
     go install github.com/golang/mock/mockgen@v1.3.1;
 
-############################################################################################
-
 .PHONY: install-tools
-install-tools: crypto_setup_tests crypto_setup_gopath check-go-version install-mock-generators
+install-tools: crypto_setup_gopath check-go-version install-mock-generators
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.49.0; \
 	cd ${GOPATH}; \
 	go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
@@ -76,23 +69,24 @@ install-tools: crypto_setup_tests crypto_setup_gopath check-go-version install-m
 	go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
 	go install golang.org/x/tools/cmd/stringer@master;
 
-.PHONY: unittest
-unittest: unittest-main
-	$(MAKE) -C crypto test
-	$(MAKE) -C integration test
+.PHONY: verify-mocks
+verify-mocks: generate-mocks
+	git diff --exit-code
 
-.PHONY: emulator-build
-emulator-build:
+############################################################################################
+
+.PHONY: emulator-norelic-check
+emulator-norelic-check:
 	# test the fvm package compiles with Relic library disabled (required for the emulator build)
 	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
 
-.PHONY: emulator-build
+.PHONY: fuzz-fvm
 fuzz-fvm:
 	# run fuzz tests in the fvm package
 	cd ./fvm && go test -fuzz=Fuzz -run ^$$ --tags relic
 
 .PHONY: test
-test: verify-mocks emulator-build unittest
+test: verify-mocks unittest-main
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -124,10 +118,6 @@ generate: generate-proto generate-mocks generate-fvm-env-wrappers
 .PHONY: generate-proto
 generate-proto:
 	prototool generate protobuf
-
-.PHONY: verify-mocks
-verify-mocks: generate-mocks
-	git diff --exit-code
 
 .PHONY: generate-fvm-env-wrappers
 generate-fvm-env-wrappers:
@@ -177,17 +167,22 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
 	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
 	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
-	mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
 	mockery --name '.*' --dir=./cmd/util/ledger/reporters --case=underscore --output="./cmd/util/ledger/reporters/mock" --outpkg="mock"
 	mockery --name 'Storage' --dir=module/executiondatasync/tracker --case=underscore --output="module/executiondatasync/tracker/mock" --outpkg="mocktracker"
+
+	#temporarily make insecure/ a non-module to allow mockery to create mocks
+	mv insecure/go.mod insecure/go2.mod
+	mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
+	mv insecure/go2.mod insecure/go.mod
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
 tidy:
-	go mod tidy
-	cd integration; go mod tidy
-	cd crypto; go mod tidy
-	cd cmd/testclient; go mod tidy
+	go mod tidy -v
+	cd integration; go mod tidy -v
+	cd crypto; go mod tidy -v
+	cd cmd/testclient; go mod tidy -v
+	cd insecure; go mod tidy -v
 	git diff --exit-code
 
 .PHONY: lint
@@ -200,9 +195,9 @@ fix-lint:
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic --fix ./...
 
-# Runs unit tests, SKIP FOR NOW linter, coverage
+# Runs unit tests with different list of packages as passed by CI so they run in parallel
 .PHONY: ci
-ci: install-tools tidy test # lint coverage
+ci: install-tools test
 
 # Runs integration tests
 .PHONY: ci-integration
@@ -275,9 +270,12 @@ docker-build-execution-debug:
 # build corrupted execution node for BFT testing
 .PHONY: docker-build-execution-corrupted
 docker-build-execution-corrupted:
+	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
+	mv insecure/go.mod insecure/go2.mod
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/execution-corrupted:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)" .
+	mv insecure/go2.mod insecure/go.mod
 
 .PHONY: docker-build-verification
 docker-build-verification:
@@ -293,9 +291,12 @@ docker-build-verification-debug:
 # build corrupted verification node for BFT testing
 .PHONY: docker-build-verification-corrupted
 docker-build-verification-corrupted:
+	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
+	mv insecure/go.mod insecure/go2.mod
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/verification-corrupted:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)" .
+	mv insecure/go2.mod insecure/go.mod
 
 .PHONY: docker-build-access
 docker-build-access:
