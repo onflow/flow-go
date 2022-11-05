@@ -170,33 +170,39 @@ const ExpectedTemplatesPath = "./testdata/expected/"
 
 func TestApply_DataTable(t *testing.T) {
 	testDataMap := map[string]testData{
-		"test1": {
+		"simple1": {
 			templatePath:     filepath.Join(TemplatesPath, "test1.yml"),
 			dataPath:         filepath.Join(DataPath, "test1.json"),
 			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "test1.yml"),
 		},
 
-		"access template": {
+		"simple2": {
 			templatePath:     filepath.Join(TemplatesPath, "access_template.yml"),
 			dataPath:         filepath.Join(DataPath, "access_template.json"),
 			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "access_template.yml"),
 		},
 
-		"values full - original": {
+		"values1 - original, empty template": {
 			templatePath:     filepath.Join(TemplatesPath, "values1-original.yml"),
 			dataPath:         filepath.Join(DataPath, "values1-original.json"),
 			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "values1.yml"),
 		},
 
-		"values full - access nodes - separate node ids": {
+		"values2 - access nodes - separate node ids": {
 			templatePath:     filepath.Join(TemplatesPath, "values2-access-nodes.yml"),
 			dataPath:         filepath.Join(DataPath, "values2-access-nodes.json"),
 			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "values1.yml"),
 		},
 
-		"values full - access nodes - loop": {
+		"values3 - access nodes - loop": {
 			templatePath:     filepath.Join(TemplatesPath, "values3-access-nodes-loop.yml"),
 			dataPath:         filepath.Join(DataPath, "values3-access-nodes-loop.json"),
+			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "values1.yml"),
+		},
+
+		"values4 - access nodes - if loop": {
+			templatePath:     filepath.Join(TemplatesPath, "values4-access-nodes-if-loop.yml"),
+			dataPath:         filepath.Join(DataPath, "values4-access-nodes-if-loop.json"),
 			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "values1.yml"),
 		},
 	}
