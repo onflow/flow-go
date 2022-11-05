@@ -128,6 +128,7 @@ var (
 		common.MemoryKindCadencePathValue:         33,
 		common.MemoryKindCadenceTypeValue:         17,
 		common.MemoryKindCadenceCapabilityValue:   1,
+		common.MemoryKindCadenceFunctionValue:     1,
 
 		// Cadence Types
 
