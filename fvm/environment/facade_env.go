@@ -291,3 +291,11 @@ func (facadeEnvironment) ResourceOwnerChanged(
 	common.Address,
 ) {
 }
+
+func (env *facadeEnvironment) SetInterpreterSharedState(state *interpreter.SharedState) {
+	// NO-OP
+}
+
+func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
+	return nil
+}
