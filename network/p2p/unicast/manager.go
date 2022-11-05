@@ -157,6 +157,9 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 
 		err := m.streamFactory.Connect(connectCtx, peer.AddrInfo{ID: peerID})
 		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				err = fmt.Errorf("connect timeout reached. peer: %s, addr: %s: %w", peerID, dialAddr, err)
+			}
 
 			// if the connection was rejected due to invalid node id, skip the re-attempt
 			if strings.Contains(err.Error(), "failed to negotiate security protocol") {
