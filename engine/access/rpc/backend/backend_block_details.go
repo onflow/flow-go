@@ -26,13 +26,13 @@ func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (
 	}
 
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 
 	block, err := b.blocks.ByID(header.ID())
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -42,7 +42,7 @@ func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (
 func (b *backendBlockDetails) GetBlockByID(_ context.Context, id flow.Identifier) (*flow.Block, error) {
 	block, err := b.blocks.ByID(id)
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -52,7 +52,7 @@ func (b *backendBlockDetails) GetBlockByID(_ context.Context, id flow.Identifier
 func (b *backendBlockDetails) GetBlockByHeight(_ context.Context, height uint64) (*flow.Block, error) {
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 

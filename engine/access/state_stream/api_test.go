@@ -83,8 +83,8 @@ func (suite *Suite) TestGetExecutionDataByBlockID() {
 	})
 
 	suite.Run("missing exec data for TestGetExecutionDataByBlockID failure", func() {
+		results.ExecutionDataID = unittest.IdentifierFixture()
 		execDataRes, err := client.GetExecutionDataByBlockID(ctx, blockHeader.ID())
-		suite.Require().Error(err)
 		assert.Nil(suite.T(), execDataRes)
 		var blobNotFoundError *execution_data.BlobNotFoundError
 		assert.ErrorAs(suite.T(), err, &blobNotFoundError)

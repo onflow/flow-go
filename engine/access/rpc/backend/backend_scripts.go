@@ -70,7 +70,7 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 	// get header at given height
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 

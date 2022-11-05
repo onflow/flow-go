@@ -26,7 +26,7 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed b
 	}
 
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -36,7 +36,7 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed b
 func (b *backendBlockHeaders) GetBlockHeaderByID(_ context.Context, id flow.Identifier) (*flow.Header, error) {
 	header, err := b.headers.ByBlockID(id)
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -46,7 +46,7 @@ func (b *backendBlockHeaders) GetBlockHeaderByID(_ context.Context, id flow.Iden
 func (b *backendBlockHeaders) GetBlockHeaderByHeight(_ context.Context, height uint64) (*flow.Header, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 

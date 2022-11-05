@@ -56,7 +56,7 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 	// get header at given height
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 

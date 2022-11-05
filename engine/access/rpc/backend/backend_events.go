@@ -68,7 +68,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	for i := startHeight; i <= endHeight; i++ {
 		header, err := b.headers.ByHeight(i)
 		if err != nil {
-			return nil, convertStorageError(fmt.Errorf("failed to get events: %w", err))
+			return nil, storage.ConvertStorageError(fmt.Errorf("failed to get events: %w", err))
 		}
 
 		blockHeaders = append(blockHeaders, header)
@@ -93,7 +93,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	for _, blockID := range blockIDs {
 		header, err := b.headers.ByBlockID(blockID)
 		if err != nil {
-			return nil, convertStorageError(fmt.Errorf("failed to get events: %w", err))
+			return nil, storage.ConvertStorageError(fmt.Errorf("failed to get events: %w", err))
 		}
 
 		blockHeaders = append(blockHeaders, header)

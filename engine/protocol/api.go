@@ -2,10 +2,6 @@ package protocol
 
 import (
 	"context"
-	"errors"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -52,13 +48,13 @@ func New(
 func (b *backend) GetLatestBlock(_ context.Context, isSealed bool) (*flow.Block, error) {
 	header, err := b.getLatestHeader(isSealed)
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 
 	block, err := b.blocks.ByID(header.ID())
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -68,7 +64,7 @@ func (b *backend) GetLatestBlock(_ context.Context, isSealed bool) (*flow.Block,
 func (b *backend) GetBlockByID(_ context.Context, id flow.Identifier) (*flow.Block, error) {
 	block, err := b.blocks.ByID(id)
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -78,7 +74,7 @@ func (b *backend) GetBlockByID(_ context.Context, id flow.Identifier) (*flow.Blo
 func (b *backend) GetBlockByHeight(_ context.Context, height uint64) (*flow.Block, error) {
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -88,7 +84,7 @@ func (b *backend) GetBlockByHeight(_ context.Context, height uint64) (*flow.Bloc
 func (b *backend) GetLatestBlockHeader(_ context.Context, isSealed bool) (*flow.Header, error) {
 	header, err := b.getLatestHeader(isSealed)
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -98,7 +94,7 @@ func (b *backend) GetLatestBlockHeader(_ context.Context, isSealed bool) (*flow.
 func (b *backend) GetBlockHeaderByID(_ context.Context, id flow.Identifier) (*flow.Header, error) {
 	header, err := b.headers.ByBlockID(id)
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -108,7 +104,7 @@ func (b *backend) GetBlockHeaderByID(_ context.Context, id flow.Identifier) (*fl
 func (b *backend) GetBlockHeaderByHeight(_ context.Context, height uint64) (*flow.Header, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		err = convertStorageError(err)
+		err = storage.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -128,16 +124,4 @@ func (b *backend) getLatestHeader(isSealed bool) (*flow.Header, error) {
 		header, err = b.state.Final().Head()
 		return header, err
 	}
-}
-
-func convertStorageError(err error) error {
-	if status.Code(err) == codes.NotFound {
-		// Already converted
-		return err
-	}
-	if errors.Is(err, storage.ErrNotFound) {
-		return status.Errorf(codes.NotFound, "not found: %v", err)
-	}
-
-	return status.Errorf(codes.Internal, "failed to find: %v", err)
 }

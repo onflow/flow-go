@@ -186,7 +186,7 @@ func (b *backendTransactions) SendRawTransaction(
 func (b *backendTransactions) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
 	// look up transaction from storage
 	tx, err := b.transactions.ByID(txID)
-	txErr := convertStorageError(err)
+	txErr := storage.ConvertStorageError(err)
 
 	if txErr != nil {
 		if status.Code(txErr) == codes.NotFound {
@@ -207,13 +207,13 @@ func (b *backendTransactions) GetTransactionsByBlockID(
 
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, storage.ConvertStorageError(err)
 	}
 
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := b.collections.ByID(guarantee.CollectionID)
 		if err != nil {
-			return nil, convertStorageError(err)
+			return nil, storage.ConvertStorageError(err)
 		}
 
 		transactions = append(transactions, collection.Transactions...)
@@ -237,7 +237,7 @@ func (b *backendTransactions) GetTransactionResult(
 	start := time.Now()
 	tx, err := b.transactions.ByID(txID)
 
-	txErr := convertStorageError(err)
+	txErr := storage.ConvertStorageError(err)
 	if txErr != nil {
 		if status.Code(txErr) == codes.NotFound {
 			// Tx not found. If we have historical Sporks setup, lets look through those as well
@@ -259,7 +259,7 @@ func (b *backendTransactions) GetTransactionResult(
 	// find the block for the transaction
 	block, err := b.lookupBlock(txID)
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		return nil, convertStorageError(err)
+		return nil, storage.ConvertStorageError(err)
 	}
 
 	var blockID flow.Identifier
@@ -274,14 +274,14 @@ func (b *backendTransactions) GetTransactionResult(
 		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, blockID)
 		blockHeight = block.Header.Height
 		if err != nil {
-			return nil, convertStorageError(err)
+			return nil, storage.ConvertStorageError(err)
 		}
 	}
 
 	// derive status of the transaction
 	txStatus, err := b.deriveTransactionStatus(tx, transactionWasExecuted, block)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, storage.ConvertStorageError(err)
 	}
 
 	b.transactionMetrics.TransactionResultFetched(time.Since(start), len(tx.Script))
@@ -303,7 +303,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 ) ([]*access.TransactionResult, error) {
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, storage.ConvertStorageError(err)
 	}
 
 	req := execproto.GetTransactionsByBlockIDRequest{
@@ -336,7 +336,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := b.collections.LightByID(guarantee.CollectionID)
 		if err != nil {
-			return nil, convertStorageError(err)
+			return nil, storage.ConvertStorageError(err)
 		}
 
 		for _, txID := range collection.Transactions {
@@ -348,7 +348,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			// tx body is irrelevant to status if it's in an executed block
 			txStatus, err := b.deriveTransactionStatus(nil, true, block)
 			if err != nil {
-				return nil, convertStorageError(err)
+				return nil, storage.ConvertStorageError(err)
 			}
 
 			results = append(results, &access.TransactionResult{
@@ -387,7 +387,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
 		systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
 		if err != nil {
-			return nil, convertStorageError(err)
+			return nil, storage.ConvertStorageError(err)
 		}
 
 		results = append(results, &access.TransactionResult{
@@ -414,7 +414,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	// TODO: https://github.com/onflow/flow-go/issues/2175 so caching doesn't cause a circular dependency
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, storage.ConvertStorageError(err)
 	}
 
 	// create request and forward to EN
@@ -442,7 +442,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := b.deriveTransactionStatus(nil, true, block)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, storage.ConvertStorageError(err)
 	}
 
 	// convert to response, cache and return
