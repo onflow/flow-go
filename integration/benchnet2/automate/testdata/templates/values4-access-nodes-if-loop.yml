@@ -43,7 +43,7 @@ access:
         targetPort: admin
     storage: 1G
   nodes:
-{{range $val := .}}
+{{range $val := .}}{{if eq ($val.group) ("access")}}
     {{$val.name}}:
       args:
         - --bootstrapdir=/bootstrap
@@ -83,7 +83,7 @@ access:
           value: ""
       image: gcr.io/flow-container-registry/access:v0.27.6
       nodeId: {{$val.node_id}}
-{{end}}
+{{end}}{{end}}
 collection:
   defaults:
     imagePullPolicy: Always
