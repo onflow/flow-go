@@ -132,13 +132,13 @@ func (_m *Environment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, e
 	return r0, r1
 }
 
-// BLSAggregatePublicKeys provides a mock function with given fields: keys
-func (_m *Environment) BLSAggregatePublicKeys(keys []*stdlib.PublicKey) (*stdlib.PublicKey, error) {
-	ret := _m.Called(keys)
+// BLSAggregatePublicKeys provides a mock function with given fields: publicKeys
+func (_m *Environment) BLSAggregatePublicKeys(publicKeys []*stdlib.PublicKey) (*stdlib.PublicKey, error) {
+	ret := _m.Called(publicKeys)
 
 	var r0 *stdlib.PublicKey
 	if rf, ok := ret.Get(0).(func([]*stdlib.PublicKey) *stdlib.PublicKey); ok {
-		r0 = rf(keys)
+		r0 = rf(publicKeys)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*stdlib.PublicKey)
@@ -147,7 +147,7 @@ func (_m *Environment) BLSAggregatePublicKeys(keys []*stdlib.PublicKey) (*stdlib
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func([]*stdlib.PublicKey) error); ok {
-		r1 = rf(keys)
+		r1 = rf(publicKeys)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -155,13 +155,13 @@ func (_m *Environment) BLSAggregatePublicKeys(keys []*stdlib.PublicKey) (*stdlib
 	return r0, r1
 }
 
-// BLSAggregateSignatures provides a mock function with given fields: sigs
-func (_m *Environment) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
-	ret := _m.Called(sigs)
+// BLSAggregateSignatures provides a mock function with given fields: signatures
+func (_m *Environment) BLSAggregateSignatures(signatures [][]byte) ([]byte, error) {
+	ret := _m.Called(signatures)
 
 	var r0 []byte
 	if rf, ok := ret.Get(0).(func([][]byte) []byte); ok {
-		r0 = rf(sigs)
+		r0 = rf(signatures)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -170,7 +170,7 @@ func (_m *Environment) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func([][]byte) error); ok {
-		r1 = rf(sigs)
+		r1 = rf(signatures)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -178,20 +178,20 @@ func (_m *Environment) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 	return r0, r1
 }
 
-// BLSVerifyPOP provides a mock function with given fields: pk, s
-func (_m *Environment) BLSVerifyPOP(pk *stdlib.PublicKey, s []byte) (bool, error) {
-	ret := _m.Called(pk, s)
+// BLSVerifyPOP provides a mock function with given fields: publicKey, signature
+func (_m *Environment) BLSVerifyPOP(publicKey *stdlib.PublicKey, signature []byte) (bool, error) {
+	ret := _m.Called(publicKey, signature)
 
 	var r0 bool
 	if rf, ok := ret.Get(0).(func(*stdlib.PublicKey, []byte) bool); ok {
-		r0 = rf(pk, s)
+		r0 = rf(publicKey, signature)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(*stdlib.PublicKey, []byte) error); ok {
-		r1 = rf(pk, s)
+		r1 = rf(publicKey, signature)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -608,6 +608,22 @@ func (_m *Environment) GetCurrentBlockHeight() (uint64, error) {
 	return r0, r1
 }
 
+// GetInterpreterSharedState provides a mock function with given fields:
+func (_m *Environment) GetInterpreterSharedState() *interpreter.SharedState {
+	ret := _m.Called()
+
+	var r0 *interpreter.SharedState
+	if rf, ok := ret.Get(0).(func() *interpreter.SharedState); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*interpreter.SharedState)
+		}
+	}
+
+	return r0
+}
+
 // GetProgram provides a mock function with given fields: _a0
 func (_m *Environment) GetProgram(_a0 common.Location) (*interpreter.Program, error) {
 	ret := _m.Called(_a0)
@@ -994,6 +1010,11 @@ func (_m *Environment) SetAccountFrozen(address common.Address, frozen bool) err
 	}
 
 	return r0
+}
+
+// SetInterpreterSharedState provides a mock function with given fields: state
+func (_m *Environment) SetInterpreterSharedState(state *interpreter.SharedState) {
+	_m.Called(state)
 }
 
 // SetProgram provides a mock function with given fields: _a0, _a1

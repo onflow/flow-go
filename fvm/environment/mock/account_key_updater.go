@@ -40,20 +40,6 @@ func (_m *AccountKeyUpdater) AddAccountKey(address common.Address, publicKey *st
 	return r0, r1
 }
 
-// AddEncodedAccountKey provides a mock function with given fields: address, publicKey
-func (_m *AccountKeyUpdater) AddEncodedAccountKey(address common.Address, publicKey []byte) error {
-	ret := _m.Called(address, publicKey)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Address, []byte) error); ok {
-		r0 = rf(address, publicKey)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // RevokeAccountKey provides a mock function with given fields: address, keyIndex
 func (_m *AccountKeyUpdater) RevokeAccountKey(address common.Address, keyIndex int) (*stdlib.AccountKey, error) {
 	ret := _m.Called(address, keyIndex)
@@ -70,29 +56,6 @@ func (_m *AccountKeyUpdater) RevokeAccountKey(address common.Address, keyIndex i
 	var r1 error
 	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
 		r1 = rf(address, keyIndex)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// RevokeEncodedAccountKey provides a mock function with given fields: address, index
-func (_m *AccountKeyUpdater) RevokeEncodedAccountKey(address common.Address, index int) ([]byte, error) {
-	ret := _m.Called(address, index)
-
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func(common.Address, int) []byte); ok {
-		r0 = rf(address, index)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
-		r1 = rf(address, index)
 	} else {
 		r1 = ret.Error(1)
 	}
