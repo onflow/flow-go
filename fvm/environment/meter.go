@@ -15,7 +15,7 @@ const (
 	ComputationKindHash                       = 2001
 	ComputationKindVerifySignature            = 2002
 	ComputationKindAddAccountKey              = 2003
-	ComputationKindAddEncodedAccountKey       = 2004
+	_                                         // removed, DO NOT REUSE
 	ComputationKindAllocateStorageIndex       = 2005
 	ComputationKindCreateAccount              = 2006
 	ComputationKindEmitEvent                  = 2007
@@ -35,7 +35,7 @@ const (
 	ComputationKindRemoveAccountContractCode  = 2021
 	ComputationKindResolveLocation            = 2022
 	ComputationKindRevokeAccountKey           = 2023
-	ComputationKindRevokeEncodedAccountKey    = 2024
+	_                                         // removed, DO NOT REUSE
 	ComputationKindSetProgram                 = 2025
 	ComputationKindSetValue                   = 2026
 	ComputationKindUpdateAccountContractCode  = 2027
