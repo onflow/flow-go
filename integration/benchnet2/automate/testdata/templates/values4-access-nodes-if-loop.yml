@@ -123,6 +123,7 @@ collection:
         targetPort: admin
     storage: 1G
   nodes:
+
     collection1:
       args:
         - --bootstrapdir=/bootstrap
@@ -159,6 +160,7 @@ collection:
           value: ""
       image: gcr.io/flow-container-registry/collection:v0.27.6
       nodeId: 416c65782048656e74736368656c00f2b77702c5b90981bc7ebca02d7e5ac9b3
+
     collection2:
       args:
         - --bootstrapdir=/bootstrap
@@ -168,8 +170,8 @@ collection:
         - --profiler-enabled=false
         - --profile-uploader-enabled=false
         - --tracer-enabled=false
-        - --profiler-dir=/profiler
         - --bind=0.0.0.0:3569
+        - --profiler-dir=/profiler
         - --profiler-interval=2m
         - --nodeid=416e647265772042757269616e004acd8c101a5810f3ca90f68378b11bb69970
         - --block-rate-delay=950ms
@@ -195,6 +197,7 @@ collection:
           value: ""
       image: gcr.io/flow-container-registry/collection:v0.27.6
       nodeId: 416e647265772042757269616e004acd8c101a5810f3ca90f68378b11bb69970
+
     collection3:
       args:
         - --bootstrapdir=/bootstrap
@@ -231,6 +234,7 @@ collection:
           value: ""
       image: gcr.io/flow-container-registry/collection:v0.27.6
       nodeId: 4261737469616e204d756c6c65720045611a422bdb73ee6e747fa3ebf43282b6
+
     collection4:
       args:
         - --bootstrapdir=/bootstrap
@@ -267,6 +271,7 @@ collection:
           value: ""
       image: gcr.io/flow-container-registry/collection:v0.27.6
       nodeId: 42656e6a616d696e2056616e204d6574657200336446ef55757e6e21f1f3883a
+
     collection5:
       args:
         - --bootstrapdir=/bootstrap
@@ -303,6 +308,7 @@ collection:
           value: ""
       image: gcr.io/flow-container-registry/collection:v0.27.6
       nodeId: 436173657920417272696e67746f6e008fe686f6bbb502f3b4d0951838ab3add
+
     collection6:
       args:
         - --bootstrapdir=/bootstrap
@@ -339,6 +345,7 @@ collection:
           value: ""
       image: gcr.io/flow-container-registry/collection:v0.27.6
       nodeId: 44696574657220536869726c65790027ed1827d18001945988737745a5c12a2d
+
 consensus:
   defaults:
     imagePullPolicy: Always
