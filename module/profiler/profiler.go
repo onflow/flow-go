@@ -37,6 +37,9 @@ type AutoProfiler struct {
 
 	uploader Uploader
 	enabled  *atomic.Bool
+
+	// used to trigger a profile run
+	trigger chan struct{}
 }
 
 // New creates a new AutoProfiler instance performing profiling every interval for duration.
@@ -55,7 +58,11 @@ func New(log zerolog.Logger, uploader Uploader, dir string, interval time.Durati
 		duration: duration,
 		uploader: uploader,
 		enabled:  atomic.NewBool(enabled),
+		trigger:  make(chan struct{}, 1),
 	}
+
+	go p.runForever()
+
 	return p, nil
 }
 
@@ -71,16 +78,39 @@ func (p *AutoProfiler) Enabled() bool {
 	return p.enabled.Load()
 }
 
-func (p *AutoProfiler) Ready() <-chan struct{} {
-	delay := time.Duration(float64(p.interval) * rand.Float64())
-	p.unit.LaunchPeriodically(p.start, p.interval, delay)
+// TriggerRun manually triggers a profile run if one is not already running.
+func (p *AutoProfiler) TriggerRun() error {
+	select {
+	case p.trigger <- struct{}{}:
+		return nil
+	default:
+		return errors.New("profiling is already in progress")
+	}
+}
 
-	if !p.Enabled() {
+func (p *AutoProfiler) runForever() {
+	jitter := time.Duration(rand.Int63n(int64(p.interval)))
+	t := time.NewTicker(p.interval + jitter)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-t.C:
+			p.runOnce()
+		case <-p.trigger:
+			p.runOnce()
+		case <-p.unit.Quit():
+			return
+		}
+	}
+}
+
+func (p *AutoProfiler) Ready() <-chan struct{} {
+	if p.Enabled() {
 		p.log.Info().Dur("duration", p.duration).Time("nextRunAt", time.Now().Add(p.interval)).Msg("AutoProfiler has started")
 	} else {
 		p.log.Info().Msg("AutoProfiler has started, profiler is disabled")
 	}
-
 	return p.unit.Ready()
 }
 
@@ -88,7 +118,7 @@ func (p *AutoProfiler) Done() <-chan struct{} {
 	return p.unit.Done()
 }
 
-func (p *AutoProfiler) start() {
+func (p *AutoProfiler) runOnce() {
 	if !p.Enabled() {
 		return
 	}
