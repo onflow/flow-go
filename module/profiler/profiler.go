@@ -96,7 +96,9 @@ func (p *AutoProfiler) runForever() {
 	for {
 		select {
 		case <-t.C:
-			p.runOnce()
+			if p.Enabled() {
+				p.runOnce()
+			}
 		case <-p.trigger:
 			p.runOnce()
 		case <-p.unit.Quit():
@@ -119,10 +121,6 @@ func (p *AutoProfiler) Done() <-chan struct{} {
 }
 
 func (p *AutoProfiler) runOnce() {
-	if !p.Enabled() {
-		return
-	}
-
 	startTime := time.Now()
 	p.log.Info().Msg("starting profile trace")
 
