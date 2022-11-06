@@ -23,7 +23,7 @@ func TestProfiler(t *testing.T) {
 			err = p.SetEnabled(true)
 			require.NoError(t, err)
 
-			err = p.TriggerRun()
+			err = p.TriggerRun(time.Millisecond * 100)
 			require.NoError(t, err)
 
 			unittest.AssertClosesBefore(t, p.Ready(), 5*time.Second)

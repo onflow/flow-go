@@ -38,8 +38,8 @@ type AutoProfiler struct {
 	uploader Uploader
 	enabled  *atomic.Bool
 
-	// used to trigger a profile run
-	trigger chan struct{}
+	// used to trigger a profile run for a given duration
+	trigger chan time.Duration
 }
 
 // New creates a new AutoProfiler instance performing profiling every interval for duration.
@@ -58,7 +58,7 @@ func New(log zerolog.Logger, uploader Uploader, dir string, interval time.Durati
 		duration: duration,
 		uploader: uploader,
 		enabled:  atomic.NewBool(enabled),
-		trigger:  make(chan struct{}, 1),
+		trigger:  make(chan time.Duration, 1),
 	}
 
 	go p.runForever()
@@ -79,9 +79,9 @@ func (p *AutoProfiler) Enabled() bool {
 }
 
 // TriggerRun manually triggers a profile run if one is not already running.
-func (p *AutoProfiler) TriggerRun() error {
+func (p *AutoProfiler) TriggerRun(d time.Duration) error {
 	select {
-	case p.trigger <- struct{}{}:
+	case p.trigger <- d:
 		return nil
 	default:
 		return errors.New("profiling is already in progress")
@@ -99,8 +99,11 @@ func (p *AutoProfiler) runForever() {
 			if p.Enabled() {
 				p.runOnce()
 			}
-		case <-p.trigger:
+		case d := <-p.trigger:
+			oldDuration := p.duration
+			p.duration = d
 			p.runOnce()
+			p.duration = oldDuration
 		case <-p.unit.Quit():
 			return
 		}
