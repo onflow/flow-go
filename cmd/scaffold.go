@@ -709,7 +709,10 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 
 	// register the enabled state of the profiler for dynamic configuring
 	err = fnb.ConfigManager.RegisterBoolConfig("profiler-enabled", profiler.Enabled, profiler.SetEnabled)
-	fnb.MustNot(err).Msg("could not register profiler config")
+	fnb.MustNot(err).Msg("could not register profiler-enabled config")
+
+	err = fnb.ConfigManager.RegisterBoolConfig("profiler-trigger", func() bool { return false }, func(bool) error { return profiler.TriggerRun() })
+	fnb.MustNot(err).Msg("could not register profiler-trigger config")
 
 	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		return profiler, nil
