@@ -1,4 +1,4 @@
-package automate
+package level2_template
 
 import (
 	"encoding/json"

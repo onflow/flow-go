@@ -1,4 +1,4 @@
-package automate
+package level2_template
 
 import (
 	"os"
@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const DataPath = "./testdata/level2-template/data/"
-const TemplatesPath = "./testdata/level2-template/templates"
-const ExpectedTemplatesPath = "./testdata/level2-template/expected"
+const DataPath = "../testdata/level2-template/data/"
+const TemplatesPath = "../testdata/level2-template/templates"
+const ExpectedTemplatesPath = "../testdata/level2-template/expected"
 
 func TestApply_DataTable(t *testing.T) {
 	testDataMap := map[string]testData{

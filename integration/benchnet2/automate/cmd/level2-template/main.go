@@ -3,9 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/onflow/flow-go/integration/benchnet2/automate/level2-template"
 	"os"
-
-	"github.com/onflow/flow-go/integration/benchnet2/automate"
 )
 
 // sample test run
@@ -21,7 +20,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	template := automate.NewTemplate(*dataFlag, *templateFlag)
+	template := level2_template.NewTemplate(*dataFlag, *templateFlag)
 	actualOutput := template.Apply(*fileOutputFlag)
 	fmt.Println("output=", actualOutput)
 }
