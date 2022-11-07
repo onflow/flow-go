@@ -131,14 +131,15 @@ func (nc *NoopCollector) ConnectionFromPoolEvicted()                            
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                 {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                {}
 func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                  {}
-func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                             {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                          {}
 func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                       {}
-func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ uint64, _ int, _ int)       {}
-func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint)        {}
-func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ uint64, _ int)         {}
-func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _ int, _ bool) {
+func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _, _ uint64, _, _, _, _ int)  {}
+func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _, _ uint64, _, _, _, _, _ int) {
 }
+func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
+func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _, _ int, _ bool) {
+}
+func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                         {}
 func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64) {}
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                              {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                                {}
@@ -211,4 +212,4 @@ func (nc *NoopCollector) PrunedBlocks(totalByHeight, totalById, storedByHeight, 
 func (nc *NoopCollector) RangeRequested(ran chainsync.Range)                                    {}
 func (nc *NoopCollector) BatchRequested(batch chainsync.Batch)                                  {}
 func (nc *NoopCollector) OnUnauthorizedMessage(role, msgType, topic, offense string)            {}
-func (nc *NoopCollector) OnRateLimitedUnicastMessage(role, msgType, topic string)               {}
+func (nc *NoopCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string)       {}

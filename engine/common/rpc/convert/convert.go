@@ -21,7 +21,7 @@ var ErrEmptyMessage = errors.New("protobuf message is empty")
 var ValidChainIds = map[string]bool{
 	flow.Mainnet.String():           true,
 	flow.Testnet.String():           true,
-	flow.Stagingnet.String():        true,
+	flow.Sandboxnet.String():        true,
 	flow.Benchnet.String():          true,
 	flow.Localnet.String():          true,
 	flow.Emulator.String():          true,

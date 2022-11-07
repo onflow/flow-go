@@ -9,8 +9,6 @@ import (
 	"github.com/onflow/flow-go/utils/slices"
 )
 
-const keyUUID = "uuid"
-
 type UUIDGenerator interface {
 	GenerateUUID() (uint64, error)
 }
@@ -33,7 +31,7 @@ func NewParseRestrictedUUIDGenerator(
 func (generator ParseRestrictedUUIDGenerator) GenerateUUID() (uint64, error) {
 	return parseRestrict1Ret(
 		generator.txnState,
-		"GenerateUUID",
+		trace.FVMEnvGenerateUUID,
 		generator.impl.GenerateUUID)
 }
 
@@ -60,7 +58,7 @@ func NewUUIDGenerator(
 func (generator *uUIDGenerator) getUUID() (uint64, error) {
 	stateBytes, err := generator.txnState.Get(
 		"",
-		keyUUID,
+		state.UUIDKey,
 		generator.txnState.EnforceLimits())
 	if err != nil {
 		return 0, fmt.Errorf("cannot get uuid byte from state: %w", err)
@@ -76,7 +74,7 @@ func (generator *uUIDGenerator) setUUID(uuid uint64) error {
 	binary.BigEndian.PutUint64(bytes, uuid)
 	err := generator.txnState.Set(
 		"",
-		keyUUID,
+		state.UUIDKey,
 		bytes,
 		generator.txnState.EnforceLimits())
 	if err != nil {

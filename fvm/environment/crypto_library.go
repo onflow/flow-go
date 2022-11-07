@@ -77,7 +77,7 @@ func (lib ParseRestrictedCryptoLibrary) Hash(
 ) {
 	return parseRestrict3Arg1Ret(
 		lib.txnState,
-		"Hash",
+		trace.FVMEnvHash,
 		lib.impl.Hash,
 		data,
 		tag,
@@ -97,7 +97,7 @@ func (lib ParseRestrictedCryptoLibrary) VerifySignature(
 ) {
 	return parseRestrict6Arg1Ret(
 		lib.txnState,
-		"VerifySignature",
+		trace.FVMEnvVerifySignature,
 		lib.impl.VerifySignature,
 		signature,
 		tag,
@@ -112,7 +112,7 @@ func (lib ParseRestrictedCryptoLibrary) ValidatePublicKey(
 ) error {
 	return parseRestrict1Arg(
 		lib.txnState,
-		"ValidatePublicKey",
+		trace.FVMEnvValidatePublicKey,
 		lib.impl.ValidatePublicKey,
 		pk)
 }
@@ -126,7 +126,7 @@ func (lib ParseRestrictedCryptoLibrary) BLSVerifyPOP(
 ) {
 	return parseRestrict2Arg1Ret(
 		lib.txnState,
-		"BLSVerifyPOP",
+		trace.FVMEnvBLSVerifyPOP,
 		lib.impl.BLSVerifyPOP,
 		pk,
 		sig)
@@ -140,7 +140,7 @@ func (lib ParseRestrictedCryptoLibrary) BLSAggregateSignatures(
 ) {
 	return parseRestrict1Arg1Ret(
 		lib.txnState,
-		"BLSAggregateSignatures",
+		trace.FVMEnvBLSAggregateSignatures,
 		lib.impl.BLSAggregateSignatures,
 		sigs)
 }
@@ -153,12 +153,11 @@ func (lib ParseRestrictedCryptoLibrary) BLSAggregatePublicKeys(
 ) {
 	return parseRestrict1Arg1Ret(
 		lib.txnState,
-		"BLSAggregatePublicKeys",
+		trace.FVMEnvBLSAggregatePublicKeys,
 		lib.impl.BLSAggregatePublicKeys,
 		keys)
 }
 
-// TODO(rbtz): add spans to the public functions
 type cryptoLibrary struct {
 	tracer *Tracer
 	meter  Meter
@@ -203,9 +202,7 @@ func (lib *cryptoLibrary) VerifySignature(
 ) {
 	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
 
-	err := lib.meter.MeterComputation(
-		ComputationKindVerifySignature,
-		1)
+	err := lib.meter.MeterComputation(ComputationKindVerifySignature, 1)
 	if err != nil {
 		return false, fmt.Errorf("verify signature failed: %w", err)
 	}
@@ -227,9 +224,9 @@ func (lib *cryptoLibrary) VerifySignature(
 }
 
 func (lib *cryptoLibrary) ValidatePublicKey(pk *runtime.PublicKey) error {
-	err := lib.meter.MeterComputation(
-		ComputationKindValidatePublicKey,
-		1)
+	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvValidatePublicKey).End()
+
+	err := lib.meter.MeterComputation(ComputationKindValidatePublicKey, 1)
 	if err != nil {
 		return fmt.Errorf("validate public key failed: %w", err)
 	}
@@ -237,26 +234,51 @@ func (lib *cryptoLibrary) ValidatePublicKey(pk *runtime.PublicKey) error {
 	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
 
-func (cryptoLibrary) BLSVerifyPOP(
+func (lib *cryptoLibrary) BLSVerifyPOP(
 	pk *runtime.PublicKey,
 	sig []byte,
 ) (
 	bool,
 	error,
 ) {
+	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvBLSVerifyPOP).End()
+
+	err := lib.meter.MeterComputation(ComputationKindBLSVerifyPOP, 1)
+	if err != nil {
+		return false, fmt.Errorf("BLSVerifyPOP failed: %w", err)
+	}
+
 	return crypto.VerifyPOP(pk, sig)
 }
 
-func (cryptoLibrary) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
+func (lib *cryptoLibrary) BLSAggregateSignatures(
+	sigs [][]byte,
+) (
+	[]byte,
+	error,
+) {
+	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvBLSAggregateSignatures).End()
+
+	err := lib.meter.MeterComputation(ComputationKindBLSAggregateSignatures, 1)
+	if err != nil {
+		return nil, fmt.Errorf("BLSAggregateSignatures failed: %w", err)
+	}
+
 	return crypto.AggregateSignatures(sigs)
 }
 
-func (cryptoLibrary) BLSAggregatePublicKeys(
+func (lib *cryptoLibrary) BLSAggregatePublicKeys(
 	keys []*runtime.PublicKey,
 ) (
 	*runtime.PublicKey,
 	error,
 ) {
+	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvBLSAggregatePublicKeys).End()
+
+	err := lib.meter.MeterComputation(ComputationKindBLSAggregatePublicKeys, 1)
+	if err != nil {
+		return nil, fmt.Errorf("BLSAggregatePublicKeys failed: %w", err)
+	}
 
 	return crypto.AggregatePublicKeys(keys)
 }

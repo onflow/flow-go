@@ -44,7 +44,7 @@ func NewParseRestrictedBlockInfo(
 func (info ParseRestrictedBlockInfo) GetCurrentBlockHeight() (uint64, error) {
 	return parseRestrict1Ret(
 		info.txnState,
-		"GetCurrentBlockHeight",
+		trace.FVMEnvGetCurrentBlockHeight,
 		info.impl.GetCurrentBlockHeight)
 }
 
@@ -57,7 +57,7 @@ func (info ParseRestrictedBlockInfo) GetBlockAtHeight(
 ) {
 	return parseRestrict1Arg2Ret(
 		info.txnState,
-		"GetBlockAtHeight",
+		trace.FVMEnvGetBlockAtHeight,
 		info.impl.GetBlockAtHeight,
 		height)
 }

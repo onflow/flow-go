@@ -43,7 +43,7 @@ func (info ParseRestrictedAccountInfo) GetStorageUsed(
 ) {
 	return parseRestrict1Arg1Ret(
 		info.txnState,
-		"GetStorageUsed",
+		trace.FVMEnvGetStorageUsed,
 		info.impl.GetStorageUsed,
 		address)
 }
@@ -56,7 +56,7 @@ func (info ParseRestrictedAccountInfo) GetStorageCapacity(
 ) {
 	return parseRestrict1Arg1Ret(
 		info.txnState,
-		"GetStorageCapacity",
+		trace.FVMEnvGetStorageCapacity,
 		info.impl.GetStorageCapacity,
 		address)
 }
@@ -69,7 +69,7 @@ func (info ParseRestrictedAccountInfo) GetAccountBalance(
 ) {
 	return parseRestrict1Arg1Ret(
 		info.txnState,
-		"GetAccountBalance",
+		trace.FVMEnvGetAccountBalance,
 		info.impl.GetAccountBalance,
 		address)
 }
@@ -82,7 +82,7 @@ func (info ParseRestrictedAccountInfo) GetAccountAvailableBalance(
 ) {
 	return parseRestrict1Arg1Ret(
 		info.txnState,
-		"GetAccountAvailableBalance",
+		trace.FVMEnvGetAccountAvailableBalance,
 		info.impl.GetAccountAvailableBalance,
 		address)
 }
@@ -95,7 +95,7 @@ func (info ParseRestrictedAccountInfo) GetAccount(
 ) {
 	return parseRestrict1Arg1Ret(
 		info.txnState,
-		"GetAccount",
+		trace.FVMEnvGetAccount,
 		info.impl.GetAccount,
 		address)
 }
@@ -205,7 +205,8 @@ func (info *accountInfo) GetAccountAvailableBalance(
 	uint64,
 	error,
 ) {
-	defer info.tracer.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
+	defer info.tracer.StartSpanFromRoot(
+		trace.FVMEnvGetAccountAvailableBalance).End()
 
 	err := info.meter.MeterComputation(
 		ComputationKindGetAccountAvailableBalance,
@@ -227,6 +228,8 @@ func (info *accountInfo) GetAccount(
 	*flow.Account,
 	error,
 ) {
+	defer info.tracer.StartSpanFromRoot(trace.FVMEnvGetAccount).End()
+
 	account, err := info.accounts.Get(address)
 	if err != nil {
 		return nil, err
