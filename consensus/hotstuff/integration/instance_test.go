@@ -199,6 +199,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			header := &flow.Header{
 				ChainID:     "chain",
 				ParentID:    parentID,
+				ParentView:  parent.View,
 				Height:      parent.Height + 1,
 				PayloadHash: unittest.IdentifierFixture(),
 				Timestamp:   time.Now().UTC(),
@@ -292,16 +293,12 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 			// sender should always have the parent
 			in.updatingBlocks.RLock()
-			parent, exists := in.headers[header.ParentID]
+			_, exists := in.headers[header.ParentID]
 			in.updatingBlocks.RUnlock()
 
 			if !exists {
-				return
+				t.Fatalf("parent for proposal not found parent: %x", header.ParentID)
 			}
-
-			// set the height and chain ID
-			header.ChainID = parent.ChainID
-			header.Height = parent.Height + 1
 
 			// convert into proposal immediately
 			proposal := model.ProposalFromFlow(header)
