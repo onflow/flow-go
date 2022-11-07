@@ -385,6 +385,7 @@ consensus:
         targetPort: admin
     storage: 1G
   nodes:
+
     consensus1:
       args:
         - --bootstrapdir=/bootstrap
@@ -422,6 +423,7 @@ consensus:
           value: ""
       image: gcr.io/flow-container-registry/consensus:v0.27.6
       nodeId: 4a616d65732048756e74657200cc3d5bc0fa89f027ec7e7a1b064cc032f1941f
+
     consensus2:
       args:
         - --bootstrapdir=/bootstrap
@@ -429,9 +431,9 @@ consensus:
         - --secretsdir=/data/secret
         - --loglevel=DEBUG
         - --profiler-enabled=false
-        - --bind=0.0.0.0:3569
         - --profile-uploader-enabled=false
         - --tracer-enabled=false
+        - --bind=0.0.0.0:3569
         - --profiler-dir=/profiler
         - --profiler-interval=2m
         - --nodeid=4a65666665727920446f796c6500a7a4692d8b56edd508238b5e8572beeba6b6
@@ -459,6 +461,7 @@ consensus:
           value: ""
       image: gcr.io/flow-container-registry/consensus:v0.27.6
       nodeId: 4a65666665727920446f796c6500a7a4692d8b56edd508238b5e8572beeba6b6
+
     consensus3:
       args:
         - --bootstrapdir=/bootstrap
@@ -496,6 +499,7 @@ consensus:
           value: ""
       image: gcr.io/flow-container-registry/consensus:v0.27.6
       nodeId: 4a6f7264616e20536368616c6d0059676024fe879d8ffc5ae53adaf00dbd8630
+
 execution:
   defaults:
     imagePullPolicy: Always

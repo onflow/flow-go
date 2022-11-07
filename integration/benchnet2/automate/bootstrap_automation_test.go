@@ -38,12 +38,12 @@ func TestApply_DataTable(t *testing.T) {
 			dataPath:         filepath.Join(DataPath, "values2-access-nodes.json"),
 			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "values1.yml"),
 		},
-		//
-		//"values3 - access nodes - loop": {
-		//	templatePath:     filepath.Join(TemplatesPath, "values3-access-nodes-loop.yml"),
-		//	dataPath:         filepath.Join(DataPath, "values3-access-nodes-loop.json"),
-		//	expectedTemplate: filepath.Join(ExpectedTemplatesPath, "values1.yml"),
-		//},
+
+		"values3 - access nodes - loop": {
+			templatePath:     filepath.Join(TemplatesPath, "values3-access-nodes-loop.yml"),
+			dataPath:         filepath.Join(DataPath, "values3-access-nodes-loop.json"),
+			expectedTemplate: filepath.Join(ExpectedTemplatesPath, "values1.yml"),
+		},
 		//
 		//"values4 - access nodes - if loop": {
 		//	templatePath:     filepath.Join(TemplatesPath, "values4-access-nodes-if-loop.yml"),
