@@ -385,6 +385,7 @@ verification:
         targetPort: admin
     storage: 1G
   nodes:
+
     verification1:
       args:
         - --bootstrapdir=/bootstrap
