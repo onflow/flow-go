@@ -280,7 +280,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 
 	for _, chunk := range result.Chunks {
 		// each chunk should be assigned to alpha verifiers
-		require.Equal(a.T(), p1.Verifiers(chunk).Len(), alpha)
+		require.Equal(a.T(), p1.Verifiers(&chunk).Len(), alpha)
 	}
 }
 

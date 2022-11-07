@@ -57,7 +57,7 @@ func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, n
 }
 
 func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) error {
-	for index, chunk := range result.Chunks.Items() {
+	for index, chunk := range result.Chunks {
 		if uint(index) != chunk.CollectionIndex {
 			return engine.NewInvalidInputErrorf("invalid CollectionIndex, expected %d got %d", index, chunk.CollectionIndex)
 		}

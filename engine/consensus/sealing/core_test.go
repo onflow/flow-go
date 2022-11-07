@@ -598,7 +598,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 		for _, chunk := range ir.Result.Chunks {
 			// assign the verifier to this chunk
-			s.ChunksAssignment.Add(chunk, verifiers)
+			s.ChunksAssignment.Add(&chunk, verifiers)
 		}
 
 		err := s.core.processIncorporatedResult(ir)

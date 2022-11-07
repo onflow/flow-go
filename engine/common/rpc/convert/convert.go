@@ -674,7 +674,7 @@ func MessagesToChunkList(m []*entities.Chunk) (flow.ChunkList, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse message at index %d to chunk: %w", i, err)
 		}
-		parsedChunks[i] = parsedChunk
+		parsedChunks[i] = *parsedChunk
 	}
 	return parsedChunks, nil
 }
@@ -778,7 +778,7 @@ func MessageToServiceEvent(m *entities.ServiceEvent) (*flow.ServiceEvent, error)
 	}, nil
 }
 
-func ChunkToMessage(chunk *flow.Chunk) *entities.Chunk {
+func ChunkToMessage(chunk flow.Chunk) *entities.Chunk {
 	return &entities.Chunk{
 		CollectionIndex:      uint32(chunk.CollectionIndex),
 		StartState:           StateCommitmentToMessage(chunk.StartState),

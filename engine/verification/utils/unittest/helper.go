@@ -332,7 +332,7 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 					}.ID()
 					expectedLocatorIds = append(expectedLocatorIds, locatorID)
 					expectedChunkIds = append(expectedChunkIds, chunk.ID())
-					a.Add(chunk, verIds.NodeIDs())
+					a.Add(&chunk, verIds.NodeIDs())
 				}
 
 			}

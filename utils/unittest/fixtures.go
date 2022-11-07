@@ -1308,7 +1308,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 		Payload: &payload,
 	}
 
-	chunks := make([]*flow.Chunk, 0)
+	chunks := make(flow.ChunkList, 0)
 
 	var chunk flow.Chunk
 
@@ -1321,7 +1321,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 			},
 			Index: uint64(i),
 		}
-		chunks = append(chunks, &chunk)
+		chunks = append(chunks, chunk)
 	}
 
 	result := flow.ExecutionResult{

@@ -90,7 +90,7 @@ func (c CompleteExecutionReceiptList) ChunkOf(t *testing.T, resultID flow.Identi
 	for _, completeER := range c {
 		for _, result := range completeER.ContainerBlock.Payload.Results {
 			if result.ID() == resultID {
-				return result.Chunks[chunkIndex]
+				return &result.Chunks[chunkIndex]
 			}
 		}
 	}

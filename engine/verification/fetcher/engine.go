@@ -151,7 +151,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 		Logger()
 	lg.Debug().Msg("result and chunk for locator retrieved")
 
-	requested, blockHeight, err := e.processAssignedChunkWithTracing(chunk, result, locatorID)
+	requested, blockHeight, err := e.processAssignedChunkWithTracing(&chunk, result, locatorID)
 	lg = lg.With().Uint64("block_height", blockHeight).Logger()
 
 	if err != nil {
@@ -338,7 +338,7 @@ func (e *Engine) handleValidatedChunkDataPack(ctx context.Context,
 
 	// pushes chunk data pack to verifier, and waits for it to be verified.
 	chunk := status.ExecutionResult.Chunks[status.ChunkIndex]
-	err := e.pushToVerifierWithTracing(ctx, chunk, status.ExecutionResult, chunkDataPack)
+	err := e.pushToVerifierWithTracing(ctx, &chunk, status.ExecutionResult, chunkDataPack)
 	if err != nil {
 		return false, fmt.Errorf("could not push the chunk to verifier engine")
 	}

@@ -29,7 +29,7 @@ func (e *ExecutionResult) Build(exeResult *flow.ExecutionResult, link LinkGenera
 
 	for i, flowChunk := range exeResult.Chunks {
 		var chunk Chunk
-		chunk.Build(flowChunk)
+		chunk.Build(&flowChunk)
 		chunks[i] = chunk
 	}
 	e.Chunks = chunks

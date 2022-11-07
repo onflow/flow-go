@@ -59,7 +59,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 
 	// create assignment
 	for _, chunk := range s.Chunks {
-		s.ChunksAssignment.Add(chunk, verifiers)
+		s.ChunksAssignment.Add(&chunk, verifiers)
 	}
 
 	s.VerID = verifiers[0]

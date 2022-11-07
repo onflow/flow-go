@@ -13,7 +13,7 @@ type ChunkStatus struct {
 }
 
 func (s ChunkStatus) Chunk() *flow.Chunk {
-	return s.ExecutionResult.Chunks[s.ChunkIndex]
+	return &s.ExecutionResult.Chunks[s.ChunkIndex]
 }
 
 func (s ChunkStatus) ChunkLocatorID() flow.Identifier {

@@ -714,7 +714,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 		vcds[i] = &verification.VerifiableChunkData{
 			IsSystemChunk:     isSystemChunk,
-			Chunk:             chunk,
+			Chunk:             &chunk,
 			Header:            executableBlock.Block.Header,
 			Result:            er,
 			ChunkDataPack:     chdps[i],

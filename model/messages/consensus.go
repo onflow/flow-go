@@ -4,6 +4,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type UntrustedBlockPayload struct {
+	Guarantees []flow.CollectionGuarantee
+	Seals      []flow.Seal
+}
+
+type UntrustedBlock struct {
+	Header flow.Header
+}
+
 // BlockProposal is part of the consensus protocol and represents the the leader
 // of a consensus round pushing a new proposal to the network.
 type BlockProposal struct {

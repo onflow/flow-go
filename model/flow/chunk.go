@@ -56,18 +56,14 @@ func (c *ChunkDataPack) Checksum() Identifier {
 }
 
 // TODO: This is the basic version of the list, we need to substitute it with something like Merkle tree at some point
-type ChunkList []*Chunk
+type ChunkList []Chunk
 
 func (cl ChunkList) Fingerprint() Identifier {
 	return MerkleRoot(GetIDs(cl)...)
 }
 
 func (cl *ChunkList) Insert(ch *Chunk) {
-	*cl = append(*cl, ch)
-}
-
-func (cl ChunkList) Items() []*Chunk {
-	return cl
+	*cl = append(*cl, *ch)
 }
 
 // Empty returns true if the chunk list is empty. Otherwise it returns false.
@@ -88,7 +84,7 @@ func (cl ChunkList) Indices() []uint64 {
 func (cl ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
 	for _, ch := range cl {
 		if ch.Checksum() == cs {
-			return ch, true
+			return &ch, true
 		}
 	}
 	return nil, false
@@ -103,7 +99,7 @@ func (cl ChunkList) ByIndex(i uint64) (*Chunk, bool) {
 		// index out of range
 		return nil, false
 	}
-	return cl[i], true
+	return &cl[i], true
 }
 
 // Len returns the number of Chunks in the list. It is also part of the sort
