@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const DataPath = "./testdata/data/"
-const TemplatesPath = "./testdata/templates/"
-const ExpectedTemplatesPath = "./testdata/expected/"
+const DataPath = "./testdata/level2-template/data/"
+const TemplatesPath = "./testdata/level2-template/templates"
+const ExpectedTemplatesPath = "./testdata/level2-template/expected"
 
 func TestApply_DataTable(t *testing.T) {
 	testDataMap := map[string]testData{
