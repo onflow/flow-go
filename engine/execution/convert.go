@@ -24,7 +24,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 	block := result.ExecutableBlock.Block
 	blockID := block.ID()
 
-	chunks := make([]*flow.Chunk, len(result.StateCommitments))
+	chunks := make(flow.ChunkList, len(result.StateCommitments))
 	chdps = make([]*flow.ChunkDataPack, len(result.StateCommitments))
 
 	// TODO: check current state root == startState
@@ -56,7 +56,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 		}
 
 		// TODO use view.SpockSecret() as an input to spock generator
-		chunks[i] = chunk
+		chunks[i] = *chunk
 		startState = endState
 	}
 
@@ -73,7 +73,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 func GenerateExecutionResultForBlock(
 	previousErID flow.Identifier,
 	block *flow.Block,
-	chunks []*flow.Chunk,
+	chunks flow.ChunkList,
 	serviceEvents []flow.Event,
 	executionDataID flow.Identifier,
 ) (*flow.ExecutionResult, error) {

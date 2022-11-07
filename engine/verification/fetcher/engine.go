@@ -400,7 +400,7 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 	}
 
 	// 3. collection id must match
-	err := e.validateCollectionID(chunkDataPack, result, chunk)
+	err := e.validateCollectionID(chunkDataPack, result, &chunk)
 	if err != nil {
 		return fmt.Errorf("could not validate collection: %w", err)
 	}

@@ -219,7 +219,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 					Msgf("Chunk for block at finalized height %d received - stopping node", e.stopAtHeight)
 			}
 
-			processed, err := e.processChunkWithTracing(ctx, chunk, resultID, block.Header.Height)
+			processed, err := e.processChunkWithTracing(ctx, &chunk, resultID, block.Header.Height)
 			if err != nil {
 				resultLog.Fatal().
 					Err(err).
@@ -327,7 +327,7 @@ func assignedChunks(assignee flow.Identifier, assignment *chunks.Assignment, chu
 			return nil, fmt.Errorf("chunk out of range requested: %v", index)
 		}
 
-		myChunks = append(myChunks, chunk)
+		myChunks = append(myChunks, *chunk)
 	}
 
 	return myChunks, nil
