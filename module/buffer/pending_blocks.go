@@ -18,7 +18,7 @@ func NewPendingBlocks() *PendingBlocks {
 }
 
 func (b *PendingBlocks) Add(originID flow.Identifier, proposal *messages.BlockProposal) bool {
-	return b.backend.add(originID, proposal.Header, proposal.Payload)
+	return b.backend.add(originID, &proposal.Block.Header, &proposal.Block.Payload)
 }
 
 func (b *PendingBlocks) ByID(blockID flow.Identifier) (*flow.PendingBlock, bool) {

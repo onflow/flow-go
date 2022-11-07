@@ -300,7 +300,7 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) {
 	// process the blocks one by one
 	for _, block := range res.Blocks {
-		if !e.core.HandleBlock(block.Header) {
+		if !e.core.HandleBlock(&block.Header) {
 			continue
 		}
 		synced := &events.SyncedClusterBlock{

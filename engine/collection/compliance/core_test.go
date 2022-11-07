@@ -187,14 +187,13 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	block := unittest.ClusterBlockWithParent(cs.head)
 
 	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
+		Block: messages.UntrustedClusterBlockFromInternal(&block),
 	}
 
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	cs.hotstuff.On("SubmitProposal", proposal.Header, cs.head.Header.View).Return(doneChan())
+	cs.hotstuff.On("SubmitProposal", block.Header, cs.head.Header.View).Return(doneChan())
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -228,8 +227,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
 	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
+		Block: messages.UntrustedClusterBlockFromInternal(&block),
 	}
 
 	// store the data for retrieval
@@ -257,8 +255,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
 	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
+		Block: messages.UntrustedClusterBlockFromInternal(&block),
 	}
 
 	// store the data for retrieval
@@ -290,8 +287,7 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	// create three children blocks
 	parent := unittest.ClusterBlockWithParent(cs.head)
 	proposal := &messages.ClusterBlockProposal{
-		Header:  parent.Header,
-		Payload: parent.Payload,
+		Block: messages.UntrustedClusterBlockFromInternal(&parent),
 	}
 	block1 := unittest.ClusterBlockWithParent(&parent)
 	block2 := unittest.ClusterBlockWithParent(&parent)
@@ -392,8 +388,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 		)
 
 		proposal := &messages.ClusterBlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
+			Block: messages.UntrustedClusterBlockFromInternal(block),
 		}
 
 		// process and make sure no error occurs (as they are unverifiable)
@@ -423,8 +418,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	).Return(doneChan())
 
 	missingProposal := &messages.ClusterBlockProposal{
-		Header:  missing.Header,
-		Payload: missing.Payload,
+		Block: messages.UntrustedClusterBlockFromInternal(missing),
 	}
 
 	proposalsLookup[missing.ID()] = missing

@@ -141,8 +141,7 @@ func NewEngine(
 				msg = &engine.Message{
 					OriginID: msg.OriginID,
 					Payload: &messages.BlockProposal{
-						Payload: syncedBlock.Block.Payload,
-						Header:  syncedBlock.Block.Header,
+						Block: syncedBlock.Block,
 					},
 				}
 				return msg, true
@@ -301,8 +300,7 @@ func (e *Engine) processAvailableMessages() error {
 			for _, block := range blockResponse.Blocks {
 				// process each block and indicate it's from a range of blocks
 				err := e.core.OnBlockProposal(msg.OriginID, &messages.BlockProposal{
-					Header:  block.Header,
-					Payload: block.Payload,
+					Block: block,
 				}, true)
 
 				if err != nil {
@@ -427,9 +425,12 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		// NOTE: some fields are not needed for the message
 		// - proposer ID is conveyed over the network message
 		// - the payload hash is deduced from the payload
-		proposal := &messages.BlockProposal{
+		block := &flow.Block{
 			Header:  header,
 			Payload: payload,
+		}
+		proposal := &messages.BlockProposal{
+			Block: messages.UntrustedBlockFromInternal(block),
 		}
 
 		// broadcast the proposal to consensus nodes

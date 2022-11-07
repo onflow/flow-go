@@ -16,7 +16,7 @@ func NewPendingClusterBlocks() *PendingClusterBlocks {
 }
 
 func (b *PendingClusterBlocks) Add(originID flow.Identifier, proposal *messages.ClusterBlockProposal) bool {
-	return b.backend.add(originID, proposal.Header, proposal.Payload)
+	return b.backend.add(originID, &proposal.Block.Header, &proposal.Block.Payload)
 }
 
 func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (*cluster.PendingBlock, bool) {

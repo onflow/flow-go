@@ -302,7 +302,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
 
 	for _, block := range res.Blocks {
-		if !e.core.HandleBlock(block.Header) {
+		if !e.core.HandleBlock(&block.Header) {
 			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
 			continue
 		}

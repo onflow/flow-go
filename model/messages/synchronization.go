@@ -1,7 +1,6 @@
 package messages
 
 import (
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -44,12 +43,12 @@ type BatchRequest struct {
 // that should correspond to the request.
 type BlockResponse struct {
 	Nonce  uint64
-	Blocks []*flow.Block
+	Blocks []UntrustedBlock
 }
 
 // ClusterBlockResponse is the same thing as BlockResponse, but for cluster
 // consensus.
 type ClusterBlockResponse struct {
 	Nonce  uint64
-	Blocks []*cluster.Block
+	Blocks []UntrustedClusterBlock
 }

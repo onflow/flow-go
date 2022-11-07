@@ -199,16 +199,14 @@ func ProposalFixture() *messages.BlockProposal {
 
 func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
 	proposal := &messages.BlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
+		Block: messages.UntrustedBlockFromInternal(block),
 	}
 	return proposal
 }
 
 func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockProposal {
 	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
+		Block: messages.UntrustedClusterBlockFromInternal(block),
 	}
 	return proposal
 }

@@ -197,8 +197,7 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 
 	// process as proposal
 	proposal := &messages.BlockProposal{
-		Header:  synced.Block.Header,
-		Payload: synced.Block.Payload,
+		Block: synced.Block,
 	}
 	return e.onBlockProposal(originID, proposal, false)
 }
@@ -206,8 +205,7 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) error {
 	for i, block := range res.Blocks {
 		proposal := &messages.BlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
+			Block: block,
 		}
 
 		// process block proposal with a wait
@@ -221,11 +219,11 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 
 // onBlockProposal handles incoming block proposals. inRangeBlockResponse will determine whether or not we should wait in processBlockAndDescendants
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
+	block := proposal.Block.ToInternal()
+	header := block.Header
 
-	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
+	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), header.ID(), trace.FollowerOnBlockProposal)
 	defer span.End()
-
-	header := proposal.Header
 
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
@@ -355,11 +353,11 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // any children are therefore also connected to the finalized state and can be processed as well.
 // No errors are expected during normal operations.
 func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
+	block := proposal.Block.ToInternal()
+	header := block.Header
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
 	defer span.End()
-
-	header := proposal.Header
 
 	log := e.log.With().
 		Str("chain_id", header.ChainID.String()).
@@ -373,12 +371,6 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 		Logger()
 
 	log.Info().Msg("processing block proposal")
-
-	// see if the block is a valid extension of the protocol state
-	block := &flow.Block{
-		Header:  proposal.Header,
-		Payload: proposal.Payload,
-	}
 
 	// check whether the block is a valid extension of the chain.
 	// it only checks the block header, since checking block body is expensive.
@@ -449,8 +441,10 @@ func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header
 	var result *multierror.Error
 	for _, child := range children {
 		proposal := &messages.BlockProposal{
-			Header:  child.Header,
-			Payload: child.Payload,
+			Block: messages.UntrustedBlockFromInternal(&flow.Block{
+				Header:  child.Header,
+				Payload: child.Payload,
+			}),
 		}
 		err := e.processBlockAndDescendants(ctx, proposal, inRangeBlockResponse)
 		if err != nil {

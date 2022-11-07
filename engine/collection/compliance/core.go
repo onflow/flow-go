@@ -81,7 +81,9 @@ func NewCore(
 
 // OnBlockProposal handles incoming block proposals.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
-	header := proposal.Header
+	block := proposal.Block.ToInternal()
+	header := block.Header
+
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
@@ -89,9 +91,9 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
 		Hex("parent_id", header.ParentID[:]).
-		Hex("ref_block_id", proposal.Payload.ReferenceBlockID[:]).
-		Hex("collection_id", logging.Entity(proposal.Payload.Collection)).
-		Int("tx_count", proposal.Payload.Collection.Len()).
+		Hex("ref_block_id", block.Payload.ReferenceBlockID[:]).
+		Hex("collection_id", logging.Entity(block.Payload.Collection)).
+		Int("tx_count", block.Payload.Collection.Len()).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("signers", header.ParentVoterIndices).
@@ -195,7 +197,8 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 // to a valid proposal are validly connected to the finalized state and can be
 // processed as well.
 func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposal) error {
-	blockID := proposal.Header.ID()
+	block := proposal.Block.ToInternal()
+	blockID := block.ID()
 
 	// process block itself
 	err := c.processBlockProposal(proposal)
@@ -228,8 +231,10 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 	}
 	for _, child := range children {
 		childProposal := &messages.ClusterBlockProposal{
-			Header:  child.Header,
-			Payload: child.Payload,
+			Block: messages.UntrustedClusterBlockFromInternal(&cluster.Block{
+				Header:  child.Header,
+				Payload: child.Payload,
+			}),
 		}
 		cpr := c.processBlockAndDescendants(childProposal)
 		if cpr != nil {
@@ -247,7 +252,8 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 // processBlockProposal processes the given block proposal. The proposal must connect to
 // the finalized state.
 func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) error {
-	header := proposal.Header
+	block := proposal.Block.ToInternal()
+	header := block.Header
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
@@ -262,10 +268,6 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 	log.Info().Msg("processing block proposal")
 
 	// see if the block is a valid extension of the protocol state
-	block := &cluster.Block{
-		Header:  proposal.Header,
-		Payload: proposal.Payload,
-	}
 	err := c.state.Extend(block)
 	// if the block proposes an invalid extension of the protocol state, then the block is invalid
 	if state.IsInvalidExtensionError(err) {

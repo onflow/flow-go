@@ -93,21 +93,22 @@ func NewCore(
 
 // OnBlockProposal handles incoming block proposals.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal, inBlockRangeResponse bool) error {
+	block := proposal.Block.ToInternal()
+	header := block.Header
 
 	var traceID string
 
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONCompOnBlockProposal)
+	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.CONCompOnBlockProposal)
 	if isSampled {
 		span.SetAttributes(
-			attribute.Int64("view", int64(proposal.Header.View)),
+			attribute.Int64("view", int64(header.View)),
 			attribute.String("origin_id", originID.String()),
-			attribute.String("proposer", proposal.Header.ProposerID.String()),
+			attribute.String("proposer", header.ProposerID.String()),
 		)
 		traceID = span.SpanContext().TraceID().String()
 	}
 	defer span.End()
 
-	header := proposal.Header
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
@@ -226,7 +227,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 // to a valid proposal are validly connected to the finalized state and can be
 // processed as well.
 func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
-	blockID := proposal.Header.ID()
+	blockID := proposal.Block.Header.ID()
 
 	// process block itself
 	err := c.processBlockProposal(proposal, inRangeBlockResponse)
@@ -259,8 +260,10 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRa
 	}
 	for _, child := range children {
 		childProposal := &messages.BlockProposal{
-			Header:  child.Header,
-			Payload: child.Payload,
+			Block: messages.UntrustedBlockFromInternal(&flow.Block{
+				Header:  child.Header,
+				Payload: child.Payload,
+			}),
 		}
 		cpr := c.processBlockAndDescendants(childProposal, inRangeBlockResponse)
 		if cpr != nil {
@@ -278,18 +281,20 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRa
 // processBlockProposal processes the given block proposal. The proposal must connect to
 // the finalized state.
 func (c *Core) processBlockProposal(proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
+	block := proposal.Block.ToInternal()
+	header := block.Header
+
 	startTime := time.Now()
 	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
 
-	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.ConCompProcessBlockProposal)
+	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.ConCompProcessBlockProposal)
 	if isSampled {
 		span.SetAttributes(
-			attribute.String("proposer", proposal.Header.ProposerID.String()),
+			attribute.String("proposer", header.ProposerID.String()),
 		)
 	}
 	defer span.End()
 
-	header := proposal.Header
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
@@ -304,10 +309,6 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal, inRangeBlo
 	log.Info().Msg("processing block proposal")
 
 	// see if the block is a valid extension of the protocol state
-	block := &flow.Block{
-		Header:  proposal.Header,
-		Payload: proposal.Payload,
-	}
 	err := c.state.Extend(ctx, block)
 	// if the block proposes an invalid extension of the protocol state, then the block is invalid
 	if state.IsInvalidExtensionError(err) {

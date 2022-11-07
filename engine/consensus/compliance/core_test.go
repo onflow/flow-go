@@ -443,7 +443,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	var proposals []*messages.BlockProposal
 	parent := missing
 	for i := 0; i < 3; i++ {
-		descendant := unittest.BlockWithParentFixture(parent.Header)
+		descendant := unittest.BlockWithParentFixture(&parent.Block.Header)
 		proposal := unittest.ProposalFromBlock(descendant)
 		proposals = append(proposals, proposal)
 		parent = proposal
@@ -459,7 +459,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 		cs.sync.On("RequestBlock", mock.Anything, mock.Anything).Once().Run(
 			func(args mock.Arguments) {
 				ancestorID := args.Get(0).(flow.Identifier)
-				assert.Equal(cs.T(), missing.Header.ID(), ancestorID, "should always request root block")
+				assert.Equal(cs.T(), missing.Block.Header.ID(), ancestorID, "should always request root block")
 			},
 		)
 
@@ -475,10 +475,10 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	*cs.hotstuff = module.HotStuff{}
 	index := 0
 	order := []flow.Identifier{
-		missing.Header.ID(),
-		proposals[0].Header.ID(),
-		proposals[1].Header.ID(),
-		proposals[2].Header.ID(),
+		missing.Block.Header.ID(),
+		proposals[0].Block.Header.ID(),
+		proposals[1].Block.Header.ID(),
+		proposals[2].Block.Header.ID(),
 	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {

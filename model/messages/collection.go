@@ -24,12 +24,51 @@ type CollectionResponse struct {
 	Nonce      uint64 // so that we aren't deduplicated by the network layer
 }
 
+type UntrustedClusterBlockPayload struct {
+	Collection       []flow.TransactionBody
+	ReferenceBlockID flow.Identifier
+}
+
+type UntrustedClusterBlock struct {
+	Header  flow.Header
+	Payload UntrustedClusterBlockPayload
+}
+
+func (ub UntrustedClusterBlock) ToInternal() *cluster.Block {
+	block := &cluster.Block{
+		Header: &ub.Header,
+		Payload: &cluster.Payload{
+			Collection: flow.Collection{
+				Transactions: make([]*flow.TransactionBody, 0, len(ub.Payload.Collection)),
+			},
+			ReferenceBlockID: ub.Payload.ReferenceBlockID,
+		},
+	}
+	for _, tx := range ub.Payload.Collection {
+		block.Payload.Collection.Transactions = append(block.Payload.Collection.Transactions, &tx)
+	}
+	return block
+}
+
+func UntrustedClusterBlockFromInternal(clusterBlock *cluster.Block) UntrustedClusterBlock {
+	block := UntrustedClusterBlock{
+		Header: *clusterBlock.Header,
+		Payload: UntrustedClusterBlockPayload{
+			ReferenceBlockID: clusterBlock.Payload.ReferenceBlockID,
+			Collection:       make([]flow.TransactionBody, 0, clusterBlock.Payload.Collection.Len()),
+		},
+	}
+	for _, tx := range clusterBlock.Payload.Collection.Transactions {
+		block.Payload.Collection = append(block.Payload.Collection, *tx)
+	}
+	return block
+}
+
 // ClusterBlockProposal is a proposal for a block in collection node cluster
 // consensus. The header contains information about consensus state and the
 // payload contains the proposed collection (may be empty).
 type ClusterBlockProposal struct {
-	Header  *flow.Header
-	Payload *cluster.Payload
+	Block UntrustedClusterBlock
 }
 
 // ClusterBlockVote is a vote for a proposed block in collection node cluster
