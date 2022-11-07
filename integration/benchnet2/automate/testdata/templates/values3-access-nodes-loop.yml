@@ -536,6 +536,7 @@ execution:
         targetPort: admin
     storage: 10G
   nodes:
+
     execution1:
       args:
         - --bootstrapdir=/bootstrap
@@ -570,18 +571,19 @@ execution:
           value: ""
       image: gcr.io/flow-container-registry/execution:v0.27.6
       nodeId: 4a6f73682048616e6e616e00a963fb7050b300c024526eee06767b237ccf5349
+
     execution2:
       args:
         - --bootstrapdir=/bootstrap
         - --datadir=/data/protocol
         - --secretsdir=/data/secret
         - --loglevel=INFO
+        - --bind=0.0.0.0:3569
         - --profiler-enabled=false
         - --profile-uploader-enabled=false
         - --tracer-enabled=false
         - --profiler-dir=/profiler
         - --profiler-interval=2m
-        - --bind=0.0.0.0:3569
         - --nodeid=4b616e205a68616e670075d983e43cd61f1136cda8c8c48887b5654dcfb2db59
         - --triedir=/trie
         - --rpc-addr=0.0.0.0:9000
@@ -604,6 +606,7 @@ execution:
           value: ""
       image: gcr.io/flow-container-registry/execution:v0.27.6
       nodeId: 4b616e205a68616e670075d983e43cd61f1136cda8c8c48887b5654dcfb2db59
+
 verification:
   defaults:
     imagePullPolicy: Always
