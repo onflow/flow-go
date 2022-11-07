@@ -77,7 +77,13 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedSen
 
 			validatePubsub := authorizedSenderValidator.PubSubMessageValidator(c.Channel)
 			pubsubResult := validatePubsub(pid, c.Message)
-			require.Equal(s.T(), pubsub.ValidationAccept, pubsubResult)
+
+			// unicast messages should be rejected when sent via pubsub
+			if c.Unicast && c.MessageStr != message.TestMessage {
+				require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+			} else {
+				require.Equal(s.T(), pubsub.ValidationAccept, pubsubResult)
+			}
 		})
 	}
 }
@@ -267,6 +273,29 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 	})
 }
 
+// TestValidatorCallback_ValidationFailure checks that AuthorizedSenderValidator returns the expected validation error when an unicast only message is published.
+func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnauthorizedPublishOnChannel() {
+	for _, c := range s.authorizedUnicastOnChannel {
+		str := fmt.Sprintf("message type (%s) is not authorized to be sent via libp2p publish", c.MessageStr)
+		s.Run(str, func() {
+			pid, err := unittest.PeerIDFromFlowID(c.Identity)
+			require.NoError(s.T(), err)
+
+			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, s.slashingViolationsConsumer, c.GetIdentity)
+
+			msgType, err := authorizedSenderValidator.Validate(pid, c.Message, c.Channel, false)
+
+			if msgType == message.TestMessage {
+				require.NoError(s.T(), err)
+			} else {
+				require.ErrorIs(s.T(), err, message.ErrUnauthorizedPublishOnChannel)
+			}
+
+			require.Equal(s.T(), c.MessageStr, msgType)
+		})
+	}
+}
+
 // initializeAuthorizationTestCases initializes happy and sad path test cases for checking authorized and unauthorized role message combinations.
 func (s *TestAuthorizedSenderValidatorSuite) initializeAuthorizationTestCases() {
 	for _, c := range s.allMsgConfigs {
@@ -321,6 +350,7 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeInvalidMessageOnChannelTe
 	}
 }
 
+// initializeUnicastOnChannelTestCases initializes happy and sad path test cases for unicast on channel message combinations.
 func (s *TestAuthorizedSenderValidatorSuite) initializeUnicastOnChannelTestCases() {
 	for _, c := range s.allMsgConfigs {
 		for channel, channelAuthConfig := range c.Config {

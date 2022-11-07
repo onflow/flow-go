@@ -7,6 +7,7 @@ import (
 
 var (
 	ErrUnauthorizedUnicastOnChannel = errors.New("message is not authorized to be sent on channel via unicast")
+	ErrUnauthorizedPublishOnChannel = errors.New("message is not authorized to be sent on channel via publish/multicast")
 	ErrUnauthorizedMessageOnChannel = errors.New("message is not authorized to be sent on channel")
 	ErrUnauthorizedRole             = errors.New("sender role not authorized to send message on channel")
 )
