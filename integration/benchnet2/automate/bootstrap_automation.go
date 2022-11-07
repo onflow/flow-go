@@ -42,7 +42,6 @@ func (t *Template) Apply(outputToFile bool) string {
 		log.Fatal(err)
 	}
 	templateStr := string(templateBytes)
-	templateStr = strings.Trim(templateStr, "\t \n")
 
 	tmpl, err := template.New("test").Parse(templateStr)
 	tmpl = template.Must(tmpl, err)
@@ -54,7 +53,7 @@ func (t *Template) Apply(outputToFile bool) string {
 		log.Fatal(err)
 	}
 
-	//output := buf.String()
+	trimmed := strings.TrimSpace(buf.String())
 
 	if outputToFile {
 		// create the file
@@ -64,11 +63,11 @@ func (t *Template) Apply(outputToFile bool) string {
 		}
 		defer f.Close()
 
-		_, e := f.WriteString(buf.String())
+		_, e := f.WriteString(trimmed)
 		if e != nil {
 			log.Fatal(e)
 		}
 	}
 
-	return buf.String()
+	return trimmed
 }
