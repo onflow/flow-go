@@ -6,6 +6,7 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
@@ -15,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request

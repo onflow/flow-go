@@ -51,7 +51,7 @@ func NewEng(
 	results storage.ExecutionResults,
 	log zerolog.Logger,
 	chainID flow.ChainID,
-	apiRatelimits map[string]int,  // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
+	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
 ) *Engine {
 	if config.MaxBlockMsgSize == 0 {
