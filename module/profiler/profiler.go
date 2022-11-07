@@ -63,7 +63,7 @@ func New(log zerolog.Logger, uploader Uploader, dir string, interval time.Durati
 		duration: duration,
 		uploader: uploader,
 		enabled:  atomic.NewBool(enabled),
-		trigger:  make(chan time.Duration, 1),
+		trigger:  make(chan time.Duration),
 	}
 
 	go p.runForever()

@@ -20,13 +20,16 @@ func TestProfiler(t *testing.T) {
 			p, err := profiler.New(zerolog.Nop(), &profiler.NoopUploader{}, tempDir, time.Hour, time.Millisecond*100, false)
 			require.NoError(t, err)
 
+			unittest.AssertClosesBefore(t, p.Ready(), 5*time.Second)
+
 			err = p.SetEnabled(true)
 			require.NoError(t, err)
 
-			err = p.TriggerRun(time.Millisecond * 100)
-			require.NoError(t, err)
+			require.Eventually(t, func() bool { return p.TriggerRun(time.Millisecond*100) == nil }, 1*time.Second, 10*time.Millisecond)
 
-			unittest.AssertClosesBefore(t, p.Ready(), 5*time.Second)
+			// Fail if profiling is already running
+			err = p.TriggerRun(0)
+			require.ErrorContains(t, err, "profiling is already in progress")
 
 			t.Logf("profiler ready %s", tempDir)
 
