@@ -1,8 +1,0 @@
-args:
-  - "--bootstrapdir=/bootstrap"
-  - "--consensus"
-env:
-  - name: consensus name
-    value: consensus {{.NodeID}}
-  - name: consensus numbers
-    value: 123

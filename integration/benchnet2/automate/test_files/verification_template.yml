@@ -1,8 +1,0 @@
-args:
-  - "--bootstrapdir=/bootstrap"
-  - "--verification"
-env:
-  - name: verification name
-    value: verification {{.NodeID}}
-  - name: verification numbers
-    value: 123

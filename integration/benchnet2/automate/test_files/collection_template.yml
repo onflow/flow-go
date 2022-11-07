@@ -1,8 +1,0 @@
-args:
-  - "--bootstrapdir=/bootstrap"
-  - "--collection"
-env:
-  - name: collection name
-    value: collection {{.NodeID}}
-  - name: collection numbers
-    value: 123
