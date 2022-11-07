@@ -22,10 +22,11 @@ import (
 	"github.com/onflow/flow-go/engine"
 )
 
+type timedProfileFunc func(io.Writer, time.Duration) error
 type profileDef struct {
 	profileName string
 	profileType pb.ProfileType
-	profileFunc profileFunc
+	profileFunc timedProfileFunc
 }
 
 type AutoProfiler struct {
@@ -49,6 +50,10 @@ func New(log zerolog.Logger, uploader Uploader, dir string, interval time.Durati
 	if err != nil {
 		return nil, fmt.Errorf("could not create profile dir %v: %w", dir, err)
 	}
+
+	// add 50% jitter to the interval
+	jitter := time.Duration(rand.Int63n(int64(interval)))
+	interval = interval/2 + jitter
 
 	p := &AutoProfiler{
 		unit:     engine.NewUnit(),
@@ -89,21 +94,17 @@ func (p *AutoProfiler) TriggerRun(d time.Duration) error {
 }
 
 func (p *AutoProfiler) runForever() {
-	jitter := time.Duration(rand.Int63n(int64(p.interval)))
-	t := time.NewTicker(p.interval + jitter)
+	t := time.NewTicker(p.interval)
 	defer t.Stop()
 
 	for {
 		select {
 		case <-t.C:
 			if p.Enabled() {
-				p.runOnce()
+				p.runOnce(p.duration)
 			}
 		case d := <-p.trigger:
-			oldDuration := p.duration
-			p.duration = d
-			p.runOnce()
-			p.duration = oldDuration
+			p.runOnce(d)
 		case <-p.unit.Quit():
 			return
 		}
@@ -123,12 +124,12 @@ func (p *AutoProfiler) Done() <-chan struct{} {
 	return p.unit.Done()
 }
 
-func (p *AutoProfiler) runOnce() {
+func (p *AutoProfiler) runOnce(d time.Duration) {
 	startTime := time.Now()
 	p.log.Info().Msg("starting profile trace")
 
 	for _, prof := range [...]profileDef{
-		{profileName: "goroutine", profileType: pb.ProfileType_THREADS, profileFunc: newProfileFunc("goroutine")},
+		{profileName: "goroutine", profileType: pb.ProfileType_THREADS, profileFunc: func(w io.Writer, _ time.Duration) error { return newProfileFunc("goroutine")(w) }},
 		{profileName: "heap", profileType: pb.ProfileType_HEAP, profileFunc: p.pprofHeap},
 		{profileName: "allocs", profileType: pb.ProfileType_HEAP_ALLOC, profileFunc: p.pprofAllocs},
 		{profileName: "block", profileType: pb.ProfileType_CONTENTION, profileFunc: p.pprofBlock},
@@ -156,7 +157,7 @@ func (p *AutoProfiler) runOnce() {
 			}
 		}(logger, f.Name())
 
-		err = p.pprof(f, prof.profileFunc)
+		err = p.pprof(f, prof.profileFunc, d)
 		if err != nil {
 			logger.Error().Err(err).Msg("failed to generate profile")
 			continue
@@ -187,12 +188,12 @@ func (p *AutoProfiler) runOnce() {
 	p.log.Info().Dur("duration", time.Since(startTime)).Msg("finished profile trace")
 }
 
-func (p *AutoProfiler) pprof(f *os.File, profileFunc profileFunc) (err error) {
+func (p *AutoProfiler) pprof(f *os.File, fn timedProfileFunc, d time.Duration) (err error) {
 	defer func() {
 		multierr.AppendInto(&err, f.Close())
 	}()
 
-	return profileFunc(f)
+	return fn(f, d)
 }
 
 type profileFunc func(io.Writer) error
@@ -261,7 +262,7 @@ func (p *AutoProfiler) goHeapProfile(sampleTypes ...string) (*profile.Profile, e
 }
 
 // pprofHeap produces cumulative heap profile since the program start.
-func (p *AutoProfiler) pprofHeap(w io.Writer) error {
+func (p *AutoProfiler) pprofHeap(w io.Writer, _ time.Duration) error {
 	prof, err := p.goHeapProfile("inuse_objects", "inuse_space")
 	if err != nil {
 		return fmt.Errorf("failed to get heap profile: %w", err)
@@ -271,14 +272,14 @@ func (p *AutoProfiler) pprofHeap(w io.Writer) error {
 }
 
 // pprofAllocs produces differential allocs profile for the given duration.
-func (p *AutoProfiler) pprofAllocs(w io.Writer) (err error) {
+func (p *AutoProfiler) pprofAllocs(w io.Writer, d time.Duration) (err error) {
 	p1, err := p.goHeapProfile("alloc_objects", "alloc_space")
 	if err != nil {
 		return fmt.Errorf("failed to get allocs profile: %w", err)
 	}
 
 	select {
-	case <-time.After(p.duration):
+	case <-time.After(d):
 	case <-p.unit.Quit():
 		return context.Canceled
 	}
@@ -295,24 +296,24 @@ func (p *AutoProfiler) pprofAllocs(w io.Writer) (err error) {
 		return fmt.Errorf("failed to merge allocs profiles: %w", err)
 	}
 	diff.TimeNanos = time.Now().UnixNano()
-	diff.DurationNanos = p.duration.Nanoseconds()
+	diff.DurationNanos = d.Nanoseconds()
 
 	return diff.Write(w)
 }
 
-func (p *AutoProfiler) pprofBlock(w io.Writer) error {
+func (p *AutoProfiler) pprofBlock(w io.Writer, d time.Duration) error {
 	runtime.SetBlockProfileRate(100)
 	defer runtime.SetBlockProfileRate(0)
 
 	select {
-	case <-time.After(p.duration):
+	case <-time.After(d):
 		return newProfileFunc("block")(w)
 	case <-p.unit.Quit():
 		return context.Canceled
 	}
 }
 
-func (p *AutoProfiler) pprofCpu(w io.Writer) error {
+func (p *AutoProfiler) pprofCpu(w io.Writer, d time.Duration) error {
 	err := pprof.StartCPUProfile(w)
 	if err != nil {
 		return fmt.Errorf("failed to start CPU profile: %w", err)
@@ -320,7 +321,7 @@ func (p *AutoProfiler) pprofCpu(w io.Writer) error {
 	defer pprof.StopCPUProfile()
 
 	select {
-	case <-time.After(p.duration):
+	case <-time.After(d):
 		return nil
 	case <-p.unit.Quit():
 		return context.Canceled
