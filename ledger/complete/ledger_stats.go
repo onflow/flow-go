@@ -4,6 +4,8 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
+
+	"github.com/schollz/progressbar/v3"
 )
 
 type LedgerStats struct {
@@ -22,6 +24,7 @@ func (l *Ledger) CollectStats(payloadCallBack func(payload *ledger.Payload)) (*L
 		return nil, err
 	}
 
+	bar := progressbar.Default(int64(len(tries)), "collecting ledger stats")
 	for _, trie := range tries {
 		for itr := flattener.NewUniqueNodeIterator(trie.RootNode(), visitedNodes); itr.Next(); {
 			n := itr.Value()
@@ -35,6 +38,7 @@ func (l *Ledger) CollectStats(payloadCallBack func(payload *ledger.Payload)) (*L
 			visitedNodes[n] = totalNodeCounter
 			totalNodeCounter++
 		}
+		bar.Add(1)
 	}
 
 	return &LedgerStats{

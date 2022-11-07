@@ -113,10 +113,9 @@ func run(*cobra.Command, []string) {
 
 	valueSizesByType := make(sizesByType, 0)
 	ledgerStats, err := led.CollectStats(func(p *ledger.Payload) {
-
 		key, err = p.Key()
 		if err != nil {
-			log.Fatal().Err(err).Msg("cannot load the key")
+			log.Fatal().Err(err).Msg("cannot load a key")
 		}
 
 		size = p.Size()
