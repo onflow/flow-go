@@ -228,7 +228,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 	}
 }
 
-// processQueuedTimeout propagates the timeout the collector cluster:
+// processQueuedTimeout propagates the timeout to the consensus committee:
 //   - the node's internal `timeoutAggregator`
 //   - broadcast to all other consensus participants (excluding myself)
 //

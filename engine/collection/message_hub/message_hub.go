@@ -241,7 +241,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 	}
 }
 
-// processQueuedTimeout propagates the timeout the collector cluster:
+// processQueuedTimeout propagates the timeout to the collector cluster:
 //   - the node's internal `timeoutAggregator`
 //   - broadcast to all other cluster participants (excluding myself)
 //
@@ -452,7 +452,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 	return nil
 }
 
-// forwardToOwnVoteAggregator converts vote to generic `model.Vote`, logs logs vote and forwards it to own `voteAggregator`.
+// forwardToOwnVoteAggregator converts vote to generic `model.Vote`, logs vote and forwards it to own `voteAggregator`.
 // Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
 func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.ClusterBlockVote, originID flow.Identifier) {
 	v := &model.Vote{
