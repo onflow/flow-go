@@ -1506,6 +1506,8 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
 		return &common.SetLogLevelCommand{}
+	}).AdminCommand("set-golog-level", func(config *NodeConfig) commands.AdminCommand {
+		return &common.SetGologLevelCommand{}
 	}).AdminCommand("get-config", func(config *NodeConfig) commands.AdminCommand {
 		return common.NewGetConfigCommand(config.ConfigManager)
 	}).AdminCommand("set-config", func(config *NodeConfig) commands.AdminCommand {
