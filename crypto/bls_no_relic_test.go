@@ -19,7 +19,7 @@ func TestNoRelicPanic(t *testing.T) {
 	assert.PanicsWithValue(t, relic_panic, func() { AggregateBLSSignatures(nil) })
 	assert.PanicsWithValue(t, relic_panic, func() { AggregateBLSPrivateKeys(nil) })
 	assert.PanicsWithValue(t, relic_panic, func() { AggregateBLSPublicKeys(nil) })
-	assert.PanicsWithValue(t, relic_panic, func() { NeutralBLSPublicKey() })
+	assert.PanicsWithValue(t, relic_panic, func() { IdentityBLSPublicKey() })
 	assert.PanicsWithValue(t, relic_panic, func() { RemoveBLSPublicKeys(nil, nil) })
 	assert.PanicsWithValue(t, relic_panic, func() { VerifyBLSSignatureOneMessage(nil, nil, nil, nil) })
 	assert.PanicsWithValue(t, relic_panic, func() { VerifyBLSSignatureManyMessages(nil, nil, nil, nil) })
