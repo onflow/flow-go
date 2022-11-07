@@ -43,8 +43,8 @@ access:
         targetPort: admin
     storage: 1G
   nodes:
-
-    access1:
+{{range $val := .}}{{if eq ($val.group) ("access")}}
+    {{$val.name}}:
       args:
         - --bootstrapdir=/bootstrap
         - --datadir=/data/protocol
@@ -56,7 +56,7 @@ access:
         - --profiler-dir=/profiler
         - --profiler-interval=2m
         - --bind=0.0.0.0:3569
-        - --nodeid=9860ac3966c3b88043a882baf8e6ca8619ea5f95853753954b7ab49363efde21
+        - --nodeid={{$val.node_id}}
         - --rpc-addr=0.0.0.0:9000
         - --secure-rpc-addr=0.0.0.0:9001
         - --http-addr=0.0.0.0:8000
@@ -82,48 +82,8 @@ access:
         - name: BINSTAT_DMP_PATH
           value: ""
       image: gcr.io/flow-container-registry/access:v0.27.6
-      nodeId: 9860ac3966c3b88043a882baf8e6ca8619ea5f95853753954b7ab49363efde21
-
-    access2:
-      args:
-        - --bootstrapdir=/bootstrap
-        - --datadir=/data/protocol
-        - --secretsdir=/data/secret
-        - --loglevel=INFO
-        - --profiler-enabled=false
-        - --profile-uploader-enabled=false
-        - --tracer-enabled=false
-        - --profiler-dir=/profiler
-        - --profiler-interval=2m
-        - --bind=0.0.0.0:3569
-        - --nodeid=7dd7ad2565841c803d898be0b7723e6ea8348eac44a4d8e4a0b7ebe0d9c8304b
-        - --rpc-addr=0.0.0.0:9000
-        - --secure-rpc-addr=0.0.0.0:9001
-        - --http-addr=0.0.0.0:8000
-        - --collection-ingress-port=9000
-        - --supports-observer=true
-        - --public-network-address=0.0.0.0:1234
-        - --log-tx-time-to-finalized
-        - --log-tx-time-to-executed
-        - --log-tx-time-to-finalized-executed
-      env:
-        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-          value: http://tempo:4317
-        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-          value: "true"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
-      image: gcr.io/flow-container-registry/access:v0.27.6
-      nodeId: 7dd7ad2565841c803d898be0b7723e6ea8348eac44a4d8e4a0b7ebe0d9c8304b
-
+      nodeId: {{$val.node_id}}
+{{end}}{{end}}
 collection:
   defaults:
     imagePullPolicy: Always
@@ -163,8 +123,8 @@ collection:
         targetPort: admin
     storage: 1G
   nodes:
-
-    collection1:
+{{range $val := .}}{{if eq ($val.group) ("collection")}}
+    {{$val.name}}:
       args:
         - --bootstrapdir=/bootstrap
         - --datadir=/data/protocol
@@ -176,7 +136,7 @@ collection:
         - --bind=0.0.0.0:3569
         - --profiler-dir=/profiler
         - --profiler-interval=2m
-        - --nodeid=416c65782048656e74736368656c00f2b77702c5b90981bc7ebca02d7e5ac9b3
+        - --nodeid={{$val.node_id}}
         - --block-rate-delay=950ms
         - --hotstuff-timeout=2.15s
         - --hotstuff-min-timeout=2.15s
@@ -199,193 +159,8 @@ collection:
         - name: BINSTAT_DMP_PATH
           value: ""
       image: gcr.io/flow-container-registry/collection:v0.27.6
-      nodeId: 416c65782048656e74736368656c00f2b77702c5b90981bc7ebca02d7e5ac9b3
-
-    collection2:
-      args:
-        - --bootstrapdir=/bootstrap
-        - --datadir=/data/protocol
-        - --secretsdir=/data/secret
-        - --loglevel=INFO
-        - --profiler-enabled=false
-        - --profile-uploader-enabled=false
-        - --tracer-enabled=false
-        - --bind=0.0.0.0:3569
-        - --profiler-dir=/profiler
-        - --profiler-interval=2m
-        - --nodeid=416e647265772042757269616e004acd8c101a5810f3ca90f68378b11bb69970
-        - --block-rate-delay=950ms
-        - --hotstuff-timeout=2.15s
-        - --hotstuff-min-timeout=2.15s
-        - --ingress-addr=0.0.0.0:9000
-        - --insecure-access-api=false
-        - --access-node-ids=*
-      env:
-        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-          value: http://tempo:4317
-        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-          value: "true"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
-      image: gcr.io/flow-container-registry/collection:v0.27.6
-      nodeId: 416e647265772042757269616e004acd8c101a5810f3ca90f68378b11bb69970
-
-    collection3:
-      args:
-        - --bootstrapdir=/bootstrap
-        - --datadir=/data/protocol
-        - --secretsdir=/data/secret
-        - --loglevel=INFO
-        - --profiler-enabled=false
-        - --profile-uploader-enabled=false
-        - --tracer-enabled=false
-        - --bind=0.0.0.0:3569
-        - --profiler-dir=/profiler
-        - --profiler-interval=2m
-        - --nodeid=4261737469616e204d756c6c65720045611a422bdb73ee6e747fa3ebf43282b6
-        - --block-rate-delay=950ms
-        - --hotstuff-timeout=2.15s
-        - --hotstuff-min-timeout=2.15s
-        - --ingress-addr=0.0.0.0:9000
-        - --insecure-access-api=false
-        - --access-node-ids=*
-      env:
-        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-          value: http://tempo:4317
-        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-          value: "true"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
-      image: gcr.io/flow-container-registry/collection:v0.27.6
-      nodeId: 4261737469616e204d756c6c65720045611a422bdb73ee6e747fa3ebf43282b6
-
-    collection4:
-      args:
-        - --bootstrapdir=/bootstrap
-        - --datadir=/data/protocol
-        - --secretsdir=/data/secret
-        - --loglevel=INFO
-        - --profiler-enabled=false
-        - --profile-uploader-enabled=false
-        - --tracer-enabled=false
-        - --bind=0.0.0.0:3569
-        - --profiler-dir=/profiler
-        - --profiler-interval=2m
-        - --nodeid=42656e6a616d696e2056616e204d6574657200336446ef55757e6e21f1f3883a
-        - --block-rate-delay=950ms
-        - --hotstuff-timeout=2.15s
-        - --hotstuff-min-timeout=2.15s
-        - --ingress-addr=0.0.0.0:9000
-        - --insecure-access-api=false
-        - --access-node-ids=*
-      env:
-        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-          value: http://tempo:4317
-        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-          value: "true"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
-      image: gcr.io/flow-container-registry/collection:v0.27.6
-      nodeId: 42656e6a616d696e2056616e204d6574657200336446ef55757e6e21f1f3883a
-
-    collection5:
-      args:
-        - --bootstrapdir=/bootstrap
-        - --datadir=/data/protocol
-        - --secretsdir=/data/secret
-        - --loglevel=INFO
-        - --profiler-enabled=false
-        - --profile-uploader-enabled=false
-        - --tracer-enabled=false
-        - --bind=0.0.0.0:3569
-        - --profiler-dir=/profiler
-        - --profiler-interval=2m
-        - --nodeid=436173657920417272696e67746f6e008fe686f6bbb502f3b4d0951838ab3add
-        - --block-rate-delay=950ms
-        - --hotstuff-timeout=2.15s
-        - --hotstuff-min-timeout=2.15s
-        - --ingress-addr=0.0.0.0:9000
-        - --insecure-access-api=false
-        - --access-node-ids=*
-      env:
-        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-          value: http://tempo:4317
-        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-          value: "true"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
-      image: gcr.io/flow-container-registry/collection:v0.27.6
-      nodeId: 436173657920417272696e67746f6e008fe686f6bbb502f3b4d0951838ab3add
-
-    collection6:
-      args:
-        - --bootstrapdir=/bootstrap
-        - --datadir=/data/protocol
-        - --secretsdir=/data/secret
-        - --loglevel=INFO
-        - --profiler-enabled=false
-        - --profile-uploader-enabled=false
-        - --tracer-enabled=false
-        - --bind=0.0.0.0:3569
-        - --profiler-dir=/profiler
-        - --profiler-interval=2m
-        - --nodeid=44696574657220536869726c65790027ed1827d18001945988737745a5c12a2d
-        - --block-rate-delay=950ms
-        - --hotstuff-timeout=2.15s
-        - --hotstuff-min-timeout=2.15s
-        - --ingress-addr=0.0.0.0:9000
-        - --insecure-access-api=false
-        - --access-node-ids=*
-      env:
-        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-          value: http://tempo:4317
-        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-          value: "true"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
-      image: gcr.io/flow-container-registry/collection:v0.27.6
-      nodeId: 44696574657220536869726c65790027ed1827d18001945988737745a5c12a2d
-
+      nodeId: {{$val.node_id}}
+{{end}}{{end}}
 consensus:
   defaults:
     imagePullPolicy: Always
@@ -425,8 +200,8 @@ consensus:
         targetPort: admin
     storage: 1G
   nodes:
-
-    consensus1:
+{{range $val := .}}{{if eq ($val.group) ("consensus")}}
+    {{$val.name}}:
       args:
         - --bootstrapdir=/bootstrap
         - --datadir=/data/protocol
@@ -438,7 +213,7 @@ consensus:
         - --bind=0.0.0.0:3569
         - --profiler-dir=/profiler
         - --profiler-interval=2m
-        - --nodeid=4a616d65732048756e74657200cc3d5bc0fa89f027ec7e7a1b064cc032f1941f
+        - --nodeid={{$val.node_id}}
         - --block-rate-delay=800ms
         - --hotstuff-timeout=2s
         - --hotstuff-min-timeout=2s
@@ -462,84 +237,8 @@ consensus:
         - name: BINSTAT_DMP_PATH
           value: ""
       image: gcr.io/flow-container-registry/consensus:v0.27.6
-      nodeId: 4a616d65732048756e74657200cc3d5bc0fa89f027ec7e7a1b064cc032f1941f
-
-    consensus2:
-      args:
-        - --bootstrapdir=/bootstrap
-        - --datadir=/data/protocol
-        - --secretsdir=/data/secret
-        - --loglevel=DEBUG
-        - --profiler-enabled=false
-        - --profile-uploader-enabled=false
-        - --tracer-enabled=false
-        - --bind=0.0.0.0:3569
-        - --profiler-dir=/profiler
-        - --profiler-interval=2m
-        - --nodeid=4a65666665727920446f796c6500a7a4692d8b56edd508238b5e8572beeba6b6
-        - --block-rate-delay=800ms
-        - --hotstuff-timeout=2s
-        - --hotstuff-min-timeout=2s
-        - --chunk-alpha=1
-        - --emergency-sealing-active=false
-        - --insecure-access-api=false
-        - --access-node-ids=*
-      env:
-        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-          value: http://tempo:4317
-        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-          value: "true"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
-      image: gcr.io/flow-container-registry/consensus:v0.27.6
-      nodeId: 4a65666665727920446f796c6500a7a4692d8b56edd508238b5e8572beeba6b6
-
-    consensus3:
-      args:
-        - --bootstrapdir=/bootstrap
-        - --datadir=/data/protocol
-        - --secretsdir=/data/secret
-        - --loglevel=DEBUG
-        - --profiler-enabled=false
-        - --profile-uploader-enabled=false
-        - --tracer-enabled=false
-        - --bind=0.0.0.0:3569
-        - --profiler-dir=/profiler
-        - --profiler-interval=2m
-        - --nodeid=4a6f7264616e20536368616c6d0059676024fe879d8ffc5ae53adaf00dbd8630
-        - --block-rate-delay=800ms
-        - --hotstuff-timeout=2s
-        - --hotstuff-min-timeout=2s
-        - --chunk-alpha=1
-        - --emergency-sealing-active=false
-        - --insecure-access-api=false
-        - --access-node-ids=*
-      env:
-        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-          value: http://tempo:4317
-        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-          value: "true"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
-      image: gcr.io/flow-container-registry/consensus:v0.27.6
-      nodeId: 4a6f7264616e20536368616c6d0059676024fe879d8ffc5ae53adaf00dbd8630
-
+      nodeId: {{$val.node_id}}
+{{end}}{{end}}
 execution:
   defaults:
     imagePullPolicy: Always
