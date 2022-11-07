@@ -61,7 +61,7 @@ func (creator ParseRestrictedAccountCreator) CreateAccount(
 ) {
 	return parseRestrict1Arg1Ret(
 		creator.txnState,
-		"CreateAccount",
+		trace.FVMEnvCreateAccount,
 		creator.impl.CreateAccount,
 		payer)
 }
