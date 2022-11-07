@@ -430,6 +430,26 @@ func TestBLSAggregatePubKeys(t *testing.T) {
 		assert.True(t, IsNotBLSKeyError(err))
 		assert.Nil(t, aggPK)
 	})
+
+	// check that the public key corresponding to the zero private key is indeed identity
+	// The package doesn't allow to generate a zero private key. One way to obtain a zero
+	// private key is via aggrgeting opposite private keys
+	t.Run("public key of zero private key", func(t *testing.T) {
+		// sk1 is group order of bls12-381 minus one
+		groupOrderMinus1 := []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39,
+			0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE,
+			0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00}
+		sk1, err := DecodePrivateKey(BLSBLS12381, groupOrderMinus1)
+		require.NoError(t, err)
+		// sk2 is 1
+		one := make([]byte, PrKeyLenBLSBLS12381)
+		one[PrKeyLenBLSBLS12381-1] = 1
+		sk2, err := DecodePrivateKey(BLSBLS12381, one)
+		require.NoError(t, err)
+		aggSK, err := AggregateBLSPrivateKeys([]PrivateKey{sk1, sk2})
+		require.NoError(t, err)
+		assert.True(t, aggSK.PublicKey().Equals(IdentityBLSPublicKey()))
+	})
 }
 
 // BLS multi-signature
