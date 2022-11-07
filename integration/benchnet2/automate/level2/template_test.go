@@ -1,4 +1,4 @@
-package level2_template
+package level2
 
 import (
 	"os"
@@ -84,8 +84,8 @@ func TestApply_DataTable(t *testing.T) {
 			expectedOutputStr := string(expectedTemplateBytes)
 			expectedOutputStr = strings.Trim(expectedOutputStr, "\t \n")
 
-			templ := NewTemplate(testData.dataPath, testData.templatePath)
-			actualOutput := templ.Apply(false)
+			template := NewTemplate(testData.dataPath, testData.templatePath)
+			actualOutput := template.Apply(false)
 			require.Equal(t, expectedOutputStr, actualOutput)
 		})
 	}

@@ -1,4 +1,4 @@
-package level2_template
+package level2
 
 import (
 	"encoding/json"
