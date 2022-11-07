@@ -81,17 +81,27 @@ func TestRequestQueue_PutAtMaxCapacity(t *testing.T) {
 		m, ok := q.Get()
 		require.True(t, ok)
 
+		// in the following code segment, we check that:
+		//  - only previously inserted elements are popped from the heap
+		//  - each element is only popped once
 		expectedMessage, found := messages[m.OriginID]
 		require.True(t, found)
 		require.Equal(t, m, expectedMessage)
+		delete(messages, m.OriginID)
+
+		// We expect that the most-recently inserted element is popped from the heap eventually,
+		// because this element has zero probability of being ejected itself
 		if m == lastMsg {
 			lastMessagePopped = true
 		}
-
-		delete(messages, m.OriginID)
 	}
 
-	// We now have removed 10 out of 11 elements from `messages`. What remains in the map
+	// We have popped 10 elements from a heap with capacity 10, so the heap should now be empty:
+	m, ok := q.Get()
+	require.False(t, ok)
+	require.Nil(t, m)
+
+	// We have removed 10 out of 11 elements from `messages`. What remains in the map
 	// is that one message that the heap ejected. By convention, the heap should always eject first
 	// before accepting a new element. Therefore, the last-inserted element ('lastMsg') should have
 	// been popped from the heap in the for-loop, i.e. `lastMessagePopped` is expected to be true.
