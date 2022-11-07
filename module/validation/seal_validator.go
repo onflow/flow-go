@@ -290,13 +290,13 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 
 		// only Verification Nodes that were assigned to the chunk are allowed to approve it
 		for _, signerId := range chunkSigs.SignerIDs {
-			if !assignments.HasVerifier(chunk, signerId) {
+			if !assignments.HasVerifier(&chunk, signerId) {
 				return engine.NewInvalidInputErrorf("invalid signer id at chunk: %d", chunk.Index)
 			}
 		}
 
 		// Verification Nodes' approval signatures must be valid
-		err := s.verifySealSignature(chunkSigs, chunk, executionResultID)
+		err := s.verifySealSignature(chunkSigs, &chunk, executionResultID)
 		if err != nil {
 			return fmt.Errorf("invalid seal signature: %w", err)
 		}

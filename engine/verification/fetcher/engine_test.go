@@ -444,7 +444,7 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 }
 
 // TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
-// it drops it without processing it any further and and notifies consumer
+// it drops it without processing it any further and notifies consumer
 // that it is done with processing that chunk.
 func TestSkipChunkOfSealedBlock(t *testing.T) {
 	s := setupTest()
@@ -992,14 +992,14 @@ func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount in
 
 func TestTransactionOffsetForChunk(t *testing.T) {
 	t.Run("first chunk index always returns zero offset", func(t *testing.T) {
-		offsetForChunk, err := fetcher.TransactionOffsetForChunk([]*flow.Chunk{nil}, 0)
+		offsetForChunk, err := fetcher.TransactionOffsetForChunk(flow.ChunkList{*unittest.ChunkFixture(unittest.IdentifierFixture(), 0)}, 0)
 		require.NoError(t, err)
 		assert.Equal(t, uint32(0), offsetForChunk)
 	})
 
 	t.Run("offset is calculated", func(t *testing.T) {
 
-		chunksList := []*flow.Chunk{
+		chunksList := flow.ChunkList{
 			{
 				ChunkBody: flow.ChunkBody{
 					NumberOfTransactions: 1,
@@ -1041,7 +1041,7 @@ func TestTransactionOffsetForChunk(t *testing.T) {
 
 	t.Run("requesting index beyond length triggers error", func(t *testing.T) {
 
-		chunksList := make([]*flow.Chunk, 2)
+		chunksList := make(flow.ChunkList, 2)
 
 		_, err := fetcher.TransactionOffsetForChunk(chunksList, 2)
 		require.Error(t, err)

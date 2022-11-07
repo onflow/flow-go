@@ -355,7 +355,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	// ExecutionResult setup
 	result := flow.ExecutionResult{
 		BlockID:       blockID,
-		Chunks:        flow.ChunkList{&chunk},
+		Chunks:        flow.ChunkList{chunk},
 		ServiceEvents: erServiceEvents,
 	}
 

@@ -218,7 +218,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 	// setups execution outputs:
 	spockSecrets := make([][]byte, 0)
-	chunks := make([]*flow.Chunk, 0)
+	chunks := make(flow.ChunkList, 0)
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
 
 	var payload flow.Payload
@@ -360,7 +360,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, nil, computationResult.Proofs[i])
 			}
 
-			chunks = append(chunks, chunk)
+			chunks = append(chunks, *chunk)
 			chunkDataPacks = append(chunkDataPacks, chunkDataPack)
 			spockSecrets = append(spockSecrets, computationResult.StateSnapshots[i].SpockSecret)
 			startState = endState

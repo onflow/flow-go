@@ -28,7 +28,7 @@ type ChunkApprovalCollectorTestSuite struct {
 
 func (s *ChunkApprovalCollectorTestSuite) SetupTest() {
 	s.BaseApprovalsTestSuite.SetupTest()
-	s.chunk = s.Chunks[0]
+	s.chunk = &s.Chunks[0]
 	s.chunkAssignment = make(map[flow.Identifier]struct{})
 	for _, verifier := range s.ChunksAssignment.Verifiers(s.chunk) {
 		s.chunkAssignment[verifier] = struct{}{}

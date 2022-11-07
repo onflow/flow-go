@@ -13,7 +13,7 @@ import (
 // out of range indices
 func TestChunkList_ByIndex(t *testing.T) {
 	// creates a chunk list with the size of 10
-	var chunkList flow.ChunkList = make([]*flow.Chunk, 10)
+	var chunkList = make(flow.ChunkList, 10)
 
 	// an out of index chunk by index
 	_, ok := chunkList.ByIndex(11)

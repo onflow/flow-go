@@ -746,8 +746,8 @@ func ExecutionResultListFixture(n int, opts ...func(*flow.ExecutionResult)) []*f
 func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.BlockID = blockID
-		for _, chunk := range result.Chunks {
-			chunk.BlockID = blockID
+		for i := range result.Chunks {
+			result.Chunks[i].BlockID = blockID
 		}
 	}
 }
@@ -1132,11 +1132,11 @@ func ChunkFixture(blockID flow.Identifier, collectionIndex uint, opts ...func(*f
 }
 
 func ChunkListFixture(n uint, blockID flow.Identifier) flow.ChunkList {
-	chunks := make([]*flow.Chunk, 0, n)
+	chunks := make(flow.ChunkList, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
 		chunk := ChunkFixture(blockID, uint(i))
 		chunk.Index = i
-		chunks = append(chunks, chunk)
+		chunks = append(chunks, *chunk)
 	}
 	return chunks
 }
