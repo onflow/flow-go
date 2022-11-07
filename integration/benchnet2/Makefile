@@ -1,4 +1,5 @@
-ACCESS_NODES=4
+# default values that can callers override when calling target
+ACCESS_NODES=2
 COLLECTION_NODES=6
 CONSENSUS_NODE=3
 EXECUTION_NODES=2
