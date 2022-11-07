@@ -27,8 +27,9 @@ import (
 )
 
 var (
-	flagCheckpoint string
-	flagOutputDir  string
+	flagCheckpointDir string
+	flagOutputDir     string
+	flagMemProfile    bool
 )
 
 var Cmd = &cobra.Command{
@@ -38,13 +39,16 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.Flags().StringVar(&flagCheckpoint, "checkpoint", "",
-		"checkpoint file to read")
-	_ = Cmd.MarkFlagRequired("checkpoint")
+	Cmd.Flags().StringVar(&flagCheckpointDir, "checkpoint-dir", "",
+		"Directory to load checkpoint files from")
+	_ = Cmd.MarkFlagRequired("checkpoint-dir")
 
 	Cmd.Flags().StringVar(&flagOutputDir, "output-dir", "",
 		"Directory to write checkpoint stats to")
 	_ = Cmd.MarkFlagRequired("output-dir")
+
+	Cmd.Flags().BoolVar(&flagMemProfile, "mem-profile", false,
+		"Enable memory profiling")
 }
 
 type Stats struct {
@@ -74,13 +78,14 @@ type sizesByType map[string][]float64
 
 func run(*cobra.Command, []string) {
 
-	defer profile.Start(profile.MemProfile).Stop()
-
-	log.Info().Msgf("loading checkpoint %v", flagCheckpoint)
+	if flagMemProfile {
+		defer profile.Start(profile.MemProfile).Stop()
+	}
 
 	memAllocBefore := debug.GetHeapAllocsBytes()
+	log.Info().Msgf("loading checkpoint(s) from %v", flagCheckpointDir)
 
-	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, &metrics.NoopCollector{}, flagCheckpoint, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, &metrics.NoopCollector{}, flagCheckpointDir, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot create WAL")
 	}
@@ -198,15 +203,12 @@ func run(*cobra.Command, []string) {
 	writer := bufio.NewWriter(fi)
 	defer writer.Flush()
 
-	jsonData, err := json.Marshal(stats)
+	encoder := json.NewEncoder(writer)
+
+	err = encoder.Encode(stats)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not create a json obj for ledger stats")
+		log.Fatal().Err(err).Msg("could not json encode ledger stats")
 	}
-	_, err = writer.WriteString(string(jsonData) + "\n")
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not write result json to the file")
-	}
-	writer.Flush()
 }
 
 func getType(key ledger.Key) string {
