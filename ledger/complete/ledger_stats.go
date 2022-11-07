@@ -1,11 +1,11 @@
 package complete
 
 import (
+	"github.com/schollz/progressbar/v3"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
-
-	"github.com/schollz/progressbar/v3"
 )
 
 type LedgerStats struct {
