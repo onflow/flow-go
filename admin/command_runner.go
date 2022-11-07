@@ -198,18 +198,21 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 
 	// Initialize gRPC and HTTP muxers
 	gwmux := runtime.NewServeMux()
-	mux := http.NewServeMux()
-	mux.Handle("/", gwmux)
-	for _, name := range []string{"allocs", "block", "goroutine", "heap", "mutex", "threadcreate"} {
-		mux.HandleFunc(fmt.Sprintf("/debug/pprof/%s", name), pprof.Handler(name).ServeHTTP)
-	}
-	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 	err = pb.RegisterAdminHandlerFromEndpoint(ctx, gwmux, "unix:///"+r.grpcAddress, opts)
 	if err != nil {
 		return fmt.Errorf("failed to register http handlers for admin service: %w", err)
 	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/", gwmux)
+
+	// This adds an ability to use standard go tooling for performance troubleshooting e.g.:
+	//  go tool pprof http://localhost:9002/debug/pprof/goroutine
+	for _, name := range []string{"allocs", "block", "goroutine", "heap", "mutex", "threadcreate"} {
+		mux.HandleFunc(fmt.Sprintf("/debug/pprof/%s", name), pprof.Handler(name).ServeHTTP)
+	}
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 	httpServer := &http.Server{
 		Addr:      r.httpAddress,
