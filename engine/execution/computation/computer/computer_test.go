@@ -659,6 +659,26 @@ func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execut
 	}
 }
 
+type testTransactionExecutor struct {
+	executeTransaction func(runtime.Script, runtime.Context) error
+
+	script  runtime.Script
+	context runtime.Context
+}
+
+func (executor *testTransactionExecutor) Preprocess() error {
+	// Do nothing.
+	return nil
+}
+
+func (executor *testTransactionExecutor) Execute() error {
+	return executor.executeTransaction(executor.script, executor.context)
+}
+
+func (executor *testTransactionExecutor) Result() (cadence.Value, error) {
+	panic("Result not expected")
+}
+
 type testRuntime struct {
 	executeScript      func(runtime.Script, runtime.Context) (cadence.Value, error)
 	executeTransaction func(runtime.Script, runtime.Context) error
@@ -670,7 +690,11 @@ func (e *testRuntime) NewScriptExecutor(script runtime.Script, c runtime.Context
 }
 
 func (e *testRuntime) NewTransactionExecutor(script runtime.Script, c runtime.Context) runtime.Executor {
-	panic("NewTransactionExecutor not expected")
+	return &testTransactionExecutor{
+		executeTransaction: e.executeTransaction,
+		script:             script,
+		context:            c,
+	}
 }
 
 func (e *testRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []cadence.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
