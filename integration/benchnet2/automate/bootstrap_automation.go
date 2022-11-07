@@ -22,14 +22,14 @@ func NewTemplate(jsonData string, templatePath string) Template {
 }
 
 func (t *Template) Apply(outputToFile bool) string {
-
-	//load data values
+	//load data values that will be applied against the template
 	dataBytes, err := os.ReadFile(t.jsonData)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// map json data to a map, so it can be decoded by template engine
+	// map any json data to array of map, so it can be decoded by template engine -
+	// this avoids the use of structs, so we can represent any arbitrary data
 	// https://stackoverflow.com/a/38437140/5719544
 	var dataMap []map[string]interface{}
 	if err := json.Unmarshal([]byte(dataBytes), &dataMap); err != nil {
@@ -53,6 +53,7 @@ func (t *Template) Apply(outputToFile bool) string {
 		log.Fatal(err)
 	}
 
+	// remove any extra trailing white space
 	trimmed := strings.TrimSpace(buf.String())
 
 	if outputToFile {
@@ -68,6 +69,5 @@ func (t *Template) Apply(outputToFile bool) string {
 			log.Fatal(e)
 		}
 	}
-
 	return trimmed
 }
