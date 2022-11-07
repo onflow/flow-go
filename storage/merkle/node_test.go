@@ -62,8 +62,10 @@ func TestLeafHash(t *testing.T) {
 	l := leaf{val: payload1}
 	require.Equal(t, ref, hex.EncodeToString(l.Hash(false)))
 	// this first time doens't have cached value
+	require.Nil(t, l.cachedHashValue)
 	require.Equal(t, ref, hex.EncodeToString(l.Hash(true)))
 	// second time returns the cached value
+	require.NotNil(t, l.cachedHashValue)
 	require.Equal(t, ref, hex.EncodeToString(l.Hash(true)))
 }
 
