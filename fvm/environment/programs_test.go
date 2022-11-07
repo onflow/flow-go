@@ -134,7 +134,8 @@ func Test_Programs(t *testing.T) {
 
 	context := fvm.NewContext(
 		fvm.WithContractDeploymentRestricted(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker()),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithCadenceLogging(true),
 		fvm.WithBlockPrograms(programs))
 
@@ -208,14 +209,14 @@ func Test_Programs(t *testing.T) {
 		// Make sure the code has been loaded from storage
 		require.True(t, loadedCode)
 
-		_, programState, has := programs.GetForTestingOnly(contractALocation)
-		require.True(t, has)
+		entry := programs.GetForTestingOnly(contractALocation)
+		require.NotNil(t, entry)
 
 		// type assertion for further inspections
-		require.IsType(t, programState.View(), &delta.View{})
+		require.IsType(t, entry.State.View(), &delta.View{})
 
 		// assert some reads were recorded (at least loading of code)
-		deltaView := programState.View().(*delta.View)
+		deltaView := entry.State.View().(*delta.View)
 		require.NotEmpty(t, deltaView.Interactions().Reads)
 
 		contractAView = deltaView
@@ -260,11 +261,11 @@ func Test_Programs(t *testing.T) {
 		err := vm.Run(context, procContractB, mainView)
 		require.NoError(t, err)
 
-		_, _, hasA := programs.GetForTestingOnly(contractALocation)
-		_, _, hasB := programs.GetForTestingOnly(contractBLocation)
+		entryA := programs.GetForTestingOnly(contractALocation)
+		entryB := programs.GetForTestingOnly(contractBLocation)
 
-		require.False(t, hasA)
-		require.False(t, hasB)
+		require.Nil(t, entryA)
+		require.Nil(t, entryB)
 	})
 
 	var viewExecB *delta.View
@@ -285,21 +286,21 @@ func Test_Programs(t *testing.T) {
 
 		require.Contains(t, procCallB.Logs, "\"hello from B but also hello from A\"")
 
-		_, programAState, has := programs.GetForTestingOnly(contractALocation)
-		require.True(t, has)
+		entry := programs.GetForTestingOnly(contractALocation)
+		require.NotNil(t, entry)
 
 		// state should be essentially the same as one which we got in tx with contract A
-		require.IsType(t, programAState.View(), &delta.View{})
-		deltaA := programAState.View().(*delta.View)
+		require.IsType(t, entry.State.View(), &delta.View{})
+		deltaA := entry.State.View().(*delta.View)
 
 		compareViews(t, contractAView, deltaA)
 
-		_, programBState, has := programs.GetForTestingOnly(contractBLocation)
-		require.True(t, has)
+		entryB := programs.GetForTestingOnly(contractBLocation)
+		require.NotNil(t, entryB)
 
 		// program B should contain all the registers used by program A, as it depends on it
-		require.IsType(t, programBState.View(), &delta.View{})
-		deltaB := programBState.View().(*delta.View)
+		require.IsType(t, entryB.State.View(), &delta.View{})
+		deltaB := entryB.State.View().(*delta.View)
 
 		idsA, valuesA := deltaA.Delta().RegisterUpdates()
 		for i, id := range idsA {
@@ -387,13 +388,13 @@ func Test_Programs(t *testing.T) {
 		err := vm.Run(context, procContractC, mainView)
 		require.NoError(t, err)
 
-		_, _, hasA := programs.GetForTestingOnly(contractALocation)
-		_, _, hasB := programs.GetForTestingOnly(contractBLocation)
-		_, _, hasC := programs.GetForTestingOnly(contractCLocation)
+		entryA := programs.GetForTestingOnly(contractALocation)
+		entryB := programs.GetForTestingOnly(contractBLocation)
+		entryC := programs.GetForTestingOnly(contractCLocation)
 
-		require.False(t, hasA)
-		require.False(t, hasB)
-		require.False(t, hasC)
+		require.Nil(t, entryA)
+		require.Nil(t, entryB)
+		require.Nil(t, entryC)
 
 	})
 
@@ -410,19 +411,19 @@ func Test_Programs(t *testing.T) {
 		require.Contains(t, procCallC.Logs, "\"hello from C, hello from B but also hello from A\"")
 
 		// program A is the same
-		_, programAState, has := programs.GetForTestingOnly(contractALocation)
-		require.True(t, has)
+		entryA := programs.GetForTestingOnly(contractALocation)
+		require.NotNil(t, entryA)
 
-		require.IsType(t, programAState.View(), &delta.View{})
-		deltaA := programAState.View().(*delta.View)
+		require.IsType(t, entryA.State.View(), &delta.View{})
+		deltaA := entryA.State.View().(*delta.View)
 		compareViews(t, contractAView, deltaA)
 
 		// program B is the same
-		_, programBState, has := programs.GetForTestingOnly(contractBLocation)
-		require.True(t, has)
+		entryB := programs.GetForTestingOnly(contractBLocation)
+		require.NotNil(t, entryB)
 
-		require.IsType(t, programBState.View(), &delta.View{})
-		deltaB := programBState.View().(*delta.View)
+		require.IsType(t, entryB.State.View(), &delta.View{})
+		deltaB := entryB.State.View().(*delta.View)
 		compareViews(t, contractBView, deltaB)
 	})
 }

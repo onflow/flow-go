@@ -32,9 +32,8 @@ func TestFungibleTokenTracker(t *testing.T) {
 	blockPrograms := programs.NewEmptyBlockPrograms()
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(),
-		),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithBlockPrograms(blockPrograms),
 	}
 	ctx := fvm.NewContext(opts...)

@@ -474,9 +474,8 @@ func TestWithServiceAccount(t *testing.T) {
 
 	ctxA := fvm.NewContext(
 		fvm.WithChain(chain),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(),
-		),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
 
 	view := utils.NewSimpleView()
@@ -523,9 +522,8 @@ func TestEventLimits(t *testing.T) {
 
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(),
-		),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithBlockPrograms(blockPrograms),
 	)
 
@@ -1495,7 +1493,7 @@ func TestStorageUsed(t *testing.T) {
 	simpleView := utils.NewSimpleView()
 	status := environment.NewAccountStatus()
 	status.SetStorageUsed(5)
-	err = simpleView.Set(string(address), state.KeyAccountStatus, status.ToBytes())
+	err = simpleView.Set(string(address), state.AccountStatusKey, status.ToBytes())
 	require.NoError(t, err)
 
 	script := fvm.Script(code)
@@ -1580,9 +1578,8 @@ func TestEnforcingComputationLimit(t *testing.T) {
 
 			ctx := fvm.NewContext(
 				fvm.WithChain(chain),
-				fvm.WithTransactionProcessors(
-					fvm.NewTransactionInvoker(),
-				),
+				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 				fvm.WithBlockPrograms(blockPrograms),
 			)
 
@@ -1625,7 +1622,8 @@ func TestEnforcingComputationLimit(t *testing.T) {
 func TestStorageCapacity(t *testing.T) {
 	t.Run("Storage capacity updates on FLOW transfer", newVMTest().
 		withContextOptions(
-			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker()),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithCadenceLogging(true),
 		).
 		withBootstrapProcedureOptions(

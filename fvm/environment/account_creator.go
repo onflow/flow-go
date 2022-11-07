@@ -13,8 +13,6 @@ import (
 )
 
 const (
-	keyAddressState = "account_address_state"
-
 	FungibleTokenAccountIndex = 2
 	FlowTokenAccountIndex     = 3
 	FlowFeesAccountIndex      = 4
@@ -150,7 +148,7 @@ func NewAccountCreator(
 func (creator *accountCreator) bytes() ([]byte, error) {
 	stateBytes, err := creator.txnState.Get(
 		"",
-		keyAddressState,
+		state.AddressStateKey,
 		creator.txnState.EnforceLimits())
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -197,7 +195,7 @@ func (creator *accountCreator) NextAddress() (flow.Address, error) {
 	// update the ledger state
 	err = creator.txnState.Set(
 		"",
-		keyAddressState,
+		state.AddressStateKey,
 		addressGenerator.Bytes(),
 		creator.txnState.EnforceLimits())
 	if err != nil {

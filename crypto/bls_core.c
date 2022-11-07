@@ -21,7 +21,7 @@ int get_sk_len() {
 
 // checks an input scalar a satisfies 0 < a < r
 // where (r) is the order of G1/G2
-int check_membership_Zr(const bn_t a){
+int check_membership_Zr_star(const bn_t a){
     int ret; // return value
     bn_t r;
     bn_new(r); 

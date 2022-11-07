@@ -30,7 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
 
-	fvmMock "github.com/onflow/flow-go/fvm/mock"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -254,7 +254,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 		vm := fvm.NewVirtualMachine()
 
-		blocks := new(fvmMock.Blocks)
+		blocks := new(envMock.Blocks)
 
 		execCtx := fvm.NewContext(
 			fvm.WithLogger(log),
