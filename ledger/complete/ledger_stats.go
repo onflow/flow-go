@@ -38,7 +38,9 @@ func (l *Ledger) CollectStats(payloadCallBack func(payload *ledger.Payload)) (*L
 			visitedNodes[n] = totalNodeCounter
 			totalNodeCounter++
 		}
-		bar.Add(1)
+		if err = bar.Add(1); err != nil {
+			return nil, err
+		}
 	}
 
 	return &LedgerStats{
