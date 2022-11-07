@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	programsCache "github.com/onflow/flow-go/fvm/programs"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -20,8 +21,8 @@ import (
 type TransactionInvoker struct {
 }
 
-func NewTransactionInvoker() TransactionInvoker {
-	return TransactionInvoker{}
+func NewTransactionInvoker() *TransactionInvoker {
+	return &TransactionInvoker{}
 }
 
 func (i TransactionInvoker) Process(
@@ -46,6 +47,9 @@ type invocationExecutor struct {
 	errs *errors.ErrorsCollector
 
 	nestedTxnId state.NestedTransactionId
+
+	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
+	txnBodyExecutor runtime.Executor
 }
 
 func newInvocationExecutor(
@@ -68,16 +72,18 @@ func newInvocationExecutor(
 		span)
 
 	return &invocationExecutor{
-		proc:     proc,
-		txnState: txnState,
-		programs: programs,
-		span:     span,
-		env:      env,
-		errs:     errors.NewErrorsCollector(),
+		proc:           proc,
+		txnState:       txnState,
+		programs:       programs,
+		span:           span,
+		env:            env,
+		errs:           errors.NewErrorsCollector(),
+		cadenceRuntime: env.BorrowCadenceRuntime(),
 	}
 }
 
 func (executor *invocationExecutor) Cleanup() {
+	executor.env.ReturnCadenceRuntime(executor.cadenceRuntime)
 	executor.span.End()
 }
 
@@ -159,16 +165,22 @@ func (executor *invocationExecutor) normalExecution() (
 	modifiedSets programsCache.ModifiedSetsInvalidator,
 	err error,
 ) {
-	rt := executor.env.BorrowCadenceRuntime()
-	defer executor.env.ReturnCadenceRuntime(rt)
-
-	err = rt.ExecuteTransaction(
+	executor.txnBodyExecutor = executor.cadenceRuntime.NewTransactionExecutor(
 		runtime.Script{
 			Source:    executor.proc.Transaction.Script,
 			Arguments: executor.proc.Transaction.Arguments,
 		},
 		common.TransactionLocation(executor.proc.ID))
 
+	err = executor.txnBodyExecutor.Preprocess()
+	if err != nil {
+		err = fmt.Errorf(
+			"transaction invocation failed when executing transaction: %w",
+			err)
+		return
+	}
+
+	err = executor.txnBodyExecutor.Execute()
 	if err != nil {
 		err = fmt.Errorf(
 			"transaction invocation failed when executing transaction: %w",

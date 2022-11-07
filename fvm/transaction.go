@@ -24,15 +24,6 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 	}
 }
 
-type TransactionProcessor interface {
-	Process(
-		Context,
-		*TransactionProcedure,
-		*state.TransactionState,
-		*programs.TransactionPrograms,
-	) error
-}
-
 type TransactionProcedure struct {
 	ID                     flow.Identifier
 	Transaction            *flow.TransactionBody
@@ -71,19 +62,52 @@ func (proc *TransactionProcedure) Run(
 	txnState *state.TransactionState,
 	programs *programs.TransactionPrograms,
 ) error {
-	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(ctx, proc, txnState, programs)
-		txErr, failure := errors.SplitErrorTypes(err)
-		if failure != nil {
-			// log the full error path
-			ctx.Logger.Err(err).Msg("fatal error when execution a transaction")
-			return failure
-		}
+	err := proc.run(ctx, txnState, programs)
+	txErr, failure := errors.SplitErrorTypes(err)
+	if failure != nil {
+		// log the full error path
+		ctx.Logger.Err(err).Msg("fatal error when execution a transaction")
+		return failure
+	}
 
-		if txErr != nil {
-			proc.Err = txErr
-			// TODO we should not break here we should continue for fee deductions
-			break
+	if txErr != nil {
+		proc.Err = txErr
+	}
+
+	return nil
+}
+
+func (proc *TransactionProcedure) run(
+	ctx Context,
+	txnState *state.TransactionState,
+	programs *programs.TransactionPrograms,
+) error {
+	if ctx.AuthorizationChecksEnabled {
+		err := NewTransactionVerifier(ctx.AccountKeyWeightThreshold).Process(
+			ctx,
+			proc,
+			txnState,
+			programs)
+		if err != nil {
+			return err
+		}
+	}
+
+	if ctx.SequenceNumberCheckAndIncrementEnabled {
+		err := NewTransactionSequenceNumberChecker().Process(
+			ctx,
+			proc,
+			txnState,
+			programs)
+		if err != nil {
+			return err
+		}
+	}
+
+	if ctx.TransactionBodyExecutionEnabled {
+		err := NewTransactionInvoker().Process(ctx, proc, txnState, programs)
+		if err != nil {
+			return err
 		}
 	}
 
