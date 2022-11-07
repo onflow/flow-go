@@ -1,5 +1,11 @@
+ACCESS_NODES=4
+COLLECTION_NODES=6
+CONSENSUS_NODE=3
+EXECUTION_NODES=2
+VERIFICATION_NODE=1
+
 gen-bootstrap:
-	go run -tags relic ../../cmd/bootstrap genconfig --address-format "%s%d.${NAMESPACE}:3569" --access 2 --collection 6 --consensus 3 --execution 2 --verification 1 --weight 1000 -o ./ --config ./bootstrap/conf/node-config.json
+	go run -tags relic ../../cmd/bootstrap genconfig --address-format "%s%d.${NAMESPACE}:3569" --access $(ACCESS_NODES) --collection $(COLLECTION_NODES) --consensus $(CONSENSUS_NODE) --execution $(EXECUTION_NODES) --verification $(VERIFICATION_NODE) --weight 1000 -o ./ --config ./bootstrap/conf/node-config.json
 	go run -tags relic ../../cmd/bootstrap keygen --machine-account --config ./bootstrap/conf/node-config.json -o ./bootstrap/keys
 	echo {} > ./bootstrap/conf/partner-stakes.json
 	mkdir ./bootstrap/partner-nodes
