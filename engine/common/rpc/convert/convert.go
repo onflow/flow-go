@@ -841,10 +841,13 @@ func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (*enti
 	}
 
 	events := EventsToMessages(data.Events)
+	if len(events) == 0 {
+		events = nil
+	}
 
 	paths := make([][]byte, len(data.TrieUpdate.Paths))
 	for i, path := range data.TrieUpdate.Paths {
-		paths[i] = []byte(path.String())
+		paths[i] = path[:]
 	}
 
 	payloads := make([]*entities.Payload, len(data.TrieUpdate.Payloads))
@@ -869,7 +872,7 @@ func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (*enti
 	trieUpdate := &entities.TrieUpdate{
 		RootHash: data.TrieUpdate.RootHash[:],
 		Paths:    paths,
-		Payloads: nil,
+		Payloads: payloads,
 	}
 
 	return &entities.ChunkExecutionData{
@@ -909,9 +912,14 @@ func MessageToChunkExecutionData(m *entities.ChunkExecutionData, chain flow.Chai
 		return execution_data.ChunkExecutionData{}, err
 	}
 
+	events := MessagesToEvents(m.GetEvents())
+	if len(events) == 0 {
+		events = nil
+	}
+
 	return execution_data.ChunkExecutionData{
 		Collection: collection,
-		Events:     MessagesToEvents(m.GetEvents()),
+		Events:     events,
 		TrieUpdate: trieUpdate,
 	}, nil
 }
@@ -925,6 +933,10 @@ func messageToExecutionDataCollection(m *entities.ExecutionDataCollection, chain
 			return &flow.Collection{}, err
 		}
 		transactions[i] = &transaction
+	}
+
+	if len(transactions) == 0 {
+		return nil, nil
 	}
 
 	return &flow.Collection{Transactions: transactions}, nil

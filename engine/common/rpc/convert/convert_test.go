@@ -1,15 +1,19 @@
 package convert_test
 
 import (
+	"bytes"
+	"math/rand"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -65,4 +69,55 @@ func TestConvertEvents(t *testing.T) {
 		require.Equal(t, event.TransactionID[:], message.TransactionId)
 		require.Equal(t, string(event.Type), message.Type)
 	})
+}
+
+func TestConvertBlockExecutionData(t *testing.T) {
+	numChunks := 5
+	ced := make([]*execution_data.ChunkExecutionData, numChunks)
+	bed := &execution_data.BlockExecutionData{
+		BlockID:             unittest.IdentifierFixture(),
+		ChunkExecutionDatas: ced,
+	}
+
+	minSerializedSize := uint64(10 * execution_data.DefaultMaxBlobSize)
+	for i := 0; i < numChunks; i++ {
+		chunk := &execution_data.ChunkExecutionData{
+			TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
+		}
+		size := 1
+	inner:
+		for {
+			buf := &bytes.Buffer{}
+			require.NoError(t, execution_data.DefaultSerializer.Serialize(buf, chunk))
+
+			if buf.Len() >= int(minSerializedSize) {
+				t.Logf("Chunk execution data size: %d", buf.Len())
+				break inner
+			}
+
+			v := make([]byte, size)
+			_, _ = rand.Read(v)
+
+			k, err := chunk.TrieUpdate.Payloads[0].Key()
+			require.NoError(t, err)
+
+			chunk.TrieUpdate.Payloads[0] = ledger.NewPayload(k, v)
+			size *= 2
+		}
+		bed.ChunkExecutionDatas[i] = chunk
+	}
+
+	chunkMsg, err := convert.ChunkExecutionDataToMessage(bed.ChunkExecutionDatas[0])
+	assert.Nil(t, err)
+
+	chunkReConverted, err := convert.MessageToChunkExecutionData(chunkMsg, flow.Testnet.Chain())
+	assert.Nil(t, err)
+	assert.Equal(t, bed.ChunkExecutionDatas[0], &chunkReConverted)
+
+	blockMsg, err := convert.BlockExecutionDataToMessage(bed)
+	assert.Nil(t, err)
+
+	bedReConverted, err := convert.MessageToBlockExecutionData(blockMsg, flow.Testnet.Chain())
+	assert.Nil(t, err)
+	assert.Equal(t, bed, &bedReConverted)
 }
