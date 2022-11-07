@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/atree"
 	"go.opentelemetry.io/otel/attribute"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -47,7 +48,7 @@ func (store ParseRestrictedValueStore) GetValue(
 ) {
 	return parseRestrict2Arg1Ret(
 		store.txnState,
-		"GetValue",
+		trace.FVMEnvGetValue,
 		store.impl.GetValue,
 		owner,
 		key)
@@ -60,7 +61,7 @@ func (store ParseRestrictedValueStore) SetValue(
 ) error {
 	return parseRestrict3Arg(
 		store.txnState,
-		"SetValue",
+		trace.FVMEnvSetValue,
 		store.impl.SetValue,
 		owner,
 		key,
@@ -76,7 +77,7 @@ func (store ParseRestrictedValueStore) ValueExists(
 ) {
 	return parseRestrict2Arg1Ret(
 		store.txnState,
-		"ValueExists",
+		trace.FVMEnvValueExists,
 		store.impl.ValueExists,
 		owner,
 		key)
@@ -90,7 +91,7 @@ func (store ParseRestrictedValueStore) AllocateStorageIndex(
 ) {
 	return parseRestrict1Arg1Ret(
 		store.txnState,
-		"AllocateStorageIndex",
+		trace.FVMEnvAllocateStorageIndex,
 		store.impl.AllocateStorageIndex,
 		owner)
 }
@@ -110,24 +111,34 @@ func NewValueStore(tracer *Tracer, meter Meter, accounts Accounts) ValueStore {
 	}
 }
 
-func (store *valueStore) GetValue(owner []byte, key []byte) ([]byte, error) {
+func (store *valueStore) GetValue(
+	owner []byte,
+	keyBytes []byte,
+) (
+	[]byte,
+	error,
+) {
+	key := string(keyBytes)
+
 	var valueByteSize int
 	span := store.tracer.StartSpanFromRoot(trace.FVMEnvGetValue)
 	defer func() {
 		if !trace.IsSampled(span) {
 			span.SetAttributes(
 				attribute.String("owner", hex.EncodeToString(owner)),
-				attribute.String("key", string(key)),
+				attribute.String("key", key),
 				attribute.Int("valueByteSize", valueByteSize),
 			)
 		}
 		span.End()
 	}()
 
-	v, err := store.accounts.GetValue(
-		flow.BytesToAddress(owner),
-		string(key),
-	)
+	address := flow.BytesToAddress(owner)
+	if state.IsFVMStateKey(string(owner), key) {
+		return nil, errors.NewInvalidFVMStateAccessError(address, key, "read")
+	}
+
+	v, err := store.accounts.GetValue(address, key)
 	if err != nil {
 		return nil, fmt.Errorf("get value failed: %w", err)
 	}
@@ -145,17 +156,24 @@ func (store *valueStore) GetValue(owner []byte, key []byte) ([]byte, error) {
 // TODO disable SetValue for scripts, right now the view changes are discarded
 func (store *valueStore) SetValue(
 	owner []byte,
-	key []byte,
+	keyBytes []byte,
 	value []byte,
 ) error {
+	key := string(keyBytes)
+
 	span := store.tracer.StartSpanFromRoot(trace.FVMEnvSetValue)
 	if !trace.IsSampled(span) {
 		span.SetAttributes(
 			attribute.String("owner", hex.EncodeToString(owner)),
-			attribute.String("key", string(key)),
+			attribute.String("key", key),
 		)
 	}
 	defer span.End()
+
+	address := flow.BytesToAddress(owner)
+	if state.IsFVMStateKey(string(owner), key) {
+		return errors.NewInvalidFVMStateAccessError(address, key, "modify")
+	}
 
 	err := store.meter.MeterComputation(
 		ComputationKindSetValue,
@@ -164,11 +182,7 @@ func (store *valueStore) SetValue(
 		return fmt.Errorf("set value failed: %w", err)
 	}
 
-	err = store.accounts.SetValue(
-		flow.BytesToAddress(owner),
-		string(key),
-		value,
-	)
+	err = store.accounts.SetValue(address, key, value)
 	if err != nil {
 		return fmt.Errorf("set value failed: %w", err)
 	}
@@ -205,6 +219,8 @@ func (store *valueStore) AllocateStorageIndex(
 	atree.StorageIndex,
 	error,
 ) {
+	defer store.tracer.StartSpanFromRoot(trace.FVMEnvAllocateStorageIndex).End()
+
 	err := store.meter.MeterComputation(ComputationKindAllocateStorageIndex, 1)
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf(

@@ -4,6 +4,7 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,16 +20,8 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 		Transaction:            tx,
 		InitialSnapshotTxIndex: txIndex,
 		TxIndex:                txIndex,
+		ComputationIntensities: make(meter.MeteredComputationIntensities),
 	}
-}
-
-type TransactionProcessor interface {
-	Process(
-		Context,
-		*TransactionProcedure,
-		*state.TransactionState,
-		*programs.TransactionPrograms,
-	) error
 }
 
 type TransactionProcedure struct {
@@ -37,13 +30,14 @@ type TransactionProcedure struct {
 	InitialSnapshotTxIndex uint32
 	TxIndex                uint32
 
-	Logs            []string
-	Events          []flow.Event
-	ServiceEvents   []flow.Event
-	ComputationUsed uint64
-	MemoryEstimate  uint64
-	Err             errors.CodedError
-	TraceSpan       otelTrace.Span
+	Logs                   []string
+	Events                 []flow.Event
+	ServiceEvents          []flow.Event
+	ComputationUsed        uint64
+	ComputationIntensities meter.MeteredComputationIntensities
+	MemoryEstimate         uint64
+	Err                    errors.CodedError
+	TraceSpan              otelTrace.Span
 }
 
 func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
@@ -68,19 +62,52 @@ func (proc *TransactionProcedure) Run(
 	txnState *state.TransactionState,
 	programs *programs.TransactionPrograms,
 ) error {
-	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(ctx, proc, txnState, programs)
-		txErr, failure := errors.SplitErrorTypes(err)
-		if failure != nil {
-			// log the full error path
-			ctx.Logger.Err(err).Msg("fatal error when execution a transaction")
-			return failure
-		}
+	err := proc.run(ctx, txnState, programs)
+	txErr, failure := errors.SplitErrorTypes(err)
+	if failure != nil {
+		// log the full error path
+		ctx.Logger.Err(err).Msg("fatal error when execution a transaction")
+		return failure
+	}
 
-		if txErr != nil {
-			proc.Err = txErr
-			// TODO we should not break here we should continue for fee deductions
-			break
+	if txErr != nil {
+		proc.Err = txErr
+	}
+
+	return nil
+}
+
+func (proc *TransactionProcedure) run(
+	ctx Context,
+	txnState *state.TransactionState,
+	programs *programs.TransactionPrograms,
+) error {
+	if ctx.AuthorizationChecksEnabled {
+		err := NewTransactionVerifier(ctx.AccountKeyWeightThreshold).Process(
+			ctx,
+			proc,
+			txnState,
+			programs)
+		if err != nil {
+			return err
+		}
+	}
+
+	if ctx.SequenceNumberCheckAndIncrementEnabled {
+		err := NewTransactionSequenceNumberChecker().Process(
+			ctx,
+			proc,
+			txnState,
+			programs)
+		if err != nil {
+			return err
+		}
+	}
+
+	if ctx.TransactionBodyExecutionEnabled {
+		err := NewTransactionInvoker().Process(ctx, proc, txnState, programs)
+		if err != nil {
+			return err
 		}
 	}
 

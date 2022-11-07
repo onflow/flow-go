@@ -14,8 +14,9 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
-	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/internal/p2putils"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -152,12 +153,16 @@ func TestConnGater(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 
 	node1Peers := make(map[peer.ID]struct{})
-	node1, identity1 := p2pfixtures.NodeFixture(t, sporkID, "test_conn_gater", p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
-		if _, ok := node1Peers[pid]; !ok {
-			return fmt.Errorf("peer id not found: %s", pid.String())
-		}
-		return nil
-	}))
+	node1, identity1 := p2pfixtures.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		p2pfixtures.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
+			if _, ok := node1Peers[pid]; !ok {
+				return fmt.Errorf("peer id not found: %s", pid.String())
+			}
+			return nil
+		})))
 
 	p2pfixtures.StartNode(t, signalerCtx, node1, 100*time.Millisecond)
 	defer p2pfixtures.StopNode(t, node1, cancel, 100*time.Millisecond)
@@ -166,12 +171,15 @@ func TestConnGater(t *testing.T) {
 	assert.NoError(t, err)
 
 	node2Peers := make(map[peer.ID]struct{})
-	node2, identity2 := p2pfixtures.NodeFixture(t, sporkID, "test_conn_gater", p2pfixtures.WithPeerFilter(func(pid peer.ID) error {
-		if _, ok := node2Peers[pid]; !ok {
-			return fmt.Errorf("id not found: %s", pid.String())
-		}
-		return nil
-	}))
+	node2, identity2 := p2pfixtures.NodeFixture(
+		t,
+		sporkID, t.Name(),
+		p2pfixtures.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
+			if _, ok := node2Peers[pid]; !ok {
+				return fmt.Errorf("id not found: %s", pid.String())
+			}
+			return nil
+		})))
 	p2pfixtures.StartNode(t, signalerCtx, node2, 100*time.Millisecond)
 	defer p2pfixtures.StopNode(t, node2, cancel, 100*time.Millisecond)
 

@@ -206,9 +206,8 @@ func CreateAccountsWithSimpleAddresses(
 ) ([]flow.Address, error) {
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(),
-		),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithBlockPrograms(programs),
 	)
 

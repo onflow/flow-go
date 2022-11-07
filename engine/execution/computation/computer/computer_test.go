@@ -74,11 +74,26 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Times(2 + 1) // 2 txs in collection + system chunk
 
 		exemetrics := new(modulemock.ExecutionMetrics)
-		exemetrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
+		exemetrics.On("ExecutionCollectionExecuted",
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+			mock.Anything).
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
-		exemetrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		exemetrics.On("ExecutionTransactionExecuted",
+			mock.Anything, // duration
+			mock.Anything, // computation used
+			mock.Anything, // memory used
+			mock.Anything, // actual memory used
+			mock.Anything, // number of events
+			mock.Anything, // size of events
+			false).        // no failure
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
@@ -345,10 +360,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("service events are emitted", func(t *testing.T) {
 		execCtx := fvm.NewContext(
 			fvm.WithServiceEventCollectionEnabled(),
-			fvm.WithTransactionProcessors(
-				// we don't need to check signatures or sequence numbers
-				fvm.NewTransactionInvoker(),
-			),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		)
 
 		collectionCount := 2
@@ -528,7 +541,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, environment.NewAccountStatus().ToBytes())
+		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
@@ -538,9 +551,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("failing transactions do not store programs", func(t *testing.T) {
 		execCtx := fvm.NewContext(
-			fvm.WithTransactionProcessors(
-				fvm.NewTransactionInvoker(),
-			),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		)
 
 		address := common.Address{0x1}
@@ -622,7 +634,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, environment.NewAccountStatus().ToBytes())
+		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
@@ -644,6 +656,26 @@ func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execut
 	}
 }
 
+type testTransactionExecutor struct {
+	executeTransaction func(runtime.Script, runtime.Context) error
+
+	script  runtime.Script
+	context runtime.Context
+}
+
+func (executor *testTransactionExecutor) Preprocess() error {
+	// Do nothing.
+	return nil
+}
+
+func (executor *testTransactionExecutor) Execute() error {
+	return executor.executeTransaction(executor.script, executor.context)
+}
+
+func (executor *testTransactionExecutor) Result() (cadence.Value, error) {
+	panic("Result not expected")
+}
+
 type testRuntime struct {
 	executeScript      func(runtime.Script, runtime.Context) (cadence.Value, error)
 	executeTransaction func(runtime.Script, runtime.Context) error
@@ -655,7 +687,11 @@ func (e *testRuntime) NewScriptExecutor(script runtime.Script, c runtime.Context
 }
 
 func (e *testRuntime) NewTransactionExecutor(script runtime.Script, c runtime.Context) runtime.Executor {
-	panic("NewTransactionExecutor not expected")
+	return &testTransactionExecutor{
+		executeTransaction: e.executeTransaction,
+		script:             script,
+		context:            c,
+	}
 }
 
 func (e *testRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []cadence.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
@@ -813,7 +849,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	// make sure check for account status has been registered
 	id := flow.RegisterID{
 		Owner: string(address.Bytes()),
-		Key:   state.KeyAccountStatus,
+		Key:   state.AccountStatusKey,
 	}
 
 	require.Contains(t, registerTouches, id.String())
@@ -841,11 +877,28 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	noopCollector := metrics.NewNoopCollector()
 
 	metrics := new(modulemock.ExecutionMetrics)
-	metrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
+	expectedNumberOfEvents := 2
+	expectedEventSize := 912
+	metrics.On("ExecutionCollectionExecuted",
+		mock.Anything, // duration
+		mock.Anything, // computation used
+		mock.Anything, // memory used
+		expectedNumberOfEvents,
+		expectedEventSize,
+		49,   // expected number of registers touched
+		3404, // expected number of bytes written
+		1).   // expected number of transactions
 		Return(nil).
 		Times(1) // system collection
 
-	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	metrics.On("ExecutionTransactionExecuted",
+		mock.Anything, // duration
+		mock.Anything, // computation used
+		mock.Anything, // memory used
+		mock.Anything, // actual memory used
+		expectedNumberOfEvents,
+		expectedEventSize,
+		false).
 		Return(nil).
 		Times(1) // system chunk tx
 
