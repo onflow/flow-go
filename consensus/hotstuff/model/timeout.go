@@ -22,9 +22,9 @@ type TimerInfo struct {
 	// Tick is the number of times a timeout event has been emitted for this view (beginning with 0).
 	// It is used to de-duplicate TimeoutObject re-broadcasts.
 	Tick uint64
-	// StartTime represents time of creating the timer.
+	// StartTime represents time of entering the view
 	StartTime time.Time
-	// Duration is how long we waited before timing out this round.
+	// Duration is how long we waited before timing out the view.
 	// It does not include subsequent timeouts (ie. all timeout events emitted for the same
 	// view will have the same Duration).
 	Duration time.Duration
