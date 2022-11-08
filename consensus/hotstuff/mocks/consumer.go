@@ -68,7 +68,7 @@ func (_m *Consumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime t
 }
 
 // OnOwnTimeout provides a mock function with given fields: timeout, timeoutTick
-func (_m *Consumer) OnOwnTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
+func (_m *Consumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	_m.Called(timeout, timeoutTick)
 }
 

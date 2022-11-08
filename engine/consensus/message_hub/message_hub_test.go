@@ -315,7 +315,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
 		// submit timeout
-		s.hub.OnOwnTimeout(timeout, 0)
+		s.hub.OnOwnTimeout(timeout)
 	})
 	s.Run("proposal", func() {
 		wg.Add(1)

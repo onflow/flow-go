@@ -387,7 +387,7 @@ func (h *MessageHub) OnOwnVote(blockID flow.Identifier, view uint64, sigData []b
 }
 
 // OnOwnTimeout queues timeout for subsequent sending
-func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
+func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 	if ok := h.ownOutboundTimeouts.Push(&messages.ClusterTimeoutObject{
 		Seq:        timeoutTick,
 		View:       timeout.View,

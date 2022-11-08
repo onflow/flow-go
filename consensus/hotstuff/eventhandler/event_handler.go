@@ -196,19 +196,19 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 
 // TimeoutChannel returns the channel for subscribing the waiting timeout on receiving
 // block or votes for the current view.
-func (e *EventHandler) TimeoutChannel() <-chan model.TimerInfo {
+func (e *EventHandler) TimeoutChannel() <-chan time.Time {
 	return e.paceMaker.TimeoutChannel()
 }
 
 // OnLocalTimeout handles a local timeout event by creating a model.TimeoutObject and broadcasting it.
 // No errors are expected during normal operation.
-func (e *EventHandler) OnLocalTimeout(timerInfo model.TimerInfo) error {
+func (e *EventHandler) OnLocalTimeout() error {
 	curView := e.paceMaker.CurView()
 	e.log.Debug().Uint64("cur_view", curView).Msg("timeout received from event loop")
 	// TODO(active-pacemaker): update telemetry
 	defer e.notifier.OnEventProcessed()
 
-	err := e.broadcastTimeoutObjectIfAuthorized(timerInfo.Tick)
+	err := e.broadcastTimeoutObjectIfAuthorized()
 	if err != nil {
 		return fmt.Errorf("unexpected exception while processing timeout in view %d: %w", curView, err)
 	}
@@ -273,7 +273,7 @@ func (e *EventHandler) Start(ctx context.Context) error {
 // not part of the _active_ consensus committee anymore. Consequently, it should not broadcast
 // timeouts anymore.
 // No errors are expected during normal operation.
-func (e *EventHandler) broadcastTimeoutObjectIfAuthorized(timeoutTick uint64) error {
+func (e *EventHandler) broadcastTimeoutObjectIfAuthorized() error {
 	curView := e.paceMaker.CurView()
 	newestQC := e.paceMaker.NewestQC()
 	lastViewTC := e.paceMaker.LastViewTC()
@@ -299,7 +299,7 @@ func (e *EventHandler) broadcastTimeoutObjectIfAuthorized(timeoutTick uint64) er
 	e.timeoutAggregator.AddTimeout(timeout)
 
 	// raise a notification to broadcast timeout
-	e.notifier.OnOwnTimeout(timeout, timeoutTick)
+	e.notifier.OnOwnTimeout(timeout)
 	log.Debug().Msg("broadcast TimeoutObject done")
 
 	return nil

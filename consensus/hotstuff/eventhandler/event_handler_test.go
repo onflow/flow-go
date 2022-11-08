@@ -712,7 +712,7 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 		require.Equal(es.T(), es.endView, timeoutObject.View)
 	}).Once()
 
-	err := es.eventhandler.OnLocalTimeout(createTimerInfo(es.endView))
+	err := es.eventhandler.OnLocalTimeout()
 	require.NoError(es.T(), err)
 
 	// TimeoutObject shouldn't trigger view change
@@ -754,7 +754,7 @@ func (es *EventHandlerSuite) TestOnTimeout_SanityChecks() {
 		require.Nil(es.T(), timeoutObject.LastViewTC)
 	}).Once()
 
-	err = es.eventhandler.OnLocalTimeout(createTimerInfo(es.endView))
+	err = es.eventhandler.OnLocalTimeout()
 	require.NoError(es.T(), err)
 }
 
@@ -764,14 +764,14 @@ func (es *EventHandlerSuite) TestOnTimeout_ReplicaEjected() {
 	es.Run("no-timeout", func() {
 		*es.safetyRules.SafetyRules = *mocks.NewSafetyRules(es.T())
 		es.safetyRules.On("ProduceTimeout", mock.Anything, mock.Anything, mock.Anything).Return(nil, model.NewNoTimeoutErrorf(""))
-		err := es.eventhandler.OnLocalTimeout(createTimerInfo(es.endView))
+		err := es.eventhandler.OnLocalTimeout()
 		require.NoError(es.T(), err, "should be handled as sentinel error")
 	})
 	es.Run("create-timeout-exception", func() {
 		*es.safetyRules.SafetyRules = *mocks.NewSafetyRules(es.T())
 		exception := errors.New("produce-timeout-exception")
 		es.safetyRules.On("ProduceTimeout", mock.Anything, mock.Anything, mock.Anything).Return(nil, exception)
-		err := es.eventhandler.OnLocalTimeout(createTimerInfo(es.endView))
+		err := es.eventhandler.OnLocalTimeout()
 		require.ErrorIs(es.T(), err, exception, "expect a wrapped exception")
 	})
 	es.timeoutAggregator.AssertNotCalled(es.T(), "AddTimeout", mock.Anything)

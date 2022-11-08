@@ -131,7 +131,7 @@ func (_m *PaceMaker) Start(ctx context.Context) {
 }
 
 // TimeoutChannel provides a mock function with given fields:
-func (_m *PaceMaker) TimeoutChannel() <-chan model.TimerInfo {
+func (_m *PaceMaker) TimeoutChannel() <-chan time.Time {
 	ret := _m.Called()
 
 	var r0 <-chan model.TimerInfo

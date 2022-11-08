@@ -182,11 +182,11 @@ func (p *Distributor) OnOwnVote(blockID flow.Identifier, view uint64, sigData []
 	}
 }
 
-func (p *Distributor) OnOwnTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
+func (p *Distributor) OnOwnTimeout(timeout *model.TimeoutObject) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, s := range p.subscribers {
-		s.OnOwnTimeout(timeout, timeoutTick)
+		s.OnOwnTimeout(timeout)
 	}
 }
 

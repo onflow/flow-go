@@ -242,7 +242,7 @@ type CommunicatorConsumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnOwnTimeout(timeout *model.TimeoutObject, timeoutTick uint64)
+	OnOwnTimeout(timeout *model.TimeoutObject)
 
 	// OnOwnProposal notifies about intent to broadcast the given block proposal to all actors of
 	// the consensus process.

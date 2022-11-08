@@ -214,7 +214,7 @@ func (lc *LogConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData [
 		Msg("publishing HotStuff vote")
 }
 
-func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject, timeoutTick uint64) {
+func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	log := timeout.LogContext(lc.log).Logger()
 	log.Info().Msg("publishing HotStuff timeout object")
 }

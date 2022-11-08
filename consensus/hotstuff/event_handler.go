@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"context"
+	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -42,7 +43,7 @@ type EventHandler interface {
 
 	// OnLocalTimeout handles a local timeout event by creating a model.TimeoutObject and broadcasting it.
 	// No errors are expected during normal operation.
-	OnLocalTimeout(info model.TimerInfo) error
+	OnLocalTimeout() error
 
 	// OnPartialTcCreated handles notification produces by the internal timeout aggregator. If the notification is for the current view,
 	// a corresponding model.TimeoutObject is broadcast to the consensus committee.
@@ -50,7 +51,7 @@ type EventHandler interface {
 	OnPartialTcCreated(partialTC *PartialTcCreated) error
 
 	// TimeoutChannel returns a channel that sends a signal on timeout.
-	TimeoutChannel() <-chan model.TimerInfo
+	TimeoutChannel() <-chan time.Time
 
 	// Start starts the event handler.
 	// No errors are expected during normal operation.

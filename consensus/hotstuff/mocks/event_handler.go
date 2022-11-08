@@ -4,6 +4,7 @@ package mocks
 
 import (
 	context "context"
+	"time"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff"
 	flow "github.com/onflow/flow-go/model/flow"
@@ -19,7 +20,7 @@ type EventHandler struct {
 }
 
 // OnLocalTimeout provides a mock function with given fields: info
-func (_m *EventHandler) OnLocalTimeout(info model.TimerInfo) error {
+func (_m *EventHandler) OnLocalTimeout() error {
 	ret := _m.Called(info)
 
 	var r0 error
@@ -103,7 +104,7 @@ func (_m *EventHandler) Start(ctx context.Context) error {
 }
 
 // TimeoutChannel provides a mock function with given fields:
-func (_m *EventHandler) TimeoutChannel() <-chan model.TimerInfo {
+func (_m *EventHandler) TimeoutChannel() <-chan time.Time {
 	ret := _m.Called()
 
 	var r0 <-chan model.TimerInfo

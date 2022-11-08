@@ -67,6 +67,6 @@ func (c *NoopConsumer) OnNewTcDiscovered(*flow.TimeoutCertificate) {}
 
 func (c *NoopConsumer) OnOwnVote(flow.Identifier, uint64, []byte, flow.Identifier) {}
 
-func (c *NoopConsumer) OnOwnTimeout(*model.TimeoutObject, uint64) {}
+func (c *NoopConsumer) OnOwnTimeout(*model.TimeoutObject) {}
 
 func (c *NoopConsumer) OnOwnProposal(*flow.Header, time.Time) {}

@@ -119,11 +119,11 @@ func (el *EventLoop) loop(ctx context.Context) error {
 		// processing timeout or partial TC event are top priority since
 		// they allow node to contribute to TC aggregation when replicas can't
 		// make progress on happy path
-		case timerInfo := <-timeoutChannel:
+		case <-timeoutChannel:
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnLocalTimeout(timerInfo)
+			err := el.eventHandler.OnLocalTimeout()
 
 			// measure how long it takes for a timeout event to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
@@ -168,14 +168,14 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			return nil
 
 		// same as before
-		case timerInfo := <-timeoutChannel:
+		case <-timeoutChannel:
 			// measure how long the event loop was idle waiting for an
 			// incoming event
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnLocalTimeout(timerInfo)
+			err := el.eventHandler.OnLocalTimeout()
 
 			// measure how long it takes for a timeout event to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
