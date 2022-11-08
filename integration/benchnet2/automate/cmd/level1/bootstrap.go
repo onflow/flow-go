@@ -2,8 +2,9 @@ package main
 
 import (
 	"flag"
-	"github.com/onflow/flow-go/integration/benchnet2/automate/level1"
 	"os"
+
+	"github.com/onflow/flow-go/integration/benchnet2/automate/level1"
 )
 
 // sample usage:

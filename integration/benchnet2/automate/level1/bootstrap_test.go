@@ -2,11 +2,11 @@ package level1
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const BootstrapPath = "../testdata/level1/data/"
@@ -30,8 +30,6 @@ func TestGenerateBootstrap_DataTable(t *testing.T) {
 			var expectedNodeData []NodeData
 			expectedDataBytes, err := os.ReadFile(testData.expectedOutput)
 			require.NoError(t, err)
-			expectedDataStr := string(expectedDataBytes)
-			expectedDataStr = strings.Trim(expectedDataStr, "\t \n")
 			err = json.Unmarshal(expectedDataBytes, &expectedNodeData)
 			require.Nil(t, err)
 
