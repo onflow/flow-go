@@ -1,12 +1,12 @@
 # default values that can callers override when calling target
 ACCESS_NODES=2
 COLLECTION_NODES=6
-CONSENSUS_NODE=3
+CONSENSUS_NODES=3
 EXECUTION_NODES=2
-VERIFICATION_NODE=1
+VERIFICATION_NODES=1
 
 gen-bootstrap:
-	go run -tags relic ../../cmd/bootstrap genconfig --address-format "%s%d.${NAMESPACE}:3569" --access $(ACCESS_NODES) --collection $(COLLECTION_NODES) --consensus $(CONSENSUS_NODE) --execution $(EXECUTION_NODES) --verification $(VERIFICATION_NODE) --weight 1000 -o ./ --config ./bootstrap/conf/node-config.json
+	go run -tags relic ../../cmd/bootstrap genconfig --address-format "%s%d.${NAMESPACE}:3569" --access $(ACCESS_NODES) --collection $(COLLECTION_NODES) --consensus $(CONSENSUS_NODES) --execution $(EXECUTION_NODES) --verification $(VERIFICATION_NODES) --weight 1000 -o ./ --config ./bootstrap/conf/node-config.json
 	go run -tags relic ../../cmd/bootstrap keygen --machine-account --config ./bootstrap/conf/node-config.json -o ./bootstrap/keys
 	echo {} > ./bootstrap/conf/partner-stakes.json
 	mkdir ./bootstrap/partner-nodes
