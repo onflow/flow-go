@@ -24,7 +24,18 @@ type Context struct {
 	MaxStateValueSize                 uint64
 	MaxStateInteractionSize           uint64
 
-	TransactionProcessors []TransactionProcessor
+	AuthorizationChecksEnabled bool
+
+	SequenceNumberCheckAndIncrementEnabled bool
+
+	// If AccountKeyWeightThreshold is set to a negative number, signature
+	// verification is skipped during authorization checks.
+	//
+	// Note: This is set only by tests
+	AccountKeyWeightThreshold int
+
+	// Note: This is disabled only by tests
+	TransactionBodyExecutionEnabled bool
 
 	BlockPrograms *programs.BlockPrograms
 
@@ -58,18 +69,17 @@ const (
 
 func defaultContext() Context {
 	return Context{
-		DisableMemoryAndInteractionLimits: false,
-		ComputationLimit:                  DefaultComputationLimit,
-		MemoryLimit:                       DefaultMemoryLimit,
-		MaxStateKeySize:                   state.DefaultMaxKeySize,
-		MaxStateValueSize:                 state.DefaultMaxValueSize,
-		MaxStateInteractionSize:           state.DefaultMaxInteractionSize,
-		TransactionProcessors: []TransactionProcessor{
-			NewTransactionVerifier(AccountKeyWeightThreshold),
-			NewTransactionSequenceNumberChecker(),
-			NewTransactionInvoker(),
-		},
-		EnvironmentParams: environment.DefaultEnvironmentParams(),
+		DisableMemoryAndInteractionLimits:      false,
+		ComputationLimit:                       DefaultComputationLimit,
+		MemoryLimit:                            DefaultMemoryLimit,
+		MaxStateKeySize:                        state.DefaultMaxKeySize,
+		MaxStateValueSize:                      state.DefaultMaxValueSize,
+		MaxStateInteractionSize:                state.DefaultMaxInteractionSize,
+		AuthorizationChecksEnabled:             true,
+		SequenceNumberCheckAndIncrementEnabled: true,
+		AccountKeyWeightThreshold:              AccountKeyWeightThreshold,
+		TransactionBodyExecutionEnabled:        true,
+		EnvironmentParams:                      environment.DefaultEnvironmentParams(),
 	}
 }
 
@@ -217,11 +227,35 @@ func WithTracer(tr module.Tracer) Option {
 	}
 }
 
+// TODO(patrick): remove after emulator has been updated.
+//
 // WithTransactionProcessors sets the transaction processors for a
 // virtual machine context.
-func WithTransactionProcessors(processors ...TransactionProcessor) Option {
+func WithTransactionProcessors(processors ...interface{}) Option {
 	return func(ctx Context) Context {
-		ctx.TransactionProcessors = processors
+		authCheck := false
+		keyWeightThreshold := 0
+		seqNumCheck := false
+		executeBody := false
+
+		for _, p := range processors {
+			switch processor := p.(type) {
+			case *TransactionVerifier:
+				authCheck = true
+				keyWeightThreshold = processor.KeyWeightThreshold
+			case *TransactionSequenceNumberChecker:
+				seqNumCheck = true
+			case *TransactionInvoker:
+				executeBody = true
+			default:
+				panic("Unexpected transaction processor")
+			}
+		}
+
+		ctx.AuthorizationChecksEnabled = authCheck
+		ctx.SequenceNumberCheckAndIncrementEnabled = seqNumCheck
+		ctx.AccountKeyWeightThreshold = keyWeightThreshold
+		ctx.TransactionBodyExecutionEnabled = executeBody
 		return ctx
 	}
 }
@@ -275,6 +309,47 @@ func WithCadenceLogging(enabled bool) Option {
 func WithAccountStorageLimit(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.LimitAccountStorage = enabled
+		return ctx
+	}
+}
+
+// WithAuthorizationCheckxEnabled enables or disables pre-execution
+// authorization checks.
+func WithAuthorizationChecksEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.AuthorizationChecksEnabled = enabled
+		return ctx
+	}
+}
+
+// WithSequenceNumberCheckAndIncrementEnabled enables or disables pre-execution
+// sequence number check / increment.
+func WithSequenceNumberCheckAndIncrementEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.SequenceNumberCheckAndIncrementEnabled = enabled
+		return ctx
+	}
+}
+
+// WithAccountKeyWeightThreshold sets the key weight threshold used for
+// authorization checks.  If the threshold is a negative number, signature
+// verification is skipped.
+//
+// Note: This is set only by tests
+func WithAccountKeyWeightThreshold(threshold int) Option {
+	return func(ctx Context) Context {
+		ctx.AccountKeyWeightThreshold = threshold
+		return ctx
+	}
+}
+
+// WithTransactionBodyExecutionEnabled enables or disables the transaction body
+// execution.
+//
+// Note: This is disabled only by tests
+func WithTransactionBodyExecutionEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.TransactionBodyExecutionEnabled = enabled
 		return ctx
 	}
 }
