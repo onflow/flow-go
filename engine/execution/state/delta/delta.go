@@ -10,19 +10,14 @@ import (
 
 // A Delta is a record of ledger mutations.
 type Delta struct {
-	Data map[string]flow.RegisterEntry
+	Data map[flow.RegisterID]flow.RegisterEntry
 }
 
 // NewDelta returns an empty ledger delta.
 func NewDelta() Delta {
 	return Delta{
-		Data: make(map[string]flow.RegisterEntry),
+		Data: make(map[flow.RegisterID]flow.RegisterEntry),
 	}
-}
-
-func toString(owner, key string) string {
-	register := flow.NewRegisterID(owner, key)
-	return register.String()
 }
 
 // Get reads a register value from this delta.
@@ -30,15 +25,15 @@ func toString(owner, key string) string {
 // This function will return nil if the given key has been deleted in this delta.
 // Second return parameters indicated if the value has been set/deleted in this delta
 func (d Delta) Get(owner, key string) (flow.RegisterValue, bool) {
-	value, set := d.Data[toString(owner, key)]
+	value, set := d.Data[flow.NewRegisterID(owner, key)]
 	return value.Value, set
 }
 
 // Set records an update in this delta.
 func (d Delta) Set(owner, key string, value flow.RegisterValue) {
-	k := toString(owner, key)
+	k := flow.NewRegisterID(owner, key)
 	d.Data[k] = flow.RegisterEntry{
-		Key:   flow.NewRegisterID(owner, key),
+		Key:   k,
 		Value: value,
 	}
 }
@@ -97,10 +92,10 @@ func (d *Delta) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return fmt.Errorf("cannot umarshal Delta: %w", err)
 	}
-	dd := make(map[string]flow.RegisterEntry, len(m))
+	dd := make(map[flow.RegisterID]flow.RegisterEntry, len(m))
 
 	for _, value := range m {
-		dd[value.Key.String()] = value
+		dd[value.Key] = value
 	}
 
 	d.Data = dd

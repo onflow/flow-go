@@ -852,8 +852,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		Key:   state.AccountStatusKey,
 	}
 
-	require.Contains(t, registerTouches, id.String())
-	require.Equal(t, id, registerTouches[id.String()])
+	require.Contains(t, registerTouches, id)
 }
 
 func Test_ExecutingSystemCollection(t *testing.T) {
