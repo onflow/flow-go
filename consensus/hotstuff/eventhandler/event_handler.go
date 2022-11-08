@@ -240,7 +240,7 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 		return nil
 	}
 
-	err = e.broadcastTimeoutObjectIfAuthorized(0)
+	err = e.broadcastTimeoutObjectIfAuthorized()
 	if err != nil {
 		return fmt.Errorf("unexpected exception while processing partial TC in view %d: %w", partialTC.View, err)
 	}

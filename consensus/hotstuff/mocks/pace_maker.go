@@ -134,12 +134,12 @@ func (_m *PaceMaker) Start(ctx context.Context) {
 func (_m *PaceMaker) TimeoutChannel() <-chan time.Time {
 	ret := _m.Called()
 
-	var r0 <-chan model.TimerInfo
-	if rf, ok := ret.Get(0).(func() <-chan model.TimerInfo); ok {
+	var r0 <-chan time.Time
+	if rf, ok := ret.Get(0).(func() <-chan time.Time); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan model.TimerInfo)
+			r0 = ret.Get(0).(<-chan time.Time)
 		}
 	}
 
