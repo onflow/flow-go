@@ -1,6 +1,7 @@
 package level1
 
 import (
+	"encoding/json"
 	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
@@ -23,16 +24,20 @@ func TestGenerateBootstrap_DataTable(t *testing.T) {
 		t.Run(i, func(t *testing.T) {
 			// generate template data file from bootstrap file
 			bootstrap := NewBootstrap(testData.bootstrapPath)
-			actualTemplateData := bootstrap.GenTemplateData(false)
+			actualNodeData := bootstrap.GenTemplateData(false)
 
 			// load expected template data file
+			var expectedNodeData []NodeData
 			expectedDataBytes, err := os.ReadFile(testData.expectedOutput)
 			require.NoError(t, err)
 			expectedDataStr := string(expectedDataBytes)
 			expectedDataStr = strings.Trim(expectedDataStr, "\t \n")
+			err = json.Unmarshal(expectedDataBytes, &expectedNodeData)
+			require.Nil(t, err)
 
-			// check generated template data file is correct
-			require.JSONEq(t, expectedDataStr, actualTemplateData)
+			// check generated template data file is correct by unmarshalling json into structs
+			require.Equal(t, len(expectedNodeData), len(actualNodeData))
+			require.ElementsMatch(t, expectedNodeData, actualNodeData)
 		})
 	}
 }

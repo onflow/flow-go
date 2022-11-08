@@ -24,7 +24,7 @@ func NewBootstrap(jsonInput string) Bootstrap {
 	}
 }
 
-func (b *Bootstrap) GenTemplateData(outputToFile bool) string {
+func (b *Bootstrap) GenTemplateData(outputToFile bool) []NodeData {
 	// load bootstrap file
 	dataBytes, err := os.ReadFile(b.jsonInput)
 	if err != nil {
@@ -35,7 +35,8 @@ func (b *Bootstrap) GenTemplateData(outputToFile bool) string {
 	// this avoids the use of structs in case the json changes
 	// https://stackoverflow.com/a/38437140/5719544
 	var dataMap map[string]interface{}
-	if err := json.Unmarshal([]byte(dataBytes), &dataMap); err != nil {
+	err = json.Unmarshal(dataBytes, &dataMap)
+	if err != nil {
 		log.Fatal(err)
 	}
 
@@ -57,13 +58,5 @@ func (b *Bootstrap) GenTemplateData(outputToFile bool) string {
 			Name: name,
 		})
 	}
-
-	templateData, err := json.Marshal(nodeDataList)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	templateDatStr := string(templateData)
-
-	return string(templateDatStr)
+	return nodeDataList
 }
