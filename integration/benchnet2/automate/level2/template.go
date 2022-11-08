@@ -28,7 +28,7 @@ func (t *Template) Apply(outputToFile bool) string {
 		log.Fatal(err)
 	}
 
-	// map any json data to array of map, so it can be decoded by template engine -
+	// map any json data to array of maps, so it can be decoded by template engine -
 	// this avoids the use of structs, so we can represent any arbitrary data
 	// https://stackoverflow.com/a/38437140/5719544
 	var dataMap []map[string]interface{}
