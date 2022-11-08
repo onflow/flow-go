@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/engine/common/provider"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 
 	"github.com/onflow/flow-go/engine/execution/computation"
@@ -26,6 +29,7 @@ type ExecutionConfig struct {
 	transactionResultsCacheSize          uint
 	checkpointDistance                   uint
 	checkpointsToKeep                    uint
+	outputCheckpointV5                   bool
 	stateDeltasLimit                     uint
 	chunkDataPackCacheSize               uint
 	chunkDataPackRequestsCacheSize       uint32
@@ -43,13 +47,16 @@ type ExecutionConfig struct {
 	s3BucketName                         string
 	apiRatelimits                        map[string]int
 	apiBurstlimits                       map[string]int
+	executionDataAllowedPeers            string
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
 	blobstoreRateLimit                   int
 	blobstoreBurstLimit                  int
 	chunkDataPackRequestWorkers          uint
 
-	computationConfig computation.ComputationConfig
+	computationConfig        computation.ComputationConfig
+	receiptRequestWorkers    uint   // common provider engine workers
+	receiptRequestsCacheSize uint32 // common provider engine cache size
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -63,6 +70,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.Uint32Var(&exeConf.mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
 	flags.UintVar(&exeConf.checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
 	flags.UintVar(&exeConf.checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
+	flags.BoolVar(&exeConf.outputCheckpointV5, "outputCheckpointV5", false, "output checkpoint file in v5")
 	flags.UintVar(&exeConf.stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
 	flags.UintVar(&exeConf.computationConfig.ProgramsCacheSize, "cadence-execution-cache", programs.DefaultProgramsCacheSize,
 		"cache size for Cadence execution")
@@ -71,6 +79,8 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
+	flags.Uint32Var(&exeConf.receiptRequestsCacheSize, "receipt-request-cache", provider.DefaultEntityRequestCacheSize, "queue size for entity requests at common provider engine")
+	flags.UintVar(&exeConf.receiptRequestWorkers, "receipt-request-workers", provider.DefaultRequestProviderWorkers, "number of workers for entity requests at common provider engine")
 	flags.DurationVar(&exeConf.computationConfig.ScriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
 		"threshold for logging script execution")
 	flags.DurationVar(&exeConf.computationConfig.ScriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit,
@@ -91,6 +101,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&exeConf.enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
 	flags.StringVar(&exeConf.gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
 	flags.StringVar(&exeConf.s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
+	flags.StringVar(&exeConf.executionDataAllowedPeers, "execution-data-allowed-requesters", "", "comma separated list of Access node IDs that are allowed to request Execution Data. an empty list allows all peers")
 	flags.Uint64Var(&exeConf.executionDataPrunerHeightRangeTarget, "execution-data-height-range-target", 0, "target height range size used to limit the amount of Execution Data kept on disk")
 	flags.Uint64Var(&exeConf.executionDataPrunerThreshold, "execution-data-height-range-threshold", 100_000, "height threshold used to trigger Execution Data pruning")
 	flags.StringToIntVar(&exeConf.apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,ExecuteScriptAtBlockID=500 etc. note limits apply globally to all clients.")
@@ -103,6 +114,14 @@ func (exeConf *ExecutionConfig) ValidateFlags() error {
 	if exeConf.enableBlockDataUpload {
 		if exeConf.gcpBucketName == "" && exeConf.s3BucketName == "" {
 			return fmt.Errorf("invalid flag. gcp-bucket-name or s3-bucket-name required when blockdata-uploader is enabled")
+		}
+	}
+	if exeConf.executionDataAllowedPeers != "" {
+		ids := strings.Split(exeConf.executionDataAllowedPeers, ",")
+		for _, id := range ids {
+			if _, err := flow.HexStringToIdentifier(id); err != nil {
+				return fmt.Errorf("invalid node ID in execution-data-allowed-requesters %s: %w", id, err)
+			}
 		}
 	}
 	return nil

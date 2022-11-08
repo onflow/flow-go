@@ -211,7 +211,7 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Subsystem: subsystemAuth,
 			Name:      nc.prefix + "unauthorized_messages_count",
 			Help:      "number of messages that failed authorization validation",
-		}, []string{LabelNodeRole, LabelMessage, LabelChannel},
+		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelViolationReason},
 	)
 
 	nc.rateLimitedUnicastMessagesCount = promauto.NewCounterVec(
@@ -220,7 +220,7 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Subsystem: subsystemRateLimiting,
 			Name:      nc.prefix + "rate_limited_unicast_messages_count",
 			Help:      "number of messages sent via unicast that have been rate limited",
-		}, []string{LabelNodeRole, LabelMessage, LabelChannel},
+		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelRateLimitReason},
 	)
 
 	return nc
@@ -323,6 +323,6 @@ func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense 
 }
 
 // OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
-func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic string) {
-	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic).Inc()
+func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string) {
+	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
 }

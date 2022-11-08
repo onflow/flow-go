@@ -135,6 +135,82 @@ type AccountKeyUpdater interface {
 	)
 }
 
+type ParseRestrictedAccountKeyUpdater struct {
+	txnState *state.TransactionState
+	impl     AccountKeyUpdater
+}
+
+func NewParseRestrictedAccountKeyUpdater(
+	txnState *state.TransactionState,
+	impl AccountKeyUpdater,
+) ParseRestrictedAccountKeyUpdater {
+	return ParseRestrictedAccountKeyUpdater{
+		txnState: txnState,
+		impl:     impl,
+	}
+}
+
+func (updater ParseRestrictedAccountKeyUpdater) AddEncodedAccountKey(
+	address runtime.Address,
+	publicKey []byte,
+) error {
+	return parseRestrict2Arg(
+		updater.txnState,
+		trace.FVMEnvAddEncodedAccountKey,
+		updater.impl.AddEncodedAccountKey,
+		address,
+		publicKey)
+}
+
+func (updater ParseRestrictedAccountKeyUpdater) RevokeEncodedAccountKey(
+	address runtime.Address,
+	index int,
+) (
+	[]byte,
+	error,
+) {
+	return parseRestrict2Arg1Ret(
+		updater.txnState,
+		trace.FVMEnvRevokeEncodedAccountKey,
+		updater.impl.RevokeEncodedAccountKey,
+		address,
+		index)
+}
+
+func (updater ParseRestrictedAccountKeyUpdater) AddAccountKey(
+	address runtime.Address,
+	publicKey *runtime.PublicKey,
+	hashAlgo runtime.HashAlgorithm,
+	weight int,
+) (
+	*runtime.AccountKey,
+	error,
+) {
+	return parseRestrict4Arg1Ret(
+		updater.txnState,
+		trace.FVMEnvAddAccountKey,
+		updater.impl.AddAccountKey,
+		address,
+		publicKey,
+		hashAlgo,
+		weight)
+}
+
+func (updater ParseRestrictedAccountKeyUpdater) RevokeAccountKey(
+	address runtime.Address,
+	keyIndex int,
+) (
+	*runtime.AccountKey,
+	error,
+) {
+	return parseRestrict2Arg1Ret(
+		updater.txnState,
+		trace.FVMEnvRevokeAccountKey,
+		updater.impl.RevokeAccountKey,
+		address,
+		keyIndex)
+}
+
 type NoAccountKeyUpdater struct{}
 
 func (NoAccountKeyUpdater) AddEncodedAccountKey(
@@ -442,7 +518,8 @@ func (updater *accountKeyUpdater) AddEncodedAccountKey(
 	address runtime.Address,
 	publicKey []byte,
 ) error {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
+	defer updater.tracer.StartSpanFromRoot(
+		trace.FVMEnvAddEncodedAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindAddEncodedAccountKey,
@@ -476,7 +553,7 @@ func (updater *accountKeyUpdater) RevokeEncodedAccountKey(
 	[]byte,
 	error,
 ) {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
+	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRevokeEncodedAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindRevokeEncodedAccountKey,
@@ -535,7 +612,7 @@ func (updater *accountKeyUpdater) RevokeAccountKey(
 	*runtime.AccountKey,
 	error,
 ) {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
+	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRevokeAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindRevokeAccountKey,

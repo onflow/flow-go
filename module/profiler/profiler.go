@@ -15,25 +15,12 @@ import (
 
 	"github.com/google/pprof/profile"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 	"go.uber.org/multierr"
 	pb "google.golang.org/genproto/googleapis/devtools/cloudprofiler/v2"
 
 	"github.com/onflow/flow-go/engine"
 )
-
-var profilerEnabled atomic.Bool
-
-// SetProfilerEnabled enable or disable generating profiler data
-func SetProfilerEnabled(newState bool) {
-	oldState := profilerEnabled.Swap(newState)
-	if oldState != newState {
-		log.Info().Bool("newState", newState).Bool("oldState", oldState).Msg("profilerEnabled changed")
-	} else {
-		log.Info().Bool("currentState", oldState).Msg("profilerEnabled unchanged")
-	}
-}
 
 type profileDef struct {
 	profileName string
@@ -49,11 +36,11 @@ type AutoProfiler struct {
 	duration time.Duration
 
 	uploader Uploader
+	enabled  *atomic.Bool
 }
 
 // New creates a new AutoProfiler instance performing profiling every interval for duration.
 func New(log zerolog.Logger, uploader Uploader, dir string, interval time.Duration, duration time.Duration, enabled bool) (*AutoProfiler, error) {
-	SetProfilerEnabled(enabled)
 
 	err := os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
@@ -67,15 +54,28 @@ func New(log zerolog.Logger, uploader Uploader, dir string, interval time.Durati
 		interval: interval,
 		duration: duration,
 		uploader: uploader,
+		enabled:  atomic.NewBool(enabled),
 	}
 	return p, nil
+}
+
+// SetEnabled sets whether the profiler is active.
+// No errors are expected during normal operation.
+func (p *AutoProfiler) SetEnabled(enabled bool) error {
+	p.enabled.Store(enabled)
+	return nil
+}
+
+// Enabled returns the current enabled state of the profiler.
+func (p *AutoProfiler) Enabled() bool {
+	return p.enabled.Load()
 }
 
 func (p *AutoProfiler) Ready() <-chan struct{} {
 	delay := time.Duration(float64(p.interval) * rand.Float64())
 	p.unit.LaunchPeriodically(p.start, p.interval, delay)
 
-	if profilerEnabled.Load() {
+	if !p.Enabled() {
 		p.log.Info().Dur("duration", p.duration).Time("nextRunAt", time.Now().Add(p.interval)).Msg("AutoProfiler has started")
 	} else {
 		p.log.Info().Msg("AutoProfiler has started, profiler is disabled")
@@ -89,7 +89,7 @@ func (p *AutoProfiler) Done() <-chan struct{} {
 }
 
 func (p *AutoProfiler) start() {
-	if !profilerEnabled.Load() {
+	if !p.Enabled() {
 		return
 	}
 

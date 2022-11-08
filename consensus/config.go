@@ -5,6 +5,8 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/module/updatable_configs"
 )
 
 // HotstuffModules is a helper structure to encapsulate dependencies to create
@@ -24,13 +26,28 @@ type HotstuffModules struct {
 }
 
 type ParticipantConfig struct {
-	StartupTime                         time.Time     // the time when consensus participant enters first view
-	TimeoutMinimum                      time.Duration // the minimum timeout for the pacemaker
-	TimeoutMaximum                      time.Duration // the maximum timeout for the pacemaker
-	TimeoutAdjustmentFactor             float64       // the factor at which the timeout duration is adjusted
-	HappyPathMaxRoundFailures           uint64        // number of failed rounds before first timeout increase
-	BlockRateDelay                      time.Duration // a delay to broadcast block proposal in order to control the block production rate
-	MaxTimeoutObjectRebroadcastInterval time.Duration // maximum interval for timeout object rebroadcast
+	StartupTime                         time.Time                   // the time when consensus participant enters first view
+	TimeoutMinimum                      time.Duration               // the minimum timeout for the pacemaker
+	TimeoutMaximum                      time.Duration               // the maximum timeout for the pacemaker
+	TimeoutAdjustmentFactor             float64                     // the factor at which the timeout duration is adjusted
+	HappyPathMaxRoundFailures           uint64                      // number of failed rounds before first timeout increase
+	BlockRateDelay                      time.Duration               // a delay to broadcast block proposal in order to control the block production rate
+	MaxTimeoutObjectRebroadcastInterval time.Duration               // maximum interval for timeout object rebroadcast
+	Registrar                           updatable_configs.Registrar // optional: for registering HotStuff configs as dynamically configurable
+}
+
+func DefaultParticipantConfig() ParticipantConfig {
+	defTimeout := timeout.DefaultConfig
+	cfg := ParticipantConfig{
+		TimeoutMinimum:                      time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
+		TimeoutMaximum:                      time.Duration(defTimeout.MaxReplicaTimeout) * time.Millisecond,
+		TimeoutAdjustmentFactor:             defTimeout.TimeoutAdjustmentFactor,
+		HappyPathMaxRoundFailures:           defTimeout.HappyPathMaxRoundFailures,
+		BlockRateDelay:                      defTimeout.GetBlockRateDelay(),
+		MaxTimeoutObjectRebroadcastInterval: time.Duration(defTimeout.MaxTimeoutObjectRebroadcastInterval) * time.Millisecond,
+		Registrar:                           nil,
+	}
+	return cfg
 }
 
 type Option func(*ParticipantConfig)
@@ -62,5 +79,11 @@ func WithHappyPathMaxRoundFailures(happyPathMaxRoundFailures uint64) Option {
 func WithBlockRateDelay(delay time.Duration) Option {
 	return func(cfg *ParticipantConfig) {
 		cfg.BlockRateDelay = delay
+	}
+}
+
+func WithConfigRegistrar(reg updatable_configs.Registrar) Option {
+	return func(cfg *ParticipantConfig) {
+		cfg.Registrar = reg
 	}
 }

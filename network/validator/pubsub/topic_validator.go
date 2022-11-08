@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/validator"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // messagePubKey extracts the public key of the envelope signer from a libp2p message.
@@ -87,12 +88,38 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 			return pubsub.ValidationReject
 		}
 
+		lg := log.With().
+			Str("peer_id", from.String()).
+			Str("topic", rawMsg.GetTopic()).
+			Logger()
+
+		// verify sender is a known peer
 		if err := peerFilter(from); err != nil {
-			log.Warn().
+			lg.Warn().
 				Err(err).
-				Str("peer_id", from.String()).
-				Hex("sender", msg.OriginID).
+				Bool(logging.KeySuspicious, true).
 				Msg("filtering message from un-allowed peer")
+			return pubsub.ValidationReject
+		}
+
+		// verify ChannelID in message matches the topic over which the message was received
+		topic := channels.Topic(rawMsg.GetTopic())
+		actualChannel, ok := channels.ChannelFromTopic(topic)
+		if !ok {
+			lg.Warn().
+				Bool(logging.KeySuspicious, true).
+				Msg("could not convert topic to channel")
+			return pubsub.ValidationReject
+		}
+
+		lg = lg.With().Str("channel", msg.ChannelID).Logger()
+
+		channel := channels.Channel(msg.ChannelID)
+		if channel != actualChannel {
+			log.Warn().
+				Str("actual_channel", actualChannel.String()).
+				Bool(logging.KeySuspicious, true).
+				Msg("channel id in message does not match pubsub topic")
 			return pubsub.ValidationReject
 		}
 
@@ -103,20 +130,18 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 			break
 		case codec.IsErrUnknownMsgCode(err):
 			// slash peer if message contains unknown message code byte
-			slashingViolationsConsumer.OnUnknownMsgTypeError(violation(from, msg, err))
+			slashingViolationsConsumer.OnUnknownMsgTypeError(violation(from, channel, err))
 			return pubsub.ValidationReject
-		case codec.IsErrMsgUnmarshal(err):
+		case codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err):
 			// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
-			slashingViolationsConsumer.OnInvalidMsgError(violation(from, msg, err))
+			slashingViolationsConsumer.OnInvalidMsgError(violation(from, channel, err))
 			return pubsub.ValidationReject
 		default:
 			// unexpected error condition. this indicates there's a bug
 			// don't crash as a result of external inputs since that creates a DoS vector.
-			log.
-				Error().
+			lg.Error().
 				Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
-				Str("peer_id", from.String()).
-				Hex("sender", msg.OriginID).
+				Bool(logging.KeySuspicious, true).
 				Msg("rejecting message")
 			return pubsub.ValidationReject
 		}
@@ -141,11 +166,10 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 	}
 }
 
-func violation(pid peer.ID, msg message.Message, err error) *slashing.Violation {
+func violation(pid peer.ID, channel channels.Channel, err error) *slashing.Violation {
 	return &slashing.Violation{
 		PeerID:    pid.String(),
-		MsgType:   msg.Type,
-		Channel:   channels.Channel(msg.ChannelID),
+		Channel:   channel,
 		IsUnicast: false,
 		Err:       err,
 	}

@@ -23,10 +23,8 @@ func TestRequiredApprovalsForSealingContruction(t *testing.T) {
 	val := instance.RequireApprovalsForSealConstructionDynamicValue()
 	require.Equal(t, uint(1), val)
 
-	// SetValue should return the old value
-	old, err := instance.SetRequiredApprovalsForSealingConstruction(0)
+	err = instance.SetRequiredApprovalsForSealingConstruction(0)
 	require.NoError(t, err)
-	require.Equal(t, val, old)
 
 	// value should be updated by SetRequiredApprovalsForSealingConstruction
 	newVal := instance.RequireApprovalsForSealConstructionDynamicValue()
@@ -34,12 +32,12 @@ func TestRequiredApprovalsForSealingContruction(t *testing.T) {
 
 	// test updating multiple times
 	for i := 1; i <= flow.DefaultChunkAssignmentAlpha; i++ {
-		old, err := instance.SetRequiredApprovalsForSealingConstruction(uint(i))
+		err := instance.SetRequiredApprovalsForSealingConstruction(uint(i))
 		require.NoError(t, err, err)
-		require.Equal(t, uint(i-1), old)
 		require.Equal(t, uint(i), instance.RequireApprovalsForSealConstructionDynamicValue())
 	}
 
-	_, err = instance.SetRequiredApprovalsForSealingConstruction(flow.DefaultChunkAssignmentAlpha + 1)
+	// test an invalid input
+	err = instance.SetRequiredApprovalsForSealingConstruction(flow.DefaultChunkAssignmentAlpha + 1)
 	require.Error(t, err)
 }

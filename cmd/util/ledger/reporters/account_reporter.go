@@ -136,7 +136,7 @@ type balanceProcessor struct {
 }
 
 func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 	blockPrograms := programs.NewEmptyBlockPrograms()
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
@@ -320,7 +320,7 @@ func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.RunV2(c.ctx, script, c.view)
+	err := c.vm.Run(c.ctx, script, c.view)
 	if err != nil {
 		return 0, false, err
 	}
@@ -341,7 +341,7 @@ func (c *balanceProcessor) fusdBalance(address flow.Address) (uint64, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.RunV2(c.ctx, script, c.view)
+	err := c.vm.Run(c.ctx, script, c.view)
 	if err != nil {
 		return 0, err
 	}
@@ -358,7 +358,7 @@ func (c *balanceProcessor) moments(address flow.Address) (int, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.RunV2(c.ctx, script, c.view)
+	err := c.vm.Run(c.ctx, script, c.view)
 	if err != nil {
 		return 0, err
 	}

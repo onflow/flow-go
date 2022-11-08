@@ -1,13 +1,17 @@
 package environment
 
 import (
+	"context"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -29,6 +33,7 @@ type Environment interface {
 	TransactionInfo
 
 	// ProgramLogger
+	Logger() *zerolog.Logger
 	Logs() []string
 
 	// EventEmitter
@@ -62,4 +67,56 @@ type Environment interface {
 	// Reset resets all stateful environment modules (e.g., ContractUpdater,
 	// EventEmitter, AccountFreezer) to initial state.
 	Reset()
+}
+
+type EnvironmentParams struct {
+	Chain flow.Chain
+
+	// NOTE: The ServiceAccountEnabled option is used by the playground
+	// https://github.com/onflow/flow-playground-api/blob/1ad967055f31db8f1ce88e008960e5fc14a9fbd1/compute/computer.go#L76
+	ServiceAccountEnabled bool
+
+	RuntimeParams
+
+	TracerParams
+	ProgramLoggerParams
+
+	EventEmitterParams
+
+	BlockInfoParams
+	TransactionInfoParams
+
+	ContractUpdaterParams
+}
+
+func DefaultEnvironmentParams() EnvironmentParams {
+	return EnvironmentParams{
+		Chain:                 flow.Mainnet.Chain(),
+		ServiceAccountEnabled: true,
+
+		RuntimeParams:         DefaultRuntimeParams(),
+		TracerParams:          DefaultTracerParams(),
+		ProgramLoggerParams:   DefaultProgramLoggerParams(),
+		EventEmitterParams:    DefaultEventEmitterParams(),
+		BlockInfoParams:       DefaultBlockInfoParams(),
+		TransactionInfoParams: DefaultTransactionInfoParams(),
+		ContractUpdaterParams: DefaultContractUpdaterParams(),
+	}
+}
+
+func NewScriptEnvironment(
+	ctx context.Context,
+	params EnvironmentParams,
+	txnState *state.TransactionState,
+	programs TransactionPrograms,
+) Environment {
+	return newScriptFacadeEnvironment(ctx, params, txnState, programs)
+}
+
+func NewTransactionEnvironment(
+	params EnvironmentParams,
+	txnState *state.TransactionState,
+	programs TransactionPrograms,
+) Environment {
+	return newTransactionFacadeEnvironment(params, txnState, programs)
 }

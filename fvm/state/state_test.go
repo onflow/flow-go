@@ -178,11 +178,15 @@ func TestState_MaxInteraction(t *testing.T) {
 }
 
 func TestState_IsFVMStateKey(t *testing.T) {
-	require.True(t, state.IsFVMStateKey("", "uuid"))
+	require.True(t, state.IsFVMStateKey("", state.UUIDKey))
+	require.True(t, state.IsFVMStateKey("", state.AddressStateKey))
+	require.False(t, state.IsFVMStateKey("", "other"))
+	require.False(t, state.IsFVMStateKey("Address", state.UUIDKey))
+	require.False(t, state.IsFVMStateKey("Address", state.AddressStateKey))
 	require.True(t, state.IsFVMStateKey("Address", "public_key_12"))
-	require.True(t, state.IsFVMStateKey("Address", state.KeyContractNames))
+	require.True(t, state.IsFVMStateKey("Address", state.ContractNamesKey))
 	require.True(t, state.IsFVMStateKey("Address", "code.MYCODE"))
-	require.True(t, state.IsFVMStateKey("Address", state.KeyAccountStatus))
+	require.True(t, state.IsFVMStateKey("Address", state.AccountStatusKey))
 	require.False(t, state.IsFVMStateKey("Address", "anything else"))
 }
 

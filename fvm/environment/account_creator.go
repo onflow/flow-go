@@ -13,8 +13,6 @@ import (
 )
 
 const (
-	keyAddressState = "account_address_state"
-
 	FungibleTokenAccountIndex = 2
 	FlowTokenAccountIndex     = 3
 	FlowFeesAccountIndex      = 4
@@ -34,6 +32,36 @@ type BootstrapAccountCreator interface {
 		flow.Address,
 		error,
 	)
+}
+
+// This ensures cadence can't access unexpected operations while parsing
+// programs.
+type ParseRestrictedAccountCreator struct {
+	txnState *state.TransactionState
+	impl     AccountCreator
+}
+
+func NewParseRestrictedAccountCreator(
+	txnState *state.TransactionState,
+	creator AccountCreator,
+) AccountCreator {
+	return ParseRestrictedAccountCreator{
+		txnState: txnState,
+		impl:     creator,
+	}
+}
+
+func (creator ParseRestrictedAccountCreator) CreateAccount(
+	payer runtime.Address,
+) (
+	runtime.Address,
+	error,
+) {
+	return parseRestrict1Arg1Ret(
+		creator.txnState,
+		trace.FVMEnvCreateAccount,
+		creator.impl.CreateAccount,
+		payer)
 }
 
 type AccountCreator interface {
@@ -120,7 +148,7 @@ func NewAccountCreator(
 func (creator *accountCreator) bytes() ([]byte, error) {
 	stateBytes, err := creator.txnState.Get(
 		"",
-		keyAddressState,
+		state.AddressStateKey,
 		creator.txnState.EnforceLimits())
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -167,7 +195,7 @@ func (creator *accountCreator) NextAddress() (flow.Address, error) {
 	// update the ledger state
 	err = creator.txnState.Set(
 		"",
-		keyAddressState,
+		state.AddressStateKey,
 		addressGenerator.Bytes(),
 		creator.txnState.EnforceLimits())
 	if err != nil {

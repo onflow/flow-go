@@ -13,7 +13,7 @@ import (
 // TestSystemContract_Address tests that we can retrieve a canonical address
 // for all accepted chains and contracts.
 func TestSystemContracts(t *testing.T) {
-	chains := []flow.ChainID{flow.Mainnet, flow.Testnet, flow.Stagingnet, flow.Benchnet, flow.Localnet, flow.Emulator}
+	chains := []flow.ChainID{flow.Mainnet, flow.Testnet, flow.Sandboxnet, flow.Benchnet, flow.Localnet, flow.Emulator}
 
 	for _, chain := range chains {
 		_, err := SystemContractsForChain(chain)
@@ -34,7 +34,7 @@ func TestSystemContract_InvalidChainID(t *testing.T) {
 // TestServiceEvents tests that we can retrieve service events for all accepted
 // chains and contracts.
 func TestServiceEvents(t *testing.T) {
-	chains := []flow.ChainID{flow.Mainnet, flow.Testnet, flow.Stagingnet, flow.Benchnet, flow.Localnet, flow.Emulator}
+	chains := []flow.ChainID{flow.Mainnet, flow.Testnet, flow.Sandboxnet, flow.Benchnet, flow.Localnet, flow.Emulator}
 
 	for _, chain := range chains {
 		_, err := ServiceEventsForChain(chain)
@@ -46,7 +46,7 @@ func TestServiceEvents(t *testing.T) {
 // TestServiceEventLookup_Consistency sanity checks consistency of the lookup
 // method, in case an update to ServiceEvents forgets to update the lookup.
 func TestServiceEventAll_Consistency(t *testing.T) {
-	chains := []flow.ChainID{flow.Mainnet, flow.Testnet, flow.Stagingnet, flow.Benchnet, flow.Localnet, flow.Emulator}
+	chains := []flow.ChainID{flow.Mainnet, flow.Testnet, flow.Sandboxnet, flow.Benchnet, flow.Localnet, flow.Emulator}
 
 	fields := reflect.TypeOf(ServiceEvents{}).NumField()
 	for _, chain := range chains {
