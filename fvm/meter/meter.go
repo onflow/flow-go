@@ -9,39 +9,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO(patrick): rm after emulator is updated ...
+// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/229
+// is merged and integrated.
 const (
-	// [2_000, 3_000) reserved for the FVM
-	_ common.ComputationKind = iota + 2_000
-	ComputationKindHash
-	ComputationKindVerifySignature
-	ComputationKindAddAccountKey
-	ComputationKindAddEncodedAccountKey
-	ComputationKindAllocateStorageIndex
-	ComputationKindCreateAccount
-	ComputationKindEmitEvent
-	ComputationKindGenerateUUID
-	ComputationKindGetAccountAvailableBalance
-	ComputationKindGetAccountBalance
-	ComputationKindGetAccountContractCode
-	ComputationKindGetAccountContractNames
-	ComputationKindGetAccountKey
-	ComputationKindGetBlockAtHeight
-	ComputationKindGetCode
-	ComputationKindGetCurrentBlockHeight
-	ComputationKindGetProgram
-	ComputationKindGetStorageCapacity
-	ComputationKindGetStorageUsed
-	ComputationKindGetValue
-	ComputationKindRemoveAccountContractCode
-	ComputationKindResolveLocation
-	ComputationKindRevokeAccountKey
-	ComputationKindRevokeEncodedAccountKey
-	ComputationKindSetProgram
-	ComputationKindSetValue
-	ComputationKindUpdateAccountContractCode
-	ComputationKindValidatePublicKey
-	ComputationKindValueExists
+	ComputationKindCreateAccount = 2006
+	ComputationKindGetValue      = 2020
+	ComputationKindSetValue      = 2026
 )
 
 type MeteredComputationIntensities map[common.ComputationKind]uint
@@ -394,7 +367,6 @@ type Meter struct {
 	totalStorageBytesRead    uint64
 	totalStorageBytesWritten uint64
 
-	eventCounter           uint32
 	totalEmittedEventBytes uint64
 }
 
@@ -448,7 +420,6 @@ func (m *Meter) MergeMeter(child *Meter) {
 	m.totalStorageBytesRead += child.TotalBytesReadFromStorage()
 	m.totalStorageBytesWritten += child.TotalBytesWrittenToStorage()
 
-	m.eventCounter += child.TotalEventCounter()
 	m.totalEmittedEventBytes += child.TotalEmittedEventBytes()
 }
 
@@ -472,8 +443,8 @@ func (m *Meter) ComputationIntensities() MeteredComputationIntensities {
 }
 
 // TotalComputationUsed returns the total computation used
-func (m *Meter) TotalComputationUsed() uint {
-	return uint(m.computationUsed >> MeterExecutionInternalPrecisionBytes)
+func (m *Meter) TotalComputationUsed() uint64 {
+	return m.computationUsed >> MeterExecutionInternalPrecisionBytes
 }
 
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit
@@ -576,7 +547,6 @@ func (m *Meter) GetStorageUpdateSizeMapForTesting() MeteredStorageInteractionMap
 
 func (m *Meter) MeterEmittedEvent(byteSize uint64) error {
 	m.totalEmittedEventBytes += uint64(byteSize)
-	m.eventCounter++
 
 	if m.totalEmittedEventBytes > m.eventEmitByteLimit {
 		return errors.NewEventLimitExceededError(
@@ -588,8 +558,4 @@ func (m *Meter) MeterEmittedEvent(byteSize uint64) error {
 
 func (m *Meter) TotalEmittedEventBytes() uint64 {
 	return m.totalEmittedEventBytes
-}
-
-func (m *Meter) TotalEventCounter() uint32 {
-	return m.eventCounter
 }

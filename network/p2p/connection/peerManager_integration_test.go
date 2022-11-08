@@ -12,14 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/network/p2p/utils"
-
-	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
-	"github.com/onflow/flow-go/network/p2p/translator"
-
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/translator"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -30,11 +29,14 @@ import (
 func TestPeerManager_Integration(t *testing.T) {
 	count := 5
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create nodes
-	nodes, identities := p2pfixtures.NodesFixture(t, ctx, unittest.IdentifierFixture(), "test_peer_manager", count)
-	defer p2pfixtures.StopNodes(t, nodes)
+	nodes, identities := p2pfixtures.NodesFixture(t, unittest.IdentifierFixture(), "test_peer_manager", count)
+
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	thisNode := nodes[0]
 	topologyPeers := identities[1:]
@@ -53,7 +55,8 @@ func TestPeerManager_Integration(t *testing.T) {
 	idTranslator, err := translator.NewFixedTableIdentityTranslator(identities)
 	require.NoError(t, err)
 
-	peerManager := connection.NewPeerManager(unittest.Logger(), connection.DefaultPeerUpdateInterval, func() peer.IDSlice {
+	peerManager := connection.NewPeerManager(unittest.Logger(), connection.DefaultPeerUpdateInterval, connector)
+	peerManager.SetPeersProvider(func() peer.IDSlice {
 		// peerManager is furnished with a full topology that connects to all nodes
 		// in the topologyPeers.
 		peers := peer.IDSlice{}
@@ -64,11 +67,11 @@ func TestPeerManager_Integration(t *testing.T) {
 		}
 
 		return peers
-	}, connector)
+	})
 
 	// initially no node should be in peer store of this node.
 	require.Empty(t, thisNode.Host().Network().Peers())
-	peerManager.ForceUpdatePeers()
+	peerManager.ForceUpdatePeers(ctx)
 	time.Sleep(1 * time.Second)
 	// after a forced update all other nodes must be added to the peer store of this node.
 	require.Len(t, thisNode.Host().Network().Peers(), count-1)
@@ -78,7 +81,7 @@ func TestPeerManager_Integration(t *testing.T) {
 	// kicks one node out of the othersIds; this imitates evicting, ejecting, or unstaking a node
 	evictedId := topologyPeers[0]     // evicted one
 	topologyPeers = topologyPeers[1:] // updates otherIds list
-	peerManager.ForceUpdatePeers()
+	peerManager.ForceUpdatePeers(ctx)
 	time.Sleep(1 * time.Second)
 	// after a forced update, the evicted one should be excluded from the peer store.
 	require.Len(t, thisNode.Host().Network().Peers(), count-2)

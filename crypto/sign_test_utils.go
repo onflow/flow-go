@@ -12,6 +12,39 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
+func TestKeyGenErrors(t *testing.T) {
+	seed := make([]byte, 50)
+	invalidSigAlgo := SigningAlgorithm(20)
+	sk, err := GeneratePrivateKey(invalidSigAlgo, seed)
+	assert.Nil(t, sk)
+	assert.Error(t, err)
+	assert.True(t, IsInvalidInputsError(err))
+}
+
+func TestHasherErrors(t *testing.T) {
+	t.Run("nilHasher error sanity", func(t *testing.T) {
+		err := nilHasherError
+		invInpError := invalidInputsErrorf("")
+		otherError := fmt.Errorf("some error")
+		assert.True(t, IsNilHasherError(err))
+		assert.False(t, IsInvalidInputsError(err))
+		assert.False(t, IsNilHasherError(invInpError))
+		assert.False(t, IsNilHasherError(otherError))
+		assert.False(t, IsNilHasherError(nil))
+	})
+
+	t.Run("nilHasher error sanity", func(t *testing.T) {
+		err := invalidHasherSizeErrorf("")
+		invInpError := invalidInputsErrorf("")
+		otherError := fmt.Errorf("some error")
+		assert.True(t, IsInvalidHasherSizeError(err))
+		assert.False(t, IsInvalidInputsError(err))
+		assert.False(t, IsInvalidHasherSizeError(invInpError))
+		assert.False(t, IsInvalidHasherSizeError(otherError))
+		assert.False(t, IsInvalidHasherSizeError(nil))
+	})
+}
+
 // tests sign and verify are consistent for multiple generated keys and messages
 func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	t.Logf("Testing Generation/Signature/Verification for %s", salg)
@@ -167,13 +200,13 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		assert.Nil(t, sk)
 	})
 
-	// test invalid private keys (equal to the curve group order)
+	// test invalid private and public keys (invalid length)
 	t.Run("invalid key length", func(t *testing.T) {
 		// private key
 		skLens := make(map[SigningAlgorithm]int)
 		skLens[ECDSAP256] = PrKeyLenECDSAP256
 		skLens[ECDSASecp256k1] = PrKeyLenECDSASecp256k1
-		skLens[BLSBLS12381] = PrKeyLenBLSBLS12381
+		skLens[BLSBLS12381] = 32
 
 		bytes := make([]byte, skLens[salg]+1)
 		sk, err := DecodePrivateKey(salg, bytes)
@@ -185,7 +218,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		pkLens := make(map[SigningAlgorithm]int)
 		pkLens[ECDSAP256] = PubKeyLenECDSAP256
 		pkLens[ECDSASecp256k1] = PubKeyLenECDSASecp256k1
-		pkLens[BLSBLS12381] = PubKeyLenBLSBLS12381
+		pkLens[BLSBLS12381] = 96
 
 		bytes = make([]byte, pkLens[salg]+1)
 		pk, err := DecodePublicKey(salg, bytes)

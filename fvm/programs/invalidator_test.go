@@ -12,7 +12,7 @@ type testInvalidator struct {
 	invalidateName string
 }
 
-func (invalidator testInvalidator) ShouldInvalidatePrograms() bool {
+func (invalidator testInvalidator) ShouldInvalidateEntries() bool {
 	return invalidator.invalidateAll ||
 		invalidator.invalidateName != ""
 }
@@ -27,7 +27,7 @@ func (invalidator testInvalidator) ShouldInvalidateEntry(
 func TestModifiedSetsInvalidator(t *testing.T) {
 	invalidator := ModifiedSetsInvalidator{}
 
-	require.False(t, invalidator.ShouldInvalidatePrograms())
+	require.False(t, invalidator.ShouldInvalidateEntries())
 	require.False(t, invalidator.ShouldInvalidateEntry(ProgramEntry{}))
 
 	invalidator = ModifiedSetsInvalidator{
@@ -37,7 +37,7 @@ func TestModifiedSetsInvalidator(t *testing.T) {
 		FrozenAccounts: nil,
 	}
 
-	require.True(t, invalidator.ShouldInvalidatePrograms())
+	require.True(t, invalidator.ShouldInvalidateEntries())
 	require.True(t, invalidator.ShouldInvalidateEntry(ProgramEntry{}))
 
 	invalidator = ModifiedSetsInvalidator{
@@ -47,54 +47,54 @@ func TestModifiedSetsInvalidator(t *testing.T) {
 		},
 	}
 
-	require.True(t, invalidator.ShouldInvalidatePrograms())
+	require.True(t, invalidator.ShouldInvalidateEntries())
 	require.True(t, invalidator.ShouldInvalidateEntry(ProgramEntry{}))
 }
 
 func TestChainedInvalidator(t *testing.T) {
-	var chain chainedInvalidators
-	require.False(t, chain.ShouldInvalidatePrograms())
+	var chain chainedDerivedDataInvalidators[ProgramEntry]
+	require.False(t, chain.ShouldInvalidateEntries())
 	require.False(t, chain.ShouldInvalidateEntry(ProgramEntry{}))
 
-	chain = chainedInvalidators{}
-	require.False(t, chain.ShouldInvalidatePrograms())
+	chain = chainedDerivedDataInvalidators[ProgramEntry]{}
+	require.False(t, chain.ShouldInvalidateEntries())
 	require.False(t, chain.ShouldInvalidateEntry(ProgramEntry{}))
 
-	chain = chainedInvalidators{
+	chain = chainedDerivedDataInvalidators[ProgramEntry]{
 		{
-			Invalidator:   testInvalidator{},
-			executionTime: 1,
+			DerivedDataInvalidator: testInvalidator{},
+			executionTime:          1,
 		},
 		{
-			Invalidator:   testInvalidator{},
-			executionTime: 2,
+			DerivedDataInvalidator: testInvalidator{},
+			executionTime:          2,
 		},
 		{
-			Invalidator:   testInvalidator{},
-			executionTime: 3,
+			DerivedDataInvalidator: testInvalidator{},
+			executionTime:          3,
 		},
 	}
-	require.False(t, chain.ShouldInvalidatePrograms())
+	require.False(t, chain.ShouldInvalidateEntries())
 
-	chain = chainedInvalidators{
+	chain = chainedDerivedDataInvalidators[ProgramEntry]{
 		{
-			Invalidator:   testInvalidator{invalidateName: "1"},
-			executionTime: 1,
+			DerivedDataInvalidator: testInvalidator{invalidateName: "1"},
+			executionTime:          1,
 		},
 		{
-			Invalidator:   testInvalidator{invalidateName: "3a"},
-			executionTime: 3,
+			DerivedDataInvalidator: testInvalidator{invalidateName: "3a"},
+			executionTime:          3,
 		},
 		{
-			Invalidator:   testInvalidator{invalidateName: "3b"},
-			executionTime: 3,
+			DerivedDataInvalidator: testInvalidator{invalidateName: "3b"},
+			executionTime:          3,
 		},
 		{
-			Invalidator:   testInvalidator{invalidateName: "7"},
-			executionTime: 7,
+			DerivedDataInvalidator: testInvalidator{invalidateName: "7"},
+			executionTime:          7,
 		},
 	}
-	require.True(t, chain.ShouldInvalidatePrograms())
+	require.True(t, chain.ShouldInvalidateEntries())
 
 	for _, name := range []string{"1", "3a", "3b", "7"} {
 		entry := ProgramEntry{

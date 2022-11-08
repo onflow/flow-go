@@ -11,22 +11,23 @@ import (
 )
 
 const (
-	unknown                     = "unknown"
-	unExpectedValidationError   = "unexpected_validation_error"
-	unAuthorizedSenderViolation = "unauthorized_sender"
-	unknownMsgTypeViolation     = "unknown_message_type"
-	invalidMsgViolation         = "invalid_message"
-	senderEjectedViolation      = "sender_ejected"
+	unknown                      = "unknown"
+	unExpectedValidationError    = "unexpected_validation_error"
+	unAuthorizedSenderViolation  = "unauthorized_sender"
+	unknownMsgTypeViolation      = "unknown_message_type"
+	invalidMsgViolation          = "invalid_message"
+	senderEjectedViolation       = "sender_ejected"
+	unauthorizedUnicastOnChannel = "unauthorized_unicast_on_channel"
 )
 
-// Consumer is a struct that logs a message for any slashable offences.
+// Consumer is a struct that logs a message for any slashable offenses.
 // This struct will be updated in the future when slashing is implemented.
 type Consumer struct {
 	log     zerolog.Logger
 	metrics module.NetworkSecurityMetrics
 }
 
-// NewSlashingViolationsConsumer returns a new Consumer
+// NewSlashingViolationsConsumer returns a new Consumer.
 func NewSlashingViolationsConsumer(log zerolog.Logger, metrics module.NetworkSecurityMetrics) *Consumer {
 	return &Consumer{
 		log:     log.With().Str("module", "network_slashing_consumer").Logger(),
@@ -54,6 +55,7 @@ func (c *Consumer) logOffense(networkOffense string, violation *Violation) {
 		Str("message_type", violation.MsgType).
 		Str("channel", violation.Channel.String()).
 		Bool("unicast_message", violation.IsUnicast).
+		Bool(logging.KeySuspicious, true).
 		Str("role", role).
 		Hex("sender_id", logging.ID(nodeID))
 
@@ -63,12 +65,12 @@ func (c *Consumer) logOffense(networkOffense string, violation *Violation) {
 	c.metrics.OnUnauthorizedMessage(role, violation.MsgType, violation.Channel.String(), networkOffense)
 }
 
-// OnUnAuthorizedSenderError logs an error for unauthorized sender error
+// OnUnAuthorizedSenderError logs an error for unauthorized sender error.
 func (c *Consumer) OnUnAuthorizedSenderError(violation *Violation) {
 	c.logOffense(unAuthorizedSenderViolation, violation)
 }
 
-// OnUnknownMsgTypeError logs an error for unknown message type error
+// OnUnknownMsgTypeError logs an error for unknown message type error.
 func (c *Consumer) OnUnknownMsgTypeError(violation *Violation) {
 	c.logOffense(unknownMsgTypeViolation, violation)
 }
@@ -79,9 +81,14 @@ func (c *Consumer) OnInvalidMsgError(violation *Violation) {
 	c.logOffense(invalidMsgViolation, violation)
 }
 
-// OnSenderEjectedError logs an error for sender ejected error
+// OnSenderEjectedError logs an error for sender ejected error.
 func (c *Consumer) OnSenderEjectedError(violation *Violation) {
 	c.logOffense(senderEjectedViolation, violation)
+}
+
+// OnUnauthorizedUnicastOnChannel logs an error for messages unauthorized to be sent via unicast.
+func (c *Consumer) OnUnauthorizedUnicastOnChannel(violation *Violation) {
+	c.logOffense(unauthorizedUnicastOnChannel, violation)
 }
 
 // OnUnexpectedError logs an error for unexpected errors. This indicates message validation

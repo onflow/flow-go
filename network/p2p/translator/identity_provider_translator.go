@@ -7,15 +7,18 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
-// IdentityProviderIDTranslator implements an IDTranslator which provides ID
+// IdentityProviderIDTranslator implements an `p2p.IDTranslator` which provides ID
 // translation capabilities for an IdentityProvider.
 type IdentityProviderIDTranslator struct {
-	idProvider id.IdentityProvider
+	idProvider module.IdentityProvider
 }
+
+var _ p2p.IDTranslator = (*IdentityProviderIDTranslator)(nil)
 
 func (t *IdentityProviderIDTranslator) GetFlowID(p peer.ID) (flow.Identifier, error) {
 	key, err := p.ExtractPublicKey()
@@ -28,7 +31,7 @@ func (t *IdentityProviderIDTranslator) GetFlowID(p peer.ID) (flow.Identifier, er
 	}
 	ids := t.idProvider.Identities(filter.HasNetworkingKey(flowKey))
 	if len(ids) == 0 {
-		return flow.ZeroID, fmt.Errorf("could not find identity corresponding to peer id %v", p.Pretty())
+		return flow.ZeroID, fmt.Errorf("could not find identity corresponding to peer id %v", p.String())
 	}
 	return ids[0].NodeID, nil
 }
@@ -49,6 +52,6 @@ func (t *IdentityProviderIDTranslator) GetPeerID(n flow.Identifier) (peer.ID, er
 	return pid, nil
 }
 
-func NewIdentityProviderIDTranslator(provider id.IdentityProvider) *IdentityProviderIDTranslator {
+func NewIdentityProviderIDTranslator(provider module.IdentityProvider) *IdentityProviderIDTranslator {
 	return &IdentityProviderIDTranslator{provider}
 }

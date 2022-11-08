@@ -115,7 +115,7 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *assigner.Engine {
 		s.state,
 		s.assigner,
 		s.chunksQueue,
-		s.newChunkListener)
+		s.newChunkListener, 0)
 
 	e.WithBlockConsumerNotifier(s.notifier)
 

@@ -11,12 +11,12 @@ type RateLimitedBlockstoreCollector struct {
 	bytesRead prometheus.Counter
 }
 
-func NewRateLimitedBlockstoreCollector() module.RateLimitedBlockstoreMetrics {
+func NewRateLimitedBlockstoreCollector(prefix string) module.RateLimitedBlockstoreMetrics {
 	return &RateLimitedBlockstoreCollector{
 		bytesRead: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceStateSync,
 			Subsystem: subsystemExeDataBlobstore,
-			Name:      "bytes_read",
+			Name:      prefix + "_bytes_read",
 			Help:      "number of bytes read from the blockstore",
 		}),
 	}
