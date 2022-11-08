@@ -8,7 +8,7 @@ import (
 )
 
 // sample test run
-// go run cmd/main.go --data "./testdata/data/test1.json" --template "./testdata/templates/test1.yml" --file=true
+// go run cmd/level2/template.go --data "./testdata/level2/data/values8-verification-nodes-if-loop.json" --template "./testdata/level2/templates/values8-verification-nodes-if-loop.yml" --file=true
 func main() {
 	dataFlag := flag.String("data", "", "Path to JSON data.")
 	templateFlag := flag.String("template", "", "Path to template file.")
