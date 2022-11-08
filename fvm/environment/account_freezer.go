@@ -6,7 +6,9 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 // AccountFreezer disables accounts.
@@ -20,6 +22,41 @@ type AccountFreezer interface {
 	FrozenAccounts() []common.Address
 
 	Reset()
+}
+
+type ParseRestrictedAccountFreezer struct {
+	txnState *state.TransactionState
+	impl     AccountFreezer
+}
+
+func NewParseRestrictedAccountFreezer(
+	txnState *state.TransactionState,
+	impl AccountFreezer,
+) AccountFreezer {
+	return ParseRestrictedAccountFreezer{
+		txnState: txnState,
+		impl:     impl,
+	}
+}
+
+func (freezer ParseRestrictedAccountFreezer) SetAccountFrozen(
+	address common.Address,
+	frozen bool,
+) error {
+	return parseRestrict2Arg(
+		freezer.txnState,
+		trace.FVMEnvSetAccountFrozen,
+		freezer.impl.SetAccountFrozen,
+		address,
+		frozen)
+}
+
+func (freezer ParseRestrictedAccountFreezer) FrozenAccounts() []common.Address {
+	return freezer.impl.FrozenAccounts()
+}
+
+func (freezer ParseRestrictedAccountFreezer) Reset() {
+	freezer.impl.Reset()
 }
 
 type NoAccountFreezer struct{}

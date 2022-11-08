@@ -38,7 +38,7 @@ func (b *Bootstrapper) BootstrapLedger(
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
 
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 
 	ctx := fvm.NewContext(
 		fvm.WithLogger(b.logger),
@@ -51,7 +51,7 @@ func (b *Bootstrapper) BootstrapLedger(
 		opts...,
 	)
 
-	err := vm.RunV2(ctx, bootstrap, view)
+	err := vm.Run(ctx, bootstrap, view)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}

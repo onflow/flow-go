@@ -310,7 +310,7 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	suite.Assert().Equal(*block.Payload, *extended.Payload)
 
 	// the block should be indexed by its parent
-	var childIDs []flow.Identifier
+	var childIDs flow.IdentifierList
 	err = suite.db.View(procedure.LookupBlockChildren(suite.genesis.ID(), &childIDs))
 	suite.Assert().Nil(err)
 	suite.Require().Len(childIDs, 1)

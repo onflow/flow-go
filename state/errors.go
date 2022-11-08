@@ -7,6 +7,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+var (
+	// ErrUnknownSnapshotReference indicates that the reference point for a queried
+	// snapshot cannot be resolved. The reference point is either a height above the
+	// finalized boundary, or a block ID that does not exist in the state.
+	ErrUnknownSnapshotReference = errors.New("reference block of the snapshot is not resolvable")
+)
+
 // InvalidExtensionError is an error for invalid extension of the state
 type InvalidExtensionError struct {
 	err error

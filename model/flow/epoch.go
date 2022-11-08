@@ -458,6 +458,7 @@ func NewEpochStatus(previousSetup, previousCommit, currentSetup, currentCommit, 
 }
 
 // Check checks that the status is well-formed, returning an error if it is not.
+// All errors indicate a malformed EpochStatus.
 func (es *EpochStatus) Check() error {
 
 	if es == nil {
@@ -479,6 +480,7 @@ func (es *EpochStatus) Check() error {
 }
 
 // Phase returns the phase for the CURRENT epoch, given this epoch status.
+// All errors indicate a malformed EpochStatus.
 func (es *EpochStatus) Phase() (EpochPhase, error) {
 
 	err := es.Check()

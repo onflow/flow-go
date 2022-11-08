@@ -98,7 +98,7 @@ func testAddressConstants(t *testing.T) {
 		Mainnet,
 		Testnet,
 		Emulator,
-		Stagingnet,
+		Sandboxnet,
 	}
 
 	for _, chainID := range chainIDs {
@@ -147,6 +147,7 @@ func testAddressGeneration(t *testing.T) {
 		Mainnet,
 		Testnet,
 		Emulator,
+		Sandboxnet,
 	}
 
 	for _, chainID := range chainIDs {
@@ -239,6 +240,7 @@ func testAddressesIntersection(t *testing.T) {
 		Mainnet,
 		Testnet,
 		Emulator,
+		Sandboxnet,
 	}
 
 	for _, chainID := range chainIDs {
@@ -307,6 +309,7 @@ func testIndexFromAddress(t *testing.T) {
 		mainnet,
 		testnet,
 		emulator,
+		sandboxnet,
 	}
 
 	for _, chain := range chains {

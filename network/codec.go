@@ -14,8 +14,9 @@ type Codec interface {
 
 	// Decode decodes a message.
 	// Expected error returns during normal operations:
-	//  * codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
-	//  * codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
+	//  - codec.ErrInvalidEncoding if message encoding is invalid.
+	//  - codec.ErrUnknownMsgCode if message code byte does not match any of the configured message codes.
+	//  - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 	Decode(data []byte) (interface{}, error)
 }
 
@@ -26,7 +27,8 @@ type Encoder interface {
 
 // Decoder decodes from the underlying reader into the given message.
 // Expected error returns during normal operations:
-//   - codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
+//   - codec.ErrInvalidEncoding if message encoding is invalid.
+//   - codec.ErrUnknownMsgCode if message code byte does not match any of the configured message codes.
 //   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 type Decoder interface {
 	Decode() (interface{}, error)

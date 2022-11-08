@@ -33,19 +33,8 @@ const (
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
-	// DEPRECATED. DO NOT USE
-	//
-	// TODO(patrick): remove after emulator is updated.
-	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
-
-	RunV2(fvm.Context, fvm.Procedure, state.View) error
-
-	// DEPRECATED. DO NOT USE
-	//
-	// TODO(patrick): remove after emulator is updated.
-	GetAccount(fvm.Context, flow.Address, state.View, *programs.Programs) (*flow.Account, error)
-
-	GetAccountV2(fvm.Context, flow.Address, state.View) (*flow.Account, error)
+	Run(fvm.Context, fvm.Procedure, state.View) error
+	GetAccount(fvm.Context, flow.Address, state.View) (*flow.Account, error)
 }
 
 // ViewCommitter commits views's deltas to the ledger and collects the proofs
@@ -160,28 +149,19 @@ func (e *blockComputer) executeBlock(
 		fvm.WithBlockPrograms(programs))
 	collections := block.Collections()
 
-	chunksSize := len(collections) + 1 // + 1 system chunk
-
-	res := &execution.ComputationResult{
-		ExecutableBlock:    block,
-		Events:             make([]flow.EventsList, chunksSize),
-		ServiceEvents:      make(flow.EventsList, 0),
-		TransactionResults: make([]flow.TransactionResult, 0),
-		StateCommitments:   make([]flow.StateCommitment, 0, chunksSize),
-		Proofs:             make([][]byte, 0, chunksSize),
-		TrieUpdates:        make([]*ledger.TrieUpdate, 0, chunksSize),
-		EventsHashes:       make([]flow.Identifier, 0, chunksSize),
-	}
+	res := execution.NewEmptyComputationResult(block)
 
 	var txIndex uint32
 	var err error
 	var wg sync.WaitGroup
 	wg.Add(2) // block commiter and event hasher
 
+	chunksSize := len(collections) + 1 // + 1 system chunk
 	bc := blockCommitter{
 		committer: e.committer,
 		blockSpan: blockSpan,
 		tracer:    e.tracer,
+		metrics:   e.metrics,
 		state:     *block.StartState,
 		views:     make(chan state.View, chunksSize),
 		res:       res,
@@ -247,8 +227,6 @@ func (e *blockComputer) executeBlock(
 
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("all views committed")
 
-	res.StateReads = stateView.(*delta.View).ReadsCount()
-
 	executionData := generateExecutionData(res, collections, systemCol)
 
 	executionDataID, err := e.executionDataProvider.Provide(ctx, block.Height(), executionData)
@@ -300,6 +278,7 @@ func (e *blockComputer) executeSystemCollection(
 	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeSystemCollection)
 	defer colSpan.End()
 
+	startedAt := time.Now()
 	tx, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
 	if err != nil {
 		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
@@ -324,7 +303,19 @@ func (e *blockComputer) executeSystemCollection(
 			Msg("error executing system chunk transaction")
 	}
 
-	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
+	snapshot := collectionView.(*delta.View).Interactions()
+	res.AddStateSnapshot(snapshot)
+	res.UpdateTransactionResultIndex(1)
+
+	compUsed, memUsed := res.ChunkComputationAndMemoryUsed(collectionIndex)
+	eventCounts, eventSize := res.ChunkEventCountsAndSize(collectionIndex)
+	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt),
+		compUsed, memUsed,
+		eventCounts, eventSize,
+		snapshot.NumberOfRegistersTouched,
+		snapshot.NumberOfBytesWrittenToRegisters,
+		1,
+	)
 
 	return &flow.Collection{
 		Transactions: []*flow.TransactionBody{tx},
@@ -348,7 +339,6 @@ func (e *blockComputer) executeCollection(
 
 	// call tracing
 	startedAt := time.Now()
-	computationUsedUpToNow := res.ComputationUsed
 	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeCollection)
 	defer func() {
 		colSpan.SetAttributes(
@@ -366,7 +356,9 @@ func (e *blockComputer) executeCollection(
 			return txIndex, err
 		}
 	}
-	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
+	viewSnapshot := collectionView.(*delta.View).Interactions()
+	res.AddStateSnapshot(viewSnapshot)
+	res.UpdateTransactionResultIndex(len(collection.Transactions))
 	e.log.Info().Str("collectionID", collection.Guarantee.CollectionID.String()).
 		Str("referenceBlockID", collection.Guarantee.ReferenceBlockID.String()).
 		Hex("blockID", logging.Entity(blockCtx.BlockHeader)).
@@ -374,8 +366,15 @@ func (e *blockComputer) executeCollection(
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("collection executed")
 
-	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt), res.ComputationUsed-computationUsedUpToNow, len(collection.Transactions))
-
+	compUsed, memUsed := res.ChunkComputationAndMemoryUsed(collectionIndex)
+	eventCounts, eventSize := res.ChunkEventCountsAndSize(collectionIndex)
+	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt),
+		compUsed, memUsed,
+		eventCounts, eventSize,
+		viewSnapshot.NumberOfRegistersTouched,
+		viewSnapshot.NumberOfBytesWrittenToRegisters,
+		len(collection.Transactions),
+	)
 	return txIndex, nil
 }
 
@@ -433,7 +432,7 @@ func (e *blockComputer) executeTransaction(
 			Bool("system_chunk", isSystemChunk).
 			Logger()),
 	)
-	err := e.vm.RunV2(childCtx, tx, txView)
+	err := e.vm.Run(childCtx, tx, txView)
 	if err != nil {
 		return fmt.Errorf("failed to execute transaction %v for block %v at height %v: %w",
 			txID.String(),
@@ -445,6 +444,7 @@ func (e *blockComputer) executeTransaction(
 	txResult := flow.TransactionResult{
 		TransactionID:   tx.ID,
 		ComputationUsed: tx.ComputationUsed,
+		MemoryUsed:      tx.MemoryEstimate,
 	}
 
 	if tx.Err != nil {
@@ -466,7 +466,9 @@ func (e *blockComputer) executeTransaction(
 	res.AddEvents(collectionIndex, tx.Events)
 	res.AddServiceEvents(tx.ServiceEvents)
 	res.AddTransactionResult(&txResult)
-	res.AddComputationUsed(tx.ComputationUsed)
+	if tx.IsSampled() {
+		res.MergeComputationEffortVector(tx.ComputationIntensities)
+	}
 
 	memAllocAfter := debug.GetHeapAllocsBytes()
 
@@ -492,9 +494,10 @@ func (e *blockComputer) executeTransaction(
 	e.metrics.ExecutionTransactionExecuted(
 		time.Since(startedAt),
 		tx.ComputationUsed,
-		memAllocAfter-memAllocBefore,
 		tx.MemoryEstimate,
+		memAllocAfter-memAllocBefore,
 		len(tx.Events),
+		flow.EventsList(tx.Events).ByteSize(),
 		tx.Err != nil,
 	)
 	return nil
@@ -518,6 +521,7 @@ type blockCommitter struct {
 	views     chan state.View
 	closeOnce sync.Once
 	blockSpan otelTrace.Span
+	metrics   module.ExecutionMetrics
 
 	res *execution.ComputationResult
 }

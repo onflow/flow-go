@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module"
 )
 
 var _ commands.AdminCommand = (*GetIdentityCommand)(nil)
@@ -30,7 +30,7 @@ type getIdentityRequestData struct {
 }
 
 type GetIdentityCommand struct {
-	idProvider id.IdentityProvider
+	idProvider module.IdentityProvider
 }
 
 func (r *GetIdentityCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
@@ -90,7 +90,7 @@ func (r *GetIdentityCommand) Validator(req *admin.CommandRequest) error {
 	}
 }
 
-func NewGetIdentityCommand(idProvider id.IdentityProvider) commands.AdminCommand {
+func NewGetIdentityCommand(idProvider module.IdentityProvider) commands.AdminCommand {
 	return &GetIdentityCommand{
 		idProvider: idProvider,
 	}
