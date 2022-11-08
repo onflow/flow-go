@@ -19,10 +19,7 @@ import (
 type TimerInfo struct {
 	// View is round at which timer was created.
 	View uint64
-	// Tick is the number of times a timeout event has been emitted for this view (beginning with 0).
-	// It is used to de-duplicate TimeoutObject re-broadcasts.
-	Tick uint64
-	// StartTime represents time of entering the view
+	// StartTime represents time of entering the view.
 	StartTime time.Time
 	// Duration is how long we waited before timing out the view.
 	// It does not include subsequent timeouts (ie. all timeout events emitted for the same
@@ -53,6 +50,14 @@ type TimeoutObject struct {
 	// SigData is a BLS signature created by staking key signing View + NewestQC.View
 	// This signature is further aggregated in TimeoutCertificate.
 	SigData crypto.Signature
+	// TimeoutTick is the number of times the `timeout.Controller` has (re-)emitted the
+	// timeout for this view. Initially, when the view just starts, TimeoutTick is zero
+	// because the view has not yet timed out. When the timer expires, an event is emitted and TimeoutObject
+	// is created. Subsequently, `timeout.Controller` repeatedly emits new events based on some internal heuristic,
+	// where new timeout objects are not created but TimeoutTick is incremented each time.
+	// This field is not part of timeout object ID. Thereby, two timeouts are identical if only they differ
+	// by their TimeoutTick value.
+	TimeoutTick uint64
 }
 
 // ID returns the TimeoutObject's identifier
@@ -74,19 +79,27 @@ func (t *TimeoutObject) ID() flow.Identifier {
 }
 
 func (t *TimeoutObject) String() string {
-	return fmt.Sprintf("View: %d, HighestQC.View: %d, LastViewTC: %v", t.View, t.NewestQC.View, t.LastViewTC)
+	return fmt.Sprintf(
+		"View: %d, HighestQC.View: %d, LastViewTC: %v, TimeoutTick: %d",
+		t.View,
+		t.NewestQC.View,
+		t.LastViewTC,
+		t.TimeoutTick,
+	)
 }
 
 // LogContext returns a `zerolog.Contex` including the most important properties of the TC:
 //   - view number that this TC is for
 //   - view and ID of the block that the included QC points to
+//   - number of times this timeout was created
 //   - [optional] if the TC also includes a TC for the prior view, i.e. `LastViewTC` ≠ nil:
 //     the new of `LastViewTC` and the view that `LastViewTC.NewestQC` is for
 func (t *TimeoutObject) LogContext(logger zerolog.Logger) zerolog.Context {
 	logContext := logger.With().
 		Uint64("timeout_newest_qc_view", t.NewestQC.View).
 		Hex("timeout_newest_qc_block_id", t.NewestQC.BlockID[:]).
-		Uint64("timeout_view", t.View)
+		Uint64("timeout_view", t.View).
+		Uint64("timeout_tick", t.TimeoutTick)
 
 	if t.LastViewTC != nil {
 		logContext.
