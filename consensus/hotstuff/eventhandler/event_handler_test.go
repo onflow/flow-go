@@ -1114,12 +1114,3 @@ func createProposal(view uint64, qcview uint64) *model.Proposal {
 		SigData: nil,
 	}
 }
-
-func createTimerInfo(view uint64) model.TimerInfo {
-	return model.TimerInfo{
-		View:      view,
-		Tick:      0,
-		StartTime: time.Now().UTC(),
-		Duration:  time.Duration(minRepTimeout * 1e6),
-	}
-}

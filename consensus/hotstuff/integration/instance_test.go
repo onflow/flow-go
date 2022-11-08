@@ -94,7 +94,7 @@ func (_m *MockedCommunicatorConsumer) OnOwnProposal(proposal *flow.Header, targe
 
 // OnOwnTimeout provides a mock function with given fields: timeout
 func (_m *MockedCommunicatorConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
-	_m.Called(timeout, timeoutTick)
+	_m.Called(timeout)
 }
 
 // OnOwnVote provides a mock function with given fields: blockID, view, sigData, recipientID
@@ -538,7 +538,7 @@ func (in *Instance) Run() error {
 
 		// we handle timeouts with priority
 		select {
-		case timerInfo := <-in.handler.TimeoutChannel():
+		case <-in.handler.TimeoutChannel():
 			err := in.handler.OnLocalTimeout()
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
@@ -553,7 +553,7 @@ func (in *Instance) Run() error {
 
 		// otherwise, process first received event
 		select {
-		case timerInfo := <-in.handler.TimeoutChannel():
+		case <-in.handler.TimeoutChannel():
 			err := in.handler.OnLocalTimeout()
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
