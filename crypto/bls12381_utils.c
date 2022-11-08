@@ -273,11 +273,14 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 
 // ep_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
 // len is the size of the input buffer.
-// The serialization is following:
+//
+// The resulting point is guaranteed to be on the curve E1.
+// The serialization follows:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_read_bin
 //
-// It returns RLC_OK if the inputs are valid and the execution completes, and RLC_ERR otherwise.
+// It returns RLC_OK if the inputs are valid (input buffer lengths are valid and coordinates correspond
+// to a point on curve) and the execution completes, and RLC_ERR otherwise.
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     // check the length
     const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
@@ -322,11 +325,16 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
 
     if (G1_SERIALIZATION == UNCOMPRESSED) {
         fp_read_bin(a->y, bin + Fp_BYTES, Fp_BYTES);
+        // check read point is on curve
+        if (!ep_on_curve(a)) {
+            return RLC_ERR;
+        }
         return RLC_OK;
     }
     fp_zero(a->y);
     fp_set_bit(a->y, 0, y_sign);
     if (ep_upk(a, a) == 1) {
+        // resulting point is guaranteed to be on curve
         return RLC_OK;
     }
     return RLC_ERR;
@@ -383,8 +391,10 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
 }
 
 // ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
+// The resulting point is guaranteed to be on curve E2.
 //
-// It returns RLC_OK if the inputs are valid and the execution completes and RLC_ERR otherwise.
+// It returns RLC_OK if the inputs are valid (input buffer lengths are valid and read coordinates
+// correspond to a point on curve) and the execution completes and RLC_ERR otherwise.
 // The code is a modified version of Relic ep2_read_bin
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     // check the length
@@ -432,6 +442,10 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
 
     if (G2_SERIALIZATION == UNCOMPRESSED) {
         fp2_read_bin(a->y, bin + Fp2_BYTES, Fp2_BYTES);
+        // check read point is on curve
+        if (!ep2_on_curve(a)) {
+            return RLC_ERR;
+        }
         return RLC_OK;
     }
     
@@ -439,6 +453,7 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     fp_set_bit(a->y[0], 0, y_sign);
     fp_zero(a->y[1]);
     if (ep2_upk(a, a) == 1) {
+        // resulting point is guaranteed to be on curve
         return RLC_OK;
     }
     return RLC_ERR;
@@ -502,7 +517,7 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
     if (read_ret != RLC_OK) 
         return read_ret;
 
-    // check s1 is on curve and in G1
+    // check s1 is in G1
     if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
         return INVALID;
 
@@ -512,7 +527,7 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
     if (read_ret != RLC_OK) 
         return read_ret;
 
-    // check s2 is on curve and in G1
+    // check s2 in G1
     if (check_membership_G1(elemsG1[1]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
         return INVALID; 
 
