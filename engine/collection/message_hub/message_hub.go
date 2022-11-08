@@ -441,17 +441,16 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 		h.voteAggregator.AddVote(v)
 	case *messages.ClusterTimeoutObject:
 		t := &model.TimeoutObject{
-			View:       msg.View,
-			NewestQC:   msg.NewestQC,
-			LastViewTC: msg.LastViewTC,
-			SignerID:   originID,
-			SigData:    msg.SigData,
+			View:        msg.View,
+			NewestQC:    msg.NewestQC,
+			LastViewTC:  msg.LastViewTC,
+			SignerID:    originID,
+			SigData:     msg.SigData,
+			TimeoutTick: msg.TimeoutTick,
 		}
-		h.log.Info().
-			Hex("origin_id", originID[:]).
-			Uint64("view", t.View).
-			Str("timeout_id", t.ID().String()).
-			Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
+		log := t.LogContext(h.log).Logger()
+		log.Info().Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
+
 		// forward the timeout to hotstuff for processing
 		h.timeoutAggregator.AddTimeout(t)
 	default:
