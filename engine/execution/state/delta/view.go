@@ -65,15 +65,15 @@ func NewView(readFunc GetRegisterFunc) *View {
 func (v *View) Interactions() *SpockSnapshot {
 
 	var delta = Delta{
-		Data: make(map[flow.RegisterID]flow.RegisterEntry, len(v.delta.Data)),
+		Data: make(map[flow.RegisterID]flow.RegisterValue, len(v.delta.Data)),
 	}
 	var reads = make(map[flow.RegisterID]struct{}, len(v.regTouchSet))
 
 	bytesWrittenToRegisters := 0
-	//copy data
+	// copy data
 	for s, value := range v.delta.Data {
 		delta.Data[s] = value
-		bytesWrittenToRegisters += len(value.Value)
+		bytesWrittenToRegisters += len(value)
 	}
 
 	for k := range v.regTouchSet {

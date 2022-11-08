@@ -10,13 +10,13 @@ import (
 
 // A Delta is a record of ledger mutations.
 type Delta struct {
-	Data map[flow.RegisterID]flow.RegisterEntry
+	Data map[flow.RegisterID]flow.RegisterValue
 }
 
 // NewDelta returns an empty ledger delta.
 func NewDelta() Delta {
 	return Delta{
-		Data: make(map[flow.RegisterID]flow.RegisterEntry),
+		Data: make(map[flow.RegisterID]flow.RegisterValue),
 	}
 }
 
@@ -26,25 +26,21 @@ func NewDelta() Delta {
 // Second return parameters indicated if the value has been set/deleted in this delta
 func (d Delta) Get(owner, key string) (flow.RegisterValue, bool) {
 	value, set := d.Data[flow.NewRegisterID(owner, key)]
-	return value.Value, set
+	return value, set
 }
 
 // Set records an update in this delta.
 func (d Delta) Set(owner, key string, value flow.RegisterValue) {
 	k := flow.NewRegisterID(owner, key)
-	d.Data[k] = flow.RegisterEntry{
-		Key:   k,
-		Value: value,
-	}
+	d.Data[k] = value
 }
 
 // RegisterUpdates returns all registers that were updated by this delta.
 // ids are returned sorted, in ascending order
 func (d Delta) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 	data := make(flow.RegisterEntries, 0, len(d.Data))
-
-	for _, v := range d.Data {
-		data = append(data, v)
+	for k, v := range d.Data {
+		data = append(data, flow.RegisterEntry{Key: k, Value: v})
 	}
 
 	sort.Sort(&data)
@@ -70,16 +66,16 @@ func (d Delta) MergeWith(delta Delta) {
 // RegisterIDs returns the list of registerIDs inside this delta
 func (d Delta) RegisterIDs() []flow.RegisterID {
 	ids := make([]flow.RegisterID, 0, len(d.Data))
-	for _, v := range d.Data {
-		ids = append(ids, v.Key)
+	for k := range d.Data {
+		ids = append(ids, k)
 	}
 	return ids
 }
 
 func (d Delta) MarshalJSON() ([]byte, error) {
 	m := make(flow.RegisterEntries, len(d.Data))
-	for _, value := range d.Data {
-		m = append(m, value)
+	for key, value := range d.Data {
+		m = append(m, flow.RegisterEntry{Key: key, Value: value})
 	}
 	return json.Marshal(m)
 }
@@ -92,10 +88,10 @@ func (d *Delta) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return fmt.Errorf("cannot umarshal Delta: %w", err)
 	}
-	dd := make(map[flow.RegisterID]flow.RegisterEntry, len(m))
+	dd := make(map[flow.RegisterID]flow.RegisterValue, len(m))
 
 	for _, value := range m {
-		dd[value.Key] = value
+		dd[value.Key] = value.Value
 	}
 
 	d.Data = dd
