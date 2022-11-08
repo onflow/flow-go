@@ -74,7 +74,7 @@ func (t *Controller) StartTimeout(ctx context.Context, view uint64) model.TimerI
 	// setup new timer:
 	// when round duration is small react with faster timeout rebroadcasts
 	duration := t.ReplicaTimeout()
-	tickInterval := time.Duration(math.Min(float64(duration.Milliseconds()), t.cfg.MaxTimeoutObjectRebroadcastInterval))
+	tickInterval := time.Duration(math.Min(float64(duration.Milliseconds()), t.cfg.MaxTimeoutObjectRebroadcastInterval) * float64(time.Millisecond))
 	timerInfo := model.TimerInfo{View: view, StartTime: time.Now().UTC(), Duration: duration}
 	t.timeoutChannel = make(chan time.Time, 1)
 

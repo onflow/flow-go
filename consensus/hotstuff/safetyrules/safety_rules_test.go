@@ -490,7 +490,10 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 
 	s.persister.AssertCalled(s.T(), "PutSafetyData", expectedSafetyData)
 
-	// producing timeout with same arguments should return cached version
+	// producing timeout with same arguments should return cached version but with incremented timeout tick
+	expectedTimeout.TimeoutTick++
+	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
+
 	otherTimeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), timeout, otherTimeout)

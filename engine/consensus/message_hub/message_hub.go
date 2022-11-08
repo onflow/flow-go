@@ -234,7 +234,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 func (h *MessageHub) processQueuedTimeout(timeout *messages.TimeoutObject) error {
 	logContext := h.log.With().
 		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
-		Uint64("timeout_tick", timeout.Seq).
+		Uint64("timeout_tick", timeout.TimeoutTick).
 		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
 		Uint64("timeout_view", timeout.View)
 
@@ -421,11 +421,11 @@ func (h *MessageHub) OnOwnVote(blockID flow.Identifier, view uint64, sigData []b
 // OnOwnTimeout queues timeout for subsequent sending
 func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 	if ok := h.ownOutboundTimeouts.Push(&messages.TimeoutObject{
-		Seq:        timeoutTick,
-		View:       timeout.View,
-		NewestQC:   timeout.NewestQC,
-		LastViewTC: timeout.LastViewTC,
-		SigData:    timeout.SigData,
+		TimeoutTick: timeout.TimeoutTick,
+		View:        timeout.View,
+		NewestQC:    timeout.NewestQC,
+		LastViewTC:  timeout.LastViewTC,
+		SigData:     timeout.SigData,
 	}); ok {
 		h.ownOutboundMessageNotifier.Notify()
 	}

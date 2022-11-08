@@ -41,7 +41,7 @@ type EventLoopTestSuite struct {
 func (s *EventLoopTestSuite) SetupTest() {
 	s.eh = mocks.NewEventHandler(s.T())
 	s.eh.On("Start", mock.Anything).Return(nil).Maybe()
-	s.eh.On("TimeoutChannel").Return(make(<-chan model.TimerInfo, 1)).Maybe()
+	s.eh.On("TimeoutChannel").Return(make(<-chan time.Time, 1)).Maybe()
 	s.eh.On("OnLocalTimeout", mock.Anything).Return(nil).Maybe()
 
 	log := zerolog.New(io.Discard)
@@ -203,14 +203,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), eh, time.Time{})
 	require.NoError(t, err)
 
-	timeoutChannel := make(chan model.TimerInfo, 1)
-	var recvTimeoutChannel <-chan model.TimerInfo = timeoutChannel
-	go func() {
-		<-time.After(100 * time.Millisecond)
-		timeoutChannel <- model.TimerInfo{View: 10}
-	}()
-
-	eh.On("TimeoutChannel").Return(recvTimeoutChannel)
+	eh.On("TimeoutChannel").Return(time.After(100 * time.Millisecond))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
@@ -251,7 +244,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 func TestReadyDoneWithStartTime(t *testing.T) {
 	eh := &mocks.EventHandler{}
 	eh.On("Start", mock.Anything).Return(nil)
-	eh.On("TimeoutChannel").Return(make(<-chan model.TimerInfo, 1))
+	eh.On("TimeoutChannel").Return(make(<-chan time.Time, 1))
 	eh.On("OnLocalTimeout", mock.Anything).Return(nil)
 
 	metrics := metrics.NewNoopCollector()
