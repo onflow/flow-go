@@ -93,10 +93,6 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 		return nil, codec.NewInvalidEncodingErr(fmt.Errorf("empty data"))
 	}
 
-	if len(data) == 0 {
-		return nil, fmt.Errorf("invalid encoded message")
-	}
-
 	// decode the envelope
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":wire>3(cbor)payload2envelope")
 
