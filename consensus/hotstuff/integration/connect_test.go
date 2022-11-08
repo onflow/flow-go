@@ -30,15 +30,11 @@ func Connect(t *testing.T, instances []*Instance) {
 
 				// sender should always have the parent
 				sender.updatingBlocks.RLock()
-				parent, exists := sender.headers[header.ParentID]
+				_, exists := sender.headers[header.ParentID]
 				sender.updatingBlocks.RUnlock()
 				if !exists {
 					t.Fatalf("parent for proposal not found (sender: %x, parent: %x)", sender.localID, header.ParentID)
 				}
-
-				// fill in the header chain ID and height
-				header.ChainID = parent.ChainID
-				header.Height = parent.Height + 1
 
 				// convert into proposal immediately
 				proposal := model.ProposalFromFlow(header)
