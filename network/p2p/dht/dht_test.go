@@ -12,14 +12,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/network/p2p/dht"
-
-	"github.com/onflow/flow-go/network/p2p/internal/p2pfixtures"
-
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/dht"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -30,19 +30,20 @@ const ticksForAssertEventually = 10 * time.Millisecond
 // able to create new streams with peers even without knowing their address info beforehand.
 func TestFindPeerWithDHT(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	count := 10
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
 	sporkId := unittest.IdentifierFixture()
-	dhtServerNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", 2, p2pfixtures.WithDHTOptions(dht.AsServer()))
+	dhtServerNodes, _ := p2pfixtures.NodesFixture(t, sporkId, "dht_test", 2, p2pfixtures.WithDHTOptions(dht.AsServer()))
 	require.Len(t, dhtServerNodes, 2)
 
-	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", count-2, p2pfixtures.WithDHTOptions(dht.AsClient()))
+	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, sporkId, "dht_test", count-2, p2pfixtures.WithDHTOptions(dht.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	defer p2pfixtures.StopNodes(t, nodes)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	getDhtServerAddr := func(i uint) peer.AddrInfo {
 		return peer.AddrInfo{ID: dhtServerNodes[i].Host().ID(), Addrs: dhtServerNodes[i].Host().Addrs()}
@@ -96,7 +97,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_FLAKY, "failing on CI")
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	topic := channels.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 5
@@ -119,15 +120,16 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 	// create one node running the DHT Server (mimicking the staked AN)
-	dhtServerNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", 1, p2pfixtures.WithDHTOptions(dht.AsServer()))
+	dhtServerNodes, _ := p2pfixtures.NodesFixture(t, sporkId, "dht_test", 1, p2pfixtures.WithDHTOptions(dht.AsServer()))
 	require.Len(t, dhtServerNodes, 1)
 	dhtServerNode := dhtServerNodes[0]
 
 	// crate other nodes running the DHT Client (mimicking the unstaked ANs)
-	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, ctx, sporkId, "dht_test", count-1, p2pfixtures.WithDHTOptions(dht.AsClient()))
+	dhtClientNodes, _ := p2pfixtures.NodesFixture(t, sporkId, "dht_test", count-1, p2pfixtures.WithDHTOptions(dht.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	defer p2pfixtures.StopNodes(t, nodes)
+	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// Step 2: Connect all nodes running a DHT client to the node running the DHT server
 	// This has to be done before subscribing to any topic, otherwise the node gives up on advertising
@@ -154,8 +156,11 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	data, err := msg.Marshal()
 	require.NoError(t, err)
 
+	logger := unittest.Logger()
+
+	topicValidator := flowpubsub.TopicValidator(logger, codec, unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
 	for _, n := range nodes {
-		s, err := n.Subscribe(topic, codec, unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+		s, err := n.Subscribe(topic, topicValidator)
 		require.NoError(t, err)
 
 		go func(s *pubsub.Subscription, nodeID peer.ID) {

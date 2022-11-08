@@ -15,15 +15,15 @@ type WeightedSignatureAggregator struct {
 }
 
 // Aggregate provides a mock function with given fields:
-func (_m *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
+func (_m *WeightedSignatureAggregator) Aggregate() (flow.IdentifierList, []byte, error) {
 	ret := _m.Called()
 
-	var r0 []flow.Identifier
-	if rf, ok := ret.Get(0).(func() []flow.Identifier); ok {
+	var r0 flow.IdentifierList
+	if rf, ok := ret.Get(0).(func() flow.IdentifierList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Identifier)
+			r0 = ret.Get(0).(flow.IdentifierList)
 		}
 	}
 

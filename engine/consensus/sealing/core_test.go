@@ -558,7 +558,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	}
 
 	// the sealing Core requires approvals from both verifiers for each chunk
-	_, err := s.setter.SetRequiredApprovalsForSealingConstruction(2)
+	err := s.setter.SetRequiredApprovalsForSealingConstruction(2)
 	require.NoError(s.T(), err)
 
 	// populate the incorporated-results tree with:
