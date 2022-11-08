@@ -2,6 +2,7 @@ package level1
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -9,7 +10,6 @@ import (
 
 type Bootstrap struct {
 	jsonInput string
-	nodeData  []NodeData
 }
 
 type NodeData struct {
@@ -58,5 +58,25 @@ func (b *Bootstrap) GenTemplateData(outputToFile bool) []NodeData {
 			Name: name,
 		})
 	}
+
+	if outputToFile {
+		nodeDataBytes, err := json.MarshalIndent(nodeDataList, "", "    ")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// create the file
+		f, err := os.Create("template-data.json")
+		if err != nil {
+			fmt.Println(err)
+		}
+		defer f.Close()
+
+		_, e := f.WriteString(string(nodeDataBytes))
+		if e != nil {
+			log.Fatal(e)
+		}
+	}
+
 	return nodeDataList
 }

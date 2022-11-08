@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-// sample test run
+// sample usage:
 // go run cmd/level2/template.go --data "./testdata/level2/data/values8-verification-nodes-if-loop.json" --template "./testdata/level2/templates/values8-verification-nodes-if-loop.yml" --file=true
 func main() {
 	dataFlag := flag.String("data", "", "Path to JSON data.")
