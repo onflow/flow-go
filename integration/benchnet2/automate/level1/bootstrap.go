@@ -2,9 +2,9 @@ package level1
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 type Bootstrap struct {
@@ -13,9 +13,9 @@ type Bootstrap struct {
 }
 
 type NodeData struct {
-	id   string
-	name string
-	role string
+	Id   string `json:"node_id"`
+	Name string `json:"name"`
+	Role string `json:"group"`
 }
 
 func NewBootstrap(jsonInput string) Bootstrap {
@@ -39,20 +39,31 @@ func (b *Bootstrap) GenTemplateData(outputToFile bool) string {
 		log.Fatal(err)
 	}
 
-	// examine "Identities" section for list of node data to extract
+	// examine "Identities" section for list of node data to extract and build out node data list
 	identities := dataMap["Identities"].([]interface{})
+	var nodeDataList []NodeData
 
-	for index, identity := range identities {
-		fmt.Println("Reading Value for Key :", index)
-		fmt.Println("identity: ", identity)
+	for _, identity := range identities {
 		identityMap := identity.(map[string]interface{})
-		nodeID := identityMap["NodeID"]
-		fmt.Println("NodeID: ", nodeID)
-		role := identityMap["Role"]
-		fmt.Println("Role: ", role)
-		address := identityMap["Address"]
-		fmt.Println("Address: ", address)
+		nodeID := identityMap["NodeID"].(string)
+		role := identityMap["Role"].(string)
+		address := identityMap["Address"].(string)
+		// address will be in format: "verification1.:3569" so we want to extract the name from before the '.'
+		name := strings.Split(address, ".")[0]
+
+		nodeDataList = append(nodeDataList, NodeData{
+			Id:   nodeID,
+			Role: role,
+			Name: name,
+		})
 	}
-	
-	return "{}"
+
+	templateData, err := json.Marshal(nodeDataList)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	templateDatStr := string(templateData)
+
+	return string(templateDatStr)
 }
