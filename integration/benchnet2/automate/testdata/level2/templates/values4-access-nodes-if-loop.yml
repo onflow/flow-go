@@ -43,7 +43,7 @@ access:
         targetPort: admin
     storage: 1G
   nodes:
-{{range $val := .}}{{if eq ($val.group) ("access")}}
+{{range $val := .}}{{if eq ($val.role) ("access")}}
     {{$val.name}}:
       args:
         - --bootstrapdir=/bootstrap
