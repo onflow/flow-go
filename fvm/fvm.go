@@ -22,6 +22,23 @@ const (
 	ScriptProcedureType      = ProcedureType("script")
 )
 
+type ProcedureExecutor interface {
+	Preprocess() error
+	Execute() error
+	Cleanup()
+}
+
+func run(executor ProcedureExecutor) error {
+	defer executor.Cleanup()
+
+	err := executor.Preprocess()
+	if err != nil {
+		return err
+	}
+
+	return executor.Execute()
+}
+
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
 	Run(
