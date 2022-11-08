@@ -15,7 +15,7 @@ type Bootstrap struct {
 type NodeData struct {
 	Id   string `json:"node_id"`
 	Name string `json:"name"`
-	Role string `json:"group"`
+	Role string `json:"role"`
 }
 
 func NewBootstrap(jsonInput string) Bootstrap {
