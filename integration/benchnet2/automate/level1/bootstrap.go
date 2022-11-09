@@ -9,7 +9,8 @@ import (
 )
 
 type Bootstrap struct {
-	jsonInput string
+	// Path to bootstrap JSON data
+	protocolJsonFilePath string
 }
 
 type NodeData struct {
@@ -18,15 +19,15 @@ type NodeData struct {
 	Role string `json:"role"`
 }
 
-func NewBootstrap(jsonInput string) Bootstrap {
+func NewBootstrap(protocolJsonFilePath string) Bootstrap {
 	return Bootstrap{
-		jsonInput: jsonInput,
+		protocolJsonFilePath: protocolJsonFilePath,
 	}
 }
 
 func (b *Bootstrap) GenTemplateData(outputToFile bool) []NodeData {
 	// load bootstrap file
-	dataBytes, err := os.ReadFile(b.jsonInput)
+	dataBytes, err := os.ReadFile(b.protocolJsonFilePath)
 	if err != nil {
 		log.Fatal(err)
 	}
