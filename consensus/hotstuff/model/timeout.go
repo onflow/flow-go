@@ -14,7 +14,7 @@ import (
 // observed evidence to transition to the next view (QC or TC). When a timeout occurs for
 // the first time in a view, we will broadcast a TimeoutObject and continue waiting for evidence
 // to enter the next view, but we will no longer submit a vote for this view. A timeout may occur
-// multiple times for the same round (indicated by Tick > 0), which is an indication
+// multiple times for the same round, which is an indication
 // to re-broadcast our TimeoutObject for the view, to ensure liveness.
 type TimerInfo struct {
 	// View is round at which timer was created.
@@ -51,10 +51,11 @@ type TimeoutObject struct {
 	// This signature is further aggregated in TimeoutCertificate.
 	SigData crypto.Signature
 	// TimeoutTick is the number of times the `timeout.Controller` has (re-)emitted the
-	// timeout for this view. Initially, when the view just starts, TimeoutTick is zero
-	// because the view has not yet timed out. When the timer expires, an event is emitted and TimeoutObject
-	// is created. Subsequently, `timeout.Controller` repeatedly emits new events based on some internal heuristic,
-	// where new timeout objects are not created but TimeoutTick is incremented each time.
+	// timeout for this view. When the timer for the view's original duration expires, a `TimeoutObject`
+	// with `TimeoutTick = 0` is broadcast. Subsequently, `timeout.Controller` re-broadcasts the
+	// `TimeoutObject` periodically  based on some internal heuristic. Each time we attempt a re-broadcast,
+	// the `TimeoutTick` is incremented. Incrementing the field prevents de-duplicated within the network layer,
+	// which in turn guarantees quick delivery of the `TimeoutObject` after GST and facilitates recovery.
 	// This field is not part of timeout object ID. Thereby, two timeouts are identical if only they differ
 	// by their TimeoutTick value.
 	TimeoutTick uint64
@@ -91,7 +92,7 @@ func (t *TimeoutObject) String() string {
 // LogContext returns a `zerolog.Contex` including the most important properties of the TC:
 //   - view number that this TC is for
 //   - view and ID of the block that the included QC points to
-//   - number of times this timeout was created
+//   - number of times a re-broadcast of this timeout was attempted
 //   - [optional] if the TC also includes a TC for the prior view, i.e. `LastViewTC` ≠ nil:
 //     the new of `LastViewTC` and the view that `LastViewTC.NewestQC` is for
 func (t *TimeoutObject) LogContext(logger zerolog.Logger) zerolog.Context {
