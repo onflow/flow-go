@@ -897,6 +897,8 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 	ctx := NewContextFromParent(parentCtx,
 		WithAccountStorageLimit(false),
 		WithTransactionFeesEnabled(false),
+		WithAuthorizationChecksEnabled(false),
+		WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
 
 	// use new derived transaction data for each meta transaction.
