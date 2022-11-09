@@ -282,20 +282,17 @@ func (s *State) MergeState(other *State) error {
 	return nil
 }
 
-type sortedAddresses []flow.Address
-
 // UpdatedAddresses returns a sorted list of addresses that were updated (at least 1 register update)
 func (s *State) UpdatedAddresses() []flow.Address {
-	addresses := make(sortedAddresses, len(s.updatedAddresses))
+	addresses := make([]flow.Address, 0, len(s.updatedAddresses))
 
-	i := 0
 	for k := range s.updatedAddresses {
-		addresses[i] = k
-		i++
+		addresses = append(addresses, k)
 	}
 
 	slices.SortFunc(addresses, func(a, b flow.Address) bool {
-		return bytes.Compare(a[:], b[:]) < 0
+		// reverse order to maintain compatibility with previous implementation.
+		return bytes.Compare(a[:], b[:]) >= 0
 	})
 
 	return addresses
