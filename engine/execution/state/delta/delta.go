@@ -3,7 +3,8 @@ package delta
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -38,19 +39,18 @@ func (d Delta) Set(owner, key string, value flow.RegisterValue) {
 // RegisterUpdates returns all registers that were updated by this delta.
 // ids are returned sorted, in ascending order
 func (d Delta) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	data := make(flow.RegisterEntries, 0, len(d.Data))
-	for k, v := range d.Data {
-		data = append(data, flow.RegisterEntry{Key: k, Value: v})
+	ids := make([]flow.RegisterID, 0, len(d.Data))
+	for k := range d.Data {
+		ids = append(ids, k)
 	}
 
-	sort.Sort(&data)
+	slices.SortFunc(ids, func(a, b flow.RegisterID) bool {
+		return (a.Owner < b.Owner) || (a.Owner == b.Owner && a.Key < b.Key)
+	})
 
-	ids := make([]flow.RegisterID, 0, len(d.Data))
-	values := make([]flow.RegisterValue, 0, len(d.Data))
-
-	for _, v := range data {
-		ids = append(ids, v.Key)
-		values = append(values, v.Value)
+	values := make([]flow.RegisterValue, len(d.Data))
+	for i, v := range ids {
+		values[i] = d.Data[v]
 	}
 
 	return ids, values
