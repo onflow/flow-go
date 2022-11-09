@@ -705,7 +705,7 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 
 	es.timeoutAggregator.On("AddTimeout", mock.Anything).Return().Once()
 
-	es.notifier.On("OnOwnTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("OnOwnTimeout", mock.Anything).Run(func(args mock.Arguments) {
 		timeoutObject, ok := args[0].(*model.TimeoutObject)
 		require.True(es.T(), ok)
 		// it should broadcast a TO with same view as endView
@@ -746,7 +746,7 @@ func (es *EventHandlerSuite) TestOnTimeout_SanityChecks() {
 	require.Equal(es.T(), tc, es.paceMaker.LastViewTC(), "invalid last view TC")
 	require.Equal(es.T(), qc, es.paceMaker.NewestQC(), "invalid newest QC")
 
-	es.notifier.On("OnOwnTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("OnOwnTimeout", mock.Anything).Run(func(args mock.Arguments) {
 		timeoutObject, ok := args[0].(*model.TimeoutObject)
 		require.True(es.T(), ok)
 		require.Equal(es.T(), es.endView, timeoutObject.View)
@@ -775,7 +775,7 @@ func (es *EventHandlerSuite) TestOnTimeout_ReplicaEjected() {
 		require.ErrorIs(es.T(), err, exception, "expect a wrapped exception")
 	})
 	es.timeoutAggregator.AssertNotCalled(es.T(), "AddTimeout", mock.Anything)
-	es.notifier.AssertNotCalled(es.T(), "OnOwnTimeout", mock.Anything, mock.Anything)
+	es.notifier.AssertNotCalled(es.T(), "OnOwnTimeout", mock.Anything)
 }
 
 // Test100Timeout tests that receiving 100 TCs for increasing views advances rounds
@@ -993,7 +993,7 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_ProducedTimeout() {
 		LastViewTC: nil,
 	}
 
-	es.notifier.On("OnOwnTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	es.notifier.On("OnOwnTimeout", mock.Anything).Run(func(args mock.Arguments) {
 		timeoutObject, ok := args[0].(*model.TimeoutObject)
 		require.True(es.T(), ok)
 		// it should broadcast a TO with same view as partialTc.View
@@ -1023,7 +1023,7 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_NotActiveView() {
 	// partial TC shouldn't trigger view change
 	require.Equal(es.T(), es.initView, es.paceMaker.CurView(), "incorrect view change")
 	// we don't want to create timeout if partial TC was delivered for view different than active one.
-	es.notifier.AssertNotCalled(es.T(), "OnOwnTimeout", mock.Anything, mock.Anything)
+	es.notifier.AssertNotCalled(es.T(), "OnOwnTimeout", mock.Anything)
 }
 
 // TestOnPartialTcCreated_QcAndTcProcessing tests that EventHandler processes QC and TC included in hotstuff.PartialTcCreated
@@ -1038,7 +1038,7 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_QcAndTcProcessing() {
 
 		es.endView++
 
-		es.notifier.On("OnOwnTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		es.notifier.On("OnOwnTimeout", mock.Anything).Run(func(args mock.Arguments) {
 			timeoutObject, ok := args[0].(*model.TimeoutObject)
 			require.True(es.T(), ok)
 			// it should broadcast a TO with same view as partialTc.View

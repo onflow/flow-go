@@ -42,7 +42,7 @@ func (s *EventLoopTestSuite) SetupTest() {
 	s.eh = mocks.NewEventHandler(s.T())
 	s.eh.On("Start", mock.Anything).Return(nil).Maybe()
 	s.eh.On("TimeoutChannel").Return(make(<-chan time.Time, 1)).Maybe()
-	s.eh.On("OnLocalTimeout", mock.Anything).Return(nil).Maybe()
+	s.eh.On("OnLocalTimeout").Return(nil).Maybe()
 
 	log := zerolog.New(io.Discard)
 
@@ -194,7 +194,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 	eh.On("Start", mock.Anything).Return(nil).Once()
 	eh.On("OnReceiveQc", mock.Anything).Return(nil).Maybe()
 	eh.On("OnReceiveProposal", mock.Anything).Return(nil).Maybe()
-	eh.On("OnLocalTimeout", mock.Anything).Run(func(args mock.Arguments) {
+	eh.On("OnLocalTimeout").Run(func(args mock.Arguments) {
 		processed.Store(true)
 	}).Return(nil).Once()
 
@@ -245,7 +245,7 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 	eh := &mocks.EventHandler{}
 	eh.On("Start", mock.Anything).Return(nil)
 	eh.On("TimeoutChannel").Return(make(<-chan time.Time, 1))
-	eh.On("OnLocalTimeout", mock.Anything).Return(nil)
+	eh.On("OnLocalTimeout").Return(nil)
 
 	metrics := metrics.NewNoopCollector()
 

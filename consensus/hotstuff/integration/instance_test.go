@@ -314,7 +314,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			in.ProcessBlock(proposal)
 		},
 	)
-	in.notifier.On("OnOwnTimeout", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	in.notifier.On("OnOwnTimeout", mock.Anything).Run(func(args mock.Arguments) {
 		timeoutObject, ok := args[0].(*model.TimeoutObject)
 		require.True(t, ok)
 		in.queue <- timeoutObject
