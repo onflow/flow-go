@@ -1004,6 +1004,10 @@ func BenchmarkAggregate(b *testing.B) {
 }
 
 func TestBLSIdentity(t *testing.T) {
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
+
 	var identitySig []byte
 	msg := []byte("random_message")
 	hasher := NewExpandMsgXOFKMAC128("")

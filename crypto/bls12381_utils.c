@@ -270,6 +270,43 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     ep_free(t);
  }
 
+// (int fp_read_bin_safe) is a modified version of Relic's (void fp_read_bin).
+// It reads a field element from a buffer and makes sure the big number read can be 
+// written as a field element (is reduced modulo p). 
+// Unlike Relic's versions, the function does not reduce the read integer modulo p and does
+// not throw an exception for an integer larger than p. The function returns RLC_OK if the input
+// corresponds to a field element, and returns RLC_ERR otherwise. 
+static int fp_read_bin_safe(fp_t a, const uint8_t *bin, int len) {
+	if (len != Fp_BYTES) {
+		return RLC_ERR;
+	}
+
+    int ret = RLC_ERR; 
+    bn_t t;
+    bn_new(t);
+    bn_read_bin(t, bin, Fp_BYTES);
+
+    // make sure read bn is reduced modulo p
+    // first check is sanity check, since current implementation of `bn_read_bin` insures
+    // output bn is positive
+    if (bn_sign(t) == RLC_NEG || bn_cmp(t, &core_get()->prime) != RLC_LT) {
+        goto out;
+    } 
+
+    if (bn_is_zero(t)) {
+        fp_zero(a);
+    } else {
+        if (t->used == 1) {
+            fp_prime_conv_dig(a, t->dp[0]);
+        } else {
+            fp_prime_conv(a, t);
+        }
+    }	
+    ret = RLC_OK;
+out:
+    bn_free(t);
+    return ret;
+}
 
 // ep_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
 // len is the size of the input buffer.
@@ -321,10 +358,14 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     byte temp[Fp_BYTES];
     memcpy(temp, bin, Fp_BYTES);
     temp[0] &= 0x1F;
-	fp_read_bin(a->x, temp, Fp_BYTES);
+	if (fp_read_bin_safe(a->x, temp, Fp_BYTES) != RLC_OK) {
+        return RLC_ERR;
+    }
 
-    if (G1_SERIALIZATION == UNCOMPRESSED) {
-        fp_read_bin(a->y, bin + Fp_BYTES, Fp_BYTES);
+    if (G1_SERIALIZATION == UNCOMPRESSED) { 
+        if (fp_read_bin_safe(a->y, bin + Fp_BYTES, Fp_BYTES) != RLC_OK) {
+            return RLC_ERR;
+        }
         // check read point is on curve
         if (!ep_on_curve(a)) {
             return RLC_ERR;
@@ -390,6 +431,25 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
     ep_free(t);
 }
 
+// (int fp2_read_bin_safe) is a modified version of Relic's (void fp2_read_bin).
+// It reads an Fp^2 element from a buffer and makes sure the big numbers read can be 
+// written as field elements (are reduced modulo p). 
+// Unlike Relic's versions, the function does not reduce the read integers modulo p and does
+// not throw an exception for integers larger than p. The function returns RLC_OK if the input
+// corresponds to a field element in Fp^2, and returns RLC_ERR otherwise.
+static int fp2_read_bin_safe(fp2_t a, const uint8_t *bin, int len) {
+	if (len != Fp2_BYTES) {
+		return RLC_ERR;
+	}
+	if (fp_read_bin_safe(a[0], bin, Fp_BYTES) != RLC_OK) {
+        return RLC_ERR;
+    }
+	if (fp_read_bin_safe(a[1], bin + Fp_BYTES, Fp_BYTES) != RLC_OK) {
+        return RLC_ERR;
+    }
+    return RLC_OK;
+}
+
 // ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
 // The resulting point is guaranteed to be on curve E2.
 //
@@ -438,10 +498,14 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     memcpy(temp, bin, Fp2_BYTES);
     // clear the header bits
     temp[0] &= 0x1F;
-    fp2_read_bin(a->x, temp, Fp2_BYTES);
+    if (fp2_read_bin_safe(a->x, temp, Fp2_BYTES) != RLC_OK) {
+        return RLC_ERR;
+    }
 
     if (G2_SERIALIZATION == UNCOMPRESSED) {
-        fp2_read_bin(a->y, bin + Fp2_BYTES, Fp2_BYTES);
+        if (fp2_read_bin_safe(a->y, bin + Fp2_BYTES, Fp2_BYTES) != RLC_OK){
+            return RLC_ERR;
+        }
         // check read point is on curve
         if (!ep2_on_curve(a)) {
             return RLC_ERR;
