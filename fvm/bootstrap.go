@@ -17,17 +17,60 @@ import (
 	"github.com/onflow/flow-go/module/epochs"
 )
 
+var (
+	DefaultAccountCreationFee = mustParseUFix64(
+		"account creation fee",
+		"0.00100000")
+
+	DefaultMinimumStorageReservation = mustParseUFix64(
+		"minimum storage reservation",
+		"0.00100000")
+
+	DefaultStorageMBPerFLOW = mustParseUFix64(
+		"storage mb per flow",
+		"100.00000000")
+
+	// DefaultTransactionFees are the default transaction fee parameters if
+	// transaction fees are on. Surge factor is 1.0, inclusion effort cost is
+	// 0.0001 (because the static inclusion effort is 1.0) and execution effort
+	// cost is 0.0 because dynamic execution fees are off. If they are off
+	// (which is the default behaviour) that means the transaction fees are 0.0.
+	DefaultTransactionFees = BootstrapProcedureFeeParameters{
+		SurgeFactor: mustParseUFix64("fee surge factor", "1.0"),
+		InclusionEffortCost: mustParseUFix64(
+			"fee inclusion effort cost",
+			"0.00001"),
+		ExecutionEffortCost: mustParseUFix64(
+			"fee execution effort cost",
+			"0.0"),
+	}
+)
+
+func mustParseUFix64(name string, valueString string) cadence.UFix64 {
+	value, err := cadence.NewUFix64(valueString)
+	if err != nil {
+		panic(fmt.Errorf("invalid default %s: %w", name, err))
+	}
+	return value
+}
+
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state
 // with the default accounts and contracts required by the Flow virtual machine.
 type BootstrapProcedure struct {
-	ctx       Context
-	txnState  *state.TransactionState
+	BootstrapParams
+
+	ctx      Context
+	txnState *state.TransactionState
+
+	accountCreator environment.BootstrapAccountCreator
+}
+
+type BootstrapParams struct {
 	rootBlock *flow.Header
 
 	// genesis parameters
 	accountKeys        BootstrapAccountKeys
 	initialTokenSupply cadence.UFix64
-	accountCreator     environment.BootstrapAccountCreator
 
 	accountCreationFee               cadence.UFix64
 	minimumStorageReservation        cadence.UFix64
@@ -75,54 +118,6 @@ func WithInitialTokenSupply(supply cadence.UFix64) BootstrapProcedureOption {
 		return bp
 	}
 }
-
-var DefaultAccountCreationFee = func() cadence.UFix64 {
-	value, err := cadence.NewUFix64("0.00100000")
-	if err != nil {
-		panic(fmt.Errorf("invalid default account creation fee: %w", err))
-	}
-	return value
-}()
-
-var DefaultMinimumStorageReservation = func() cadence.UFix64 {
-	value, err := cadence.NewUFix64("0.00100000")
-	if err != nil {
-		panic(fmt.Errorf("invalid default minimum storage reservation: %w", err))
-	}
-	return value
-}()
-
-var DefaultStorageMBPerFLOW = func() cadence.UFix64 {
-	value, err := cadence.NewUFix64("100.00000000")
-	if err != nil {
-		panic(fmt.Errorf("invalid default minimum storage reservation: %w", err))
-	}
-	return value
-}()
-
-// DefaultTransactionFees are the default transaction fee parameters if transaction fees are on.
-// surge factor is 1.0, inclusion effort cost is 0.0001 (because the static inclusion effort is 1.0) and
-// execution effort cost is 0.0 because dynamic execution fees are off
-// If they are off (which is the default behaviour) that means the transaction fees are 0.0.
-var DefaultTransactionFees = func() BootstrapProcedureFeeParameters {
-	surgeFactor, err := cadence.NewUFix64("1.0")
-	if err != nil {
-		panic(fmt.Errorf("invalid default fee surge factor: %w", err))
-	}
-	inclusionEffortCost, err := cadence.NewUFix64("0.00001")
-	if err != nil {
-		panic(fmt.Errorf("invalid default fee effort cost: %w", err))
-	}
-	executionEffortCost, err := cadence.NewUFix64("0.0")
-	if err != nil {
-		panic(fmt.Errorf("invalid default fee effort cost: %w", err))
-	}
-	return BootstrapProcedureFeeParameters{
-		SurgeFactor:         surgeFactor,
-		InclusionEffortCost: inclusionEffortCost,
-		ExecutionEffortCost: executionEffortCost,
-	}
-}()
 
 // WithBootstrapAccountKeys sets the public keys of the accounts that will be created during bootstrapping
 // by default all accounts are created with the ServiceAccountPublicKey specified when calling `Bootstrap`.
@@ -224,14 +219,16 @@ func Bootstrap(
 	opts ...BootstrapProcedureOption,
 ) *BootstrapProcedure {
 	bootstrapProcedure := &BootstrapProcedure{
-		transactionFees: BootstrapProcedureFeeParameters{0, 0, 0},
-		epochConfig:     epochs.DefaultEpochConfig(),
-	}
-	bootstrapProcedure.accountKeys = BootstrapAccountKeys{
-		ServiceAccountPublicKeys:       []flow.AccountPublicKey{serviceAccountPublicKey},
-		FungibleTokenAccountPublicKeys: []flow.AccountPublicKey{serviceAccountPublicKey},
-		FlowTokenAccountPublicKeys:     []flow.AccountPublicKey{serviceAccountPublicKey},
-		NodeAccountPublicKeys:          []flow.AccountPublicKey{serviceAccountPublicKey},
+		BootstrapParams: BootstrapParams{
+			accountKeys: BootstrapAccountKeys{
+				ServiceAccountPublicKeys:       []flow.AccountPublicKey{serviceAccountPublicKey},
+				FungibleTokenAccountPublicKeys: []flow.AccountPublicKey{serviceAccountPublicKey},
+				FlowTokenAccountPublicKeys:     []flow.AccountPublicKey{serviceAccountPublicKey},
+				NodeAccountPublicKeys:          []flow.AccountPublicKey{serviceAccountPublicKey},
+			},
+			transactionFees: BootstrapProcedureFeeParameters{0, 0, 0},
+			epochConfig:     epochs.DefaultEpochConfig(),
+		},
 	}
 
 	for _, applyOption := range opts {
