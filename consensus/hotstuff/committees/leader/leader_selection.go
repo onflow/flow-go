@@ -157,11 +157,11 @@ func weightedRandomSelection(
 
 	leaders := make([]uint16, 0, count)
 	for i := 0; i < count; i++ {
-		// pick a random number from 0 (inclusive) to cumsum (exclusive). Or [0, cumsum)
-		randomness := rng.UintN(cumsum)
+		// pick a random number [1, cumsum]
+		randomness := rng.UintN(cumsum) + 1
 
 		// binary search to find the leader index by the random number
-		leader, _ := slices.BinarySearch(weightSums, randomness+1)
+		leader, _ := slices.BinarySearch(weightSums, randomness)
 		leaders = append(leaders, uint16(leader))
 	}
 	return leaders, nil
