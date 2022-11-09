@@ -22,14 +22,10 @@ int get_sk_len() {
 // checks an input scalar a satisfies 0 < a < r
 // where (r) is the order of G1/G2
 int check_membership_Zr_star(const bn_t a){
-    int ret; // return value
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    if (bn_cmp(a,r) != RLC_LT || bn_cmp_dig(a, 0) != RLC_GT) ret = INVALID; 
-    else ret = VALID;
-    bn_free(r);
-    return ret;
+    if (bn_cmp(a, &core_get()->ep_r) != RLC_LT || bn_cmp_dig(a, 0) != RLC_GT) {
+        return INVALID; 
+    }
+    return VALID;
 }
 
 // Checks if input point s is in the subgroup G1. 
