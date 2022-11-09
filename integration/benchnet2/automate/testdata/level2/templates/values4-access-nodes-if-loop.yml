@@ -81,7 +81,7 @@ access:
           value: ""
         - name: BINSTAT_DMP_PATH
           value: ""
-      image: gcr.io/flow-container-registry/access:v0.27.6
+      image: gcr.io/flow-container-registry/access:{{$val.image_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
 collection:
