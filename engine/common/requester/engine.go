@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/vmihailenco/msgpack"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -34,19 +35,20 @@ type CreateFunc func() flow.Entity
 // on the flow network. It is the `request` part of the request-reply
 // pattern provided by the pair of generic exchange engines.
 type Engine struct {
-	unit     *engine.Unit
-	log      zerolog.Logger
-	cfg      Config
-	metrics  module.EngineMetrics
-	me       module.Local
-	state    protocol.State
-	con      network.Conduit
-	channel  channels.Channel
-	selector flow.IdentityFilter
-	create   CreateFunc
-	handle   HandleFunc
-	items    map[flow.Identifier]*Item
-	requests map[uint64]*messages.EntityRequest
+	unit                  *engine.Unit
+	log                   zerolog.Logger
+	cfg                   Config
+	metrics               module.EngineMetrics
+	me                    module.Local
+	state                 protocol.State
+	con                   network.Conduit
+	channel               channels.Channel
+	selector              flow.IdentityFilter
+	create                CreateFunc
+	handle                HandleFunc
+	items                 map[flow.Identifier]*Item
+	requests              map[uint64]*messages.EntityRequest
+	forcedDispatchOngoing *atomic.Bool // to ensure only trigger dispatching logic once at any time
 }
 
 // New creates a new requester engine, operating on the provided network channel, and requesting entities from a node
@@ -99,18 +101,19 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "requester").Logger(),
-		cfg:      cfg,
-		metrics:  metrics,
-		me:       me,
-		state:    state,
-		channel:  channel,
-		selector: selector,
-		create:   create,
-		handle:   nil,
-		items:    make(map[flow.Identifier]*Item),          // holds all pending items
-		requests: make(map[uint64]*messages.EntityRequest), // holds all sent requests
+		unit:                  engine.NewUnit(),
+		log:                   log.With().Str("engine", "requester").Logger(),
+		cfg:                   cfg,
+		metrics:               metrics,
+		me:                    me,
+		state:                 state,
+		channel:               channel,
+		selector:              selector,
+		create:                create,
+		handle:                nil,
+		items:                 make(map[flow.Identifier]*Item),          // holds all pending items
+		requests:              make(map[uint64]*messages.EntityRequest), // holds all sent requests
+		forcedDispatchOngoing: atomic.NewBool(false),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -234,19 +237,31 @@ func (e *Engine) addEntityRequest(entityID flow.Identifier, selector flow.Identi
 // Force will force the requester engine to dispatch all currently
 // valid batch requests.
 func (e *Engine) Force() {
-	count := uint(0)
-	for {
-		dispatched, err := e.dispatchRequest()
-		if err != nil {
-			e.log.Error().Err(err).Msg("could not dispatch requests")
-			return
-		}
-		if !dispatched {
-			e.log.Debug().Uint("requests", count).Msg("forced request dispatch")
-			return
-		}
-		count++
+	// exit early in case a forced dispatch is currently ongoing
+	if e.forcedDispatchOngoing.Load() {
+		return
 	}
+
+	// using Launch to ensure the caller won't be blocked
+	e.unit.Launch(func() {
+		// using atomic bool to ensure there is at most one caller would trigger dispatching requests
+		if e.forcedDispatchOngoing.CompareAndSwap(false, true) {
+			count := uint(0)
+			for {
+				dispatched, err := e.dispatchRequest()
+				if err != nil {
+					e.log.Error().Err(err).Msg("could not dispatch requests")
+					break
+				}
+				if !dispatched {
+					e.log.Debug().Uint("requests", count).Msg("forced request dispatch")
+					break
+				}
+				count++
+			}
+			e.forcedDispatchOngoing.Store(false)
+		}
+	})
 }
 
 func (e *Engine) poll() {
@@ -259,6 +274,10 @@ PollLoop:
 			break PollLoop
 
 		case <-ticker.C:
+			if e.forcedDispatchOngoing.Load() {
+				return
+			}
+
 			dispatched, err := e.dispatchRequest()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not dispatch requests")
@@ -273,6 +292,11 @@ PollLoop:
 	ticker.Stop()
 }
 
+// dispatchRequest dispatches a subset of requests (selection based on internal heuristic).
+// While `dispatchRequest` sends a request (covering some but not necessarily all items),
+// if and only if there is something to request. In other words it cannot happen that
+// `dispatchRequest` sends no request, but there is something to be requested.
+// The boolean return value indicates whether a request was dispatched at all.
 func (e *Engine) dispatchRequest() (bool, error) {
 
 	e.unit.Lock()
