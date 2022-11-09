@@ -93,7 +93,7 @@ func (_m *Consumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView 
 }
 
 // OnReachedTimeout provides a mock function with given fields: timeout
-func (_m *Consumer) OnReachedTimeout(timeout *model.TimerInfo) {
+func (_m *Consumer) OnReachedTimeout(timeout model.TimerInfo) {
 	_m.Called(timeout)
 }
 
@@ -108,7 +108,7 @@ func (_m *Consumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
 }
 
 // OnStartingTimeout provides a mock function with given fields: _a0
-func (_m *Consumer) OnStartingTimeout(_a0 *model.TimerInfo) {
+func (_m *Consumer) OnStartingTimeout(_a0 model.TimerInfo) {
 	_m.Called(_a0)
 }
 
