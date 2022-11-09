@@ -33,7 +33,7 @@ func initTimeoutController(t *testing.T) *Controller {
 // Test_TimeoutInitialization timeouts are initialized and reported properly
 func Test_TimeoutInitialization(t *testing.T) {
 	tc := initTimeoutController(t)
-	assert.Equal(t, tc.ReplicaTimeout().Milliseconds(), int64(minRepTimeout))
+	assert.Equal(t, tc.replicaTimeout().Milliseconds(), int64(minRepTimeout))
 
 	// verify that initially returned timeout channel is closed and `nil` is returned as `TimerInfo`
 	select {
@@ -57,7 +57,7 @@ func Test_TimeoutIncrease(t *testing.T) {
 	for r := 1; r <= 10; r += 1 {
 		tc.OnTimeout()
 		assert.Equal(t,
-			tc.ReplicaTimeout().Milliseconds(),
+			tc.replicaTimeout().Milliseconds(),
 			int64(minRepTimeout*math.Pow(timeoutAdjustmentFactor, float64(r))),
 		)
 	}
@@ -77,7 +77,7 @@ func Test_TimeoutDecrease(t *testing.T) {
 	for ; r > happyPathMaxRoundFailures; r-- {
 		tc.OnProgressBeforeTimeout()
 		assert.Equal(t,
-			tc.ReplicaTimeout().Milliseconds(),
+			tc.replicaTimeout().Milliseconds(),
 			int64(minRepTimeout*math.Pow(timeoutAdjustmentFactor, float64(r-1-happyPathMaxRoundFailures))),
 		)
 	}
@@ -98,7 +98,7 @@ func Test_MinCutoff(t *testing.T) {
 	tc.OnProgressBeforeTimeout() // replica timeout decreases 100 -> 100 * 2/3 = max(66.6, 100) = 100
 
 	tc.OnProgressBeforeTimeout()
-	assert.Equal(t, tc.ReplicaTimeout().Milliseconds(), int64(minRepTimeout))
+	assert.Equal(t, tc.replicaTimeout().Milliseconds(), int64(minRepTimeout))
 }
 
 // Test_MaxCutoff verifies that timeout does not increase beyond timeout cap
@@ -116,7 +116,7 @@ func Test_MaxCutoff(t *testing.T) {
 			unboundedReferenceTimeout *= timeoutAdjustmentFactor
 		}
 		if unboundedReferenceTimeout > maxRepTimeout {
-			assert.True(t, float64(tc.ReplicaTimeout().Milliseconds()) <= maxRepTimeout)
+			assert.True(t, float64(tc.replicaTimeout().Milliseconds()) <= maxRepTimeout)
 			return // end of test
 		}
 	}
@@ -141,7 +141,7 @@ func Test_CombinedIncreaseDecreaseDynamics(t *testing.T) {
 		}
 
 		expectedRepTimeout := minRepTimeout * math.Pow(timeoutAdjustmentFactor, float64(numberIncreases-numberDecreases))
-		numericalError := math.Abs(expectedRepTimeout - float64(tc.ReplicaTimeout().Milliseconds()))
+		numericalError := math.Abs(expectedRepTimeout - float64(tc.replicaTimeout().Milliseconds()))
 		require.LessOrEqual(t, numericalError, 1.0) // at most one millisecond numerical error
 	}
 
