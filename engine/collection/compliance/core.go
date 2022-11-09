@@ -27,8 +27,8 @@ import (
 // Core contains the central business logic for the collector clusters' compliance engine.
 // It is responsible for handling communication for the embedded consensus algorithm.
 // CAUTION with CONCURRENCY:
-//   - At the moment, compliance.Core  _can not_ process blocks concurrently. Callers of `OnBlockProposal`
-//     needs to ensure single thread access.
+//   - At the moment, compliance.Core _can not_ process blocks concurrently. Callers of `OnBlockProposal`
+//     need to ensure single-threaded access.
 //   - The only exception is calls to `ProcessFinalizedView`, which is the only concurrency-safe
 //     method of compliance.Core
 type Core struct {

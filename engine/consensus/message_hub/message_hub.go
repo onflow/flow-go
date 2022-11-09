@@ -173,7 +173,7 @@ func (h *MessageHub) queuedMessagesProcessingLoop(ctx irrecoverable.SignalerCont
 		case <-ctx.Done():
 			return
 		case <-notifier:
-			err := h.processQueuedMessages(ctx)
+			err := h.sendOwnMessages(ctx)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("internal error processing queued messages: %w", err))
 				return
@@ -182,10 +182,10 @@ func (h *MessageHub) queuedMessagesProcessingLoop(ctx irrecoverable.SignalerCont
 	}
 }
 
-// processQueuedMessages is a function which dispatches previously queued messages on worker thread
+// sendOwnMessages is a function which dispatches previously queued messages on worker thread
 // This function is called whenever we have queued messages ready to be dispatched.
 // No errors are expected during normal operations.
-func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
+func (h *MessageHub) sendOwnMessages(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -196,7 +196,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 		msg, ok := h.ownOutboundProposals.Pop()
 		if ok {
 			block := msg.(*flow.Header)
-			err := h.processQueuedProposal(block)
+			err := h.sendOwnProposal(block)
 			if err != nil {
 				return fmt.Errorf("could not process queued block %v: %w", block.ID(), err)
 			}
@@ -206,7 +206,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 		msg, ok = h.ownOutboundVotes.Pop()
 		if ok {
 			packed := msg.(*packedVote)
-			err := h.processQueuedVote(packed)
+			err := h.sendOwnVote(packed)
 			if err != nil {
 				return fmt.Errorf("could not process queued vote: %w", err)
 			}
@@ -215,7 +215,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 
 		msg, ok = h.ownOutboundTimeouts.Pop()
 		if ok {
-			err := h.processQueuedTimeout(msg.(*model.TimeoutObject))
+			err := h.sendOwnTimeout(msg.(*model.TimeoutObject))
 			if err != nil {
 				return fmt.Errorf("coult not process queued timeout: %w", err)
 			}
@@ -228,14 +228,9 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 	}
 }
 
-// processQueuedTimeout propagates the timeout to the consensus committee:
-//   - the node's internal `timeoutAggregator`
-//   - broadcast to all other consensus participants (excluding myself)
-//
+// sendOwnTimeout propagates the timeout to the consensus committee (excluding myself)
 // No errors are expected during normal operations.
-func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
-	h.forwardToOwnTimeoutAggregator(timeout) // forward timeout to my own `timeoutAggregator`
-
+func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 	log := timeout.LogContext(h.log).Logger()
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
 
@@ -275,19 +270,9 @@ func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 	return nil
 }
 
-// processQueuedVote propagates the vote to relevant recipient(s):
-//   - [common case]  vote is sent via unicast to another node that is the next leader
-//   - [special case] this node is the next leader: vote is directly forwarded to the node's internal `VoteAggregator`
-//
+// sendOwnVote propagates the vote via unicast to another node that is the next leader
 // No errors are expected during normal operations.
-func (h *MessageHub) processQueuedVote(packed *packedVote) error {
-	// special case: I am the next leader
-	if packed.recipientID == h.me.NodeID() {
-		h.forwardToOwnVoteAggregator(packed.vote, h.me.NodeID()) // forward vote to my own `voteAggregator`
-		return nil
-	}
-
-	// common case: somebody else is the next leader
+func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 	log := h.log.With().
 		Hex("block_id", packed.vote.BlockID[:]).
 		Uint64("block_view", packed.vote.View).
@@ -308,14 +293,14 @@ func (h *MessageHub) processQueuedVote(packed *packedVote) error {
 	return nil
 }
 
-// processQueuedProposal propagates the block proposal to the consensus cluster and submits to non-consensus network:
+// sendOwnProposal propagates the block proposal to the consensus cluster and submits to non-consensus network:
 //   - directly forwarded proposal to HotStuff core logic
 //     (skipping compliance engine as we assume our own proposals to be correct)
 //   - broadcast to all other consensus participants (excluding myself)
 //   - broadcast to all non-consensus participants
 //
 // No errors are expected during normal operations.
-func (h *MessageHub) processQueuedProposal(header *flow.Header) error {
+func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	// first, check that we are the proposer of the block
 	if header.ProposerID != h.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
@@ -417,24 +402,36 @@ func (h *MessageHub) provideProposal(proposal *messages.BlockProposal, recipient
 	log.Info().Msg("block proposal propagated to non-consensus nodes")
 }
 
-// OnOwnVote queues vote for subsequent propagation to next primary (`recipientID`),
-// which _may occasionally_ be also this node itself.
+// OnOwnVote propagates the vote to relevant recipient(s):
+//   - [common case] vote is queued and is sent via unicast to another node that is the next leader by worker
+//   - [special case] this node is the next leader: vote is directly forwarded to the node's internal `VoteAggregator`
 func (h *MessageHub) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
-	vote := &packedVote{
-		recipientID: recipientID,
-		vote: &messages.BlockVote{
-			BlockID: blockID,
-			View:    view,
-			SigData: sigData,
-		},
+	vote := &messages.BlockVote{
+		BlockID: blockID,
+		View:    view,
+		SigData: sigData,
 	}
-	if ok := h.ownOutboundVotes.Push(vote); ok {
+
+	// special case: I am the next leader
+	if recipientID == h.me.NodeID() {
+		h.forwardToOwnVoteAggregator(vote, h.me.NodeID()) // forward vote to my own `voteAggregator`
+		return
+	}
+
+	// common case: someone else is leader
+	packed := &packedVote{
+		recipientID: recipientID,
+		vote:        vote,
+	}
+	if ok := h.ownOutboundVotes.Push(packed); ok {
 		h.ownOutboundMessageNotifier.Notify()
 	}
 }
 
-// OnOwnTimeout queues timeout for subsequent propagation to all consensus participants (including this node)
+// OnOwnTimeout forwards timeout to node's internal `timeoutAggregator` and queues timeout for
+// subsequent propagation to all consensus participants (excluding this node)
 func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
+	h.forwardToOwnTimeoutAggregator(timeout) // forward timeout to my own `timeoutAggregator`
 	if ok := h.ownOutboundTimeouts.Push(timeout); ok {
 		h.ownOutboundMessageNotifier.Notify()
 	}
@@ -482,7 +479,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 	return nil
 }
 
-// forwardToOwnVoteAggregator converts vote to generic `model.Vote`, logs logs vote and forwards it to own `voteAggregator`.
+// forwardToOwnVoteAggregator converts vote to generic `model.Vote`, logs vote and forwards it to own `voteAggregator`.
 // Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
 func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.BlockVote, originID flow.Identifier) {
 	v := &model.Vote{

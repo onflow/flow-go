@@ -240,7 +240,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with wrong proposer", func() {
 		header := *block.Header
 		header.ProposerID = unittest.IdentifierFixture()
-		err := s.hub.processQueuedProposal(&header)
+		err := s.hub.sendOwnProposal(&header)
 		require.Error(s.T(), err, "should fail with wrong proposer")
 		header.ProposerID = s.myID
 	})
@@ -249,7 +249,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with wrong block ID", func() {
 		header := *block.Header
 		header.View++
-		err := s.hub.processQueuedProposal(&header)
+		err := s.hub.sendOwnProposal(&header)
 		require.Error(s.T(), err, "should fail with missing payload")
 		header.View--
 	})
@@ -276,7 +276,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit to broadcast proposal
-		err := s.hub.processQueuedProposal(block.Header)
+		err := s.hub.sendOwnProposal(block.Header)
 		require.NoError(s.T(), err, "header broadcast should pass")
 
 		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
