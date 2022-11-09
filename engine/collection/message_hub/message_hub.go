@@ -268,9 +268,6 @@ func (h *MessageHub) processQueuedTimeout(timeout *messages.ClusterTimeoutObject
 	}
 
 	err = h.con.Publish(timeout, recipients.NodeIDs()...)
-	if errors.Is(err, network.EmptyTargetList) {
-		return nil
-	}
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
 			log.Err(err).Msg("could not broadcast timeout")

@@ -42,7 +42,7 @@ type ClusterBlockVote struct {
 
 // ClusterTimeoutObject is part of the collection cluster protocol and represents a collection node
 // timing out in given round. Contains a sequential number for deduplication purposes.
-type ClusterTimeoutObject struct {
+type ClusterTimeoutObject TimeoutObject
 	TimeoutTick uint64
 	View        uint64
 	NewestQC    *flow.QuorumCertificate
