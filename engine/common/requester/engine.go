@@ -35,19 +35,22 @@ type CreateFunc func() flow.Entity
 // on the flow network. It is the `request` part of the request-reply
 // pattern provided by the pair of generic exchange engines.
 type Engine struct {
-	unit                  *engine.Unit
-	log                   zerolog.Logger
-	cfg                   Config
-	metrics               module.EngineMetrics
-	me                    module.Local
-	state                 protocol.State
-	con                   network.Conduit
-	channel               channels.Channel
-	selector              flow.IdentityFilter
-	create                CreateFunc
-	handle                HandleFunc
-	items                 map[flow.Identifier]*Item
-	requests              map[uint64]*messages.EntityRequest
+	unit     *engine.Unit
+	log      zerolog.Logger
+	cfg      Config
+	metrics  module.EngineMetrics
+	me       module.Local
+	state    protocol.State
+	con      network.Conduit
+	channel  channels.Channel
+	selector flow.IdentityFilter
+	create   CreateFunc
+	handle   HandleFunc
+
+	// changing the following state variables must be guarded by unit.Lock()
+	items    map[flow.Identifier]*Item
+	requests map[uint64]*messages.EntityRequest
+
 	forcedDispatchOngoing *atomic.Bool // to ensure only trigger dispatching logic once at any time
 }
 
@@ -449,9 +452,6 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityResponse)
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityResponse)
 
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
 	switch msg := message.(type) {
 	case *messages.EntityResponse:
 		return e.onEntityResponse(originID, msg)
@@ -487,6 +487,9 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 			Uint64("nonce", res.Nonce).
 			Msg("onEntityResponse entries received")
 	}
+
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// build a list of needed entities; if not available, process anyway,
 	// but in that case we can't re-queue missing items
