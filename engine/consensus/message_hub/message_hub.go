@@ -215,7 +215,7 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 
 		msg, ok = h.ownOutboundTimeouts.Pop()
 		if ok {
-			err := h.processQueuedTimeout(msg.(*model.TimeoutObject))
+			err := h.processQueuedTimeout(msg.(*messages.TimeoutObject))
 			if err != nil {
 				return fmt.Errorf("coult not process queued timeout: %w", err)
 			}
@@ -231,8 +231,20 @@ func (h *MessageHub) processQueuedMessages(ctx context.Context) error {
 // processQueuedTimeout performs actual processing of model.TimeoutObject, as a result of successful invocation
 // broadcasts timeout object to consensus committee.
 // No errors are expected during normal operations.
-func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
-	log := timeout.LogContext(h.log).Logger()
+func (h *MessageHub) processQueuedTimeout(timeout *messages.TimeoutObject) error {
+	logContext := h.log.With().
+		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
+		Uint64("timeout_tick", timeout.TimeoutTick).
+		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
+		Uint64("timeout_view", timeout.View)
+
+	if timeout.LastViewTC != nil {
+		logContext.
+			Uint64("last_view_tc_view", timeout.LastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", timeout.LastViewTC.NewestQC.View)
+	}
+	log := logContext.Logger()
+
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
 
 	// Retrieve all consensus nodes (excluding myself).
@@ -247,15 +259,10 @@ func (h *MessageHub) processQueuedTimeout(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("could not get consensus recipients for broadcasting timeout: %w", err)
 	}
 
-	// create the timeout message
-	msg := &messages.TimeoutObject{
-		View:       timeout.View,
-		NewestQC:   timeout.NewestQC,
-		LastViewTC: timeout.LastViewTC,
-		SigData:    timeout.SigData,
+	err = h.con.Publish(timeout, recipients.NodeIDs()...)
+	if errors.Is(err, network.EmptyTargetList) {
+		return nil
 	}
-
-	err = h.con.Publish(msg, recipients.NodeIDs()...)
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
 			log.Err(err).Msg("could not broadcast timeout")
@@ -413,7 +420,13 @@ func (h *MessageHub) OnOwnVote(blockID flow.Identifier, view uint64, sigData []b
 
 // OnOwnTimeout queues timeout for subsequent sending
 func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
-	if ok := h.ownOutboundTimeouts.Push(timeout); ok {
+	if ok := h.ownOutboundTimeouts.Push(&messages.TimeoutObject{
+		TimeoutTick: timeout.TimeoutTick,
+		View:        timeout.View,
+		NewestQC:    timeout.NewestQC,
+		LastViewTC:  timeout.LastViewTC,
+		SigData:     timeout.SigData,
+	}); ok {
 		h.ownOutboundMessageNotifier.Notify()
 	}
 }
@@ -460,17 +473,16 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 		h.voteAggregator.AddVote(v)
 	case *messages.TimeoutObject:
 		t := &model.TimeoutObject{
-			View:       msg.View,
-			NewestQC:   msg.NewestQC,
-			LastViewTC: msg.LastViewTC,
-			SignerID:   originID,
-			SigData:    msg.SigData,
+			View:        msg.View,
+			NewestQC:    msg.NewestQC,
+			LastViewTC:  msg.LastViewTC,
+			SignerID:    originID,
+			SigData:     msg.SigData,
+			TimeoutTick: msg.TimeoutTick,
 		}
-		h.log.Info().
-			Hex("origin_id", originID[:]).
-			Uint64("view", t.View).
-			Str("timeout_id", t.ID().String()).
-			Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
+		log := t.LogContext(h.log).Logger()
+		log.Info().Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
+
 		// forward the timeout to aggregator for processing
 		h.timeoutAggregator.AddTimeout(t)
 	default:

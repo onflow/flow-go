@@ -41,7 +41,7 @@ type EventLoopTestSuite struct {
 func (s *EventLoopTestSuite) SetupTest() {
 	s.eh = mocks.NewEventHandler(s.T())
 	s.eh.On("Start", mock.Anything).Return(nil).Maybe()
-	s.eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C).Maybe()
+	s.eh.On("TimeoutChannel").Return(make(<-chan time.Time, 1)).Maybe()
 	s.eh.On("OnLocalTimeout").Return(nil).Maybe()
 
 	log := zerolog.New(io.Discard)
@@ -192,7 +192,6 @@ func TestEventLoop_Timeout(t *testing.T) {
 	eh := &mocks.EventHandler{}
 	processed := atomic.NewBool(false)
 	eh.On("Start", mock.Anything).Return(nil).Once()
-	eh.On("TimeoutChannel").Return(time.NewTimer(100 * time.Millisecond).C)
 	eh.On("OnReceiveQc", mock.Anything).Return(nil).Maybe()
 	eh.On("OnReceiveProposal", mock.Anything).Return(nil).Maybe()
 	eh.On("OnLocalTimeout").Run(func(args mock.Arguments) {
@@ -203,6 +202,8 @@ func TestEventLoop_Timeout(t *testing.T) {
 
 	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), eh, time.Time{})
 	require.NoError(t, err)
+
+	eh.On("TimeoutChannel").Return(time.After(100 * time.Millisecond))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
@@ -232,7 +233,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 	}()
 
 	require.Eventually(t, processed.Load, time.Millisecond*200, time.Millisecond*10)
-	wg.Wait()
+	unittest.AssertReturnsBefore(t, func() { wg.Wait() }, time.Millisecond*200)
 
 	cancel()
 	unittest.RequireCloseBefore(t, eventLoop.Done(), 100*time.Millisecond, "event loop not stopped")
@@ -243,7 +244,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 func TestReadyDoneWithStartTime(t *testing.T) {
 	eh := &mocks.EventHandler{}
 	eh.On("Start", mock.Anything).Return(nil)
-	eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C)
+	eh.On("TimeoutChannel").Return(make(<-chan time.Time, 1))
 	eh.On("OnLocalTimeout").Return(nil)
 
 	metrics := metrics.NewNoopCollector()
