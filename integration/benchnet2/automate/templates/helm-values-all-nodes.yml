@@ -382,4 +382,4 @@ verification:
           value: ""
       image: gcr.io/flow-container-registry/verification:v0.27.6
       nodeId: {{$val.node_id}}
-{{end}}{{end}}
+{{- end -}}{{- end -}}

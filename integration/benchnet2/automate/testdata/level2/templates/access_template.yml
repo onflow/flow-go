@@ -5,4 +5,4 @@ env:
   - name: access name
     value: access {{$val.NodeID}}
   - name: access numbers
-    value: 123{{end}}
+    value: 123{{- end -}}

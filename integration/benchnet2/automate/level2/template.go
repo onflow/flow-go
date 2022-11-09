@@ -43,12 +43,12 @@ func (t *Template) Apply(outputToFile bool) string {
 	}
 	templateStr := string(templateBytes)
 
-	tmpl, err := template.New("test").Parse(templateStr)
-	tmpl = template.Must(tmpl, err)
+	helmTemplate, err := template.New("helm").Parse(templateStr)
+	helmTemplate = template.Must(helmTemplate, err)
 
 	buf := new(strings.Builder)
 
-	err = tmpl.Execute(buf, dataMap)
+	err = helmTemplate.Execute(buf, dataMap)
 	if err != nil {
 		log.Fatal(err)
 	}
