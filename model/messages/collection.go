@@ -34,17 +34,8 @@ type ClusterBlockProposal struct {
 
 // ClusterBlockVote is a vote for a proposed block in collection node cluster
 // consensus; effectively a vote for a particular collection.
-type ClusterBlockVote struct {
-	BlockID flow.Identifier
-	View    uint64
-	SigData []byte
-}
+type ClusterBlockVote BlockVote
 
 // ClusterTimeoutObject is part of the collection cluster protocol and represents a collection node
-// timing out in given round.
-type ClusterTimeoutObject struct {
-	View       uint64
-	NewestQC   *flow.QuorumCertificate
-	LastViewTC *flow.TimeoutCertificate
-	SigData    []byte
-}
+// timing out in given round. Contains a sequential number for deduplication purposes.
+type ClusterTimeoutObject TimeoutObject

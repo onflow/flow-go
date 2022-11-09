@@ -41,9 +41,9 @@ func (*NoopPartialConsumer) OnTcTriggeredViewChange(*flow.TimeoutCertificate, ui
 
 func (*NoopPartialConsumer) OnQcConstructedFromVotes(uint64, *flow.QuorumCertificate) {}
 
-func (*NoopPartialConsumer) OnStartingTimeout(*model.TimerInfo) {}
+func (*NoopPartialConsumer) OnStartingTimeout(model.TimerInfo) {}
 
-func (*NoopPartialConsumer) OnReachedTimeout(*model.TimerInfo) {}
+func (*NoopPartialConsumer) OnReachedTimeout(model.TimerInfo) {}
 
 func (*NoopPartialConsumer) OnQcIncorporated(*flow.QuorumCertificate) {}
 

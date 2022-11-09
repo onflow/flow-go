@@ -32,7 +32,6 @@ import (
 //   - on progress: decrease number of failed rounds, this results in exponential decrease of round duration.
 type Controller struct {
 	cfg            Config
-	timerInfo      *model.TimerInfo
 	timeoutChannel chan time.Time
 	stopTicker     context.CancelFunc
 	maxExponent    float64 // max exponent for exponential function, derived from maximum round duration
@@ -61,11 +60,6 @@ func NewController(timeoutConfig Config) *Controller {
 	return &tc
 }
 
-// TimerInfo returns TimerInfo for the current timer.
-// New struct is created for each call of `StartTimeout`.
-// Returns nil if no timer has been started.
-func (t *Controller) TimerInfo() *model.TimerInfo { return t.timerInfo }
-
 // Channel returns a channel that will receive the specific timeout.
 // A new channel is created on each call of `StartTimeout`.
 // Returns closed channel if no timer has been started.
@@ -74,22 +68,22 @@ func (t *Controller) Channel() <-chan time.Time {
 }
 
 // StartTimeout starts the timeout of the specified type and returns the timer info
-func (t *Controller) StartTimeout(ctx context.Context, view uint64) *model.TimerInfo {
+func (t *Controller) StartTimeout(ctx context.Context, view uint64) model.TimerInfo {
 	t.stopTicker() // stop old timeout
 
-	// setup new timer:
-	// when round duration is small react with faster timeout rebroadcasts
-	duration := t.ReplicaTimeout()
-	tickInterval := time.Duration(math.Min(float64(duration.Milliseconds()), t.cfg.MaxTimeoutObjectRebroadcastInterval))
-	t.timerInfo = &model.TimerInfo{View: view, StartTime: time.Now().UTC(), Duration: duration}
-	t.timeoutChannel = make(chan time.Time, 1)
+	// setup new timer
+	durationMs := t.replicaTimeout()                                                         // duration of current view in units of Milliseconds
+	rebroadcastIntervalMs := math.Min(durationMs, t.cfg.MaxTimeoutObjectRebroadcastInterval) // time between attempted re-broadcast of timeouts if there is no progress
+	t.timeoutChannel = make(chan time.Time, 1)                                               // channel for delivering timeouts
 
 	// start timeout logic for (re-)broadcasting timeout objects on regular basis as long as we are in the same round.
 	var childContext context.Context
 	childContext, t.stopTicker = context.WithCancel(ctx)
-	go tickAfterTimeout(childContext, duration, tickInterval, t.timeoutChannel)
+	duration := time.Duration(durationMs) * time.Millisecond
+	rebroadcastInterval := time.Duration(rebroadcastIntervalMs) * time.Millisecond
+	go tickAfterTimeout(childContext, duration, rebroadcastInterval, t.timeoutChannel)
 
-	return t.timerInfo
+	return model.TimerInfo{View: view, StartTime: time.Now().UTC(), Duration: duration}
 }
 
 // tickAfterTimeout is a utility function which:
@@ -100,9 +94,9 @@ func (t *Controller) StartTimeout(ctx context.Context, view uint64) *model.Timer
 // we drop ticks until the receiver catches up. When cancelling `ctx`, all timing logic stops.
 // This approach allows to have a concurrent-safe implementation, where there is no unsafe state sharing between caller and
 // ticking logic.
-func tickAfterTimeout(ctx context.Context, initialTimeout time.Duration, tickInterval time.Duration, timeoutChannel chan<- time.Time) {
+func tickAfterTimeout(ctx context.Context, duration time.Duration, tickInterval time.Duration, timeoutChannel chan<- time.Time) {
 	// wait for initial timeout
-	timer := time.NewTimer(initialTimeout)
+	timer := time.NewTimer(duration)
 	select {
 	case t := <-timer.C:
 		timeoutChannel <- t // forward initial timeout to the sink
@@ -124,18 +118,17 @@ func tickAfterTimeout(ctx context.Context, initialTimeout time.Duration, tickInt
 	}
 }
 
-// ReplicaTimeout returns the duration of the current view before we time out
-func (t *Controller) ReplicaTimeout() time.Duration {
+// replicaTimeout returns the duration of the current view in milliseconds before we time out
+func (t *Controller) replicaTimeout() float64 {
 	if t.r <= t.cfg.HappyPathMaxRoundFailures {
-		return time.Duration(t.cfg.MinReplicaTimeout * float64(time.Millisecond))
+		return t.cfg.MinReplicaTimeout
 	}
 	r := float64(t.r - t.cfg.HappyPathMaxRoundFailures)
 	if r >= t.maxExponent {
-		return time.Duration(t.cfg.MaxReplicaTimeout * float64(time.Millisecond))
+		return t.cfg.MaxReplicaTimeout
 	}
 	// compute timeout duration [in milliseconds]:
-	duration := t.cfg.MinReplicaTimeout * math.Pow(t.cfg.TimeoutAdjustmentFactor, r)
-	return time.Duration(duration * float64(time.Millisecond))
+	return t.cfg.MinReplicaTimeout * math.Pow(t.cfg.TimeoutAdjustmentFactor, r)
 }
 
 // OnTimeout indicates to the Controller that a view change was triggered by a TC (unhappy path).

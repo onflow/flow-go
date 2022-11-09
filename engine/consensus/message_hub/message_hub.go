@@ -248,12 +248,12 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 
 	// create the timeout message
 	msg := &messages.TimeoutObject{
-		View:       timeout.View,
-		NewestQC:   timeout.NewestQC,
-		LastViewTC: timeout.LastViewTC,
-		SigData:    timeout.SigData,
+		View:        timeout.View,
+		NewestQC:    timeout.NewestQC,
+		LastViewTC:  timeout.LastViewTC,
+		SigData:     timeout.SigData,
+		TimeoutTick: timeout.TimeoutTick,
 	}
-
 	err = h.con.Publish(msg, recipients.NodeIDs()...)
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
@@ -466,11 +466,12 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 		h.forwardToOwnVoteAggregator(msg, originID)
 	case *messages.TimeoutObject:
 		t := &model.TimeoutObject{
-			View:       msg.View,
-			NewestQC:   msg.NewestQC,
-			LastViewTC: msg.LastViewTC,
-			SignerID:   originID,
-			SigData:    msg.SigData,
+			View:        msg.View,
+			NewestQC:    msg.NewestQC,
+			LastViewTC:  msg.LastViewTC,
+			SignerID:    originID,
+			SigData:     msg.SigData,
+			TimeoutTick: msg.TimeoutTick,
 		}
 		h.forwardToOwnTimeoutAggregator(t)
 	default:

@@ -83,7 +83,7 @@ type MessageHub struct {
 	ownOutboundVotes           *fifoqueue.FifoQueue // queue for handling outgoing vote transmissions
 	ownOutboundProposals       *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions
 	ownOutboundTimeouts        *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
-	cluster                    flow.IdentityList    // consensus participants in our cluster
+	clusterIdentityFilter      flow.IdentityFilter
 
 	// injected dependencies
 	compliance        network.MessageProcessor   // handler of incoming block proposals
@@ -150,7 +150,10 @@ func NewMessageHub(log zerolog.Logger,
 		ownOutboundVotes:           ownOutboundVotes,
 		ownOutboundProposals:       ownOutboundProposals,
 		ownOutboundTimeouts:        ownOutboundTimeouts,
-		cluster:                    currentCluster,
+		clusterIdentityFilter: filter.And(
+			filter.In(currentCluster),
+			filter.Not(filter.HasNodeID(me.NodeID())),
+		),
 	}
 
 	// register network conduit
@@ -247,22 +250,18 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 	log := timeout.LogContext(h.log).Logger()
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
 
-	// Retrieve all consensus nodes (excluding myself).
-	// CAUTION: We must include also nodes with weight zero, because otherwise
-	//          TCs might not be constructed at epoch switchover.
-	recipients, err := h.state.Final().Identities(filter.And(
-		filter.In(h.cluster),
-		filter.Not(filter.HasNodeID(h.me.NodeID())),
-	))
+	// Retrieve all collection nodes in our cluster (excluding myself).
+	recipients, err := h.state.Final().Identities(h.clusterIdentityFilter)
 	if err != nil {
 		return fmt.Errorf("could not get cluster members for broadcasting timeout: %w", err)
 	}
 	// create the timeout message
 	msg := &messages.ClusterTimeoutObject{
-		View:       timeout.View,
-		NewestQC:   timeout.NewestQC,
-		LastViewTC: timeout.LastViewTC,
-		SigData:    timeout.SigData,
+		View:        timeout.View,
+		NewestQC:    timeout.NewestQC,
+		LastViewTC:  timeout.LastViewTC,
+		SigData:     timeout.SigData,
+		TimeoutTick: timeout.TimeoutTick,
 	}
 
 	err = h.con.Publish(msg, recipients.NodeIDs()...)
@@ -342,10 +341,7 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	h.hotstuff.SubmitProposal(hotstuffProposal) // non-blocking
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := h.state.Final().Identities(filter.And(
-		filter.In(h.cluster),
-		filter.Not(filter.HasNodeID(h.me.NodeID())),
-	))
+	recipients, err := h.state.Final().Identities(h.clusterIdentityFilter)
 	if err != nil {
 		return fmt.Errorf("could not get cluster members for broadcasting collection proposal")
 	}
@@ -437,11 +433,12 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 		h.forwardToOwnVoteAggregator(msg, originID)
 	case *messages.ClusterTimeoutObject:
 		t := &model.TimeoutObject{
-			View:       msg.View,
-			NewestQC:   msg.NewestQC,
-			LastViewTC: msg.LastViewTC,
-			SignerID:   originID,
-			SigData:    msg.SigData,
+			View:        msg.View,
+			NewestQC:    msg.NewestQC,
+			LastViewTC:  msg.LastViewTC,
+			SignerID:    originID,
+			SigData:     msg.SigData,
+			TimeoutTick: msg.TimeoutTick,
 		}
 		h.forwardToOwnTimeoutAggregator(t)
 	default:
