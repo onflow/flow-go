@@ -285,6 +285,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 
 	hotstuffProposal := model.ProposalFromFlow(block.Header)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
 
 	// it should be processed without error
@@ -310,6 +311,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 
 	hotstuffProposal := model.ProposalFromFlow(block.Header)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
 
 	// it should be processed without error
@@ -511,6 +513,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	for _, block := range []*flow.Block{parent, block1, block2, block3} {
 		hotstuffProposal := model.ProposalFromFlow(block.Header)
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 	}
 
@@ -581,6 +584,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 			calls++
 		},
 	)
+	cs.voteAggregator.On("AddBlock", mock.Anything).Times(4)
 
 	// process the root proposal
 	err := cs.core.OnBlockProposal(originID, missing)
