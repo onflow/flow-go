@@ -1433,6 +1433,8 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return common.NewSetConfigCommand(config.ConfigManager)
 	}).AdminCommand("list-configs", func(config *NodeConfig) commands.AdminCommand {
 		return common.NewListConfigCommand(config.ConfigManager)
+	}).AdminCommand("set-golog-level", func(config *NodeConfig) commands.AdminCommand {
+		return &common.SetGologLevelCommand{}
 	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
 	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
