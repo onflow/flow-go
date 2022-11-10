@@ -18,11 +18,11 @@ type TransactionPrograms struct {
 }
 
 // Get provides a mock function with given fields: loc
-func (_m *TransactionPrograms) Get(loc common.Location) (*interpreter.Program, *state.State, bool) {
+func (_m *TransactionPrograms) Get(loc common.AddressLocation) (*interpreter.Program, *state.State, bool) {
 	ret := _m.Called(loc)
 
 	var r0 *interpreter.Program
-	if rf, ok := ret.Get(0).(func(common.Location) *interpreter.Program); ok {
+	if rf, ok := ret.Get(0).(func(common.AddressLocation) *interpreter.Program); ok {
 		r0 = rf(loc)
 	} else {
 		if ret.Get(0) != nil {
@@ -31,7 +31,7 @@ func (_m *TransactionPrograms) Get(loc common.Location) (*interpreter.Program, *
 	}
 
 	var r1 *state.State
-	if rf, ok := ret.Get(1).(func(common.Location) *state.State); ok {
+	if rf, ok := ret.Get(1).(func(common.AddressLocation) *state.State); ok {
 		r1 = rf(loc)
 	} else {
 		if ret.Get(1) != nil {
@@ -40,7 +40,7 @@ func (_m *TransactionPrograms) Get(loc common.Location) (*interpreter.Program, *
 	}
 
 	var r2 bool
-	if rf, ok := ret.Get(2).(func(common.Location) bool); ok {
+	if rf, ok := ret.Get(2).(func(common.AddressLocation) bool); ok {
 		r2 = rf(loc)
 	} else {
 		r2 = ret.Get(2).(bool)
@@ -50,7 +50,7 @@ func (_m *TransactionPrograms) Get(loc common.Location) (*interpreter.Program, *
 }
 
 // Set provides a mock function with given fields: loc, prog, _a2
-func (_m *TransactionPrograms) Set(loc common.Location, prog *interpreter.Program, _a2 *state.State) {
+func (_m *TransactionPrograms) Set(loc common.AddressLocation, prog *interpreter.Program, _a2 *state.State) {
 	_m.Called(loc, prog, _a2)
 }
 

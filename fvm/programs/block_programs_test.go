@@ -627,42 +627,6 @@ func TestTxnProgsCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 	require.Equal(t, 0, len(block.EntriesForTestingOnly()))
 }
 
-func TestTxnProgsCommitNonAddressPrograms(t *testing.T) {
-	block := NewEmptyBlockPrograms()
-
-	expectedTime := LogicalTime(121)
-	testTxn, err := block.NewTransactionPrograms(0, expectedTime)
-	require.NoError(t, err)
-
-	location := common.IdentifierLocation("non-address")
-
-	actualProg, actualState, ok := testTxn.Get(location)
-	require.False(t, ok)
-	require.Nil(t, actualProg)
-	require.Nil(t, actualState)
-
-	expectedProg := &interpreter.Program{}
-
-	testTxn.Set(location, expectedProg, nil)
-
-	actualProg, actualState, ok = testTxn.Get(location)
-	require.True(t, ok)
-	require.Same(t, expectedProg, actualProg)
-	require.Nil(t, actualState)
-
-	err = testTxn.Commit()
-	require.NoError(t, err)
-
-	// Sanity Check
-
-	require.Equal(
-		t,
-		expectedTime,
-		block.LatestCommitExecutionTimeForTestingOnly())
-	require.Equal(t, 0, len(block.InvalidatorsForTestingOnly()))
-	require.Equal(t, 0, len(block.EntriesForTestingOnly()))
-}
-
 func TestTxnProgsCommitValidateError(t *testing.T) {
 	block := NewEmptyBlockPrograms()
 

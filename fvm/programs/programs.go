@@ -55,20 +55,20 @@ func (p *Programs) NextTxIndexForTestingOnly() uint32 {
 	return p.block.NextTxIndexForTestingOnly()
 }
 
-func (p *Programs) GetForTestingOnly(location common.Location) (*interpreter.Program, *state.State, bool) {
+func (p *Programs) GetForTestingOnly(location common.AddressLocation) (*interpreter.Program, *state.State, bool) {
 	return p.Get(location)
 }
 
 // Get returns stored program, state which contains changes which correspond to loading this program,
 // and boolean indicating if the value was found
-func (p *Programs) Get(location common.Location) (*interpreter.Program, *state.State, bool) {
+func (p *Programs) Get(location common.AddressLocation) (*interpreter.Program, *state.State, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.currentTxn.Get(location)
 }
 
-func (p *Programs) Set(location common.Location, program *interpreter.Program, state *state.State) {
+func (p *Programs) Set(location common.AddressLocation, program *interpreter.Program, state *state.State) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
