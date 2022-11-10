@@ -37,6 +37,51 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// Test cases:
+// 1. ExecuteChain
+//     	given collection nodes will return [C1, C2, C3]
+// 				if EN received B1[C1] <- B2[C2] <- B3[C3], then B1, B2, B3 will be executed
+//			note: B1[C1] <- B2[C2] means block B1 has one collection, which is C1, and B1 has a child block B2
+//			note: test case should ensure [B1,B2,B3] are received before [C1,C2,C3] in order to
+//					  prove a chain was created in-memory
+//
+// 2. ExecuteForks
+//     given collection nodes will return [C1, C2, C3],
+//				if EN received B1[C1] <- B2[C2]
+//															^- B3[C3], then B1, B2, B3 will be executed
+// 3. CollectionIsCached
+//     	given collection nodes will return [C1, C2, C3]
+// 				if EN received B1[C1] <- B2[C2] <- B3[C3], then B1, B2, B3 will be executed.
+//		 	Why? Because ingestion engine will cache collections after they are received
+//			note: test case should ensure C1 to be received after C2 and C3, so that B2, B3 are not executable,
+//					until C1 is received.
+//
+// 4. CollectionReusedWhenReceivedLater
+//     	given collection nodes will return [C1, C2]
+//				if EN received B1[C1] <- B2[C2]
+//															^- B3[C2], then B1, B2, B3 will be executed
+//		 	Why? Because B2 and B3 both have C2, both should become executable as soon as C2 is received.
+//			note: test case should ensure C2 is received after both B2 and B3 are received in order to prove
+//						C2 is being used in executing B2 and B3 as soon as C2 is received.
+//
+// 5. CollectionReusedWhenReceivedEarlier
+//    	given collection nodes will return [C1, C2]
+//				if EN received B1[C1] <- B2[C2]
+//															^- B3[C2], then B1, B2, B3 will be executed
+//		note: it's similar to CollectionReusedWhenReceivedLater, only difference is that C2 is received
+//					before B2 and B3 are received in order to prove the collection was cached or stored
+//
+// 6. LoadingUnexecutedOnStartup
+//     	given collection nodes will return [C1, C2, C3, C4]
+//				if B1[C1] <- B2[C2] <- B3[C3] have been received and are unexecuted blocks, B1 is finalized, [B2,B3] are unfinalized and have child
+//				then on startup, B1, B2, B3 will be executed,
+//				if B4[C4] is received before engine.Ready is finished, then it's a bug, because ingestion hasn't finish initializing
+//				if B4[C4] is received after engine.Ready is finished, then B4 will be executed.
+//
+// 7. Block won't be executed twice
+//     	given collection nodes will return [C1, C2, C3]
+// 				if EN received B1[C1] <- B2[C2] <- B3[C3], and then received B3[C3] again, then B1, B2, B3 will only be executed once
+
 // An Engine receives and saves incoming blocks.
 type Engine struct {
 	psEvents.Noop // satisfy protocol events consumer interface
