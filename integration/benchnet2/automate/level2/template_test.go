@@ -74,6 +74,12 @@ func TestApply_DataTable(t *testing.T) {
 			dataPath:       filepath.Join(DataPath, "values8-verification-nodes-if-loop.json"),
 			expectedOutput: filepath.Join(ExpectedOutputPath, "values1.yml"),
 		},
+
+		"values9 - nested template (env) - if loop": {
+			templatePath:   filepath.Join(TemplatesPath, "values9-nested-template-env.yml"),
+			dataPath:       filepath.Join(DataPath, "values8-verification-nodes-if-loop.json"), // same data file
+			expectedOutput: filepath.Join(ExpectedOutputPath, "values1.yml"),
+		},
 	}
 
 	for i, testData := range testDataMap {
