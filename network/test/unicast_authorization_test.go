@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -529,6 +530,48 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 
 	// send message via unicast
 	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
+	require.NoError(u.T(), err)
+
+	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
+	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
+}
+
+// TestUnicastAuthorization_ReceiverHasSubscription tests that messages sent via unicast are processed on the receiver end if the receiver does have a subscription
+// to the channel of the message.
+func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubscription() {
+	// setup mock slashing violations consumer and middlewares
+	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
+	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+
+	channel := channels.RequestReceiptsByBlockID
+	msg, expectedMsg, payload := messageutils.CreateMessageWithPayload(u.T(), u.senderID.NodeID, u.receiverID.NodeID, channel, &messages.EntityRequest{})
+
+	u.senderID.Role = flow.RoleConsensus
+	u.receiverID.Role = flow.RoleExecution
+
+	overlay := mocknetwork.NewOverlay(u.T())
+	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
+		return u.providers[0].Identities(filter.Any)
+	})
+	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
+		return u.providers[0].Identities(filter.Any)
+	}, nil)
+	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(u.senderID, true)
+
+	// we should receive the message on our overlay, at this point close the waitCh
+	overlay.On("Receive", u.senderID.NodeID, expectedMsg, payload).Return(nil).
+		Once().
+		Run(func(args mockery.Arguments) {
+			close(u.waitCh)
+		})
+
+	u.startMiddlewares(overlay)
+
+	require.NoError(u.T(), u.receiverMW.Subscribe(channel))
+	require.NoError(u.T(), u.senderMW.Subscribe(channel))
+
+	// send message via unicast
+	err := u.senderMW.SendDirect(msg, u.receiverID.NodeID)
 	require.NoError(u.T(), err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
