@@ -236,8 +236,6 @@ static int fp_get_sign(const fp_t y) {
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_write_bin
 void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
-    ep_t t;
-    ep_null(t);
     const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
 
     if (len!=G1_size) {
@@ -253,6 +251,8 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     }
 
     RLC_TRY {
+        ep_t t;
+        ep_null(t);
         ep_new(t); 
         ep_norm(t, a);
         fp_write_bin(bin, Fp_BYTES, t->x);
@@ -262,12 +262,12 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
         } else {
             fp_write_bin(bin + Fp_BYTES, Fp_BYTES, t->y);
         }
+        ep_free(t);
     } RLC_CATCH_ANY {
         RLC_THROW(ERR_CAUGHT);
     }
 
     bin[0] |= (G1_SERIALIZATION << 7);
-    ep_free(t);
  }
 
 // fp_read_bin_safe is a modified version of Relic's (void fp_read_bin).
