@@ -1,14 +1,27 @@
 DOCKER_TAG := $(shell git rev-parse --short HEAD)
 
 # default values that callers can override when calling target
-ACCESS_NODES=2
-COLLECTION_NODES=6
-CONSENSUS_NODES=3
-EXECUTION_NODES=2
-VERIFICATION_NODES=1
+ACCESS = 1
+COLLECTION = 6
+VALID_COLLECTION := $(shell test $(COLLECTION) -ge 6; echo $$?)
+CONSENSUS = 2
+VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
+EXECUTION = 2
+VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
+VERIFICATION = 1
+
+check-nodes:
+ifeq ($(strip $(VALID_EXECUTION)), 1)
+	# multiple execution nodes are required to prevent seals being generated in case of execution forking.
+	$(error Number of Execution nodes should be no less than 2)
+else ifeq ($(strip $(VALID_CONSENSUS)), 1)
+	$(error Number of Consensus nodes should be no less than 2)
+else ifeq ($(strip $(VALID_COLLECTION)), 1)
+	$(error Number of Collection nodes should be no less than 6)
+endif
 
 gen-bootstrap:
-	go run -tags relic ../../cmd/bootstrap genconfig --address-format "%s%d.${NAMESPACE}:3569" --access $(ACCESS_NODES) --collection $(COLLECTION_NODES) --consensus $(CONSENSUS_NODES) --execution $(EXECUTION_NODES) --verification $(VERIFICATION_NODES) --weight 1000 -o ./ --config ./bootstrap/conf/node-config.json
+	go run -tags relic ../../cmd/bootstrap genconfig --address-format "%s%d.${NAMESPACE}:3569" --access $(ACCESS) --collection $(COLLECTION) --consensus $(CONSENSUS) --execution $(EXECUTION) --verification $(VERIFICATION) --weight 1000 -o ./ --config ./bootstrap/conf/node-config.json
 	go run -tags relic ../../cmd/bootstrap keygen --machine-account --config ./bootstrap/conf/node-config.json -o ./bootstrap/keys
 	echo {} > ./bootstrap/conf/partner-stakes.json
 	mkdir ./bootstrap/partner-nodes
@@ -27,7 +40,7 @@ gen-helm-l2:
 # runs bootstrap to generate all node info
 # runs level 1 automation to read bootstrap data and generate data input for level 2
 # runs level 2 automation to generate values.yml based on template and data values from previous step
-gen-helm-values: gen-bootstrap gen-helm-l1 gen-helm-l2
+gen-helm-values: check-nodes gen-bootstrap gen-helm-l1 gen-helm-l2
 
 
 k8s-secrets-create:
