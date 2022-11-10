@@ -1,7 +1,9 @@
 package corruptlibp2p
 
 import (
+	"context"
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -9,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -26,7 +29,7 @@ func TestSpammerGossipSub(t *testing.T) {
 	disallowedList := map[*flow.Identity]struct{}{}
 
 	for i := 0; i < count; i++ {
-		handler, inbound := p2pfixtures.StreamHandlerFixture(t)
+		handler, inbound := p2ptest.StreamHandlerFixture(t)
 		node, id := p2pfixtures.NodeFixture(
 			t,
 			sporkId,

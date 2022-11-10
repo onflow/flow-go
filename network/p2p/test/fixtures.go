@@ -1,6 +1,7 @@
 package p2ptest
 
 import (
+	"bufio"
 	"context"
 	"testing"
 	"time"
@@ -268,4 +269,16 @@ func StopNodes(t *testing.T, nodes []p2p.LibP2PNode, cancel context.CancelFunc, 
 func StopNode(t *testing.T, node p2p.LibP2PNode, cancel context.CancelFunc, timeout time.Duration) {
 	cancel()
 	unittest.RequireComponentsDoneBefore(t, timeout, node)
+}
+
+// StreamHandlerFixture returns a stream handler that writes the received message to the given channel.
+func StreamHandlerFixture(t *testing.T) (func(s network.Stream), chan string) {
+	ch := make(chan string, 1) // channel to receive messages
+
+	return func(s network.Stream) {
+		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+		str, err := rw.ReadString('\n')
+		require.NoError(t, err)
+		ch <- str
+	}, ch
 }

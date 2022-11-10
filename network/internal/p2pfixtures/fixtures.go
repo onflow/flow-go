@@ -12,7 +12,6 @@ import (
 	addrutil "github.com/libp2p/go-addr-util"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -478,18 +477,6 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 			require.NotNil(t, s)
 		}
 	}
-}
-
-// StreamHandlerFixture returns a stream handler that writes the received message to the given channel.
-func StreamHandlerFixture(t *testing.T) (func(s network.Stream), chan string) {
-	ch := make(chan string, 1) // channel to receive messages
-
-	return func(s network.Stream) {
-		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-		str, err := rw.ReadString('\n')
-		require.NoError(t, err)
-		ch <- str
-	}, ch
 }
 
 // LongStringMessageFactoryFixture returns a function that creates a long unique string message.

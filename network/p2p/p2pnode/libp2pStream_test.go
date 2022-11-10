@@ -392,14 +392,14 @@ func testUnicastOverStream(t *testing.T, opts ...p2ptest.NodeFixtureParameterOpt
 	// Creates nodes
 	sporkId := unittest.IdentifierFixture()
 
-	streamHandler1, inbound1 := p2pfixtures.StreamHandlerFixture(t)
+	streamHandler1, inbound1 := p2ptest.StreamHandlerFixture(t)
 	node1, id1 := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		append(opts, p2ptest.WithDefaultStreamHandler(streamHandler1))...)
 
-	streamHandler2, inbound2 := p2pfixtures.StreamHandlerFixture(t)
+	streamHandler2, inbound2 := p2ptest.StreamHandlerFixture(t)
 	node2, id2 := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -432,7 +432,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	// node2: supports plain and gzip
 	sporkId := unittest.IdentifierFixture()
 
-	streamHandler1, inbound1 := p2pfixtures.StreamHandlerFixture(t)
+	streamHandler1, inbound1 := p2ptest.StreamHandlerFixture(t)
 	node1, id1 := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -440,7 +440,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 		p2ptest.WithDefaultStreamHandler(streamHandler1),
 	)
 
-	streamHandler2, inbound2 := p2pfixtures.StreamHandlerFixture(t)
+	streamHandler2, inbound2 := p2ptest.StreamHandlerFixture(t)
 	node2, id2 := p2ptest.NodeFixture(
 		t,
 		sporkId,

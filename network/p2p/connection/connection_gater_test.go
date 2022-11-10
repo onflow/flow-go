@@ -117,7 +117,7 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 
 	connectionGater := mockp2p.NewConnectionGater(t)
 	for i := 0; i < count; i++ {
-		handler, inbound := p2pfixtures.StreamHandlerFixture(t)
+		handler, inbound := p2ptest.StreamHandlerFixture(t)
 		node, _ := p2ptest.NodeFixture(
 			t,
 			sporkId,
@@ -201,7 +201,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 	disallowedList := map[*flow.Identity]struct{}{}
 
 	for i := 0; i < count; i++ {
-		handler, inbound := p2pfixtures.StreamHandlerFixture(t)
+		handler, inbound := p2ptest.StreamHandlerFixture(t)
 		node, id := p2ptest.NodeFixture(
 			t,
 			sporkId,
