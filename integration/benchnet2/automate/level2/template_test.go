@@ -27,24 +27,6 @@ func TestApply_DataTable(t *testing.T) {
 			expectedOutput: filepath.Join(ExpectedOutputPath, "access_template.yml"),
 		},
 
-		"values1 - original, empty template": {
-			templatePath:   filepath.Join(TemplatesPath, "values1-original.yml"),
-			dataPath:       filepath.Join(DataPath, "values1-original.json"),
-			expectedOutput: filepath.Join(ExpectedOutputPath, "values1.yml"),
-		},
-
-		"values2 - access nodes - separate node ids": {
-			templatePath:   filepath.Join(TemplatesPath, "values2-access-nodes.yml"),
-			dataPath:       filepath.Join(DataPath, "values2-access-nodes.json"),
-			expectedOutput: filepath.Join(ExpectedOutputPath, "values1.yml"),
-		},
-
-		"values10 - nested template (args)": {
-			templatePath:   filepath.Join(TemplatesPath, "values10-nested-template-args.yml"),
-			dataPath:       filepath.Join(DataPath, "values8-verification-nodes-if-loop.json"), // same data file
-			expectedOutput: filepath.Join(ExpectedOutputPath, "values1.yml"),
-		},
-
 		"values11 - nested template (defaults)": {
 			templatePath:   filepath.Join(TemplatesPath, "values11-nested-template-defaults.yml"),
 			dataPath:       filepath.Join(DataPath, "values8-verification-nodes-if-loop.json"), // same data file
