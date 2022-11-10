@@ -92,8 +92,6 @@ func NewParticipant(
 		modules.Forks,
 		modules.Persist,
 		modules.Committee,
-		modules.VoteAggregator,
-		modules.TimeoutAggregator,
 		safetyRules,
 		modules.Notifier,
 	)

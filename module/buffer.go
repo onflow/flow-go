@@ -10,6 +10,7 @@ import (
 // cannot yet be processed because they do not connect to the rest of the chain
 // state. They are indexed by parent ID to enable processing all of a parent's
 // children once the parent is received.
+// Safe for concurrent use.
 type PendingBlockBuffer interface {
 	Add(originID flow.Identifier, proposal *messages.BlockProposal) bool
 
@@ -27,6 +28,7 @@ type PendingBlockBuffer interface {
 
 // PendingClusterBlockBuffer is the same thing as PendingBlockBuffer, but for
 // collection node cluster consensus.
+// Safe for concurrent use.
 type PendingClusterBlockBuffer interface {
 	Add(originID flow.Identifier, proposal *messages.ClusterBlockProposal) bool
 

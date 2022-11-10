@@ -83,25 +83,18 @@ type Instance struct {
 }
 
 type MockedCommunicatorConsumer struct {
-	notifications.NoopConsumer
-	mock.Mock
+	notifications.NoopPartialConsumer
+	notifications.NoopFinalizationConsumer
+	*mocks.CommunicatorConsumer
 }
 
-// OnOwnProposal provides a mock function with given fields: proposal, delay
-func (_m *MockedCommunicatorConsumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
-	_m.Called(proposal, targetPublicationTime)
+func NewMockedCommunicatorConsumer() *MockedCommunicatorConsumer {
+	return &MockedCommunicatorConsumer{
+		CommunicatorConsumer: &mocks.CommunicatorConsumer{},
+	}
 }
 
-// OnOwnTimeout provides a mock function with given fields: timeout
-func (_m *MockedCommunicatorConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
-	_m.Called(timeout)
-}
-
-// OnOwnVote provides a mock function with given fields: blockID, view, sigData, recipientID
-func (_m *MockedCommunicatorConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
-	_m.Called(blockID, view, sigData, recipientID)
-}
-
+var _ hotstuff.Consumer = (*MockedCommunicatorConsumer)(nil)
 var _ hotstuff.TimeoutCollectorConsumer = (*Instance)(nil)
 
 func NewInstance(t *testing.T, options ...Option) *Instance {
@@ -166,7 +159,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		persist:   &mocks.Persister{},
 		signer:    &mocks.Signer{},
 		verifier:  &mocks.Verifier{},
-		notifier:  &MockedCommunicatorConsumer{},
+		notifier:  NewMockedCommunicatorConsumer(),
 		finalizer: &module.Finalizer{},
 	}
 
@@ -320,7 +313,16 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		in.queue <- timeoutObject
 	},
 	)
-	in.notifier.On("OnOwnVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	// in case of single node setup we should just forward vote to our own node
+	// for multi-node setup this method will be overridden
+	in.notifier.On("OnOwnVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		in.queue <- &model.Vote{
+			View:     args[1].(uint64),
+			BlockID:  args[0].(flow.Identifier),
+			SignerID: in.localID,
+			SigData:  args[2].([]byte),
+		}
+	})
 
 	// program the finalizer module behaviour
 	in.finalizer.On("MakeFinal", mock.Anything).Return(
@@ -498,8 +500,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		in.forks,
 		in.persist,
 		in.committee,
-		in.voteAggregator,
-		in.timeoutAggregator,
 		in.safetyRules,
 		notifier,
 	)
@@ -561,6 +561,9 @@ func (in *Instance) Run() error {
 		case msg := <-in.queue:
 			switch m := msg.(type) {
 			case *model.Proposal:
+				// add block to aggregator
+				in.voteAggregator.AddBlock(m)
+				// then pass to event handler
 				err := in.handler.OnReceiveProposal(m)
 				if err != nil {
 					return fmt.Errorf("could not process proposal: %w", err)
