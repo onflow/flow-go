@@ -13,7 +13,7 @@ require (
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/rs/zerolog v1.28.0
 	github.com/stretchr/testify v1.8.0
-	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110000148-5e7a6828a453
+	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110003401-b897e22c3c7c
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
 )

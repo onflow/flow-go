@@ -872,6 +872,8 @@ github.com/libp2p/go-libp2p-peerstore v0.8.0 h1:bzTG693TA1Ju/zKmUCQzDLSqiJnyRFVw
 github.com/libp2p/go-libp2p-pnet v0.2.0/go.mod h1:Qqvq6JH/oMZGwqs3N1Fqhv8NVhrdYcO0BW4wssv21LA=
 github.com/libp2p/go-libp2p-pubsub v0.8.1-0.20220908052023-8866ca88a105 h1:EAAgUl0EnSk4Z/ct1xsHTYSy9JYDdcTazrC6phSdlIY=
 github.com/libp2p/go-libp2p-pubsub v0.8.1-0.20220908052023-8866ca88a105/go.mod h1:e4kT+DYjzPUYGZeWk4I+oxCSYTXizzXii5LDRRhjKSw=
+github.com/libp2p/go-libp2p-pubsub v0.8.1 h1:hSw09NauFUaA0FLgQPBJp6QOy0a2n+HSkb8IeOx8OnY=
+github.com/libp2p/go-libp2p-pubsub v0.8.1/go.mod h1:e4kT+DYjzPUYGZeWk4I+oxCSYTXizzXii5LDRRhjKSw=
 github.com/libp2p/go-libp2p-quic-transport v0.10.0/go.mod h1:RfJbZ8IqXIhxBRm5hqUEJqjiiY8xmEuq3HUDS993MkA=
 github.com/libp2p/go-libp2p-record v0.1.0/go.mod h1:ujNc8iuE5dlKWVy6wuL6dd58t0n7xI4hAIl8pE6wu5Q=
 github.com/libp2p/go-libp2p-record v0.2.0 h1:oiNUOCWno2BFuxt3my4i1frNrt7PerzB3queqa1NkQ0=
@@ -1491,6 +1493,8 @@ github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
 github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11 h1:WYWfp6ydU0v6ev+amaIRIfxJEoEnf9HP0o523qlg/1o=
 github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11/go.mod h1:GwZ5VBU63KlM8wZsnVvSGDIMeGMOO9Cb3uLXDP8WFYM=
+github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110003401-b897e22c3c7c h1:Za50fWzRA8RfwWvy434k+HpTFUuL5Tlx3SvhoEcv1CA=
+github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110003401-b897e22c3c7c/go.mod h1:lqsC4XUC1754dyyPIJjQ4rhVhmv2SMAgq+1MJUoJyOU=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
