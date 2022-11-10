@@ -1,6 +1,6 @@
 DOCKER_TAG := $(shell git rev-parse --short HEAD)
 
-# default values that can callers override when calling target
+# default values that callers can override when calling target
 ACCESS_NODES=2
 COLLECTION_NODES=6
 CONSENSUS_NODES=3
