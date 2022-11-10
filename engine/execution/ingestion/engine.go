@@ -410,7 +410,7 @@ func (e *Engine) reloadBlock(
 		return fmt.Errorf("could not enqueue block %x on reloading: %w", blockID, err)
 	}
 
-	return e.addOrFetch(block.Header, missingCollections)
+	return e.addOrFetch(blockID, block.Header.Height, missingCollections)
 }
 
 // BlockProcessable handles the new verified blocks (blocks that
@@ -486,7 +486,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 		return fmt.Errorf("could not enqueue block %v: %w", blockID, err)
 	}
 
-	return e.addOrFetch(block.Header, missingCollections)
+	return e.addOrFetch(blockID, block.Header.Height, missingCollections)
 }
 
 func (e *Engine) enqueueBlockAndCheckExecutable(
@@ -704,7 +704,7 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 
 	// e.checkStateSyncStop(executed.Block.Header.Height)
 
-	var missingCollections []*flow.CollectionGuarantee
+	missingCollections := make(map[*entity.ExecutableBlock][]*flow.CollectionGuarantee)
 	err := e.mempool.Run(
 		func(
 			blockByCollection *stdmap.BlockByCollectionBackdata,
@@ -743,7 +743,9 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 				if err != nil {
 					return fmt.Errorf("cannot send collection requests: %w", err)
 				}
-				missingCollections = missing
+				if len(missing) > 0 {
+					missingCollections[child] = append(missingCollections[child], missing...)
+				}
 
 				completed := e.executeBlockIfComplete(child)
 				if !completed {
@@ -771,7 +773,14 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			Msg("error while requeueing blocks after execution")
 	}
 
-	return e.addOrFetch(executed.Block.Header, missingCollections)
+	for child, missing := range missingCollections {
+		err := e.addOrFetch(child.ID(), child.Block.Header.Height, missing)
+		if err != nil {
+			return fmt.Errorf("fail to add missing collections: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // executeBlockIfComplete checks whether the block is ready to be executed.
@@ -1284,9 +1293,7 @@ func GenerateExecutionReceipt(
 // addOrFetch checks if there are stored collections for the given guarantees, if there is,
 // forward them to mempool to process the collection, otherwise fetch the collections.
 // any error returned are exception
-func (e *Engine) addOrFetch(header *flow.Header, guarantees []*flow.CollectionGuarantee) error {
-	blockID := header.ID()
-	height := header.Height
+func (e *Engine) addOrFetch(blockID flow.Identifier, height uint64, guarantees []*flow.CollectionGuarantee) error {
 	fetched := false
 	for _, guarantee := range guarantees {
 		// if we've requested this collection, we will store it in the storage,
