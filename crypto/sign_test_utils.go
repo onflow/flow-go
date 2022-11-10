@@ -68,6 +68,7 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		s, err := sk.Sign(input, halg)
 		require.NoError(t, err)
 		pk := sk.PublicKey()
+		fmt.Println(pk)
 
 		// test a valid signature
 		result, err := pk.Verify(s, input, halg)

@@ -270,7 +270,7 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     ep_free(t);
  }
 
-// (int fp_read_bin_safe) is a modified version of Relic's (void fp_read_bin).
+// fp_read_bin_safe is a modified version of Relic's (void fp_read_bin).
 // It reads a field element from a buffer and makes sure the big number read can be 
 // written as a field element (is reduced modulo p). 
 // Unlike Relic's versions, the function does not reduce the read integer modulo p and does
@@ -431,7 +431,7 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
     ep_free(t);
 }
 
-// (int fp2_read_bin_safe) is a modified version of Relic's (void fp2_read_bin).
+// fp2_read_bin_safe is a modified version of Relic's (void fp2_read_bin).
 // It reads an Fp^2 element from a buffer and makes sure the big numbers read can be 
 // written as field elements (are reduced modulo p). 
 // Unlike Relic's versions, the function does not reduce the read integers modulo p and does

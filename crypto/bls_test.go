@@ -5,6 +5,7 @@ package crypto
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	mrand "math/rand"
 	"testing"
@@ -16,13 +17,41 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
-// BLS tests
-func TestBLSBLS12381(t *testing.T) {
-	halg := NewExpandMsgXOFKMAC128("test tag")
+// TestBLSMainMethods is a sanity check of main signature scheme methods (keyGen, sign, verify)
+func TestBLSMainMethods(t *testing.T) {
+	hasher := NewExpandMsgXOFKMAC128("test tag")
 	// test the key generation seed lengths
-	testKeyGenSeed(t, BLSBLS12381, KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
+	//testKeyGenSeed(t, BLSBLS12381, KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
 	// test the consistency with different inputs
-	testGenSignVerify(t, BLSBLS12381, halg)
+	testGenSignVerify(t, BLSBLS12381, hasher)
+
+	// specific signature test for BLS:
+	// Test a signature with a point encoded with a coordinate x not reduced mod p
+	// The same signature point with the x coordinate reduced passes verification.
+	// This test checks that:
+	//  - signature decoding handles input x-coordinates larger than p (doesn't result in an exception)
+	//  - signature decoding only accepts reduced x-coordinates to avoid signature malleability
+	t.Run("invalid x coordinate larger than p", func(t *testing.T) {
+		msg, err := hex.DecodeString("7f26ba692dc2da7ff828ef4675ff1cd6ab855fca0637b6dab295f1df8e51bc8bb1b8f0c6610aabd486cf1f098f2ddbc6691d94e10f928816f890a3d366ce46249836a595c7ea1828af52e899ba2ab627ab667113bb563918c5d5a787c414399487b4e3a7")
+		require.NoError(t, err)
+		validSig, err := hex.DecodeString("80b0cac2a0f4f8881913edf2b29065675dfed6f6f4e17e9b5d860a845d4e7d476b277d06a493b81482e63d8131f9f2fa")
+		require.NoError(t, err)
+		invalidSig, err := hex.DecodeString("9AB1DCACDA74DF22642F95A8F5DC123EC276227BE866915AC4B6DD2553FF736B89D37D0555E7B8143CE53D8131F99DA5")
+		require.NoError(t, err)
+		pkBytes, err := hex.DecodeString("a7ac85ac8ffd9d2611f73721a93ec92115f29d769dfa425fec2e2c26ab3e4e8089a961ab430639104262723e829b75e9190a05d8fc8d22a7ac78a18473cc3df146b5c4c9c8e46d5f208039384fe2fc018321f14c01641c3afff7558a2eb06463")
+		require.NoError(t, err)
+		pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
+		require.NoError(t, err)
+		// sanity check of valid signature (P_x < p)
+		valid, err := pk.Verify(validSig, msg, hasher)
+		require.NoError(t, err)
+		require.True(t, valid)
+		// invalid signature (P'_x = P_x + p )
+		valid, err = pk.Verify(invalidSig, msg, hasher)
+		require.NoError(t, err)
+		assert.False(t, valid)
+	})
+
 }
 
 // Signing bench
@@ -143,6 +172,31 @@ func TestBLSEncodeDecode(t *testing.T) {
 	require.Error(t, err, "the key decoding should fail - key value is invalid")
 	assert.True(t, IsInvalidInputsError(err))
 	assert.Nil(t, pk)
+
+	// Test a public key serialization with a point encoded with a coordinate x with
+	// x[0] or x[1] not reduced mod p.
+	// The same public key point with x[0] and x[1] reduced passes decoding.
+	// This test checks that:
+	//  - public key decoding handles input x-coordinates with x[0] and x[1] larger than p (doesn't result in an exception)
+	//  - public key decoding only accepts reduced x[0] and x[1] to insure key serialization uniqueness.
+	// Although uniqueness of public key respresentation isn't a security property, some implementations
+	// may implicitely rely on the property.
+
+	// valid pk with x[0] < p and x[1] < p
+	validPk, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b8038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
+	require.NoError(t, err)
+	_, err = DecodePublicKey(BLSBLS12381, validPk)
+	assert.NoError(t, err)
+	// invalidpk1 with x[0]+p and same x[1]
+	invalidPk1, err := hex.DecodeString("9B8E840277BE772540D913E47A94F94C00003BBE60C4CEEB0C0ABCC9E876034089000EC7AF5AB6D81AF62EC9363D5E63038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
+	require.NoError(t, err)
+	_, err = DecodePublicKey(BLSBLS12381, invalidPk1)
+	assert.Error(t, err)
+	// invalidpk1 with same x[0] and x[1]+p
+	invalidPk2, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b81D84726AD080BA07C1385A1CF2B758C104E127F8585862EDEB843E798A86E6C2E1894F067C35F8A132FEACC450F9644D")
+	require.NoError(t, err)
+	_, err = DecodePublicKey(BLSBLS12381, invalidPk2)
+	assert.Error(t, err)
 }
 
 // TestBLSEquals tests equal for BLS keys
