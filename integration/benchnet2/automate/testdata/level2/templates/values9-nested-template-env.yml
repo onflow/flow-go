@@ -66,13 +66,7 @@ access:
         - --log-tx-time-to-finalized
         - --log-tx-time-to-executed
         - --log-tx-time-to-finalized-executed
-      env:
-        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-          value: http://tempo:4317
-        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-          value: "true"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network=localnet,role=%s,num=%s
+{{template "env"}}
       image: gcr.io/flow-container-registry/access:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
@@ -135,13 +129,7 @@ collection:
         - --ingress-addr=0.0.0.0:9000
         - --insecure-access-api=false
         - --access-node-ids=*
-      env:
-        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-          value: http://tempo:4317
-        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-          value: "true"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network=localnet,role=%s,num=%s
+{{template "env"}}
       image: gcr.io/flow-container-registry/collection:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
@@ -205,13 +193,7 @@ consensus:
         - --emergency-sealing-active=false
         - --insecure-access-api=false
         - --access-node-ids=*
-      env:
-        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-          value: http://tempo:4317
-        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-          value: "true"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network=localnet,role=%s,num=%s
+{{template "env"}}
       image: gcr.io/flow-container-registry/consensus:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
@@ -269,13 +251,7 @@ execution:
         - --rpc-addr=0.0.0.0:9000
         - --cadence-tracing=false
         - --extensive-tracing=false
-      env:
-        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-          value: http://tempo:4317
-        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-          value: "true"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network=localnet,role=%s,num=%s
+{{template "env"}}
       image: gcr.io/flow-container-registry/execution:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
@@ -333,6 +309,12 @@ verification:
         - --profiler-interval=2m
         - --nodeid={{$val.node_id}}
         - --chunk-alpha=1
+{{template "env"}}
+      image: gcr.io/flow-container-registry/verification:{{$val.docker_tag}}
+      nodeId: {{$val.node_id}}
+{{- end -}}{{- end -}}
+
+{{define "env"}}
       env:
         - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
           value: http://tempo:4317
@@ -340,16 +322,4 @@ verification:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network=localnet,role=%s,num=%s
-      image: gcr.io/flow-container-registry/verification:{{$val.docker_tag}}
-      nodeId: {{$val.node_id}}
-{{- end -}}{{- end -}}
-
-{{define "env"}}
-env:
-  - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-    value: http://tempo:4317
-  - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
-    value: "true"
-  - name: OTEL_RESOURCE_ATTRIBUTES
-    value: network=localnet,role=%s,num=%s
 {{end}}
