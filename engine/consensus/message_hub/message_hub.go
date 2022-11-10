@@ -45,7 +45,7 @@ type packedVote struct {
 	vote        *messages.BlockVote
 }
 
-// MessageHub is a central module for handling incoming and outgoing messages via cluster consensus channel.
+// MessageHub is a central module for handling incoming and outgoing messages via consensus channel.
 // It performs message routing for incoming messages by matching them by type and sending to respective engine.
 // For incoming messages handling processing looks like this:
 //
@@ -59,7 +59,7 @@ type packedVote struct {
 //	          vote                     block                  timeout object
 //
 // MessageHub acts as communicator and handles hotstuff.Consumer communication events to send votes, broadcast timeouts
-// and proposals. It is responsible for communication between cluster consensus participants.
+// and proposals. It is responsible for communication between consensus participants.
 // It implements hotstuff.Consumer interface and needs to be subscribed for notifications via pub/sub.
 // All communicator events are handled on worker thread to prevent sender from blocking.
 // For outgoing messages processing logic looks like this:
@@ -293,9 +293,7 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 	return nil
 }
 
-// sendOwnProposal propagates the block proposal to the consensus cluster and submits to non-consensus network:
-//   - directly forwarded proposal to HotStuff core logic
-//     (skipping compliance engine as we assume our own proposals to be correct)
+// sendOwnProposal propagates the block proposal to the consensus committee and submits to non-consensus network:
 //   - broadcast to all other consensus participants (excluding myself)
 //   - broadcast to all non-consensus participants
 //
@@ -328,13 +326,6 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 		Logger()
 
 	log.Debug().Msg("processing proposal broadcast request from hotstuff")
-
-	hotstuffProposal := model.ProposalFromFlow(header)
-	// notify vote aggregator that new block proposal is available, in case we are next leader
-	h.voteAggregator.AddBlock(hotstuffProposal)
-
-	// TODO(active-pacemaker): replace with pub/sub?
-	h.hotstuff.SubmitProposal(hotstuffProposal) // non-blocking
 
 	// Retrieve all consensus nodes (excluding myself).
 	// CAUTION: We must include also nodes with weight zero, because otherwise
@@ -437,7 +428,8 @@ func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 	}
 }
 
-// OnOwnProposal queues proposal for subsequent propagation to all consensus participants (including this node).
+// OnOwnProposal directly forwards proposal to HotStuff core logic(skipping compliance engine as we assume our
+// own proposals to be correct) and queues proposal for subsequent propagation to all consensus participants (including this node).
 // The proposal will only be placed in the queue, after the specified delay (or dropped on shutdown signal).
 func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
 	go func() {
@@ -446,6 +438,14 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 		case <-h.ShutdownSignal():
 			return
 		}
+
+		hotstuffProposal := model.ProposalFromFlow(proposal)
+		// notify vote aggregator that new block proposal is available, in case we are next leader
+		h.voteAggregator.AddBlock(hotstuffProposal) // non-blocking
+
+		// TODO(active-pacemaker): replace with pub/sub?
+		// submit proposal to our own processing pipeline
+		h.hotstuff.SubmitProposal(hotstuffProposal) // non-blocking
 
 		if ok := h.ownOutboundProposals.Push(proposal); ok {
 			h.ownOutboundMessageNotifier.Notify()

@@ -303,10 +303,7 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 	return nil
 }
 
-// sendOwnProposal propagates the block proposal to the consensus cluster and submits to non-consensus network:
-//   - directly forwarded proposal to own compliance engine
-//   - broadcast to all other cluster participants (excluding myself)
-//
+// sendOwnProposal propagates the block proposal to the consensus committee by broadcasting to all other cluster participants (excluding myself)
 // No errors are expected during normal operations.
 func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	// first, check that we are the proposer of the block
@@ -332,13 +329,6 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 		Logger()
 
 	log.Debug().Msg("processing cluster broadcast request from hotstuff")
-
-	hotstuffProposal := model.ProposalFromFlow(header)
-	// notify vote aggregator that new block proposal is available, in case we are next leader
-	h.voteAggregator.AddBlock(hotstuffProposal)
-
-	// TODO(active-pacemaker): replace with pub/sub?
-	h.hotstuff.SubmitProposal(hotstuffProposal) // non-blocking
 
 	// retrieve all collection nodes in our cluster
 	recipients, err := h.state.Final().Identities(h.clusterIdentityFilter)
@@ -404,7 +394,8 @@ func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 	}
 }
 
-// OnOwnProposal queues proposal for subsequent propagation to all consensus participants (including this node).
+// OnOwnProposal directly forwards proposal to HotStuff core logic(skipping compliance engine as we assume our
+// own proposals to be correct) and queues proposal for subsequent propagation to all consensus participants (including this node).
 // The proposal will only be placed in the queue, after the specified delay (or dropped on shutdown signal).
 func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
 	go func() {
@@ -413,6 +404,14 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 		case <-h.ShutdownSignal():
 			return
 		}
+
+		hotstuffProposal := model.ProposalFromFlow(proposal)
+		// notify vote aggregator that new block proposal is available, in case we are next leader
+		h.voteAggregator.AddBlock(hotstuffProposal) // non-blocking
+
+		// TODO(active-pacemaker): replace with pub/sub?
+		// submit proposal to our own processing pipeline
+		h.hotstuff.SubmitProposal(hotstuffProposal) // non-blocking
 
 		if ok := h.ownOutboundProposals.Push(proposal); ok {
 			h.ownOutboundMessageNotifier.Notify()

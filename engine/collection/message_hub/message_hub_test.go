@@ -297,8 +297,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 			Once()
 
 		// submit to broadcast proposal
-		err := s.hub.sendOwnProposal(block.Header)
-		require.NoError(s.T(), err, "header broadcast should pass")
+		s.hub.OnOwnProposal(block.Header, time.Now())
 
 		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
 	})
