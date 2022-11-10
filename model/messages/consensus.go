@@ -22,7 +22,7 @@ type UntrustedExecutionResult struct {
 func (ur UntrustedExecutionResult) ToInternal() *flow.ExecutionResult {
 	result := flow.ExecutionResult{
 		PreviousResultID: ur.PreviousResultID,
-		BlockID:          ur.PreviousResultID,
+		BlockID:          ur.BlockID,
 		Chunks:           make(flow.ChunkList, 0, len(ur.Chunks)),
 		ServiceEvents:    ur.ServiceEvents,
 		ExecutionDataID:  ur.ExecutionDataID,
