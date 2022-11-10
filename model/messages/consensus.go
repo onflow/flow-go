@@ -21,6 +21,7 @@ func (ur UntrustedExecutionResult) ToFlowResult() *flow.ExecutionResult {
 		ExecutionDataID:  ur.ExecutionDataID,
 	}
 	for _, chunk := range ur.Chunks {
+		chunk := chunk
 		result.Chunks = append(result.Chunks, &chunk)
 	}
 	return &result
@@ -30,7 +31,6 @@ func UntrustedExecutionResultFromInternal(flowResult *flow.ExecutionResult) Untr
 	result := UntrustedExecutionResult{
 		PreviousResultID: flowResult.PreviousResultID,
 		BlockID:          flowResult.BlockID,
-		Chunks:           make([]flow.Chunk, 0, flowResult.Chunks.Len()),
 		ServiceEvents:    flowResult.ServiceEvents,
 		ExecutionDataID:  flowResult.ExecutionDataID,
 	}
@@ -54,24 +54,23 @@ type UntrustedBlock struct {
 
 func (ub UntrustedBlock) ToInternal() *flow.Block {
 	block := flow.Block{
-		Header: &ub.Header,
-		Payload: &flow.Payload{
-			Guarantees: make([]*flow.CollectionGuarantee, 0, len(ub.Payload.Guarantees)),
-			Seals:      make([]*flow.Seal, 0, len(ub.Payload.Seals)),
-			Receipts:   make(flow.ExecutionReceiptMetaList, 0, len(ub.Payload.Receipts)),
-			Results:    make(flow.ExecutionResultList, 0, len(ub.Payload.Results)),
-		},
+		Header:  &ub.Header,
+		Payload: &flow.Payload{},
 	}
 	for _, guarantee := range ub.Payload.Guarantees {
+		guarantee := guarantee
 		block.Payload.Guarantees = append(block.Payload.Guarantees, &guarantee)
 	}
 	for _, seal := range ub.Payload.Seals {
+		seal := seal
 		block.Payload.Seals = append(block.Payload.Seals, &seal)
 	}
 	for _, receipt := range ub.Payload.Receipts {
+		receipt := receipt
 		block.Payload.Receipts = append(block.Payload.Receipts, &receipt)
 	}
 	for _, result := range ub.Payload.Results {
+		result := result
 		block.Payload.Results = append(block.Payload.Results, result.ToFlowResult())
 	}
 

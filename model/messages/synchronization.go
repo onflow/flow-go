@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -46,9 +47,25 @@ type BlockResponse struct {
 	Blocks []UntrustedBlock
 }
 
+func (br *BlockResponse) BlocksInternal() []*flow.Block {
+	internal := make([]*flow.Block, len(br.Blocks))
+	for i, b := range br.Blocks {
+		internal[i] = b.ToInternal()
+	}
+	return internal
+}
+
 // ClusterBlockResponse is the same thing as BlockResponse, but for cluster
 // consensus.
 type ClusterBlockResponse struct {
 	Nonce  uint64
 	Blocks []UntrustedClusterBlock
+}
+
+func (br *ClusterBlockResponse) BlocksInternal() []*cluster.Block {
+	internal := make([]*cluster.Block, len(br.Blocks))
+	for i, b := range br.Blocks {
+		internal[i] = b.ToInternal()
+	}
+	return internal
 }

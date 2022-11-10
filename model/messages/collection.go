@@ -38,13 +38,11 @@ func (ub UntrustedClusterBlock) ToInternal() *cluster.Block {
 	block := &cluster.Block{
 		Header: &ub.Header,
 		Payload: &cluster.Payload{
-			Collection: flow.Collection{
-				Transactions: make([]*flow.TransactionBody, 0, len(ub.Payload.Collection)),
-			},
 			ReferenceBlockID: ub.Payload.ReferenceBlockID,
 		},
 	}
 	for _, tx := range ub.Payload.Collection {
+		tx := tx
 		block.Payload.Collection.Transactions = append(block.Payload.Collection.Transactions, &tx)
 	}
 	return block
