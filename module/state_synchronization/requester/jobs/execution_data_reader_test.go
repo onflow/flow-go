@@ -196,19 +196,9 @@ func (suite *ExecutionDataReaderSuite) runTest(fn func()) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go irrecoverableNotExpected(suite.T(), ctx, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	suite.reader.AddContext(signalCtx)
+	suite.reader.AddContext(signalerCtx)
 
 	fn()
-}
-
-func irrecoverableNotExpected(t *testing.T, ctx context.Context, errChan <-chan error) {
-	select {
-	case <-ctx.Done():
-		return
-	case err := <-errChan:
-		require.NoError(t, err, "unexpected irrecoverable error")
-	}
 }

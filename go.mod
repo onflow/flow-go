@@ -7,6 +7,7 @@ require (
 	cloud.google.com/go/profiler v0.3.0
 	cloud.google.com/go/storage v1.22.1
 	github.com/antihax/optional v1.0.0
+	github.com/aws/aws-sdk-go-v2/config v1.8.0
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.5.1
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.15.0
 	github.com/btcsuite/btcd v0.22.1 // indirect
@@ -32,7 +33,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/improbable-eng/grpc-web v0.12.0
-	github.com/ipfs/go-bitswap v0.9.0
+	github.com/ipfs/go-bitswap v0.9.0 // indirect
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-blockservice v0.4.0
 	github.com/ipfs/go-cid v0.2.0
@@ -55,13 +56,14 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/onflow/atree v0.4.0
-	github.com/onflow/cadence v0.27.0
-	github.com/onflow/flow v0.3.3-0.20221012172052-e4ab66320562
+	github.com/onflow/cadence v0.28.0
+	github.com/onflow/flow v0.3.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220720151516-797b149ceaaa
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220720151516-797b149ceaaa
-	github.com/onflow/flow-go-sdk v0.28.0
+	github.com/onflow/flow-go-sdk v0.29.0
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221012172052-e4ab66320562
+	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
@@ -69,6 +71,7 @@ require (
 	github.com/rs/zerolog v1.26.1
 	github.com/schollz/progressbar/v3 v3.8.3
 	github.com/sethvargo/go-retry v0.2.3
+	github.com/shirou/gopsutil/v3 v3.22.2
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.12.0
@@ -95,11 +98,6 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gotest.tools v2.2.0+incompatible
 	pgregory.net/rapid v0.4.7
-)
-
-require (
-	github.com/aws/aws-sdk-go-v2/config v1.8.0
-	github.com/shirou/gopsutil/v3 v3.22.8
 )
 
 require (
@@ -196,7 +194,6 @@ require (
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-core v0.20.1 // indirect
-	github.com/libp2p/go-libp2p-loggables v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-record v0.2.0 // indirect
 	github.com/libp2p/go-msgio v0.2.0 // indirect
 	github.com/libp2p/go-nat v0.1.0 // indirect
@@ -260,8 +257,8 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/stretchr/objx v0.4.0 // indirect
 	github.com/subosito/gotenv v1.4.0 // indirect
-	github.com/tklauser/go-sysconf v0.3.10 // indirect
-	github.com/tklauser/numcpus v0.4.0 // indirect
+	github.com/tklauser/go-sysconf v0.3.9 // indirect
+	github.com/tklauser/numcpus v0.3.0 // indirect
 	github.com/turbolent/prettier v0.0.0-20220320183459-661cc755135d // indirect
 	github.com/vmihailenco/tagparser v0.1.1 // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/onflow/cadence/runtime/common"
 
@@ -19,16 +20,27 @@ const (
 	DefaultMaxValueSize       = 256_000_000 // ~256MB
 	DefaultMaxInteractionSize = 20_000_000  // ~20MB
 
-	AccountKeyPrefix = "a."
-	KeyAccountStatus = AccountKeyPrefix + "s"
-	KeyCode          = "code"
-	KeyContractNames = "contract_names"
+	// Service level keys (owner is empty):
+	UUIDKey         = "uuid"
+	AddressStateKey = "account_address_state"
+
+	// Account level keys
+	AccountKeyPrefix   = "a."
+	AccountStatusKey   = AccountKeyPrefix + "s"
+	CodeKeyPrefix      = "code."
+	ContractNamesKey   = "contract_names"
+	PublicKeyKeyPrefix = "public_key_"
 )
 
 // State represents the execution state
 // it holds draft of updates and captures
 // all register touches
 type State struct {
+	// NOTE: A committed state is no longer accessible.  It can however be
+	// re-attached to another transaction and be committed (for cached result
+	// bookkeeping purpose).
+	committed bool
+
 	view             View
 	meter            *meter.Meter
 	updatedAddresses map[flow.Address]struct{}
@@ -100,6 +112,7 @@ type StateOption func(st *State) *State
 func NewState(view View, params StateParameters) *State {
 	m := meter.NewMeter(params.MeterParameters)
 	return &State{
+		committed:        false,
 		view:             view,
 		meter:            m,
 		updatedAddresses: make(map[flow.Address]struct{}),
@@ -110,6 +123,7 @@ func NewState(view View, params StateParameters) *State {
 // NewChild generates a new child state
 func (s *State) NewChild() *State {
 	return &State{
+		committed:        false,
 		view:             s.view.NewChild(),
 		meter:            s.meter.NewChild(),
 		updatedAddresses: make(map[flow.Address]struct{}),
@@ -124,6 +138,10 @@ func (s *State) InteractionUsed() uint64 {
 
 // Get returns a register value given owner and key
 func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, error) {
+	if s.committed {
+		return nil, fmt.Errorf("cannot Get on a committed state")
+	}
+
 	var value []byte
 	var err error
 
@@ -150,6 +168,10 @@ func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, e
 
 // Set updates state delta with a register update
 func (s *State) Set(owner, key string, value flow.RegisterValue, enforceLimit bool) error {
+	if s.committed {
+		return fmt.Errorf("cannot Set on a committed state")
+	}
+
 	if enforceLimit {
 		if err := s.checkSize(owner, key, value); err != nil {
 			return err
@@ -179,23 +201,17 @@ func (s *State) Set(owner, key string, value flow.RegisterValue, enforceLimit bo
 	return nil
 }
 
-// Delete deletes a register
-func (s *State) Delete(owner, key string, enforceLimit bool) error {
-	return s.Set(owner, key, nil, enforceLimit)
-}
-
-// Touch touches a register
-func (s *State) Touch(owner, key string) error {
-	return s.view.Touch(owner, key)
-}
-
 // MeterComputation meters computation usage
 func (s *State) MeterComputation(kind common.ComputationKind, intensity uint) error {
+	if s.committed {
+		return fmt.Errorf("cannot MeterComputation on a committed state")
+	}
+
 	return s.meter.MeterComputation(kind, intensity)
 }
 
 // TotalComputationUsed returns total computation used
-func (s *State) TotalComputationUsed() uint {
+func (s *State) TotalComputationUsed() uint64 {
 	return s.meter.TotalComputationUsed()
 }
 
@@ -211,6 +227,10 @@ func (s *State) TotalComputationLimit() uint {
 
 // MeterMemory meters memory usage
 func (s *State) MeterMemory(kind common.MemoryKind, intensity uint) error {
+	if s.committed {
+		return fmt.Errorf("cannot MeterMemory on a committed state")
+	}
+
 	return s.meter.MeterMemory(kind, intensity)
 }
 
@@ -230,6 +250,10 @@ func (s *State) TotalMemoryLimit() uint {
 }
 
 func (s *State) MeterEmittedEvent(byteSize uint64) error {
+	if s.committed {
+		return fmt.Errorf("cannot MeterEmittedEvent on a committed state")
+	}
+
 	return s.meter.MeterEmittedEvent(byteSize)
 }
 
@@ -237,12 +261,12 @@ func (s *State) TotalEmittedEventBytes() uint64 {
 	return s.meter.TotalEmittedEventBytes()
 }
 
-func (s *State) TotalEventCounter() uint32 {
-	return s.meter.TotalEventCounter()
-}
-
 // MergeState applies the changes from a the given view to this view.
 func (s *State) MergeState(other *State) error {
+	if s.committed {
+		return fmt.Errorf("cannot MergeState on a committed state")
+	}
+
 	err := s.view.MergeView(other.view)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)
@@ -301,39 +325,27 @@ func addressFromOwner(owner string) (flow.Address, bool) {
 	return address, true
 }
 
-// IsFVMStateKey returns true if the
-// key is controlled by the fvm env and
+// IsFVMStateKey returns true if the key is controlled by the fvm env and
 // return false otherwise (key controlled by the cadence env)
-func IsFVMStateKey(owner, key string) bool {
-
+func IsFVMStateKey(owner string, key string) bool {
 	// check if is a service level key (owner is empty)
 	// cases:
 	// 		- "", "uuid"
 	// 		- "", "account_address_state"
-	if len(owner) == 0 {
+	if len(owner) == 0 && (key == UUIDKey || key == AddressStateKey) {
 		return true
 	}
+
 	// check account level keys
 	// cases:
 	// 		- address, "contract_names"
 	// 		- address, "code.%s" (contract name)
 	// 		- address, "public_key_%d" (index)
 	// 		- address, "a.s" (account status)
-
-	if bytes.HasPrefix([]byte(key), []byte("public_key_")) {
-		return true
-	}
-	if key == KeyContractNames {
-		return true
-	}
-	if bytes.HasPrefix([]byte(key), []byte(KeyCode)) {
-		return true
-	}
-	if key == KeyAccountStatus {
-		return true
-	}
-
-	return false
+	return strings.HasPrefix(key, PublicKeyKeyPrefix) ||
+		key == ContractNamesKey ||
+		strings.HasPrefix(key, CodeKeyPrefix) ||
+		key == AccountStatusKey
 }
 
 // PrintableKey formats slabs properly and avoids invalid utf8s

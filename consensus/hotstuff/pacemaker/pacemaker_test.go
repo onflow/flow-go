@@ -27,7 +27,7 @@ const (
 
 func expectedTimerInfo(view uint64) interface{} {
 	return mock.MatchedBy(
-		func(timerInfo *model.TimerInfo) bool {
+		func(timerInfo model.TimerInfo) bool {
 			return timerInfo.View == view
 		})
 }

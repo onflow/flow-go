@@ -36,16 +36,14 @@ import (
 //
 // Not concurrency safe.
 type EventHandler struct {
-	log               zerolog.Logger
-	paceMaker         hotstuff.PaceMaker
-	blockProducer     hotstuff.BlockProducer
-	forks             hotstuff.Forks
-	persist           hotstuff.Persister
-	committee         hotstuff.Replicas
-	voteAggregator    hotstuff.VoteAggregator
-	timeoutAggregator hotstuff.TimeoutAggregator
-	safetyRules       hotstuff.SafetyRules
-	notifier          hotstuff.Consumer
+	log           zerolog.Logger
+	paceMaker     hotstuff.PaceMaker
+	blockProducer hotstuff.BlockProducer
+	forks         hotstuff.Forks
+	persist       hotstuff.Persister
+	committee     hotstuff.Replicas
+	safetyRules   hotstuff.SafetyRules
+	notifier      hotstuff.Consumer
 }
 
 var _ hotstuff.EventHandler = (*EventHandler)(nil)
@@ -58,22 +56,18 @@ func NewEventHandler(
 	forks hotstuff.Forks,
 	persist hotstuff.Persister,
 	committee hotstuff.Replicas,
-	voteAggregator hotstuff.VoteAggregator,
-	timeoutAggregator hotstuff.TimeoutAggregator,
 	safetyRules hotstuff.SafetyRules,
 	notifier hotstuff.Consumer,
 ) (*EventHandler, error) {
 	e := &EventHandler{
-		log:               log.With().Str("hotstuff", "participant").Logger(),
-		paceMaker:         paceMaker,
-		blockProducer:     blockProducer,
-		forks:             forks,
-		persist:           persist,
-		safetyRules:       safetyRules,
-		committee:         committee,
-		voteAggregator:    voteAggregator,
-		timeoutAggregator: timeoutAggregator,
-		notifier:          notifier,
+		log:           log.With().Str("hotstuff", "participant").Logger(),
+		paceMaker:     paceMaker,
+		blockProducer: blockProducer,
+		forks:         forks,
+		persist:       persist,
+		safetyRules:   safetyRules,
+		committee:     committee,
+		notifier:      notifier,
 	}
 	return e, nil
 }
@@ -174,10 +168,6 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	if err != nil {
 		return fmt.Errorf("could not process TC for block %x: %w", block.BlockID, err)
 	}
-
-	// notify vote aggregator about a new block, so that it can start verifying
-	// votes for it.
-	e.voteAggregator.AddBlock(proposal)
 
 	// if the block is for the current view, then try voting for this block
 	err = e.processBlockForCurrentView(proposal)
@@ -294,9 +284,6 @@ func (e *EventHandler) broadcastTimeoutObjectIfAuthorized() error {
 		}
 		return fmt.Errorf("could not produce timeout: %w", err)
 	}
-
-	// contribute produced timeout to TC aggregation logic
-	e.timeoutAggregator.AddTimeout(timeout)
 
 	// raise a notification to broadcast timeout
 	e.notifier.OnOwnTimeout(timeout)
@@ -510,13 +497,8 @@ func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLea
 		return nil
 	}
 
-	if e.committee.Self() == nextLeader { // I am the next leader
-		log.Debug().Msg("forwarding vote to vote aggregator")
-		e.voteAggregator.AddVote(ownVote)
-	} else {
-		log.Debug().Msg("forwarding vote to compliance engine")
-		// raise a notification to send vote
-		e.notifier.OnOwnVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
-	}
+	log.Debug().Msg("forwarding vote to compliance engine")
+	// raise a notification to send vote
+	e.notifier.OnOwnVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
 	return nil
 }

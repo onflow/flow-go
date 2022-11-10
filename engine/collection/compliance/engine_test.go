@@ -177,6 +177,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			cs.headerDB[block.Header.ParentID] = cs.head
 			hotstuffProposal := model.ProposalFromFlow(block.Header)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
+			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
 			cs.engine.OnClusterBlockProposal(&block)
@@ -196,6 +197,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		cs.headerDB[block.Header.ParentID] = cs.head
 		hotstuffProposal := model.ProposalFromFlow(block.Header)
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
+		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 		cs.engine.OnClusterBlockProposal(proposal)
 		wg.Done()

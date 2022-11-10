@@ -254,7 +254,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with wrong proposer", func() {
 		header := *block.Header
 		header.ProposerID = unittest.IdentifierFixture()
-		err := s.hub.processQueuedProposal(&header)
+		err := s.hub.sendOwnProposal(&header)
 		require.Error(s.T(), err, "should fail with wrong proposer")
 		header.ProposerID = s.myID
 	})
@@ -264,7 +264,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with changed/missing parent", func() {
 		header := *block.Header
 		header.ParentID[0]++
-		err := s.hub.processQueuedProposal(&header)
+		err := s.hub.sendOwnProposal(&header)
 		require.Error(s.T(), err, "should fail with missing parent")
 		header.ParentID[0]--
 	})
@@ -273,7 +273,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with wrong block ID", func() {
 		header := *block.Header
 		header.View++
-		err := s.hub.processQueuedProposal(&header)
+		err := s.hub.sendOwnProposal(&header)
 		require.Error(s.T(), err, "should fail with missing payload")
 		header.View--
 	})
@@ -285,7 +285,9 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		}
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		s.hotstuff.On("SubmitProposal", model.ProposalFromFlow(block.Header)).
+		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
+		s.hotstuff.On("SubmitProposal", hotstuffProposal).
 			Run(func(args mock.Arguments) { close(submitted) }).
 			Once()
 
@@ -296,8 +298,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 			Once()
 
 		// submit to broadcast proposal
-		err := s.hub.processQueuedProposal(block.Header)
-		require.NoError(s.T(), err, "header broadcast should pass")
+		s.hub.OnOwnProposal(block.Header, time.Now())
 
 		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
 	})
@@ -333,6 +334,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.con.On("Publish", expectedBroadcastMsg, s.cluster[1].NodeID, s.cluster[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
+		s.timeoutAggregator.On("AddTimeout", timeout).Once()
 		// submit timeout
 		s.hub.OnOwnTimeout(timeout)
 	})
@@ -344,7 +346,9 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.payloads.On("ByBlockID", proposal.Header.ID()).Return(proposal.Payload, nil)
 
 		// unset chain and height to make sure they are correctly reconstructed
-		s.hotstuff.On("SubmitProposal", model.ProposalFromFlow(proposal.Header))
+		hotstuffProposal := model.ProposalFromFlow(proposal.Header)
+		s.voteAggregator.On("AddBlock", hotstuffProposal)
+		s.hotstuff.On("SubmitProposal", hotstuffProposal)
 		expectedBroadcastMsg := &messages.ClusterBlockProposal{
 			Header:  proposal.Header,
 			Payload: proposal.Payload,

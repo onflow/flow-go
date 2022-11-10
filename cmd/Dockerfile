@@ -70,3 +70,5 @@ FROM gcr.io/distroless/base-debian11 as production-transit-nocgo
 COPY --from=build-transit-production-nocgo /app/app /bin/app
 
 ENTRYPOINT ["/bin/app"]
+
+FROM build-setup as environment-clean

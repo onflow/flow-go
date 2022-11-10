@@ -632,7 +632,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	txs [][]*flow.TransactionBody,
 	opts []fvm.Option,
 	bootstrapOpts []fvm.BootstrapProcedureOption) *execution.ComputationResult {
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 
 	logger := zerolog.Nop()
 
@@ -700,7 +700,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	prevResultId := unittest.IdentifierFixture()
 
-	_, chdps, er, err := execution.GenerateExecutionResultAndChunkDataPacks(prevResultId, initialCommit, computationResult)
+	_, chdps, er, err := execution.GenerateExecutionResultAndChunkDataPacks(metrics.NewNoopCollector(), prevResultId, initialCommit, computationResult)
 	require.NoError(t, err)
 
 	verifier := chunks.NewChunkVerifier(vm, fvmContext, logger)

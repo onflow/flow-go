@@ -186,7 +186,7 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.RunV2(ctx, script, view)
+						err := vm.Run(ctx, script, view)
 						assert.NoError(t, err)
 						assert.NoError(t, script.Err)
 
@@ -203,7 +203,7 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.RunV2(ctx, script, view)
+						err := vm.Run(ctx, script, view)
 						assert.NoError(t, err)
 						assert.NoError(t, script.Err)
 
@@ -225,7 +225,7 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.RunV2(ctx, script, view)
+						err := vm.Run(ctx, script, view)
 						assert.NoError(t, err)
 						assert.NoError(t, script.Err)
 
@@ -246,7 +246,7 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.RunV2(ctx, script, view)
+						err := vm.Run(ctx, script, view)
 						require.NoError(t, err)
 						require.Error(t, script.Err)
 					})
@@ -294,7 +294,7 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.RunV2(ctx, script, view)
+						err := vm.Run(ctx, script, view)
 						assert.NoError(t, err)
 						assert.NoError(t, script.Err)
 
@@ -314,7 +314,7 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.RunV2(ctx, script, view)
+						err := vm.Run(ctx, script, view)
 						assert.NoError(t, err)
 						assert.NoError(t, script.Err)
 
@@ -333,7 +333,7 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.RunV2(ctx, script, view)
+						err := vm.Run(ctx, script, view)
 						assert.NoError(t, err)
 						assert.NoError(t, script.Err)
 
@@ -440,7 +440,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						jsoncdc.MustEncode(pop),
 					)
 
-					err = vm.RunV2(ctx, script, view)
+					err = vm.Run(ctx, script, view)
 					assert.NoError(t, err)
 					assert.NoError(t, script.Err)
 					assert.Equal(t, cadence.NewBool(true), script.Value)
@@ -466,7 +466,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						jsoncdc.MustEncode(pop),
 					)
 
-					err = vm.RunV2(ctx, script, view)
+					err = vm.Run(ctx, script, view)
 					assert.NoError(t, err)
 					assert.NoError(t, script.Err)
 					assert.Equal(t, cadence.NewBool(false), script.Value)
@@ -492,7 +492,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							jsoncdc.MustEncode(pop),
 						)
 
-						err = vm.RunV2(ctx, script, view)
+						err = vm.Run(ctx, script, view)
 						assert.Error(t, err)
 					})
 				}
@@ -560,7 +560,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						}),
 					)
 
-					err = vm.RunV2(ctx, script, view)
+					err = vm.Run(ctx, script, view)
 					assert.NoError(t, err)
 					assert.NoError(t, script.Err)
 
@@ -595,7 +595,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					// revert the change
 					sigs[numSigs/2] = tmp
 
-					err = vm.RunV2(ctx, script, view)
+					err = vm.Run(ctx, script, view)
 					assert.NoError(t, err)
 					assert.Error(t, script.Err)
 					assert.Equal(t, nil, script.Value)
@@ -615,7 +615,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						}),
 					)
 
-					err = vm.RunV2(ctx, script, view)
+					err = vm.Run(ctx, script, view)
 					assert.NoError(t, err)
 					assert.Error(t, script.Err)
 					assert.Equal(t, nil, script.Value)
@@ -686,7 +686,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						}),
 					)
 
-					err := vm.RunV2(ctx, script, view)
+					err := vm.Run(ctx, script, view)
 					assert.NoError(t, err)
 					assert.NoError(t, script.Err)
 					expectedPk, err := crypto.AggregateBLSPublicKeys(pks)
@@ -720,7 +720,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							}),
 						)
 
-						err := vm.RunV2(ctx, script, view)
+						err := vm.Run(ctx, script, view)
 						assert.Error(t, err)
 					})
 				}
@@ -739,7 +739,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						}),
 					)
 
-					err := vm.RunV2(ctx, script, view)
+					err := vm.Run(ctx, script, view)
 					assert.NoError(t, err)
 					assert.Error(t, script.Err)
 					assert.Equal(t, nil, script.Value)
@@ -830,7 +830,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					jsoncdc.MustEncode(cadence.String(tag)),
 				)
 
-				err := vm.RunV2(ctx, script, view)
+				err := vm.Run(ctx, script, view)
 				assert.NoError(t, err)
 				assert.NoError(t, script.Err)
 				assert.Equal(t, cadence.NewBool(true), script.Value)

@@ -129,7 +129,17 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	lastTimeout := r.safetyData.LastTimeout
 	if lastTimeout != nil && lastTimeout.View == curView {
-		return lastTimeout, nil
+		// model.TimeoutObject are conceptually immutable, hence we create a shallow copy here, which allows us to increment TimeoutTick
+		updatedTimeout := *lastTimeout
+		updatedTimeout.TimeoutTick += 1
+
+		// persist updated TimeoutObject in `safetyData` and return it
+		r.safetyData.LastTimeout = &updatedTimeout
+		err := r.persist.PutSafetyData(r.safetyData)
+		if err != nil {
+			return nil, fmt.Errorf("could not persist safety data: %w", err)
+		}
+		return r.safetyData.LastTimeout, nil
 	}
 
 	err := r.IsSafeToTimeout(curView, newestQC, lastViewTC)

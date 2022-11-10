@@ -56,5 +56,6 @@ type MutableState interface {
 	// to be the last finalized block.
 	// It modifies the persistent immutable protocol state accordingly and
 	// forwards the pointer to the latest finalized state.
+	// TODO error docs
 	Finalize(ctx context.Context, blockID flow.Identifier) error
 }
