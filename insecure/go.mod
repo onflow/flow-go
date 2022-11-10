@@ -8,12 +8,12 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/libp2p/go-libp2p v0.23.3
 	github.com/libp2p/go-libp2p-pubsub v0.8.1-0.20220908052023-8866ca88a105
+	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110181155-60457b3ef6d5
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/flow-go v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/rs/zerolog v1.28.0
 	github.com/stretchr/testify v1.8.0
-	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110003401-b897e22c3c7c
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
 )
