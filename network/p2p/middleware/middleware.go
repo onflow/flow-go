@@ -518,16 +518,18 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			return
 		}
 
+		channel := channels.Channel(msg.ChannelID)
+		topic := channels.TopicFromChannel(channel, m.rootBlockID)
+
 		// msg type is not guaranteed to be correct since it is set by the client
 		_, what, err := codec.InterfaceFromMessageCode(msg.Payload[0])
 		if err != nil {
-			log.Err(err).Msg("failed to decode message type code")
+			violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), MsgType: what, Channel: channel, IsUnicast: true, Err: err}
+			m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 			continue
 		}
 
 		// ignore messages if node does not have subscription to topic
-		channel := channels.Channel(msg.ChannelID)
-		topic := channels.TopicFromChannel(channel, m.rootBlockID)
 		if !m.libP2PNode.HasSubscription(topic) {
 			violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), MsgType: what, Channel: channel, IsUnicast: true, Err: ErrUnicastMsgWithoutSub}
 			m.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
