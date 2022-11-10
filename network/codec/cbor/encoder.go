@@ -10,7 +10,6 @@ import (
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/network/codec"
-	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // Encoder is an encoder to write serialized CBOR to a writer.
@@ -28,21 +27,17 @@ func (e *Encoder) Encode(v interface{}) error {
 	}
 
 	// encode the payload
-	//bs1 := binstat.EnterTime(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":strm<1(cbor)", what, code)) // e.g. ~3net::strm<1(cbor)CodeEntityRequest:23
 	var data bytes.Buffer
 	_ = data.WriteByte(code)
 	encoder := cborcodec.EncMode.NewEncoder(&data)
 	err = encoder.Encode(v)
-	//binstat.LeaveVal(bs1, int64(data.Len()))
 	if err != nil {
 		return fmt.Errorf("could not encode cbor payload with message code %d aka %s: %w", code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
 
 	// encode / append the envelope code and write to stream
-	//bs2 := binstat.EnterTime(binstat.BinNet+":strm<2(cbor)envelope2payload2iowriter")
 	dataBytes := data.Bytes()
 	err = e.enc.Encode(dataBytes)
-	//binstat.LeaveVal(bs2, int64(data.Len()))
 	if err != nil {
 		return fmt.Errorf("could not encode to stream: %w", err)
 	}

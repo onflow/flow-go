@@ -12,7 +12,6 @@ import (
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec"
-	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 var defaultDecMode, _ = cbor.DecOptions{ExtraReturnErrors: cbor.ExtraDecErrorUnknownField}.DecMode()
@@ -58,16 +57,12 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	//       .NewEncoder() to .Encode() is the fastest.
 
 	// encode / append the envelope code
-	//bs1 := binstat.EnterTime(binstat.BinNet + ":wire<1(cbor)envelope2payload")
 	var data bytes.Buffer
 	data.WriteByte(code)
-	//binstat.LeaveVal(bs1, int64(data.Len()))
 
 	// encode the payload
-	//bs2 := binstat.EnterTime(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":wire<2(cbor)", what, code)) // e.g. ~3net::wire<1(cbor)CodeEntityRequest:23
 	encoder := cborcodec.EncMode.NewEncoder(&data)
 	err = encoder.Encode(v)
-	//binstat.LeaveVal(bs2, int64(data.Len()))
 	if err != nil {
 		return nil, fmt.Errorf("could not encode CBOR payload with envelope code %d AKA %s: %w", code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
@@ -94,9 +89,7 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 	}
 
 	// decode the envelope
-	//bs1 := binstat.EnterTime(binstat.BinNet + ":wire>3(cbor)payload2envelope")
 
-	//binstat.LeaveVal(bs1, int64(len(data)))
 
 	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
 	if err != nil {
@@ -104,9 +97,7 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 	}
 
 	// unmarshal the payload
-	//bs2 := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":wire>4(cbor)", what, code), int64(len(data))) // e.g. ~3net:wire>4(cbor)CodeEntityRequest:23
 	err = defaultDecMode.Unmarshal(data[1:], msgInterface) // all but first byte
-	//binstat.Leave(bs2)
 	if err != nil {
 		return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
 	}

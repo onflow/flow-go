@@ -38,7 +38,6 @@ import (
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
-	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -747,9 +746,7 @@ func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) err
 	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
 
 	// convert the message to bytes to be put on the wire.
-	//bs := binstat.EnterTime(binstat.BinNet + ":wire<4message2protobuf")
 	data, err := msg.Marshal()
-	//binstat.LeaveVal(bs, int64(len(data)))
 	if err != nil {
 		return fmt.Errorf("failed to marshal the message: %w", err)
 	}

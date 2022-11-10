@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
-	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -375,8 +374,6 @@ func (n *Network) genNetworkMessage(channel channels.Channel, event interface{},
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
 
-	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
-	//defer binstat.Leave(bs)
 
 	var emTargets [][]byte
 	for _, targetID := range targetIDs {

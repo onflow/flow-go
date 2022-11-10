@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/validator"
-	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -76,9 +75,7 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 	return func(ctx context.Context, receivedFrom peer.ID, rawMsg *pubsub.Message) pubsub.ValidationResult {
 		var msg message.Message
 		// convert the incoming raw message payload to Message type
-		//bs := binstat.EnterTimeVal(binstat.BinNet+":wire>1protobuf2message", int64(len(rawMsg.Data)))
 		err := msg.Unmarshal(rawMsg.Data)
-		//binstat.Leave(bs)
 		if err != nil {
 			return pubsub.ValidationReject
 		}

@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/queue"
-	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 type Queues struct {
@@ -57,14 +56,10 @@ func (b *Queues) Get(queueID flow.Identifier) (*queue.Queue, bool) {
 }
 
 func (b *Queues) Run(f func(backdata *QueuesBackdata) error) error {
-	//bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Queues)Run")
 	b.Lock()
-	//binstat.Leave(bs1)
 
-	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Queues)Run")
 	defer b.Unlock()
 	err := f(&QueuesBackdata{b.backData})
-	//binstat.Leave(bs2)
 
 	if err != nil {
 		return err
