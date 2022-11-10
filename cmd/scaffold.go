@@ -1383,6 +1383,7 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 			BaseConfig:              *config,
 			Logger:                  zerolog.New(os.Stderr),
 			PeerManagerDependencies: &DependencyList{},
+			ConfigManager:           updatable_configs.NewManager(),
 		},
 		flags:                    pflag.CommandLine,
 		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
@@ -1470,7 +1471,6 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	fnb.initLogger()
-	fnb.ConfigManager = updatable_configs.NewManager()
 
 	fnb.initDB()
 	fnb.initSecretsDB()
