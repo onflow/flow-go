@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/network/p2p"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -131,8 +132,8 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	for _, role := range flow.Roles() {
 		peerId := p2pfixtures.PeerIdFixture(t)
 		unauthorizedChannels := channels.Channels(). // all channels
-								ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
-								ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
+			ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
+			ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
 		sporkID := unittest.IdentifierFixture()
 		unauthorizedTopics := make([]string, 0, len(unauthorizedChannels))
 		for _, channel := range unauthorizedChannels {
@@ -176,21 +177,21 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	idProvider := mock.NewIdentityProvider(t)
 	// one consensus node.
-	conNode, conId := p2pfixtures.NodeFixture(t, sporkId, t.Name(),
-		p2pfixtures.WithLogger(unittest.Logger()),
-		p2pfixtures.WithPeerScoringEnabled(idProvider),
-		p2pfixtures.WithRole(flow.RoleConsensus))
+	conNode, conId := p2ptest.NodeFixture(t, sporkId, t.Name(),
+		p2ptest.WithLogger(unittest.Logger()),
+		p2ptest.WithPeerScoringEnabled(idProvider),
+		p2ptest.WithRole(flow.RoleConsensus))
 
 	// two verification node.
-	verNode1, verId1 := p2pfixtures.NodeFixture(t, sporkId, t.Name(),
-		p2pfixtures.WithLogger(unittest.Logger()),
-		p2pfixtures.WithPeerScoringEnabled(idProvider),
-		p2pfixtures.WithRole(flow.RoleVerification))
+	verNode1, verId1 := p2ptest.NodeFixture(t, sporkId, t.Name(),
+		p2ptest.WithLogger(unittest.Logger()),
+		p2ptest.WithPeerScoringEnabled(idProvider),
+		p2ptest.WithRole(flow.RoleVerification))
 
-	verNode2, verId2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(),
-		p2pfixtures.WithLogger(unittest.Logger()),
-		p2pfixtures.WithPeerScoringEnabled(idProvider),
-		p2pfixtures.WithRole(flow.RoleVerification))
+	verNode2, verId2 := p2ptest.NodeFixture(t, sporkId, t.Name(),
+		p2ptest.WithLogger(unittest.Logger()),
+		p2ptest.WithPeerScoringEnabled(idProvider),
+		p2ptest.WithRole(flow.RoleVerification))
 
 	ids := flow.IdentityList{&conId, &verId1, &verId2}
 	nodes := []p2p.LibP2PNode{conNode, verNode1, verNode2}
@@ -205,8 +206,8 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 			return ok
 		})
 
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
