@@ -134,7 +134,8 @@ func Test_Programs(t *testing.T) {
 
 	context := fvm.NewContext(
 		fvm.WithContractDeploymentRestricted(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker()),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithCadenceLogging(true),
 		fvm.WithBlockPrograms(programs))
 

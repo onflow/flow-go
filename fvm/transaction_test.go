@@ -135,8 +135,9 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithServiceAccount(false),
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
-			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
-				fvm.NewTransactionInvoker()),
+			// run with limited processor to test just core of freezing, but still inside FVM
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithBlockPrograms(programsStorage))
 
 		err = vm.Run(context, proc, st.ViewForTestingOnly())
@@ -268,8 +269,9 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithServiceAccount(false),
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
-			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
-				fvm.NewTransactionInvoker()),
+			// run with limited processor to test just core of freezing, but still inside FVM
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithBlockPrograms(programsStorage))
 
 		err := vm.Run(context, procFrozen, st.ViewForTestingOnly())
@@ -492,9 +494,9 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithServiceAccount(false),
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
-			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
-				fvm.NewTransactionVerifier(-1),
-				fvm.NewTransactionInvoker()),
+			// run with limited processor to test just core of freezing, but still inside FVM
+			fvm.WithAccountKeyWeightThreshold(-1),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithBlockPrograms(blockPrograms))
 
 		// freeze account
