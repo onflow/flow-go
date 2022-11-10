@@ -404,9 +404,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Header:  header,
 			Payload: payload,
 		}
-		msg := &messages.ClusterBlockProposal{
-			Block: messages.UntrustedClusterBlockFromInternal(block),
-		}
+		msg := messages.NewClusterBlockProposal(block)
 
 		err := e.con.Publish(msg, recipients.NodeIDs()...)
 		if errors.Is(err, network.EmptyTargetList) {

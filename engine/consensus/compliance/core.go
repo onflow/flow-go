@@ -259,12 +259,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRa
 		return nil
 	}
 	for _, child := range children {
-		childProposal := &messages.BlockProposal{
-			Block: messages.UntrustedBlockFromInternal(&flow.Block{
-				Header:  child.Header,
-				Payload: child.Payload,
-			}),
-		}
+		childProposal := messages.NewBlockProposal(&child.Block)
 		cpr := c.processBlockAndDescendants(childProposal, inRangeBlockResponse)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error

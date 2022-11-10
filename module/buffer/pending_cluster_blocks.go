@@ -27,8 +27,10 @@ func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (*cluster.PendingBl
 
 	block := &cluster.PendingBlock{
 		OriginID: item.originID,
-		Header:   item.header,
-		Payload:  item.payload.(*cluster.Payload),
+		Block: cluster.Block{
+			Header:  item.header,
+			Payload: item.payload.(*cluster.Payload),
+		},
 	}
 
 	return block, true
@@ -44,8 +46,10 @@ func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]*cluster.
 	for _, item := range items {
 		block := &cluster.PendingBlock{
 			OriginID: item.originID,
-			Header:   item.header,
-			Payload:  item.payload.(*cluster.Payload),
+			Block: cluster.Block{
+				Header:  item.header,
+				Payload: item.payload.(*cluster.Payload),
+			},
 		}
 		blocks = append(blocks, block)
 	}

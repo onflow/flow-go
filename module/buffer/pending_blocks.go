@@ -29,8 +29,10 @@ func (b *PendingBlocks) ByID(blockID flow.Identifier) (*flow.PendingBlock, bool)
 
 	block := &flow.PendingBlock{
 		OriginID: item.originID,
-		Header:   item.header,
-		Payload:  item.payload.(*flow.Payload),
+		Block: flow.Block{
+			Header:  item.header,
+			Payload: item.payload.(*flow.Payload),
+		},
 	}
 
 	return block, true
@@ -46,8 +48,10 @@ func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]*flow.PendingBlo
 	for _, item := range items {
 		block := &flow.PendingBlock{
 			OriginID: item.originID,
-			Header:   item.header,
-			Payload:  item.payload.(*flow.Payload),
+			Block: flow.Block{
+				Header:  item.header,
+				Payload: item.payload.(*flow.Payload),
+			},
 		}
 		blocks = append(blocks, block)
 	}

@@ -71,6 +71,12 @@ type ClusterBlockProposal struct {
 	Block UntrustedClusterBlock
 }
 
+func NewClusterBlockProposal(internal *cluster.Block) *ClusterBlockProposal {
+	return &ClusterBlockProposal{
+		Block: UntrustedClusterBlockFromInternal(internal),
+	}
+}
+
 // ClusterBlockVote is a vote for a proposed block in collection node cluster
 // consensus; effectively a vote for a particular collection.
 type ClusterBlockVote struct {

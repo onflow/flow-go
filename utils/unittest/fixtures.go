@@ -198,24 +198,17 @@ func ProposalFixture() *messages.BlockProposal {
 }
 
 func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
-	proposal := &messages.BlockProposal{
-		Block: messages.UntrustedBlockFromInternal(block),
-	}
-	return proposal
+	return messages.NewBlockProposal(block)
 }
 
 func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockProposal {
-	proposal := &messages.ClusterBlockProposal{
-		Block: messages.UntrustedClusterBlockFromInternal(block),
-	}
-	return proposal
+	return messages.NewClusterBlockProposal(block)
 }
 
 func PendingFromBlock(block *flow.Block) *flow.PendingBlock {
 	pending := flow.PendingBlock{
 		OriginID: block.Header.ProposerID,
-		Header:   block.Header,
-		Payload:  block.Payload,
+		Block:    *block,
 	}
 	return &pending
 }

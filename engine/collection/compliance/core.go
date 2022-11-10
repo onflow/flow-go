@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -230,12 +229,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 		return nil
 	}
 	for _, child := range children {
-		childProposal := &messages.ClusterBlockProposal{
-			Block: messages.UntrustedClusterBlockFromInternal(&cluster.Block{
-				Header:  child.Header,
-				Payload: child.Payload,
-			}),
-		}
+		childProposal := messages.NewClusterBlockProposal(&child.Block)
 		cpr := c.processBlockAndDescendants(childProposal)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error

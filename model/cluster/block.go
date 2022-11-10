@@ -47,6 +47,5 @@ func (b *Block) SetPayload(payload Payload) {
 // while waiting for the block to become processable.
 type PendingBlock struct {
 	OriginID flow.Identifier
-	Header   *flow.Header
-	Payload  *Payload
+	Block
 }

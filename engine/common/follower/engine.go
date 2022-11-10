@@ -440,12 +440,7 @@ func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header
 	// then try to process children only this once
 	var result *multierror.Error
 	for _, child := range children {
-		proposal := &messages.BlockProposal{
-			Block: messages.UntrustedBlockFromInternal(&flow.Block{
-				Header:  child.Header,
-				Payload: child.Payload,
-			}),
-		}
+		proposal := messages.NewBlockProposal(&child.Block)
 		err := e.processBlockAndDescendants(ctx, proposal, inRangeBlockResponse)
 		if err != nil {
 			result = multierror.Append(result, err)

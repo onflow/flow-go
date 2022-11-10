@@ -200,10 +200,7 @@ func demo() {
 
 			tryRandomCall(func() {
 				block := unittest.BlockFixture()
-				pendingBlocks.Add(unittest.IdentifierFixture(), &messages.BlockProposal{
-					Header:  block.Header,
-					Payload: block.Payload,
-				})
+				pendingBlocks.Add(unittest.IdentifierFixture(), messages.NewBlockProposal(&block))
 			})
 
 			// adds a synthetic 1 s delay for verification duration

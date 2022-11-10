@@ -429,9 +429,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Header:  header,
 			Payload: payload,
 		}
-		proposal := &messages.BlockProposal{
-			Block: messages.UntrustedBlockFromInternal(block),
-		}
+		proposal := messages.NewBlockProposal(block)
 
 		// broadcast the proposal to consensus nodes
 		err = e.con.Publish(proposal, recipients.NodeIDs()...)

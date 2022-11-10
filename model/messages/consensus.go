@@ -103,6 +103,12 @@ type BlockProposal struct {
 	Block UntrustedBlock
 }
 
+func NewBlockProposal(internal *flow.Block) *BlockProposal {
+	return &BlockProposal{
+		Block: UntrustedBlockFromInternal(internal),
+	}
+}
+
 // BlockVote is part of the consensus protocol and represents a consensus node
 // voting on the proposal of the leader of a given round.
 type BlockVote struct {

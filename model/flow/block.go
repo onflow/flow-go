@@ -62,6 +62,5 @@ func (b Block) Checksum() Identifier {
 // while waiting for the block to become processable.
 type PendingBlock struct {
 	OriginID Identifier
-	Header   *Header
-	Payload  *Payload
+	Block
 }
