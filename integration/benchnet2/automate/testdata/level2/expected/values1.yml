@@ -17,13 +17,6 @@ access:
       - name: admin
         containerPort: 9002
     env: []
-    resources:
-      requests:
-        cpu: "200m"
-        memory: "128Mi"
-      limits:
-        cpu: "800m"
-        memory: "10Gi"
     servicePorts:
       - name: ptp
         protocol: TCP
@@ -41,6 +34,13 @@ access:
         protocol: TCP
         port: 9002
         targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "128Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
     storage: 1G
   nodes:
     access1:
@@ -118,13 +118,6 @@ collection:
       - name: admin
         containerPort: 9002
     env: []
-    resources:
-      requests:
-        cpu: "200m"
-        memory: "128Mi"
-      limits:
-        cpu: "800m"
-        memory: "10Gi"
     servicePorts:
       - name: ptp
         protocol: TCP
@@ -142,6 +135,13 @@ collection:
         protocol: TCP
         port: 9002
         targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "128Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
     storage: 1G
   nodes:
     collection1:
@@ -325,13 +325,6 @@ consensus:
       - name: admin
         containerPort: 9002
     env: []
-    resources:
-      requests:
-        cpu: "200m"
-        memory: "128Mi"
-      limits:
-        cpu: "800m"
-        memory: "10Gi"
     servicePorts:
       - name: ptp
         protocol: TCP
@@ -349,6 +342,13 @@ consensus:
         protocol: TCP
         port: 9002
         targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "128Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
     storage: 1G
   nodes:
     consensus1:
@@ -451,10 +451,6 @@ execution:
       - name: admin
         containerPort: 9002
     env: []
-    resources:
-      requests:
-        cpu: "200m"
-        memory: "512Mi"
     servicePorts:
       - name: ptp
         protocol: TCP
@@ -472,6 +468,10 @@ execution:
         protocol: TCP
         port: 9002
         targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
     storage: 10G
   nodes:
     execution1:
@@ -539,13 +539,6 @@ verification:
       - name: admin
         containerPort: 9002
     env: []
-    resources:
-      requests:
-        cpu: "200m"
-        memory: "512Mi"
-      limits:
-        cpu: "800m"
-        memory: "10Gi"
     servicePorts:
       - name: ptp
         protocol: TCP
@@ -563,6 +556,13 @@ verification:
         protocol: TCP
         port: 9002
         targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
     storage: 1G
   nodes:
     verification1:

@@ -6,13 +6,6 @@ commit: "123456"
 defaults: {}
 access:
   defaults:{{template "defaults"}}
-    resources:
-      requests:
-        cpu: "200m"
-        memory: "128Mi"
-      limits:
-        cpu: "800m"
-        memory: "10Gi"
     servicePorts:
       - name: ptp
         protocol: TCP
@@ -30,6 +23,13 @@ access:
         protocol: TCP
         port: 9002
         targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "128Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
     storage: 1G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("access")}}
@@ -51,13 +51,6 @@ access:
 {{- end -}}{{- end}}
 collection:
   defaults:{{template "defaults"}}
-    resources:
-      requests:
-        cpu: "200m"
-        memory: "128Mi"
-      limits:
-        cpu: "800m"
-        memory: "10Gi"
     servicePorts:
       - name: ptp
         protocol: TCP
@@ -75,6 +68,13 @@ collection:
         protocol: TCP
         port: 9002
         targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "128Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
     storage: 1G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("collection")}}
@@ -93,13 +93,6 @@ collection:
 {{- end -}}{{- end}}
 consensus:
   defaults:{{template "defaults"}}
-    resources:
-      requests:
-        cpu: "200m"
-        memory: "128Mi"
-      limits:
-        cpu: "800m"
-        memory: "10Gi"
     servicePorts:
       - name: ptp
         protocol: TCP
@@ -117,6 +110,13 @@ consensus:
         protocol: TCP
         port: 9002
         targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "128Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
     storage: 1G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("consensus")}}
@@ -136,10 +136,6 @@ consensus:
 {{- end -}}{{- end}}
 execution:
   defaults:{{template "defaults"}}
-    resources:
-      requests:
-        cpu: "200m"
-        memory: "512Mi"
     servicePorts:
       - name: ptp
         protocol: TCP
@@ -157,6 +153,10 @@ execution:
         protocol: TCP
         port: 9002
         targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
     storage: 10G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("execution")}}
@@ -173,13 +173,6 @@ execution:
 {{- end -}}{{- end}}
 verification:
   defaults:{{template "defaults"}}
-    resources:
-      requests:
-        cpu: "200m"
-        memory: "512Mi"
-      limits:
-        cpu: "800m"
-        memory: "10Gi"
     servicePorts:
       - name: ptp
         protocol: TCP
@@ -197,6 +190,13 @@ verification:
         protocol: TCP
         port: 9002
         targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
     storage: 1G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("verification")}}
