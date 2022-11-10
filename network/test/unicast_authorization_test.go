@@ -117,12 +117,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 
 	var nilID *flow.Identity
 	expectedViolation := &slashing.Violation{
-		Identity:  nilID, // because the peer will be unverified this identity will be nil
-		PeerID:    expectedSenderPeerID.String(),
-		MsgType:   "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
-		Channel:   channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
-		IsUnicast: true,
-		Err:       validator.ErrIdentityUnverified,
+		Identity: nilID, // because the peer will be unverified this identity will be nil
+		PeerID:   expectedSenderPeerID.String(),
+		MsgType:  "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+		Channel:  channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
+		Protocol: message.ProtocolUnicast,
+		Err:      validator.ErrIdentityUnverified,
 	}
 	slashingViolationsConsumer.On(
 		"OnUnAuthorizedSenderError",
@@ -168,12 +168,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 	require.NoError(u.T(), err)
 
 	expectedViolation := &slashing.Violation{
-		Identity:  u.senderID, // we expect this method to be called with the ejected identity
-		PeerID:    expectedSenderPeerID.String(),
-		MsgType:   "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
-		Channel:   channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
-		IsUnicast: true,
-		Err:       validator.ErrSenderEjected,
+		Identity: u.senderID, // we expect this method to be called with the ejected identity
+		PeerID:   expectedSenderPeerID.String(),
+		MsgType:  "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+		Channel:  channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
+		Protocol: message.ProtocolUnicast,
+		Err:      validator.ErrSenderEjected,
 	}
 	slashingViolationsConsumer.On(
 		"OnSenderEjectedError",
@@ -216,12 +216,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 	require.NoError(u.T(), err)
 
 	expectedViolation := &slashing.Violation{
-		Identity:  u.senderID,
-		PeerID:    expectedSenderPeerID.String(),
-		MsgType:   message.TestMessage,
-		Channel:   channels.ConsensusCommittee,
-		IsUnicast: true,
-		Err:       message.ErrUnauthorizedMessageOnChannel,
+		Identity: u.senderID,
+		PeerID:   expectedSenderPeerID.String(),
+		MsgType:  message.TestMessage,
+		Channel:  channels.ConsensusCommittee,
+		Protocol: message.ProtocolUnicast,
+		Err:      message.ErrUnauthorizedMessageOnChannel,
 	}
 
 	slashingViolationsConsumer.On(
@@ -270,12 +270,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 	var nilID *flow.Identity
 	expectedViolation := &slashing.Violation{
-		Identity:  nilID,
-		PeerID:    expectedSenderPeerID.String(),
-		MsgType:   "",
-		Channel:   channels.TestNetworkChannel,
-		IsUnicast: true,
-		Err:       codec.NewUnknownMsgCodeErr(invalidMessageCode),
+		Identity: nilID,
+		PeerID:   expectedSenderPeerID.String(),
+		MsgType:  "",
+		Channel:  channels.TestNetworkChannel,
+		Protocol: message.ProtocolUnicast,
+		Err:      codec.NewUnknownMsgCodeErr(invalidMessageCode),
 	}
 
 	slashingViolationsConsumer.On(
@@ -325,11 +325,11 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	var nilID *flow.Identity
 	expectedViolation := &slashing.Violation{
-		Identity:  nilID,
-		PeerID:    expectedSenderPeerID.String(),
-		MsgType:   "",
-		Channel:   channels.TestNetworkChannel,
-		IsUnicast: true,
+		Identity: nilID,
+		PeerID:   expectedSenderPeerID.String(),
+		MsgType:  "",
+		Channel:  channels.TestNetworkChannel,
+		Protocol: message.ProtocolUnicast,
 		//NOTE: in this test the message code does not match the underlying message type causing the codec to fail to unmarshal the message when decoding.
 		Err: codec.NewMsgUnmarshalErr(modifiedMessageCode, message.DKGMessage, fmt.Errorf("cbor: found unknown field at map element index 0")),
 	}
@@ -415,12 +415,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	require.NoError(u.T(), err)
 
 	expectedViolation := &slashing.Violation{
-		Identity:  u.senderID,
-		PeerID:    expectedSenderPeerID.String(),
-		MsgType:   "BlockProposal",
-		Channel:   channels.ConsensusCommittee,
-		IsUnicast: true,
-		Err:       message.ErrUnauthorizedUnicastOnChannel,
+		Identity: u.senderID,
+		PeerID:   expectedSenderPeerID.String(),
+		MsgType:  "BlockProposal",
+		Channel:  channels.ConsensusCommittee,
+		Protocol: message.ProtocolUnicast,
+		Err:      message.ErrUnauthorizedUnicastOnChannel,
 	}
 
 	slashingViolationsConsumer.On(
