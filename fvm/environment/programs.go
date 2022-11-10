@@ -15,10 +15,10 @@ import (
 )
 
 // TODO(patrick): remove and switch to *programs.TransactionPrograms once
-// emulator is updated.
+// https://github.com/onflow/flow-emulator/pull/229 is integrated.
 type TransactionPrograms interface {
-	Get(loc common.Location) (*interpreter.Program, *state.State, bool)
-	Set(loc common.Location, prog *interpreter.Program, state *state.State)
+	Get(loc common.AddressLocation) (*interpreter.Program, *state.State, bool)
+	Set(loc common.AddressLocation, prog *interpreter.Program, state *state.State)
 }
 
 // Programs manages operations around cadence program parsing.
@@ -35,6 +35,10 @@ type Programs struct {
 	accounts Accounts
 
 	transactionPrograms TransactionPrograms
+
+	// NOTE: non-address programs are not reusable across transactions, hence
+	// they are kept out of the derived data database.
+	nonAddressPrograms map[common.Location]*interpreter.Program
 }
 
 // NewPrograms construts a new ProgramHandler
@@ -51,6 +55,7 @@ func NewPrograms(
 		txnState:            txnState,
 		accounts:            accounts,
 		transactionPrograms: transactionPrograms,
+		nonAddressPrograms:  make(map[common.Location]*interpreter.Program),
 	}
 }
 
@@ -63,11 +68,12 @@ func (programs *Programs) set(
 		return nil
 	}
 
-	// transactionPrograms only cache state for AddressLocation, so for non
-	// address location, simply set the state to nil.
+	// derivedTransactionData only cache program/state for AddressLocation.
+	// For non-address location, simply keep track of the program in the
+	// environment.
 	address, ok := location.(common.AddressLocation)
 	if !ok {
-		programs.transactionPrograms.Set(address, program, nil)
+		programs.nonAddressPrograms[location] = program
 		return nil
 	}
 
@@ -91,30 +97,33 @@ func (programs *Programs) get(
 		return nil, false
 	}
 
-	program, state, has := programs.transactionPrograms.Get(location)
+	address, ok := location.(common.AddressLocation)
+	if !ok {
+		program, ok := programs.nonAddressPrograms[location]
+		return program, ok
+	}
+
+	program, state, has := programs.transactionPrograms.Get(address)
 	if has {
-		if state != nil {
-			err := programs.txnState.AttachAndCommit(state)
-			if err != nil {
-				panic(fmt.Sprintf(
-					"merge error while getting program, panic: %s",
-					err))
-			}
+		err := programs.txnState.AttachAndCommit(state)
+		if err != nil {
+			panic(fmt.Sprintf(
+				"merge error while getting program, panic: %s",
+				err))
 		}
+
 		return program, true
 	}
 
-	address, ok := location.(common.AddressLocation)
-	if ok {
-		// Address location program is reusable across transactions.  Create
-		// a nested transaction here in order to capture the states read to
-		// parse the program.
-		_, err := programs.txnState.BeginParseRestrictedNestedTransaction(
-			address)
-		if err != nil {
-			panic(err)
-		}
+	// Address location program is reusable across transactions.  Create
+	// a nested transaction here in order to capture the states read to
+	// parse the program.
+	_, err := programs.txnState.BeginParseRestrictedNestedTransaction(
+		address)
+	if err != nil {
+		panic(err)
 	}
+
 	return nil, false
 }
 

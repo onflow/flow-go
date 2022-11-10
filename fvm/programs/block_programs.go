@@ -16,11 +16,6 @@ type BlockPrograms struct {
 // TransactionPrograms is the scratch space for programs of a single transaction.
 type TransactionPrograms struct {
 	*TransactionDerivedData[common.AddressLocation, ProgramEntry]
-
-	// TODO(patrick): to make non-address programs back in environment package.
-	// NOTE: non-address programs are not reusable across transactions, hence
-	// they are kept out of the writeSet and the BlockPrograms database.
-	nonAddressSet map[common.Location]ProgramEntry
 }
 
 func NewEmptyBlockPrograms() *BlockPrograms {
@@ -59,7 +54,6 @@ func (block *BlockPrograms) NewSnapshotReadTransactionPrograms(
 
 	return &TransactionPrograms{
 		TransactionDerivedData: txn,
-		nonAddressSet:          make(map[common.Location]ProgramEntry),
 	}, nil
 }
 
@@ -77,23 +71,16 @@ func (block *BlockPrograms) NewTransactionPrograms(
 
 	return &TransactionPrograms{
 		TransactionDerivedData: txn,
-		nonAddressSet:          make(map[common.Location]ProgramEntry),
 	}, nil
 }
 
 func (transaction *TransactionPrograms) Get(
-	location common.Location,
+	addressLocation common.AddressLocation,
 ) (
 	*interpreter.Program,
 	*state.State,
 	bool,
 ) {
-	addressLocation, ok := location.(common.AddressLocation)
-	if !ok {
-		nonAddrEntry, ok := transaction.nonAddressSet[location]
-		return nonAddrEntry.Program, nonAddrEntry.State, ok
-	}
-
 	programEntry := transaction.TransactionDerivedData.Get(addressLocation)
 	if programEntry == nil {
 		return nil, nil, false
@@ -103,21 +90,12 @@ func (transaction *TransactionPrograms) Get(
 }
 
 func (transaction *TransactionPrograms) Set(
-	location common.Location,
+	addressLocation common.AddressLocation,
 	program *interpreter.Program,
 	state *state.State,
 ) {
-	addrLoc, ok := location.(common.AddressLocation)
-	if !ok {
-		transaction.nonAddressSet[location] = ProgramEntry{
-			Program: program,
-			State:   state,
-		}
-		return
-	}
-
-	transaction.TransactionDerivedData.Set(addrLoc, ProgramEntry{
-		Location: addrLoc,
+	transaction.TransactionDerivedData.Set(addressLocation, ProgramEntry{
+		Location: addressLocation,
 		Program:  program,
 		State:    state,
 	})
