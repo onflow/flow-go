@@ -51,7 +51,7 @@ const (
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	component.Component
-	sync.Mutex
+	sync.RWMutex
 	uniMgr      *unicast.Manager
 	host        host.Host                               // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
 	pubSub      *pubsub.PubSub                          // reference to the libp2p PubSub component
@@ -316,8 +316,8 @@ func (n *Node) Publish(ctx context.Context, topic channels.Topic, data []byte) e
 
 // HasSubscription returns true if the node currently has an active subscription to the topic.
 func (n *Node) HasSubscription(topic channels.Topic) bool {
-	n.Lock()
-	defer n.Unlock()
+	n.RLock()
+	defer n.RUnlock()
 	_, ok := n.subs[topic]
 	return ok
 }
