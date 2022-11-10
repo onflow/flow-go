@@ -17,7 +17,7 @@ func TestGenerateBootstrap_DataTable(t *testing.T) {
 		"2 AN, 6 LN, 3 CN, 2 EN, 1 VN": {
 			bootstrapPath:  filepath.Join(BootstrapPath, "root-protocol-state-snapshot1.json"),
 			expectedOutput: filepath.Join(ExpectedOutputPath, "template-data-input1.json"),
-			imageTag:       "v0.27.6",
+			dockerTag:      "v0.27.6",
 		},
 	}
 
@@ -25,7 +25,7 @@ func TestGenerateBootstrap_DataTable(t *testing.T) {
 		t.Run(i, func(t *testing.T) {
 			// generate template data file from bootstrap file
 			bootstrap := NewBootstrap(testData.bootstrapPath)
-			actualNodeData := bootstrap.GenTemplateData(false, testData.imageTag)
+			actualNodeData := bootstrap.GenTemplateData(false, testData.dockerTag)
 
 			// load expected template data file
 			var expectedNodeData []NodeData
@@ -44,5 +44,5 @@ func TestGenerateBootstrap_DataTable(t *testing.T) {
 type testData struct {
 	bootstrapPath  string
 	expectedOutput string
-	imageTag       string
+	dockerTag      string
 }

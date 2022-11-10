@@ -14,10 +14,10 @@ type Bootstrap struct {
 }
 
 type NodeData struct {
-	Id   string `json:"node_id"`
-	Name string `json:"name"`
-	Role string `json:"role"`
-	Tag  string `json:"image_tag"`
+	Id        string `json:"node_id"`
+	Name      string `json:"name"`
+	Role      string `json:"role"`
+	DockerTag string `json:"docker_tag"`
 }
 
 func NewBootstrap(protocolJsonFilePath string) Bootstrap {
@@ -26,7 +26,7 @@ func NewBootstrap(protocolJsonFilePath string) Bootstrap {
 	}
 }
 
-func (b *Bootstrap) GenTemplateData(outputToFile bool, imageTag string) []NodeData {
+func (b *Bootstrap) GenTemplateData(outputToFile bool, dockerTag string) []NodeData {
 	// load bootstrap file
 	dataBytes, err := os.ReadFile(b.protocolJsonFilePath)
 	if err != nil {
@@ -55,10 +55,10 @@ func (b *Bootstrap) GenTemplateData(outputToFile bool, imageTag string) []NodeDa
 		name := strings.Split(address, ".")[0]
 
 		nodeDataList = append(nodeDataList, NodeData{
-			Id:   nodeID,
-			Role: role,
-			Name: name,
-			Tag:  imageTag,
+			Id:        nodeID,
+			Role:      role,
+			Name:      name,
+			DockerTag: dockerTag,
 		})
 	}
 

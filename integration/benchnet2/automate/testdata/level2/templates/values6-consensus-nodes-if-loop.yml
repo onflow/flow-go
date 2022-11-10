@@ -81,7 +81,7 @@ access:
           value: ""
         - name: BINSTAT_DMP_PATH
           value: ""
-      image: gcr.io/flow-container-registry/access:{{$val.image_tag}}
+      image: gcr.io/flow-container-registry/access:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
 collection:
@@ -158,7 +158,7 @@ collection:
           value: ""
         - name: BINSTAT_DMP_PATH
           value: ""
-      image: gcr.io/flow-container-registry/collection:{{$val.image_tag}}
+      image: gcr.io/flow-container-registry/collection:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
 consensus:
@@ -236,7 +236,7 @@ consensus:
           value: ""
         - name: BINSTAT_DMP_PATH
           value: ""
-      image: gcr.io/flow-container-registry/consensus:{{$val.image_tag}}
+      image: gcr.io/flow-container-registry/consensus:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
 execution:

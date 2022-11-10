@@ -2,11 +2,11 @@
   {
     "name": "access1",
     "node_id": "9860ac3966c3b88043a882baf8e6ca8619ea5f95853753954b7ab49363efde21",
-    "image_tag": "v0.27.6"
+    "docker_tag": "v0.27.6"
   },
   {
     "name": "access2",
     "node_id": "7dd7ad2565841c803d898be0b7723e6ea8348eac44a4d8e4a0b7ebe0d9c8304b",
-    "image_tag": "v0.27.6"
+    "docker_tag": "v0.27.6"
   }
 ]
