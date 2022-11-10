@@ -273,7 +273,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 	})
 }
 
-// TestValidatorCallback_ValidationFailure checks that AuthorizedSenderValidator returns the expected validation error when an unicast only message is published.
+// TestValidatorCallback_ValidationFailure checks that AuthorizedSenderValidator returns the expected validation error when a unicast-only message is published.
 func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnauthorizedPublishOnChannel() {
 	for _, c := range s.authorizedUnicastOnChannel {
 		str := fmt.Sprintf("message type (%s) is not authorized to be sent via libp2p publish", c.MessageStr)
