@@ -36,10 +36,15 @@
 # Bootstrap and transit scripts
 /cmd/bootstrap/** @vishalchangrani
 
+# Dev Tools Stream
+.github/workflows/** @gomisha
+/insecure/** @gomisha @yhassanzadeh13
+/integration/benchnet2/** @gomisha
+/tools/test_monitor/** @gomisha
+
 # Performance Stream
-/integration/benchmark/** @SaveTheRbtz @Kay-Zee @AndrewM-SDET
-/integration/localnet/** @SaveTheRbtz @Kay-Zee @zhangchiqing @AndrewM-SDET
-/module/profiler/** @SaveTheRbtz @Kay-Zee @pattyshack
-/module/trace/** @SaveTheRbtz @Kay-Zee @pattyshack
-/module/tracer.go @SaveTheRbtz @Kay-Zee @pattyshack
-/utils/binstat/** @SaveTheRbtz @Kay-Zee @pattyshack
+/integration/benchmark/** @SaveTheRbtz @gomisha
+/integration/localnet/** @SaveTheRbtz
+/module/profiler/** @SaveTheRbtz @pattyshack
+/module/trace/** @SaveTheRbtz @pattyshack
+/module/tracer.go @SaveTheRbtz @pattyshack
