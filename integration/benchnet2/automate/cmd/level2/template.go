@@ -9,11 +9,11 @@ import (
 )
 
 // sample usage:
-// go run cmd/level2/template.go --data "./testdata/level2/data/values8-verification-nodes-if-loop.json" --template "./testdata/level2/templates/values8-verification-nodes-if-loop.yml" --file=true
+// go run cmd/level2/template.go --data "./testdata/level2/data/values8-verification-nodes-if-loop.json" --template "./testdata/level2/templates/values8-verification-nodes-if-loop.yml" --outPath="./values.yml"
 func main() {
 	dataFlag := flag.String("data", "", "Path to JSON data.")
 	templateFlag := flag.String("template", "", "Path to template file.")
-	fileOutputFlag := flag.Bool("file", false, "Whether to output to a file")
+	outputPathFlag := flag.String("outPath", "", "Helm output file full path.")
 	flag.Parse()
 
 	if *dataFlag == "" || *templateFlag == "" {
@@ -22,6 +22,6 @@ func main() {
 	}
 
 	template := level2.NewTemplate(*dataFlag, *templateFlag)
-	actualOutput := template.Apply(*fileOutputFlag)
+	actualOutput := template.Apply(*outputPathFlag)
 	fmt.Println("output=", actualOutput)
 }

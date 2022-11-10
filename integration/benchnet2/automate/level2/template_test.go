@@ -78,18 +78,18 @@ func TestApply_DataTable(t *testing.T) {
 
 	for i, testData := range testDataMap {
 		t.Run(i, func(t *testing.T) {
-			// generate values.yml based on template and data values
+			// generate template output based on template and data values
 			template := NewTemplate(testData.dataPath, testData.templatePath)
-			actualValuesYmlStr := template.Apply(false)
+			actualTemplateOutputStr := template.Apply("")
 
-			//load expected output
-			expectedValuesYmlBytes, err := os.ReadFile(testData.expectedOutput)
+			//load expected template output
+			expectedTemplateOutputBytes, err := os.ReadFile(testData.expectedOutput)
 			require.NoError(t, err)
-			expectedValuesYmlStr := string(expectedValuesYmlBytes)
-			expectedValuesYmlStr = strings.Trim(expectedValuesYmlStr, "\t \n")
+			expectedTemplateOutputStr := string(expectedTemplateOutputBytes)
+			expectedTemplateOutputStr = strings.Trim(expectedTemplateOutputStr, "\t \n")
 
-			// check generated values.yml is correct
-			require.Equal(t, expectedValuesYmlStr, actualValuesYmlStr)
+			// check generated template output is correct
+			require.Equal(t, expectedTemplateOutputStr, actualTemplateOutputStr)
 		})
 	}
 }

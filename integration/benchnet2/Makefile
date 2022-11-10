@@ -17,11 +17,11 @@ gen-bootstrap:
 
 # go run cmd/level1/bootstrap.go  --data "./testdata/level1/data/root-protocol-state-snapshot1.json"
 gen-helm-l1:
-	go run automate/cmd/level1/bootstrap.go --data bootstrap/public-root-information/root-protocol-state-snapshot.json --docker-tag $(DOCKER_TAG)
+	go run automate/cmd/level1/bootstrap.go --data bootstrap/public-root-information/root-protocol-state-snapshot.json --dockerTag $(DOCKER_TAG)
 
 # // go run cmd/level2/template.go --data "./testdata/level2/data/values8-verification-nodes-if-loop.json" --template "./testdata/level2/templates/values8-verification-nodes-if-loop.yml" --file=true
 gen-helm-l2:
-	go run automate/cmd/level2/template.go --data template-data.json --template automate/templates/helm-values-all-nodes.yml --file=true
+	go run automate/cmd/level2/template.go --data template-data.json --template automate/templates/helm-values-all-nodes.yml --outPath="./values.yml"
 
 # main target for creating dynamic helm values.yml chart
 # runs bootstrap to generate all node info

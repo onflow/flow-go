@@ -2,9 +2,9 @@ package level2
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 )
@@ -21,7 +21,7 @@ func NewTemplate(jsonData string, templatePath string) Template {
 	}
 }
 
-func (t *Template) Apply(outputToFile bool) string {
+func (t *Template) Apply(outputPath string) string {
 	//load data values that will be applied against the template
 	dataBytes, err := os.ReadFile(t.jsonData)
 	if err != nil {
@@ -33,7 +33,7 @@ func (t *Template) Apply(outputToFile bool) string {
 	// https://stackoverflow.com/a/38437140/5719544
 	var dataMap []map[string]interface{}
 	if err := json.Unmarshal([]byte(dataBytes), &dataMap); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// load template
@@ -56,11 +56,17 @@ func (t *Template) Apply(outputToFile bool) string {
 	// remove any extra trailing white space
 	trimmed := strings.TrimSpace(buf.String())
 
-	if outputToFile {
-		// create the file
-		f, err := os.Create("values.yml")
+	if outputPath != "" {
+		// create the path first if it doesn't exist
+		err := os.MkdirAll(filepath.Dir(outputPath), 0770)
 		if err != nil {
-			fmt.Println(err)
+			log.Fatal(err)
+		}
+
+		// create the file
+		f, err := os.Create(outputPath)
+		if err != nil {
+			log.Fatal(err)
 		}
 		defer f.Close()
 

@@ -8,10 +8,10 @@ import (
 )
 
 // sample usage:
-// go run cmd/level1/bootstrap.go  --data "./testdata/level1/data/root-protocol-state-snapshot1.json" --docker-tag "v0.27.6"
+// go run cmd/level1/bootstrap.go  --data "./testdata/level1/data/root-protocol-state-snapshot1.json" --dockerTag "v0.27.6"
 func main() {
 	dataFlag := flag.String("data", "", "Path to bootstrap JSON data.")
-	dockerTagFlag := flag.String("docker-tag", "", "Docker image tag.")
+	dockerTagFlag := flag.String("dockerTag", "", "Docker image tag.")
 	flag.Parse()
 
 	if *dataFlag == "" || *dockerTagFlag == "" {
