@@ -26,10 +26,7 @@ func NewRemoteDebugger(grpcAddress string,
 	ctx := fvm.NewContext(
 		fvm.WithLogger(logger),
 		fvm.WithChain(chain),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionSequenceNumberChecker(),
-			fvm.NewTransactionInvoker(),
-		),
+		fvm.WithAuthorizationChecksEnabled(false),
 	)
 
 	return &RemoteDebugger{

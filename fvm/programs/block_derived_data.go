@@ -144,7 +144,7 @@ func (block *BlockDerivedData[TKey, TVal]) unsafeValidate(
 	item *TransactionDerivedData[TKey, TVal],
 ) RetryableError {
 	if item.isSnapshotReadTransaction &&
-		item.invalidators.ShouldInvalidateItems() {
+		item.invalidators.ShouldInvalidateEntries() {
 
 		return newNotRetryableError(
 			"invalid TransactionDerivedData: snapshot read can't invalidate")
@@ -176,7 +176,7 @@ func (block *BlockDerivedData[TKey, TVal]) unsafeValidate(
 
 	applicable := block.invalidators.ApplicableInvalidators(
 		item.snapshotTime)
-	if applicable.ShouldInvalidateItems() {
+	if applicable.ShouldInvalidateEntries() {
 		for _, entry := range item.writeSet {
 			if applicable.ShouldInvalidateEntry(entry) {
 				return newRetryableError(
@@ -225,7 +225,7 @@ func (block *BlockDerivedData[TKey, TVal]) commit(
 		}
 	}
 
-	if item.invalidators.ShouldInvalidateItems() {
+	if item.invalidators.ShouldInvalidateEntries() {
 		for key, entry := range block.items {
 			if item.invalidators.ShouldInvalidateEntry(
 				entry.Entry) {
@@ -337,7 +337,7 @@ func (item *TransactionDerivedData[TKey, TVal]) Set(key TKey, val TVal) {
 func (item *TransactionDerivedData[TKey, TVal]) AddInvalidator(
 	invalidator DerivedDataInvalidator[TVal],
 ) {
-	if invalidator == nil || !invalidator.ShouldInvalidateItems() {
+	if invalidator == nil || !invalidator.ShouldInvalidateEntries() {
 		return
 	}
 

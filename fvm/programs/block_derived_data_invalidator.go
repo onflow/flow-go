@@ -2,7 +2,7 @@ package programs
 
 type DerivedDataInvalidator[TVal any] interface {
 	// This returns true if the this invalidates any data
-	ShouldInvalidateItems() bool
+	ShouldInvalidateEntries() bool
 
 	// This returns true if the data entry should be invalidated.
 	ShouldInvalidateEntry(TVal) bool
@@ -32,9 +32,9 @@ func (chained chainedDerivedDataInvalidators[TVal]) ApplicableInvalidators(
 	return nil
 }
 
-func (chained chainedDerivedDataInvalidators[TVal]) ShouldInvalidateItems() bool {
+func (chained chainedDerivedDataInvalidators[TVal]) ShouldInvalidateEntries() bool {
 	for _, invalidator := range chained {
-		if invalidator.ShouldInvalidateItems() {
+		if invalidator.ShouldInvalidateEntries() {
 			return true
 		}
 	}

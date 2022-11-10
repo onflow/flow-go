@@ -360,10 +360,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("service events are emitted", func(t *testing.T) {
 		execCtx := fvm.NewContext(
 			fvm.WithServiceEventCollectionEnabled(),
-			fvm.WithTransactionProcessors(
-				// we don't need to check signatures or sequence numbers
-				fvm.NewTransactionInvoker(),
-			),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		)
 
 		collectionCount := 2
@@ -553,9 +551,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("failing transactions do not store programs", func(t *testing.T) {
 		execCtx := fvm.NewContext(
-			fvm.WithTransactionProcessors(
-				fvm.NewTransactionInvoker(),
-			),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		)
 
 		address := common.Address{0x1}
@@ -659,6 +656,26 @@ func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execut
 	}
 }
 
+type testTransactionExecutor struct {
+	executeTransaction func(runtime.Script, runtime.Context) error
+
+	script  runtime.Script
+	context runtime.Context
+}
+
+func (executor *testTransactionExecutor) Preprocess() error {
+	// Do nothing.
+	return nil
+}
+
+func (executor *testTransactionExecutor) Execute() error {
+	return executor.executeTransaction(executor.script, executor.context)
+}
+
+func (executor *testTransactionExecutor) Result() (cadence.Value, error) {
+	panic("Result not expected")
+}
+
 type testRuntime struct {
 	executeScript      func(runtime.Script, runtime.Context) (cadence.Value, error)
 	executeTransaction func(runtime.Script, runtime.Context) error
@@ -670,7 +687,11 @@ func (e *testRuntime) NewScriptExecutor(script runtime.Script, c runtime.Context
 }
 
 func (e *testRuntime) NewTransactionExecutor(script runtime.Script, c runtime.Context) runtime.Executor {
-	panic("NewTransactionExecutor not expected")
+	return &testTransactionExecutor{
+		executeTransaction: e.executeTransaction,
+		script:             script,
+		context:            c,
+	}
 }
 
 func (e *testRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []cadence.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
@@ -831,8 +852,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		Key:   state.AccountStatusKey,
 	}
 
-	require.Contains(t, registerTouches, id.String())
-	require.Equal(t, id, registerTouches[id.String()])
+	require.Contains(t, registerTouches, id)
 }
 
 func Test_ExecutingSystemCollection(t *testing.T) {
