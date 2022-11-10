@@ -73,14 +73,6 @@ access:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/access:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
@@ -150,14 +142,6 @@ collection:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/collection:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
@@ -228,14 +212,6 @@ consensus:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/consensus:v0.27.6
       nodeId: 4a616d65732048756e74657200cc3d5bc0fa89f027ec7e7a1b064cc032f1941f
 
@@ -266,14 +242,6 @@ consensus:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/consensus:v0.27.6
       nodeId: 4a65666665727920446f796c6500a7a4692d8b56edd508238b5e8572beeba6b6
 
@@ -304,14 +272,6 @@ consensus:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/consensus:v0.27.6
       nodeId: 4a6f7264616e20536368616c6d0059676024fe879d8ffc5ae53adaf00dbd8630
 
@@ -376,14 +336,6 @@ execution:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/execution:v0.27.6
       nodeId: 4a6f73682048616e6e616e00a963fb7050b300c024526eee06767b237ccf5349
 
@@ -411,14 +363,6 @@ execution:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/execution:v0.27.6
       nodeId: 4b616e205a68616e670075d983e43cd61f1136cda8c8c48887b5654dcfb2db59
 
@@ -483,13 +427,5 @@ verification:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/verification:v0.27.6
       nodeId: 4c61796e65204c616672616e636500d8948997c9da4f49de7c997ebcdd44d55e

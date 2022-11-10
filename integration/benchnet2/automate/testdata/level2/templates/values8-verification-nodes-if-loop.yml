@@ -73,14 +73,6 @@ access:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/access:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
@@ -150,14 +142,6 @@ collection:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/collection:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
@@ -228,14 +212,6 @@ consensus:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/consensus:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
@@ -300,14 +276,6 @@ execution:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/execution:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
@@ -372,14 +340,6 @@ verification:
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: network
-        - name: BINSTAT_ENABLE
-          value: ""
-        - name: BINSTAT_LEN_WHAT
-          value: ""
-        - name: BINSTAT_DMP_NAME
-          value: ""
-        - name: BINSTAT_DMP_PATH
-          value: ""
       image: gcr.io/flow-container-registry/verification:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end -}}{{- end -}}
