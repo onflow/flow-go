@@ -48,7 +48,7 @@ func TestPRGseeding(t *testing.T) {
 }
 
 // G1 and G2 scalar multiplication
-func BenchmarkScalarMult(b *testing.B) {
+func BenchmarkScalarMultG1G2(b *testing.B) {
 	blsInstance.reInit()
 	seed := make([]byte, securityBits/8)
 	_, _ = rand.Read(seed)
