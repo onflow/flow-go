@@ -214,8 +214,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	pending := []*flow.PendingBlock{
 		{
 			OriginID: originID,
-			Header:   child.Header,
-			Payload:  child.Payload,
+			Block:    child,
 		},
 	}
 	suite.cache.On("ByParentID", block.ID()).Return(pending, true)
