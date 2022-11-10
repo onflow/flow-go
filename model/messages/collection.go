@@ -24,16 +24,29 @@ type CollectionResponse struct {
 	Nonce      uint64 // so that we aren't deduplicated by the network layer
 }
 
+// UntrustedClusterBlockPayload is a duplicate of cluster.Payload used within
+// untrusted messages. It exists only to provide a memory-safe structure for
+// decoding messages and should be replaced in the future by updating the core
+// cluster.Payload type.
+// Deprecated: Please update cluster.Payload.Collection to use []flow.TransactionBody,
+// then replace instances of this type with cluster.Payload
 type UntrustedClusterBlockPayload struct {
 	Collection       []flow.TransactionBody
 	ReferenceBlockID flow.Identifier
 }
 
+// UntrustedClusterBlock is a duplicate of cluster.Block used within
+// untrusted messages. It exists only to provide a memory-safe structure for
+// decoding messages and should be replaced in the future by updating the core
+// cluster.Block type.
+// Deprecated: Please update cluster.Payload.Collection to use []flow.TransactionBody,
+// then replace instances of this type with cluster.Block
 type UntrustedClusterBlock struct {
 	Header  flow.Header
 	Payload UntrustedClusterBlockPayload
 }
 
+// ToInternal returns the internal representation of the type.
 func (ub UntrustedClusterBlock) ToInternal() *cluster.Block {
 	block := &cluster.Block{
 		Header: &ub.Header,
@@ -48,6 +61,8 @@ func (ub UntrustedClusterBlock) ToInternal() *cluster.Block {
 	return block
 }
 
+// UntrustedClusterBlockFromInternal converts the internal cluster.Block representation
+// to the representation used in untrusted messages.
 func UntrustedClusterBlockFromInternal(clusterBlock *cluster.Block) UntrustedClusterBlock {
 	block := UntrustedClusterBlock{
 		Header: *clusterBlock.Header,

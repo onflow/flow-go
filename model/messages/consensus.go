@@ -4,6 +4,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// UntrustedExecutionResult is a duplicate of flow.ExecutionResult used within
+// untrusted messages. It exists only to provide a memory-safe structure for
+// decoding messages and should be replaced in the future by updating the core
+// flow.ExecutionResult type.
+// Deprecated: Please update flow.ExecutionResult to use []flow.Chunk, then
+// replace instances of this type with flow.ExecutionResult
 type UntrustedExecutionResult struct {
 	PreviousResultID flow.Identifier
 	BlockID          flow.Identifier
@@ -12,7 +18,8 @@ type UntrustedExecutionResult struct {
 	ExecutionDataID  flow.Identifier
 }
 
-func (ur UntrustedExecutionResult) ToFlowResult() *flow.ExecutionResult {
+// ToInternal returns the internal representation of the type.
+func (ur UntrustedExecutionResult) ToInternal() *flow.ExecutionResult {
 	result := flow.ExecutionResult{
 		PreviousResultID: ur.PreviousResultID,
 		BlockID:          ur.PreviousResultID,
@@ -27,19 +34,27 @@ func (ur UntrustedExecutionResult) ToFlowResult() *flow.ExecutionResult {
 	return &result
 }
 
-func UntrustedExecutionResultFromInternal(flowResult *flow.ExecutionResult) UntrustedExecutionResult {
+// UntrustedExecutionResultFromInternal converts the internal flow.ExecutionResult representation
+// to the representation used in untrusted messages.
+func UntrustedExecutionResultFromInternal(internal *flow.ExecutionResult) UntrustedExecutionResult {
 	result := UntrustedExecutionResult{
-		PreviousResultID: flowResult.PreviousResultID,
-		BlockID:          flowResult.BlockID,
-		ServiceEvents:    flowResult.ServiceEvents,
-		ExecutionDataID:  flowResult.ExecutionDataID,
+		PreviousResultID: internal.PreviousResultID,
+		BlockID:          internal.BlockID,
+		ServiceEvents:    internal.ServiceEvents,
+		ExecutionDataID:  internal.ExecutionDataID,
 	}
-	for _, chunk := range flowResult.Chunks {
+	for _, chunk := range internal.Chunks {
 		result.Chunks = append(result.Chunks, *chunk)
 	}
 	return result
 }
 
+// UntrustedBlockPayload is a duplicate of flow.Payload used within
+// untrusted messages. It exists only to provide a memory-safe structure for
+// decoding messages and should be replaced in the future by updating the core
+// flow.Payload type.
+// Deprecated: Please update flow.Payload to use []flow.Guarantee etc., then
+// replace instances of this type with flow.Payload
 type UntrustedBlockPayload struct {
 	Guarantees []flow.CollectionGuarantee
 	Seals      []flow.Seal
@@ -47,11 +62,18 @@ type UntrustedBlockPayload struct {
 	Results    []UntrustedExecutionResult
 }
 
+// UntrustedBlock is a duplicate of flow.Block used within
+// untrusted messages. It exists only to provide a memory-safe structure for
+// decoding messages and should be replaced in the future by updating the core
+// flow.Block type.
+// Deprecated: Please update flow.Payload to use []flow.Guarantee etc., then
+// replace instances of this type with flow.Block
 type UntrustedBlock struct {
 	Header  flow.Header
 	Payload UntrustedBlockPayload
 }
 
+// ToInternal returns the internal representation of the type.
 func (ub UntrustedBlock) ToInternal() *flow.Block {
 	block := flow.Block{
 		Header:  &ub.Header,
@@ -71,12 +93,14 @@ func (ub UntrustedBlock) ToInternal() *flow.Block {
 	}
 	for _, result := range ub.Payload.Results {
 		result := result
-		block.Payload.Results = append(block.Payload.Results, result.ToFlowResult())
+		block.Payload.Results = append(block.Payload.Results, result.ToInternal())
 	}
 
 	return &block
 }
 
+// UntrustedBlockFromInternal converts the internal flow.Block representation
+// to the representation used in untrusted messages.
 func UntrustedBlockFromInternal(flowBlock *flow.Block) UntrustedBlock {
 	block := UntrustedBlock{
 		Header: *flowBlock.Header,
