@@ -28,7 +28,7 @@ access:
         - --log-tx-time-to-finalized
         - --log-tx-time-to-executed
         - --log-tx-time-to-finalized-executed
-      env:{{template "env"}}
+      env:{{template "env" .}}
       image: gcr.io/flow-container-registry/access:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end}}{{end}}
@@ -53,7 +53,7 @@ collection:
         - --ingress-addr=0.0.0.0:9000
         - --insecure-access-api=false
         - --access-node-ids=*
-      env:{{template "env"}}
+      env:{{template "env" .}}
       image: gcr.io/flow-container-registry/collection:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end}}{{end}}
@@ -79,7 +79,7 @@ consensus:
         - --emergency-sealing-active=false
         - --insecure-access-api=false
         - --access-node-ids=*
-      env:{{template "env"}}
+      env:{{template "env" .}}
       image: gcr.io/flow-container-registry/consensus:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end}}{{end}}
@@ -99,7 +99,7 @@ execution:
         - --rpc-addr=0.0.0.0:9000
         - --cadence-tracing=false
         - --extensive-tracing=false
-      env:{{template "env"}}
+      env:{{template "env" .}}
       image: gcr.io/flow-container-registry/execution:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end}}{{end}}
@@ -119,7 +119,7 @@ verification:
       args:{{template "args" .}}
         - --loglevel=INFO
         - --chunk-alpha=1
-      env:{{template "env"}}
+      env:{{template "env" .}}
       image: gcr.io/flow-container-registry/verification:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
@@ -143,7 +143,7 @@ verification:
         - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
           value: "true"
         - name: OTEL_RESOURCE_ATTRIBUTES
-          value: network=localnet,role=%s,num=%s
+          value: network=benchnet2,role={{.role}},num={{.name}}
 {{- end}}
 
 {{define "defaults"}}
