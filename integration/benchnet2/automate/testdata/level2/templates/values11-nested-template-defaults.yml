@@ -6,23 +6,6 @@ commit: "123456"
 defaults: {}
 access:
   defaults:{{template "defaults"}}
-    servicePorts:
-      - name: ptp
-        protocol: TCP
-        port: 3569
-        targetPort: ptp
-      - name: grpc
-        protocol: TCP
-        port: 9000
-        targetPort: grpc
-      - name: secure-grpc
-        protocol: TCP
-        port: 9001
-        targetPort: secure-grpc
-      - name: admin
-        protocol: TCP
-        port: 9002
-        targetPort: admin
     resources:
       requests:
         cpu: "200m"
@@ -48,26 +31,9 @@ access:
       env:{{template "env"}}
       image: gcr.io/flow-container-registry/access:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
-{{- end -}}{{- end}}
+{{- end}}{{end}}
 collection:
   defaults:{{template "defaults"}}
-    servicePorts:
-      - name: ptp
-        protocol: TCP
-        port: 3569
-        targetPort: ptp
-      - name: grpc
-        protocol: TCP
-        port: 9000
-        targetPort: grpc
-      - name: secure-grpc
-        protocol: TCP
-        port: 9001
-        targetPort: secure-grpc
-      - name: admin
-        protocol: TCP
-        port: 9002
-        targetPort: admin
     resources:
       requests:
         cpu: "200m"
@@ -90,26 +56,9 @@ collection:
       env:{{template "env"}}
       image: gcr.io/flow-container-registry/collection:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
-{{- end -}}{{- end}}
+{{- end}}{{end}}
 consensus:
   defaults:{{template "defaults"}}
-    servicePorts:
-      - name: ptp
-        protocol: TCP
-        port: 3569
-        targetPort: ptp
-      - name: grpc
-        protocol: TCP
-        port: 9000
-        targetPort: grpc
-      - name: secure-grpc
-        protocol: TCP
-        port: 9001
-        targetPort: secure-grpc
-      - name: admin
-        protocol: TCP
-        port: 9002
-        targetPort: admin
     resources:
       requests:
         cpu: "200m"
@@ -133,26 +82,9 @@ consensus:
       env:{{template "env"}}
       image: gcr.io/flow-container-registry/consensus:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
-{{- end -}}{{- end}}
+{{- end}}{{end}}
 execution:
   defaults:{{template "defaults"}}
-    servicePorts:
-      - name: ptp
-        protocol: TCP
-        port: 3569
-        targetPort: ptp
-      - name: grpc
-        protocol: TCP
-        port: 9000
-        targetPort: grpc
-      - name: secure-grpc
-        protocol: TCP
-        port: 9001
-        targetPort: secure-grpc
-      - name: admin
-        protocol: TCP
-        port: 9002
-        targetPort: admin
     resources:
       requests:
         cpu: "200m"
@@ -170,26 +102,9 @@ execution:
       env:{{template "env"}}
       image: gcr.io/flow-container-registry/execution:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
-{{- end -}}{{- end}}
+{{- end}}{{end}}
 verification:
   defaults:{{template "defaults"}}
-    servicePorts:
-      - name: ptp
-        protocol: TCP
-        port: 3569
-        targetPort: ptp
-      - name: grpc
-        protocol: TCP
-        port: 9000
-        targetPort: grpc
-      - name: secure-grpc
-        protocol: TCP
-        port: 9001
-        targetPort: secure-grpc
-      - name: admin
-        protocol: TCP
-        port: 9002
-        targetPort: admin
     resources:
       requests:
         cpu: "200m"
@@ -207,7 +122,7 @@ verification:
       env:{{template "env"}}
       image: gcr.io/flow-container-registry/verification:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
-{{- end -}}{{- end}}
+{{end}}{{end}}
 
 {{define "args"}}
         - --bootstrapdir=/bootstrap
@@ -220,7 +135,7 @@ verification:
         - --profiler-dir=/profiler
         - --profiler-interval=2m
         - --nodeid={{.node_id}}
-{{- end -}}
+{{- end}}
 
 {{define "env"}}
         - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
@@ -243,4 +158,21 @@ verification:
       - name: admin
         containerPort: 9002
     env: []
+    servicePorts:
+      - name: ptp
+        protocol: TCP
+        port: 3569
+        targetPort: ptp
+      - name: grpc
+        protocol: TCP
+        port: 9000
+        targetPort: grpc
+      - name: secure-grpc
+        protocol: TCP
+        port: 9001
+        targetPort: secure-grpc
+      - name: admin
+        protocol: TCP
+        port: 9002
+        targetPort: admin
 {{- end}}
