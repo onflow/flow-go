@@ -144,22 +144,10 @@ func TestSubgroupCheckG1(t *testing.T) {
 	_ = seedRelic(seed)
 
 	// tests for simple membership check
-	t.Run("simple check", func(t *testing.T) {
-		simple := 0
-		check := checkG1Test(1, simple) // point in G1
-		assert.True(t, check)
-		check = checkG1Test(0, simple) // point in E1\G1
-		assert.False(t, check)
-	})
-
-	// tests for Bowe membership check
-	t.Run("bowe check", func(t *testing.T) {
-		bowe := 1
-		check := checkG1Test(1, bowe) // point in G1
-		assert.True(t, check)
-		check = checkG1Test(0, bowe) // point in E1\G1
-		assert.False(t, check)
-	})
+	check := checkG1Test(1) // point in G1
+	assert.True(t, check)
+	check = checkG1Test(0) // point in E1\G1
+	assert.False(t, check)
 }
 
 // G1 membership check bench

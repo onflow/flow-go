@@ -147,7 +147,7 @@ func testEncodeDecodeSignatureCrossBLST(t *rapid.T) {
 	var pointFlow pointG1
 	// here we test readPointG1 rather than the simple Signature type alias
 	err := readPointG1(&pointFlow, sigBytes)
-	flowPass := (err == nil) && checkInG1Test(&pointFlow)
+	flowPass := (err == nil) && checkMembershipG1Test(&pointFlow)
 
 	var pointBLST blst.P1Affine
 	res := pointBLST.Uncompress(sigBytes)
@@ -156,7 +156,7 @@ func testEncodeDecodeSignatureCrossBLST(t *rapid.T) {
 
 	require.Equal(t, flowPass, blstPass, "deserialization of signature %x differs", sigBytes)
 
-	// check both signatures (G1 points) are are equal
+	// check both signatures (G1 points) are equal
 	if flowPass && blstPass {
 		sigFlowOutBytes := make([]byte, signatureLengthBLSBLS12381)
 		writePointG1(sigFlowOutBytes, &pointFlow)

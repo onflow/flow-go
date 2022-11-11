@@ -122,7 +122,7 @@ void ep_rand_G1complement( ep_t);
 #if  (MEMBERSHIP_CHECK_G1 == BOWE)
 int bowe_subgroup_check_G1(const ep_t);
 #endif
-int subgroup_check_G1_test(int, int);
+int subgroup_check_G1_test(int);
 int subgroup_check_G1_bench();
 
 // utility testing function

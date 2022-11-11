@@ -802,9 +802,13 @@ void ep_rand_G1complement(ep_t p) {
     bn_new(order); 
     g1_get_ord(order);
     ep_mul_basic(p, p, order);
+    bn_free(order);
 }
 
-int subgroup_check_G1_test(int inG1, int method) {
+// runs a G1 subgroup check against:
+//  - a point in G1 if inG1 is true
+//  - a point in E1\G1 otherwise
+int subgroup_check_G1_test(int inG1) {
     // generate a random p
     ep_t p;
 	if (inG1) ep_rand_G1(p); // p in G1
@@ -813,31 +817,15 @@ int subgroup_check_G1_test(int inG1, int method) {
     if (!ep_on_curve(p)) { // sanity check to make sure p is in E1
         return UNDEFINED; // this should not happen
     }
-        
-    switch (method) {
-    case EXP_ORDER: 
-        return simple_subgroup_check_G1(p);
-    #if  (MEMBERSHIP_CHECK_G1 == BOWE)
-    case BOWE:
-        return bowe_subgroup_check_G1(p);
-    #endif
-    default:
-        if (inG1) return VALID;
-        else return INVALID;
-    }
+
+    return check_membership_G1(p);
 }
 
 int subgroup_check_G1_bench() {
     ep_t p;
 	ep_curve_get_gen(p);
-    int res;
     // check p is in G1
-    #if MEMBERSHIP_CHECK_G1 == EXP_ORDER
-    res = simple_subgroup_check_G1(p);
-    #elif MEMBERSHIP_CHECK_G1 == BOWE
-    res = bowe_subgroup_check_G1(p);
-    #endif
-    return res;
+    return check_membership_G1(p);
 }
 
 // This is a testing function.
