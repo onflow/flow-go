@@ -213,12 +213,12 @@ func defaultAppSpecificScoreFunction(logger zerolog.Logger, idProvider module.Id
 		// checks if peer is an access node, and if so, pushes it to the
 		// edges of the network by giving the minimum penalty.
 		if flowId.Role == flow.RoleAccess {
-			lg.Debug().
+			lg.Trace().
 				Msg("pushing access node to edge by penalizing with minimum penalty value")
 			return MinAppSpecificPenalty
 		}
 
-		logger.Debug().
+		logger.Trace().
 			Msg("rewarding well-behaved non-access node peer with maximum reward value")
 		return MaxAppSpecificReward
 	}
