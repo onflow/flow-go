@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -281,4 +282,18 @@ func StreamHandlerFixture(t *testing.T) (func(s network.Stream), chan string) {
 		require.NoError(t, err)
 		ch <- str
 	}, ch
+}
+
+// LetNodesDiscoverEachOther connects all nodes to each other on the pubsub mesh.
+func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, ids flow.IdentityList) {
+	for _, node := range nodes {
+		for i, other := range nodes {
+			if node == other {
+				continue
+			}
+			otherPInfo, err := utils.PeerAddressInfo(*ids[i])
+			require.NoError(t, err)
+			require.NoError(t, node.AddPeer(ctx, otherPInfo))
+		}
+	}
 }

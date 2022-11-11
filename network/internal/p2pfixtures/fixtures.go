@@ -233,20 +233,6 @@ func SubsMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, subs []*p
 	}
 }
 
-// LetNodesDiscoverEachOther connects all nodes to each other on the pubsub mesh.
-func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, ids flow.IdentityList) {
-	for _, node := range nodes {
-		for i, other := range nodes {
-			if node == other {
-				continue
-			}
-			otherPInfo, err := utils.PeerAddressInfo(*ids[i])
-			require.NoError(t, err)
-			require.NoError(t, node.AddPeer(ctx, otherPInfo))
-		}
-	}
-}
-
 // AddNodesToEachOthersPeerStore adds the dialing address of all nodes to the peer store of all other nodes.
 // However, it does not connect them to each other.
 func AddNodesToEachOthersPeerStore(t *testing.T, nodes []p2p.LibP2PNode, ids flow.IdentityList) {

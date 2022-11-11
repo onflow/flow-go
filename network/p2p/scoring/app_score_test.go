@@ -86,8 +86,8 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 
 	// creates a topology as follows:
 	// groupOneNodes <--> accessNodeGroup <--> groupTwoNodes
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, append(groupOneNodes, accessNodeGroup...), append(groupOneIds, accessNodeIds...))
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, append(groupTwoNodes, accessNodeGroup...), append(groupTwoIds, accessNodeIds...))
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, append(groupOneNodes, accessNodeGroup...), append(groupOneIds, accessNodeIds...))
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, append(groupTwoNodes, accessNodeGroup...), append(groupTwoIds, accessNodeIds...))
 
 	// checks end-to-end message delivery works
 	// each node sends a distinct message to all and checks that all nodes receive it.
@@ -199,7 +199,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	}
 
 	// let nodes reside on a full topology, hence no partition is caused by the topology.
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, allNodes, allIds)
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, allNodes, allIds)
 
 	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 	require.NoError(t, con1Node.Publish(ctx, blockTopic, proposalMsg))

@@ -132,8 +132,8 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	for _, role := range flow.Roles() {
 		peerId := p2pfixtures.PeerIdFixture(t)
 		unauthorizedChannels := channels.Channels(). // all channels
-			ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
-			ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
+								ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
+								ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
 		sporkID := unittest.IdentifierFixture()
 		unauthorizedTopics := make([]string, 0, len(unauthorizedChannels))
 		for _, channel := range unauthorizedChannels {
@@ -215,7 +215,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	topicValidator := flowpubsub.TopicValidator(unittest.Logger(), unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter())
 
 	// wait for the subscriptions to be established
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
 	// consensus node subscribes to the block topic.
 	conSub, err := conNode.Subscribe(blockTopic, topicValidator)

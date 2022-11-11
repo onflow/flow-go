@@ -411,7 +411,7 @@ func testUnicastOverStream(t *testing.T, opts ...p2ptest.NodeFixtureParameterOpt
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
 	p2pfixtures.EnsureMessageExchangeOverUnicast(
 		t,
@@ -454,7 +454,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, []chan string{inbound1, inbound2}, p2pfixtures.LongStringMessageFactoryFixture(t))
 }
 

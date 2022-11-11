@@ -243,7 +243,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
 
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
 	// ensures that all nodes are connected to each other, and they can exchange messages over the pubsub and unicast.
 	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes, inbounds)

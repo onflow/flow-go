@@ -1495,6 +1495,8 @@ github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11 h1:WYWfp6ydU0v6ev+amaIRIfxJEo
 github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11/go.mod h1:GwZ5VBU63KlM8wZsnVvSGDIMeGMOO9Cb3uLXDP8WFYM=
 github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110003401-b897e22c3c7c h1:Za50fWzRA8RfwWvy434k+HpTFUuL5Tlx3SvhoEcv1CA=
 github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110003401-b897e22c3c7c/go.mod h1:lqsC4XUC1754dyyPIJjQ4rhVhmv2SMAgq+1MJUoJyOU=
+github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110181155-60457b3ef6d5 h1:c6Ns5fDv1quWqDgIVw+hRRsLfCVTz7tqhSwRP5wjRRo=
+github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110181155-60457b3ef6d5/go.mod h1:lqsC4XUC1754dyyPIJjQ4rhVhmv2SMAgq+1MJUoJyOU=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
