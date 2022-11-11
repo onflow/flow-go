@@ -44,6 +44,7 @@ import (
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func() (p2p.LibP2PNode, error)
+type GossipSubFactoryFuc func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
@@ -87,6 +88,7 @@ type NodeBuilder interface {
 	SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder
 	EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
+	SetGossipSubFactory(f GossipSubFactoryFuc) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
 
@@ -101,6 +103,7 @@ type LibP2PNodeBuilder struct {
 	connManager                 connmgr.ConnManager
 	connGater                   connmgr.ConnectionGater
 	idProvider                  module.IdentityProvider
+	gossipSubFactory            GossipSubFactoryFuc
 	gossipSubPeerScoring        bool // whether to enable gossipsub peer scoring
 	routingFactory              func(context.Context, host.Host) (routing.Routing, error)
 	peerManagerEnablePruning    bool
@@ -177,6 +180,11 @@ func (builder *LibP2PNodeBuilder) SetPeerManagerOptions(connectionPruning bool, 
 
 func (builder *LibP2PNodeBuilder) SetCreateNode(f CreateNodeFunc) NodeBuilder {
 	builder.createNode = f
+	return builder
+}
+
+func (builder *LibP2PNodeBuilder) SetGossipSubFactory(f GossipSubFactoryFuc) NodeBuilder {
+	builder.gossipSubFactory = f
 	return builder
 }
 
@@ -264,15 +272,25 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
 			}
 
-			pubSub, err := pubsub.NewGossipSub(ctx, h, psOpts...)
-			if err != nil {
-				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
-			}
-			if scoreOpt != nil {
-				scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, pubSub))
+			var ps *pubsub.PubSub
+			if builder.gossipSubFactory != nil {
+				// builds GossipSub with the given factory
+				ps, err = builder.gossipSubFactory(ctx, h, psOpts...)
+				if err != nil {
+					ctx.Throw(fmt.Errorf("could not create gossipsub using injected factory: %w", err))
+				}
+			} else {
+				// builds GossipSub with the default factory
+				ps, err = pubsub.NewGossipSub(ctx, h, psOpts...)
+				if err != nil {
+					ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
+				}
 			}
 
-			node.SetPubSub(pubSub)
+			if scoreOpt != nil {
+				scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, ps))
+			}
+			node.SetPubSub(ps)
 
 			ready()
 			<-ctx.Done()
