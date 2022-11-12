@@ -97,7 +97,7 @@ func main() {
 	}
 	log = log.Level(lvl)
 
-	server := metrics.NewServer(log, metricport, false)
+	server := metrics.NewServer(log, metricport)
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
 
