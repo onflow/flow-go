@@ -126,7 +126,7 @@ void     ep_rand_G1complement( ep_t);
 void     ep2_rand_G2(ep2_t);
 void     ep2_rand_G2complement( ep2_t);
 #if  (MEMBERSHIP_CHECK_G1 == BOWE)
-int bowe_subgroup_check_G1(const ep_t);
+int      bowe_subgroup_check_G1(const ep_t);
 #endif
 
 // utility testing function

@@ -277,9 +277,9 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 // not throw an exception for an integer larger than p. The function returns RLC_OK if the input
 // corresponds to a field element, and returns RLC_ERR otherwise. 
 static int fp_read_bin_safe(fp_t a, const uint8_t *bin, int len) {
-	if (len != Fp_BYTES) {
-		return RLC_ERR;
-	}
+    if (len != Fp_BYTES) {
+        return RLC_ERR;
+    }
 
     int ret = RLC_ERR; 
     bn_t t;
@@ -358,7 +358,7 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     byte temp[Fp_BYTES];
     memcpy(temp, bin, Fp_BYTES);
     temp[0] &= 0x1F;
-	if (fp_read_bin_safe(a->x, temp, Fp_BYTES) != RLC_OK) {
+    if (fp_read_bin_safe(a->x, temp, Fp_BYTES) != RLC_OK) {
         return RLC_ERR;
     }
 
