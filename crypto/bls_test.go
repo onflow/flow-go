@@ -21,7 +21,7 @@ import (
 func TestBLSMainMethods(t *testing.T) {
 	hasher := NewExpandMsgXOFKMAC128("test tag")
 	// test the key generation seed lengths
-	//testKeyGenSeed(t, BLSBLS12381, KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
+	testKeyGenSeed(t, BLSBLS12381, KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
 	// test the consistency with different inputs
 	testGenSignVerify(t, BLSBLS12381, hasher)
 
