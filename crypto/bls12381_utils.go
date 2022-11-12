@@ -5,7 +5,7 @@ package crypto
 
 // this file contains utility functions for the curve BLS 12-381
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
-// and the BLS distributed key generation protcols
+// and the BLS distributed key generation protocols
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I${SRCDIR}/ -I${SRCDIR}/relic/build/include
 // #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s

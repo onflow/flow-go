@@ -2,7 +2,7 @@
 
 // this file contains utility functions for the curve BLS 12-381
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
-// and the BLS distributed key generation protcols
+// and the BLS distributed key generation protocols
 
 #include "bls12381_utils.h"
 #include "bls_include.h"
@@ -438,13 +438,13 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
 // not throw an exception for integers larger than p. The function returns RLC_OK if the input
 // corresponds to a field element in Fp^2, and returns RLC_ERR otherwise.
 static int fp2_read_bin_safe(fp2_t a, const uint8_t *bin, int len) {
-	if (len != Fp2_BYTES) {
-		return RLC_ERR;
-	}
-	if (fp_read_bin_safe(a[0], bin, Fp_BYTES) != RLC_OK) {
+    if (len != Fp2_BYTES) {
         return RLC_ERR;
     }
-	if (fp_read_bin_safe(a[1], bin + Fp_BYTES, Fp_BYTES) != RLC_OK) {
+    if (fp_read_bin_safe(a[0], bin, Fp_BYTES) != RLC_OK) {
+        return RLC_ERR;
+    }
+    if (fp_read_bin_safe(a[1], bin + Fp_BYTES, Fp_BYTES) != RLC_OK) {
         return RLC_ERR;
     }
     return RLC_OK;
