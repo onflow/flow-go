@@ -798,34 +798,36 @@ void ep_rand_G1complement(ep_t p) {
     while (ep_upk(p, p) == 0); // make sure p is in E1
 
     // map the point to E1\G1 by clearing G1 order
-    bn_t order;
-    bn_new(order); 
-    g1_get_ord(order);
-    ep_mul_basic(p, p, order);
-    bn_free(order);
+    ep_mul_basic(p, p, &core_get()->ep_r);
+
+    assert(ep_on_curve(p));  // sanity check to make sure p is in E1
 }
 
-// runs a G1 subgroup check against:
-//  - a point in G1 if inG1 is true
-//  - a point in E1\G1 otherwise
-int subgroup_check_G1_test(int inG1) {
-    // generate a random p
-    ep_t p;
-	if (inG1) ep_rand_G1(p); // p in G1
-	else ep_rand_G1complement(p); // p in E1\G1
+// generates a random point in G2 and stores it in p
+void ep2_rand_G2(ep2_t p) {
+    // multiplies G2 generator by a random scalar
+    ep2_rand(p);
+}
 
-    if (!ep_on_curve(p)) { // sanity check to make sure p is in E1
-        return UNDEFINED; // this should not happen
+// generates a random point in E2\G2 and stores it in p
+void ep2_rand_G2complement(ep2_t p) {
+    // generate a random point in E2
+    p->coord = BASIC;
+    fp_set_dig(p->z[0], 1);
+	fp_zero(p->z[1]);
+    do {
+        fp2_rand(p->x); // set x to a random field element
+        byte r;
+        rand_bytes(&r, 1);
+        fp2_zero(p->y);
+        fp_set_bit(p->y[0], 0, r&1); // set y randomly to 0 or 1
     }
+    while (ep2_upk(p, p) == 0); // make sure p is in E1
 
-    return check_membership_G1(p);
-}
+    // map the point to E1\G1 by clearing G1 order
+    ep2_mul_basic(p, p, &core_get()->ep_r);
 
-int subgroup_check_G1_bench() {
-    ep_t p;
-	ep_curve_get_gen(p);
-    // check p is in G1
-    return check_membership_G1(p);
+    assert(ep2_on_curve(p));  // sanity check to make sure p is in E1
 }
 
 // This is a testing function.

@@ -134,28 +134,56 @@ func BenchmarkMapToG1(b *testing.B) {
 	b.StopTimer()
 }
 
-// test Bowe subgroup check in G1
-// The test compares Bowe's check result to multiplying by the group order
-func TestSubgroupCheckG1(t *testing.T) {
+// test subgroup membership check in G1 and G2
+func TestSubgroupCheck(t *testing.T) {
 	blsInstance.reInit()
 	// seed Relic PRG
 	seed := make([]byte, securityBits/8)
 	_, _ = rand.Read(seed)
 	_ = seedRelic(seed)
 
-	// tests for simple membership check
-	check := checkG1Test(1) // point in G1
-	assert.True(t, check)
-	check = checkG1Test(0) // point in E1\G1
-	assert.False(t, check)
+	t.Run("G1", func(t *testing.T) {
+		var p pointG1
+		randPointG1(&p) // point in G1
+		res := checkMembershipG1(&p)
+		assert.Equal(t, res, int(valid))
+		randPointG1Complement(&p) // point in E1\G1
+		res = checkMembershipG1(&p)
+		assert.Equal(t, res, int(invalid))
+	})
+
+	t.Run("G2", func(t *testing.T) {
+		var p pointG2
+		randPointG2(&p) // point in G2
+		res := checkMembershipG2(&p)
+		assert.Equal(t, res, int(valid))
+		randPointG2Complement(&p) // point in E2\G2
+		res = checkMembershipG2(&p)
+		assert.Equal(t, res, int(invalid))
+	})
 }
 
-// G1 membership check bench
-func BenchmarkCheckG1(b *testing.B) {
+// subgroup membership check bench
+func BenchmarkSubgroupCheck(b *testing.B) {
 	blsInstance.reInit()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		benchG1Test()
-	}
-	b.StopTimer()
+
+	b.Run("G1", func(b *testing.B) {
+		var p pointG1
+		randPointG1(&p)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = checkMembershipG1(&p) // G1
+		}
+		b.StopTimer()
+	})
+
+	b.Run("G2", func(b *testing.B) {
+		var p pointG2
+		randPointG2(&p)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = checkMembershipG2(&p) // G2
+		}
+		b.StopTimer()
+	})
 }

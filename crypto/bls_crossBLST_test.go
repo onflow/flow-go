@@ -147,7 +147,7 @@ func testEncodeDecodeSignatureCrossBLST(t *rapid.T) {
 	var pointFlow pointG1
 	// here we test readPointG1 rather than the simple Signature type alias
 	err := readPointG1(&pointFlow, sigBytes)
-	flowPass := (err == nil) && checkMembershipG1Test(&pointFlow)
+	flowPass := (err == nil) && (checkMembershipG1(&pointFlow) == int(valid))
 
 	var pointBLST blst.P1Affine
 	res := pointBLST.Uncompress(sigBytes)
