@@ -312,6 +312,7 @@ func (block *BlockDerivedData[TKey, TVal]) NewTransactionDerivedData(
 		false)
 }
 
+// Note: use GetOrCompute instead of Get/Set whenever possible.
 func (txn *TransactionDerivedData[TKey, TVal]) Get(key TKey) (
 	TVal,
 	*state.State,
@@ -338,6 +339,7 @@ func (txn *TransactionDerivedData[TKey, TVal]) Get(key TKey) (
 	return defaultValue, nil, false
 }
 
+// Note: use GetOrCompute instead of Get/Set whenever possible.
 func (txn *TransactionDerivedData[TKey, TVal]) Set(
 	key TKey,
 	value TVal,
@@ -348,6 +350,55 @@ func (txn *TransactionDerivedData[TKey, TVal]) Set(
 		State:     state,
 		isInvalid: false,
 	}
+}
+
+// GetOrCompute returns the key's value.  If a pre-computed value is available,
+// then the pre-computed value is returned and the cached state is replayed on
+// txnState.  Otherwise, the value is computed using valFunc; both the value
+// and the states used to compute the value are captured.
+//
+// Note: valFunc must be an idempotent function and it must not modify
+// txnState's values.
+func (txn *TransactionDerivedData[TKey, TVal]) GetOrCompute(
+	txnState *state.TransactionState,
+	key TKey,
+	valFunc func(txnState *state.TransactionState, key TKey) (TVal, error),
+) (
+	TVal,
+	error,
+) {
+	var defaultVal TVal
+
+	val, state, ok := txn.Get(key)
+	if ok {
+		err := txnState.AttachAndCommit(state)
+		if err != nil {
+			return defaultVal, fmt.Errorf(
+				"failed to replay cached state: %w",
+				err)
+		}
+
+		return val, nil
+	}
+
+	nestedTxId, err := txnState.BeginNestedTransaction()
+	if err != nil {
+		return defaultVal, fmt.Errorf("failed to start nested txn: %w", err)
+	}
+
+	val, err = valFunc(txnState, key)
+	if err != nil {
+		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
+	}
+
+	committedState, err := txnState.Commit(nestedTxId)
+	if err != nil {
+		return defaultVal, fmt.Errorf("failed to commit nested txn: %w", err)
+	}
+
+	txn.Set(key, val, committedState)
+
+	return val, nil
 }
 
 func (txn *TransactionDerivedData[TKey, TVal]) AddInvalidator(
