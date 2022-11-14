@@ -7,23 +7,23 @@ import (
 )
 
 type GossipSubRouterFixture struct {
-	router *pubsub.GossipSubRouter
+	Router *pubsub.GossipSubRouter
 }
 
 var _ pubsub.GossipPubSubRouter = (*GossipSubRouterFixture)(nil)
 
-//func NewGossipSubRouterFixture() *GossipSubRouterFixture {
-//	return &GossipSubRouterFixture{
-//		router: pubsub.DefaultGossipSubRouter(),
-//	}
-//}
+func NewGossipSubRouterFixture() *GossipSubRouterFixture {
+	return &GossipSubRouterFixture{
+		Router: pubsub.DefaultGossipSubRouter(),
+	}
+}
 
 func (m *GossipSubRouterFixture) Protocols() []protocol.ID {
-	return m.router.Protocols()
+	return m.Router.Protocols()
 }
 
 func (m *GossipSubRouterFixture) Attach(sub *pubsub.PubSub) {
-	m.router.Attach(sub)
+	m.Router.Attach(sub)
 }
 
 func (m *GossipSubRouterFixture) AddPeer(pid peer.ID, protocolId protocol.ID) {
@@ -35,61 +35,61 @@ func (m *GossipSubRouterFixture) RemovePeer(pid peer.ID) {
 }
 
 func (m *GossipSubRouterFixture) EnoughPeers(topic string, suggested int) bool {
-	return m.router.EnoughPeers(topic, suggested)
+	return m.Router.EnoughPeers(topic, suggested)
 }
 
 func (m *GossipSubRouterFixture) AcceptFrom(pid peer.ID) pubsub.AcceptStatus {
-	return m.router.AcceptFrom(pid)
+	return m.Router.AcceptFrom(pid)
 }
 
 func (m *GossipSubRouterFixture) HandleRPC(rpc *pubsub.RPC) {
-	m.router.HandleRPC(rpc)
+	m.Router.HandleRPC(rpc)
 }
 
 func (m *GossipSubRouterFixture) Publish(message *pubsub.Message) {
-	m.router.Publish(message)
+	m.Router.Publish(message)
 }
 
 func (m *GossipSubRouterFixture) Join(topic string) {
-	m.router.Join(topic)
+	m.Router.Join(topic)
 }
 
 func (m *GossipSubRouterFixture) Leave(topic string) {
-	m.router.Leave(topic)
+	m.Router.Leave(topic)
 }
 
 func (m *GossipSubRouterFixture) SetPeerScore(score *pubsub.PeerScore) {
-	m.router.SetPeerScore(score)
+	m.Router.SetPeerScore(score)
 }
 
 func (m *GossipSubRouterFixture) GetPeerScore() *pubsub.PeerScore {
-	return m.router.GetPeerScore()
+	return m.Router.GetPeerScore()
 }
 
 func (m *GossipSubRouterFixture) SetPeerScoreThresholds(thresholds *pubsub.PeerScoreThresholds) {
-	m.router.SetPeerScoreThresholds(thresholds)
+	m.Router.SetPeerScoreThresholds(thresholds)
 }
 
 func (m *GossipSubRouterFixture) SetGossipTracer(tracer *pubsub.GossipTracer) {
-	m.router.SetGossipTracer(tracer)
+	m.Router.SetGossipTracer(tracer)
 }
 
 func (m *GossipSubRouterFixture) GetGossipTracer() *pubsub.GossipTracer {
-	return m.router.GetGossipTracer()
+	return m.Router.GetGossipTracer()
 }
 
 func (m *GossipSubRouterFixture) GetTagTracer() *pubsub.TagTracer {
-	return m.router.GetTagTracer()
+	return m.Router.GetTagTracer()
 }
 
 func (m *GossipSubRouterFixture) SetDirectPeers(direct map[peer.ID]struct{}) {
-	m.router.SetDirectPeers(direct)
+	m.Router.SetDirectPeers(direct)
 }
 
 func (m *GossipSubRouterFixture) SetPeerGater(gater *pubsub.PeerGater) {
-	m.router.SetPeerGater(gater)
+	m.Router.SetPeerGater(gater)
 }
 
 func (m *GossipSubRouterFixture) GetPeerGater() *pubsub.PeerGater {
-	return m.router.GetPeerGater()
+	return m.Router.GetPeerGater()
 }

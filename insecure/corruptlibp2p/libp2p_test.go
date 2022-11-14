@@ -2,6 +2,8 @@ package corruptlibp2p
 
 import (
 	"context"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/insecure/corruptlibp2p/internal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
@@ -29,8 +31,7 @@ func TestSpam(t *testing.T) {
 	nodes := make([]p2p.LibP2PNode, 0, 5)
 	ids := flow.IdentityList{}
 	inbounds := make([]chan string, 0, 5)
-
-	//disallowedList := map[*flow.Identity]struct{}{}
+	peerIds := make([]peer.ID, 5)
 
 	for i := 0; i < count; i++ {
 		handler, inbound := p2ptest.StreamHandlerFixture(t)
@@ -40,39 +41,23 @@ func TestSpam(t *testing.T) {
 			t.Name(),
 			p2ptest.WithRole(flow.RoleConsensus),
 			p2ptest.WithDefaultStreamHandler(handler),
-			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
-			//p2ptest.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
-			//	list := make(peer.IDSlice, 0)
-			//	for _, id := range ids {
-			//		if _, ok := disallowedList[id]; ok {
-			//			continue
-			//		}
-			//
-			//		pid, err := unittest.PeerIDFromFlowID(id)
-			//		require.NoError(t, err)
-			//
-			//		list = append(list, pid)
-			//	}
-			//	return list
-			//}),
-			//p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
-			//	for id := range disallowedList {
-			//		bid, err := unittest.PeerIDFromFlowID(id)
-			//		require.NoError(t, err)
-			//		if bid == pid {
-			//			return fmt.Errorf("disallow-listed")
-			//		}
-			//	}
-			//
-			//	return nil
-			//})),
 		)
+		peerId, err := unittest.PeerIDFromFlowID(&id)
+		require.NoError(t, err)
 
 		nodes = append(nodes, node)
 		ids = append(ids, &id)
 		inbounds = append(inbounds, inbound)
+		peerIds = append(peerIds, peerId)
 	}
 
 	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+
+	// create new spammer
+	gsr := internal.NewGossipSubRouterFixture()
+	spammer := NewSpammerGossipSub(gsr.Router)
+
+	// start spamming the first peer
+	spammer.SpamIHave(peerIds[0], 10, 1)
 }
