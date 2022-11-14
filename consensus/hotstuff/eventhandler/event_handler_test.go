@@ -89,7 +89,6 @@ func initPaceMaker(t require.TestingT, ctx context.Context, livenessData *hotstu
 	notifier.On("OnStartingTimeout", mock.Anything).Return()
 	notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything).Return()
 	notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return()
-	notifier.On("OnReachedTimeout", mock.Anything).Return()
 	pm.Start(ctx)
 	return pm
 }
@@ -296,7 +295,10 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.notifier.On("OnEventProcessed").Maybe()
 	es.notifier.On("OnEnteringView", mock.Anything, mock.Anything).Maybe()
 	es.notifier.On("OnReceiveProposal", mock.Anything, mock.Anything).Maybe()
-	es.notifier.On("OnQcConstructedFromVotes", mock.Anything, mock.Anything).Maybe()
+	es.notifier.On("OnReceiveQc", mock.Anything, mock.Anything).Maybe()
+	es.notifier.On("OnReceiveTc", mock.Anything, mock.Anything).Maybe()
+	es.notifier.On("OnPartialTc", mock.Anything, mock.Anything).Maybe()
+	es.notifier.On("OnLocalTimeout", mock.Anything).Maybe()
 
 	eventhandler, err := NewEventHandler(
 		zerolog.New(os.Stderr),
