@@ -225,27 +225,16 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 	defer e.notifier.OnEventProcessed()
 
 	// process QC, this might trigger view change
-	newViewEvent, err := e.paceMaker.ProcessQC(partialTC.NewestQC)
+	_, err := e.paceMaker.ProcessQC(partialTC.NewestQC)
 	if err != nil {
 		return fmt.Errorf("could not process newest QC: %w", err)
 	}
-	viewChanged := newViewEvent != nil
 
 	// process TC, this might trigger view change
 	if lastViewTC != nil {
-		newViewEvent, err = e.paceMaker.ProcessTC(lastViewTC)
+		_, err = e.paceMaker.ProcessTC(lastViewTC)
 		if err != nil {
 			return fmt.Errorf("could not process TC for view %d: %w", lastViewTC.View, err)
-		}
-		viewChanged = viewChanged || (newViewEvent != nil)
-	}
-
-	// if QC or TC resulted in view change then we need to trigger proposing logic
-	if viewChanged {
-		log.Debug().Msg("data in partial TC initiated view change")
-		err = e.proposeForNewViewIfPrimary()
-		if err != nil {
-			return fmt.Errorf("could not propose new block: %w", err)
 		}
 	}
 
@@ -254,7 +243,7 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 		return nil
 	}
 
-	log.Debug().Msg("")
+	log.Debug().Msg("partial TC generated for current view, broadcasting timeout")
 	err = e.broadcastTimeoutObjectIfAuthorized()
 	if err != nil {
 		return fmt.Errorf("unexpected exception while processing partial TC in view %d: %w", partialTC.View, err)
