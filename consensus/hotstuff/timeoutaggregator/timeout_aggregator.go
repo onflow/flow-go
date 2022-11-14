@@ -198,12 +198,22 @@ func (t *TimeoutAggregator) PruneUpToView(lowestRetainedView uint64) {
 	t.collectors.PruneUpToView(lowestRetainedView)
 }
 
-// OnEnteringView implements the `OnEnteringView` callback from the `hotstuff.Consumer`.
+// OnQcTriggeredViewChange implements the `OnQcTriggeredViewChange` callback from the `hotstuff.Consumer`.
 // We notify the enteringViewProcessingLoop worker, which then prunes up to the active view.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (t *TimeoutAggregator) OnEnteringView(viewNumber uint64, _ flow.Identifier) {
-	if t.lowestRetainedView.Set(viewNumber) {
+func (t *TimeoutAggregator) OnQcTriggeredViewChange(_ *flow.QuorumCertificate, newView uint64) {
+	if t.lowestRetainedView.Set(newView) {
+		t.enteringViewNotifier.Notify()
+	}
+}
+
+// OnTcTriggeredViewChange implements the `OnTcTriggeredViewChange` callback from the `hotstuff.Consumer`.
+// We notify the enteringViewProcessingLoop worker, which then prunes up to the active view.
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (t *TimeoutAggregator) OnTcTriggeredViewChange(_ *flow.TimeoutCertificate, newView uint64) {
+	if t.lowestRetainedView.Set(newView) {
 		t.enteringViewNotifier.Notify()
 	}
 }
