@@ -103,9 +103,17 @@ func main() {
 		}
 	}
 
+	workerStatsTracker := benchmark.NewWorkerStatsTracker(ctx)
+	defer workerStatsTracker.Stop()
+
+	statsLogger := benchmark.NewPeriodicStatsLogger(workerStatsTracker, log)
+	statsLogger.Start()
+	defer statsLogger.Stop()
+
 	lg, err := benchmark.New(
 		ctx,
 		log,
+		workerStatsTracker,
 		loaderMetrics,
 		clients,
 		benchmark.NetworkParams{

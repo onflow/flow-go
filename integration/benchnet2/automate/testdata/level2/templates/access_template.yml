@@ -1,0 +1,8 @@
+{{range $val := .}}args:
+  - "--bootstrapdir=/bootstrap"
+  - "--access"
+env:
+  - name: access name
+    value: access {{$val.NodeID}}
+  - name: access numbers
+    value: 123{{- end -}}
