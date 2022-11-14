@@ -389,11 +389,23 @@ func (n *Network) genNetworkMessage(channel channels.Channel, event interface{},
 		emTargets = append(emTargets, tempID[:])
 	}
 
+	eventID, err := EventId(channel, payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate event id for message: %x", err)
+	}
+
+	// get message type from event type and remove the asterisk prefix if present
+	msgType := MessageType(event)
+
 	// cast event to a libp2p.Message
 	msg := &message.Message{
 		ChannelID: channel.String(),
 		TargetIDs: emTargets,
 		Payload:   payload,
+
+		// TODO: these fields are unused and here for backwards compatibility
+		EventID: eventID,
+		Type:    msgType,
 	}
 
 	return msg, nil
