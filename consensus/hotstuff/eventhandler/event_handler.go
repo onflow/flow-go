@@ -83,7 +83,7 @@ func (e *EventHandler) OnReceiveQc(qc *flow.QuorumCertificate) error {
 		Hex("qc_block_id", qc.BlockID[:]).
 		Logger()
 	log.Debug().Msg("received QC")
-	e.notifier.OnQcConstructedFromVotes(curView, qc)
+	e.notifier.OnReceiveQc(curView, qc)
 	defer e.notifier.OnEventProcessed()
 
 	newViewEvent, err := e.paceMaker.ProcessQC(qc)
@@ -113,6 +113,7 @@ func (e *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 		Hex("tc_newest_qc_block_id", tc.NewestQC.BlockID[:]).
 		Logger()
 	log.Debug().Msg("received TC")
+	e.notifier.OnReceiveTc(curView, tc)
 	defer e.notifier.OnEventProcessed()
 
 	newViewEvent, err := e.paceMaker.ProcessTC(tc)
@@ -195,7 +196,7 @@ func (e *EventHandler) TimeoutChannel() <-chan time.Time {
 func (e *EventHandler) OnLocalTimeout() error {
 	curView := e.paceMaker.CurView()
 	e.log.Debug().Uint64("cur_view", curView).Msg("timeout received from event loop")
-	// TODO(active-pacemaker): update telemetry
+	e.notifier.OnLocalTimeout(curView)
 	defer e.notifier.OnEventProcessed()
 
 	err := e.broadcastTimeoutObjectIfAuthorized()
@@ -209,19 +210,42 @@ func (e *EventHandler) OnLocalTimeout() error {
 // a corresponding model.TimeoutObject is broadcast to the consensus committee.
 // No errors are expected during normal operation.
 func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) error {
-	// TODO(active-pacemaker): update telemetry
+	curView := e.paceMaker.CurView()
+	lastViewTC := partialTC.LastViewTC
+	logger := e.log.With().
+		Uint64("cur_view", curView).
+		Uint64("qc_view", partialTC.NewestQC.View)
+	if lastViewTC != nil {
+		logger.Uint64("last_view_tc_view", lastViewTC.View)
+	}
+	log := logger.Logger()
+	log.Debug().Msg("constructed partial TC")
+
+	e.notifier.OnPartialTc(curView, partialTC)
 	defer e.notifier.OnEventProcessed()
 
-	// process QC, this might trigger view change and any related logic(proposing, voting)
-	err := e.OnReceiveQc(partialTC.NewestQC)
+	// process QC, this might trigger view change
+	newViewEvent, err := e.paceMaker.ProcessQC(partialTC.NewestQC)
 	if err != nil {
-		return fmt.Errorf("could not process QC: %w", err)
+		return fmt.Errorf("could not process newest QC: %w", err)
 	}
-	// process TC, this might trigger view change and any related logic(proposing, voting)
-	if partialTC.LastViewTC != nil {
-		err = e.OnReceiveTc(partialTC.LastViewTC)
+	viewChanged := newViewEvent != nil
+
+	// process TC, this might trigger view change
+	if lastViewTC != nil {
+		newViewEvent, err = e.paceMaker.ProcessTC(lastViewTC)
 		if err != nil {
-			return fmt.Errorf("could not process TC: %w", err)
+			return fmt.Errorf("could not process TC for view %d: %w", lastViewTC.View, err)
+		}
+		viewChanged = viewChanged || (newViewEvent != nil)
+	}
+
+	// if QC or TC resulted in view change then we need to trigger proposing logic
+	if viewChanged {
+		log.Debug().Msg("data in partial TC initiated view change")
+		err = e.proposeForNewViewIfPrimary()
+		if err != nil {
+			return fmt.Errorf("could not propose new block: %w", err)
 		}
 	}
 
@@ -230,6 +254,7 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 		return nil
 	}
 
+	log.Debug().Msg("")
 	err = e.broadcastTimeoutObjectIfAuthorized()
 	if err != nil {
 		return fmt.Errorf("unexpected exception while processing partial TC in view %d: %w", partialTC.View, err)
@@ -364,7 +389,6 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	}
 
 	// attempt to generate proposal:
-	e.notifier.OnEnteringView(curView, currentLeader)
 	newestQC := e.paceMaker.NewestQC()
 	lastViewTC := e.paceMaker.LastViewTC()
 

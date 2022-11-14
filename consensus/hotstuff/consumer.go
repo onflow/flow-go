@@ -108,13 +108,6 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64)
 
-	// OnQcConstructedFromVotes notifications are produced by the VoteAggregator
-	// component, whenever it constructs a QC from votes.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate)
-
 	// OnStartingTimeout notifications are produced by PaceMaker. Such a notification indicates that the
 	// PaceMaker is now waiting for the system to (receive and) process blocks or votes.
 	// The specific timeout type is contained in the TimerInfo.
