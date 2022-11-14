@@ -48,7 +48,7 @@ func TestChainPrograms(t *testing.T) {
 
 	entry := block1.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
-	require.Same(t, prog1, entry.Program)
+	require.Same(t, prog1, entry.Value)
 
 	//
 	// Creating a BlockPrograms from parent
@@ -72,11 +72,11 @@ func TestChainPrograms(t *testing.T) {
 
 	entry = block2.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
-	require.Same(t, prog1, entry.Program)
+	require.Same(t, prog1, entry.Value)
 
 	entry = block2.GetForTestingOnly(loc2)
 	require.NotNil(t, entry)
-	require.Same(t, prog2, entry.Program)
+	require.Same(t, prog2, entry.Value)
 
 	//
 	// Reuse exising BlockPrograms in cache
@@ -90,7 +90,7 @@ func TestChainPrograms(t *testing.T) {
 
 	entry = block1.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
-	require.Same(t, prog1, entry.Program)
+	require.Same(t, prog1, entry.Value)
 
 	// writes to block2 did't poplute block1.
 	entry = block1.GetForTestingOnly(loc2)
@@ -110,11 +110,11 @@ func TestChainPrograms(t *testing.T) {
 
 	entry = block3.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
-	require.Same(t, prog1, entry.Program)
+	require.Same(t, prog1, entry.Value)
 
 	entry = block3.GetForTestingOnly(loc2)
 	require.NotNil(t, entry)
-	require.Same(t, prog2, entry.Program)
+	require.Same(t, prog2, entry.Value)
 
 	// block1 forces block2 to evict
 	foundBlock = programs.GetOrCreateBlockPrograms(blockId1, flow.ZeroID)
@@ -140,11 +140,11 @@ func TestChainPrograms(t *testing.T) {
 
 	entry = scriptBlock.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
-	require.Same(t, prog1, entry.Program)
+	require.Same(t, prog1, entry.Value)
 
 	entry = scriptBlock.GetForTestingOnly(loc2)
 	require.NotNil(t, entry)
-	require.Same(t, prog2, entry.Program)
+	require.Same(t, prog2, entry.Value)
 
 	foundBlock = programs.Get(blockId3)
 	require.Same(t, block3, foundBlock)

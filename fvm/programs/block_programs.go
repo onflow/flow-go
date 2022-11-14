@@ -10,17 +10,17 @@ import (
 // BlockPrograms is a simple fork-aware OCC database for "caching" programs
 // for a particular block.
 type BlockPrograms struct {
-	*BlockDerivedData[common.AddressLocation, ProgramEntry]
+	*BlockDerivedData[common.AddressLocation, *interpreter.Program]
 }
 
 // TransactionPrograms is the scratch space for programs of a single transaction.
 type TransactionPrograms struct {
-	*TransactionDerivedData[common.AddressLocation, ProgramEntry]
+	*TransactionDerivedData[common.AddressLocation, *interpreter.Program]
 }
 
 func NewEmptyBlockPrograms() *BlockPrograms {
 	return &BlockPrograms{
-		NewEmptyBlockDerivedData[common.AddressLocation, ProgramEntry](),
+		NewEmptyBlockDerivedData[common.AddressLocation, *interpreter.Program](),
 	}
 }
 
@@ -28,7 +28,7 @@ func NewEmptyBlockPrograms() *BlockPrograms {
 // beginning of the block.
 func NewEmptyBlockProgramsWithTransactionOffset(offset uint32) *BlockPrograms {
 	return &BlockPrograms{
-		NewEmptyBlockDerivedDataWithOffset[common.AddressLocation, ProgramEntry](offset),
+		NewEmptyBlockDerivedDataWithOffset[common.AddressLocation, *interpreter.Program](offset),
 	}
 }
 
@@ -81,12 +81,7 @@ func (transaction *TransactionPrograms) Get(
 	*state.State,
 	bool,
 ) {
-	programEntry := transaction.TransactionDerivedData.Get(addressLocation)
-	if programEntry == nil {
-		return nil, nil, false
-	}
-
-	return programEntry.Program, programEntry.State, true
+	return transaction.TransactionDerivedData.Get(addressLocation)
 }
 
 func (transaction *TransactionPrograms) Set(
@@ -94,15 +89,11 @@ func (transaction *TransactionPrograms) Set(
 	program *interpreter.Program,
 	state *state.State,
 ) {
-	transaction.TransactionDerivedData.Set(addressLocation, ProgramEntry{
-		Location: addressLocation,
-		Program:  program,
-		State:    state,
-	})
+	transaction.TransactionDerivedData.Set(addressLocation, program, state)
 }
 
 func (transaction *TransactionPrograms) AddInvalidator(
-	invalidator DerivedDataInvalidator[ProgramEntry],
+	invalidator DerivedDataInvalidator[common.AddressLocation, *interpreter.Program],
 ) {
 	transaction.TransactionDerivedData.AddInvalidator(invalidator)
 }

@@ -345,9 +345,8 @@ func TestTxnProgsCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
 	entry, ok := entries[location]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Equal(t, location, entry.Entry.Location)
-	require.Same(t, expectedProg, entry.Entry.Program)
-	require.Same(t, expectedState, entry.Entry.State)
+	require.Same(t, expectedProg, entry.Value)
+	require.Same(t, expectedState, entry.State)
 }
 
 func TestTxnProgsCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
@@ -393,7 +392,10 @@ func TestTxnProgsCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
 
 	require.Equal(
 		t,
-		chainedDerivedDataInvalidators[ProgramEntry]{
+		chainedDerivedDataInvalidators[
+			common.AddressLocation,
+			*interpreter.Program,
+		]{
 			{
 				DerivedDataInvalidator: invalidator,
 				executionTime:          testTxnTime,
@@ -447,11 +449,10 @@ func TestTxnProgsCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
 
 	require.Same(t, expectedEntry, actualEntry)
 	require.False(t, actualEntry.isInvalid)
-	require.Equal(t, location, actualEntry.Entry.Location)
-	require.Same(t, expectedProg, actualEntry.Entry.Program)
-	require.Same(t, expectedState, actualEntry.Entry.State)
-	require.NotSame(t, otherProg, actualEntry.Entry.Program)
-	require.NotSame(t, otherState, actualEntry.Entry.State)
+	require.Same(t, expectedProg, actualEntry.Value)
+	require.Same(t, expectedState, actualEntry.State)
+	require.NotSame(t, otherProg, actualEntry.Value)
+	require.NotSame(t, otherState, actualEntry.State)
 }
 
 func TestTxnProgsCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
@@ -523,16 +524,14 @@ func TestTxnProgsCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 	entry, ok := entries[loc1]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Equal(t, loc1, entry.Entry.Location)
-	require.Same(t, expectedProg1, entry.Entry.Program)
-	require.Same(t, expectedState1, entry.Entry.State)
+	require.Same(t, expectedProg1, entry.Value)
+	require.Same(t, expectedState1, entry.State)
 
 	entry, ok = entries[loc2]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Equal(t, loc2, entry.Entry.Location)
-	require.Same(t, expectedProg2, entry.Entry.Program)
-	require.Same(t, expectedState2, entry.Entry.State)
+	require.Same(t, expectedProg2, entry.Value)
+	require.Same(t, expectedState2, entry.State)
 }
 
 func TestTxnProgsCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
@@ -612,7 +611,10 @@ func TestTxnProgsCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 
 	require.Equal(
 		t,
-		chainedDerivedDataInvalidators[ProgramEntry]{
+		chainedDerivedDataInvalidators[
+			common.AddressLocation,
+			*interpreter.Program,
+		]{
 			{
 				DerivedDataInvalidator: testSetupTxn1Invalidator,
 				executionTime:          testSetupTxn1Time,
@@ -767,7 +769,10 @@ func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
 
 	require.Equal(
 		t,
-		chainedDerivedDataInvalidators[ProgramEntry]{
+		chainedDerivedDataInvalidators[
+			common.AddressLocation,
+			*interpreter.Program,
+		]{
 			{
 				DerivedDataInvalidator: invalidator1,
 				executionTime:          testTxnTime,
@@ -785,16 +790,14 @@ func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
 	entry, ok := entries[readLoc2]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Equal(t, readLoc2, entry.Entry.Location)
-	require.Same(t, readProg2, entry.Entry.Program)
-	require.Same(t, readState2, entry.Entry.State)
+	require.Same(t, readProg2, entry.Value)
+	require.Same(t, readState2, entry.State)
 
 	entry, ok = entries[writeLoc2]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Equal(t, writeLoc2, entry.Entry.Location)
-	require.Same(t, writeProg2, entry.Entry.Program)
-	require.Same(t, writeState2, entry.Entry.State)
+	require.Same(t, writeProg2, entry.Value)
+	require.Same(t, writeState2, entry.State)
 }
 
 func TestBlockProgsNewChildBlockPrograms(t *testing.T) {
@@ -845,9 +848,8 @@ func TestBlockProgsNewChildBlockPrograms(t *testing.T) {
 	parentEntry, ok := parentEntries[location]
 	require.True(t, ok)
 	require.False(t, parentEntry.isInvalid)
-	require.Equal(t, location, parentEntry.Entry.Location)
-	require.Same(t, prog, parentEntry.Entry.Program)
-	require.Same(t, state, parentEntry.Entry.State)
+	require.Same(t, prog, parentEntry.Value)
+	require.Same(t, state, parentEntry.State)
 
 	// Verify child is correctly initialized
 
@@ -866,9 +868,8 @@ func TestBlockProgsNewChildBlockPrograms(t *testing.T) {
 	childEntry, ok := childEntries[location]
 	require.True(t, ok)
 	require.False(t, childEntry.isInvalid)
-	require.Equal(t, location, childEntry.Entry.Location)
-	require.Same(t, prog, childEntry.Entry.Program)
-	require.Same(t, state, childEntry.Entry.State)
+	require.Same(t, prog, childEntry.Value)
+	require.Same(t, state, childEntry.State)
 
 	require.NotSame(t, parentEntry, childEntry)
 }

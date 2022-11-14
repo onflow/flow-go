@@ -73,13 +73,11 @@ func NewScriptWithContextAndArgs(
 	}
 }
 
-// TODO(patrick): add ProcedureExecutor interface (superset of
-// TransactionExecutor api).
 func (proc *ScriptProcedure) NewExecutor(
 	ctx Context,
 	txnState *state.TransactionState,
 	programs *programs.TransactionPrograms,
-) *scriptExecutor {
+) ProcedureExecutor {
 	return newScriptExecutor(ctx, proc, txnState, programs)
 }
 
@@ -88,8 +86,7 @@ func (proc *ScriptProcedure) Run(
 	txnState *state.TransactionState,
 	programs *programs.TransactionPrograms,
 ) error {
-	// TODO(patrick): switch to run(proc.NewExecutor(ctx, txnState, programs)
-	return proc.NewExecutor(ctx, txnState, programs).Execute()
+	return run(proc.NewExecutor(ctx, txnState, programs))
 }
 
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
