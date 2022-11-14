@@ -12,11 +12,11 @@ type GossipSubRouterFixture struct {
 
 var _ pubsub.GossipPubSubRouter = (*GossipSubRouterFixture)(nil)
 
-func NewGossipSubRouterFixture() *GossipSubRouterFixture {
-	return &GossipSubRouterFixture{
-		router: pubsub.DefaultGossipSubRouter(),
-	}
-}
+//func NewGossipSubRouterFixture() *GossipSubRouterFixture {
+//	return &GossipSubRouterFixture{
+//		router: pubsub.DefaultGossipSubRouter(),
+//	}
+//}
 
 func (m *GossipSubRouterFixture) Protocols() []protocol.ID {
 	return m.router.Protocols()
