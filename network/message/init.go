@@ -5,6 +5,7 @@ import (
 )
 
 var (
+	// validationExclusionList list of messages that are allowed to have more than 1 configured allowed protocol.
 	validationExclusionList = []string{TestMessage}
 )
 

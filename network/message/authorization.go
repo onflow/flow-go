@@ -46,7 +46,7 @@ func (m MsgAuthConfig) EnsureAuthorized(role flow.Role, channel channels.Channel
 	}
 
 	if !authConfig.AllowedProtocols.Contains(protocol) {
-		return protocol.Error()
+		return NewUnauthorizedProtocolError(protocol)
 	}
 
 	return nil

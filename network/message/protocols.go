@@ -11,7 +11,8 @@ func (p Protocol) String() string {
 	return string(p)
 }
 
-func (p Protocol) Error() error {
+// NewUnauthorizedProtocolError returns ErrUnauthorizedUnicastOnChannel or ErrUnauthorizedPublishOnChannel depending on the protocol provided.
+func NewUnauthorizedProtocolError(p Protocol) error {
 	if p == ProtocolUnicast {
 		return ErrUnauthorizedUnicastOnChannel
 	}
