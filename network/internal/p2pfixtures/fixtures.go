@@ -287,9 +287,8 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 
 	subs := make([]*pubsub.Subscription, len(nodes))
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
-	var err error
 	for i, node := range nodes {
-		subs[i], err = node.Subscribe(
+		ps, err := node.Subscribe(
 			topic,
 			validator.TopicValidator(
 				unittest.Logger(),
@@ -297,6 +296,7 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 				slashingViolationsConsumer,
 				unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
+		subs[i] = MustBePubSubSubscription(t, ps)
 	}
 
 	// let subscriptions propagate
@@ -336,8 +336,9 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p
 	}
 
 	for i, node := range to {
-		subs[i], err = node.Subscribe(topic, tv)
+		s, err := node.Subscribe(topic, tv)
 		require.NoError(t, err)
+		subs[i] = MustBePubSubSubscription(t, s)
 	}
 
 	// let subscriptions propagate
@@ -472,4 +473,10 @@ func LongStringMessageFactoryFixture(t *testing.T) func() string {
 		require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
 		return fmt.Sprintf("%s %d \n", msg, time.Now().UnixNano()) // add timestamp to make sure we don't send the same message twice
 	}
+}
+
+func MustBePubSubSubscription(t *testing.T, subscription p2p.Subscription) *pubsub.Subscription {
+	ps, ok := subscription.(*pubsub.Subscription)
+	require.True(t, ok)
+	return ps
 }
