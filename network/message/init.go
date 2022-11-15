@@ -16,7 +16,7 @@ func init() {
 }
 
 // validateMessageAuthConfigsMap ensures that each message authorization config has exactly one configured AllowedProtocol either pubsub or unicast.
-// This is due to the fact that currently there are no messages that are used with both protocols aside from TestMessage. 
+// This is due to the fact that currently there are no messages that are used with both protocols aside from TestMessage.
 func validateMessageAuthConfigsMap(excludeList []string) {
 	for _, msgAuthConf := range authorizationConfigs {
 		if excludeConfig(msgAuthConf.Name, excludeList) {

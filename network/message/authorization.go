@@ -11,7 +11,8 @@ type ChannelAuthConfig struct {
 	// AuthorizedRoles list of roles authorized to send this message on the channel.
 	AuthorizedRoles flow.RoleList
 
-	// AllowedProtocols list of protocols the message is allowed to be sent on.
+	// AllowedProtocols list of protocols the message is allowed to be sent on. Currently AllowedProtocols is expected to have
+	// exactly one element in the list. This is due to the fact that currently there are no messages that are used with both protocols aside from TestMessage.
 	AllowedProtocols Protocols
 }
 
