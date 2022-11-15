@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -22,22 +22,19 @@ import (
 //
 // if KeyWeightThreshold is set to a negative number, signature verification is skipped
 type TransactionVerifier struct {
-	KeyWeightThreshold int
 }
 
-func NewTransactionVerifier(keyWeightThreshold int) *TransactionVerifier {
-	return &TransactionVerifier{
-		KeyWeightThreshold: keyWeightThreshold,
-	}
-}
-
-func (v *TransactionVerifier) Process(
-	ctx Context,
+func (v *TransactionVerifier) CheckAuthorization(
+	tracer module.Tracer,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	_ *programs.TransactionPrograms,
+	keyWeightThreshold int,
 ) error {
-	err := v.verifyTransaction(proc, ctx, txnState)
+	// TODO(Janez): verification is part of inclusion fees, not execution fees.
+	var err error
+	txnState.RunWithAllLimitsDisabled(func() {
+		err = v.verifyTransaction(tracer, proc, txnState, keyWeightThreshold)
+	})
 	if err != nil {
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
@@ -46,11 +43,12 @@ func (v *TransactionVerifier) Process(
 }
 
 func (v *TransactionVerifier) verifyTransaction(
+	tracer module.Tracer,
 	proc *TransactionProcedure,
-	ctx Context,
 	txnState *state.TransactionState,
+	keyWeightThreshold int,
 ) error {
-	span := proc.StartSpanFromProcTraceSpan(ctx.Tracer, trace.FVMVerifyTransaction)
+	span := proc.StartSpanFromProcTraceSpan(tracer, trace.FVMVerifyTransaction)
 	span.SetAttributes(
 		attribute.String("transaction.ID", proc.ID.String()),
 	)
@@ -71,21 +69,12 @@ func (v *TransactionVerifier) verifyTransaction(
 		return err
 	}
 
-	// TODO(Janez): move disabling limits out of the verifier. Verifier should not be metered anyway.
-	// TODO(Janez): verification is part of inclusion fees, not execution fees.
-
-	// check accounts uses the state, but if the limits are too low, this might fail.
-	// we shouldn't fail here if the limits are too low as fee deduction won't happen
-	txnState.RunWithAllLimitsDisabled(
-		func() {
-			err = v.checkAccountsAreNotFrozen(tx, accounts)
-		},
-	)
+	err = v.checkAccountsAreNotFrozen(tx, accounts)
 	if err != nil {
 		return err
 	}
 
-	if v.KeyWeightThreshold < 0 {
+	if keyWeightThreshold < 0 {
 		return nil
 	}
 
@@ -131,40 +120,25 @@ func (v *TransactionVerifier) verifyTransaction(
 			continue
 		}
 		// hasSufficientKeyWeight
-		if !v.hasSufficientKeyWeight(payloadWeights, addr) {
+		if !v.hasSufficientKeyWeight(payloadWeights, addr, keyWeightThreshold) {
 			return errors.NewAccountAuthorizationErrorf(
 				addr,
 				"authorizer account does not have sufficient signatures (%d < %d)",
 				payloadWeights[addr],
-				v.KeyWeightThreshold)
+				keyWeightThreshold)
 		}
 	}
 
-	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer) {
+	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer, keyWeightThreshold) {
 		// TODO change this to payer error (needed for fees)
 		return errors.NewAccountAuthorizationErrorf(
 			tx.Payer,
 			"payer account does not have sufficient signatures (%d < %d)",
 			envelopeWeights[tx.Payer],
-			v.KeyWeightThreshold)
+			keyWeightThreshold)
 	}
 
 	return nil
-}
-
-// getPublicKey skips checking limits when getting the public key
-func (v *TransactionVerifier) getPublicKey(
-	txnState *state.TransactionState,
-	accounts environment.Accounts,
-	address flow.Address,
-	keyIndex uint64,
-) (pub flow.AccountPublicKey, err error) {
-	txnState.RunWithAllLimitsDisabled(
-		func() {
-			pub, err = accounts.GetPublicKey(address, keyIndex)
-		},
-	)
-	return
 }
 
 func (v *TransactionVerifier) verifyAccountSignatures(
@@ -183,7 +157,7 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 
 	for _, txSig := range signatures {
 
-		accountKey, err := v.getPublicKey(txnState, accounts, txSig.Address, txSig.KeyIndex)
+		accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyIndex)
 		if err != nil {
 			return nil, false, errorBuilder(txSig, err)
 		}
@@ -239,8 +213,9 @@ func (v *TransactionVerifier) verifyAccountSignature(
 func (v *TransactionVerifier) hasSufficientKeyWeight(
 	weights map[flow.Address]int,
 	address flow.Address,
+	keyWeightThreshold int,
 ) bool {
-	return weights[address] >= v.KeyWeightThreshold
+	return weights[address] >= keyWeightThreshold
 }
 
 func (v *TransactionVerifier) sigIsForProposalKey(

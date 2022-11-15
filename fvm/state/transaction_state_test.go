@@ -69,7 +69,7 @@ func TestUnrestrictedNestedTransactionBasic(t *testing.T) {
 
 	// Ensure nested transactions are merged correctly
 
-	err = txn.Commit(id2)
+	_, err = txn.Commit(id2)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, txn.NumNestedTransactions())
@@ -83,7 +83,7 @@ func TestUnrestrictedNestedTransactionBasic(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	err = txn.Commit(id1)
+	_, err = txn.Commit(id1)
 	require.NoError(t, err)
 
 	require.Equal(t, 0, txn.NumNestedTransactions())
@@ -170,7 +170,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 	err = cachedState.Set(addr, key, val, true)
 	require.NoError(t, err)
 
-	err = txn.AttachAndCommitParseRestricted(cachedState)
+	err = txn.AttachAndCommit(cachedState)
 	require.NoError(t, err)
 
 	require.Equal(t, 3, txn.NumNestedTransactions())
@@ -228,7 +228,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	err = txn.Commit(id1)
+	_, err = txn.Commit(id1)
 	require.NoError(t, err)
 
 	require.Equal(t, 0, txn.NumNestedTransactions())
@@ -312,7 +312,7 @@ func TestRestartNestedTransactionWithInvalidId(t *testing.T) {
 		otherId, err = txn.BeginNestedTransaction()
 		require.NoError(t, err)
 
-		err = txn.Commit(otherId)
+		_, err = txn.Commit(otherId)
 		require.NoError(t, err)
 	}
 
@@ -360,7 +360,7 @@ func TestUnrestrictedCannotCommitMainTransaction(t *testing.T) {
 
 	require.Equal(t, 2, txn.NumNestedTransactions())
 
-	err = txn.Commit(id1)
+	_, err = txn.Commit(id1)
 	require.Error(t, err)
 
 	require.Equal(t, 2, txn.NumNestedTransactions())
@@ -374,7 +374,7 @@ func TestUnrestrictedCannotCommitUnexpectedNested(t *testing.T) {
 
 	require.Equal(t, 0, txn.NumNestedTransactions())
 
-	err := txn.Commit(mainId)
+	_, err := txn.Commit(mainId)
 	require.Error(t, err)
 
 	require.Equal(t, 0, txn.NumNestedTransactions())
@@ -415,7 +415,7 @@ func TestParseRestrictedCannotCommitUnrestricted(t *testing.T) {
 
 	require.Equal(t, 1, txn.NumNestedTransactions())
 
-	err = txn.Commit(id)
+	_, err = txn.Commit(id)
 	require.Error(t, err)
 
 	require.Equal(t, 1, txn.NumNestedTransactions())
@@ -446,4 +446,76 @@ func TestParseRestrictedCannotCommitLocationMismatch(t *testing.T) {
 
 	require.Equal(t, 1, txn.NumNestedTransactions())
 	require.True(t, txn.IsCurrent(id))
+}
+
+func TestPauseAndResume(t *testing.T) {
+	txn := newTestTransactionState()
+
+	val, err := txn.Get("addr", "key", true)
+	require.NoError(t, err)
+	require.Nil(t, val)
+
+	id1, err := txn.BeginNestedTransaction()
+	require.NoError(t, err)
+
+	err = txn.Set("addr", "key", createByteArray(2), true)
+	require.NoError(t, err)
+
+	val, err = txn.Get("addr", "key", true)
+	require.NoError(t, err)
+	require.NotNil(t, val)
+
+	pausedState, err := txn.Pause(id1)
+	require.NoError(t, err)
+
+	val, err = txn.Get("addr", "key", true)
+	require.NoError(t, err)
+	require.Nil(t, val)
+
+	txn.Resume(pausedState)
+
+	val, err = txn.Get("addr", "key", true)
+	require.NoError(t, err)
+	require.NotNil(t, val)
+
+	err = txn.Set("addr2", "key2", createByteArray(2), true)
+	require.NoError(t, err)
+
+	_, err = txn.Commit(id1)
+	require.NoError(t, err)
+
+	val, err = txn.Get("addr2", "key2", true)
+	require.NoError(t, err)
+	require.NotNil(t, val)
+}
+
+func TestInvalidCommittedStateModification(t *testing.T) {
+	txn := newTestTransactionState()
+
+	id1, err := txn.BeginNestedTransaction()
+	require.NoError(t, err)
+
+	err = txn.Set("addr", "key", createByteArray(2), true)
+	require.NoError(t, err)
+
+	_, err = txn.Get("addr", "key", true)
+	require.NoError(t, err)
+
+	committedState, err := txn.Commit(id1)
+	require.NoError(t, err)
+
+	err = committedState.MergeState(
+		state.NewState(utils.NewSimpleView(), state.DefaultParameters()))
+	require.ErrorContains(t, err, "cannot MergeState on a committed state")
+
+	txn.Resume(committedState)
+
+	err = txn.Set("addr", "key", createByteArray(2), true)
+	require.ErrorContains(t, err, "cannot Set on a committed state")
+
+	_, err = txn.Get("addr", "key", true)
+	require.ErrorContains(t, err, "cannot Get on a committed state")
+
+	_, err = txn.Commit(id1)
+	require.NoError(t, err)
 }

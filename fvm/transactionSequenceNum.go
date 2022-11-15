@@ -5,25 +5,25 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
 type TransactionSequenceNumberChecker struct{}
 
-func NewTransactionSequenceNumberChecker() *TransactionSequenceNumberChecker {
-	return &TransactionSequenceNumberChecker{}
-}
-
-func (c *TransactionSequenceNumberChecker) Process(
-	ctx Context,
+func (c TransactionSequenceNumberChecker) CheckAndIncrementSequenceNumber(
+	tracer module.Tracer,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	_ *programs.TransactionPrograms,
 ) error {
-	err := c.checkAndIncrementSequenceNumber(proc, ctx, txnState)
+	// TODO(Janez): verification is part of inclusion fees, not execution fees.
+	var err error
+	txnState.RunWithAllLimitsDisabled(func() {
+		err = c.checkAndIncrementSequenceNumber(tracer, proc, txnState)
+	})
+
 	if err != nil {
 		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
@@ -31,13 +31,15 @@ func (c *TransactionSequenceNumberChecker) Process(
 	return nil
 }
 
-func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
+func (c TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
+	tracer module.Tracer,
 	proc *TransactionProcedure,
-	ctx Context,
 	txnState *state.TransactionState,
 ) error {
 
-	defer proc.StartSpanFromProcTraceSpan(ctx.Tracer, trace.FVMSeqNumCheckTransaction).End()
+	defer proc.StartSpanFromProcTraceSpan(
+		tracer,
+		trace.FVMSeqNumCheckTransaction).End()
 
 	nestedTxnId, err := txnState.BeginNestedTransaction()
 	if err != nil {
@@ -45,7 +47,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	}
 
 	defer func() {
-		commitError := txnState.Commit(nestedTxnId)
+		_, commitError := txnState.Commit(nestedTxnId)
 		if commitError != nil {
 			panic(commitError)
 		}
@@ -56,13 +58,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	var accountKey flow.AccountPublicKey
 
-	// TODO(Janez): move disabling limits out of the sequence number verifier. Verifier should not be metered anyway.
-	// TODO(Janez): verification is part of inclusion fees, not execution fees.
-
-	// Skip checking limits when getting the public key
-	txnState.RunWithAllLimitsDisabled(func() {
-		accountKey, err = accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
-	})
+	accountKey, err = accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(proposalKey, err)
 	}
@@ -82,10 +78,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	accountKey.SeqNumber++
 
-	// Skip checking limits when setting the public key sequence number
-	txnState.RunWithAllLimitsDisabled(func() {
-		_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
-	})
+	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {
 		restartError := txnState.RestartNestedTransaction(nestedTxnId)
 		if restartError != nil {

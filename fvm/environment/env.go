@@ -108,15 +108,15 @@ func NewScriptEnvironment(
 	ctx context.Context,
 	params EnvironmentParams,
 	txnState *state.TransactionState,
-	programs TransactionPrograms,
+	derivedTxnData DerivedTransactionData,
 ) Environment {
-	return newScriptFacadeEnvironment(ctx, params, txnState, programs)
+	return newScriptFacadeEnvironment(ctx, params, txnState, derivedTxnData)
 }
 
 func NewTransactionEnvironment(
 	params EnvironmentParams,
 	txnState *state.TransactionState,
-	programs TransactionPrograms,
+	derivedTxnData DerivedTransactionData,
 ) Environment {
-	return newTransactionFacadeEnvironment(params, txnState, programs)
+	return newTransactionFacadeEnvironment(params, txnState, derivedTxnData)
 }

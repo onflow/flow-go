@@ -20,7 +20,8 @@ type Worker struct {
 }
 
 func NewWorker(workerID int, interval time.Duration, work workFunc) *Worker {
-	ctx, cancel := context.WithCancel(context.Background())
+	// TODO(rbtz): pass in real context
+	ctx, cancel := context.WithCancel(context.TODO())
 
 	return &Worker{
 		workerID: workerID,
