@@ -31,10 +31,15 @@ const (
 	ConstExecCostLoadType LoadType = "const-exec" // for an empty transactions with various tx arguments
 )
 
-const slowTransactionThreshold = 30 * time.Second
+const lostTransactionThreshold = 90 * time.Second
 
 var accountCreationBatchSize = 750 // a higher number would hit max gRPC message size
-const tokensPerTransfer = 0.01     // flow testnets only have 10e6 total supply, so we choose a small amount here
+
+const (
+	// flow testnets only have 10e6 total supply, so we choose a small amounts here
+	tokensPerTransfer = 0.000001
+	tokensPerAccount  = 10
+)
 
 // ConstExecParam hosts all parameters for const-exec load type
 type ConstExecParams struct {
@@ -388,7 +393,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	count := cadence.NewInt(num)
 
 	initialTokenAmount, err := cadence.NewUFix64FromParts(
-		24*60*60*tokensPerTransfer, //  (24 hours at 1 block per second and 10 tokens sent)
+		tokensPerAccount,
 		0,
 	)
 	if err != nil {
@@ -415,19 +420,19 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		return err
 	}
 
-	ch, err := lg.sendTx(-1, createAccountTx)
+	// Do not wait for the transaction to be sealed.
+	_, err = lg.sendTx(-1, createAccountTx)
 	if err != nil {
 		return err
 	}
-	<-ch
-	lg.workerStatsTracker.IncTxExecuted()
 
-	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
 	result, err := WaitForTransactionResult(context.Background(), lg.flowClient, createAccountTx.ID())
 	if err != nil {
 		return fmt.Errorf("failed to get transactions result: %w", err)
 	}
+	lg.workerStatsTracker.IncTxExecuted()
 
+	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
 	log.Trace().Str("status", result.Status.String()).Msg("account creation tx executed")
 	if result.Error != nil {
 		log.Error().Err(result.Error).Msg("account creation tx failed")
@@ -719,26 +724,25 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 		return
 	}
 
-	log.Trace().Hex("txID", transferTx.ID().Bytes()).Msg("transaction sent")
+	log = log.With().Hex("tx_id", transferTx.ID().Bytes()).Logger()
+	log.Trace().Msg("transaction sent")
 
-	for {
-		select {
-		case <-ch:
-			log.Trace().
-				Hex("txID", transferTx.ID().Bytes()).
-				Dur("duration", time.Since(startTime)).
-				Msg("transaction confirmed")
-			lg.workerStatsTracker.IncTxExecuted()
-			return
-		case <-time.After(slowTransactionThreshold):
-			// TODO(rbtz): add a counter for slow transactions
-			log.Trace().
-				Hex("txID", transferTx.ID().Bytes()).
-				Dur("duration", time.Since(startTime)).
-				Int("availableAccounts", len(lg.availableAccounts)).
-				Msg("is taking too long")
-		}
+	t := time.NewTimer(lostTransactionThreshold)
+	defer t.Stop()
+
+	select {
+	case <-ch:
+		log.Trace().
+			Dur("duration", time.Since(startTime)).
+			Msg("transaction confirmed")
+	case <-t.C:
+		lg.loaderMetrics.TransactionLost()
+		log.Warn().
+			Dur("duration", time.Since(startTime)).
+			Int("availableAccounts", len(lg.availableAccounts)).
+			Msg("transaction lost")
 	}
+	lg.workerStatsTracker.IncTxExecuted()
 }
 
 // TODO update this to include loadtype
