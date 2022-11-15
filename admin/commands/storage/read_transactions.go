@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/rs/zerolog/log"
 
@@ -54,10 +53,6 @@ func (c *GetTransactionsCommand) Handler(ctx context.Context, req *admin.Command
 	}
 
 	return commands.ConvertToInterfaceList(blocks)
-}
-
-func usageErr(msg string) error {
-	return fmt.Errorf("required flags \"start-height\", \"end-height\", %s", msg)
 }
 
 // Returns admin.InvalidAdminReqError for invalid inputs

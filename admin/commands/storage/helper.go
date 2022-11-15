@@ -36,10 +36,10 @@ func parseN(m interface{}) (uint64, error) {
 		return 0, fmt.Errorf("invalid value for \"n\": %v", n)
 	}
 	if math.Trunc(n) != n {
-		return 0, fmt.Errorf("\"n\" must be an integer")
+		return 0, fmt.Errorf("\"n\" must be an integer, got: %v", n)
 	}
 	if n < 1 {
-		return 0, fmt.Errorf("\"n\" must be at least 1")
+		return 0, fmt.Errorf("\"n\" must be at least 1, got: %v", n)
 	}
 	return uint64(n), nil
 }
