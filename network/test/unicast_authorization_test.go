@@ -496,12 +496,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 	require.NoError(u.T(), err)
 
 	expectedViolation := &slashing.Violation{
-		Identity:  nil,
-		PeerID:    expectedSenderPeerID.String(),
-		MsgType:   message.TestMessage,
-		Channel:   channels.TestNetworkChannel,
-		IsUnicast: true,
-		Err:       middleware.ErrUnicastMsgWithoutSub,
+		Identity: nil,
+		PeerID:   expectedSenderPeerID.String(),
+		MsgType:  message.TestMessage,
+		Channel:  channels.TestNetworkChannel,
+		Protocol: message.ProtocolUnicast,
+		Err:      middleware.ErrUnicastMsgWithoutSub,
 	}
 
 	slashingViolationsConsumer.On(
