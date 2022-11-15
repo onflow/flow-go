@@ -9,10 +9,10 @@ type Payload struct {
 	// Guarantees are ordered in execution order. May be empty, in which case
 	// only the system chunk is executed for this block.
 	Guarantees []*CollectionGuarantee
-	// Seals contains the block seals, for ancestor blocks, included in this payload.
+	// Seals holds block seals for ancestor blocks.
 	// The oldest seal must connect to the latest seal in the fork extended by this block.
 	// Seals must be internally connected, containing no seals with duplicate block IDs or heights.
-	// Seals may be empty, and may be in any order.
+	// Seals may be empty. It presents a set, i.e. there is no protocol-defined ordering.
 	Seals    []*Seal
 	Receipts ExecutionReceiptMetaList
 	Results  ExecutionResultList
