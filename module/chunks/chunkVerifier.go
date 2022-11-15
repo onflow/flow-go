@@ -139,8 +139,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 
 	context = fvm.NewContextFromParent(
 		context,
-		fvm.WithBlockPrograms(
-			programs.NewEmptyBlockProgramsWithTransactionOffset(
+		fvm.WithDerivedBlockData(
+			programs.NewEmptyDerivedBlockDataWithTransactionOffset(
 				transactionOffset)))
 
 	// chunk view construction

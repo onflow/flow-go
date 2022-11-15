@@ -11,7 +11,7 @@ import (
 )
 
 func TestBlockProgsWithTransactionOffset(t *testing.T) {
-	block := NewEmptyBlockProgramsWithTransactionOffset(18)
+	block := NewEmptyDerivedBlockDataWithTransactionOffset(18)
 
 	require.Equal(
 		t,
@@ -20,64 +20,64 @@ func TestBlockProgsWithTransactionOffset(t *testing.T) {
 }
 
 func TestTxnProgsNormalTransactionInvalidExecutionTimeBound(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	_, err := block.NewTransactionPrograms(-1, -1)
+	_, err := block.NewDerivedTransactionData(-1, -1)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewTransactionPrograms(0, 0)
+	_, err = block.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
-	_, err = block.NewTransactionPrograms(0, EndOfBlockExecutionTime)
+	_, err = block.NewDerivedTransactionData(0, EndOfBlockExecutionTime)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewTransactionPrograms(0, EndOfBlockExecutionTime-1)
+	_, err = block.NewDerivedTransactionData(0, EndOfBlockExecutionTime-1)
 	require.NoError(t, err)
 }
 
 func TestTxnProgsNormalTransactionInvalidSnapshotTime(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	_, err := block.NewTransactionPrograms(10, 0)
+	_, err := block.NewDerivedTransactionData(10, 0)
 	require.ErrorContains(t, err, "snapshot > execution")
 
-	_, err = block.NewTransactionPrograms(10, 10)
+	_, err = block.NewDerivedTransactionData(10, 10)
 	require.NoError(t, err)
 
-	_, err = block.NewTransactionPrograms(999, 998)
+	_, err = block.NewDerivedTransactionData(999, 998)
 	require.ErrorContains(t, err, "snapshot > execution")
 
-	_, err = block.NewTransactionPrograms(999, 999)
+	_, err = block.NewDerivedTransactionData(999, 999)
 	require.NoError(t, err)
 }
 
 func TestTxnProgsSnapshotReadTransactionInvalidExecutionTimeBound(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	_, err := block.NewSnapshotReadTransactionPrograms(
+	_, err := block.NewSnapshotReadDerivedTransactionData(
 		ParentBlockTime,
 		ParentBlockTime)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewSnapshotReadTransactionPrograms(ParentBlockTime, 0)
+	_, err = block.NewSnapshotReadDerivedTransactionData(ParentBlockTime, 0)
 	require.NoError(t, err)
 
-	_, err = block.NewSnapshotReadTransactionPrograms(0, ChildBlockTime)
+	_, err = block.NewSnapshotReadDerivedTransactionData(0, ChildBlockTime)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewSnapshotReadTransactionPrograms(
+	_, err = block.NewSnapshotReadDerivedTransactionData(
 		0,
 		EndOfBlockExecutionTime)
 	require.NoError(t, err)
 }
 
 func TestTxnProgsValidateRejectOutOfOrderCommit(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	testTxn, err := block.NewTransactionPrograms(0, 0)
+	testTxn, err := block.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
-	testSetupTxn, err := block.NewTransactionPrograms(0, 1)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, 1)
 	require.NoError(t, err)
 
 	validateErr := testTxn.Validate()
@@ -92,15 +92,15 @@ func TestTxnProgsValidateRejectOutOfOrderCommit(t *testing.T) {
 }
 
 func TestTxnProgsValidateRejectNonIncreasingExecutionTime(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	testSetupTxn, err := block.NewTransactionPrograms(0, 0)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	testTxn, err := block.NewTransactionPrograms(0, 0)
+	testTxn, err := block.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
 	validateErr := testTxn.Validate()
@@ -109,10 +109,10 @@ func TestTxnProgsValidateRejectNonIncreasingExecutionTime(t *testing.T) {
 }
 
 func TestTxnProgsValidateRejectCommitGapForNormalTxn(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
 	commitTime := LogicalTime(5)
-	testSetupTxn, err := block.NewTransactionPrograms(0, commitTime)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
@@ -120,7 +120,7 @@ func TestTxnProgsValidateRejectCommitGapForNormalTxn(t *testing.T) {
 
 	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
 
-	testTxn, err := block.NewTransactionPrograms(10, 10)
+	testTxn, err := block.NewDerivedTransactionData(10, 10)
 	require.NoError(t, err)
 
 	validateErr := testTxn.Validate()
@@ -129,10 +129,10 @@ func TestTxnProgsValidateRejectCommitGapForNormalTxn(t *testing.T) {
 }
 
 func TestTxnProgsValidateRejectCommitGapForSnapshotRead(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
 	commitTime := LogicalTime(5)
-	testSetupTxn, err := block.NewTransactionPrograms(0, commitTime)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
@@ -140,7 +140,7 @@ func TestTxnProgsValidateRejectCommitGapForSnapshotRead(t *testing.T) {
 
 	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
 
-	testTxn, err := block.NewSnapshotReadTransactionPrograms(10, 10)
+	testTxn, err := block.NewSnapshotReadDerivedTransactionData(10, 10)
 	require.NoError(t, err)
 
 	validateErr := testTxn.Validate()
@@ -149,15 +149,15 @@ func TestTxnProgsValidateRejectCommitGapForSnapshotRead(t *testing.T) {
 }
 
 func TestTxnProgsValidateRejectOutdatedReadSet(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	testSetupTxn1, err := block.NewTransactionPrograms(0, 0)
+	testSetupTxn1, err := block.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
-	testSetupTxn2, err := block.NewTransactionPrograms(0, 1)
+	testSetupTxn2, err := block.NewDerivedTransactionData(0, 1)
 	require.NoError(t, err)
 
-	testTxn, err := block.NewTransactionPrograms(0, 2)
+	testTxn, err := block.NewDerivedTransactionData(0, 2)
 	require.NoError(t, err)
 
 	location := common.AddressLocation{
@@ -167,7 +167,7 @@ func TestTxnProgsValidateRejectOutdatedReadSet(t *testing.T) {
 	expectedProg := &interpreter.Program{}
 	expectedState := &state.State{}
 
-	testSetupTxn1.Set(location, expectedProg, expectedState)
+	testSetupTxn1.SetProgram(location, expectedProg, expectedState)
 
 	testSetupTxn1.AddInvalidator(testInvalidator{})
 
@@ -177,7 +177,7 @@ func TestTxnProgsValidateRejectOutdatedReadSet(t *testing.T) {
 	validateErr := testTxn.Validate()
 	require.NoError(t, validateErr)
 
-	actualProg, actualState, ok := testTxn.Get(location)
+	actualProg, actualState, ok := testTxn.GetProgram(location)
 	require.True(t, ok)
 	require.Same(t, expectedProg, actualProg)
 	require.Same(t, expectedState, actualState)
@@ -196,9 +196,9 @@ func TestTxnProgsValidateRejectOutdatedReadSet(t *testing.T) {
 }
 
 func TestTxnProgsValidateRejectOutdatedWriteSet(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	testSetupTxn, err := block.NewTransactionPrograms(0, 0)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
 	testSetupTxn.AddInvalidator(testInvalidator{invalidateAll: true})
@@ -208,10 +208,10 @@ func TestTxnProgsValidateRejectOutdatedWriteSet(t *testing.T) {
 
 	require.Equal(t, 1, len(block.InvalidatorsForTestingOnly()))
 
-	testTxn, err := block.NewTransactionPrograms(0, 1)
+	testTxn, err := block.NewDerivedTransactionData(0, 1)
 	require.NoError(t, err)
 
-	testTxn.Set(
+	testTxn.SetProgram(
 		common.AddressLocation{
 			Address: common.MustBytesToAddress([]byte{2, 3, 4}),
 			Name:    "address",
@@ -225,9 +225,9 @@ func TestTxnProgsValidateRejectOutdatedWriteSet(t *testing.T) {
 }
 
 func TestTxnProgsValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	testSetupTxn, err := block.NewTransactionPrograms(0, 0)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
 	testSetupTxn.AddInvalidator(testInvalidator{invalidateAll: true})
@@ -236,10 +236,10 @@ func TestTxnProgsValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T) {
 
 	require.Equal(t, 1, len(block.InvalidatorsForTestingOnly()))
 
-	testTxn, err := block.NewTransactionPrograms(1, 1)
+	testTxn, err := block.NewDerivedTransactionData(1, 1)
 	require.NoError(t, err)
 
-	testTxn.Set(
+	testTxn.SetProgram(
 		common.AddressLocation{
 			Address: common.MustBytesToAddress([]byte{2, 3, 4}),
 			Name:    "address",
@@ -252,10 +252,10 @@ func TestTxnProgsValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T) {
 }
 
 func TestTxnProgsCommitEndOfBlockSnapshotRead(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
 	commitTime := LogicalTime(5)
-	testSetupTxn, err := block.NewTransactionPrograms(0, commitTime)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
@@ -263,7 +263,7 @@ func TestTxnProgsCommitEndOfBlockSnapshotRead(t *testing.T) {
 
 	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
 
-	testTxn, err := block.NewSnapshotReadTransactionPrograms(
+	testTxn, err := block.NewSnapshotReadDerivedTransactionData(
 		EndOfBlockExecutionTime,
 		EndOfBlockExecutionTime)
 	require.NoError(t, err)
@@ -275,10 +275,10 @@ func TestTxnProgsCommitEndOfBlockSnapshotRead(t *testing.T) {
 }
 
 func TestTxnProgsCommitSnapshotReadDontAdvanceTime(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
 	commitTime := LogicalTime(71)
-	testSetupTxn, err := block.NewTransactionPrograms(0, commitTime)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
@@ -286,7 +286,7 @@ func TestTxnProgsCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 
 	repeatedTime := commitTime + 1
 	for i := 0; i < 10; i++ {
-		txn, err := block.NewSnapshotReadTransactionPrograms(0, repeatedTime)
+		txn, err := block.NewSnapshotReadDerivedTransactionData(0, repeatedTime)
 		require.NoError(t, err)
 
 		err = txn.Commit()
@@ -300,9 +300,9 @@ func TestTxnProgsCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 }
 
 func TestTxnProgsCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	testTxn, err := block.NewTransactionPrograms(0, 0)
+	testTxn, err := block.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
 	location := common.AddressLocation{
@@ -310,7 +310,7 @@ func TestTxnProgsCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
 		Name:    "address",
 	}
 
-	actualProg, actualState, ok := testTxn.Get(location)
+	actualProg, actualState, ok := testTxn.GetProgram(location)
 	require.False(t, ok)
 	require.Nil(t, actualProg)
 	require.Nil(t, actualState)
@@ -318,9 +318,9 @@ func TestTxnProgsCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
 	expectedProg := &interpreter.Program{}
 	expectedState := &state.State{}
 
-	testTxn.Set(location, expectedProg, expectedState)
+	testTxn.SetProgram(location, expectedProg, expectedState)
 
-	actualProg, actualState, ok = testTxn.Get(location)
+	actualProg, actualState, ok = testTxn.GetProgram(location)
 	require.True(t, ok)
 	require.Same(t, expectedProg, actualProg)
 	require.Same(t, expectedState, actualState)
@@ -345,16 +345,15 @@ func TestTxnProgsCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
 	entry, ok := entries[location]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Equal(t, location, entry.Entry.Location)
-	require.Same(t, expectedProg, entry.Entry.Program)
-	require.Same(t, expectedState, entry.Entry.State)
+	require.Same(t, expectedProg, entry.Value)
+	require.Same(t, expectedState, entry.State)
 }
 
 func TestTxnProgsCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
 	testTxnTime := LogicalTime(47)
-	testTxn, err := block.NewTransactionPrograms(0, testTxnTime)
+	testTxn, err := block.NewDerivedTransactionData(0, testTxnTime)
 	require.NoError(t, err)
 
 	location := common.AddressLocation{
@@ -362,7 +361,7 @@ func TestTxnProgsCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
 		Name:    "address",
 	}
 
-	actualProg, actualState, ok := testTxn.Get(location)
+	actualProg, actualState, ok := testTxn.GetProgram(location)
 	require.False(t, ok)
 	require.Nil(t, actualProg)
 	require.Nil(t, actualState)
@@ -370,9 +369,9 @@ func TestTxnProgsCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
 	expectedProg := &interpreter.Program{}
 	expectedState := &state.State{}
 
-	testTxn.Set(location, expectedProg, expectedState)
+	testTxn.SetProgram(location, expectedProg, expectedState)
 
-	actualProg, actualState, ok = testTxn.Get(location)
+	actualProg, actualState, ok = testTxn.GetProgram(location)
 	require.True(t, ok)
 	require.Same(t, expectedProg, actualProg)
 	require.Same(t, expectedState, actualState)
@@ -393,7 +392,10 @@ func TestTxnProgsCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
 
 	require.Equal(
 		t,
-		chainedDerivedDataInvalidators[ProgramEntry]{
+		chainedDerivedDataInvalidators[
+			common.AddressLocation,
+			*interpreter.Program,
+		]{
 			{
 				DerivedDataInvalidator: invalidator,
 				executionTime:          testTxnTime,
@@ -405,12 +407,12 @@ func TestTxnProgsCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
 }
 
 func TestTxnProgsCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	testSetupTxn, err := block.NewTransactionPrograms(0, 11)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, 11)
 	require.NoError(t, err)
 
-	testTxn, err := block.NewTransactionPrograms(10, 12)
+	testTxn, err := block.NewDerivedTransactionData(10, 12)
 	require.NoError(t, err)
 
 	location := common.AddressLocation{
@@ -420,7 +422,7 @@ func TestTxnProgsCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
 	expectedProg := &interpreter.Program{}
 	expectedState := &state.State{}
 
-	testSetupTxn.Set(location, expectedProg, expectedState)
+	testSetupTxn.SetProgram(location, expectedProg, expectedState)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
@@ -434,7 +436,7 @@ func TestTxnProgsCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
 	otherProg := &interpreter.Program{}
 	otherState := &state.State{}
 
-	testTxn.Set(location, otherProg, otherState)
+	testTxn.SetProgram(location, otherProg, otherState)
 
 	err = testTxn.Commit()
 	require.NoError(t, err)
@@ -447,20 +449,19 @@ func TestTxnProgsCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
 
 	require.Same(t, expectedEntry, actualEntry)
 	require.False(t, actualEntry.isInvalid)
-	require.Equal(t, location, actualEntry.Entry.Location)
-	require.Same(t, expectedProg, actualEntry.Entry.Program)
-	require.Same(t, expectedState, actualEntry.Entry.State)
-	require.NotSame(t, otherProg, actualEntry.Entry.Program)
-	require.NotSame(t, otherState, actualEntry.Entry.State)
+	require.Same(t, expectedProg, actualEntry.Value)
+	require.Same(t, expectedState, actualEntry.State)
+	require.NotSame(t, otherProg, actualEntry.Value)
+	require.NotSame(t, otherState, actualEntry.State)
 }
 
 func TestTxnProgsCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	testSetupTxn, err := block.NewTransactionPrograms(0, 0)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
-	testTxn, err := block.NewTransactionPrograms(0, 1)
+	testTxn, err := block.NewDerivedTransactionData(0, 1)
 	require.NoError(t, err)
 
 	loc1 := common.AddressLocation{
@@ -470,7 +471,7 @@ func TestTxnProgsCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 	expectedProg1 := &interpreter.Program{}
 	expectedState1 := &state.State{}
 
-	testSetupTxn.Set(loc1, expectedProg1, expectedState1)
+	testSetupTxn.SetProgram(loc1, expectedProg1, expectedState1)
 
 	loc2 := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
@@ -479,22 +480,22 @@ func TestTxnProgsCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 	expectedProg2 := &interpreter.Program{}
 	expectedState2 := &state.State{}
 
-	testSetupTxn.Set(loc2, expectedProg2, expectedState2)
+	testSetupTxn.SetProgram(loc2, expectedProg2, expectedState2)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	actualProg, actualState, ok := testTxn.Get(loc1)
+	actualProg, actualState, ok := testTxn.GetProgram(loc1)
 	require.True(t, ok)
 	require.Same(t, expectedProg1, actualProg)
 	require.Same(t, expectedState1, actualState)
 
-	actualProg, actualState, ok = testTxn.Get(loc2)
+	actualProg, actualState, ok = testTxn.GetProgram(loc2)
 	require.True(t, ok)
 	require.Same(t, expectedProg2, actualProg)
 	require.Same(t, expectedState2, actualState)
 
-	actualProg, actualState, ok = testTxn.Get(
+	actualProg, actualState, ok = testTxn.GetProgram(
 		common.AddressLocation{
 			Address: common.MustBytesToAddress([]byte{2, 3, 4}),
 			Name:    "address3",
@@ -523,30 +524,28 @@ func TestTxnProgsCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 	entry, ok := entries[loc1]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Equal(t, loc1, entry.Entry.Location)
-	require.Same(t, expectedProg1, entry.Entry.Program)
-	require.Same(t, expectedState1, entry.Entry.State)
+	require.Same(t, expectedProg1, entry.Value)
+	require.Same(t, expectedState1, entry.State)
 
 	entry, ok = entries[loc2]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Equal(t, loc2, entry.Entry.Location)
-	require.Same(t, expectedProg2, entry.Entry.Program)
-	require.Same(t, expectedState2, entry.Entry.State)
+	require.Same(t, expectedProg2, entry.Value)
+	require.Same(t, expectedState2, entry.State)
 }
 
 func TestTxnProgsCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
 	testSetupTxn1Time := LogicalTime(2)
-	testSetupTxn1, err := block.NewTransactionPrograms(0, testSetupTxn1Time)
+	testSetupTxn1, err := block.NewDerivedTransactionData(0, testSetupTxn1Time)
 	require.NoError(t, err)
 
-	testSetupTxn2, err := block.NewTransactionPrograms(0, 4)
+	testSetupTxn2, err := block.NewDerivedTransactionData(0, 4)
 	require.NoError(t, err)
 
 	testTxnTime := LogicalTime(6)
-	testTxn, err := block.NewTransactionPrograms(0, testTxnTime)
+	testTxn, err := block.NewDerivedTransactionData(0, testTxnTime)
 	require.NoError(t, err)
 
 	testSetupTxn1Invalidator := testInvalidator{
@@ -564,7 +563,7 @@ func TestTxnProgsCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 	expectedProg1 := &interpreter.Program{}
 	expectedState1 := &state.State{}
 
-	testSetupTxn2.Set(loc1, expectedProg1, expectedState1)
+	testSetupTxn2.SetProgram(loc1, expectedProg1, expectedState1)
 
 	loc2 := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
@@ -573,22 +572,22 @@ func TestTxnProgsCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 	expectedProg2 := &interpreter.Program{}
 	expectedState2 := &state.State{}
 
-	testSetupTxn2.Set(loc2, expectedProg2, expectedState2)
+	testSetupTxn2.SetProgram(loc2, expectedProg2, expectedState2)
 
 	err = testSetupTxn2.Commit()
 	require.NoError(t, err)
 
-	actualProg, actualState, ok := testTxn.Get(loc1)
+	actualProg, actualState, ok := testTxn.GetProgram(loc1)
 	require.True(t, ok)
 	require.Same(t, expectedProg1, actualProg)
 	require.Same(t, expectedState1, actualState)
 
-	actualProg, actualState, ok = testTxn.Get(loc2)
+	actualProg, actualState, ok = testTxn.GetProgram(loc2)
 	require.True(t, ok)
 	require.Same(t, expectedProg2, actualProg)
 	require.Same(t, expectedState2, actualState)
 
-	actualProg, actualState, ok = testTxn.Get(
+	actualProg, actualState, ok = testTxn.GetProgram(
 		common.AddressLocation{
 			Address: common.MustBytesToAddress([]byte{2, 3, 4}),
 			Name:    "address3",
@@ -612,7 +611,10 @@ func TestTxnProgsCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 
 	require.Equal(
 		t,
-		chainedDerivedDataInvalidators[ProgramEntry]{
+		chainedDerivedDataInvalidators[
+			common.AddressLocation,
+			*interpreter.Program,
+		]{
 			{
 				DerivedDataInvalidator: testSetupTxn1Invalidator,
 				executionTime:          testSetupTxn1Time,
@@ -628,15 +630,15 @@ func TestTxnProgsCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 }
 
 func TestTxnProgsCommitValidateError(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	testSetupTxn, err := block.NewTransactionPrograms(0, 10)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, 10)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	testTxn, err := block.NewTransactionPrograms(10, 10)
+	testTxn, err := block.NewDerivedTransactionData(10, 10)
 	require.NoError(t, err)
 
 	commitErr := testTxn.Commit()
@@ -645,16 +647,16 @@ func TestTxnProgsCommitValidateError(t *testing.T) {
 }
 
 func TestTxnProgsCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
 	expectedTime := LogicalTime(10)
-	testSetupTxn, err := block.NewTransactionPrograms(0, expectedTime)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, expectedTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	testTxn, err := block.NewSnapshotReadTransactionPrograms(0, 11)
+	testTxn, err := block.NewSnapshotReadDerivedTransactionData(0, 11)
 	require.NoError(t, err)
 
 	err = testTxn.Commit()
@@ -667,9 +669,9 @@ func TestTxnProgsCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) {
 }
 
 func TestTxnProgsCommitBadSnapshotReadInvalidator(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
-	testTxn, err := block.NewSnapshotReadTransactionPrograms(0, 42)
+	testTxn, err := block.NewSnapshotReadDerivedTransactionData(0, 42)
 	require.NoError(t, err)
 
 	testTxn.AddInvalidator(testInvalidator{invalidateAll: true})
@@ -680,11 +682,11 @@ func TestTxnProgsCommitBadSnapshotReadInvalidator(t *testing.T) {
 }
 
 func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
-	block := NewEmptyBlockPrograms()
+	block := NewEmptyDerivedBlockData()
 
 	// Setup the database with two read entries
 
-	testSetupTxn, err := block.NewTransactionPrograms(0, 0)
+	testSetupTxn, err := block.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
 	readLoc1Name := "read-address1"
@@ -702,8 +704,8 @@ func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
 	readProg2 := &interpreter.Program{}
 	readState2 := &state.State{}
 
-	testSetupTxn.Set(readLoc1, readProg1, readState1)
-	testSetupTxn.Set(readLoc2, readProg2, readState2)
+	testSetupTxn.SetProgram(readLoc1, readProg1, readState1)
+	testSetupTxn.SetProgram(readLoc2, readProg2, readState2)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
@@ -712,15 +714,15 @@ func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
 	// two new ones,
 
 	testTxnTime := LogicalTime(15)
-	testTxn, err := block.NewTransactionPrograms(1, testTxnTime)
+	testTxn, err := block.NewDerivedTransactionData(1, testTxnTime)
 	require.NoError(t, err)
 
-	actualProg, actualState, ok := testTxn.Get(readLoc1)
+	actualProg, actualState, ok := testTxn.GetProgram(readLoc1)
 	require.True(t, ok)
 	require.Same(t, readProg1, actualProg)
 	require.Same(t, readState1, actualState)
 
-	actualProg, actualState, ok = testTxn.Get(readLoc2)
+	actualProg, actualState, ok = testTxn.GetProgram(readLoc2)
 	require.True(t, ok)
 	require.Same(t, readProg2, actualProg)
 	require.Same(t, readState2, actualState)
@@ -740,8 +742,8 @@ func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
 	writeProg2 := &interpreter.Program{}
 	writeState2 := &state.State{}
 
-	testTxn.Set(writeLoc1, writeProg1, writeState1)
-	testTxn.Set(writeLoc2, writeProg2, writeState2)
+	testTxn.SetProgram(writeLoc1, writeProg1, writeState1)
+	testTxn.SetProgram(writeLoc2, writeProg2, writeState2)
 
 	// Actual test.  Invalidate one pre-existing entry and one new entry.
 
@@ -767,7 +769,10 @@ func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
 
 	require.Equal(
 		t,
-		chainedDerivedDataInvalidators[ProgramEntry]{
+		chainedDerivedDataInvalidators[
+			common.AddressLocation,
+			*interpreter.Program,
+		]{
 			{
 				DerivedDataInvalidator: invalidator1,
 				executionTime:          testTxnTime,
@@ -785,20 +790,18 @@ func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
 	entry, ok := entries[readLoc2]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Equal(t, readLoc2, entry.Entry.Location)
-	require.Same(t, readProg2, entry.Entry.Program)
-	require.Same(t, readState2, entry.Entry.State)
+	require.Same(t, readProg2, entry.Value)
+	require.Same(t, readState2, entry.State)
 
 	entry, ok = entries[writeLoc2]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Equal(t, writeLoc2, entry.Entry.Location)
-	require.Same(t, writeProg2, entry.Entry.Program)
-	require.Same(t, writeState2, entry.Entry.State)
+	require.Same(t, writeProg2, entry.Value)
+	require.Same(t, writeState2, entry.State)
 }
 
-func TestBlockProgsNewChildBlockPrograms(t *testing.T) {
-	parentBlock := NewEmptyBlockPrograms()
+func TestBlockProgsNewChildDerivedBlockData(t *testing.T) {
+	parentBlock := NewEmptyDerivedBlockData()
 
 	require.Equal(
 		t,
@@ -807,7 +810,7 @@ func TestBlockProgsNewChildBlockPrograms(t *testing.T) {
 	require.Equal(t, 0, len(parentBlock.InvalidatorsForTestingOnly()))
 	require.Equal(t, 0, len(parentBlock.EntriesForTestingOnly()))
 
-	txn, err := parentBlock.NewTransactionPrograms(0, 0)
+	txn, err := parentBlock.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
 	txn.AddInvalidator(testInvalidator{invalidateAll: true})
@@ -815,7 +818,7 @@ func TestBlockProgsNewChildBlockPrograms(t *testing.T) {
 	err = txn.Commit()
 	require.NoError(t, err)
 
-	txn, err = parentBlock.NewTransactionPrograms(1, 1)
+	txn, err = parentBlock.NewDerivedTransactionData(1, 1)
 	require.NoError(t, err)
 
 	location := common.AddressLocation{
@@ -825,7 +828,7 @@ func TestBlockProgsNewChildBlockPrograms(t *testing.T) {
 	prog := &interpreter.Program{}
 	state := &state.State{}
 
-	txn.Set(location, prog, state)
+	txn.SetProgram(location, prog, state)
 
 	err = txn.Commit()
 	require.NoError(t, err)
@@ -845,13 +848,12 @@ func TestBlockProgsNewChildBlockPrograms(t *testing.T) {
 	parentEntry, ok := parentEntries[location]
 	require.True(t, ok)
 	require.False(t, parentEntry.isInvalid)
-	require.Equal(t, location, parentEntry.Entry.Location)
-	require.Same(t, prog, parentEntry.Entry.Program)
-	require.Same(t, state, parentEntry.Entry.State)
+	require.Same(t, prog, parentEntry.Value)
+	require.Same(t, state, parentEntry.State)
 
 	// Verify child is correctly initialized
 
-	childBlock := parentBlock.NewChildBlockPrograms()
+	childBlock := parentBlock.NewChildDerivedBlockData()
 
 	require.Equal(
 		t,
@@ -866,9 +868,8 @@ func TestBlockProgsNewChildBlockPrograms(t *testing.T) {
 	childEntry, ok := childEntries[location]
 	require.True(t, ok)
 	require.False(t, childEntry.isInvalid)
-	require.Equal(t, location, childEntry.Entry.Location)
-	require.Same(t, prog, childEntry.Entry.Program)
-	require.Same(t, state, childEntry.Entry.State)
+	require.Same(t, prog, childEntry.Value)
+	require.Same(t, state, childEntry.State)
 
 	require.NotSame(t, parentEntry, childEntry)
 }

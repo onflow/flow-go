@@ -8,11 +8,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type ProgramEntry struct {
-	Location common.AddressLocation
-	Program  *interpreter.Program
-	State    *state.State
-}
 type ContractUpdateKey struct {
 	Address flow.Address
 	Name    string
@@ -23,7 +18,10 @@ type ContractUpdate struct {
 	Code []byte
 }
 
-var _ DerivedDataInvalidator[ProgramEntry] = ModifiedSetsInvalidator{}
+var _ DerivedDataInvalidator[
+	common.AddressLocation,
+	*interpreter.Program,
+] = ModifiedSetsInvalidator{}
 
 type ModifiedSetsInvalidator struct {
 	ContractUpdateKeys []ContractUpdateKey
@@ -35,7 +33,9 @@ func (sets ModifiedSetsInvalidator) ShouldInvalidateEntries() bool {
 }
 
 func (sets ModifiedSetsInvalidator) ShouldInvalidateEntry(
-	entry ProgramEntry,
+	location common.AddressLocation,
+	program *interpreter.Program,
+	state *state.State,
 ) bool {
 	// TODO(rbtz): switch to fine grain invalidation.
 	return sets.ShouldInvalidateEntries()

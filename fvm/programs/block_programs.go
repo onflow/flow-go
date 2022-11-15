@@ -7,42 +7,43 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
-// BlockPrograms is a simple fork-aware OCC database for "caching" programs
-// for a particular block.
-type BlockPrograms struct {
-	*BlockDerivedData[common.AddressLocation, ProgramEntry]
+// DerivedBlockData is a simple fork-aware OCC database for "caching" derived
+// data for a particular block.
+type DerivedBlockData struct {
+	*BlockDerivedData[common.AddressLocation, *interpreter.Program]
 }
 
-// TransactionPrograms is the scratch space for programs of a single transaction.
-type TransactionPrograms struct {
-	*TransactionDerivedData[common.AddressLocation, ProgramEntry]
+// DerivedTransactionData is the derived data scratch space for a single
+// transaction.
+type DerivedTransactionData struct {
+	*TransactionDerivedData[common.AddressLocation, *interpreter.Program]
 }
 
-func NewEmptyBlockPrograms() *BlockPrograms {
-	return &BlockPrograms{
-		NewEmptyBlockDerivedData[common.AddressLocation, ProgramEntry](),
+func NewEmptyDerivedBlockData() *DerivedBlockData {
+	return &DerivedBlockData{
+		NewEmptyBlockDerivedData[common.AddressLocation, *interpreter.Program](),
 	}
 }
 
 // This variant is needed by the chunk verifier, which does not start at the
 // beginning of the block.
-func NewEmptyBlockProgramsWithTransactionOffset(offset uint32) *BlockPrograms {
-	return &BlockPrograms{
-		NewEmptyBlockDerivedDataWithOffset[common.AddressLocation, ProgramEntry](offset),
+func NewEmptyDerivedBlockDataWithTransactionOffset(offset uint32) *DerivedBlockData {
+	return &DerivedBlockData{
+		NewEmptyBlockDerivedDataWithOffset[common.AddressLocation, *interpreter.Program](offset),
 	}
 }
 
-func (block *BlockPrograms) NewChildBlockPrograms() *BlockPrograms {
-	return &BlockPrograms{
+func (block *DerivedBlockData) NewChildDerivedBlockData() *DerivedBlockData {
+	return &DerivedBlockData{
 		block.NewChildBlockDerivedData(),
 	}
 }
 
-func (block *BlockPrograms) NewSnapshotReadTransactionPrograms(
+func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
 	snapshotTime LogicalTime,
 	executionTime LogicalTime,
 ) (
-	*TransactionPrograms,
+	*DerivedTransactionData,
 	error,
 ) {
 	txn, err := block.NewSnapshotReadTransactionDerivedData(
@@ -52,16 +53,16 @@ func (block *BlockPrograms) NewSnapshotReadTransactionPrograms(
 		return nil, err
 	}
 
-	return &TransactionPrograms{
+	return &DerivedTransactionData{
 		TransactionDerivedData: txn,
 	}, nil
 }
 
-func (block *BlockPrograms) NewTransactionPrograms(
+func (block *DerivedBlockData) NewDerivedTransactionData(
 	snapshotTime LogicalTime,
 	executionTime LogicalTime,
 ) (
-	*TransactionPrograms,
+	*DerivedTransactionData,
 	error,
 ) {
 	txn, err := block.NewTransactionDerivedData(snapshotTime, executionTime)
@@ -69,48 +70,39 @@ func (block *BlockPrograms) NewTransactionPrograms(
 		return nil, err
 	}
 
-	return &TransactionPrograms{
+	return &DerivedTransactionData{
 		TransactionDerivedData: txn,
 	}, nil
 }
 
-func (transaction *TransactionPrograms) Get(
+func (transaction *DerivedTransactionData) GetProgram(
 	addressLocation common.AddressLocation,
 ) (
 	*interpreter.Program,
 	*state.State,
 	bool,
 ) {
-	programEntry := transaction.TransactionDerivedData.Get(addressLocation)
-	if programEntry == nil {
-		return nil, nil, false
-	}
-
-	return programEntry.Program, programEntry.State, true
+	return transaction.TransactionDerivedData.Get(addressLocation)
 }
 
-func (transaction *TransactionPrograms) Set(
+func (transaction *DerivedTransactionData) SetProgram(
 	addressLocation common.AddressLocation,
 	program *interpreter.Program,
 	state *state.State,
 ) {
-	transaction.TransactionDerivedData.Set(addressLocation, ProgramEntry{
-		Location: addressLocation,
-		Program:  program,
-		State:    state,
-	})
+	transaction.TransactionDerivedData.Set(addressLocation, program, state)
 }
 
-func (transaction *TransactionPrograms) AddInvalidator(
-	invalidator DerivedDataInvalidator[ProgramEntry],
+func (transaction *DerivedTransactionData) AddInvalidator(
+	invalidator DerivedDataInvalidator[common.AddressLocation, *interpreter.Program],
 ) {
 	transaction.TransactionDerivedData.AddInvalidator(invalidator)
 }
 
-func (transaction *TransactionPrograms) Validate() RetryableError {
+func (transaction *DerivedTransactionData) Validate() RetryableError {
 	return transaction.TransactionDerivedData.Validate()
 }
 
-func (transaction *TransactionPrograms) Commit() RetryableError {
+func (transaction *DerivedTransactionData) Commit() RetryableError {
 	return transaction.TransactionDerivedData.Commit()
 }
