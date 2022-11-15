@@ -34,7 +34,12 @@ const (
 const slowTransactionThreshold = 30 * time.Second
 
 var accountCreationBatchSize = 750 // a higher number would hit max gRPC message size
-const tokensPerTransfer = 0.01     // flow testnets only have 10e6 total supply, so we choose a small amount here
+
+const (
+	// flow testnets only have 10e6 total supply, so we choose a small amounts here
+	tokensPerTransfer = 0.000001
+	tokensPerAccount  = 10
+)
 
 // ConstExecParam hosts all parameters for const-exec load type
 type ConstExecParams struct {
@@ -388,7 +393,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	count := cadence.NewInt(num)
 
 	initialTokenAmount, err := cadence.NewUFix64FromParts(
-		24*60*60*tokensPerTransfer, //  (24 hours at 1 block per second and 10 tokens sent)
+		tokensPerAccount,
 		0,
 	)
 	if err != nil {
