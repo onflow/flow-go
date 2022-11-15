@@ -400,8 +400,12 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 
 	ordered, err := protocol.OrderedSeals(payload, m.headers)
 	if err != nil {
+		// all errors are unexpected - differentiation is for clearer error messages
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, fmt.Errorf("ordering seals: candidate payload contains seals for unknown block: %s", err.Error())
+		}
+		if errors.Is(err, protocol.ErrDiscontinuousSeals) || errors.Is(err, protocol.ErrMultipleSealsForSameHeight) {
+			return nil, fmt.Errorf("ordering seals: candidate payload contains invalid seal set: %s", err.Error())
 		}
 		return nil, fmt.Errorf("unexpected error ordering seals: %w", err)
 	}
