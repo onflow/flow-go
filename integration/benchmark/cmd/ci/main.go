@@ -59,8 +59,8 @@ const (
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
 
 	// Auto TPS scaling constants
-	additiveIncrease       = 50
-	multiplicativeDecrease = 0.8
+	additiveIncrease       = 100
+	multiplicativeDecrease = 0.9
 	adjustInterval         = 20 * time.Second
 )
 
