@@ -60,9 +60,9 @@ func (proc *TransactionProcedure) StartSpanFromProcTraceSpan(
 func (proc *TransactionProcedure) Run(
 	ctx Context,
 	txnState *state.TransactionState,
-	programs *programs.TransactionPrograms,
+	derivedTxnData *programs.DerivedTransactionData,
 ) error {
-	err := proc.run(ctx, txnState, programs)
+	err := proc.run(ctx, txnState, derivedTxnData)
 	txErr, failure := errors.SplitErrorTypes(err)
 	if failure != nil {
 		// log the full error path
@@ -80,14 +80,14 @@ func (proc *TransactionProcedure) Run(
 func (proc *TransactionProcedure) run(
 	ctx Context,
 	txnState *state.TransactionState,
-	programs *programs.TransactionPrograms,
+	derivedTxnData *programs.DerivedTransactionData,
 ) error {
 	if ctx.AuthorizationChecksEnabled {
 		err := NewTransactionVerifier(ctx.AccountKeyWeightThreshold).Process(
 			ctx,
 			proc,
 			txnState,
-			programs)
+			derivedTxnData)
 		if err != nil {
 			return err
 		}
@@ -98,14 +98,14 @@ func (proc *TransactionProcedure) run(
 			ctx,
 			proc,
 			txnState,
-			programs)
+			derivedTxnData)
 		if err != nil {
 			return err
 		}
 	}
 
 	if ctx.TransactionBodyExecutionEnabled {
-		err := NewTransactionInvoker().Process(ctx, proc, txnState, programs)
+		err := NewTransactionInvoker().Process(ctx, proc, txnState, derivedTxnData)
 		if err != nil {
 			return err
 		}

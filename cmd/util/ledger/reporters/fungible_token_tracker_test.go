@@ -29,12 +29,12 @@ func TestFungibleTokenTracker(t *testing.T) {
 	view := migrations.NewView(payloads)
 
 	vm := fvm.NewVirtualMachine()
-	blockPrograms := programs.NewEmptyBlockPrograms()
+	derivedBlockData := programs.NewEmptyDerivedBlockData()
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-		fvm.WithBlockPrograms(blockPrograms),
+		fvm.WithDerivedBlockData(derivedBlockData),
 	}
 	ctx := fvm.NewContext(opts...)
 	bootstrapOptions := []fvm.BootstrapProcedureOption{
@@ -80,7 +80,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		SetScript(deployingTestContractScript).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx := fvm.Transaction(txBody, blockPrograms.NextTxIndexForTestingOnly())
+	tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
 	err = vm.Run(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
@@ -106,7 +106,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(105))).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx = fvm.Transaction(txBody, blockPrograms.NextTxIndexForTestingOnly())
+	tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
 	err = vm.Run(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)

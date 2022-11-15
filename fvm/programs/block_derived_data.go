@@ -3,16 +3,19 @@ package programs
 import (
 	"fmt"
 	"sync"
+
+	"github.com/onflow/flow-go/fvm/state"
 )
 
 type invalidatableEntry[TVal any] struct {
-	Entry TVal // Immutable after initialization.
+	Value TVal         // immutable after initialization.
+	State *state.State // immutable after initialization.
 
 	isInvalid bool // Guarded by BlockDerivedData' lock.
 }
 
-// BlockDerivedData is a simple fork-aware OCC database for "caching" given types
-// of data for a particular block.
+// BlockDerivedData is a rudimentary fork-aware OCC database table for
+// "caching" a given type of data for a particular block.
 //
 // Since data are derived from external source, the database need not be
 // durable and can be recreated on the fly.
@@ -28,7 +31,7 @@ type BlockDerivedData[TKey comparable, TVal any] struct {
 
 	latestCommitExecutionTime LogicalTime
 
-	invalidators chainedDerivedDataInvalidators[TVal] // Guarded by lock.
+	invalidators chainedDerivedDataInvalidators[TKey, TVal] // Guarded by lock.
 }
 
 type TransactionDerivedData[TKey comparable, TVal any] struct {
@@ -42,14 +45,16 @@ type TransactionDerivedData[TKey comparable, TVal any] struct {
 	executionTime LogicalTime
 
 	readSet  map[TKey]*invalidatableEntry[TVal]
-	writeSet map[TKey]TVal
+	writeSet map[TKey]*invalidatableEntry[TVal]
 
 	// When isSnapshotReadTransaction is true, invalidators must be empty.
 	isSnapshotReadTransaction bool
-	invalidators              chainedDerivedDataInvalidators[TVal]
+	invalidators              chainedDerivedDataInvalidators[TKey, TVal]
 }
 
-func newEmptyBlockDerivedData[TKey comparable, TVal any](latestCommit LogicalTime) *BlockDerivedData[TKey, TVal] {
+func newEmptyBlockDerivedData[TKey comparable, TVal any](
+	latestCommit LogicalTime,
+) *BlockDerivedData[TKey, TVal] {
 	return &BlockDerivedData[TKey, TVal]{
 		items:                     map[TKey]*invalidatableEntry[TVal]{},
 		latestCommitExecutionTime: latestCommit,
@@ -76,8 +81,12 @@ func (block *BlockDerivedData[TKey, TVal]) NewChildBlockDerivedData() *BlockDeri
 		len(block.items))
 
 	for key, entry := range block.items {
+		// Note: We need to deep copy the invalidatableEntry here since the
+		// entry may be valid in the parent block, but invalid in the child
+		// block.
 		items[key] = &invalidatableEntry[TVal]{
-			Entry:     entry.Entry,
+			Value:     entry.Value,
+			State:     entry.State,
 			isInvalid: false,
 		}
 	}
@@ -114,7 +123,7 @@ func (block *BlockDerivedData[TKey, TVal]) EntriesForTestingOnly() map[TKey]*inv
 	return entries
 }
 
-func (block *BlockDerivedData[TKey, TVal]) InvalidatorsForTestingOnly() chainedDerivedDataInvalidators[TVal] {
+func (block *BlockDerivedData[TKey, TVal]) InvalidatorsForTestingOnly() chainedDerivedDataInvalidators[TKey, TVal] {
 	block.lock.RLock()
 	defer block.lock.RUnlock()
 
@@ -123,12 +132,8 @@ func (block *BlockDerivedData[TKey, TVal]) InvalidatorsForTestingOnly() chainedD
 
 func (block *BlockDerivedData[TKey, TVal]) GetForTestingOnly(
 	key TKey,
-) *TVal {
-	entry := block.get(key)
-	if entry != nil {
-		return &entry.Entry
-	}
-	return nil
+) *invalidatableEntry[TVal] {
+	return block.get(key)
 }
 
 func (block *BlockDerivedData[TKey, TVal]) get(
@@ -177,8 +182,8 @@ func (block *BlockDerivedData[TKey, TVal]) unsafeValidate(
 	applicable := block.invalidators.ApplicableInvalidators(
 		item.snapshotTime)
 	if applicable.ShouldInvalidateEntries() {
-		for _, entry := range item.writeSet {
-			if applicable.ShouldInvalidateEntry(entry) {
+		for key, entry := range item.writeSet {
+			if applicable.ShouldInvalidateEntry(key, entry.Value, entry.State) {
 				return newRetryableError(
 					"invalid TransactionDerivedDatas. outdated write set")
 			}
@@ -198,19 +203,19 @@ func (block *BlockDerivedData[TKey, TVal]) validate(
 }
 
 func (block *BlockDerivedData[TKey, TVal]) commit(
-	item *TransactionDerivedData[TKey, TVal],
+	txn *TransactionDerivedData[TKey, TVal],
 ) RetryableError {
 	block.lock.Lock()
 	defer block.lock.Unlock()
 
 	// NOTE: Instead of throwing out all the write entries, we can commit
 	// the valid write entries then return error.
-	err := block.unsafeValidate(item)
+	err := block.unsafeValidate(txn)
 	if err != nil {
 		return err
 	}
 
-	for key, entry := range item.writeSet {
+	for key, entry := range txn.writeSet {
 		_, ok := block.items[key]
 		if ok {
 			// A previous transaction already committed an equivalent TransactionDerivedData
@@ -219,16 +224,15 @@ func (block *BlockDerivedData[TKey, TVal]) commit(
 			continue
 		}
 
-		block.items[key] = &invalidatableEntry[TVal]{
-			Entry:     entry,
-			isInvalid: false,
-		}
+		block.items[key] = entry
 	}
 
-	if item.invalidators.ShouldInvalidateEntries() {
+	if txn.invalidators.ShouldInvalidateEntries() {
 		for key, entry := range block.items {
-			if item.invalidators.ShouldInvalidateEntry(
-				entry.Entry) {
+			if txn.invalidators.ShouldInvalidateEntry(
+				key,
+				entry.Value,
+				entry.State) {
 
 				entry.isInvalid = true
 				delete(block.items, key)
@@ -237,15 +241,15 @@ func (block *BlockDerivedData[TKey, TVal]) commit(
 
 		block.invalidators = append(
 			block.invalidators,
-			item.invalidators...)
+			txn.invalidators...)
 	}
 
 	// NOTE: We cannot advance commit time when we encounter a snapshot read
 	// (aka script) transaction since these transactions don't generate new
 	// snapshots.  It is safe to commit the entries since snapshot read
 	// transactions never invalidate entries.
-	if !item.isSnapshotReadTransaction {
-		block.latestCommitExecutionTime = item.executionTime
+	if !txn.isSnapshotReadTransaction {
+		block.latestCommitExecutionTime = txn.executionTime
 	}
 	return nil
 }
@@ -277,7 +281,7 @@ func (block *BlockDerivedData[TKey, TVal]) newTransactionDerivedData(
 		snapshotTime:              snapshotTime,
 		executionTime:             executionTime,
 		readSet:                   map[TKey]*invalidatableEntry[TVal]{},
-		writeSet:                  map[TKey]TVal{},
+		writeSet:                  map[TKey]*invalidatableEntry[TVal]{},
 		isSnapshotReadTransaction: isSnapshotReadTransaction,
 	}, nil
 }
@@ -310,49 +314,63 @@ func (block *BlockDerivedData[TKey, TVal]) NewTransactionDerivedData(
 		false)
 }
 
-func (item *TransactionDerivedData[TKey, TVal]) Get(key TKey) *TVal {
-	writeEntry, ok := item.writeSet[key]
+func (txn *TransactionDerivedData[TKey, TVal]) Get(key TKey) (
+	TVal,
+	*state.State,
+	bool,
+) {
+
+	writeEntry, ok := txn.writeSet[key]
 	if ok {
-		return &writeEntry
+		return writeEntry.Value, writeEntry.State, true
 	}
 
-	readEntry := item.readSet[key]
+	readEntry := txn.readSet[key]
 	if readEntry != nil {
-		return &readEntry.Entry
+		return readEntry.Value, readEntry.State, true
 	}
 
-	readEntry = item.block.get(key)
+	readEntry = txn.block.get(key)
 	if readEntry != nil {
-		item.readSet[key] = readEntry
-		return &readEntry.Entry
+		txn.readSet[key] = readEntry
+		return readEntry.Value, readEntry.State, true
 	}
 
-	return nil
+	var defaultValue TVal
+	return defaultValue, nil, false
 }
 
-func (item *TransactionDerivedData[TKey, TVal]) Set(key TKey, val TVal) {
-	item.writeSet[key] = val
+func (txn *TransactionDerivedData[TKey, TVal]) Set(
+	key TKey,
+	value TVal,
+	state *state.State,
+) {
+	txn.writeSet[key] = &invalidatableEntry[TVal]{
+		Value:     value,
+		State:     state,
+		isInvalid: false,
+	}
 }
 
-func (item *TransactionDerivedData[TKey, TVal]) AddInvalidator(
-	invalidator DerivedDataInvalidator[TVal],
+func (txn *TransactionDerivedData[TKey, TVal]) AddInvalidator(
+	invalidator DerivedDataInvalidator[TKey, TVal],
 ) {
 	if invalidator == nil || !invalidator.ShouldInvalidateEntries() {
 		return
 	}
 
-	item.invalidators = append(
-		item.invalidators,
-		derivedDataInvalidatorAtTime[TVal]{
+	txn.invalidators = append(
+		txn.invalidators,
+		derivedDataInvalidatorAtTime[TKey, TVal]{
 			DerivedDataInvalidator: invalidator,
-			executionTime:          item.executionTime,
+			executionTime:          txn.executionTime,
 		})
 }
 
-func (item *TransactionDerivedData[TKey, TVal]) Validate() RetryableError {
-	return item.block.validate(item)
+func (txn *TransactionDerivedData[TKey, TVal]) Validate() RetryableError {
+	return txn.block.validate(txn)
 }
 
-func (item *TransactionDerivedData[TKey, TVal]) Commit() RetryableError {
-	return item.block.commit(item)
+func (txn *TransactionDerivedData[TKey, TVal]) Commit() RetryableError {
+	return txn.block.commit(txn)
 }

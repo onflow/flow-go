@@ -42,11 +42,11 @@ func TestSafetyCheck(t *testing.T) {
 				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		)
 
-		blockPrograms := programs.NewEmptyBlockPrograms()
-		txnPrograms, err := blockPrograms.NewTransactionPrograms(0, 0)
+		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, txnState, txnPrograms)
+		err = txInvoker.Process(context, proc, txnState, derivedTxnData)
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -75,11 +75,11 @@ func TestSafetyCheck(t *testing.T) {
 				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		)
 
-		blockPrograms := programs.NewEmptyBlockPrograms()
-		txnPrograms, err := blockPrograms.NewTransactionPrograms(0, 0)
+		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, txnState, txnPrograms)
+		err = txInvoker.Process(context, proc, txnState, derivedTxnData)
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")

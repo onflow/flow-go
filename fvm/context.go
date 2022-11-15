@@ -37,7 +37,7 @@ type Context struct {
 	// Note: This is disabled only by tests
 	TransactionBodyExecutionEnabled bool
 
-	BlockPrograms *programs.BlockPrograms
+	DerivedBlockData *programs.DerivedBlockData
 
 	environment.EnvironmentParams
 }
@@ -373,11 +373,11 @@ func WithReusableCadenceRuntimePool(
 	}
 }
 
-// WithBlockPrograms sets the programs cache storage to be used by the
+// WithDerivedBlockData sets the derived data cache storage to be used by the
 // transaction/script.
-func WithBlockPrograms(programs *programs.BlockPrograms) Option {
+func WithDerivedBlockData(derivedBlockData *programs.DerivedBlockData) Option {
 	return func(ctx Context) Context {
-		ctx.BlockPrograms = programs
+		ctx.DerivedBlockData = derivedBlockData
 		return ctx
 	}
 }

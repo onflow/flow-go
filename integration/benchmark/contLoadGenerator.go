@@ -87,6 +87,7 @@ func New(
 	// TODO(rbtz): use context
 	ctx context.Context,
 	log zerolog.Logger,
+	workerStatsTracker *WorkerStatsTracker,
 	loaderMetrics *metrics.LoaderCollector,
 	flowClients []access.Client,
 	networkParams NetworkParams,
@@ -154,7 +155,7 @@ func New(
 		serviceAccount:      servAcc,
 		accounts:            make([]*flowAccount, 0),
 		availableAccounts:   make(chan *flowAccount, loadParams.NumberOfAccounts),
-		workerStatsTracker:  NewWorkerStatsTracker(),
+		workerStatsTracker:  workerStatsTracker,
 		follower:            follower,
 		availableAccountsLo: loadParams.NumberOfAccounts,
 		stoppedChannel:      make(chan struct{}),
@@ -223,8 +224,6 @@ func (lg *ContLoadGenerator) Init() error {
 			return err
 		}
 	}
-
-	lg.workerStatsTracker.StartPrinting(1 * time.Second)
 
 	return nil
 }
@@ -350,7 +349,6 @@ func (lg *ContLoadGenerator) Stop() {
 	lg.follower.Stop()
 	lg.log.Debug().Msg("stopping workers")
 	_ = lg.unsafeSetTPS(0)
-	lg.workerStatsTracker.StopPrinting()
 	close(lg.stoppedChannel)
 }
 
@@ -364,10 +362,6 @@ func (lg *ContLoadGenerator) GetTxSent() int {
 
 func (lg *ContLoadGenerator) GetTxExecuted() int {
 	return lg.workerStatsTracker.GetTxExecuted()
-}
-
-func (lg *ContLoadGenerator) AvgTpsBetween(start, stop time.Time) float64 {
-	return lg.workerStatsTracker.AvgTPSBetween(start, stop)
 }
 
 func (lg *ContLoadGenerator) createAccounts(num int) error {
@@ -804,7 +798,7 @@ func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) (<-ch
 		return nil, err
 	}
 
-	lg.workerStatsTracker.AddTxSent()
+	lg.workerStatsTracker.IncTxSent()
 	lg.loaderMetrics.TransactionSent()
 	return ch, err
 }
