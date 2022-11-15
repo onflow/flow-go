@@ -14,7 +14,9 @@ var (
 	ErrUnknownSnapshotReference = errors.New("reference block of the snapshot is not resolvable")
 )
 
-// InvalidExtensionError is an error for invalid extension of the state
+// InvalidExtensionError is an error for invalid extension of the state. An invalid
+// extension is distinct from outdated or unverifiable extensions, in that it indicates
+// a malicious input.
 type InvalidExtensionError struct {
 	err error
 }
@@ -70,6 +72,34 @@ func (e OutdatedExtensionError) Error() string {
 
 func IsOutdatedExtensionError(err error) bool {
 	return errors.As(err, &OutdatedExtensionError{})
+}
+
+// UnverifiableExtensionError represents a state extension (block) which cannot be
+// verified at the moment. For example, it does not connect to the finalized state,
+// or an entity referenced within the payload is unknown.
+// Unlike InvalidExtensionError, this error is only used when the failure CANNOT be
+// attributed to a malicious input, therefore this error can be treated as a benign failure.
+type UnverifiableExtensionError struct {
+	err error
+}
+
+func NewUnverifiableExtensionError(msg string, args ...interface{}) error {
+	return UnverifiableExtensionError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e UnverifiableExtensionError) Unwrap() error {
+	return e.err
+}
+
+func (e UnverifiableExtensionError) Error() string {
+	return e.err.Error()
+}
+
+func IsUnverifiableExtensionError(err error) bool {
+	var errUnverifiableExtensionError UnverifiableExtensionError
+	return errors.As(err, &errUnverifiableExtensionError)
 }
 
 // NoValidChildBlockError is a sentinel error when the case where a certain block has
