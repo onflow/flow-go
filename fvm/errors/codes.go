@@ -77,6 +77,8 @@ const (
 	ErrCodeCouldNotDecodeExecutionParameterFromState ErrorCode = 1112
 	ErrCodeScriptExecutionCancelledError             ErrorCode = 1114
 	ErrCodeScriptExecutionTimedOutError              ErrorCode = 1113
+	ErrCodeEventEncodingError                        ErrorCode = 1115
+	ErrCodeInvalidFVMStateAccessError                ErrorCode = 1116
 
 	// accounts errors 1200 - 1250
 	// Deprecated: No longer used.

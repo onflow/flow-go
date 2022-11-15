@@ -135,7 +135,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 // BasicBlockExecutor executes blocks in sequence and applies all changes (not fork aware)
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
-	programsCache         *programs.ChainPrograms
+	derivedChainData      *programs.DerivedChainData
 	activeView            state.View
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
@@ -216,12 +216,13 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 
 	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))
 
-	programsCache, err := programs.NewChainPrograms(programs.DefaultProgramsCacheSize)
+	derivedChainData, err := programs.NewDerivedChainData(
+		programs.DefaultDerivedDataCacheSize)
 	require.NoError(tb, err)
 
 	return &BasicBlockExecutor{
 		blockComputer:         blockComputer,
-		programsCache:         programsCache,
+		derivedChainData:      derivedChainData,
 		activeStateCommitment: initialCommit,
 		activeView:            view,
 		chain:                 chain,
@@ -242,14 +243,14 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 	executableBlock := unittest.ExecutableBlockFromTransactions(b.chain.ChainID(), collections)
 	executableBlock.StartState = &b.activeStateCommitment
 
-	blockPrograms := b.programsCache.GetOrCreateBlockPrograms(
+	derivedBlockData := b.derivedChainData.GetOrCreateDerivedBlockData(
 		executableBlock.ID(),
 		executableBlock.ParentID())
 
-	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, blockPrograms)
+	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, derivedBlockData)
 	require.NoError(tb, err)
 
-	endState, _, _, err := execution.GenerateExecutionResultAndChunkDataPacks(unittest.IdentifierFixture(), b.activeStateCommitment, computationResult)
+	endState, _, _, err := execution.GenerateExecutionResultAndChunkDataPacks(metrics.NewNoopCollector(), unittest.IdentifierFixture(), b.activeStateCommitment, computationResult)
 	require.NoError(tb, err)
 	b.activeStateCommitment = endState
 

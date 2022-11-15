@@ -6,46 +6,51 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 )
 
 const (
 	// [2_000, 3_000) reserved for the FVM
-	_ common.ComputationKind = iota + 2_000
-	ComputationKindHash
-	ComputationKindVerifySignature
-	ComputationKindAddAccountKey
-	ComputationKindAddEncodedAccountKey
-	ComputationKindAllocateStorageIndex
-	ComputationKindCreateAccount
-	ComputationKindEmitEvent
-	ComputationKindGenerateUUID
-	ComputationKindGetAccountAvailableBalance
-	ComputationKindGetAccountBalance
-	ComputationKindGetAccountContractCode
-	ComputationKindGetAccountContractNames
-	ComputationKindGetAccountKey
-	ComputationKindGetBlockAtHeight
-	ComputationKindGetCode
-	ComputationKindGetCurrentBlockHeight
-	ComputationKindGetProgram
-	ComputationKindGetStorageCapacity
-	ComputationKindGetStorageUsed
-	ComputationKindGetValue
-	ComputationKindRemoveAccountContractCode
-	ComputationKindResolveLocation
-	ComputationKindRevokeAccountKey
-	ComputationKindRevokeEncodedAccountKey
-	ComputationKindSetProgram
-	ComputationKindSetValue
-	ComputationKindUpdateAccountContractCode
-	ComputationKindValidatePublicKey
-	ComputationKindValueExists
+	ComputationKindHash                       = 2001
+	ComputationKindVerifySignature            = 2002
+	ComputationKindAddAccountKey              = 2003
+	ComputationKindAddEncodedAccountKey       = 2004
+	ComputationKindAllocateStorageIndex       = 2005
+	ComputationKindCreateAccount              = 2006
+	ComputationKindEmitEvent                  = 2007
+	ComputationKindGenerateUUID               = 2008
+	ComputationKindGetAccountAvailableBalance = 2009
+	ComputationKindGetAccountBalance          = 2010
+	ComputationKindGetAccountContractCode     = 2011
+	ComputationKindGetAccountContractNames    = 2012
+	ComputationKindGetAccountKey              = 2013
+	ComputationKindGetBlockAtHeight           = 2014
+	ComputationKindGetCode                    = 2015
+	ComputationKindGetCurrentBlockHeight      = 2016
+	ComputationKindGetProgram                 = 2017
+	ComputationKindGetStorageCapacity         = 2018
+	ComputationKindGetStorageUsed             = 2019
+	ComputationKindGetValue                   = 2020
+	ComputationKindRemoveAccountContractCode  = 2021
+	ComputationKindResolveLocation            = 2022
+	ComputationKindRevokeAccountKey           = 2023
+	ComputationKindRevokeEncodedAccountKey    = 2024
+	ComputationKindSetProgram                 = 2025
+	ComputationKindSetValue                   = 2026
+	ComputationKindUpdateAccountContractCode  = 2027
+	ComputationKindValidatePublicKey          = 2028
+	ComputationKindValueExists                = 2029
+	ComputationKindAccountKeysCount           = 2030
+	ComputationKindBLSVerifyPOP               = 2031
+	ComputationKindBLSAggregateSignatures     = 2032
+	ComputationKindBLSAggregatePublicKeys     = 2033
 )
 
 type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error
 	ComputationUsed() uint64
+	ComputationIntensities() meter.MeteredComputationIntensities
 
 	MeterMemory(usage common.MemoryUsage) error
 	MemoryEstimate() uint64
@@ -72,6 +77,10 @@ func (meter *meterImpl) MeterComputation(
 		return meter.txnState.MeterComputation(kind, intensity)
 	}
 	return nil
+}
+
+func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensities {
+	return meter.txnState.ComputationIntensities()
 }
 
 func (meter *meterImpl) ComputationUsed() uint64 {

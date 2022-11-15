@@ -19,7 +19,7 @@ import (
 func getEnvironmentMeterParameters(
 	ctx Context,
 	view state.View,
-	programs *programs.TransactionPrograms,
+	derivedTxnData *programs.DerivedTransactionData,
 	params meter.MeterParameters,
 ) (
 	meter.MeterParameters,
@@ -34,7 +34,7 @@ func getEnvironmentMeterParameters(
 
 	sth.DisableAllLimitEnforcements()
 
-	env := NewScriptEnv(context.Background(), ctx, sth, programs)
+	env := NewScriptEnv(context.Background(), ctx, sth, derivedTxnData)
 
 	return fillEnvironmentMeterParameters(ctx, env, params)
 }

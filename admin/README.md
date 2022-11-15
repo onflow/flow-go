@@ -9,8 +9,16 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 ```
 
 ### To change log level
+Flow, and other zerolog-based libraries:
+
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-log-level", "data": "debug"}'
+```
+
+libp2p, badger, and other golog-based libraries:
+
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-golog-level", "data": "debug"}'
 ```
 
 ### To turn on profiler
@@ -38,20 +46,37 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-latest-identity", "data": { "peer_id": "QmNqszdfyEZmMCXcnoUdBDWboFvVLF5reyKPuiqFQT77Vw" }}'
 ```
 
-
 ### To get transactions for ranges (only available to staked access and execution nodes)
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-transactions", "data": { "start-height": 340, "end-height": 343 }}'
 ```
 
-### To set required approvals for sealing
+#### To get a list of all updatable configs
 ```
-curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-required-approvals-for-sealing", "data": 1}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "list-configs"}'
 ```
 
-### To get required apporvals for sealing
+### To get a config value
 ```
-curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-required-approvals-for-sealing"}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-config", "data": "consensus-required-approvals-for-sealing"}'
+```
+
+### To set a config value
+#### Example: require 1 approval for consensus sealing
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"consensus-required-approvals-for-sealing": 1}}'
+```
+#### Example: set block rate delay to 750ms
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"hotstuff-block-rate-delay": "750ms"}}'
+```
+#### Example: enable the auto-profiler
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-enabled": true}}'
+```
+#### Example: manually trigger the auto-profiler for 1 minute
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-trigger": "1m"}}'
 ```
 
 ### Set a stop height

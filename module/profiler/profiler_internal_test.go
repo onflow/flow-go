@@ -60,7 +60,7 @@ func TestGoAllocsProfile(t *testing.T) {
 			}()
 
 			buf := &bytes.Buffer{}
-			err = p.pprofAllocs(buf)
+			err = p.pprofAllocs(buf, time.Second*1)
 			require.NoError(t, err)
 
 			prof, err := profile.Parse(buf)

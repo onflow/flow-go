@@ -100,6 +100,17 @@ func (p *pointG2) equals(other *pointG2) bool {
 	return C.ep2_cmp((*C.ep2_st)(p), (*C.ep2_st)(other)) == valid
 }
 
+// Comparison to zero in Zr.
+// Scalar must be already reduced modulo r
+func (x *scalar) isZero() bool {
+	return C.bn_is_zero((*C.bn_st)(x)) == 1
+}
+
+// Comparison to point at infinity in G2.
+func (p *pointG2) isInfinity() bool {
+	return C.ep2_is_infty((*C.ep2_st)(p)) == 1
+}
+
 // returns a random number in Zr
 func randZr(x *scalar) {
 	C.bn_randZr((*C.bn_st)(x))

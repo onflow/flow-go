@@ -287,6 +287,22 @@ func (suite *CommandRunnerSuite) TestHTTPServer() {
 	suite.Equal("200 OK", resp.Status)
 }
 
+func (suite *CommandRunnerSuite) TestHTTPPProf() {
+	suite.SetupCommandRunner()
+
+	url := fmt.Sprintf("http://%s/debug/pprof/goroutine", suite.httpAddress)
+	resp, err := http.Get(url)
+	require.NoError(suite.T(), err)
+	defer func() {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	suite.Equal(resp.Status, "200 OK")
+	suite.Equal(resp.Header.Get("Content-Type"), "application/octet-stream")
+}
+
 func (suite *CommandRunnerSuite) TestListCommands() {
 	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		return nil, nil

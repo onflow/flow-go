@@ -24,10 +24,9 @@ type Context struct {
 	MaxStateValueSize                 uint64
 	MaxStateInteractionSize           uint64
 
-	TransactionProcessors []TransactionProcessor
-	ScriptProcessors      []ScriptProcessor
+	TransactionExecutorParams
 
-	BlockPrograms *programs.BlockPrograms
+	DerivedBlockData *programs.DerivedBlockData
 
 	environment.EnvironmentParams
 }
@@ -65,15 +64,8 @@ func defaultContext() Context {
 		MaxStateKeySize:                   state.DefaultMaxKeySize,
 		MaxStateValueSize:                 state.DefaultMaxValueSize,
 		MaxStateInteractionSize:           state.DefaultMaxInteractionSize,
-		TransactionProcessors: []TransactionProcessor{
-			NewTransactionVerifier(AccountKeyWeightThreshold),
-			NewTransactionSequenceNumberChecker(),
-			NewTransactionInvoker(),
-		},
-		ScriptProcessors: []ScriptProcessor{
-			NewScriptInvoker(),
-		},
-		EnvironmentParams: environment.DefaultEnvironmentParams(),
+		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
+		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
 	}
 }
 
@@ -221,11 +213,26 @@ func WithTracer(tr module.Tracer) Option {
 	}
 }
 
+// TODO(patrick): remove after emulator has been updated.
+//
 // WithTransactionProcessors sets the transaction processors for a
 // virtual machine context.
-func WithTransactionProcessors(processors ...TransactionProcessor) Option {
+func WithTransactionProcessors(processors ...interface{}) Option {
 	return func(ctx Context) Context {
-		ctx.TransactionProcessors = processors
+		executeBody := false
+		for _, p := range processors {
+			switch p.(type) {
+			case *TransactionInvoker:
+				executeBody = true
+			default:
+				panic("Unexpected transaction processor")
+			}
+		}
+
+		ctx.AuthorizationChecksEnabled = false
+		ctx.SequenceNumberCheckAndIncrementEnabled = false
+		ctx.AccountKeyWeightThreshold = 0
+		ctx.TransactionBodyExecutionEnabled = executeBody
 		return ctx
 	}
 }
@@ -283,6 +290,47 @@ func WithAccountStorageLimit(enabled bool) Option {
 	}
 }
 
+// WithAuthorizationCheckxEnabled enables or disables pre-execution
+// authorization checks.
+func WithAuthorizationChecksEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.AuthorizationChecksEnabled = enabled
+		return ctx
+	}
+}
+
+// WithSequenceNumberCheckAndIncrementEnabled enables or disables pre-execution
+// sequence number check / increment.
+func WithSequenceNumberCheckAndIncrementEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.SequenceNumberCheckAndIncrementEnabled = enabled
+		return ctx
+	}
+}
+
+// WithAccountKeyWeightThreshold sets the key weight threshold used for
+// authorization checks.  If the threshold is a negative number, signature
+// verification is skipped.
+//
+// Note: This is set only by tests
+func WithAccountKeyWeightThreshold(threshold int) Option {
+	return func(ctx Context) Context {
+		ctx.AccountKeyWeightThreshold = threshold
+		return ctx
+	}
+}
+
+// WithTransactionBodyExecutionEnabled enables or disables the transaction body
+// execution.
+//
+// Note: This is disabled only by tests
+func WithTransactionBodyExecutionEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.TransactionBodyExecutionEnabled = enabled
+		return ctx
+	}
+}
+
 // WithTransactionFeesEnabled enables or disables deduction of transaction fees
 func WithTransactionFeesEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
@@ -302,11 +350,19 @@ func WithReusableCadenceRuntimePool(
 	}
 }
 
-// WithBlockPrograms sets the programs cache storage to be used by the
+// WithDerivedBlockData sets the derived data cache storage to be used by the
 // transaction/script.
-func WithBlockPrograms(programs *programs.BlockPrograms) Option {
+func WithDerivedBlockData(derivedBlockData *programs.DerivedBlockData) Option {
 	return func(ctx Context) Context {
-		ctx.BlockPrograms = programs
+		ctx.DerivedBlockData = derivedBlockData
+		return ctx
+	}
+}
+
+// WithEventEncoder sets events encoder to be used for encoding events emitted during execution
+func WithEventEncoder(encoder environment.EventEncoder) Option {
+	return func(ctx Context) Context {
+		ctx.EventEncoder = encoder
 		return ctx
 	}
 }

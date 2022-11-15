@@ -16,6 +16,8 @@ import (
 
 	interpreter "github.com/onflow/cadence/runtime/interpreter"
 
+	meter "github.com/onflow/flow-go/fvm/meter"
+
 	mock "github.com/stretchr/testify/mock"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -200,6 +202,22 @@ func (_m *Environment) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*runtime.ReusableCadenceRuntime)
+		}
+	}
+
+	return r0
+}
+
+// ComputationIntensities provides a mock function with given fields:
+func (_m *Environment) ComputationIntensities() meter.MeteredComputationIntensities {
+	ret := _m.Called()
+
+	var r0 meter.MeteredComputationIntensities
+	if rf, ok := ret.Get(0).(func() meter.MeteredComputationIntensities); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(meter.MeteredComputationIntensities)
 		}
 	}
 

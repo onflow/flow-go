@@ -337,7 +337,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 	}
 
 	// check point is non-infinity and cache it
-	pk.isIdentity = C.ep2_is_infty((*C.ep2_st)(&pk.point)) != valid
+	pk.isIdentity = (&pk.point).isInfinity()
 
 	return &pk, nil
 }
@@ -394,7 +394,7 @@ func (sk *prKeyBLSBLS12381) computePublicKey() {
 	generatorScalarMultG2(&newPk.point, &sk.scalar)
 
 	// cache the identity comparison
-	newPk.isIdentity = C.bn_is_zero((*C.bn_st)(&sk.scalar)) != valid
+	newPk.isIdentity = (&sk.scalar).isZero()
 
 	sk.pk = &newPk
 }
@@ -431,9 +431,18 @@ func (sk *prKeyBLSBLS12381) String() string {
 }
 
 // pubKeyBLSBLS12381 is the public key of BLS using BLS12_381,
-// it implements PublicKey
+// it implements PublicKey.
 type pubKeyBLSBLS12381 struct {
-	// public key data
+	// The package guarantees an instance is only created with a point
+	// on the correct G2 subgroup. No membership check is needed when the
+	// instance is used in any BLS function.
+	// However, an instance can be created with an infinity point. Although
+	// infinity is a valid G2 point, some BLS functions fail (return false)
+	// when used with an infinity point. The package caches the infinity
+	// comparison in pubKeyBLSBLS12381 for a faster check. The package makes
+	// sure the comparison is performed after an instance is created.
+	//
+	// public key G2 point
 	point pointG2
 	// G2 identity check cache
 	isIdentity bool
@@ -449,7 +458,7 @@ func newPubKeyBLSBLS12381(p *pointG2) *pubKeyBLSBLS12381 {
 		}
 		// cache the identity comparison for a faster check
 		// during signature verifications
-		key.isIdentity = C.ep2_is_infty((*C.ep2_st)(p)) != valid
+		key.isIdentity = p.isInfinity()
 		return key
 	}
 	return &pubKeyBLSBLS12381{}

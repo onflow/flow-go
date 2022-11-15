@@ -32,17 +32,7 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 	invalidEncodedKey := make([]byte, 64)
 	invalidUTF8 := []byte{0xc3, 0x28}
 	copy(invalidUTF8, invalidEncodedKey)
-	publicKey := FakePublicKey{data: invalidEncodedKey}
-
-	accountPublicKey := flow.AccountPublicKey{
-		Index:     1,
-		PublicKey: publicKey,
-		SignAlgo:  crypto.ECDSASecp256k1,
-		HashAlgo:  hash.SHA3_256,
-		SeqNumber: 0,
-		Weight:    1000,
-		Revoked:   false,
-	}
+	accountPublicKey := FakePublicKey{data: invalidEncodedKey}.toAccountPublicKey()
 
 	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(accountPublicKey)
 	require.NoError(t, err)
@@ -156,6 +146,20 @@ type FakePublicKey struct {
 	data []byte
 }
 
+var _ crypto.PublicKey = &FakePublicKey{}
+
+func (f FakePublicKey) toAccountPublicKey() flow.AccountPublicKey {
+	return flow.AccountPublicKey{
+		Index:     1,
+		PublicKey: f,
+		SignAlgo:  crypto.ECDSASecp256k1,
+		HashAlgo:  hash.SHA3_256,
+		SeqNumber: 0,
+		Weight:    1000,
+		Revoked:   false,
+	}
+}
+
 func (f FakePublicKey) Encode() []byte {
 	return f.data
 }
@@ -169,15 +173,25 @@ func (f FakePublicKey) Verify(_ crypto.Signature, _ []byte, _ hash.Hasher) (bool
 func (f FakePublicKey) EncodeCompressed() []byte         { return nil }
 func (f FakePublicKey) Equals(key crypto.PublicKey) bool { return false }
 
-type FakeAccounts struct{}
-
-func (f FakeAccounts) Exists(address flow.Address) (bool, error)                     { return true, nil }
-func (f FakeAccounts) Get(address flow.Address) (*flow.Account, error)               { return &flow.Account{}, nil }
-func (f FakeAccounts) GetPublicKeyCount(_ flow.Address) (uint64, error)              { return 0, nil }
-func (f FakeAccounts) AppendPublicKey(_ flow.Address, _ flow.AccountPublicKey) error { return nil }
-func (f FakeAccounts) GetPublicKey(_ flow.Address, _ uint64) (flow.AccountPublicKey, error) {
-	return flow.AccountPublicKey{}, nil
+type FakeAccounts struct {
+	keyCount uint64
 }
+
+var _ Accounts = &FakeAccounts{}
+
+func (f FakeAccounts) Exists(address flow.Address) (bool, error)       { return true, nil }
+func (f FakeAccounts) Get(address flow.Address) (*flow.Account, error) { return &flow.Account{}, nil }
+func (f FakeAccounts) GetPublicKeyCount(_ flow.Address) (uint64, error) {
+	return f.keyCount, nil
+}
+func (f FakeAccounts) AppendPublicKey(_ flow.Address, _ flow.AccountPublicKey) error { return nil }
+func (f FakeAccounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
+	if keyIndex >= f.keyCount {
+		return flow.AccountPublicKey{}, errors.NewAccountPublicKeyNotFoundError(address, keyIndex)
+	}
+	return FakePublicKey{}.toAccountPublicKey(), nil
+}
+
 func (f FakeAccounts) SetPublicKey(_ flow.Address, _ uint64, _ flow.AccountPublicKey) ([]byte, error) {
 	return nil, nil
 }

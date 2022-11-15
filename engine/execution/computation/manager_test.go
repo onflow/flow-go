@@ -21,6 +21,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/environment"
+
 	"github.com/onflow/flow-go/engine/execution"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
@@ -61,7 +63,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -135,14 +137,14 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
-	programsCache, err := programs.NewChainPrograms(10)
+	derivedChainData, err := programs.NewDerivedChainData(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
-		blockComputer: blockComputer,
-		me:            me,
-		programsCache: programsCache,
-		tracer:        trace.NewNoopTracer(),
+		blockComputer:    blockComputer,
+		me:               me,
+		derivedChainData: derivedChainData,
+		tracer:           trace.NewNoopTracer(),
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -154,7 +156,9 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
-	assert.True(t, returnedComputationResult.ComputationUsed > 0)
+	compUsed, memUsed := returnedComputationResult.BlockComputationAndMemoryUsed()
+	assert.True(t, compUsed > 0)
+	assert.True(t, memUsed > 0)
 }
 
 func TestComputeBlock_Uploader(t *testing.T) {
@@ -183,17 +187,17 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		computationResult: computationResult,
 	}
 
-	programsCache, err := programs.NewChainPrograms(10)
+	derivedChainData, err := programs.NewDerivedChainData(10)
 	require.NoError(t, err)
 
 	fakeUploader := &FakeUploader{}
 
 	manager := &Manager{
-		blockComputer: blockComputer,
-		me:            me,
-		programsCache: programsCache,
-		uploaders:     []uploader.Uploader{fakeUploader},
-		tracer:        trace.NewNoopTracer(),
+		blockComputer:    blockComputer,
+		me:               me,
+		derivedChainData: derivedChainData,
+		uploaders:        []uploader.Uploader{fakeUploader},
+		tracer:           trace.NewNoopTracer(),
 	}
 
 	view := delta.NewView(state2.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
@@ -258,7 +262,7 @@ func TestExecuteScript(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 		},
@@ -320,7 +324,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 		},
@@ -365,7 +369,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 			NewCustomVirtualMachine: func() computer.VirtualMachine {
@@ -415,7 +419,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       1 * time.Millisecond,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 			NewCustomVirtualMachine: func() computer.VirtualMachine {
@@ -465,7 +469,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       1 * time.Second,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 			NewCustomVirtualMachine: func() computer.VirtualMachine {
@@ -514,7 +518,7 @@ type FakeBlockComputer struct {
 	computationResult *execution.ComputationResult
 }
 
-func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.BlockPrograms) (*execution.ComputationResult, error) {
+func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.DerivedBlockData) (*execution.ComputationResult, error) {
 	return f.computationResult, nil
 }
 
@@ -550,7 +554,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		nil,
 		nil,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -590,7 +594,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		nil,
 		nil,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -625,6 +629,150 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	require.Contains(t, err.Error(), fvmErrors.ErrCodeScriptExecutionCancelledError.String())
 }
 
+func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
+
+	chain := flow.Mainnet.Chain()
+	vm := fvm.NewVirtualMachine()
+
+	eventEncoder := &testingEventEncoder{
+		realEncoder: environment.NewCadenceEventEncoder(),
+	}
+
+	execCtx := fvm.NewContext(
+		fvm.WithChain(chain),
+		fvm.WithEventEncoder(eventEncoder),
+	)
+
+	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+	require.NoError(t, err)
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
+	require.NoError(t, err)
+
+	// setup transactions
+	account := accounts[0]
+	privKey := privateKeys[0]
+	// tx1 deploys contract version 1
+	tx1 := testutil.DeployEventContractTransaction(account, chain, 1)
+	prepareTx(t, tx1, account, privKey, 0, chain)
+
+	// tx2 emits event which will fail encoding
+	tx2 := testutil.CreateEmitEventTransaction(account, account)
+	prepareTx(t, tx2, account, privKey, 1, chain)
+
+	// tx3 emits event that will work fine
+	tx3 := testutil.CreateEmitEventTransaction(account, account)
+	prepareTx(t, tx3, account, privKey, 2, chain)
+
+	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
+
+	col := flow.Collection{Transactions: transactions}
+
+	guarantee := flow.CollectionGuarantee{
+		CollectionID: col.ID(),
+		Signature:    nil,
+	}
+
+	block := flow.Block{
+		Header: &flow.Header{
+			View: 26,
+		},
+		Payload: &flow.Payload{
+			Guarantees: []*flow.CollectionGuarantee{&guarantee},
+		},
+	}
+
+	executableBlock := &entity.ExecutableBlock{
+		Block: &block,
+		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
+			guarantee.ID(): {
+				Guarantee:    &guarantee,
+				Transactions: transactions,
+			},
+		},
+		StartState: unittest.StateCommitmentPointerFixture(),
+	}
+
+	me := new(module.Local)
+	me.On("NodeID").Return(flow.ZeroID)
+
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
+
+	prov := provider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		prov,
+	)
+	require.NoError(t, err)
+
+	derivedChainData, err := programs.NewDerivedChainData(10)
+	require.NoError(t, err)
+
+	engine := &Manager{
+		blockComputer:    blockComputer,
+		me:               me,
+		derivedChainData: derivedChainData,
+		tracer:           trace.NewNoopTracer(),
+	}
+
+	view := delta.NewView(ledger.Get)
+	blockView := view.NewChild()
+
+	eventEncoder.enabled = true
+
+	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+	require.NoError(t, err)
+
+	require.Len(t, returnedComputationResult.Events, 2)             // 1 collection + 1 system chunk
+	require.Len(t, returnedComputationResult.TransactionResults, 4) // 2 txs + 1 system tx
+
+	require.Empty(t, returnedComputationResult.TransactionResults[0].ErrorMessage)
+	require.Contains(t, returnedComputationResult.TransactionResults[1].ErrorMessage, "I failed encoding")
+	require.Empty(t, returnedComputationResult.TransactionResults[2].ErrorMessage)
+
+	// first event should be contract deployed
+	assert.EqualValues(t, "flow.AccountContractAdded", returnedComputationResult.Events[0][0].Type)
+
+	// second event should come from tx3 (index 2)  as tx2 (index 1) should fail encoding
+	hasValidEventValue(t, returnedComputationResult.Events[0][1], 1)
+	assert.Equal(t, returnedComputationResult.Events[0][1].TransactionIndex, uint32(2))
+}
+
+type testingEventEncoder struct {
+	realEncoder *environment.CadenceEventEncoder
+	calls       int
+	enabled     bool
+}
+
+func (e *testingEventEncoder) Encode(event cadence.Event) ([]byte, error) {
+	defer func() {
+		if e.enabled {
+			e.calls++
+		}
+	}()
+
+	if e.calls == 1 && e.enabled {
+		return nil, fmt.Errorf("I failed encoding")
+	}
+	return e.realEncoder.Encode(event)
+}
+
 func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	timeout := 10 * time.Second
@@ -641,7 +789,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		nil,
 		nil,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -649,19 +797,19 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	vm := manager.vm.(*fvm.VirtualMachine)
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 
-	programs := programs.NewEmptyBlockPrograms()
-	txnPrograms, err := programs.NewTransactionPrograms(0, 0)
+	derivedBlockData := programs.NewEmptyDerivedBlockData()
+	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
 	txnState := state.NewTransactionState(view, state.DefaultParameters())
-	env := fvm.NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
+	env := fvm.NewScriptEnv(context.Background(), ctx, txnState, derivedTxnData)
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, view, derivedBlockData, privateKeys, chain)
 	require.NoError(t, err)
 	account := accounts[0]
 	address := cadence.NewAddress(account)

@@ -574,8 +574,8 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	a := make([]scalar, threshold+1)
 	randZrStar(&a[0]) // non-identity key
 	if threshold > 0 {
-		for i := 1; i < threshold+1; i++ {
-			randZrStar(&a[i])
+		for i := 1; i < threshold; i++ {
+			randZr(&a[i])
 		}
 		randZrStar(&a[threshold]) // enforce the polynomial degree
 	}
