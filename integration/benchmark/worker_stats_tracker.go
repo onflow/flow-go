@@ -12,6 +12,7 @@ import (
 type workerStats struct {
 	workers                  int
 	txsSent                  int
+	txsTimedout              int
 	txsExecuted              int
 	txsSentMovingAverage     float64
 	txsExecutedMovingAverage float64
@@ -79,6 +80,20 @@ func (st *WorkerStatsTracker) Stop() {
 	st.wg.Wait()
 }
 
+func (st *WorkerStatsTracker) IncTxTimedout() {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	st.stats.txsTimedout++
+}
+
+func (st *WorkerStatsTracker) GetTxTimedout() int {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	return st.stats.txsTimedout
+}
+
 func (st *WorkerStatsTracker) IncTxExecuted() {
 	st.mux.Lock()
 	defer st.mux.Unlock()
@@ -114,6 +129,7 @@ func (st *WorkerStatsTracker) GetTxSent() int {
 	return st.stats.txsSent
 }
 
+// TODO(rbtz): make this a method public so that we can remove all getters from the ContLoadGenerator.
 func (st *WorkerStatsTracker) getStats() workerStats {
 	st.mux.Lock()
 	defer st.mux.Unlock()
@@ -129,6 +145,7 @@ func NewPeriodicStatsLogger(st *WorkerStatsTracker, log zerolog.Logger) *Worker 
 		log.Info().
 			Int("workers", stats.workers).
 			Int("txsSent", stats.txsSent).
+			Int("txsTimedout", stats.txsTimedout).
 			Int("txsExecuted", stats.txsExecuted).
 			Float64("txsSentEWMA", stats.txsSentMovingAverage).
 			Float64("txsExecutedEWMA", stats.txsExecutedMovingAverage).
