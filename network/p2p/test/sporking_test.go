@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p"
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
-
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/network/p2p"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 
 	"github.com/onflow/flow-go/network/p2p/utils"
 
@@ -221,7 +221,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// assert that node 1 can successfully send a message to node 2 via PubSub
-	testOneToKMessagingSucceeds(ctx, t, node1, sub2, topicBeforeSpork)
+	testOneToKMessagingSucceeds(ctx, t, node1, p2pfixtures.MustBePubSubSubscription(t, sub2), topicBeforeSpork)
 
 	// new root id after spork
 	rootIDAfterSpork := unittest.IdentifierFixture()
@@ -238,7 +238,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	require.NoError(t, err)
 
 	// assert that node 1 can no longer send a message to node 2 via PubSub
-	testOneToKMessagingFails(ctx, t, node1, sub2, topicAfterSpork)
+	testOneToKMessagingFails(ctx, t, node1, p2pfixtures.MustBePubSubSubscription(t, sub2), topicAfterSpork)
 }
 
 func testOneToOneMessagingSucceeds(t *testing.T, sourceNode p2p.LibP2PNode, peerInfo peer.AddrInfo) {

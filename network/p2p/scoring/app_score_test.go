@@ -66,21 +66,23 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	// all nodes subscribe to block topic (common topic among all roles)
 	// group one
 	groupOneSubs := make([]*pubsub.Subscription, len(groupOneNodes))
-	var err error
 	for i, node := range groupOneNodes {
-		groupOneSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		groupOneSubs[i] = p2pfixtures.MustBePubSubSubscription(t, sub)
 		require.NoError(t, err)
 	}
 	// group two
 	groupTwoSubs := make([]*pubsub.Subscription, len(groupTwoNodes))
 	for i, node := range groupTwoNodes {
-		groupTwoSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		groupTwoSubs[i] = p2pfixtures.MustBePubSubSubscription(t, sub)
 		require.NoError(t, err)
 	}
 	// access node group
 	accessNodeSubs := make([]*pubsub.Subscription, len(accessNodeGroup))
 	for i, node := range accessNodeGroup {
-		accessNodeSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		accessNodeSubs[i] = p2pfixtures.MustBePubSubSubscription(t, sub)
 		require.NoError(t, err)
 	}
 
@@ -194,7 +196,8 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	// access node group
 	accessNodeSubs := make([]*pubsub.Subscription, len(accessNodeGroup))
 	for i, node := range accessNodeGroup {
-		accessNodeSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		accessNodeSubs[i] = p2pfixtures.MustBePubSubSubscription(t, sub)
 		require.NoError(t, err)
 	}
 
@@ -213,7 +216,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	// If honest peer scoring is enabled, then con1Node and con2Node are certainly in the same mesh, and hence the message is delivered.
 	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, con2Sub)
+	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, p2pfixtures.MustBePubSubSubscription(t, con2Sub))
 }
 
 // maliciousAppSpecificScore returns a malicious app specific score function that rewards the malicious node and
