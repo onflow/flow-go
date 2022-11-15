@@ -4,7 +4,10 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/state"
 )
 
 type testInvalidator struct {
@@ -18,17 +21,22 @@ func (invalidator testInvalidator) ShouldInvalidateEntries() bool {
 }
 
 func (invalidator testInvalidator) ShouldInvalidateEntry(
-	entry ProgramEntry,
+	location common.AddressLocation,
+	program *interpreter.Program,
+	state *state.State,
 ) bool {
 	return invalidator.invalidateAll ||
-		invalidator.invalidateName == entry.Location.Name
+		invalidator.invalidateName == location.Name
 }
 
 func TestModifiedSetsInvalidator(t *testing.T) {
 	invalidator := ModifiedSetsInvalidator{}
 
 	require.False(t, invalidator.ShouldInvalidateEntries())
-	require.False(t, invalidator.ShouldInvalidateEntry(ProgramEntry{}))
+	require.False(t, invalidator.ShouldInvalidateEntry(
+		common.AddressLocation{},
+		nil,
+		nil))
 
 	invalidator = ModifiedSetsInvalidator{
 		ContractUpdateKeys: []ContractUpdateKey{
@@ -38,7 +46,10 @@ func TestModifiedSetsInvalidator(t *testing.T) {
 	}
 
 	require.True(t, invalidator.ShouldInvalidateEntries())
-	require.True(t, invalidator.ShouldInvalidateEntry(ProgramEntry{}))
+	require.True(t, invalidator.ShouldInvalidateEntry(
+		common.AddressLocation{},
+		nil,
+		nil))
 
 	invalidator = ModifiedSetsInvalidator{
 		ContractUpdateKeys: nil,
@@ -48,19 +59,37 @@ func TestModifiedSetsInvalidator(t *testing.T) {
 	}
 
 	require.True(t, invalidator.ShouldInvalidateEntries())
-	require.True(t, invalidator.ShouldInvalidateEntry(ProgramEntry{}))
+	require.True(t, invalidator.ShouldInvalidateEntry(
+		common.AddressLocation{},
+		nil,
+		nil))
 }
 
 func TestChainedInvalidator(t *testing.T) {
-	var chain chainedDerivedDataInvalidators[ProgramEntry]
+	var chain chainedDerivedDataInvalidators[
+		common.AddressLocation,
+		*interpreter.Program,
+	]
 	require.False(t, chain.ShouldInvalidateEntries())
-	require.False(t, chain.ShouldInvalidateEntry(ProgramEntry{}))
+	require.False(t, chain.ShouldInvalidateEntry(
+		common.AddressLocation{},
+		nil,
+		nil))
 
-	chain = chainedDerivedDataInvalidators[ProgramEntry]{}
+	chain = chainedDerivedDataInvalidators[
+		common.AddressLocation,
+		*interpreter.Program,
+	]{}
 	require.False(t, chain.ShouldInvalidateEntries())
-	require.False(t, chain.ShouldInvalidateEntry(ProgramEntry{}))
+	require.False(t, chain.ShouldInvalidateEntry(
+		common.AddressLocation{},
+		nil,
+		nil))
 
-	chain = chainedDerivedDataInvalidators[ProgramEntry]{
+	chain = chainedDerivedDataInvalidators[
+		common.AddressLocation,
+		*interpreter.Program,
+	]{
 		{
 			DerivedDataInvalidator: testInvalidator{},
 			executionTime:          1,
@@ -76,7 +105,10 @@ func TestChainedInvalidator(t *testing.T) {
 	}
 	require.False(t, chain.ShouldInvalidateEntries())
 
-	chain = chainedDerivedDataInvalidators[ProgramEntry]{
+	chain = chainedDerivedDataInvalidators[
+		common.AddressLocation,
+		*interpreter.Program,
+	]{
 		{
 			DerivedDataInvalidator: testInvalidator{invalidateName: "1"},
 			executionTime:          1,
@@ -97,23 +129,25 @@ func TestChainedInvalidator(t *testing.T) {
 	require.True(t, chain.ShouldInvalidateEntries())
 
 	for _, name := range []string{"1", "3a", "3b", "7"} {
-		entry := ProgramEntry{
-			Location: common.AddressLocation{
-				Name: name,
-			},
-		}
-
-		require.True(t, chain.ShouldInvalidateEntry(entry))
+		require.True(
+			t,
+			chain.ShouldInvalidateEntry(
+				common.AddressLocation{
+					Name: name,
+				},
+				nil,
+				nil))
 	}
 
 	for _, name := range []string{"0", "2", "3c", "4", "8"} {
-		entry := ProgramEntry{
-			Location: common.AddressLocation{
-				Name: name,
-			},
-		}
-
-		require.False(t, chain.ShouldInvalidateEntry(entry))
+		require.False(
+			t,
+			chain.ShouldInvalidateEntry(
+				common.AddressLocation{
+					Name: name,
+				},
+				nil,
+				nil))
 	}
 
 	require.Equal(t, chain, chain.ApplicableInvalidators(0))
@@ -126,11 +160,11 @@ func TestChainedInvalidator(t *testing.T) {
 	require.Equal(t, chain[3:], chain.ApplicableInvalidators(7))
 	require.Nil(t, chain.ApplicableInvalidators(8))
 
-	entry := ProgramEntry{
-		Location: common.AddressLocation{
-			Name: "1",
-		},
+	location := common.AddressLocation{
+		Name: "1",
 	}
-	require.True(t, chain.ShouldInvalidateEntry(entry))
-	require.False(t, chain.ApplicableInvalidators(3).ShouldInvalidateEntry(entry))
+	require.True(t, chain.ShouldInvalidateEntry(location, nil, nil))
+	require.False(
+		t,
+		chain.ApplicableInvalidators(3).ShouldInvalidateEntry(location, nil, nil))
 }

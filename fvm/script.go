@@ -73,23 +73,20 @@ func NewScriptWithContextAndArgs(
 	}
 }
 
-// TODO(patrick): add ProcedureExecutor interface (superset of
-// TransactionExecutor api).
 func (proc *ScriptProcedure) NewExecutor(
 	ctx Context,
 	txnState *state.TransactionState,
-	programs *programs.TransactionPrograms,
-) *scriptExecutor {
-	return newScriptExecutor(ctx, proc, txnState, programs)
+	derivedTxnData *programs.DerivedTransactionData,
+) ProcedureExecutor {
+	return newScriptExecutor(ctx, proc, txnState, derivedTxnData)
 }
 
 func (proc *ScriptProcedure) Run(
 	ctx Context,
 	txnState *state.TransactionState,
-	programs *programs.TransactionPrograms,
+	derivedTxnData *programs.DerivedTransactionData,
 ) error {
-	// TODO(patrick): switch to run(proc.NewExecutor(ctx, txnState, programs)
-	return proc.NewExecutor(ctx, txnState, programs).Execute()
+	return run(proc.NewExecutor(ctx, txnState, derivedTxnData))
 }
 
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
@@ -131,8 +128,8 @@ func (proc *ScriptProcedure) ExecutionTime() programs.LogicalTime {
 type scriptExecutor struct {
 	proc *ScriptProcedure
 
-	txnState    *state.TransactionState
-	txnPrograms *programs.TransactionPrograms
+	txnState       *state.TransactionState
+	derivedTxnData *programs.DerivedTransactionData
 
 	env environment.Environment
 }
@@ -141,13 +138,13 @@ func newScriptExecutor(
 	ctx Context,
 	proc *ScriptProcedure,
 	txnState *state.TransactionState,
-	txnPrograms *programs.TransactionPrograms,
+	derivedTxnData *programs.DerivedTransactionData,
 ) *scriptExecutor {
 	return &scriptExecutor{
-		proc:        proc,
-		txnState:    txnState,
-		txnPrograms: txnPrograms,
-		env:         NewScriptEnv(proc.RequestContext, ctx, txnState, txnPrograms),
+		proc:           proc,
+		txnState:       txnState,
+		derivedTxnData: derivedTxnData,
+		env:            NewScriptEnv(proc.RequestContext, ctx, txnState, derivedTxnData),
 	}
 }
 

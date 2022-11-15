@@ -9,8 +9,16 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 ```
 
 ### To change log level
+Flow, and other zerolog-based libraries:
+
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-log-level", "data": "debug"}'
+```
+
+libp2p, badger, and other golog-based libraries:
+
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-golog-level", "data": "debug"}'
 ```
 
 ### To turn on profiler
@@ -65,6 +73,10 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 #### Example: enable the auto-profiler
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-enabled": true}}'
+```
+#### Example: manually trigger the auto-profiler for 1 minute
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-trigger": "1m"}}'
 ```
 
 ### Set a stop height

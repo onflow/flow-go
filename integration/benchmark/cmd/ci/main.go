@@ -144,9 +144,18 @@ func main() {
 		Msg("Running load case...")
 
 	maxInflight := *maxTPSFlag * accountMultiplier
+
+	workerStatsTracker := benchmark.NewWorkerStatsTracker(ctx)
+	defer workerStatsTracker.Stop()
+
+	statsLogger := benchmark.NewPeriodicStatsLogger(workerStatsTracker, log)
+	statsLogger.Start()
+	defer statsLogger.Stop()
+
 	lg, err := benchmark.New(
 		ctx,
 		log,
+		workerStatsTracker,
 		loaderMetrics,
 		[]access.Client{flowClient},
 		benchmark.NetworkParams{
@@ -249,22 +258,22 @@ func recordTransactionData(
 ) []dataSlice {
 	var dataSlices []dataSlice
 
-	// get initial values for first slice
-	startTime := time.Now()
-	startExecutedTransactions := lg.GetTxExecuted()
-
 	t := time.NewTicker(sliceDuration)
 	defer t.Stop()
 
 	for {
+		startTime := time.Now()
+		startExecutedTransactions := lg.GetTxExecuted()
+		startSentTransactions := lg.GetTxSent()
+
 		select {
-		case <-t.C:
-			endTime := time.Now()
+		case endTime := <-t.C:
 			endExecutedTransaction := lg.GetTxExecuted()
+			endSentTransactions := lg.GetTxSent()
 
 			// calculate this slice
-			inputTps := lg.AvgTpsBetween(startTime, endTime)
 			outputTps := float64(endExecutedTransaction-startExecutedTransactions) / sliceDuration.Seconds()
+			inputTps := float64(endSentTransactions-startSentTransactions) / sliceDuration.Seconds()
 			dataSlices = append(dataSlices,
 				dataSlice{
 					GitSha:              gitSha,
@@ -279,9 +288,6 @@ func recordTransactionData(
 					RunStartTime:        runStartTime,
 				})
 
-			// set start values for next slice
-			startExecutedTransactions = endExecutedTransaction
-			startTime = endTime
 		case <-lg.Done():
 			return dataSlices
 		}

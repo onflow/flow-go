@@ -11,7 +11,7 @@ import (
 func NewTransactionEnvironment(
 	ctx Context,
 	txnState *state.TransactionState,
-	programs environment.TransactionPrograms,
+	derivedTxnData environment.DerivedTransactionData,
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
@@ -24,5 +24,5 @@ func NewTransactionEnvironment(
 	return environment.NewTransactionEnvironment(
 		ctx.EnvironmentParams,
 		txnState,
-		programs)
+		derivedTxnData)
 }

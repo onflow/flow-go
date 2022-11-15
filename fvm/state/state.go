@@ -5,10 +5,10 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/onflow/cadence/runtime/common"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -282,23 +282,18 @@ func (s *State) MergeState(other *State) error {
 	return nil
 }
 
-type sortedAddresses []flow.Address
-
-func (a sortedAddresses) Len() int           { return len(a) }
-func (a sortedAddresses) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a sortedAddresses) Less(i, j int) bool { return bytes.Compare(a[i][:], a[j][:]) >= 0 }
-
 // UpdatedAddresses returns a sorted list of addresses that were updated (at least 1 register update)
 func (s *State) UpdatedAddresses() []flow.Address {
-	addresses := make(sortedAddresses, len(s.updatedAddresses))
+	addresses := make([]flow.Address, 0, len(s.updatedAddresses))
 
-	i := 0
 	for k := range s.updatedAddresses {
-		addresses[i] = k
-		i++
+		addresses = append(addresses, k)
 	}
 
-	sort.Sort(addresses)
+	slices.SortFunc(addresses, func(a, b flow.Address) bool {
+		// reverse order to maintain compatibility with previous implementation.
+		return bytes.Compare(a[:], b[:]) >= 0
+	})
 
 	return addresses
 }
