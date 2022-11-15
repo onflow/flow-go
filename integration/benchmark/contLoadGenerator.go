@@ -415,18 +415,18 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		return err
 	}
 
-	ch, err := lg.sendTx(-1, createAccountTx)
+	// Do not wait for the transaction to be sealed.
+	_, err = lg.sendTx(-1, createAccountTx)
 	if err != nil {
 		return err
 	}
-	<-ch
-	lg.workerStatsTracker.IncTxExecuted()
 
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
 	result, err := WaitForTransactionResult(context.Background(), lg.flowClient, createAccountTx.ID())
 	if err != nil {
 		return fmt.Errorf("failed to get transactions result: %w", err)
 	}
+	lg.workerStatsTracker.IncTxExecuted()
 
 	log.Trace().Str("status", result.Status.String()).Msg("account creation tx executed")
 	if result.Error != nil {
