@@ -1,7 +1,12 @@
 package corruptnet
 
 import (
+	"context"
 	"time"
+
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/host"
+	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/network/p2p"
 
@@ -51,6 +56,13 @@ func NewCorruptLibP2PNodeFactory(
 			connectionPruning,
 			updateInterval)
 		builder.SetCreateNode(NewCorruptLibP2PNode)
+		builder.SetGossipSubFactory()
 		return builder.Build()
+	}
+}
+
+func corruptibleGossipSubFactory() p2pbuilder.GossipSubFactoryFuc {
+	return func(ctx context.Context, host host.Host, option ...pubsub.Option) (p2p.PubSub, error) {
+		return corrupt.NewGossipSubWithRouter(ctx, host, router, option...)
 	}
 }
