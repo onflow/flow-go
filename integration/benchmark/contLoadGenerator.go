@@ -52,21 +52,20 @@ type ConstExecParams struct {
 // ContLoadGenerator creates a continuous load of transactions to the network
 // by creating many accounts and transfer flow tokens between them
 type ContLoadGenerator struct {
-	log                 zerolog.Logger
-	loaderMetrics       *metrics.LoaderCollector
-	loadParams          LoadParams
-	networkParams       NetworkParams
-	constExecParams     ConstExecParams
-	flowClient          access.Client
-	serviceAccount      *flowAccount
-	favContractAddress  *flowsdk.Address
-	accounts            []*flowAccount
-	availableAccounts   chan *flowAccount // queue with accounts available for workers
-	workerStatsTracker  *WorkerStatsTracker
-	stoppedChannel      chan struct{}
-	follower            TxFollower
-	availableAccountsLo int
-	workFunc            workFunc
+	log                zerolog.Logger
+	loaderMetrics      *metrics.LoaderCollector
+	loadParams         LoadParams
+	networkParams      NetworkParams
+	constExecParams    ConstExecParams
+	flowClient         access.Client
+	serviceAccount     *flowAccount
+	favContractAddress *flowsdk.Address
+	accounts           []*flowAccount
+	availableAccounts  chan *flowAccount // queue with accounts available for workers
+	workerStatsTracker *WorkerStatsTracker
+	stoppedChannel     chan struct{}
+	follower           TxFollower
+	workFunc           workFunc
 
 	workersMutex sync.Mutex
 	workers      []*Worker
@@ -151,19 +150,18 @@ func New(
 	}
 
 	lg := &ContLoadGenerator{
-		log:                 log,
-		loaderMetrics:       loaderMetrics,
-		loadParams:          loadParams,
-		networkParams:       networkParams,
-		constExecParams:     constExecParams,
-		flowClient:          flowClient,
-		serviceAccount:      servAcc,
-		accounts:            make([]*flowAccount, 0),
-		availableAccounts:   make(chan *flowAccount, loadParams.NumberOfAccounts),
-		workerStatsTracker:  workerStatsTracker,
-		follower:            follower,
-		availableAccountsLo: loadParams.NumberOfAccounts,
-		stoppedChannel:      make(chan struct{}),
+		log:                log,
+		loaderMetrics:      loaderMetrics,
+		loadParams:         loadParams,
+		networkParams:      networkParams,
+		constExecParams:    constExecParams,
+		flowClient:         flowClient,
+		serviceAccount:     servAcc,
+		accounts:           make([]*flowAccount, 0),
+		availableAccounts:  make(chan *flowAccount, loadParams.NumberOfAccounts),
+		workerStatsTracker: workerStatsTracker,
+		follower:           follower,
+		stoppedChannel:     make(chan struct{}),
 	}
 
 	// TODO(rbtz): hide load implementation behind an interface
@@ -666,14 +664,6 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	log.Trace().
 		Int("availableAccounts", len(lg.availableAccounts)).
 		Msg("getting next available account")
-
-	if workerID == 0 {
-		l := len(lg.availableAccounts)
-		if l < lg.availableAccountsLo {
-			lg.availableAccountsLo = l
-			log.Debug().Int("availableAccountsLo", l).Int("numberOfAccounts", lg.loadParams.NumberOfAccounts).Msg("discovered new account low")
-		}
-	}
 
 	var acc *flowAccount
 	select {
