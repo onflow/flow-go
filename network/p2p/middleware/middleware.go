@@ -12,6 +12,7 @@ import (
 
 	ggio "github.com/gogo/protobuf/io"
 	"github.com/ipfs/go-datastore"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2pnetwork "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -568,9 +569,14 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	if err != nil {
 		return fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
 	}
+	sub, ok := s.(*pubsub.Subscription)
+	if !ok {
+		// from this point on, we assume that the subscription is a pubsub.Subscription
+		m.log.Fatal().Str("topic", topic.String()).Msg("could not cast subscription to pubsub.Subscription")
+	}
 
 	// create a new readSubscription with the context of the middleware
-	rs := newReadSubscription(m.ctx, s, m.processAuthenticatedMessage, m.log, m.metrics)
+	rs := newReadSubscription(m.ctx, sub, m.processAuthenticatedMessage, m.log, m.metrics)
 	m.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages
