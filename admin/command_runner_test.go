@@ -164,7 +164,7 @@ func (suite *CommandRunnerSuite) TestValidator() {
 		return "ok", nil
 	})
 
-	validatorErr := errors.New("unexpected value")
+	validatorErr := NewInvalidAdminReqErrorf("unexpected value")
 	suite.bootstrapper.RegisterValidator("foo", func(req *CommandRequest) error {
 		if req.Data.(map[string]interface{})["key"] != "value" {
 			return validatorErr
