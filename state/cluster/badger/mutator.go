@@ -109,7 +109,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			// if its height is below current boundary, the block does not connect
 			// to the finalized protocol state and would break database consistency
 			if ancestor.Height < finalizedClusterBlock.Height {
-				return state.NewUnverifiableExtensionError("block doesn't connect to finalized state. ancestor.Height (%d), final.Height (%d)",
+				return state.NewOutdatedExtensionErrorf("block doesn't connect to finalized state. ancestor.Height (%d), final.Height (%d)",
 					ancestor.Height, finalizedClusterBlock.Height)
 			}
 
