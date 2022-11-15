@@ -23,8 +23,8 @@ type SealingConfigsGetter interface {
 // SealingConfigsSetter is an interface that allows the caller to update updatable configs
 type SealingConfigsSetter interface {
 	SealingConfigsGetter
-	// SetRequiredApprovalsForSealingConstruction takes a new value and returns the old value
-	// if the new value is valid.  otherwise returns an error,
-	// and the value is not updated (equivalent to no-op)
-	SetRequiredApprovalsForSealingConstruction(newVal uint) (uint, error)
+	// SetRequiredApprovalsForSealingConstruction takes a new config value and updates the config
+	// if the new value is valid.
+	// Returns ValidationError if the new value results in an invalid sealing config.
+	SetRequiredApprovalsForSealingConstruction(newVal uint) error
 }

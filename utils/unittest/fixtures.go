@@ -2113,7 +2113,7 @@ func NewSealingConfigs(val uint) module.SealingConfigsSetter {
 	if err != nil {
 		panic(err)
 	}
-	_, err = instance.SetRequiredApprovalsForSealingConstruction(val)
+	err = instance.SetRequiredApprovalsForSealingConstruction(val)
 	if err != nil {
 		panic(err)
 	}

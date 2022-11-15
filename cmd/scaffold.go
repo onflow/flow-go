@@ -43,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
@@ -393,6 +394,7 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 			!(fnb.AdminCert != NotSet && fnb.AdminKey != NotSet && fnb.AdminClientCAs != NotSet) {
 			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
 		}
+		// create the updatable config manager
 		fnb.RegisterDefaultAdminCommands()
 		fnb.Component("admin server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// set up all admin commands
@@ -605,28 +607,30 @@ func (fnb *FlowNodeBuilder) createProfileUploader() (profiler.Uploader, error) {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueProfiler() {
+	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
+	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
+
+	uploader, err := fnb.createProfileUploader()
+	if err != nil {
+		fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
+		uploader = &profiler.NoopUploader{}
+	}
+
+	profiler, err := profiler.New(
+		fnb.Logger,
+		uploader,
+		fnb.BaseConfig.profilerDir,
+		fnb.BaseConfig.profilerInterval,
+		fnb.BaseConfig.profilerDuration,
+		fnb.BaseConfig.profilerEnabled,
+	)
+	fnb.MustNot(err).Msg("could not initialize profiler")
+
+	// register the enabled state of the profiler for dynamic configuring
+	err = fnb.ConfigManager.RegisterBoolConfig("profiler-enabled", profiler.Enabled, profiler.SetEnabled)
+	fnb.MustNot(err).Msg("could not register profiler config")
+
 	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
-		runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
-
-		uploader, err := fnb.createProfileUploader()
-		if err != nil {
-			fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
-			uploader = &profiler.NoopUploader{}
-		}
-
-		profiler, err := profiler.New(
-			fnb.Logger,
-			uploader,
-			fnb.BaseConfig.profilerDir,
-			fnb.BaseConfig.profilerInterval,
-			fnb.BaseConfig.profilerDuration,
-			fnb.BaseConfig.profilerEnabled,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize profiler: %w", err)
-		}
-
 		return profiler, nil
 	})
 }
@@ -1379,6 +1383,7 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 			BaseConfig:              *config,
 			Logger:                  zerolog.New(os.Stderr),
 			PeerManagerDependencies: &DependencyList{},
+			ConfigManager:           updatable_configs.NewManager(),
 		},
 		flags:                    pflag.CommandLine,
 		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
@@ -1422,10 +1427,14 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
 		return &common.SetLogLevelCommand{}
+	}).AdminCommand("get-config", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewGetConfigCommand(config.ConfigManager)
+	}).AdminCommand("set-config", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewSetConfigCommand(config.ConfigManager)
+	}).AdminCommand("list-configs", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewListConfigCommand(config.ConfigManager)
 	}).AdminCommand("set-golog-level", func(config *NodeConfig) commands.AdminCommand {
 		return &common.SetGologLevelCommand{}
-	}).AdminCommand("set-profiler-enabled", func(config *NodeConfig) commands.AdminCommand {
-		return &common.SetProfilerEnabledCommand{}
 	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
 	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
