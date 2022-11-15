@@ -143,10 +143,12 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 }
 
 func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityRequest) error {
-	lg := e.log.With().Uint64("nonce", req.Nonce).Str("origin_id", originID.String()).Logger()
+	lg := e.log.With().
+		Str("origin_id", originID.String()).
+		Strs("entity_ids", flow.IdentifierList(req.EntityIDs).Strings()).
+		Logger()
 
 	lg.Debug().
-		Strs("entity_ids", flow.IdentifierList(req.EntityIDs).Strings()).
 		Msg("entity request received")
 
 	// TODO: add reputation system to punish nodes for malicious behaviour (spam / repeated requests)

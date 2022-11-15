@@ -376,8 +376,6 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			item.RetryAfter = e.cfg.RetryMaximum
 		}
 
-		e.log.Debug().Hex("entity", logging.ID(entityID)).Msg("selected entity")
-
 		// if we reached the maximum size for a batch, bail
 		if uint(len(entityIDs)) >= e.cfg.BatchThreshold {
 			break
