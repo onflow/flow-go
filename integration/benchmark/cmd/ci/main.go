@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"net"
 	"os"
 	"runtime"
 	"strings"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/integration/benchmark"
+	pb "github.com/onflow/flow-go/integration/benchmark/proto"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -62,12 +64,17 @@ const (
 	additiveIncrease       = 50
 	multiplicativeDecrease = 0.8
 	adjustInterval         = 20 * time.Second
+
+	// gRPC constants
+	defaultMaxMsgSize  = 1024 * 1024 * 16 // 16 MB
+	defaultGRPCAddress = "127.0.0.1:4777"
 )
 
 func main() {
 	logLvl := flag.String("log-level", "info", "set log level")
 
 	// CI relevant flags
+	grpcAddressFlag := flag.String("grpc-address", defaultGRPCAddress, "listen address for gRPC server")
 	initialTPSFlag := flag.Int("initial-tps", 10, "starting transactions per second")
 	maxTPSFlag := flag.Int("max-tps", *initialTPSFlag, "maximum transactions per second allowed")
 	durationFlag := flag.Duration("duration", 10*time.Minute, "test duration")
@@ -103,6 +110,26 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	grpcServerOptions := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(defaultMaxMsgSize),
+		grpc.MaxSendMsgSize(defaultMaxMsgSize),
+	}
+	grpcServer := grpc.NewServer(grpcServerOptions...)
+	defer grpcServer.Stop()
+
+	pb.RegisterBenchmarkServer(grpcServer, &benchmarkServer{})
+
+	grpcListener, err := net.Listen("tcp", *grpcAddressFlag)
+	if err != nil {
+		log.Fatal().Err(err).Str("address", *grpcAddressFlag).Msg("failed to listen")
+	}
+
+	go func() {
+		if err := grpcServer.Serve(grpcListener); err != nil {
+			log.Fatal().Err(err).Msg("failed to serve")
+		}
+	}()
 
 	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
 	defer sp.Stop()
