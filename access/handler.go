@@ -62,11 +62,11 @@ func (h *Handler) GetLatestBlockHeader(
 	ctx context.Context,
 	req *access.GetLatestBlockHeaderRequest,
 ) (*access.BlockHeaderResponse, error) {
-	header, err := h.api.GetLatestBlockHeader(ctx, req.GetIsSealed())
+	header, status, err := h.api.GetLatestBlockHeader(ctx, req.GetIsSealed())
 	if err != nil {
 		return nil, err
 	}
-	return h.blockHeaderResponse(header)
+	return h.blockHeaderResponse(header, status)
 }
 
 // GetBlockHeaderByHeight gets a block header by height.
@@ -74,11 +74,11 @@ func (h *Handler) GetBlockHeaderByHeight(
 	ctx context.Context,
 	req *access.GetBlockHeaderByHeightRequest,
 ) (*access.BlockHeaderResponse, error) {
-	header, err := h.api.GetBlockHeaderByHeight(ctx, req.GetHeight())
+	header, status, err := h.api.GetBlockHeaderByHeight(ctx, req.GetHeight())
 	if err != nil {
 		return nil, err
 	}
-	return h.blockHeaderResponse(header)
+	return h.blockHeaderResponse(header, status)
 }
 
 // GetBlockHeaderByID gets a block header by ID.
@@ -90,11 +90,11 @@ func (h *Handler) GetBlockHeaderByID(
 	if err != nil {
 		return nil, err
 	}
-	header, err := h.api.GetBlockHeaderByID(ctx, id)
+	header, status, err := h.api.GetBlockHeaderByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return h.blockHeaderResponse(header)
+	return h.blockHeaderResponse(header, status)
 }
 
 // GetLatestBlock gets the latest sealed block.
@@ -102,11 +102,10 @@ func (h *Handler) GetLatestBlock(
 	ctx context.Context,
 	req *access.GetLatestBlockRequest,
 ) (*access.BlockResponse, error) {
-	block, err := h.api.GetLatestBlock(ctx, req.GetIsSealed())
+	block, status, err := h.api.GetLatestBlock(ctx, req.GetIsSealed())
 	if err != nil {
 		return nil, err
 	}
-	status := h.api.GetBlockStatus(ctx, block.ID())
 	return h.blockResponse(block, req.GetFullBlockResponse(), status)
 }
 
@@ -115,11 +114,10 @@ func (h *Handler) GetBlockByHeight(
 	ctx context.Context,
 	req *access.GetBlockByHeightRequest,
 ) (*access.BlockResponse, error) {
-	block, err := h.api.GetBlockByHeight(ctx, req.GetHeight())
+	block, status, err := h.api.GetBlockByHeight(ctx, req.GetHeight())
 	if err != nil {
 		return nil, err
 	}
-	status := h.api.GetBlockStatus(ctx, block.ID())
 	return h.blockResponse(block, req.GetFullBlockResponse(), status)
 }
 
@@ -132,11 +130,10 @@ func (h *Handler) GetBlockByID(
 	if err != nil {
 		return nil, err
 	}
-	block, err := h.api.GetBlockByID(ctx, id)
+	block, status, err := h.api.GetBlockByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	status := h.api.GetBlockStatus(ctx, block.ID())
 	return h.blockResponse(block, req.GetFullBlockResponse(), status)
 }
 
@@ -513,7 +510,7 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flo
 	}, nil
 }
 
-func (h *Handler) blockHeaderResponse(header *flow.Header) (*access.BlockHeaderResponse, error) {
+func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStatus) (*access.BlockHeaderResponse, error) {
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 	if err != nil {
 		return nil, err
@@ -525,7 +522,8 @@ func (h *Handler) blockHeaderResponse(header *flow.Header) (*access.BlockHeaderR
 	}
 
 	return &access.BlockHeaderResponse{
-		Block: msg,
+		Block:       msg,
+		BlockStatus: entities.BlockStatus(status),
 	}, nil
 }
 

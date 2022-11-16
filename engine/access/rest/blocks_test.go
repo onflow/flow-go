@@ -211,14 +211,14 @@ func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Bl
 		executionResult.BlockID = block.ID()
 		executionResults[i] = executionResult
 
-		backend.Mock.On("GetBlockByID", mocks.Anything, block.ID()).Return(&block, nil)
-		backend.Mock.On("GetBlockByHeight", mocks.Anything, block.Header.Height).Return(&block, nil)
+		backend.Mock.On("GetBlockByID", mocks.Anything, block.ID()).Return(&block, flow.BlockStatusSealed, nil)
+		backend.Mock.On("GetBlockByHeight", mocks.Anything, block.Header.Height).Return(&block, flow.BlockStatusSealed, nil)
 		backend.Mock.On("GetExecutionResultForBlockID", mocks.Anything, block.ID()).Return(executionResults[i], nil)
 	}
 
 	// any other call to the backend should return a not found error
-	backend.Mock.On("GetBlockByID", mocks.Anything, mocks.Anything).Return(nil, status.Error(codes.NotFound, "not found"))
-	backend.Mock.On("GetBlockByHeight", mocks.Anything, mocks.Anything).Return(nil, status.Error(codes.NotFound, "not found"))
+	backend.Mock.On("GetBlockByID", mocks.Anything, mocks.Anything).Return(nil, flow.BlockStatusUnknown, status.Error(codes.NotFound, "not found"))
+	backend.Mock.On("GetBlockByHeight", mocks.Anything, mocks.Anything).Return(nil, flow.BlockStatusUnknown, status.Error(codes.NotFound, "not found"))
 
 	return blockIDs, heights, blocks, executionResults
 }
