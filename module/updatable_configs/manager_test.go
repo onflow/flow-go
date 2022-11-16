@@ -50,6 +50,7 @@ func TestManager_RegisterBoolConfig(t *testing.T) {
 	// should fail to set incorrect type
 	err = field.Set(struct{}{})
 	assert.Error(t, err)
+	assert.True(t, updatable_configs.IsValidationError(err))
 
 	// should succeed setting correct type
 	err = field.Set(true)
@@ -77,6 +78,7 @@ func TestManager_RegisterUintConfig(t *testing.T) {
 	// should fail to set incorrect type
 	err = field.Set(struct{}{})
 	assert.Error(t, err)
+	assert.True(t, updatable_configs.IsValidationError(err))
 
 	// should succeed setting correct type
 	err = field.Set(float64(1)) // JSON uints parse to float64
@@ -104,9 +106,11 @@ func TestManager_RegisterDurationConfig(t *testing.T) {
 	// should fail to set incorrect type
 	err = field.Set(struct{}{})
 	assert.Error(t, err)
+	assert.True(t, updatable_configs.IsValidationError(err))
 	// should fail to set with correct type, but unparseable
 	err = field.Set("not a parseable duration string")
 	assert.Error(t, err)
+	assert.True(t, updatable_configs.IsValidationError(err))
 
 	// should succeed setting correct type
 	err = field.Set("1h")
@@ -134,11 +138,14 @@ func TestManager_RegisterIdentifierListConfig(t *testing.T) {
 	// should fail to set incorrect type
 	err = field.Set(struct{}{})
 	assert.Error(t, err)
+	assert.True(t, updatable_configs.IsValidationError(err))
 	// should fail to set with correct type, but un-parseable
 	err = field.Set([]string{"un-parseable"})
 	assert.Error(t, err)
+	assert.True(t, updatable_configs.IsValidationError(err))
 	err = field.Set([]string{unittest.IdentifierFixture().String(), "un-parseable"})
 	assert.Error(t, err)
+	assert.True(t, updatable_configs.IsValidationError(err))
 
 	// should succeed setting correct type
 	err = field.Set(util.DetypeSlice(unittest.IdentifierListFixture(5).Strings()))
