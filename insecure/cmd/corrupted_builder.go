@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
 	"net"
 	"strconv"
 
@@ -28,8 +29,15 @@ func NewCorruptedNodeBuilder(role string) *CorruptedNodeBuilder {
 }
 
 func (cnb *CorruptedNodeBuilder) Initialize() error {
-	if err := cnb.FlowNodeBuilder.Initialize(); err != nil {
-		return fmt.Errorf("could not initilized flow node builder: %w", err)
+
+	// skip FlowNodeBuilder initialization if node role is access. This is because the AN builder uses
+	// a slightly different build flow than the other node roles. Flags and components are initialized
+	// in calls to anBuilder.ParseFlags & anBuilder.Initialize . Another call to FlowNodeBuilder.Initialize will
+	// end up calling BaseFlags() and causing a flags redefined error.
+	if cnb.NodeRole != flow.RoleAccess.String() {
+		if err := cnb.FlowNodeBuilder.Initialize(); err != nil {
+			return fmt.Errorf("could not initilized flow node builder: %w", err)
+		}
 	}
 
 	cnb.enqueueNetworkingLayer() // initializes corrupted networking layer.

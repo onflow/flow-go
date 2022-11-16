@@ -8,8 +8,7 @@ import (
 
 func main() {
 	corruptedBuilder := insecmd.NewCorruptedNodeBuilder(flow.RoleAccess.String())
-	builder := nodebuilder.FlowAccessNode() // use the Access Node builder
-	builder.FlowNodeBuilder = corruptedBuilder.FlowNodeBuilder
+	builder := nodebuilder.FlowAccessNode(nodebuilder.WithFlowNodeBuilder(corruptedBuilder.FlowNodeBuilder)) // use the Access Node builder
 	builder.PrintBuildVersionDetails()
 
 	// parse all the command line args
@@ -18,12 +17,17 @@ func main() {
 	}
 
 	if err := builder.Initialize(); err != nil {
-		builder.Logger.Fatal().Err(err).Send()
+		builder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+
+	if err := corruptedBuilder.Initialize(); err != nil {
+		builder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 
 	node, err := builder.Build()
 	if err != nil {
 		builder.Logger.Fatal().Err(err).Send()
 	}
+
 	node.Run()
 }

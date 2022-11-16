@@ -118,8 +118,8 @@ type AccessNodeConfig struct {
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
 	baseOptions                  []cmd.Option
-
-	PublicNetworkConfig PublicNetworkConfig
+	FlowNodeBuilder              *cmd.FlowNodeBuilder
+	PublicNetworkConfig          PublicNetworkConfig
 }
 
 type PublicNetworkConfig struct {
@@ -132,7 +132,7 @@ type PublicNetworkConfig struct {
 // DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
 func DefaultAccessNodeConfig() *AccessNodeConfig {
 	homedir, _ := os.UserHomeDir()
-	return &AccessNodeConfig{
+	config := &AccessNodeConfig{
 		supportsObserver:   false,
 		collectionGRPCPort: 9000,
 		executionGRPCPort:  9000,
@@ -176,6 +176,10 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
 	}
+
+	config.FlowNodeBuilder = cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...)
+
+	return config
 }
 
 // FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow access node
@@ -525,6 +529,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 
 type Option func(*AccessNodeConfig)
 
+func WithFlowNodeBuilder(builder *cmd.FlowNodeBuilder) func(config *AccessNodeConfig) {
+	return func(config *AccessNodeConfig) {
+		config.FlowNodeBuilder = builder
+	}
+}
+
 func FlowAccessNode(opts ...Option) *FlowAccessNodeBuilder {
 	config := DefaultAccessNodeConfig()
 	for _, opt := range opts {
@@ -533,7 +543,7 @@ func FlowAccessNode(opts ...Option) *FlowAccessNodeBuilder {
 
 	return &FlowAccessNodeBuilder{
 		AccessNodeConfig:        config,
-		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
+		FlowNodeBuilder:         config.FlowNodeBuilder,
 		FinalizationDistributor: consensuspubsub.NewFinalizationDistributor(),
 	}
 }
