@@ -12,6 +12,8 @@ type CorruptPubSubAdapter struct {
 	gossipSub *corrupt.PubSub
 }
 
+var _ p2p.PubSubAdapter = (*CorruptPubSubAdapter)(nil)
+
 func (c *CorruptPubSubAdapter) RegisterTopicValidator(topic string, val interface{}) error {
 	return c.gossipSub.RegisterTopicValidator(topic, val, corrupt.WithValidatorInline(true))
 }
@@ -36,9 +38,9 @@ func (c *CorruptPubSubAdapter) ListPeers(topic string) []peer.ID {
 	return c.ListPeers(topic)
 }
 
-func NewCorruptPubSubAdapter() p2p.PubSubAdapter {
+func NewCorruptPubSubAdapter(gossipSub *corrupt.PubSub) p2p.PubSubAdapter {
 	return &CorruptPubSubAdapter{
-		gossipSub: corrupt.NewGossipSub(),
+		gossipSub: gossipSub,
 	}
 }
 
