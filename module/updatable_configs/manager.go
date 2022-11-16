@@ -253,7 +253,7 @@ func (m *Manager) RegisterIdentifierListConfig(name string, get GetIdentifierLis
 		Set: func(val any) error {
 			gval, ok := val.([]any)
 			if !ok {
-				return NewValidationErrorf("invalid type for duration config: %T", val)
+				return NewValidationErrorf("invalid type for IdentifierList config: %T", val)
 			}
 			ids := make(flow.IdentifierList, len(gval))
 			for i, gid := range gval {
