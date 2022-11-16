@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/state"
@@ -21,12 +20,12 @@ func (invalidator testInvalidator) ShouldInvalidateEntries() bool {
 }
 
 func (invalidator testInvalidator) ShouldInvalidateEntry(
-	location common.AddressLocation,
-	program *interpreter.Program,
+	key string,
+	value *string,
 	state *state.State,
 ) bool {
 	return invalidator.invalidateAll ||
-		invalidator.invalidateName == location.Name
+		invalidator.invalidateName == key
 }
 
 func TestModifiedSetsInvalidator(t *testing.T) {
@@ -66,30 +65,15 @@ func TestModifiedSetsInvalidator(t *testing.T) {
 }
 
 func TestChainedInvalidator(t *testing.T) {
-	var chain chainedDerivedDataInvalidators[
-		common.AddressLocation,
-		*interpreter.Program,
-	]
+	var chain chainedDerivedDataInvalidators[string, *string]
 	require.False(t, chain.ShouldInvalidateEntries())
-	require.False(t, chain.ShouldInvalidateEntry(
-		common.AddressLocation{},
-		nil,
-		nil))
+	require.False(t, chain.ShouldInvalidateEntry("", nil, nil))
 
-	chain = chainedDerivedDataInvalidators[
-		common.AddressLocation,
-		*interpreter.Program,
-	]{}
+	chain = chainedDerivedDataInvalidators[string, *string]{}
 	require.False(t, chain.ShouldInvalidateEntries())
-	require.False(t, chain.ShouldInvalidateEntry(
-		common.AddressLocation{},
-		nil,
-		nil))
+	require.False(t, chain.ShouldInvalidateEntry("", nil, nil))
 
-	chain = chainedDerivedDataInvalidators[
-		common.AddressLocation,
-		*interpreter.Program,
-	]{
+	chain = chainedDerivedDataInvalidators[string, *string]{
 		{
 			DerivedDataInvalidator: testInvalidator{},
 			executionTime:          1,
@@ -105,10 +89,7 @@ func TestChainedInvalidator(t *testing.T) {
 	}
 	require.False(t, chain.ShouldInvalidateEntries())
 
-	chain = chainedDerivedDataInvalidators[
-		common.AddressLocation,
-		*interpreter.Program,
-	]{
+	chain = chainedDerivedDataInvalidators[string, *string]{
 		{
 			DerivedDataInvalidator: testInvalidator{invalidateName: "1"},
 			executionTime:          1,
@@ -129,25 +110,11 @@ func TestChainedInvalidator(t *testing.T) {
 	require.True(t, chain.ShouldInvalidateEntries())
 
 	for _, name := range []string{"1", "3a", "3b", "7"} {
-		require.True(
-			t,
-			chain.ShouldInvalidateEntry(
-				common.AddressLocation{
-					Name: name,
-				},
-				nil,
-				nil))
+		require.True(t, chain.ShouldInvalidateEntry(name, nil, nil))
 	}
 
 	for _, name := range []string{"0", "2", "3c", "4", "8"} {
-		require.False(
-			t,
-			chain.ShouldInvalidateEntry(
-				common.AddressLocation{
-					Name: name,
-				},
-				nil,
-				nil))
+		require.False(t, chain.ShouldInvalidateEntry(name, nil, nil))
 	}
 
 	require.Equal(t, chain, chain.ApplicableInvalidators(0))
@@ -160,11 +127,9 @@ func TestChainedInvalidator(t *testing.T) {
 	require.Equal(t, chain[3:], chain.ApplicableInvalidators(7))
 	require.Nil(t, chain.ApplicableInvalidators(8))
 
-	location := common.AddressLocation{
-		Name: "1",
-	}
-	require.True(t, chain.ShouldInvalidateEntry(location, nil, nil))
+	key := "1"
+	require.True(t, chain.ShouldInvalidateEntry(key, nil, nil))
 	require.False(
 		t,
-		chain.ApplicableInvalidators(3).ShouldInvalidateEntry(location, nil, nil))
+		chain.ApplicableInvalidators(3).ShouldInvalidateEntry(key, nil, nil))
 }
