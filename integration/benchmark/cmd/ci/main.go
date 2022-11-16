@@ -343,6 +343,7 @@ func adjustTPS(
 	lastTs := time.Now()
 	lastTPS := float64(minTPS)
 	lastTxs := uint(lg.GetTxExecuted())
+	lastTimedoutTxs := lg.GetTxTimedout()
 	for {
 		select {
 		// NOTE: not using a ticker here since adjusting worker count in SetTPS
@@ -350,6 +351,9 @@ func adjustTPS(
 		case nowTs := <-time.After(interval):
 			currentSentTxs := lg.GetTxSent()
 			currentTxs := uint(lg.GetTxExecuted())
+			currentTimedoutTxs := lg.GetTxTimedout()
+			// number of timed out transactions in the last interval
+			timedoutTxs := currentTimedoutTxs - lastTimedoutTxs
 
 			inflight := currentSentTxs - int(currentTxs)
 			inflightPerWorker := inflight / int(targetTPS)
@@ -363,6 +367,7 @@ func adjustTPS(
 				targetTPS,
 				inflight,
 				maxInflight,
+				timedoutTxs > 0,
 			)
 
 			if skip {
@@ -389,6 +394,7 @@ func adjustTPS(
 				Uint("targetTPS", boundedTPS).
 				Int("inflight", inflight).
 				Int("inflightPerWorker", inflightPerWorker).
+				Int("timedoutTxs", timedoutTxs).
 				Msg("adjusting TPS")
 
 			err := lg.SetTPS(boundedTPS)
@@ -397,6 +403,7 @@ func adjustTPS(
 			}
 
 			targetTPS = boundedTPS
+			lastTimedoutTxs = currentTimedoutTxs
 			//
 			// SetTPS is a blocking call, so we need to re-fetch the TxExecuted and time.
 			//
@@ -418,6 +425,7 @@ func computeTPS(
 	targetTPS uint,
 	inflight int,
 	maxInflight uint,
+	timedout bool,
 ) (bool, float64, uint) {
 	timeDiff := nowTs.Sub(lastTs).Seconds()
 	if timeDiff == 0 {
@@ -426,6 +434,12 @@ func computeTPS(
 
 	currentTPS := float64(currentTxs-lastTxs) / timeDiff
 	unboundedTPS := uint(math.Ceil(currentTPS))
+
+	// If there are timed out transactions we throttle regardless of anything else.
+	// We'll continue to throttle until the timed out transactions are gone.
+	if timedout {
+		return false, currentTPS, uint(float64(targetTPS) * multiplicativeDecrease)
+	}
 
 	// To avoid setting target TPS below current TPS,
 	// we decrease the former one by the multiplicativeDecrease factor.
