@@ -117,7 +117,7 @@ func (s *TimeoutAggregatorTestSuite) TestOnQcTriggeredViewChange() {
 		close(done)
 	}).Once()
 	qc := helper.MakeQC(helper.WithQCView(s.lowestRetainedView))
-	s.aggregator.OnQcTriggeredViewChange(qc, qc.View+1)
+	s.aggregator.OnViewChange(qc.View, qc.View+1)
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
 
@@ -130,6 +130,6 @@ func (s *TimeoutAggregatorTestSuite) TestOnTcTriggeredViewChange() {
 		close(done)
 	}).Once()
 	tc := helper.MakeTC(helper.WithTCView(s.lowestRetainedView))
-	s.aggregator.OnTcTriggeredViewChange(tc, tc.View+1)
+	s.aggregator.OnViewChange(tc.View, tc.View+1)
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
