@@ -44,7 +44,7 @@ import (
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func() (p2p.LibP2PNode, error)
-type GossipSubFactoryFuc func(context.Context, host.Host, ...pubsub.Option) (p2p.PubSub, error)
+type GossipSubFactoryFuc func(context.Context, host.Host, ...pubsub.Option) (p2p.PubSubAdapter, error)
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
@@ -272,7 +272,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
 			}
 
-			var ps p2p.PubSub
+			var ps p2p.PubSubAdapter
 			if builder.gossipSubFactory != nil {
 				// builds GossipSub with the given factory
 				ps, err = builder.gossipSubFactory(ctx, h, psOpts...)
@@ -281,7 +281,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				}
 			} else {
 				// builds GossipSub with the default factory
-				ps, err = pubsub.NewGossipSub(ctx, h, psOpts...)
+				ps, err = p2pnode.NewGossipSubAdapter(ctx, h, psOpts...)
 				if err != nil {
 					ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
 				}
