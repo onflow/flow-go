@@ -444,24 +444,27 @@ func (il IdentityList) ByNetworkingKey(key crypto.PublicKey) (*Identity, bool) {
 
 // Sample returns simple random sample from the `IdentityList`
 func (il IdentityList) Sample(size uint) IdentityList {
+	return il.sample(size, rand.Intn)
+}
+
+// DeterministicSample returns deterministic random sample from the `IdentityList` using the given seed
+func (il IdentityList) DeterministicSample(size uint, seed int64) IdentityList {
+	rng := rand.New(rand.NewSource(seed))
+	return il.sample(size, rng.Intn)
+}
+
+func (il IdentityList) sample(size uint, intn func(int) int) IdentityList {
 	n := uint(len(il))
 	if size > n {
 		size = n
 	}
-	dup := make([]*Identity, 0, n)
-	dup = append(dup, il...)
+
+	dup := il.Copy()
 	for i := uint(0); i < size; i++ {
-		j := uint(rand.Intn(int(n - i)))
+		j := uint(intn(int(n - i)))
 		dup[i], dup[j+i] = dup[j+i], dup[i]
 	}
 	return dup[:size]
-}
-
-// DeterministicSample returns deterministic random sample from the `IdentityList` using the given seed
-// TODO(rbtz): fix race condition
-func (il IdentityList) DeterministicSample(size uint, seed int64) IdentityList {
-	rand.Seed(seed)
-	return il.Sample(size)
 }
 
 // DeterministicShuffle randomly and deterministically shuffles the identity
