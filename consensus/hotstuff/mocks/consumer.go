@@ -113,6 +113,11 @@ func (_m *Consumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView
 	_m.Called(tc, newView)
 }
 
+// OnViewChange provides a mock function with given fields: oldView, newView
+func (_m *Consumer) OnViewChange(oldView uint64, newView uint64) {
+	_m.Called(oldView, newView)
+}
+
 // OnVoteForInvalidBlockDetected provides a mock function with given fields: vote, invalidProposal
 func (_m *Consumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
 	_m.Called(vote, invalidProposal)

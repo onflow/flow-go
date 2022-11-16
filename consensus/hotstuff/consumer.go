@@ -92,6 +92,14 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnLocalTimeout(currentView uint64)
 
+	// OnViewChange notifications are produced by PaceMaker when it moves to a new view
+	// based on processing a QC or TC. The arguments specify the oldView (first argument),
+	// and the newView to which the PaceMaker transitioned (second argument).
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnViewChange(oldView, newView uint64)
+
 	// OnQcTriggeredViewChange notifications are produced by PaceMaker when it moves to a new view
 	// based on processing a QC. The arguments specify the qc (first argument), which triggered
 	// the view change, and the newView to which the PaceMaker transitioned (second argument).

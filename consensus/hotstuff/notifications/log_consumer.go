@@ -98,6 +98,13 @@ func (lc *LogConsumer) OnLocalTimeout(currentView uint64) {
 		Msg("processing local timeout")
 }
 
+func (lc *LogConsumer) OnViewChange(oldView, newView uint64) {
+	lc.log.Debug().
+		Uint64("old_view", oldView).
+		Uint64("new_view", newView).
+		Msg("entered new view")
+}
+
 func (lc *LogConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
 	lc.log.Debug().
 		Uint64("qc_view", qc.View).

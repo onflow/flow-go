@@ -39,6 +39,8 @@ func (*NoopPartialConsumer) OnPartialTc(uint64, *hotstuff.PartialTcCreated) {}
 
 func (*NoopPartialConsumer) OnLocalTimeout(uint64) {}
 
+func (*NoopPartialConsumer) OnViewChange(uint64, uint64) {}
+
 func (*NoopPartialConsumer) OnQcTriggeredViewChange(*flow.QuorumCertificate, uint64) {}
 
 func (*NoopPartialConsumer) OnTcTriggeredViewChange(*flow.TimeoutCertificate, uint64) {}

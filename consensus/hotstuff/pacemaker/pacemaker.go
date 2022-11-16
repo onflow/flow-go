@@ -126,7 +126,8 @@ func (p *ActivePaceMaker) TimeoutChannel() <-chan time.Time {
 // fast-forward its view. In contrast to `ProcessTC`, this function does _not_ handle `nil` inputs.
 // No errors are expected, any error should be treated as exception
 func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, error) {
-	if qc.View < p.CurView() {
+	oldView := p.CurView()
+	if qc.View < oldView {
 		err := p.updateNewestQC(qc)
 		if err != nil {
 			return nil, fmt.Errorf("could not update tracked newest QC: %w", err)
@@ -144,6 +145,7 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 	}
 
 	p.notifier.OnQcTriggeredViewChange(qc, newView)
+	p.notifier.OnViewChange(oldView, newView)
 
 	timerInfo := p.timeoutControl.StartTimeout(p.ctx, newView)
 	p.notifier.OnStartingTimeout(timerInfo)
@@ -165,7 +167,8 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 		return nil, nil
 	}
 
-	if tc.View < p.CurView() {
+	oldView := p.CurView()
+	if tc.View < oldView {
 		err := p.updateNewestQC(tc.NewestQC)
 		if err != nil {
 			return nil, fmt.Errorf("could not update tracked newest QC: %w", err)
@@ -183,6 +186,7 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 	}
 
 	p.notifier.OnTcTriggeredViewChange(tc, newView)
+	p.notifier.OnViewChange(oldView, newView)
 
 	timerInfo := p.timeoutControl.StartTimeout(p.ctx, newView)
 	p.notifier.OnStartingTimeout(timerInfo)

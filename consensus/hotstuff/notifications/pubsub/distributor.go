@@ -78,6 +78,14 @@ func (p *Distributor) OnLocalTimeout(currentView uint64) {
 	}
 }
 
+func (p *Distributor) OnViewChange(oldView, newView uint64) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnViewChange(oldView, newView)
+	}
+}
+
 func (p *Distributor) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
