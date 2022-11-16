@@ -161,7 +161,7 @@ func (m *Manager) RegisterBoolConfig(name string, get GetBoolConfigFunc, set Set
 		Set: func(val any) error {
 			bval, ok := val.(bool)
 			if !ok {
-				return fmt.Errorf("invalid type for bool config: %T", val)
+				return NewValidationErrorf("invalid type for bool config: %T", val)
 			}
 			return set(bval)
 		},
