@@ -89,6 +89,7 @@ func initPaceMaker(t require.TestingT, ctx context.Context, livenessData *hotstu
 	notifier.On("OnStartingTimeout", mock.Anything).Return()
 	notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything).Return()
 	notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return()
+	notifier.On("OnViewChange", mock.Anything, mock.Anything).Maybe()
 	pm.Start(ctx)
 	return pm
 }
