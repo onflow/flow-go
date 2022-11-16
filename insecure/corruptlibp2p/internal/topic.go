@@ -12,6 +12,14 @@ type CorruptTopic struct {
 	t *corrupt.Topic
 }
 
+func (c *CorruptTopic) Subscribe() (p2p.Subscription, error) {
+	sub, err := c.t.Subscribe()
+	if err != nil {
+		return nil, err
+	}
+	return NewCorruptSubscription(sub), nil
+}
+
 func NewCorruptTopic(t *corrupt.Topic) p2p.Topic {
 	return &CorruptTopic{
 		t: t,
