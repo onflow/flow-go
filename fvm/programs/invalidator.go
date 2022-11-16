@@ -18,21 +18,35 @@ type ContractUpdate struct {
 	Code []byte
 }
 
-var _ DerivedDataInvalidator[
+type ProgramInvalidator DerivedDataInvalidator[
 	common.AddressLocation,
 	*interpreter.Program,
-] = ModifiedSetsInvalidator{}
+]
+
+type TransactionInvalidator interface {
+	ProgramInvalidator() ProgramInvalidator
+}
 
 type ModifiedSetsInvalidator struct {
 	ContractUpdateKeys []ContractUpdateKey
 	FrozenAccounts     []common.Address
 }
 
-func (sets ModifiedSetsInvalidator) ShouldInvalidateEntries() bool {
+func (sets ModifiedSetsInvalidator) ProgramInvalidator() ProgramInvalidator {
+	return ModifiedSetsProgramInvalidator{sets}
+}
+
+type ModifiedSetsProgramInvalidator struct {
+	ModifiedSetsInvalidator
+}
+
+var _ ProgramInvalidator = ModifiedSetsProgramInvalidator{}
+
+func (sets ModifiedSetsProgramInvalidator) ShouldInvalidateEntries() bool {
 	return len(sets.ContractUpdateKeys) > 0 || len(sets.FrozenAccounts) > 0
 }
 
-func (sets ModifiedSetsInvalidator) ShouldInvalidateEntry(
+func (sets ModifiedSetsProgramInvalidator) ShouldInvalidateEntry(
 	location common.AddressLocation,
 	program *interpreter.Program,
 	state *state.State,

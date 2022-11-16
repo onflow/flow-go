@@ -28,8 +28,8 @@ func (invalidator testInvalidator) ShouldInvalidateEntry(
 		invalidator.invalidateName == key
 }
 
-func TestModifiedSetsInvalidator(t *testing.T) {
-	invalidator := ModifiedSetsInvalidator{}
+func TestModifiedSetsProgramInvalidator(t *testing.T) {
+	invalidator := ModifiedSetsInvalidator{}.ProgramInvalidator()
 
 	require.False(t, invalidator.ShouldInvalidateEntries())
 	require.False(t, invalidator.ShouldInvalidateEntry(
@@ -42,7 +42,7 @@ func TestModifiedSetsInvalidator(t *testing.T) {
 			{}, // For now, the entry's value does not matter.
 		},
 		FrozenAccounts: nil,
-	}
+	}.ProgramInvalidator()
 
 	require.True(t, invalidator.ShouldInvalidateEntries())
 	require.True(t, invalidator.ShouldInvalidateEntry(
@@ -55,7 +55,7 @@ func TestModifiedSetsInvalidator(t *testing.T) {
 		FrozenAccounts: []common.Address{
 			{}, // For now, the entry's value does not matter
 		},
-	}
+	}.ProgramInvalidator()
 
 	require.True(t, invalidator.ShouldInvalidateEntries())
 	require.True(t, invalidator.ShouldInvalidateEntry(
