@@ -2,24 +2,28 @@ package p2pnode
 
 import (
 	"context"
+	"fmt"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/routing"
 
 	"github.com/onflow/flow-go/network/p2p"
 )
 
 type GossipSubAdapter struct {
 	gossipSub *pubsub.PubSub
-	cr        routing.ContentRouting
 }
 
 var _ p2p.PubSubAdapter = (*GossipSubAdapter)(nil)
 
-func NewGossipSubAdapter(ctx context.Context, h host.Host, opts ...pubsub.Option) (p2p.PubSubAdapter, error) {
-	gossipSub, err := pubsub.NewGossipSub(ctx, h, opts...)
+func NewGossipSubAdapter(ctx context.Context, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+	gossipSubConfig, ok := cfg.(*GossipSubAdapterConfig)
+	if !ok {
+		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
+	}
+
+	gossipSub, err := pubsub.NewGossipSub(ctx, h, gossipSubConfig.Build()...)
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +54,4 @@ func (g *GossipSubAdapter) GetTopics() []string {
 
 func (g *GossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return g.gossipSub.ListPeers(topic)
-}
-
-func defaultPubsubOptions() []pubsub.Option {
-
 }
