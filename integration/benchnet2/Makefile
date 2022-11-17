@@ -18,7 +18,7 @@ else ifeq ($(strip $(VALID_CONSENSUS)), 1)
 	$(error Number of Consensus nodes should be no less than 2)
 else ifeq ($(strip $(VALID_COLLECTION)), 1)
 	$(error Number of Collection nodes should be no less than 6)
-else ifeq ($(NAMESPACE),)
+else ifeq ($(strip $(NAMESPACE)),)
 	$(error Namespace cannot be empty)
 endif
 
