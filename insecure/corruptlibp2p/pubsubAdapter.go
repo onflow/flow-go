@@ -1,6 +1,10 @@
 package corruptlibp2p
 
 import (
+	"context"
+	"fmt"
+
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
@@ -8,21 +12,21 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-type CorruptPubSubAdapter struct {
+type CorruptGossipSubAdapter struct {
 	gossipSub *corrupt.PubSub
 }
 
-var _ p2p.PubSubAdapter = (*CorruptPubSubAdapter)(nil)
+var _ p2p.PubSubAdapter = (*CorruptGossipSubAdapter)(nil)
 
-func (c *CorruptPubSubAdapter) RegisterTopicValidator(topic string, val interface{}) error {
+func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, val interface{}) error {
 	return c.gossipSub.RegisterTopicValidator(topic, val, corrupt.WithValidatorInline(true))
 }
 
-func (c *CorruptPubSubAdapter) UnregisterTopicValidator(topic string) error {
+func (c *CorruptGossipSubAdapter) UnregisterTopicValidator(topic string) error {
 	return c.gossipSub.UnregisterTopicValidator(topic)
 }
 
-func (c *CorruptPubSubAdapter) Join(topic string) (p2p.Topic, error) {
+func (c *CorruptGossipSubAdapter) Join(topic string) (p2p.Topic, error) {
 	t, err := c.gossipSub.Join(topic)
 	if err != nil {
 		return nil, err
@@ -30,18 +34,28 @@ func (c *CorruptPubSubAdapter) Join(topic string) (p2p.Topic, error) {
 	return internal.NewCorruptTopic(t), nil
 }
 
-func (c *CorruptPubSubAdapter) GetTopics() []string {
+func (c *CorruptGossipSubAdapter) GetTopics() []string {
 	return c.gossipSub.GetTopics()
 }
 
-func (c *CorruptPubSubAdapter) ListPeers(topic string) []peer.ID {
+func (c *CorruptGossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return c.ListPeers(topic)
 }
 
-func NewCorruptPubSubAdapter(gossipSub *corrupt.PubSub) p2p.PubSubAdapter {
-	return &CorruptPubSubAdapter{
-		gossipSub: gossipSub,
+func NewCorruptGossipSubAdapter(ctx context.Context, router *corrupt.GossipSubRouter, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+	gossipSubConfig, ok := cfg.(*internal.CorruptPubSubAdapterConfig)
+	if !ok {
+		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
 	}
+
+	gossipSub, err := corrupt.NewGossipSubWithRouter(ctx, h, router, gossipSubConfig.Build()...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CorruptGossipSubAdapter{
+		gossipSub: gossipSub,
+	}, nil
 }
 
-var _ p2p.PubSubAdapter = (*CorruptPubSubAdapter)(nil)
+var _ p2p.PubSubAdapter = (*CorruptGossipSubAdapter)(nil)
