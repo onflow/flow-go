@@ -1,11 +1,13 @@
 package state_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
@@ -92,6 +94,39 @@ func TestUnrestrictedNestedTransactionBasic(t *testing.T) {
 	v, err = mainState.Get(addr, key, true)
 	require.NoError(t, err)
 	require.Equal(t, val, v)
+}
+
+func TestUnrestrictedNestedTransactionDifferentMeterParams(t *testing.T) {
+	txn := newTestTransactionState()
+
+	mainState := txn.MainTransactionId().StateForTestingOnly()
+
+	require.Equal(t, uint(math.MaxUint), mainState.TotalMemoryLimit())
+
+	id1, err := txn.BeginNestedTransactionWithMeterParams(
+		meter.DefaultParameters().WithMemoryLimit(1))
+	require.NoError(t, err)
+
+	nestedState1 := id1.StateForTestingOnly()
+
+	require.Equal(t, uint(1), nestedState1.TotalMemoryLimit())
+
+	id2, err := txn.BeginNestedTransactionWithMeterParams(
+		meter.DefaultParameters().WithMemoryLimit(2))
+	require.NoError(t, err)
+
+	nestedState2 := id2.StateForTestingOnly()
+
+	require.Equal(t, uint(2), nestedState2.TotalMemoryLimit())
+
+	// inherits memory limit from parent
+
+	id3, err := txn.BeginNestedTransaction()
+	require.NoError(t, err)
+
+	nestedState3 := id3.StateForTestingOnly()
+
+	require.Equal(t, uint(2), nestedState3.TotalMemoryLimit())
 }
 
 func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
