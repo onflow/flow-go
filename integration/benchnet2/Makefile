@@ -10,7 +10,7 @@ EXECUTION = 2
 VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
 VERIFICATION = 1
 
-check-nodes:
+validate:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
 	# multiple execution nodes are required to prevent seals being generated in case of execution forking.
 	$(error Number of Execution nodes should be no less than 2)
@@ -18,7 +18,10 @@ else ifeq ($(strip $(VALID_CONSENSUS)), 1)
 	$(error Number of Consensus nodes should be no less than 2)
 else ifeq ($(strip $(VALID_COLLECTION)), 1)
 	$(error Number of Collection nodes should be no less than 6)
+else ifeq ($(NAMESPACE),)
+	$(error Namespace cannot be empty)
 endif
+
 
 gen-bootstrap:
 	go run -tags relic ../../cmd/bootstrap genconfig --address-format "%s%d.${NAMESPACE}:3569" --access $(ACCESS) --collection $(COLLECTION) --consensus $(CONSENSUS) --execution $(EXECUTION) --verification $(VERIFICATION) --weight 1000 -o ./ --config ./bootstrap/conf/node-config.json
@@ -40,7 +43,7 @@ gen-helm-l2:
 # runs bootstrap to generate all node info
 # runs level 1 automation to read bootstrap data and generate data input for level 2
 # runs level 2 automation to generate values.yml based on template and data values from previous step
-gen-helm-values: check-nodes gen-bootstrap gen-helm-l1 gen-helm-l2
+gen-helm-values: validate gen-bootstrap gen-helm-l1 gen-helm-l2
 
 
 k8s-secrets-create:
