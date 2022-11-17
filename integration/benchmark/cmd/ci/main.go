@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -26,7 +25,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/integration/benchmark"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -67,13 +65,7 @@ const (
 )
 
 func main() {
-	// holdover flags from loader/main.go
 	logLvl := flag.String("log-level", "info", "set log level")
-	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
-	maxConstExecTxSizeInBytes := flag.Uint("const-exec-max-tx-size", flow.DefaultMaxTransactionByteSize/10, "max byte size of constant exec transaction size to generate")
-	authAccNumInConstExecTx := flag.Uint("const-exec-num-authorizer", 1, "num of authorizer for each constant exec transaction to generate")
-	argSizeInByteInConstExecTx := flag.Uint("const-exec-arg-size", 100, "byte size of tx argument for each constant exec transaction to generate")
-	payerKeyCountInConstExecTx := flag.Uint("const-exec-payer-key-count", 2, "num of payer keys for each constant exec transaction to generate")
 
 	// CI relevant flags
 	initialTPSFlag := flag.Int("initial-tps", 10, "starting transactions per second")
@@ -82,7 +74,6 @@ func main() {
 	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
 	bigQueryTableFlag := flag.String("bigquery-table", "tpsslices", "table name for the bigquery uploader")
-	localDev := flag.Bool("local-dev", false, "whether this script itself is being tested. Turns off submitting data to big query and instead outputs a local results file instead")
 	sliceSize := flag.Duration("slice-size", 2*time.Minute, "the amount of time that each slice covers")
 	flag.Parse()
 
@@ -106,17 +97,15 @@ func main() {
 	}
 	log = log.Level(lvl)
 
-	server := metrics.NewServer(log, metricport, *profilerEnabled)
+	server := metrics.NewServer(log, metricport)
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if *localDev {
-		sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
-		defer sp.Stop()
-	}
+	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
+	defer sp.Stop()
 
 	loadCase := LoadCase{tps: uint(*initialTPSFlag), duration: *durationFlag}
 
@@ -144,9 +133,18 @@ func main() {
 		Msg("Running load case...")
 
 	maxInflight := *maxTPSFlag * accountMultiplier
+
+	workerStatsTracker := benchmark.NewWorkerStatsTracker(ctx)
+	defer workerStatsTracker.Stop()
+
+	statsLogger := benchmark.NewPeriodicStatsLogger(workerStatsTracker, log)
+	statsLogger.Start()
+	defer statsLogger.Stop()
+
 	lg, err := benchmark.New(
 		ctx,
 		log,
+		workerStatsTracker,
 		loaderMetrics,
 		[]access.Client{flowClient},
 		benchmark.NetworkParams{
@@ -160,12 +158,8 @@ func main() {
 			LoadType:         benchmark.LoadType(loadType),
 			FeedbackEnabled:  feedbackEnabled,
 		},
-		benchmark.ConstExecParams{
-			MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
-			AuthAccountNum:  *authAccNumInConstExecTx,
-			ArgSizeInByte:   *argSizeInByteInConstExecTx,
-			PayerKeyCount:   *payerKeyCountInConstExecTx,
-		},
+		// We do support only one load type for now.
+		benchmark.ConstExecParams{},
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to create new cont load generator")
@@ -230,14 +224,10 @@ func main() {
 		log.Fatal().Msg("no data slices recorded")
 	}
 
-	if *localDev {
-		outputLocalData(dataSlices, log)
-	} else {
-		log.Info().Msg("Uploading data to BigQuery")
-		err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("unable to send data to bigquery")
-		}
+	log.Info().Msg("Uploading data to BigQuery")
+	err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("unable to send data to bigquery")
 	}
 }
 
@@ -249,22 +239,22 @@ func recordTransactionData(
 ) []dataSlice {
 	var dataSlices []dataSlice
 
-	// get initial values for first slice
-	startTime := time.Now()
-	startExecutedTransactions := lg.GetTxExecuted()
-
 	t := time.NewTicker(sliceDuration)
 	defer t.Stop()
 
 	for {
+		startTime := time.Now()
+		startExecutedTransactions := lg.GetTxExecuted()
+		startSentTransactions := lg.GetTxSent()
+
 		select {
-		case <-t.C:
-			endTime := time.Now()
+		case endTime := <-t.C:
 			endExecutedTransaction := lg.GetTxExecuted()
+			endSentTransactions := lg.GetTxSent()
 
 			// calculate this slice
-			inputTps := lg.AvgTpsBetween(startTime, endTime)
 			outputTps := float64(endExecutedTransaction-startExecutedTransactions) / sliceDuration.Seconds()
+			inputTps := float64(endSentTransactions-startSentTransactions) / sliceDuration.Seconds()
 			dataSlices = append(dataSlices,
 				dataSlice{
 					GitSha:              gitSha,
@@ -279,9 +269,6 @@ func recordTransactionData(
 					RunStartTime:        runStartTime,
 				})
 
-			// set start values for next slice
-			startExecutedTransactions = endExecutedTransaction
-			startTime = endTime
 		case <-lg.Done():
 			return dataSlices
 		}
@@ -306,21 +293,6 @@ func sendDataToBigQuery(
 		return fmt.Errorf("failed to insert data: %w", err)
 	}
 	return nil
-}
-
-func outputLocalData(slices []dataSlice, log zerolog.Logger) {
-	jsonText, err := json.MarshalIndent(slices, "", "    ")
-	if err != nil {
-		log.Fatal().Msg("Error converting slice data to json")
-	}
-
-	// output human-readable json blob
-	timestamp := time.Now()
-	fileName := fmt.Sprintf("tps-results-%v.json", timestamp.Format("2006-02-01 15:04"))
-	err = os.WriteFile(fileName, jsonText, 0666)
-	if err != nil {
-		log.Fatal().Err(err)
-	}
 }
 
 // adjustTPS tries to find the maximum TPS that the network can handle using a simple AIMD algorithm.

@@ -24,20 +24,9 @@ type Context struct {
 	MaxStateValueSize                 uint64
 	MaxStateInteractionSize           uint64
 
-	AuthorizationChecksEnabled bool
+	TransactionExecutorParams
 
-	SequenceNumberCheckAndIncrementEnabled bool
-
-	// If AccountKeyWeightThreshold is set to a negative number, signature
-	// verification is skipped during authorization checks.
-	//
-	// Note: This is set only by tests
-	AccountKeyWeightThreshold int
-
-	// Note: This is disabled only by tests
-	TransactionBodyExecutionEnabled bool
-
-	BlockPrograms *programs.BlockPrograms
+	DerivedBlockData *programs.DerivedBlockData
 
 	environment.EnvironmentParams
 }
@@ -69,17 +58,14 @@ const (
 
 func defaultContext() Context {
 	return Context{
-		DisableMemoryAndInteractionLimits:      false,
-		ComputationLimit:                       DefaultComputationLimit,
-		MemoryLimit:                            DefaultMemoryLimit,
-		MaxStateKeySize:                        state.DefaultMaxKeySize,
-		MaxStateValueSize:                      state.DefaultMaxValueSize,
-		MaxStateInteractionSize:                state.DefaultMaxInteractionSize,
-		AuthorizationChecksEnabled:             true,
-		SequenceNumberCheckAndIncrementEnabled: true,
-		AccountKeyWeightThreshold:              AccountKeyWeightThreshold,
-		TransactionBodyExecutionEnabled:        true,
-		EnvironmentParams:                      environment.DefaultEnvironmentParams(),
+		DisableMemoryAndInteractionLimits: false,
+		ComputationLimit:                  DefaultComputationLimit,
+		MemoryLimit:                       DefaultMemoryLimit,
+		MaxStateKeySize:                   state.DefaultMaxKeySize,
+		MaxStateValueSize:                 state.DefaultMaxValueSize,
+		MaxStateInteractionSize:           state.DefaultMaxInteractionSize,
+		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
+		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
 	}
 }
 
@@ -233,18 +219,9 @@ func WithTracer(tr module.Tracer) Option {
 // virtual machine context.
 func WithTransactionProcessors(processors ...interface{}) Option {
 	return func(ctx Context) Context {
-		authCheck := false
-		keyWeightThreshold := 0
-		seqNumCheck := false
 		executeBody := false
-
 		for _, p := range processors {
-			switch processor := p.(type) {
-			case *TransactionVerifier:
-				authCheck = true
-				keyWeightThreshold = processor.KeyWeightThreshold
-			case *TransactionSequenceNumberChecker:
-				seqNumCheck = true
+			switch p.(type) {
 			case *TransactionInvoker:
 				executeBody = true
 			default:
@@ -252,9 +229,9 @@ func WithTransactionProcessors(processors ...interface{}) Option {
 			}
 		}
 
-		ctx.AuthorizationChecksEnabled = authCheck
-		ctx.SequenceNumberCheckAndIncrementEnabled = seqNumCheck
-		ctx.AccountKeyWeightThreshold = keyWeightThreshold
+		ctx.AuthorizationChecksEnabled = false
+		ctx.SequenceNumberCheckAndIncrementEnabled = false
+		ctx.AccountKeyWeightThreshold = 0
 		ctx.TransactionBodyExecutionEnabled = executeBody
 		return ctx
 	}
@@ -373,11 +350,11 @@ func WithReusableCadenceRuntimePool(
 	}
 }
 
-// WithBlockPrograms sets the programs cache storage to be used by the
+// WithDerivedBlockData sets the derived data cache storage to be used by the
 // transaction/script.
-func WithBlockPrograms(programs *programs.BlockPrograms) Option {
+func WithDerivedBlockData(derivedBlockData *programs.DerivedBlockData) Option {
 	return func(ctx Context) Context {
-		ctx.BlockPrograms = programs
+		ctx.DerivedBlockData = derivedBlockData
 		return ctx
 	}
 }

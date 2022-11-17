@@ -9,14 +9,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const DefaultProgramsCacheSize = 1000
+const DefaultDerivedDataCacheSize = 1000
 
-// ChainPrograms is a cache of BlockPrograms databases used for speeding up
+// DerivedChainData is a cache of DerivedBlockData databases used for speeding up
 // cadence execution.
 //
-// Since programs are derived from external source, the BlockPrograms databases
+// Since programs are derived from external source, the DerivedBlockData databases
 // need not be durable and can be recreated on the fly.
-type ChainPrograms struct {
+type DerivedChainData struct {
 	// NOTE: It's unsafe to use RWMutex since lru updates the data structure
 	// on Get.
 	mutex sync.Mutex
@@ -24,41 +24,41 @@ type ChainPrograms struct {
 	lru *simplelru.LRU
 }
 
-func NewChainPrograms(chainCacheSize uint) (*ChainPrograms, error) {
+func NewDerivedChainData(chainCacheSize uint) (*DerivedChainData, error) {
 	lru, err := simplelru.NewLRU(int(chainCacheSize), nil)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LRU cache: %w", err)
 	}
 
-	return &ChainPrograms{
+	return &DerivedChainData{
 		lru: lru,
 	}, nil
 }
 
-func (chain *ChainPrograms) unsafeGet(
+func (chain *DerivedChainData) unsafeGet(
 	currentBlockId flow.Identifier,
-) *BlockPrograms {
+) *DerivedBlockData {
 	currentEntry, ok := chain.lru.Get(currentBlockId)
 	if ok {
-		return currentEntry.(*BlockPrograms)
+		return currentEntry.(*DerivedBlockData)
 	}
 
 	return nil
 }
 
-func (chain *ChainPrograms) Get(
+func (chain *DerivedChainData) Get(
 	currentBlockId flow.Identifier,
-) *BlockPrograms {
+) *DerivedBlockData {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
 	return chain.unsafeGet(currentBlockId)
 }
 
-func (chain *ChainPrograms) GetOrCreateBlockPrograms(
+func (chain *DerivedChainData) GetOrCreateDerivedBlockData(
 	currentBlockId flow.Identifier,
 	parentBlockId flow.Identifier,
-) *BlockPrograms {
+) *DerivedBlockData {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
@@ -67,25 +67,25 @@ func (chain *ChainPrograms) GetOrCreateBlockPrograms(
 		return currentEntry
 	}
 
-	var current *BlockPrograms
+	var current *DerivedBlockData
 	parentEntry, ok := chain.lru.Get(parentBlockId)
 	if ok {
-		current = parentEntry.(*BlockPrograms).NewChildBlockPrograms()
+		current = parentEntry.(*DerivedBlockData).NewChildDerivedBlockData()
 	} else {
-		current = NewEmptyBlockPrograms()
+		current = NewEmptyDerivedBlockData()
 	}
 
 	chain.lru.Add(currentBlockId, current)
 	return current
 }
 
-func (chain *ChainPrograms) NewBlockProgramsForScript(
+func (chain *DerivedChainData) NewDerivedBlockDataForScript(
 	currentBlockId flow.Identifier,
-) *BlockPrograms {
+) *DerivedBlockData {
 	block := chain.Get(currentBlockId)
 	if block != nil {
-		return block.NewChildBlockPrograms()
+		return block.NewChildDerivedBlockData()
 	}
 
-	return NewEmptyBlockPrograms()
+	return NewEmptyDerivedBlockData()
 }

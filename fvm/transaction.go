@@ -60,58 +60,9 @@ func (proc *TransactionProcedure) StartSpanFromProcTraceSpan(
 func (proc *TransactionProcedure) Run(
 	ctx Context,
 	txnState *state.TransactionState,
-	programs *programs.TransactionPrograms,
+	derivedTxnData *programs.DerivedTransactionData,
 ) error {
-	err := proc.run(ctx, txnState, programs)
-	txErr, failure := errors.SplitErrorTypes(err)
-	if failure != nil {
-		// log the full error path
-		ctx.Logger.Err(err).Msg("fatal error when execution a transaction")
-		return failure
-	}
-
-	if txErr != nil {
-		proc.Err = txErr
-	}
-
-	return nil
-}
-
-func (proc *TransactionProcedure) run(
-	ctx Context,
-	txnState *state.TransactionState,
-	programs *programs.TransactionPrograms,
-) error {
-	if ctx.AuthorizationChecksEnabled {
-		err := NewTransactionVerifier(ctx.AccountKeyWeightThreshold).Process(
-			ctx,
-			proc,
-			txnState,
-			programs)
-		if err != nil {
-			return err
-		}
-	}
-
-	if ctx.SequenceNumberCheckAndIncrementEnabled {
-		err := NewTransactionSequenceNumberChecker().Process(
-			ctx,
-			proc,
-			txnState,
-			programs)
-		if err != nil {
-			return err
-		}
-	}
-
-	if ctx.TransactionBodyExecutionEnabled {
-		err := NewTransactionInvoker().Process(ctx, proc, txnState, programs)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return NewTransactionInvoker().Process(ctx, proc, txnState, derivedTxnData)
 }
 
 func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
