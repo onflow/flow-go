@@ -289,7 +289,7 @@ func (_m *LibP2PNode) SetComponentManager(cm *component.ComponentManager) {
 }
 
 // SetPubSub provides a mock function with given fields: ps
-func (_m *LibP2PNode) SetPubSub(ps *pubsub.PubSub) {
+func (_m *LibP2PNode) SetPubSub(ps p2p.PubSubAdapter) {
 	_m.Called(ps)
 }
 
@@ -318,15 +318,15 @@ func (_m *LibP2PNode) Stop() error {
 }
 
 // Subscribe provides a mock function with given fields: topic, topicValidator
-func (_m *LibP2PNode) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (*pubsub.Subscription, error) {
+func (_m *LibP2PNode) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (p2p.Subscription, error) {
 	ret := _m.Called(topic, topicValidator)
 
-	var r0 *pubsub.Subscription
-	if rf, ok := ret.Get(0).(func(channels.Topic, pubsub.ValidatorEx) *pubsub.Subscription); ok {
+	var r0 p2p.Subscription
+	if rf, ok := ret.Get(0).(func(channels.Topic, pubsub.ValidatorEx) p2p.Subscription); ok {
 		r0 = rf(topic, topicValidator)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*pubsub.Subscription)
+			r0 = ret.Get(0).(p2p.Subscription)
 		}
 	}
 
