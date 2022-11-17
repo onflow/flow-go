@@ -410,7 +410,42 @@ func (e *Engine) reloadBlock(
 		return fmt.Errorf("could not enqueue block %x on reloading: %w", blockID, err)
 	}
 
-	return e.addOrFetch(blockID, block.Header.Height, missingCollections)
+	height := block.Header.Height
+	fetched := false
+	for _, guarantee := range missingCollections {
+		// if we've requested this collection, we will store it in the storage,
+		// so check the storage to see whether we've seen it.
+		collection, err := e.collections.ByID(guarantee.CollectionID)
+
+		if err == nil {
+			err = e.addCollectionToMempool(collection, blockByCollection)
+
+			if err != nil {
+				return fmt.Errorf("could not add collection to mempool: %w", err)
+			}
+
+			continue
+		}
+
+		// check if there was exception
+		if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("error while querying for collection: %w", err)
+		}
+
+		err = e.fetchCollection(blockID, height, guarantee)
+		if err != nil {
+			return fmt.Errorf("could not fetch collection: %w", err)
+		}
+		fetched = true
+	}
+
+	// make sure that the requests are dispatched immediately by the requester
+	if fetched {
+		e.request.Force()
+		e.metrics.ExecutionCollectionRequestSent()
+	}
+
+	return nil
 }
 
 // BlockProcessable handles the new verified blocks (blocks that
@@ -876,62 +911,62 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 		return fmt.Errorf("cannot store collection: %w", err)
 	}
 
-	return e.addCollectionToMempool(collection)
-}
-
-func (e *Engine) addCollectionToMempool(collection *flow.Collection) error {
-	collID := collection.ID()
 	return e.mempool.BlockByCollection.Run(
 		func(backdata *stdmap.BlockByCollectionBackdata) error {
-			blockByCollectionID, exists := backdata.ByID(collID)
-
-			// if we don't find any block for this collection, then
-			// means we don't need this collection any more.
-			// or it was ejected from the mempool when it was full.
-			// either way, we will return
-			if !exists {
-				return nil
-			}
-
-			for _, executableBlock := range blockByCollectionID.ExecutableBlocks {
-				blockID := executableBlock.ID()
-
-				completeCollection, ok := executableBlock.CompleteCollections[collID]
-				if !ok {
-					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block %v which does not contain said collection",
-						blockID)
-				}
-
-				// record collection max height metrics
-				blockHeight := executableBlock.Block.Header.Height
-				if blockHeight > e.maxCollectionHeight {
-					e.metrics.UpdateCollectionMaxHeight(blockHeight)
-					e.maxCollectionHeight = blockHeight
-				}
-
-				if completeCollection.IsCompleted() {
-					// already received transactions for this collection
-					continue
-				}
-
-				// update the transactions of the collection
-				// Note: it's guaranteed the transactions are for this collection, because
-				// the collection id matches with the CollectionID from the collection guarantee
-				completeCollection.Transactions = collection.Transactions
-
-				// check if the block becomes executable
-				_ = e.executeBlockIfComplete(executableBlock)
-			}
-
-			// since we've received this collection, remove it from the index
-			// this also prevents from executing the same block twice, because the second
-			// time when the collection arrives, it will not be found in the blockByCollectionID
-			// index.
-			backdata.Remove(collID)
-
-			return nil
+			return e.addCollectionToMempool(collection, backdata)
 		},
 	)
+}
+
+func (e *Engine) addCollectionToMempool(collection *flow.Collection, backdata *stdmap.BlockByCollectionBackdata) error {
+	collID := collection.ID()
+	blockByCollectionID, exists := backdata.ByID(collID)
+
+	// if we don't find any block for this collection, then
+	// means we don't need this collection any more.
+	// or it was ejected from the mempool when it was full.
+	// either way, we will return
+	if !exists {
+		return nil
+	}
+
+	for _, executableBlock := range blockByCollectionID.ExecutableBlocks {
+		blockID := executableBlock.ID()
+
+		completeCollection, ok := executableBlock.CompleteCollections[collID]
+		if !ok {
+			return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block %v which does not contain said collection",
+				blockID)
+		}
+
+		// record collection max height metrics
+		blockHeight := executableBlock.Block.Header.Height
+		if blockHeight > e.maxCollectionHeight {
+			e.metrics.UpdateCollectionMaxHeight(blockHeight)
+			e.maxCollectionHeight = blockHeight
+		}
+
+		if completeCollection.IsCompleted() {
+			// already received transactions for this collection
+			continue
+		}
+
+		// update the transactions of the collection
+		// Note: it's guaranteed the transactions are for this collection, because
+		// the collection id matches with the CollectionID from the collection guarantee
+		completeCollection.Transactions = collection.Transactions
+
+		// check if the block becomes executable
+		_ = e.executeBlockIfComplete(executableBlock)
+	}
+
+	// since we've received this collection, remove it from the index
+	// this also prevents from executing the same block twice, because the second
+	// time when the collection arrives, it will not be found in the blockByCollectionID
+	// index.
+	backdata.Remove(collID)
+
+	return nil
 }
 
 func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
@@ -1301,7 +1336,11 @@ func (e *Engine) addOrFetch(blockID flow.Identifier, height uint64, guarantees [
 		collection, err := e.collections.ByID(guarantee.CollectionID)
 
 		if err == nil {
-			err := e.addCollectionToMempool(collection)
+			err = e.mempool.BlockByCollection.Run(
+				func(backdata *stdmap.BlockByCollectionBackdata) error {
+					return e.addCollectionToMempool(collection, backdata)
+				})
+
 			if err != nil {
 				return fmt.Errorf("could not add collection to mempool: %w", err)
 			}
