@@ -195,7 +195,7 @@ func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready comp
 		case <-doneSignal:
 			return
 		case <-newMessageSignal:
-			err := e.processQueuedBlocks() // no errors expected during normal operations
+			err := e.processQueuedBlocks(doneSignal) // no errors expected during normal operations
 			if err != nil {
 				ctx.Throw(err)
 			}
@@ -207,8 +207,14 @@ func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready comp
 // Only returns when all inbound queues are empty (or the engine is terminated).
 // No errors are expected during normal operation. All returned exceptions are potential
 // symptoms of internal state corruption and should be fatal.
-func (e *Engine) processQueuedBlocks() error {
+func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 	for {
+		select {
+		case <-doneSignal:
+			return nil
+		default:
+		}
+
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
 			in := msg.(inboundBlock)
@@ -239,7 +245,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // processBlockProposal handles incoming block proposals.
 // No errors are expected during normal operations.
 func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
-
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
 	defer span.End()
 
