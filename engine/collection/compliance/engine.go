@@ -1,7 +1,6 @@
 package compliance
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -204,7 +203,7 @@ func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready comp
 		case <-doneSignal:
 			return
 		case <-newMessageSignal:
-			err := e.processQueuedBlocks(ctx)
+			err := e.processQueuedBlocks(doneSignal)
 			if err != nil {
 				ctx.Throw(err)
 			}
@@ -215,10 +214,10 @@ func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready comp
 // processQueuedBlocks processes any available messages from the inbound queues.
 // Only returns when all inbound queues are empty (or the engine is terminated).
 // No errors expected during normal operations.
-func (e *Engine) processQueuedBlocks(ctx context.Context) error {
+func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-doneSignal:
 			return nil
 		default:
 		}
