@@ -151,7 +151,7 @@ func New(
 
 // OnBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
 func (e *Engine) OnBlockProposal(proposal *messages.BlockProposal) {
-	e.onBlockProposal(e.me.NodeID(), proposal)
+	e.log.Error().Msg("received unexpected block proposal via internal method")
 }
 
 // OnSyncedBlock performs processing of incoming block by pushing into queue and notifying worker.
