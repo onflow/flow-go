@@ -21,10 +21,9 @@ func TestSpammerGossipSub(t *testing.T) {
 	count := 5
 	nodes := make([]p2p.LibP2PNode, 0, 5)
 	ids := flow.IdentityList{}
-	inbounds := make([]chan string, 0, 5)
 
 	for i := 0; i < count; i++ {
-		handler, inbound := p2ptest.StreamHandlerFixture(t)
+		handler, _ := p2ptest.StreamHandlerFixture(t)
 		node, id := p2ptest.NodeFixture(
 			t,
 			sporkId,
@@ -35,7 +34,6 @@ func TestSpammerGossipSub(t *testing.T) {
 
 		nodes = append(nodes, node)
 		ids = append(ids, &id)
-		inbounds = append(inbounds, inbound)
 	}
 
 	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)

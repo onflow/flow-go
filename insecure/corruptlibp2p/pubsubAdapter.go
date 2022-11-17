@@ -40,7 +40,7 @@ func (c *CorruptGossipSubAdapter) GetTopics() []string {
 }
 
 func (c *CorruptGossipSubAdapter) ListPeers(topic string) []peer.ID {
-	return c.ListPeers(topic)
+	return c.gossipSub.ListPeers(topic)
 }
 
 func (c *CorruptGossipSubAdapter) GetRouter() *internal.CorruptGossipSubRouter {
