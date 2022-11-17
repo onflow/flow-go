@@ -102,6 +102,7 @@ require (
 )
 
 require (
+	github.com/google/btree v1.1.2
 	github.com/montanaflynn/stats v0.6.6
 	github.com/pkg/profile v1.7.0
 )
