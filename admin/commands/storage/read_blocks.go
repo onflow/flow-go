@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/admin"
@@ -50,27 +49,29 @@ func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandReque
 	return commands.ConvertToInterfaceList(result)
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadBlocksCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return admin.ErrValidatorReqDataFormat
+		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}
 
 	block, ok := input["block"]
 	if !ok {
-		return errors.New("the \"block\" field is required")
+		return admin.NewInvalidAdminReqErrorf("the \"block\" field is required")
 	}
 
 	data := &readBlocksRequest{}
 	if blocksRequest, err := parseBlocksRequest(block); err != nil {
-		return err
+		return admin.NewInvalidAdminReqErrorf("invalid 'block' field: %w", err)
 	} else {
 		data.blocksRequest = blocksRequest
 	}
 
 	if n, ok := input["n"]; ok {
 		if n, err := parseN(n); err != nil {
-			return err
+			return admin.NewInvalidAdminReqErrorf("invalid 'n' field: %w", err)
 		} else {
 			data.numBlocksToQuery = n
 		}

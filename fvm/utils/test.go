@@ -120,7 +120,7 @@ func NewMapLedger() *MapLedger {
 }
 
 func (m *MapLedger) Set(owner, key string, value flow.RegisterValue) error {
-	k := fullKey(owner, key)
+	k := FullKey(owner, key)
 	m.RegisterTouches[k] = true
 	m.RegisterUpdated[k] = true
 	m.Registers[k] = flow.RegisterEntry{
@@ -134,22 +134,22 @@ func (m *MapLedger) Set(owner, key string, value flow.RegisterValue) error {
 }
 
 func (m *MapLedger) Get(owner, key string) (flow.RegisterValue, error) {
-	k := fullKey(owner, key)
+	k := FullKey(owner, key)
 	m.RegisterTouches[k] = true
 	return m.Registers[k].Value, nil
 }
 
 func (m *MapLedger) Touch(owner, key string) error {
-	m.RegisterTouches[fullKey(owner, key)] = true
+	m.RegisterTouches[FullKey(owner, key)] = true
 	return nil
 }
 
 func (m *MapLedger) Delete(owner, key string) error {
-	delete(m.RegisterTouches, fullKey(owner, key))
+	delete(m.RegisterTouches, FullKey(owner, key))
 	return nil
 }
 
-func fullKey(owner, key string) string {
+func FullKey(owner, key string) string {
 	// https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Field_separators
 	return strings.Join([]string{owner, key}, "\x1F")
 }

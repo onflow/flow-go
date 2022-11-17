@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -160,8 +161,9 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	topicValidator := flowpubsub.TopicValidator(logger, codec, unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
 	for _, n := range nodes {
-		s, err := n.Subscribe(topic, topicValidator)
+		ps, err := n.Subscribe(topic, topicValidator)
 		require.NoError(t, err)
+		s := p2pfixtures.MustBePubSubSubscription(t, ps)
 
 		go func(s *pubsub.Subscription, nodeID peer.ID) {
 			msg, err := s.Next(ctx)

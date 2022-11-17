@@ -244,7 +244,10 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// checks that the message is received by all nodes.
 	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, []*pubsub.Subscription{conSub, ver1SubBlocks, ver2SubBlocks})
+	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, []*pubsub.Subscription{
+		p2pfixtures.MustBePubSubSubscription(t, conSub),
+		p2pfixtures.MustBePubSubSubscription(t, ver1SubBlocks),
+		p2pfixtures.MustBePubSubSubscription(t, ver2SubBlocks)})
 
 	// now consensus node is doing something very bad!
 	// it is subscribing to a channel that it is not supposed to subscribe to.
@@ -263,7 +266,9 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	ctx5s, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
-	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []*pubsub.Subscription{ver1SubBlocks, ver2SubBlocks})
+	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []*pubsub.Subscription{
+		p2pfixtures.MustBePubSubSubscription(t, ver1SubBlocks),
+		p2pfixtures.MustBePubSubSubscription(t, ver2SubBlocks)})
 
 	// moreover, a verification node publishing a message to the request chunk topic should not reach consensus node.
 	// however, both verification nodes should receive the message.
@@ -275,9 +280,11 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	ctx1s, cancel1s = context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []*pubsub.Subscription{ver1SubChunks, ver2SubChunks})
+	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []*pubsub.Subscription{
+		p2pfixtures.MustBePubSubSubscription(t, ver1SubChunks),
+		p2pfixtures.MustBePubSubSubscription(t, ver2SubChunks)})
 
 	ctx5s, cancel5s = context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
-	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []*pubsub.Subscription{conSubChunks})
+	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []*pubsub.Subscription{p2pfixtures.MustBePubSubSubscription(t, conSubChunks)})
 }

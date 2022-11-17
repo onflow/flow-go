@@ -51,13 +51,13 @@ const (
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	component.Component
-	sync.Mutex
+	sync.RWMutex
 	uniMgr      *unicast.Manager
-	host        host.Host                               // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
-	pubSub      *pubsub.PubSub                          // reference to the libp2p PubSub component
-	logger      zerolog.Logger                          // used to provide logging
-	topics      map[channels.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs        map[channels.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
+	host        host.Host // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
+	pubSub      p2p.PubSubAdapter
+	logger      zerolog.Logger                      // used to provide logging
+	topics      map[channels.Topic]p2p.Topic        // map of a topic string to an actual topic instance
+	subs        map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
 	routing     routing.Routing
 	pCache      *ProtocolPeerCache
 	peerManager *connection.PeerManager
@@ -75,8 +75,8 @@ func NewNode(
 		uniMgr:      uniMgr,
 		host:        host,
 		logger:      logger.With().Str("component", "libp2p-node").Logger(),
-		topics:      make(map[channels.Topic]*pubsub.Topic),
-		subs:        make(map[channels.Topic]*pubsub.Subscription),
+		topics:      make(map[channels.Topic]p2p.Topic),
+		subs:        make(map[channels.Topic]p2p.Subscription),
 		pCache:      pCache,
 		peerManager: peerManager,
 	}
@@ -220,7 +220,7 @@ func (n *Node) ListPeers(topic string) []peer.ID {
 
 // Subscribe subscribes the node to the given topic and returns the subscription
 // All errors returned from this function can be considered benign.
-func (n *Node) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (p2p.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -229,9 +229,7 @@ func (n *Node) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		if err := n.pubSub.RegisterTopicValidator(
-			topic.String(), topicValidator, pubsub.WithValidatorInline(true),
-		); err != nil {
+		if err := n.pubSub.RegisterTopicValidator(topic.String(), topicValidator); err != nil {
 			n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
 			return nil, fmt.Errorf("failed to register topic validator: %w", err)
 		}
@@ -314,6 +312,14 @@ func (n *Node) Publish(ctx context.Context, topic channels.Topic, data []byte) e
 	return nil
 }
 
+// HasSubscription returns true if the node currently has an active subscription to the topic.
+func (n *Node) HasSubscription(topic channels.Topic) bool {
+	n.RLock()
+	defer n.RUnlock()
+	_, ok := n.subs[topic]
+	return ok
+}
+
 // Host returns pointer to host object of node.
 func (n *Node) Host() host.Host {
 	return n.host
@@ -375,7 +381,7 @@ func (n *Node) Routing() routing.Routing {
 
 // SetPubSub sets the node's pubsub implementation.
 // SetPubSub may be called at most once.
-func (n *Node) SetPubSub(ps *pubsub.PubSub) {
+func (n *Node) SetPubSub(ps p2p.PubSubAdapter) {
 	if n.pubSub != nil {
 		n.logger.Fatal().Msg("pubSub already set")
 	}

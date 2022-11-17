@@ -29,9 +29,19 @@ type profileDef struct {
 	profileFunc timedProfileFunc
 }
 
+// ProfilerConfig profiler parameters.
+type ProfilerConfig struct {
+	Enabled         bool
+	UploaderEnabled bool
+
+	Dir      string
+	Interval time.Duration
+	Duration time.Duration
+}
+
 type AutoProfiler struct {
 	unit     *engine.Unit
-	dir      string // where we store profiles
+	dir      string
 	log      zerolog.Logger
 	interval time.Duration
 	duration time.Duration
@@ -44,25 +54,25 @@ type AutoProfiler struct {
 }
 
 // New creates a new AutoProfiler instance performing profiling every interval for duration.
-func New(log zerolog.Logger, uploader Uploader, dir string, interval time.Duration, duration time.Duration, enabled bool) (*AutoProfiler, error) {
+func New(log zerolog.Logger, uploader Uploader, cfg ProfilerConfig) (*AutoProfiler, error) {
 
-	err := os.MkdirAll(dir, os.ModePerm)
+	err := os.MkdirAll(cfg.Dir, os.ModePerm)
 	if err != nil {
-		return nil, fmt.Errorf("could not create profile dir %v: %w", dir, err)
+		return nil, fmt.Errorf("could not create profile dir %v: %w", cfg.Dir, err)
 	}
 
 	// add 50% jitter to the interval
-	jitter := time.Duration(rand.Int63n(int64(interval)))
-	interval = interval/2 + jitter
+	jitter := time.Duration(rand.Int63n(int64(cfg.Interval)))
+	interval := cfg.Interval/2 + jitter
 
 	p := &AutoProfiler{
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("component", "profiler").Logger(),
-		dir:      dir,
+		dir:      cfg.Dir,
 		interval: interval,
-		duration: duration,
+		duration: cfg.Duration,
 		uploader: uploader,
-		enabled:  atomic.NewBool(enabled),
+		enabled:  atomic.NewBool(cfg.Enabled),
 		trigger:  make(chan time.Duration),
 	}
 

@@ -32,7 +32,10 @@ func TestSafetyCheck(t *testing.T) {
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
-		context := fvm.NewContext(fvm.WithLogger(log))
+		context := fvm.NewContext(
+			fvm.WithLogger(log),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
 
 		txnState := state.NewTransactionState(
 			view,
@@ -42,12 +45,13 @@ func TestSafetyCheck(t *testing.T) {
 				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		)
 
-		blockPrograms := programs.NewEmptyBlockPrograms()
-		txnPrograms, err := blockPrograms.NewTransactionPrograms(0, 0)
+		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, txnState, txnPrograms)
-		require.Error(t, err)
+		err = txInvoker.Process(context, proc, txnState, derivedTxnData)
+		require.Nil(t, err)
+		require.Error(t, proc.Err)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
@@ -65,7 +69,10 @@ func TestSafetyCheck(t *testing.T) {
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
-		context := fvm.NewContext(fvm.WithLogger(log))
+		context := fvm.NewContext(
+			fvm.WithLogger(log),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
 
 		txnState := state.NewTransactionState(
 			view,
@@ -75,12 +82,13 @@ func TestSafetyCheck(t *testing.T) {
 				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		)
 
-		blockPrograms := programs.NewEmptyBlockPrograms()
-		txnPrograms, err := blockPrograms.NewTransactionPrograms(0, 0)
+		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, txnState, txnPrograms)
-		require.Error(t, err)
+		err = txInvoker.Process(context, proc, txnState, derivedTxnData)
+		require.Nil(t, err)
+		require.Error(t, proc.Err)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")

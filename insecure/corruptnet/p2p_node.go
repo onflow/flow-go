@@ -60,7 +60,7 @@ type CorruptP2PNode struct {
 
 // Subscribe subscribes the node to the given topic with a noop topic validator.
 // All errors returned from this function can be considered benign.
-func (n *CorruptP2PNode) Subscribe(topic channels.Topic, _ pubsub.ValidatorEx) (*pubsub.Subscription, error) {
+func (n *CorruptP2PNode) Subscribe(topic channels.Topic, _ pubsub.ValidatorEx) (p2p.Subscription, error) {
 	return n.Node.Subscribe(topic, AcceptAllTopicValidator(n.logger, n.codec))
 }
 

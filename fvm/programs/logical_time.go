@@ -14,7 +14,7 @@ import (
 // execution time.
 //
 // Normal transaction advances the time clock and must be committed to
-// BlockPrograms in monotonically increasing execution time order.
+// DerivedBlockData in monotonically increasing execution time order.
 //
 // Snapshot read transaction (aka script) does not advance the time clock.  Its
 // execution and snapshot time must be set to the latest snapshot time (or

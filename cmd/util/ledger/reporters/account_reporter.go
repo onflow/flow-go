@@ -137,11 +137,11 @@ type balanceProcessor struct {
 
 func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	vm := fvm.NewVirtualMachine()
-	blockPrograms := programs.NewEmptyBlockPrograms()
+	derivedBlockData := programs.NewEmptyDerivedBlockData()
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
-		fvm.WithBlockPrograms(blockPrograms))
+		fvm.WithDerivedBlockData(derivedBlockData))
 
 	v := view.NewChild()
 	txnState := state.NewTransactionState(
@@ -150,12 +150,12 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	)
 	accounts := environment.NewAccounts(txnState)
 
-	txnPrograms, err := blockPrograms.NewSnapshotReadTransactionPrograms(0, 0)
+	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(0, 0)
 	if err != nil {
 		panic(err)
 	}
 
-	env := fvm.NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
+	env := fvm.NewScriptEnv(context.Background(), ctx, txnState, derivedTxnData)
 
 	return &balanceProcessor{
 		vm:       vm,

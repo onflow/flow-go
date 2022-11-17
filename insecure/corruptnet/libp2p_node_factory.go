@@ -1,8 +1,13 @@
 package corruptnet
 
 import (
+	"context"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/host"
+	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
+
+	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/network/p2p"
 
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -24,6 +29,7 @@ func NewCorruptLibP2PNodeFactory(
 	idProvider module.IdentityProvider,
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
+	router *corrupt.GossipSubRouter,
 	peerScoringEnabled bool,
 	role string,
 	onInterceptPeerDialFilters,
@@ -51,6 +57,13 @@ func NewCorruptLibP2PNodeFactory(
 			connectionPruning,
 			updateInterval)
 		builder.SetCreateNode(NewCorruptLibP2PNode)
+		builder.SetGossipSubFactory(corruptibleGossipSubFactory(router))
 		return builder.Build()
+	}
+}
+
+func corruptibleGossipSubFactory(router *corrupt.GossipSubRouter) p2pbuilder.GossipSubFactoryFuc {
+	return func(ctx context.Context, host host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+		return corruptlibp2p.NewCorruptGossipSubAdapter(ctx, router, host, cfg)
 	}
 }

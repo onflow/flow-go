@@ -5,6 +5,7 @@ package middleware
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -12,6 +13,7 @@ import (
 
 	ggio "github.com/gogo/protobuf/io"
 	"github.com/ipfs/go-datastore"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2pnetwork "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -66,6 +68,11 @@ const (
 
 var (
 	_ network.Middleware = (*Middleware)(nil)
+
+	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
+	// the middleware receives a message via unicast but does not have a corresponding subscription for
+	// the channel in that message.
+	ErrUnicastMsgWithoutSub = errors.New("middleware does not have subscription for the channel ID indicated in the unicast message received")
 )
 
 // Middleware handles the input & output on the direct connections we have to
@@ -512,6 +519,24 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			return
 		}
 
+		channel := channels.Channel(msg.ChannelID)
+		topic := channels.TopicFromChannel(channel, m.rootBlockID)
+
+		// ignore messages if node does not have subscription to topic
+		if !m.libP2PNode.HasSubscription(topic) {
+			// msg type is not guaranteed to be correct since it is set by the client
+			_, what, err := codec.InterfaceFromMessageCode(msg.Payload[0])
+			if err != nil {
+				violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), MsgType: what, Channel: channel, IsUnicast: true, Err: err}
+				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+				return
+			}
+
+			violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), MsgType: what, Channel: channel, IsUnicast: true, Err: ErrUnicastMsgWithoutSub}
+			m.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
+			return
+		}
+
 		// check if unicast messages have reached rate limit before processing next message
 		if !m.unicastRateLimiters.MessageAllowed(remotePeer) {
 			return
@@ -551,7 +576,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	if channels.IsPublicChannel(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
 		// return true for every node.
-		peerFilter = p2putils.AllowAllPeerFilter()
+		peerFilter = p2p.AllowAllPeerFilter()
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
@@ -568,9 +593,14 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	if err != nil {
 		return fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
 	}
+	sub, ok := s.(*pubsub.Subscription)
+	if !ok {
+		// from this point on, we assume that the subscription is a pubsub.Subscription
+		m.log.Fatal().Str("topic", topic.String()).Msg("could not cast subscription to pubsub.Subscription")
+	}
 
 	// create a new readSubscription with the context of the middleware
-	rs := newReadSubscription(m.ctx, s, m.processAuthenticatedMessage, m.log, m.metrics)
+	rs := newReadSubscription(m.ctx, sub, m.processAuthenticatedMessage, m.log, m.metrics)
 	m.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages
