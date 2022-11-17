@@ -16,7 +16,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/transport"
-	discoveryRouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -32,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/dht"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -44,7 +42,9 @@ import (
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func() (p2p.LibP2PNode, error)
-type GossipSubFactoryFuc func(context.Context, host.Host, ...pubsub.Option) (p2p.PubSubAdapter, error)
+type GossipSubFactoryFuc func(context.Context, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)
+type CreateNodeFunc func(logger zerolog.Logger, host host.Host, pCache *p2pnode.ProtocolPeerCache, uniMgr *unicast.Manager, peerManager *connection.PeerManager) p2p.LibP2PNode
+type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
@@ -71,12 +71,8 @@ func DefaultLibP2PNodeFactory(
 
 // DefaultMessageIDFunction returns a default message ID function based on the message's data
 func DefaultMessageIDFunction(msg *pb.Message) string {
-	h := hash.NewSHA3_384()
-	_, _ = h.Write(msg.Data)
-	return h.SumHash().Hex()
+	return utils.MessageID(msg.Data)
 }
-
-type CreateNodeFunc func(logger zerolog.Logger, host host.Host, pCache *p2pnode.ProtocolPeerCache, uniMgr *unicast.Manager, peerManager *connection.PeerManager) p2p.LibP2PNode
 
 type NodeBuilder interface {
 	SetBasicResolver(madns.BasicResolver) NodeBuilder
@@ -104,6 +100,7 @@ type LibP2PNodeBuilder struct {
 	connGater                   connmgr.ConnectionGater
 	idProvider                  module.IdentityProvider
 	gossipSubFactory            GossipSubFactoryFuc
+	gossipSubConfigFunc         GossipSubAdapterConfigFunc
 	gossipSubPeerScoring        bool // whether to enable gossipsub peer scoring
 	routingFactory              func(context.Context, host.Host) (routing.Routing, error)
 	peerManagerEnablePruning    bool
@@ -119,12 +116,27 @@ func NewNodeBuilder(
 	sporkID flow.Identifier,
 ) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
-		logger:     logger,
-		sporkID:    sporkID,
-		addr:       addr,
-		networkKey: networkKey,
-		createNode: DefaultCreateNodeFunc,
+		logger:              logger,
+		sporkID:             sporkID,
+		addr:                addr,
+		networkKey:          networkKey,
+		createNode:          DefaultCreateNodeFunc,
+		gossipSubFactory:    defaultGossipSubFactory(),
+		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
 	}
+}
+
+func defaultGossipSubFactory() GossipSubFactoryFuc {
+	return func(ctx context.Context, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+		return p2pnode.NewGossipSubAdapter(ctx, h, cfg)
+	}
+}
+
+func defaultGossipSubAdapterConfig() GossipSubAdapterConfigFunc {
+	return func(cfg *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
+		return p2pnode.NewGossipSubAdapterConfig(cfg)
+	}
+
 }
 
 // SetBasicResolver sets the DNS resolver for the node.
@@ -256,41 +268,31 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 			node.SetRouting(rsys)
 
-			psOpts := append(
-				DefaultPubsubOptions(p2pnode.DefaultMaxPubSubMsgSize),
-				pubsub.WithDiscovery(discoveryRouting.NewRoutingDiscovery(rsys)),
-				pubsub.WithMessageIdFn(DefaultMessageIDFunction),
-			)
-
+			gossipSubConfigs := builder.gossipSubConfigFunc(&p2p.BasePubSubAdapterConfig{
+				MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
+			})
+			gossipSubConfigs.WithMessageIdFunction(utils.MessageID)
+			gossipSubConfigs.WithRoutingDiscovery(rsys)
 			if builder.subscriptionFilter != nil {
-				psOpts = append(psOpts, pubsub.WithSubscriptionFilter(builder.subscriptionFilter))
+				gossipSubConfigs.WithSubscriptionFilter(builder.subscriptionFilter)
 			}
 
 			var scoreOpt *scoring.ScoreOption
 			if builder.gossipSubPeerScoring {
 				scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider, builder.peerScoringParameterOptions...)
-				psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
+				gossipSubConfigs.WithScoreOption(scoreOpt)
 			}
 
-			var ps p2p.PubSubAdapter
-			if builder.gossipSubFactory != nil {
-				// builds GossipSub with the given factory
-				ps, err = builder.gossipSubFactory(ctx, h, psOpts...)
-				if err != nil {
-					ctx.Throw(fmt.Errorf("could not create gossipsub using injected factory: %w", err))
-				}
-			} else {
-				// builds GossipSub with the default factory
-				ps, err = p2pnode.NewGossipSubAdapter(ctx, h, psOpts...)
-				if err != nil {
-					ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
-				}
+			// builds GossipSub with the given factory
+			gossipSub, err := builder.gossipSubFactory(ctx, h, gossipSubConfigs)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
 			}
 
 			if scoreOpt != nil {
-				scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, ps))
+				scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, gossipSub))
 			}
-			node.SetPubSub(ps)
+			node.SetPubSub(gossipSub)
 
 			ready()
 			<-ctx.Done()
@@ -364,18 +366,6 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 	}
 
 	return options, nil
-}
-
-func DefaultPubsubOptions(maxPubSubMsgSize int) []pubsub.Option {
-	return []pubsub.Option{
-		// enforce message signing
-		pubsub.WithMessageSigning(true),
-		// enforce message signature verification
-		pubsub.WithStrictSignatureVerification(true),
-		// set max message size limit for 1-k PubSub messaging
-		pubsub.WithMaxMessageSize(maxPubSubMsgSize),
-		// no discovery
-	}
 }
 
 // DefaultCreateNodeFunc returns new libP2P node.
