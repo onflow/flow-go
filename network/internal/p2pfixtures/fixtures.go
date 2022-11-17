@@ -157,7 +157,7 @@ func MustEncodeEvent(t *testing.T, v interface{}, channel channels.Channel) []by
 }
 
 // SubMustReceiveMessage checks that the subscription have received the given message within the given timeout by the context.
-func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, sub *pubsub.Subscription) {
+func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, sub p2p.Subscription) {
 	received := make(chan struct{})
 	go func() {
 		msg, err := sub.Next(ctx)

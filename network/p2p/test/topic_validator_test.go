@@ -158,10 +158,10 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	defer cancel1s()
 
 	// sn1 gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, p2pfixtures.MustBePubSubSubscription(t, sub1))
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub1)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, p2pfixtures.MustBePubSubSubscription(t, sub2))
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub2)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 }
@@ -349,13 +349,13 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	require.NoError(t, err)
 
 	// sn1 gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, p2pfixtures.MustBePubSubSubscription(t, sub1))
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub1)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, p2pfixtures.MustBePubSubSubscription(t, sub2))
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub2)
 
 	// an1 also gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, p2pfixtures.MustBePubSubSubscription(t, sub3))
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub3)
 
 	timedCtx, cancel2s := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel2s()
@@ -368,7 +368,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	require.NoError(t, err)
 
 	// an1 receives its own message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data2, p2pfixtures.MustBePubSubSubscription(t, sub3))
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data2, sub3)
 
 	var wg sync.WaitGroup
 
@@ -533,13 +533,13 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	require.NoError(t, err)
 
 	// sn1 gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, p2pfixtures.MustBePubSubSubscription(t, sub1))
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub1)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, p2pfixtures.MustBePubSubSubscription(t, sub2))
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub2)
 
 	// an1 also gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, p2pfixtures.MustBePubSubSubscription(t, sub3))
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub3)
 
 	// "eject" sn2 to ensure messages published by ejected nodes get rejected
 	identity2.Ejected = true
@@ -625,11 +625,11 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	require.NoError(t, err)
 
 	// ln1 gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, p2pfixtures.MustBePubSubSubscription(t, sub1))
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, sub1)
 
 	// ln2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, p2pfixtures.MustBePubSubSubscription(t, sub2))
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, sub2)
 
 	// ln3 also gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, p2pfixtures.MustBePubSubSubscription(t, sub3))
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, sub3)
 }
