@@ -445,7 +445,8 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 
 	ss.comp.On("OnSyncedClusterBlock", mock.Anything).Run(func(args mock.Arguments) {
 		res := args.Get(0).(*events.SyncedClusterBlock)
-		ss.Assert().Equal(&processable, res.Block)
+		ss.Assert().Equal(processable.Header, res.Block.Header)
+		ss.Assert().Equal(processable.Payload, res.Block.Payload)
 		ss.Assert().Equal(originID, res.OriginID)
 	}).Return(nil)
 

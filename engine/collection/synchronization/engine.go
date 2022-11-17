@@ -306,7 +306,10 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 		}
 		synced := &events.SyncedClusterBlock{
 			OriginID: originID,
-			Block:    block,
+			Block: &messages.ClusterBlockProposal{
+				Header:  block.Header,
+				Payload: block.Payload,
+			},
 		}
 		// forward the block to the compliance engine for validation and processing
 		// we use the network.MessageProcessor interface here because the block is un-validated

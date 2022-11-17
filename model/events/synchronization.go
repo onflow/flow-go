@@ -1,8 +1,8 @@
 package events
 
 import (
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 )
 
 type SyncedBlock struct {
@@ -12,5 +12,5 @@ type SyncedBlock struct {
 
 type SyncedClusterBlock struct {
 	OriginID flow.Identifier
-	Block    *cluster.Block
+	Block    *messages.ClusterBlockProposal
 }

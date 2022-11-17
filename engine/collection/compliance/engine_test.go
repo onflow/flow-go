@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -169,7 +170,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < blockCount; i++ {
-			block := messages.ClusterBlockProposal{
+			block := &messages.ClusterBlockProposal{
 				Header:  unittest.BlockHeaderWithParentFixture(cs.head.Header),
 				Payload: unittest.ClusterPayloadFixture(1),
 			}
@@ -180,7 +181,10 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			cs.engine.OnClusterBlockProposal(&block)
+			cs.engine.OnClusterBlockProposal(&events.SyncedClusterBlock{
+				OriginID: unittest.IdentifierFixture(),
+				Block:    block,
+			})
 		}
 		wg.Done()
 	}()
@@ -199,7 +203,10 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		cs.engine.OnClusterBlockProposal(proposal)
+		cs.engine.OnClusterBlockProposal(&events.SyncedClusterBlock{
+			OriginID: unittest.IdentifierFixture(),
+			Block:    proposal,
+		})
 		wg.Done()
 	}()
 
