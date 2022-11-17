@@ -17,7 +17,7 @@ var _ p2p.PubSubAdapterConfig = (*GossipSubAdapterConfig)(nil)
 
 func NewGossipSubAdapterConfig(base *p2p.BasePubSubAdapterConfig) *GossipSubAdapterConfig {
 	return &GossipSubAdapterConfig{
-		options: append(defaultPubsubOptions(base)),
+		options: defaultPubsubOptions(base),
 	}
 }
 

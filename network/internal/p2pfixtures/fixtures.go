@@ -39,11 +39,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// Creating a node fixture with defaultAddress lets libp2p runs it on an
-// allocated port by OS. So after fixture created, its address would be
-// "0.0.0.0:<selected-port-by-os>
-const defaultAddress = "0.0.0.0:0"
-
 // NetworkingKeyFixtures is a test helper that generates a ECDSA flow key pair.
 func NetworkingKeyFixtures(t *testing.T) crypto.PrivateKey {
 	seed := unittest.SeedFixture(48)
