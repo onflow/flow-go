@@ -3,7 +3,7 @@ package collection
 import (
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 )
 
 // Compliance defines the interface to the cluster consensus logic that precedes hotstuff logic.
@@ -14,8 +14,7 @@ import (
 // components.
 // Implementation need to be non-blocking and concurrency safe.
 type Compliance interface {
-	module.ReadyDoneAware
-	module.Startable
+	component.Component
 
 	// OnClusterBlockProposal feeds a new block proposal into the processing pipeline.
 	// Incoming proposals will be queued and eventually dispatched by worker.
