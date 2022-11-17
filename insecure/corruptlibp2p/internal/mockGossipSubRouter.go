@@ -6,90 +6,90 @@ import (
 	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
 )
 
-type GossipSubRouterFixture struct {
-	Router *pubsub.GossipSubRouter
+type CorruptGossipSubRouter struct {
+	router *pubsub.GossipSubRouter
 }
 
-var _ pubsub.GossipPubSubRouter = (*GossipSubRouterFixture)(nil)
+var _ pubsub.GossipPubSubRouter = (*CorruptGossipSubRouter)(nil)
 
-func NewGossipSubRouterFixture() *GossipSubRouterFixture {
-	return &GossipSubRouterFixture{
-		Router: pubsub.DefaultGossipSubRouter(),
+func NewCorruptGossipSubRouter(router *pubsub.GossipSubRouter) *CorruptGossipSubRouter {
+	return &CorruptGossipSubRouter{
+		router: router,
 	}
 }
 
-func (m *GossipSubRouterFixture) Protocols() []protocol.ID {
-	return m.Router.Protocols()
+func (m *CorruptGossipSubRouter) Protocols() []protocol.ID {
+	return m.router.Protocols()
 }
 
-func (m *GossipSubRouterFixture) Attach(sub *pubsub.PubSub) {
-	m.Router.Attach(sub)
+func (m *CorruptGossipSubRouter) Attach(sub *pubsub.PubSub) {
+	m.router.Attach(sub)
 }
 
-func (m *GossipSubRouterFixture) AddPeer(pid peer.ID, protocolId protocol.ID) {
+func (m *CorruptGossipSubRouter) AddPeer(pid peer.ID, protocolId protocol.ID) {
 	m.AddPeer(pid, protocolId)
 }
 
-func (m *GossipSubRouterFixture) RemovePeer(pid peer.ID) {
+func (m *CorruptGossipSubRouter) RemovePeer(pid peer.ID) {
 	m.RemovePeer(pid)
 }
 
-func (m *GossipSubRouterFixture) EnoughPeers(topic string, suggested int) bool {
-	return m.Router.EnoughPeers(topic, suggested)
+func (m *CorruptGossipSubRouter) EnoughPeers(topic string, suggested int) bool {
+	return m.router.EnoughPeers(topic, suggested)
 }
 
-func (m *GossipSubRouterFixture) AcceptFrom(pid peer.ID) pubsub.AcceptStatus {
-	return m.Router.AcceptFrom(pid)
+func (m *CorruptGossipSubRouter) AcceptFrom(pid peer.ID) pubsub.AcceptStatus {
+	return m.router.AcceptFrom(pid)
 }
 
-func (m *GossipSubRouterFixture) HandleRPC(rpc *pubsub.RPC) {
-	m.Router.HandleRPC(rpc)
+func (m *CorruptGossipSubRouter) HandleRPC(rpc *pubsub.RPC) {
+	m.router.HandleRPC(rpc)
 }
 
-func (m *GossipSubRouterFixture) Publish(message *pubsub.Message) {
-	m.Router.Publish(message)
+func (m *CorruptGossipSubRouter) Publish(message *pubsub.Message) {
+	m.router.Publish(message)
 }
 
-func (m *GossipSubRouterFixture) Join(topic string) {
-	m.Router.Join(topic)
+func (m *CorruptGossipSubRouter) Join(topic string) {
+	m.router.Join(topic)
 }
 
-func (m *GossipSubRouterFixture) Leave(topic string) {
-	m.Router.Leave(topic)
+func (m *CorruptGossipSubRouter) Leave(topic string) {
+	m.router.Leave(topic)
 }
 
-func (m *GossipSubRouterFixture) SetPeerScore(score *pubsub.PeerScore) {
-	m.Router.SetPeerScore(score)
+func (m *CorruptGossipSubRouter) SetPeerScore(score *pubsub.PeerScore) {
+	m.router.SetPeerScore(score)
 }
 
-func (m *GossipSubRouterFixture) GetPeerScore() *pubsub.PeerScore {
-	return m.Router.GetPeerScore()
+func (m *CorruptGossipSubRouter) GetPeerScore() *pubsub.PeerScore {
+	return m.router.GetPeerScore()
 }
 
-func (m *GossipSubRouterFixture) SetPeerScoreThresholds(thresholds *pubsub.PeerScoreThresholds) {
-	m.Router.SetPeerScoreThresholds(thresholds)
+func (m *CorruptGossipSubRouter) SetPeerScoreThresholds(thresholds *pubsub.PeerScoreThresholds) {
+	m.router.SetPeerScoreThresholds(thresholds)
 }
 
-func (m *GossipSubRouterFixture) SetGossipTracer(tracer *pubsub.GossipTracer) {
-	m.Router.SetGossipTracer(tracer)
+func (m *CorruptGossipSubRouter) SetGossipTracer(tracer *pubsub.GossipTracer) {
+	m.router.SetGossipTracer(tracer)
 }
 
-func (m *GossipSubRouterFixture) GetGossipTracer() *pubsub.GossipTracer {
-	return m.Router.GetGossipTracer()
+func (m *CorruptGossipSubRouter) GetGossipTracer() *pubsub.GossipTracer {
+	return m.router.GetGossipTracer()
 }
 
-func (m *GossipSubRouterFixture) GetTagTracer() *pubsub.TagTracer {
-	return m.Router.GetTagTracer()
+func (m *CorruptGossipSubRouter) GetTagTracer() *pubsub.TagTracer {
+	return m.router.GetTagTracer()
 }
 
-func (m *GossipSubRouterFixture) SetDirectPeers(direct map[peer.ID]struct{}) {
-	m.Router.SetDirectPeers(direct)
+func (m *CorruptGossipSubRouter) SetDirectPeers(direct map[peer.ID]struct{}) {
+	m.router.SetDirectPeers(direct)
 }
 
-func (m *GossipSubRouterFixture) SetPeerGater(gater *pubsub.PeerGater) {
-	m.Router.SetPeerGater(gater)
+func (m *CorruptGossipSubRouter) SetPeerGater(gater *pubsub.PeerGater) {
+	m.router.SetPeerGater(gater)
 }
 
-func (m *GossipSubRouterFixture) GetPeerGater() *pubsub.PeerGater {
-	return m.Router.GetPeerGater()
+func (m *CorruptGossipSubRouter) GetPeerGater() *pubsub.PeerGater {
+	return m.router.GetPeerGater()
 }

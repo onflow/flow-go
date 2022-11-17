@@ -14,6 +14,7 @@ import (
 
 type CorruptGossipSubAdapter struct {
 	gossipSub *corrupt.PubSub
+	router    *internal.CorruptGossipSubRouter
 }
 
 var _ p2p.PubSubAdapter = (*CorruptGossipSubAdapter)(nil)
@@ -42,20 +43,28 @@ func (c *CorruptGossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return c.ListPeers(topic)
 }
 
-func NewCorruptGossipSubAdapter(ctx context.Context, router *corrupt.GossipSubRouter, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+func (c *CorruptGossipSubAdapter) GetRouter() *internal.CorruptGossipSubRouter {
+	return c.router
+}
+
+func NewCorruptGossipSubAdapter(ctx context.Context, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
 	gossipSubConfig, ok := cfg.(*internal.CorruptPubSubAdapterConfig)
 	if !ok {
 		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
 	}
 
-	gossipSub, err := corrupt.NewGossipSubWithRouter(ctx, h, router, gossipSubConfig.Build()...)
+	router, err := corrupt.DefaultGossipSubRouter(h)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossipsub router: %w", err)
+	}
+	corruptRouter := internal.NewCorruptGossipSubRouter(router)
+	gossipSub, err := corrupt.NewGossipSubWithRouter(ctx, h, corruptRouter, gossipSubConfig.Build()...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &CorruptGossipSubAdapter{
 		gossipSub: gossipSub,
+		router:    corruptRouter,
 	}, nil
 }
-
-var _ p2p.PubSubAdapter = (*CorruptGossipSubAdapter)(nil)
