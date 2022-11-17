@@ -48,7 +48,7 @@ func (c *CorruptGossipSubAdapter) GetRouter() *internal.CorruptGossipSubRouter {
 }
 
 func NewCorruptGossipSubAdapter(ctx context.Context, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
-	gossipSubConfig, ok := cfg.(*internal.CorruptPubSubAdapterConfig)
+	gossipSubConfig, ok := cfg.(*CorruptPubSubAdapterConfig)
 	if !ok {
 		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
 	}

@@ -7,7 +7,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
-	"github.com/onflow/flow-go/insecure/corruptnet/internal"
 	"github.com/onflow/flow-go/network/p2p"
 
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -69,6 +68,6 @@ func corruptibleGossipSubFactory() p2pbuilder.GossipSubFactoryFuc {
 
 func corruptibleGossipSubConfigFactory() p2pbuilder.GossipSubAdapterConfigFunc {
 	return func(base *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
-		return internal.NewCorruptPubSubAdapterConfig(base)
+		return corruptlibp2p.NewCorruptPubSubAdapterConfig(base)
 	}
 }

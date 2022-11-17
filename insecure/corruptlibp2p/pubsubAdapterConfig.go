@@ -1,4 +1,4 @@
-package internal
+package corruptlibp2p
 
 import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
