@@ -13,6 +13,14 @@ type CorruptPubSubAdapterConfig struct {
 	options []corrupt.Option
 }
 
+var _ p2p.PubSubAdapterConfig = (*CorruptPubSubAdapterConfig)(nil)
+
+func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig) *CorruptPubSubAdapterConfig {
+	return &CorruptPubSubAdapterConfig{
+		options: defaultCorruptPubsubOptions(base),
+	}
+}
+
 func (c *CorruptPubSubAdapterConfig) WithRoutingDiscovery(routing routing.ContentRouting) {
 	c.options = append(c.options, corrupt.WithDiscovery(discoveryRouting.NewRoutingDiscovery(routing)))
 }
@@ -34,8 +42,6 @@ func (c *CorruptPubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string
 func (c *CorruptPubSubAdapterConfig) Build() []corrupt.Option {
 	return c.options
 }
-
-var _ p2p.PubSubAdapterConfig = (*CorruptPubSubAdapterConfig)(nil)
 
 func defaultCorruptPubsubOptions(base *p2p.BasePubSubAdapterConfig) []corrupt.Option {
 	return []corrupt.Option{

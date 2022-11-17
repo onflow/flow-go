@@ -7,6 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
+	"github.com/onflow/flow-go/insecure/corruptnet/internal"
 	"github.com/onflow/flow-go/network/p2p"
 
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -55,7 +56,7 @@ func NewCorruptLibP2PNodeFactory(
 			connectionPruning,
 			updateInterval)
 		builder.SetCreateNode(NewCorruptLibP2PNode)
-		builder.SetGossipSubFactory(corruptibleGossipSubFactory())
+		builder.SetGossipSubFactory(corruptibleGossipSubFactory(), corruptibleGossipSubConfigFactory())
 		return builder.Build()
 	}
 }
@@ -63,5 +64,11 @@ func NewCorruptLibP2PNodeFactory(
 func corruptibleGossipSubFactory() p2pbuilder.GossipSubFactoryFuc {
 	return func(ctx context.Context, host host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
 		return corruptlibp2p.NewCorruptGossipSubAdapter(ctx, host, cfg)
+	}
+}
+
+func corruptibleGossipSubConfigFactory() p2pbuilder.GossipSubAdapterConfigFunc {
+	return func(base *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
+		return internal.NewCorruptPubSubAdapterConfig(base)
 	}
 }

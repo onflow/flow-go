@@ -84,7 +84,7 @@ type NodeBuilder interface {
 	SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder
 	EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
-	SetGossipSubFactory(f GossipSubFactoryFuc) NodeBuilder
+	SetGossipSubFactory(GossipSubFactoryFuc, GossipSubAdapterConfigFunc) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
 
@@ -195,8 +195,9 @@ func (builder *LibP2PNodeBuilder) SetCreateNode(f CreateNodeFunc) NodeBuilder {
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubFactory(f GossipSubFactoryFuc) NodeBuilder {
-	builder.gossipSubFactory = f
+func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf GossipSubFactoryFuc, cf GossipSubAdapterConfigFunc) NodeBuilder {
+	builder.gossipSubFactory = gf
+	builder.gossipSubConfigFunc = cf
 	return builder
 }
 
