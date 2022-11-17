@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"net"
 	"os"
 	"runtime"
 	"strings"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/integration/benchmark"
+	pb "github.com/onflow/flow-go/integration/benchmark/proto"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -59,15 +61,20 @@ const (
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
 
 	// Auto TPS scaling constants
-	additiveIncrease       = 50
-	multiplicativeDecrease = 0.8
+	additiveIncrease       = 100
+	multiplicativeDecrease = 0.9
 	adjustInterval         = 20 * time.Second
+
+	// gRPC constants
+	defaultMaxMsgSize  = 1024 * 1024 * 16 // 16 MB
+	defaultGRPCAddress = "127.0.0.1:4777"
 )
 
 func main() {
 	logLvl := flag.String("log-level", "info", "set log level")
 
 	// CI relevant flags
+	grpcAddressFlag := flag.String("grpc-address", defaultGRPCAddress, "listen address for gRPC server")
 	initialTPSFlag := flag.Int("initial-tps", 10, "starting transactions per second")
 	maxTPSFlag := flag.Int("max-tps", *initialTPSFlag, "maximum transactions per second allowed")
 	durationFlag := flag.Duration("duration", 10*time.Minute, "test duration")
@@ -103,6 +110,26 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	grpcServerOptions := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(defaultMaxMsgSize),
+		grpc.MaxSendMsgSize(defaultMaxMsgSize),
+	}
+	grpcServer := grpc.NewServer(grpcServerOptions...)
+	defer grpcServer.Stop()
+
+	pb.RegisterBenchmarkServer(grpcServer, &benchmarkServer{})
+
+	grpcListener, err := net.Listen("tcp", *grpcAddressFlag)
+	if err != nil {
+		log.Fatal().Err(err).Str("address", *grpcAddressFlag).Msg("failed to listen")
+	}
+
+	go func() {
+		if err := grpcServer.Serve(grpcListener); err != nil {
+			log.Fatal().Err(err).Msg("failed to serve")
+		}
+	}()
 
 	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
 	defer sp.Stop()
@@ -316,6 +343,7 @@ func adjustTPS(
 	lastTs := time.Now()
 	lastTPS := float64(minTPS)
 	lastTxs := uint(lg.GetTxExecuted())
+	lastTimedoutTxs := lg.GetTxTimedout()
 	for {
 		select {
 		// NOTE: not using a ticker here since adjusting worker count in SetTPS
@@ -323,6 +351,9 @@ func adjustTPS(
 		case nowTs := <-time.After(interval):
 			currentSentTxs := lg.GetTxSent()
 			currentTxs := uint(lg.GetTxExecuted())
+			currentTimedoutTxs := lg.GetTxTimedout()
+			// number of timed out transactions in the last interval
+			timedoutTxs := currentTimedoutTxs - lastTimedoutTxs
 
 			inflight := currentSentTxs - int(currentTxs)
 			inflightPerWorker := inflight / int(targetTPS)
@@ -336,6 +367,7 @@ func adjustTPS(
 				targetTPS,
 				inflight,
 				maxInflight,
+				timedoutTxs > 0,
 			)
 
 			if skip {
@@ -362,6 +394,7 @@ func adjustTPS(
 				Uint("targetTPS", boundedTPS).
 				Int("inflight", inflight).
 				Int("inflightPerWorker", inflightPerWorker).
+				Int("timedoutTxs", timedoutTxs).
 				Msg("adjusting TPS")
 
 			err := lg.SetTPS(boundedTPS)
@@ -370,6 +403,7 @@ func adjustTPS(
 			}
 
 			targetTPS = boundedTPS
+			lastTimedoutTxs = currentTimedoutTxs
 			//
 			// SetTPS is a blocking call, so we need to re-fetch the TxExecuted and time.
 			//
@@ -391,6 +425,7 @@ func computeTPS(
 	targetTPS uint,
 	inflight int,
 	maxInflight uint,
+	timedout bool,
 ) (bool, float64, uint) {
 	timeDiff := nowTs.Sub(lastTs).Seconds()
 	if timeDiff == 0 {
@@ -399,6 +434,12 @@ func computeTPS(
 
 	currentTPS := float64(currentTxs-lastTxs) / timeDiff
 	unboundedTPS := uint(math.Ceil(currentTPS))
+
+	// If there are timed out transactions we throttle regardless of anything else.
+	// We'll continue to throttle until the timed out transactions are gone.
+	if timedout {
+		return false, currentTPS, uint(float64(targetTPS) * multiplicativeDecrease)
+	}
 
 	// To avoid setting target TPS below current TPS,
 	// we decrease the former one by the multiplicativeDecrease factor.

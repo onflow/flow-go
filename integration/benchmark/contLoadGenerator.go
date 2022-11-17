@@ -367,6 +367,10 @@ func (lg *ContLoadGenerator) GetTxExecuted() int {
 	return lg.workerStatsTracker.GetTxExecuted()
 }
 
+func (lg *ContLoadGenerator) GetTxTimedout() int {
+	return lg.workerStatsTracker.GetTxTimedout()
+}
+
 func (lg *ContLoadGenerator) createAccounts(num int) error {
 	privKey := randomPrivateKey()
 	accountKey := flowsdk.NewAccountKey().
@@ -731,6 +735,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 			Dur("duration", time.Since(startTime)).
 			Int("availableAccounts", len(lg.availableAccounts)).
 			Msg("transaction lost")
+		lg.workerStatsTracker.IncTxTimedout()
 	}
 	lg.workerStatsTracker.IncTxExecuted()
 }
