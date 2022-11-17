@@ -35,6 +35,8 @@ type MsgAuthConfig struct {
 // Expected error returns during normal operations:
 //   - ErrUnauthorizedMessageOnChannel: the channel is not included in the message's list of authorized channels
 //   - ErrUnauthorizedRole: the role is not included in the message's list of authorized roles for the provided channel
+//   - ErrUnauthorizedUnicastOnChannel: the message is not authorized to be sent via unicast protocol.
+//   - ErrUnauthorizedPublishOnChannel: the message is not authorized to be sent via publish protocol.
 func (m MsgAuthConfig) EnsureAuthorized(role flow.Role, channel channels.Channel, protocol Protocol) error {
 	authConfig, ok := m.Config[channel]
 	if !ok {
