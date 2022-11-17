@@ -8,7 +8,7 @@ import (
 
 // Compliance defines the interface to the consensus logic that precedes hotstuff logic.
 // It's responsible for processing incoming block proposals broadcast by other consensus nodes
-// as well obtained via sync protocol.
+// as well as blocks obtained via the sync protocol.
 // Compliance logic performs validation of incoming blocks depending on internal implementation.
 // Main consensus logic performs full validation by checking headers and payloads.
 // Follower consensus logic checks header validity and by observing a valid QC can make a statement about

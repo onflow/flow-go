@@ -8,7 +8,7 @@ import (
 
 // Compliance defines the interface to the cluster consensus logic that precedes hotstuff logic.
 // It's responsible for processing incoming block proposals broadcast by other cluster consensus participants
-// as well obtained via sync protocol.
+// as well as blocks obtained via the chain sync protocol.
 // Compliance logic performs validation of incoming blocks by checking headers and payloads.
 // Compliance logic guarantees that only valid blocks are added to chain state, passed to hotstuff and other
 // components.
