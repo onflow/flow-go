@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
@@ -30,6 +29,7 @@ func NewCorruptLibP2PNodeFactory(
 	idProvider module.IdentityProvider,
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
+	router *corrupt.GossipSubRouter,
 	peerScoringEnabled bool,
 	role string,
 	onInterceptPeerDialFilters,
@@ -57,21 +57,13 @@ func NewCorruptLibP2PNodeFactory(
 			connectionPruning,
 			updateInterval)
 		builder.SetCreateNode(NewCorruptLibP2PNode)
-		builder.SetGossipSubFactory(corruptibleGossipSubFactory())
+		builder.SetGossipSubFactory(corruptibleGossipSubFactory(router))
 		return builder.Build()
 	}
 }
 
-func corruptibleGossipSubFactory() p2pbuilder.GossipSubFactoryFuc {
-	return func(ctx context.Context, host host.Host, options ...pubsub.Option) (p2p.PubSubAdapter, error) {
-		for _, option := range options {
-
-		}
-
-		ps, err := corrupt.NewGossipSubWithRouter(ctx, host, option...)
-		if err != nil {
-			return nil, err
-		}
-		return corruptlibp2p.NewCorruptPubSubAdapter(ps), nil
+func corruptibleGossipSubFactory(router *corrupt.GossipSubRouter) p2pbuilder.GossipSubFactoryFuc {
+	return func(ctx context.Context, host host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+		return corruptlibp2p.NewCorruptGossipSubAdapter(ctx, router, host, cfg)
 	}
 }
