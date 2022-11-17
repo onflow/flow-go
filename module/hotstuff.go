@@ -41,6 +41,7 @@ type HotStuff interface {
 //     in addition to the proposal.
 type HotStuffFollower interface {
 	ReadyDoneAware
+	Startable
 
 	// SubmitProposal feeds a new block proposal into the HotStuffFollower.
 	// This method blocks until the proposal is accepted to the event queue.
