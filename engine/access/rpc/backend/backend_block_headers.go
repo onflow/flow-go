@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -13,7 +14,7 @@ type backendBlockHeaders struct {
 	state   protocol.State
 }
 
-func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) {
+func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) {
 	var header *flow.Header
 	var err error
 
@@ -30,40 +31,49 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed
 		return nil, flow.BlockStatusUnknown, err
 	}
 
-	status := b.getBlockStatus(ctx, header)
+	status, err := b.getBlockStatus(header)
+	if err != nil {
+		return nil, status, err
+	}
 	return header, status, nil
 }
 
-func (b *backendBlockHeaders) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
+func (b *backendBlockHeaders) GetBlockHeaderByID(_ context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
 	header, err := b.headers.ByBlockID(id)
 	if err != nil {
 		err = convertStorageError(err)
 		return nil, flow.BlockStatusUnknown, err
 	}
 
-	status := b.getBlockStatus(ctx, header)
+	status, err := b.getBlockStatus(header)
+	if err != nil {
+		return nil, status, err
+	}
 	return header, status, nil
 }
 
-func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error) {
+func (b *backendBlockHeaders) GetBlockHeaderByHeight(_ context.Context, height uint64) (*flow.Header, flow.BlockStatus, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
 		err = convertStorageError(err)
 		return nil, flow.BlockStatusUnknown, err
 	}
 
-	status := b.getBlockStatus(ctx, header)
+	status, err := b.getBlockStatus(header)
+	if err != nil {
+		return nil, status, err
+	}
 	return header, status, nil
 }
 
-func (b *backendBlockHeaders) getBlockStatus(_ context.Context, header *flow.Header) flow.BlockStatus {
-	latest, err := b.state.Sealed().Head()
+func (b *backendBlockHeaders) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
+	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		return flow.BlockStatusUnknown
+		return flow.BlockStatusUnknown, fmt.Errorf("failed to find latest sealed header: %w", err)
 	}
 
-	if header.Height > latest.Height {
-		return flow.BlockStatusFinalized
+	if header.Height > sealed.Height {
+		return flow.BlockStatusFinalized, nil
 	}
-	return flow.BlockStatusSealed
+	return flow.BlockStatusSealed, nil
 }

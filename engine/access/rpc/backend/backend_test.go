@@ -144,13 +144,14 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	)
 
 	// query the handler for the latest finalized block
-	header, _, err := backend.GetLatestBlockHeader(context.Background(), false)
+	header, status, err := backend.GetLatestBlockHeader(context.Background(), false)
 	suite.checkResponse(header, err)
 
 	// make sure we got the latest block
 	suite.Require().Equal(block.ID(), header.ID())
 	suite.Require().Equal(block.Height, header.Height)
 	suite.Require().Equal(block.ParentID, header.ParentID)
+	suite.Require().Equal(status, flow.BlockStatusSealed)
 
 	suite.assertAllExpectations()
 
