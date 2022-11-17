@@ -7,7 +7,6 @@ import (
 	discoveryrouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
 type GossipSubAdapterConfig struct {
@@ -30,7 +29,7 @@ func (g *GossipSubAdapterConfig) WithSubscriptionFilter(filter p2p.SubscriptionF
 	g.options = append(g.options, pubsub.WithSubscriptionFilter(filter))
 }
 
-func (g *GossipSubAdapterConfig) WithScoreOption(option *scoring.ScoreOption) {
+func (g *GossipSubAdapterConfig) WithScoreOption(option p2p.ScoreOption) {
 	g.options = append(g.options, option.BuildFlowPubSubScoreOption())
 }
 

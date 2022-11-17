@@ -7,7 +7,6 @@ import (
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
 type CorruptPubSubAdapterConfig struct {
@@ -22,7 +21,7 @@ func (c *CorruptPubSubAdapterConfig) WithSubscriptionFilter(filter p2p.Subscript
 	c.options = append(c.options, corrupt.WithSubscriptionFilter(filter))
 }
 
-func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ *scoring.ScoreOption) {
+func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ p2p.ScoreOption) {
 	panic("courrpted gossipsub does not support score option")
 }
 

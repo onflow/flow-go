@@ -7,8 +7,6 @@ import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
-
-	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
 type PubSubAdapter interface {
@@ -22,7 +20,7 @@ type PubSubAdapter interface {
 type PubSubAdapterConfig interface {
 	WithRoutingDiscovery(routing.ContentRouting)
 	WithSubscriptionFilter(SubscriptionFilter)
-	WithScoreOption(*scoring.ScoreOption)
+	WithScoreOption(ScoreOption)
 	WithMessageIdFunction(f func([]byte) string)
 }
 
@@ -31,6 +29,10 @@ type Topic interface {
 	Close() error
 	Publish(context.Context, []byte) error
 	Subscribe() (Subscription, error)
+}
+
+type ScoreOption interface {
+	BuildFlowPubSubScoreOption() pubsub.Option
 }
 
 type Subscription interface {
