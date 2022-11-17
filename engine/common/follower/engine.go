@@ -245,7 +245,6 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 // processBlockProposal handles incoming block proposals.
 // No errors are expected during normal operations.
 func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
-
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
 	defer span.End()
 
