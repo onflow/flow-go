@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/rs/zerolog/log"
 
@@ -56,27 +55,26 @@ func (c *GetTransactionsCommand) Handler(ctx context.Context, req *admin.Command
 	return commands.ConvertToInterfaceList(blocks)
 }
 
-func usageErr(msg string) error {
-	return fmt.Errorf("required flags \"start-height\", \"end-height\", %s", msg)
-}
-
+// Returns admin.InvalidAdminReqError for invalid inputs
 func findUint64(input map[string]interface{}, field string) (uint64, error) {
 	data, ok := input[field]
 	if !ok {
-		return 0, usageErr(fmt.Sprintf("%s not set", field))
+		return 0, admin.NewInvalidAdminReqErrorf("missing required field '%s'", field)
 	}
 	val, err := parseN(data)
 	if err != nil {
-		return 0, usageErr(fmt.Sprintf("%s must be a uint64 value, but got %v: %v", field, data, err))
+		return 0, admin.NewInvalidAdminReqErrorf("invalid 'n' field: %w", err)
 	}
 
 	return uint64(val), nil
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (c *GetTransactionsCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return usageErr("invalid json")
+		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}
 
 	startHeight, err := findUint64(input, "start-height")
@@ -90,11 +88,11 @@ func (c *GetTransactionsCommand) Validator(req *admin.CommandRequest) error {
 	}
 
 	if endHeight < startHeight {
-		return fmt.Errorf("endHeight %v should not be smaller than startHeight %v", endHeight, startHeight)
+		return admin.NewInvalidAdminReqErrorf("endHeight %v should not be smaller than startHeight %v", endHeight, startHeight)
 	}
 
 	if endHeight-startHeight+1 > MAX_HEIGHT_RANGE {
-		return fmt.Errorf("getting transactions for more than %v blocks at a time might have an impact to node's performance", MAX_HEIGHT_RANGE)
+		return admin.NewInvalidAdminReqErrorf("getting transactions for more than %v blocks at a time might have an impact to node's performance and is not allowed", MAX_HEIGHT_RANGE)
 	}
 
 	req.ValidatorData = &getTransactionsReqData{
