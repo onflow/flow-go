@@ -175,7 +175,7 @@ func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []
 }
 
 // SubsMustReceiveMessage checks that all subscriptions receive the given message within the given timeout by the context.
-func SubsMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, subs []*pubsub.Subscription) {
+func SubsMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, subs []p2p.Subscription) {
 	for _, sub := range subs {
 		SubMustReceiveMessage(t, ctx, expectedMessage, sub)
 	}
@@ -280,7 +280,7 @@ func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA [
 func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
 	_, topic := messageFactory()
 
-	subs := make([]*pubsub.Subscription, len(nodes))
+	subs := make([]p2p.Subscription, len(nodes))
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
 	for i, node := range nodes {
 		ps, err := node.Subscribe(

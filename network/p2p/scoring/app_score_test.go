@@ -65,24 +65,22 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 
 	// all nodes subscribe to block topic (common topic among all roles)
 	// group one
-	groupOneSubs := make([]*pubsub.Subscription, len(groupOneNodes))
+	groupOneSubs := make([]p2p.Subscription, len(groupOneNodes))
+	var err error
 	for i, node := range groupOneNodes {
-		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
-		groupOneSubs[i] = p2pfixtures.MustBePubSubSubscription(t, sub)
+		groupOneSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 	}
 	// group two
-	groupTwoSubs := make([]*pubsub.Subscription, len(groupTwoNodes))
+	groupTwoSubs := make([]p2p.Subscription, len(groupTwoNodes))
 	for i, node := range groupTwoNodes {
-		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
-		groupTwoSubs[i] = p2pfixtures.MustBePubSubSubscription(t, sub)
+		groupTwoSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 	}
 	// access node group
-	accessNodeSubs := make([]*pubsub.Subscription, len(accessNodeGroup))
+	accessNodeSubs := make([]p2p.Subscription, len(accessNodeGroup))
 	for i, node := range accessNodeGroup {
-		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
-		accessNodeSubs[i] = p2pfixtures.MustBePubSubSubscription(t, sub)
+		accessNodeSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 	}
 
