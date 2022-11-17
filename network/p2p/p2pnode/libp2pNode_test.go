@@ -214,10 +214,10 @@ func TestNode_HasSubscription(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkID := unittest.IdentifierFixture()
-	node, _ := p2pfixtures.NodeFixture(t, sporkID, "test_has_subscription")
+	node, _ := p2ptest.NodeFixture(t, sporkID, "test_has_subscription")
 
-	p2pfixtures.StartNode(t, signalerCtx, node, 100*time.Millisecond)
-	defer p2pfixtures.StopNode(t, node, cancel, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx, node, 100*time.Millisecond)
+	defer p2ptest.StopNode(t, node, cancel, 100*time.Millisecond)
 
 	logger := unittest.Logger()
 	met := mock.NewNetworkMetrics(t)
