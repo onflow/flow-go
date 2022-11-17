@@ -11,7 +11,7 @@ type SpammerGossipSub struct {
 	router *pubsub.GossipSubRouter
 }
 
-func NewSpammerGossipSub(router *pubsub.GossipSubRouter) *SpammerGossipSub {
+func NewSpammerGossipSubRouter(router *pubsub.GossipSubRouter) *SpammerGossipSub {
 	return &SpammerGossipSub{
 		router: router,
 	}
