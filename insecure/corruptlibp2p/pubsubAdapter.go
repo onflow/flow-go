@@ -57,14 +57,14 @@ func NewCorruptGossipSubAdapter(ctx context.Context, h host.Host, cfg p2p.PubSub
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub router: %w", err)
 	}
-	corruptRouter := internal.NewCorruptGossipSubRouter(router)
-	gossipSub, err := corrupt.NewGossipSubWithRouter(ctx, h, corruptRouter, gossipSubConfig.Build()...)
+	// corruptRouter := internal.NewCorruptGossipSubRouter(router)
+	gossipSub, err := corrupt.NewGossipSubWithRouter(ctx, h, router, gossipSubConfig.Build()...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &CorruptGossipSubAdapter{
 		gossipSub: gossipSub,
-		router:    corruptRouter,
+		router:    nil,
 	}, nil
 }
