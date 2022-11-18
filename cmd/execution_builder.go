@@ -77,6 +77,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 const (
@@ -235,6 +236,18 @@ func (exeNode *ExecutionNode) LoadSystemSpecs(node *NodeConfig) error {
 
 func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 	exeNode.collector = metrics.NewExecutionCollector(node.Tracer)
+
+	// report the highest executed block height as soon as possible
+	// this is guaranteed to exist because LoadBootstrapper has inserted
+	// the root block as executed block
+	var height uint64
+	var blockID flow.Identifier
+	err := node.DB.View(procedure.GetHighestExecutedBlock(&height, &blockID))
+	if err != nil {
+		return fmt.Errorf("could not get highest executed block: %w", err)
+	}
+
+	exeNode.collector.ExecutionLastExecutedBlockHeight(height)
 	return nil
 }
 
