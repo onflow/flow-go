@@ -208,6 +208,7 @@ type ExecutionNode struct {
 	ExecutionEngine     *ComputerWrap
 	RequestEngine       *requester.Engine
 	ReceiptsEngine      *executionprovider.Engine
+	FollowerCore        module.HotStuffFollower
 	FollowerEngine      *followereng.Engine
 	SyncEngine          *synchronization.Engine
 	Compactor           *complete.Compactor
@@ -227,11 +228,14 @@ func (en ExecutionNode) Ready(ctx context.Context) {
 	// new interface.
 	irctx, _ := irrecoverable.WithSignaler(ctx)
 	en.ReceiptsEngine.Start(irctx)
+	en.FollowerCore.Start(irctx)
+	en.FollowerEngine.Start(irctx)
 
 	<-util.AllReady(
 		en.Ledger,
 		en.ReceiptsEngine,
 		en.IngestionEngine,
+		en.FollowerCore,
 		en.FollowerEngine,
 		en.RequestEngine,
 		en.SyncEngine,
@@ -248,6 +252,7 @@ func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
 		en.IngestionEngine,
 		en.ReceiptsEngine,
 		en.Ledger,
+		en.FollowerCore,
 		en.FollowerEngine,
 		en.RequestEngine,
 		en.SyncEngine,

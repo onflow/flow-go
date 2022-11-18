@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	"github.com/onflow/flow-go/model/cluster"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -57,7 +57,7 @@ type MessageHubSuite struct {
 	hotstuff          *module.HotStuff
 	voteAggregator    *hotstuff.VoteAggregator
 	timeoutAggregator *hotstuff.TimeoutAggregator
-	compliance        *mocknetwork.MessageProcessor
+	compliance        *mockcollection.Compliance
 	snapshot          *clusterstate.Snapshot
 
 	ctx    irrecoverable.SignalerContext
@@ -88,7 +88,7 @@ func (s *MessageHubSuite) SetupTest() {
 	s.hotstuff = module.NewHotStuff(s.T())
 	s.voteAggregator = hotstuff.NewVoteAggregator(s.T())
 	s.timeoutAggregator = hotstuff.NewTimeoutAggregator(s.T())
-	s.compliance = mocknetwork.NewMessageProcessor(s.T())
+	s.compliance = mockcollection.NewCompliance(s.T())
 
 	// set up proto state mock
 	protoEpoch := &protocol.Epoch{}
@@ -188,20 +188,17 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
 		block := unittest.ClusterBlockFixture()
-		syncedBlockMsg := &events.SyncedClusterBlock{
-			OriginID: originID,
-			Block:    &block,
-		}
-		s.compliance.On("Process", channel, s.myID, syncedBlockMsg).Return(nil).Once()
-		err := s.hub.Process(channel, originID, syncedBlockMsg)
-		require.NoError(s.T(), err)
 
 		blockProposalMsg := &messages.ClusterBlockProposal{
 			Header:  block.Header,
 			Payload: block.Payload,
 		}
-		s.compliance.On("Process", channel, s.myID, blockProposalMsg).Return(nil).Once()
-		err = s.hub.Process(channel, originID, blockProposalMsg)
+		expectedComplianceMsg := flow.Slashable[messages.ClusterBlockProposal]{
+			OriginID: originID,
+			Message:  blockProposalMsg,
+		}
+		s.compliance.On("OnClusterBlockProposal", expectedComplianceMsg).Return(nil).Once()
+		err := s.hub.Process(channel, originID, blockProposalMsg)
 		require.NoError(s.T(), err)
 	})
 	s.Run("to-vote-aggregator", func() {
