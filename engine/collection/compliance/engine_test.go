@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -165,17 +164,12 @@ func (cs *EngineSuite) TearDownTest() {
 // TestSubmittingMultipleVotes tests that we can send multiple votes and they
 // are queued and processed in expected way
 func (cs *EngineSuite) TestSubmittingMultipleEntries() {
-	// create a vote
-	originID := unittest.IdentifierFixture()
 	blockCount := 15
-
-	channel := channels.ConsensusCluster(cs.clusterID)
-
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		for i := 0; i < blockCount; i++ {
-			block := messages.ClusterBlockProposal{
+			block := &messages.ClusterBlockProposal{
 				Header:  unittest.BlockHeaderWithParentFixture(cs.head.Header),
 				Payload: unittest.ClusterPayloadFixture(1),
 			}
@@ -186,14 +180,16 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			_ = cs.engine.Process(channel, originID, &block)
+			cs.engine.OnClusterBlockProposal(flow.Slashable[messages.ClusterBlockProposal]{
+				OriginID: unittest.IdentifierFixture(),
+				Message:  block,
+			})
 		}
 		wg.Done()
 	}()
 	wg.Add(1)
 	go func() {
 		// create a proposal that directly descends from the latest finalized header
-		originID := cs.cluster[1].NodeID
 		block := unittest.ClusterBlockWithParent(cs.head)
 		proposal := &messages.ClusterBlockProposal{
 			Header:  block.Header,
@@ -206,8 +202,10 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		err := cs.engine.Process(channel, originID, proposal)
-		cs.Assert().NoError(err)
+		cs.engine.OnClusterBlockProposal(flow.Slashable[messages.ClusterBlockProposal]{
+			OriginID: unittest.IdentifierFixture(),
+			Message:  proposal,
+		})
 		wg.Done()
 	}()
 
@@ -215,17 +213,8 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 
 	// wait for the votes queue to drain
 	assert.Eventually(cs.T(), func() bool {
-		return cs.engine.pendingBlocks.(*engine.FifoMessageStore).Len() == 0
+		return cs.engine.pendingBlocks.Len() == 0
 	}, time.Second, time.Millisecond*10)
-}
-
-// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
-// was submitted from network layer.
-func (cs *EngineSuite) TestProcessUnsupportedMessageType() {
-	invalidEvent := uint64(42)
-	err := cs.engine.Process("ch", unittest.IdentifierFixture(), invalidEvent)
-	// shouldn't result in error since byzantine inputs are expected
-	require.NoError(cs.T(), err)
 }
 
 // TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.

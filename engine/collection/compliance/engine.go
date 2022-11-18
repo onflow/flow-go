@@ -7,9 +7,9 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -17,8 +17,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -28,17 +26,17 @@ const defaultBlockQueueCapacity = 10_000
 
 // Engine is a wrapper struct for `Core` which implements cluster consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
+// Implements collection.Compliance interface.
 type Engine struct {
-	log      zerolog.Logger
-	metrics  module.EngineMetrics
-	me       module.Local
-	headers  storage.Headers
-	payloads storage.ClusterPayloads
-	state    protocol.State
-	core     *Core
-	// queues for inbound messages
-	pendingBlocks  engine.MessageStore
-	messageHandler *engine.MessageHandler
+	log                   zerolog.Logger
+	metrics               module.EngineMetrics
+	me                    module.Local
+	headers               storage.Headers
+	payloads              storage.ClusterPayloads
+	state                 protocol.State
+	core                  *Core
+	pendingBlocks         *fifoqueue.FifoQueue // queue for processing inbound blocks
+	pendingBlocksNotifier engine.Notifier
 	// tracking finalized view
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
@@ -47,8 +45,7 @@ type Engine struct {
 	component.Component
 }
 
-var _ network.MessageProcessor = (*Engine)(nil)
-var _ component.Component = (*Engine)(nil)
+var _ collection.Compliance = (*Engine)(nil)
 
 func NewEngine(
 	log zerolog.Logger,
@@ -67,46 +64,8 @@ func NewEngine(
 		}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
+		return nil, fmt.Errorf("failed to create queue for inbound block proposals: %w", err)
 	}
-	pendingBlocks := &engine.FifoMessageStore{FifoQueue: blocksQueue}
-
-	// define message queueing behaviour
-	handler := engine.NewMessageHandler(
-		engineLog,
-		engine.NewNotifier(),
-		engine.Pattern{
-			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.ClusterBlockProposal)
-				if ok {
-					core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
-				}
-				return ok
-			},
-			Store: pendingBlocks,
-		},
-		engine.Pattern{
-			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*events.SyncedClusterBlock)
-				if ok {
-					core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
-				}
-				return ok
-			},
-			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				syncedBlock := msg.Payload.(*events.SyncedClusterBlock)
-				msg = &engine.Message{
-					OriginID: msg.OriginID,
-					Payload: &messages.ClusterBlockProposal{
-						Header:  syncedBlock.Block.Header,
-						Payload: syncedBlock.Block.Payload,
-					},
-				}
-				return msg, true
-			},
-			Store: pendingBlocks,
-		},
-	)
 
 	eng := &Engine{
 		log:                        engineLog,
@@ -116,8 +75,8 @@ func NewEngine(
 		payloads:                   payloads,
 		state:                      state,
 		core:                       core,
-		pendingBlocks:              pendingBlocks,
-		messageHandler:             handler,
+		pendingBlocks:              blocksQueue,
+		pendingBlocksNotifier:      engine.NewNotifier(),
 		finalizationEventsNotifier: engine.NewNotifier(),
 	}
 
@@ -178,26 +137,12 @@ func (e *Engine) Done() <-chan struct{} {
 	return util.AllDone(e.cm, e.core.hotstuff)
 }
 
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	err := e.messageHandler.Process(originID, event)
-	if err != nil {
-		if engine.IsIncompatibleInputTypeError(err) {
-			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
-			return nil
-		}
-		return fmt.Errorf("unexpected error while processing engine message: %w", err)
-	}
-	return nil
-}
-
-// processBlocksLoop processes available block, vote, and timeout messages as they are queued.
+// processBlocksLoop processes available blocks as they are queued.
 func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	doneSignal := ctx.Done()
-	newMessageSignal := e.messageHandler.GetNotifier()
+	newMessageSignal := e.pendingBlocksNotifier.Channel()
 	for {
 		select {
 		case <-doneSignal:
@@ -222,9 +167,10 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 		default:
 		}
 
-		msg, ok := e.pendingBlocks.Get()
+		msg, ok := e.pendingBlocks.Pop()
 		if ok {
-			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.ClusterBlockProposal))
+			inBlock := msg.(flow.Slashable[messages.ClusterBlockProposal])
+			err := e.core.OnBlockProposal(inBlock.OriginID, inBlock.Message)
 			if err != nil {
 				return fmt.Errorf("could not handle block proposal: %w", err)
 			}
@@ -245,6 +191,24 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	if e.finalizedView.Set(block.View) {
 		e.finalizationEventsNotifier.Notify()
+	}
+}
+
+// OnClusterBlockProposal feeds a new block proposal into the processing pipeline.
+// Incoming proposals are queued and eventually dispatched by worker.
+func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[messages.ClusterBlockProposal]) {
+	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
+	if e.pendingBlocks.Push(proposal) {
+		e.pendingBlocksNotifier.Notify()
+	}
+}
+
+// OnSyncedClusterBlock feeds a block obtained from sync proposal into the processing pipeline.
+// Incoming proposals are queued and eventually dispatched by worker.
+func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[messages.ClusterBlockProposal]) {
+	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
+	if e.pendingBlocks.Push(syncedBlock) {
+		e.pendingBlocksNotifier.Notify()
 	}
 }
 

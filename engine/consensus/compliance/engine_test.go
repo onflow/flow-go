@@ -12,11 +12,10 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -67,14 +66,13 @@ func (cs *EngineSuite) TearDownTest() {
 // are queued and processed in expected way
 func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	// create a vote
-	originID := unittest.IdentifierFixture()
 	blockCount := 15
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		for i := 0; i < blockCount; i++ {
-			block := messages.BlockProposal{
+			block := &messages.BlockProposal{
 				Header: unittest.BlockWithParentFixture(cs.head).Header,
 			}
 			cs.headerDB[block.Header.ParentID] = cs.head
@@ -83,15 +81,16 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			err := cs.engine.Process(channels.ConsensusCommittee, originID, &block)
-			cs.Assert().NoError(err)
+			cs.engine.OnBlockProposal(flow.Slashable[messages.BlockProposal]{
+				OriginID: unittest.IdentifierFixture(),
+				Message:  block,
+			})
 		}
 		wg.Done()
 	}()
 	wg.Add(1)
 	go func() {
 		// create a proposal that directly descends from the latest finalized header
-		originID := cs.participants[1].NodeID
 		block := unittest.BlockWithParentFixture(cs.head)
 		proposal := unittest.ProposalFromBlock(block)
 
@@ -101,8 +100,10 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		err := cs.engine.Process(channels.ConsensusCommittee, originID, proposal)
-		cs.Assert().NoError(err)
+		cs.engine.OnBlockProposal(flow.Slashable[messages.BlockProposal]{
+			OriginID: unittest.IdentifierFixture(),
+			Message:  proposal,
+		})
 		wg.Done()
 	}()
 
@@ -110,7 +111,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	wg.Wait()
 	// wait for the votes queue to drain
 	assert.Eventually(cs.T(), func() bool {
-		return cs.engine.pendingBlocks.(*engine.FifoMessageStore).Len() == 0
+		return cs.engine.pendingBlocks.Len() == 0
 	}, time.Second, time.Millisecond*10)
 }
 

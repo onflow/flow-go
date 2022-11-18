@@ -197,7 +197,6 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 			WithStopCondition(ViewReached(finalView)),
 			WithOutgoingVotes(BlockAllVotes),
 			WithOutgoingProposals(BlockAllProposals),
-			WithIncomingProposals(BlockAllProposals),
 		)
 		instances = append(instances, in)
 	}

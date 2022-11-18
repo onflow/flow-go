@@ -12,8 +12,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -86,7 +86,7 @@ type MessageHub struct {
 	clusterIdentityFilter      flow.IdentityFilter
 
 	// injected dependencies
-	compliance        network.MessageProcessor   // handler of incoming block proposals
+	compliance        collection.Compliance      // handler of incoming block proposals
 	hotstuff          module.HotStuff            // used to submit proposals that were previously broadcast
 	voteAggregator    hotstuff.VoteAggregator    // handler of incoming votes
 	timeoutAggregator hotstuff.TimeoutAggregator // handler of incoming timeouts
@@ -100,7 +100,7 @@ var _ hotstuff.CommunicatorConsumer = (*MessageHub)(nil)
 func NewMessageHub(log zerolog.Logger,
 	net network.Network,
 	me module.Local,
-	compliance network.MessageProcessor,
+	compliance collection.Compliance,
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
@@ -424,10 +424,11 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 // No errors are expected during normal operations.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *events.SyncedClusterBlock:
-		return h.compliance.Process(channel, h.me.NodeID(), message)
 	case *messages.ClusterBlockProposal:
-		return h.compliance.Process(channel, h.me.NodeID(), message)
+		h.compliance.OnClusterBlockProposal(flow.Slashable[messages.ClusterBlockProposal]{
+			OriginID: originID,
+			Message:  msg,
+		})
 	case *messages.ClusterBlockVote:
 		h.forwardToOwnVoteAggregator(msg, originID)
 	case *messages.ClusterTimeoutObject:
