@@ -103,9 +103,9 @@ func (d *dummyOrchestrator) Register(orchestratorNetwork insecure.OrchestratorNe
 	d.orchestratorNetwork = orchestratorNetwork
 }
 
-// mustSeenFlowProtocolEvent checks the dummy orchestrator has passed through the flow protocol events with given ids. It fails
+// mustSeenEgressFlowProtocolEvent checks the dummy orchestrator has passed through the flow protocol events with given ids. It fails
 // if any entity is gone missing from sight of the orchestrator.
-func (d *dummyOrchestrator) mustSeenFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
+func (d *dummyOrchestrator) mustSeenEgressFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
 	events, ok := d.egressEventTracker[eventType]
 	require.Truef(t, ok, "unknown type: %s", eventType)
 

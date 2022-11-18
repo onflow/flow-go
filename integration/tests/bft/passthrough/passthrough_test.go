@@ -43,8 +43,8 @@ func (p *PassThroughTestSuite) TestSealingAndVerificationPassThrough() {
 
 	// as orchestrator controls the corrupted execution and verification nodes, it must see
 	// the execution receipts, chunk data pack requests and responses, as well as result approvals emitted by these nodes.
-	p.Orchestrator.mustSeenFlowProtocolEvent(p.T(), typeExecutionReceipt, flow.GetIDs(receipts)...)
-	p.Orchestrator.mustSeenFlowProtocolEvent(p.T(), typeChunkDataRequest, chunkIds...)
-	p.Orchestrator.mustSeenFlowProtocolEvent(p.T(), typeChunkDataResponse, chunkIds...)
-	p.Orchestrator.mustSeenFlowProtocolEvent(p.T(), typeResultApproval, flow.GetIDs(approvals)...)
+	p.Orchestrator.mustSeenEgressFlowProtocolEvent(p.T(), typeExecutionReceipt, flow.GetIDs(receipts)...)
+	p.Orchestrator.mustSeenEgressFlowProtocolEvent(p.T(), typeChunkDataRequest, chunkIds...)
+	p.Orchestrator.mustSeenEgressFlowProtocolEvent(p.T(), typeChunkDataResponse, chunkIds...)
+	p.Orchestrator.mustSeenEgressFlowProtocolEvent(p.T(), typeResultApproval, flow.GetIDs(approvals)...)
 }
