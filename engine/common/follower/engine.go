@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -29,12 +28,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
-
-// helper type used to pass originID and block through FIFO queue
-type inboundBlock struct {
-	originID flow.Identifier
-	block    *messages.BlockProposal
-}
 
 // defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
 const defaultBlockQueueCapacity = 10_000
@@ -149,23 +142,19 @@ func New(
 	return e, nil
 }
 
-// OnBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
-func (e *Engine) OnBlockProposal(proposal *messages.BlockProposal) {
+// OnBlockProposal errors when called since follower engine doesn't support direct ingestion via internal method.
+func (e *Engine) OnBlockProposal(_ flow.Slashable[messages.BlockProposal]) {
 	e.log.Error().Msg("received unexpected block proposal via internal method")
 }
 
 // OnSyncedBlock performs processing of incoming block by pushing into queue and notifying worker.
-func (e *Engine) OnSyncedBlock(synced *events.SyncedBlock) {
+func (e *Engine) OnSyncedBlock(synced flow.Slashable[messages.BlockProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
 	// a block that is synced has to come locally, from the synchronization engine
 	// the block itself will contain the proposer to indicate who created it
 
-	// queue as proposal
-	in := inboundBlock{synced.OriginID, &messages.BlockProposal{
-		Header:  synced.Block.Header,
-		Payload: synced.Block.Payload,
-	}}
-	if e.pendingBlocks.Push(in) {
+	// queue proposal
+	if e.pendingBlocks.Push(synced) {
 		e.pendingBlocksNotifier.Notify()
 	}
 }
@@ -174,10 +163,11 @@ func (e *Engine) OnSyncedBlock(synced *events.SyncedBlock) {
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *events.SyncedBlock:
-		return fmt.Errorf("synced blocks should be feed using dedicated interface")
 	case *messages.BlockProposal:
-		e.onBlockProposal(originID, msg)
+		e.onBlockProposal(flow.Slashable[messages.BlockProposal]{
+			OriginID: originID,
+			Message:  msg,
+		})
 	default:
 		e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
 	}
@@ -217,8 +207,8 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
-			in := msg.(inboundBlock)
-			err := e.processBlockProposal(in.originID, in.block)
+			in := msg.(flow.Slashable[messages.BlockProposal])
+			err := e.processBlockProposal(in.OriginID, in.Message)
 			if err != nil {
 				return fmt.Errorf("could not handle block proposal: %w", err)
 			}
@@ -233,11 +223,10 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 }
 
 // onBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
-func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) {
+func (e *Engine) onBlockProposal(proposal flow.Slashable[messages.BlockProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
-	// queue as proposal
-	in := inboundBlock{originID, proposal}
-	if e.pendingBlocks.Push(in) {
+	// queue proposal
+	if e.pendingBlocks.Push(proposal) {
 		e.pendingBlocksNotifier.Notify()
 	}
 }

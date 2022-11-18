@@ -2,6 +2,7 @@ package follower_test
 
 import (
 	"context"
+	"github.com/onflow/flow-go/model/messages"
 	"testing"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/common/follower"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -281,15 +281,6 @@ func (s *Suite) TestProcessSyncedBlock() {
 	block.Header.Height = 11
 	block.Header.ParentID = parent.ID()
 
-	syncedBlock := &events.SyncedBlock{
-		OriginID: unittest.IdentifierFixture(),
-		Block:    &block,
-	}
-
-	// using unsafe interface should result in error
-	err := s.engine.Process(channels.ReceiveBlocks, s.me.NodeID(), syncedBlock)
-	require.Error(s.T(), err)
-
 	// not in cache
 	s.cache.On("ByID", block.ID()).Return(nil, false).Once()
 	s.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
@@ -313,6 +304,12 @@ func (s *Suite) TestProcessSyncedBlock() {
 		close(done)
 	}).Once()
 
-	s.engine.OnSyncedBlock(syncedBlock)
+	s.engine.OnSyncedBlock(flow.Slashable[messages.BlockProposal]{
+		OriginID: unittest.IdentifierFixture(),
+		Message: &messages.BlockProposal{
+			Header:  block.Header,
+			Payload: block.Payload,
+		},
+	})
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
