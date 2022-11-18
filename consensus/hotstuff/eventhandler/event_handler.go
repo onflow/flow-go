@@ -231,11 +231,9 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 	}
 
 	// process TC, this might trigger view change
-	if lastViewTC != nil {
-		_, err = e.paceMaker.ProcessTC(lastViewTC)
-		if err != nil {
-			return fmt.Errorf("could not process TC for view %d: %w", lastViewTC.View, err)
-		}
+	_, err = e.paceMaker.ProcessTC(lastViewTC)
+	if err != nil {
+		return fmt.Errorf("could not process TC for view %d: %w", lastViewTC.View, err)
 	}
 
 	// by definition, we are allowed to produce timeout object if we have received partial TC for current view
