@@ -404,47 +404,28 @@ func (e *Engine) reloadBlock(
 		return fmt.Errorf("could not get block by ID: %v %w", blockID, err)
 	}
 
+	// enqueue the block and check if there is any missing collections
 	missingCollections, err := e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, false)
 
 	if err != nil {
 		return fmt.Errorf("could not enqueue block %x on reloading: %w", blockID, err)
 	}
 
-	height := block.Header.Height
-	fetched := false
-	for _, guarantee := range missingCollections {
-		// if we've requested this collection, we will store it in the storage,
-		// so check the storage to see whether we've seen it.
-		collection, err := e.collections.ByID(guarantee.CollectionID)
+	// forward the missing collections to requester engine for requesting them from collection nodes,
+	// adding the missing collections to mempool in order to trigger the block execution as soon as
+	// all missing collections are received.
+	err = e.fetchAndHandleCollection(blockID, block.Header.Height, missingCollections, func(collection *flow.Collection) error {
+		err := e.addCollectionToMempool(collection, blockByCollection)
 
-		if err == nil {
-			err = e.addCollectionToMempool(collection, blockByCollection)
-
-			if err != nil {
-				return fmt.Errorf("could not add collection to mempool: %w", err)
-			}
-
-			continue
-		}
-
-		// check if there was exception
-		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("error while querying for collection: %w", err)
-		}
-
-		err = e.fetchCollection(blockID, height, guarantee)
 		if err != nil {
-			return fmt.Errorf("could not fetch collection: %w", err)
+			return fmt.Errorf("could not add collection to mempool: %w", err)
 		}
-		fetched = true
-	}
+		return nil
+	})
 
-	// make sure that the requests are dispatched immediately by the requester
-	if fetched {
-		e.request.Force()
-		e.metrics.ExecutionCollectionRequestSent()
+	if err != nil {
+		return fmt.Errorf("could not fetch or handle collection %w", err)
 	}
-
 	return nil
 }
 
@@ -1329,6 +1310,28 @@ func GenerateExecutionReceipt(
 // forward them to mempool to process the collection, otherwise fetch the collections.
 // any error returned are exception
 func (e *Engine) addOrFetch(blockID flow.Identifier, height uint64, guarantees []*flow.CollectionGuarantee) error {
+	return e.fetchAndHandleCollection(blockID, height, guarantees, func(collection *flow.Collection) error {
+		err := e.mempool.BlockByCollection.Run(
+			func(backdata *stdmap.BlockByCollectionBackdata) error {
+				return e.addCollectionToMempool(collection, backdata)
+			})
+
+		if err != nil {
+			return fmt.Errorf("could not add collection to mempool: %w", err)
+		}
+		return nil
+	})
+}
+
+// addOrFetch checks if there are stored collections for the given guarantees, if there is,
+// forward them to the handler to process the collection, otherwise fetch the collections.
+// any error returned are exception
+func (e *Engine) fetchAndHandleCollection(
+	blockID flow.Identifier,
+	height uint64,
+	guarantees []*flow.CollectionGuarantee,
+	handleCollection func(*flow.Collection) error,
+) error {
 	fetched := false
 	for _, guarantee := range guarantees {
 		// if we've requested this collection, we will store it in the storage,
@@ -1336,13 +1339,10 @@ func (e *Engine) addOrFetch(blockID flow.Identifier, height uint64, guarantees [
 		collection, err := e.collections.ByID(guarantee.CollectionID)
 
 		if err == nil {
-			err = e.mempool.BlockByCollection.Run(
-				func(backdata *stdmap.BlockByCollectionBackdata) error {
-					return e.addCollectionToMempool(collection, backdata)
-				})
-
+			// we found the collection from storage, forward this collection to handler
+			err = handleCollection(collection)
 			if err != nil {
-				return fmt.Errorf("could not add collection to mempool: %w", err)
+				return fmt.Errorf("could not handle collection: %w", err)
 			}
 
 			continue
@@ -1393,6 +1393,7 @@ func (e *Engine) fetchCollection(blockID flow.Identifier, height uint64, guarant
 	// queue the collection to be requested from one of the guarantors
 	e.request.EntityByID(guarantee.ID(), filter.And(
 		filter.HasNodeID(guarantors...),
+		filter.OnlyDapper,
 	))
 
 	return nil
