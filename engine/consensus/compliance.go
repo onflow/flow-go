@@ -1,7 +1,7 @@
 package consensus
 
 import (
-	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/component"
 )
@@ -22,9 +22,9 @@ type Compliance interface {
 	// OnBlockProposal feeds a new block proposal into the processing pipeline.
 	// Incoming proposals will be queued and eventually dispatched by worker.
 	// This method is non-blocking.
-	OnBlockProposal(proposal *messages.BlockProposal)
+	OnBlockProposal(proposal flow.Slashable[messages.BlockProposal])
 	// OnSyncedBlock feeds a block obtained from sync proposal into the processing pipeline.
 	// Incoming proposals will be queued and eventually dispatched by worker.
 	// This method is non-blocking.
-	OnSyncedBlock(block *events.SyncedBlock)
+	OnSyncedBlock(block flow.Slashable[messages.BlockProposal])
 }

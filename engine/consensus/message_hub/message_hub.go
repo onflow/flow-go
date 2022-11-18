@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -459,10 +458,11 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 // No errors are expected during normal operations.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *events.SyncedBlock:
-		h.compliance.OnSyncedBlock(msg)
 	case *messages.BlockProposal:
-		h.compliance.OnBlockProposal(msg)
+		h.compliance.OnBlockProposal(flow.Slashable[messages.BlockProposal]{
+			OriginID: originID,
+			Message:  msg,
+		})
 	case *messages.BlockVote:
 		h.forwardToOwnVoteAggregator(msg, originID)
 	case *messages.TimeoutObject:

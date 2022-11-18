@@ -16,7 +16,6 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -176,20 +175,17 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
 		block := unittest.BlockFixture()
-		syncedBlockMsg := &events.SyncedBlock{
-			OriginID: originID,
-			Block:    &block,
-		}
-		s.compliance.On("OnSyncedBlock", syncedBlockMsg).Return(nil).Once()
-		err := s.hub.Process(channel, originID, syncedBlockMsg)
-		require.NoError(s.T(), err)
 
 		blockProposalMsg := &messages.BlockProposal{
 			Header:  block.Header,
 			Payload: block.Payload,
 		}
-		s.compliance.On("OnBlockProposal", blockProposalMsg).Return(nil).Once()
-		err = s.hub.Process(channel, originID, blockProposalMsg)
+		expectedComplianceMsg := flow.Slashable[messages.BlockProposal]{
+			OriginID: originID,
+			Message:  blockProposalMsg,
+		}
+		s.compliance.On("OnBlockProposal", expectedComplianceMsg).Return(nil).Once()
+		err := s.hub.Process(channel, originID, blockProposalMsg)
 		require.NoError(s.T(), err)
 	})
 	s.Run("to-vote-aggregator", func() {

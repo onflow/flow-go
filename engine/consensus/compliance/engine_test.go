@@ -2,6 +2,7 @@ package compliance
 
 import (
 	"context"
+	"github.com/onflow/flow-go/model/flow"
 	"sync"
 	"testing"
 	"time"
@@ -71,7 +72,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < blockCount; i++ {
-			block := messages.BlockProposal{
+			block := &messages.BlockProposal{
 				Header: unittest.BlockWithParentFixture(cs.head).Header,
 			}
 			cs.headerDB[block.Header.ParentID] = cs.head
@@ -80,7 +81,10 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			cs.engine.OnBlockProposal(&block)
+			cs.engine.OnBlockProposal(flow.Slashable[messages.BlockProposal]{
+				OriginID: unittest.IdentifierFixture(),
+				Message:  block,
+			})
 		}
 		wg.Done()
 	}()
@@ -96,7 +100,10 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		cs.engine.OnBlockProposal(proposal)
+		cs.engine.OnBlockProposal(flow.Slashable[messages.BlockProposal]{
+			OriginID: unittest.IdentifierFixture(),
+			Message:  proposal,
+		})
 		wg.Done()
 	}()
 

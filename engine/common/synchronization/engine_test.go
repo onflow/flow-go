@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -459,8 +458,9 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	res.Blocks = append(res.Blocks, &unprocessable)
 
 	ss.comp.On("OnSyncedBlock", mock.Anything).Run(func(args mock.Arguments) {
-		res := args.Get(0).(*events.SyncedBlock)
-		ss.Assert().Equal(&processable, res.Block)
+		res := args.Get(0).(flow.Slashable[messages.BlockProposal])
+		ss.Assert().Equal(processable.Header, res.Message.Header)
+		ss.Assert().Equal(processable.Payload, res.Message.Payload)
 		ss.Assert().Equal(originID, res.OriginID)
 	})
 

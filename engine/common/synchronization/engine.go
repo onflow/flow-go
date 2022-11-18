@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/chainsync"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -309,9 +308,12 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 			continue
 		}
 		// forward the block to the compliance engine for validation and processing
-		e.comp.OnSyncedBlock(&events.SyncedBlock{
+		e.comp.OnSyncedBlock(flow.Slashable[messages.BlockProposal]{
 			OriginID: originID,
-			Block:    block,
+			Message: &messages.BlockProposal{
+				Header:  block.Header,
+				Payload: block.Payload,
+			},
 		})
 	}
 }
