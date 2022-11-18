@@ -2,7 +2,6 @@ package follower_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/model/messages"
 	"testing"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
