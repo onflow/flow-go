@@ -123,13 +123,13 @@ func (on *Network) Observe(message *insecure.Message) {
 	}
 	if message.Egress != nil {
 		if err := on.processEgressMessage(message.Egress); err != nil {
-			on.logger.Fatal().Err(err).Msg("could not process egress message of corrupt node")
+			on.logger.Error().Err(err).Msg("could not process egress message of corrupt node")
 			return // return to avoid changing the behavior by tweaking the log level.
 		}
 	}
 	if message.Ingress != nil {
 		if err := on.processIngressMessage(message.Ingress); err != nil {
-			on.logger.Fatal().Err(err).Msg("could not process ingress message of corrupt node")
+			on.logger.Error().Err(err).Msg("could not process ingress message of corrupt node")
 			return // return to avoid changing the behavior by tweaking the log level.
 		}
 	}
