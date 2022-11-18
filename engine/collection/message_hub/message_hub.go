@@ -428,10 +428,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 	case *events.SyncedClusterBlock:
 		h.compliance.OnSyncedClusterBlock(msg)
 	case *messages.ClusterBlockProposal:
-		h.compliance.OnClusterBlockProposal(&events.SyncedClusterBlock{
-			OriginID: originID,
-			Block:    msg,
-		})
+		h.compliance.OnClusterBlockProposal(msg)
 	case *messages.ClusterBlockVote:
 		h.forwardToOwnVoteAggregator(msg, originID)
 	case *messages.ClusterTimeoutObject:

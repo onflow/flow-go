@@ -6,6 +6,8 @@ import (
 	events "github.com/onflow/flow-go/model/events"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
+	messages "github.com/onflow/flow-go/model/messages"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -31,7 +33,7 @@ func (_m *Compliance) Done() <-chan struct{} {
 }
 
 // OnClusterBlockProposal provides a mock function with given fields: proposal
-func (_m *Compliance) OnClusterBlockProposal(proposal *events.SyncedClusterBlock) {
+func (_m *Compliance) OnClusterBlockProposal(proposal *messages.ClusterBlockProposal) {
 	_m.Called(proposal)
 }
 

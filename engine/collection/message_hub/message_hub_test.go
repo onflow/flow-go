@@ -191,10 +191,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 		block := unittest.ClusterBlockFixture()
 		syncedBlockMsg := &events.SyncedClusterBlock{
 			OriginID: originID,
-			Block: &messages.ClusterBlockProposal{
-				Header:  block.Header,
-				Payload: block.Payload,
-			},
+			Block:    &block,
 		}
 		s.compliance.On("OnSyncedClusterBlock", syncedBlockMsg).Return(nil).Once()
 		err := s.hub.Process(channel, originID, syncedBlockMsg)
@@ -204,11 +201,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 			Header:  block.Header,
 			Payload: block.Payload,
 		}
-		expectedComplianceMsg := &events.SyncedClusterBlock{
-			OriginID: originID,
-			Block:    blockProposalMsg,
-		}
-		s.compliance.On("OnClusterBlockProposal", expectedComplianceMsg).Return(nil).Once()
+		s.compliance.On("OnClusterBlockProposal", blockProposalMsg).Return(nil).Once()
 		err = s.hub.Process(channel, originID, blockProposalMsg)
 		require.NoError(s.T(), err)
 	})
