@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/chainsync"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -304,9 +303,12 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 		if !e.core.HandleBlock(block.Header) {
 			continue
 		}
-		synced := &events.SyncedClusterBlock{
+		synced := flow.Slashable[messages.ClusterBlockProposal]{
 			OriginID: originID,
-			Block:    block,
+			Message: &messages.ClusterBlockProposal{
+				Header:  block.Header,
+				Payload: block.Payload,
+			},
 		}
 		// forward the block to the compliance engine for validation and processing
 		// we use the network.MessageProcessor interface here because the block is un-validated

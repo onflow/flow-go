@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	clustermodel "github.com/onflow/flow-go/model/cluster"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -444,8 +443,9 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	res.Blocks = append(res.Blocks, &unprocessable)
 
 	ss.comp.On("OnSyncedClusterBlock", mock.Anything).Run(func(args mock.Arguments) {
-		res := args.Get(0).(*events.SyncedClusterBlock)
-		ss.Assert().Equal(&processable, res.Block)
+		res := args.Get(0).(flow.Slashable[messages.ClusterBlockProposal])
+		ss.Assert().Equal(processable.Header, res.Message.Header)
+		ss.Assert().Equal(processable.Payload, res.Message.Payload)
 		ss.Assert().Equal(originID, res.OriginID)
 	}).Return(nil)
 
