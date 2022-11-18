@@ -397,9 +397,9 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 // it is a callback that gets called for each incoming stream by libp2p with a new stream object
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	// qualify the logger with local and remote address
-	log := p2putils.StreamLogger(m.log, s)
+	lg := p2putils.StreamLogger(m.log, s)
 
-	log.Info().Msg("incoming stream received")
+	lg.Info().Msg("incoming stream received")
 
 	success := false
 
@@ -409,12 +409,12 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		if success {
 			err := s.Close()
 			if err != nil {
-				log.Err(err).Msg("failed to close stream")
+				lg.Err(err).Msg("failed to close stream")
 			}
 		} else {
 			err := s.Reset()
 			if err != nil {
-				log.Err(err).Msg("failed to reset stream")
+				lg.Err(err).Msg("failed to reset stream")
 			}
 		}
 	}()
@@ -431,7 +431,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	err := s.SetReadDeadline(deadline)
 	if err != nil {
-		log.Err(err).Msg("failed to set read deadline for stream")
+		lg.Err(err).Msg("failed to set read deadline for stream")
 		return
 	}
 
@@ -440,6 +440,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	for {
 		if ctx.Err() != nil {
+			lg.Debug().Err(ctx.Err()).Msg("context error while reading message, aborting")
 			return
 		}
 
@@ -448,9 +449,9 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 		// read the next message (blocking call)
 		err = r.ReadMsg(&msg)
-
 		if err != nil {
 			if err == io.EOF {
+				lg.Debug().Err(err).Msg("stream closed by remote peer")
 				break
 			}
 
@@ -460,10 +461,14 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			return
 		}
 
+		lg.Debug().Msg("unicast message received successfully, awaiting processing")
+
 		m.wg.Add(1)
 		go func() {
 			defer m.wg.Done()
+			lg.Debug().Msg("processing unicast message")
 			m.processUnicastStreamMessage(remotePeer, &msg)
+			lg.Debug().Msg("unicast message processed")
 		}()
 	}
 

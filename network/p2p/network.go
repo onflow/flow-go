@@ -363,6 +363,11 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 	if err != nil {
 		return fmt.Errorf("failed to insert message in queue: %w", err)
 	}
+	n.logger.Debug().
+		Str("channel", message.ChannelID).
+		Str("payload_type", fmt.Sprintf("%T", decodedMsgPayload)).
+		Str("sender_id", senderID.String()).
+		Msg("received message inserted in queue")
 
 	return nil
 }
@@ -509,7 +514,7 @@ func (n *Network) sendOnChannel(channel channels.Channel, message interface{}, t
 func (n *Network) queueSubmitFunc(message interface{}) {
 	qm := message.(queue.QMessage)
 
-	logger := n.logger.With().
+	lg := n.logger.With().
 		Str("channel_id", qm.Target.String()).
 		Str("sender_id", qm.SenderID.String()).
 		Logger()
@@ -517,13 +522,13 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	eng, err := n.subscriptionManager.GetEngine(qm.Target)
 	if err != nil {
 		// This means the message was received on a channel that the node has not registered an engine for
-		logger.Err(err).
+		lg.Err(err).
 			Bool(logging.KeySuspicious, true).
 			Msg("failed to submit message")
 		return
 	}
 
-	logger.Debug().Msg("submitting message to engine")
+	lg.Debug().Msg("submitting message to engine")
 
 	n.metrics.MessageProcessingStarted(qm.Target.String())
 
@@ -533,8 +538,9 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 
 	err = eng.Process(qm.Target, qm.SenderID, qm.Payload)
 	if err != nil {
-		logger.Err(err).Msg("failed to process message")
+		lg.Err(err).Msg("engine failed to process message")
 	}
+	lg.Debug().Msg("message processed by engine")
 
 	n.metrics.MessageProcessingFinished(qm.Target.String(), time.Since(startTimestamp))
 }
