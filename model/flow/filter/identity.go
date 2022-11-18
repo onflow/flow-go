@@ -3,8 +3,6 @@
 package filter
 
 import (
-	"regexp"
-
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -49,14 +47,6 @@ func Not(filter flow.IdentityFilter) flow.IdentityFilter {
 // to HasNodeID, but for list-typed inputs.
 func In(list flow.IdentityList) flow.IdentityFilter {
 	return HasNodeID(list.NodeIDs()...)
-}
-
-var onlyDapperRegex = regexp.MustCompile(`.*onflow.org:3569$`)
-
-// OnlyDapper(Identity("verification-049.mainnet20.nodes.onflow.org:3569")) => true
-// OnlyDapper(Identity("verification-049.hello.org:3569")) => false
-func OnlyDapper(identity *flow.Identity) bool {
-	return onlyDapperRegex.MatchString(identity.Address)
 }
 
 // HasNodeID returns a filter that returns true for any identity with an ID
