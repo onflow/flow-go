@@ -51,7 +51,7 @@ func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *mode
 		Hex("block_id", logging.ID(block.BlockID)).
 		Hex("block_proposer_id", logging.ID(block.ProposerID)).
 		Time("block_time", block.Timestamp).
-		Uint64("qc_block_view", block.QC.View).
+		Uint64("qc_view", block.QC.View).
 		Hex("qc_block_id", logging.ID(block.QC.BlockID))
 
 	lastViewTC := proposal.LastViewTC
@@ -69,7 +69,7 @@ func (t *TelemetryConsumer) OnReceiveQc(currentView uint64, qc *flow.QuorumCerti
 	t.pathHandler.StartNextPath(currentView)
 	step := t.pathHandler.NextStep()
 	step.
-		Uint64("qc_block_view", qc.View).
+		Uint64("qc_view", qc.View).
 		Hex("qc_block_id", logging.ID(qc.BlockID))
 	step.Msg("OnReceiveQc")
 }
@@ -79,7 +79,7 @@ func (t *TelemetryConsumer) OnReceiveTc(currentView uint64, tc *flow.TimeoutCert
 	step := t.pathHandler.NextStep()
 	step.
 		Uint64("view", tc.View).
-		Uint64("newest_qc_block_view", tc.NewestQC.View).
+		Uint64("newest_qc_view", tc.NewestQC.View).
 		Hex("newest_qc_block_id", logging.ID(tc.NewestQC.BlockID))
 	step.Msg("OnReceiveTc")
 }
@@ -89,8 +89,8 @@ func (t *TelemetryConsumer) OnPartialTc(currentView uint64, partialTc *hotstuff.
 	step := t.pathHandler.NextStep()
 	step.
 		Uint64("view", partialTc.View).
-		Uint64("qc_block_view", partialTc.NewestQC.View).
-		Hex("qc_block_id", logging.ID(partialTc.NewestQC.BlockID))
+		Uint64("newest_qc_view", partialTc.NewestQC.View).
+		Hex("newest_qc_block_id", logging.ID(partialTc.NewestQC.BlockID))
 
 	lastViewTC := partialTc.LastViewTC
 	if lastViewTC != nil {
@@ -139,7 +139,7 @@ func (t *TelemetryConsumer) OnFinalizedBlock(block *model.Block) {
 
 func (t *TelemetryConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
 	t.pathHandler.NextStep().
-		Uint64("qc_block_view", qc.View).
+		Uint64("qc_view", qc.View).
 		Uint64("next_view", newView).
 		Hex("qc_block_id", qc.BlockID[:]).
 		Msg("OnQcTriggeredViewChange")
@@ -169,7 +169,7 @@ func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.Header, targetPublicati
 		Hex("block_id", logging.ID(proposal.ID())).
 		Hex("block_proposer_id", logging.ID(proposal.ProposerID)).
 		Time("block_time", proposal.Timestamp).
-		Uint64("qc_block_view", proposal.ParentView).
+		Uint64("qc_view", proposal.ParentView).
 		Hex("qc_block_id", logging.ID(proposal.ParentID)).
 		Time("targetPublicationTime", targetPublicationTime)
 	lastViewTC := proposal.LastViewTC

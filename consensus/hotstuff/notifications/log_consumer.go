@@ -60,7 +60,7 @@ func (lc *LogConsumer) OnReceiveQc(currentView uint64, qc *flow.QuorumCertificat
 	lc.log.Debug().
 		Uint64("cur_view", currentView).
 		Uint64("qc_view", qc.View).
-		Hex("qc_id", logging.ID(qc.BlockID)).
+		Hex("qc_block_id", logging.ID(qc.BlockID)).
 		Msg("processing QC")
 }
 
@@ -77,7 +77,7 @@ func (lc *LogConsumer) OnPartialTc(currentView uint64, partialTc *hotstuff.Parti
 	logger := lc.log.With().
 		Uint64("cur_view", currentView).
 		Uint64("view", partialTc.View).
-		Uint64("qc_block_view", partialTc.NewestQC.View).
+		Uint64("qc_view", partialTc.NewestQC.View).
 		Hex("qc_block_id", logging.ID(partialTc.NewestQC.BlockID))
 
 	lastViewTC := partialTc.LastViewTC
@@ -108,7 +108,7 @@ func (lc *LogConsumer) OnViewChange(oldView, newView uint64) {
 func (lc *LogConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
 	lc.log.Debug().
 		Uint64("qc_view", qc.View).
-		Hex("qc_id", qc.BlockID[:]).
+		Hex("qc_block_id", qc.BlockID[:]).
 		Uint64("new_view", newView).
 		Msg("QC triggered view change")
 }
@@ -179,7 +179,7 @@ func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *mode
 	if block.QC != nil {
 		loggerEvent.
 			Uint64("qc_view", block.QC.View).
-			Hex("qc_id", logging.ID(block.QC.BlockID))
+			Hex("qc_block_id", logging.ID(block.QC.BlockID))
 	}
 	return loggerEvent
 }
