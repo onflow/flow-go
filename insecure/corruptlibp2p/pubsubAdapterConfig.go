@@ -30,7 +30,7 @@ func (c *CorruptPubSubAdapterConfig) WithSubscriptionFilter(filter p2p.Subscript
 }
 
 func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ p2p.ScoreOption) {
-	panic("courrpted gossipsub does not support score option")
+	// Corrupt does not support score options. This is a no-op.
 }
 
 func (c *CorruptPubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
