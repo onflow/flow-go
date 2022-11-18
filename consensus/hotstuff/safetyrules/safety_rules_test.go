@@ -490,10 +490,16 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 
 	s.persister.AssertCalled(s.T(), "PutSafetyData", expectedSafetyData)
 
-	// producing timeout with same arguments should return cached version
+	// producing timeout with same arguments should return cached version but with incremented timeout tick
+	expectedSafetyData.LastTimeout = &model.TimeoutObject{}
+	*expectedSafetyData.LastTimeout = *expectedTimeout
+	expectedSafetyData.LastTimeout.TimeoutTick++
+	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
+
 	otherTimeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), timeout, otherTimeout)
+	require.Equal(s.T(), timeout.ID(), otherTimeout.ID())
+	require.Equal(s.T(), timeout.TimeoutTick+1, otherTimeout.TimeoutTick)
 
 	// to create new TO we need to provide a TC
 	lastViewTC := helper.MakeTC(helper.WithTCView(view),

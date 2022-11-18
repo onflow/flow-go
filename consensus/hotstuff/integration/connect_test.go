@@ -22,7 +22,7 @@ func Connect(t *testing.T, instances []*Instance) {
 	for _, sender := range instances {
 		sender := sender // avoid capturing loop variable in closure
 
-		*sender.notifier = MockedCommunicatorConsumer{}
+		*sender.notifier = *NewMockedCommunicatorConsumer()
 		sender.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(
 			func(args mock.Arguments) {
 				header, ok := args[0].(*flow.Header)
@@ -30,15 +30,11 @@ func Connect(t *testing.T, instances []*Instance) {
 
 				// sender should always have the parent
 				sender.updatingBlocks.RLock()
-				parent, exists := sender.headers[header.ParentID]
+				_, exists := sender.headers[header.ParentID]
 				sender.updatingBlocks.RUnlock()
 				if !exists {
 					t.Fatalf("parent for proposal not found (sender: %x, parent: %x)", sender.localID, header.ParentID)
 				}
-
-				// fill in the header chain ID and height
-				header.ChainID = parent.ChainID
-				header.Height = parent.Height + 1
 
 				// convert into proposal immediately
 				proposal := model.ProposalFromFlow(header)
@@ -81,25 +77,23 @@ func Connect(t *testing.T, instances []*Instance) {
 				// convert into vote
 				vote := model.VoteFromFlow(sender.localID, blockID, view, sigData)
 
-				// should never send to self
-				if recipientID == sender.localID {
-					t.Fatalf("can't send to self (sender: %x)", sender.localID)
-				}
-
-				// check if we should block the outgoing vote
-				if sender.blockVoteOut(vote) {
-					return
-				}
-
 				// get the receiver
 				receiver, exists := lookup[recipientID]
 				if !exists {
 					t.Fatalf("recipient doesn't exist (sender: %x, receiver: %x)", sender.localID, recipientID)
 				}
 
-				// check if e should block the incoming vote
-				if receiver.blockVoteIn(vote) {
-					return
+				// if we are next leader we should be receiving our own vote
+				if recipientID != sender.localID {
+					// check if we should block the outgoing vote
+					if sender.blockVoteOut(vote) {
+						return
+					}
+
+					// check if e should block the incoming vote
+					if receiver.blockVoteIn(vote) {
+						return
+					}
 				}
 
 				// submit the vote to the receiving event loop (non-blocking)

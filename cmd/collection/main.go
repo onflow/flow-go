@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/mempool/queue"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
@@ -58,6 +59,8 @@ func main() {
 		maxCollectionSize                 uint
 		maxCollectionByteSize             uint64
 		maxCollectionTotalGas             uint64
+		maxCollectionRequestCacheSize     uint32 // collection provider engine
+		collectionProviderWorkers         uint   // collection provider engine
 		builderExpiryBuffer               uint
 		builderPayerRateLimitDryRun       bool
 		builderPayerRateLimit             float64
@@ -142,7 +145,8 @@ func main() {
 		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
 			"cluster-compliance-skip-proposals-threshold", modulecompliance.DefaultConfig().SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height (cluster compliance engine)")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g (e.g 1996-04-24T15:04:05-07:00))")
-
+		flags.Uint32Var(&maxCollectionRequestCacheSize, "max-collection-provider-cache-size", provider.DefaultEntityRequestCacheSize, "maximum number of collection requests to cache for collection provider")
+		flags.UintVar(&collectionProviderWorkers, "collection-provider-workers", provider.DefaultRequestProviderWorkers, "number of workers to use for collection provider")
 		// epoch qc contract flags
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
@@ -259,7 +263,7 @@ func main() {
 			return mainConsensusCommittee, err
 		}).
 		Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// create a finalizer that will handling updating the protocol
+			// create a finalizer for updating the protocol
 			// state when the follower detects newly finalized blocks
 			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
@@ -380,7 +384,21 @@ func main() {
 				coll, err := node.Storage.Collections.ByID(collID)
 				return coll, err
 			}
-			return provider.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+
+			var collectionRequestMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if node.HeroCacheMetricsEnable {
+				collectionRequestMetrics = metrics.CollectionRequestsQueueMetricFactory(node.MetricsRegisterer)
+			}
+			collectionRequestQueue := queue.NewHeroStore(maxCollectionRequestCacheSize, node.Logger, collectionRequestMetrics)
+
+			return provider.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				collectionRequestQueue,
+				collectionProviderWorkers,
 				channels.ProvideCollections,
 				filter.HasRole(flow.RoleAccess, flow.RoleExecution),
 				retrieve,

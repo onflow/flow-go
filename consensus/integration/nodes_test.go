@@ -585,6 +585,11 @@ func createNode(
 		syncCore,
 		finalizedHeader,
 		idProvider,
+		func(cfg *synceng.Config) {
+			// use a small pool and scan interval for sync engine
+			cfg.ScanInterval = 500 * time.Millisecond
+			cfg.PollInterval = time.Second
+		},
 	)
 	require.NoError(t, err)
 

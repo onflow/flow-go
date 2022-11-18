@@ -158,7 +158,7 @@ func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
 //
 // TODO : When compacting the list of signers, update the return from []flow.Identifier
 // to a compact bit vector.
-func (w *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
+func (w *WeightedSignatureAggregator) Aggregate() (flow.IdentifierList, []byte, error) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 

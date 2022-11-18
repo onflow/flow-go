@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -20,12 +19,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
-
-// helper type used to pass originID and block through FIFO queue
-type inboundBlock struct {
-	originID flow.Identifier
-	block    *messages.ClusterBlockProposal
-}
 
 // defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.ClusterBlockProposal`s
 const defaultBlockQueueCapacity = 10_000
@@ -128,8 +121,8 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
-			inBlock := msg.(inboundBlock)
-			err := e.core.OnBlockProposal(inBlock.originID, inBlock.block)
+			inBlock := msg.(flow.Slashable[messages.ClusterBlockProposal])
+			err := e.core.OnBlockProposal(inBlock.OriginID, inBlock.Message)
 			if err != nil {
 				return fmt.Errorf("could not handle block proposal: %w", err)
 			}
@@ -155,25 +148,18 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 
 // OnClusterBlockProposal feeds a new block proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnClusterBlockProposal(proposal *messages.ClusterBlockProposal) {
+func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[messages.ClusterBlockProposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
-	if e.pendingBlocks.Push(inboundBlock{proposal.Header.ProposerID, proposal}) {
+	if e.pendingBlocks.Push(proposal) {
 		e.pendingBlocksNotifier.Notify()
 	}
 }
 
 // OnSyncedClusterBlock feeds a block obtained from sync proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnSyncedClusterBlock(syncedBlock *events.SyncedClusterBlock) {
+func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[messages.ClusterBlockProposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
-	inBlock := inboundBlock{
-		originID: syncedBlock.OriginID,
-		block: &messages.ClusterBlockProposal{
-			Payload: syncedBlock.Block.Payload,
-			Header:  syncedBlock.Block.Header,
-		},
-	}
-	if e.pendingBlocks.Push(inBlock) {
+	if e.pendingBlocks.Push(syncedBlock) {
 		e.pendingBlocksNotifier.Notify()
 	}
 }

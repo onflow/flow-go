@@ -14,12 +14,10 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/chainsync"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	synccore "github.com/onflow/flow-go/module/chainsync"
-	identifier "github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -47,7 +45,7 @@ type Engine struct {
 	pollInterval         time.Duration
 	scanInterval         time.Duration
 	core                 module.SyncCore
-	participantsProvider identifier.IdentifierProvider
+	participantsProvider module.IdentifierProvider
 	finalizedHeader      *FinalizedHeaderCache
 
 	requestHandler *RequestHandler // component responsible for handling requests
@@ -67,7 +65,7 @@ func New(
 	comp consensus.Compliance,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
-	participantsProvider identifier.IdentifierProvider,
+	participantsProvider module.IdentifierProvider,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 
@@ -310,9 +308,12 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 			continue
 		}
 		// forward the block to the compliance engine for validation and processing
-		e.comp.OnSyncedBlock(&events.SyncedBlock{
+		e.comp.OnSyncedBlock(flow.Slashable[messages.BlockProposal]{
 			OriginID: originID,
-			Block:    block,
+			Message: &messages.BlockProposal{
+				Header:  block.Header,
+				Payload: block.Payload,
+			},
 		})
 	}
 }

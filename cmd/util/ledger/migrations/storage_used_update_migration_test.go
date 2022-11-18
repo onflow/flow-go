@@ -29,7 +29,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		payload := []ledger.Payload{
 			// TODO (ramtin) add more registers
 			*ledger.NewPayload(
-				createAccountPayloadKey(address1, state2.KeyAccountStatus),
+				createAccountPayloadKey(address1, state2.AccountStatusKey),
 				status.ToBytes(),
 			),
 		}
@@ -48,7 +48,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		status.SetStorageUsed(10000)
 		payload := []ledger.Payload{
 			*ledger.NewPayload(
-				createAccountPayloadKey(address1, state2.KeyAccountStatus),
+				createAccountPayloadKey(address1, state2.AccountStatusKey),
 				status.ToBytes(),
 			),
 		}
@@ -67,7 +67,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		status.SetStorageUsed(40)
 		payload := []ledger.Payload{
 			*ledger.NewPayload(
-				createAccountPayloadKey(address1, state2.KeyAccountStatus),
+				createAccountPayloadKey(address1, state2.AccountStatusKey),
 				status.ToBytes(),
 			),
 		}
@@ -84,7 +84,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 	t.Run("error is storage used does not exist", func(t *testing.T) {
 		payload := []ledger.Payload{
 			*ledger.NewPayload(
-				createAccountPayloadKey(address1, state2.KeyAccountStatus),
+				createAccountPayloadKey(address1, state2.AccountStatusKey),
 				[]byte{1},
 			),
 		}

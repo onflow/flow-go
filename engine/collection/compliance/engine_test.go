@@ -163,7 +163,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < blockCount; i++ {
-			block := messages.ClusterBlockProposal{
+			block := &messages.ClusterBlockProposal{
 				Header:  unittest.BlockHeaderWithParentFixture(cs.head.Header),
 				Payload: unittest.ClusterPayloadFixture(1),
 			}
@@ -171,9 +171,13 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			cs.headerDB[block.Header.ParentID] = cs.head
 			hotstuffProposal := model.ProposalFromFlow(block.Header)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
+			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			cs.engine.OnClusterBlockProposal(&block)
+			cs.engine.OnClusterBlockProposal(flow.Slashable[messages.ClusterBlockProposal]{
+				OriginID: unittest.IdentifierFixture(),
+				Message:  block,
+			})
 		}
 		wg.Done()
 	}()
@@ -190,8 +194,12 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		cs.headerDB[block.Header.ParentID] = cs.head
 		hotstuffProposal := model.ProposalFromFlow(block.Header)
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
+		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		cs.engine.OnClusterBlockProposal(proposal)
+		cs.engine.OnClusterBlockProposal(flow.Slashable[messages.ClusterBlockProposal]{
+			OriginID: unittest.IdentifierFixture(),
+			Message:  proposal,
+		})
 		wg.Done()
 	}()
 

@@ -34,10 +34,10 @@ func (c *MetricsConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, ne
 	c.metrics.CountSkipped()
 }
 
-func (c *MetricsConsumer) OnReachedTimeout(info *model.TimerInfo) {
+func (c *MetricsConsumer) OnReachedTimeout(timeout model.TimerInfo) {
 	c.metrics.CountTimeout()
 }
 
-func (c *MetricsConsumer) OnStartingTimeout(info *model.TimerInfo) {
+func (c *MetricsConsumer) OnStartingTimeout(info model.TimerInfo) {
 	c.metrics.SetTimeout(info.Duration)
 }

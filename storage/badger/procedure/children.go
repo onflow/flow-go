@@ -44,10 +44,10 @@ func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(*badg
 		// children or not, we will either update the index or insert the index:
 		// when parent block doesn't exist, we will insert the block children.
 		// when parent block exists already, we will update the block children,
-		var childrenIDs []flow.Identifier
+		var childrenIDs flow.IdentifierList
 		err = operation.RetrieveBlockChildren(parentID, &childrenIDs)(tx)
 
-		var saveIndex func(blockID flow.Identifier, childrenIDs []flow.Identifier) func(*badger.Txn) error
+		var saveIndex func(blockID flow.Identifier, childrenIDs flow.IdentifierList) func(*badger.Txn) error
 		if errors.Is(err, storage.ErrNotFound) {
 			saveIndex = operation.InsertBlockChildren
 		} else if err != nil {
@@ -77,6 +77,6 @@ func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(*badg
 }
 
 // LookupBlockChildren looks up the IDs of all child blocks of the given parent block.
-func LookupBlockChildren(blockID flow.Identifier, childrenIDs *[]flow.Identifier) func(tx *badger.Txn) error {
+func LookupBlockChildren(blockID flow.Identifier, childrenIDs *flow.IdentifierList) func(tx *badger.Txn) error {
 	return operation.RetrieveBlockChildren(blockID, childrenIDs)
 }

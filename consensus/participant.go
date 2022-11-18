@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -33,18 +32,10 @@ func NewParticipant(
 	pending []*flow.Header,
 	modules *HotstuffModules,
 	options ...Option,
-) (module.HotStuff, error) {
+) (*eventloop.EventLoop, error) {
 
 	// initialize the default configuration
-	defTimeout := timeout.DefaultConfig
-	cfg := ParticipantConfig{
-		TimeoutMinimum:                      time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
-		TimeoutMaximum:                      time.Duration(defTimeout.MaxReplicaTimeout) * time.Millisecond,
-		TimeoutAdjustmentFactor:             defTimeout.TimeoutAdjustmentFactor,
-		HappyPathMaxRoundFailures:           defTimeout.HappyPathMaxRoundFailures,
-		BlockRateDelay:                      time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
-		MaxTimeoutObjectRebroadcastInterval: time.Duration(defTimeout.MaxTimeoutObjectRebroadcastInterval) * time.Millisecond,
-	}
+	cfg := DefaultParticipantConfig()
 
 	// apply the configuration options
 	for _, option := range options {
@@ -101,8 +92,6 @@ func NewParticipant(
 		modules.Forks,
 		modules.Persist,
 		modules.Committee,
-		modules.VoteAggregator,
-		modules.TimeoutAggregator,
 		safetyRules,
 		modules.Notifier,
 	)
@@ -119,6 +108,14 @@ func NewParticipant(
 	// add observer, event loop needs to receive events from distributor
 	modules.QCCreatedDistributor.AddConsumer(loop)
 	modules.TimeoutCollectorDistributor.AddConsumer(loop)
+
+	// register dynamically updatable configs
+	if cfg.Registrar != nil {
+		err = cfg.Registrar.RegisterDurationConfig("hotstuff-block-rate-delay", timeoutConfig.GetBlockRateDelay, timeoutConfig.SetBlockRateDelay)
+		if err != nil {
+			return nil, fmt.Errorf("failed to register block rate delay config: %w", err)
+		}
+	}
 
 	return loop, nil
 }

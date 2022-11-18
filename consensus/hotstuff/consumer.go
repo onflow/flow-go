@@ -107,14 +107,14 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnStartingTimeout(*model.TimerInfo)
+	OnStartingTimeout(model.TimerInfo)
 
 	// OnReachedTimeout notifications are produced by PaceMaker. Such a notification indicates that the
 	// PaceMaker's timeout was processed by the system. The specific timeout type is contained in the TimerInfo.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnReachedTimeout(timeout *model.TimerInfo)
+	OnReachedTimeout(timeout model.TimerInfo)
 
 	// OnQcIncorporated notifications are produced by ForkChoice
 	// whenever a quorum certificate is incorporated into the consensus state.

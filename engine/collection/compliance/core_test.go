@@ -202,6 +202,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 
 	hotstuffProposal := model.ProposalFromFlow(block.Header)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
 
 	// it should be processed without error
@@ -227,6 +228,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 
 	hotstuffProposal := model.ProposalFromFlow(block.Header)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 
 	// it should be processed without error
@@ -438,6 +440,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	for _, block := range []cluster.Block{parent, block1, block2, block3} {
 		hotstuffProposal := model.ProposalFromFlow(block.Header)
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 	}
 
@@ -514,6 +517,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 			cs.headerDB[header.BlockID] = proposalsLookup[header.BlockID]
 		},
 	)
+	cs.voteAggregator.On("AddBlock", mock.Anything).Times(4)
 	cs.validator.On("ValidateProposal", mock.Anything).Times(4).Return(nil)
 
 	missingProposal := &messages.ClusterBlockProposal{

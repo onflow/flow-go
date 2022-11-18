@@ -17,12 +17,12 @@ import (
 
 // pacemaker timeout
 // if your laptop is fast enough, 10 ms is enough
-const pmTimeout = 60 * time.Millisecond
+const pmTimeout = 100 * time.Millisecond
 
 // maxTimeoutRebroadcast specifies how often the PaceMaker rebroadcasts
 // its timeout object in case there is no progress. We keep the value
 // small so we have smaller latency
-const maxTimeoutRebroadcast = 60 * time.Millisecond
+const maxTimeoutRebroadcast = 1 * time.Second
 
 // If 2 nodes are down in a 7 nodes cluster, the rest of 5 nodes can
 // still make progress and reach consensus
@@ -78,7 +78,7 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	wg.Wait()
+	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
 
 	// check that all instances have the same finalized block
 	ref := instances[0]
@@ -147,7 +147,7 @@ func Test2TimeoutOutof4Instances(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	wg.Wait()
+	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
 
 	// check that all instances have the same finalized block
 	ref := instances[0]
@@ -197,7 +197,6 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 			WithStopCondition(ViewReached(finalView)),
 			WithOutgoingVotes(BlockAllVotes),
 			WithOutgoingProposals(BlockAllProposals),
-			WithIncomingProposals(BlockAllProposals),
 		)
 		instances = append(instances, in)
 	}
@@ -215,7 +214,7 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	wg.Wait()
+	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
 
 	// check that all instances have the same finalized block
 	ref := instances[0]
@@ -300,7 +299,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	wg.Wait()
+	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
 
 	// check that all instances have the same finalized block
 	ref := instances[0]
@@ -382,7 +381,7 @@ func TestAsyncClusterStartup(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	wg.Wait()
+	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
 
 	// check that all instances have the same finalized block
 	ref := instances[0]

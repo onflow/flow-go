@@ -20,10 +20,11 @@ type BlockVote struct {
 }
 
 // TimeoutObject is part of the consensus protocol and represents a consensus node
-// timing out in given round.
+// timing out in given round. Contains a sequential number for deduplication purposes.
 type TimeoutObject struct {
-	View       uint64
-	NewestQC   *flow.QuorumCertificate
-	LastViewTC *flow.TimeoutCertificate
-	SigData    []byte
+	TimeoutTick uint64
+	View        uint64
+	NewestQC    *flow.QuorumCertificate
+	LastViewTC  *flow.TimeoutCertificate
+	SigData     []byte
 }

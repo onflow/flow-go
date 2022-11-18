@@ -84,6 +84,14 @@ func (tb TransactionBody) ByteSize() uint {
 	return uint(size)
 }
 
+// InclusionEffort returns the inclusion effort of the transaction
+func (tb TransactionBody) InclusionEffort() uint64 {
+	// Hardcoded inclusion effort (of 1.0 UFix).
+	// Eventually this will be dynamic and will depend on the transaction properties
+	inclusionEffort := uint64(100_000_000)
+	return inclusionEffort
+}
+
 func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }

@@ -3,7 +3,7 @@
 package mock
 
 import (
-	events "github.com/onflow/flow-go/model/events"
+	flow "github.com/onflow/flow-go/model/flow"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
 	messages "github.com/onflow/flow-go/model/messages"
@@ -33,12 +33,12 @@ func (_m *Compliance) Done() <-chan struct{} {
 }
 
 // OnBlockProposal provides a mock function with given fields: proposal
-func (_m *Compliance) OnBlockProposal(proposal *messages.BlockProposal) {
+func (_m *Compliance) OnBlockProposal(proposal flow.Slashable[messages.BlockProposal]) {
 	_m.Called(proposal)
 }
 
 // OnSyncedBlock provides a mock function with given fields: block
-func (_m *Compliance) OnSyncedBlock(block *events.SyncedBlock) {
+func (_m *Compliance) OnSyncedBlock(block flow.Slashable[messages.BlockProposal]) {
 	_m.Called(block)
 }
 

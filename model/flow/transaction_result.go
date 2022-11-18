@@ -13,6 +13,8 @@ type TransactionResult struct {
 	ErrorMessage string
 	// Computation used
 	ComputationUsed uint64
+	// Memory used (estimation)
+	MemoryUsed uint64
 }
 
 // String returns the string representation of this error.
