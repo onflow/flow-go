@@ -18,7 +18,7 @@ var (
 // extension is distinct from outdated or unverifiable extensions, in that it indicates
 // a malicious input.
 type InvalidExtensionError struct {
-	err error
+	error
 }
 
 func NewInvalidExtensionError(msg string) error {
@@ -27,16 +27,12 @@ func NewInvalidExtensionError(msg string) error {
 
 func NewInvalidExtensionErrorf(msg string, args ...interface{}) error {
 	return InvalidExtensionError{
-		err: fmt.Errorf(msg, args...),
+		error: fmt.Errorf(msg, args...),
 	}
 }
 
 func (e InvalidExtensionError) Unwrap() error {
-	return e.err
-}
-
-func (e InvalidExtensionError) Error() string {
-	return e.err.Error()
+	return e.error
 }
 
 // IsInvalidExtensionError returns whether the given error is an InvalidExtensionError error
@@ -49,7 +45,7 @@ func IsInvalidExtensionError(err error) bool {
 // Knowing whether an outdated extension is an invalid extension or not would
 // take more state queries.
 type OutdatedExtensionError struct {
-	err error
+	error
 }
 
 func NewOutdatedExtensionError(msg string) error {
@@ -58,16 +54,12 @@ func NewOutdatedExtensionError(msg string) error {
 
 func NewOutdatedExtensionErrorf(msg string, args ...interface{}) error {
 	return OutdatedExtensionError{
-		err: fmt.Errorf(msg, args...),
+		error: fmt.Errorf(msg, args...),
 	}
 }
 
 func (e OutdatedExtensionError) Unwrap() error {
-	return e.err
-}
-
-func (e OutdatedExtensionError) Error() string {
-	return e.err.Error()
+	return e.error
 }
 
 func IsOutdatedExtensionError(err error) bool {
@@ -80,21 +72,17 @@ func IsOutdatedExtensionError(err error) bool {
 // Unlike InvalidExtensionError, this error is only used when the failure CANNOT be
 // attributed to a malicious input, therefore this error can be treated as a benign failure.
 type UnverifiableExtensionError struct {
-	err error
+	error
 }
 
 func NewUnverifiableExtensionError(msg string, args ...interface{}) error {
 	return UnverifiableExtensionError{
-		err: fmt.Errorf(msg, args...),
+		error: fmt.Errorf(msg, args...),
 	}
 }
 
 func (e UnverifiableExtensionError) Unwrap() error {
-	return e.err
-}
-
-func (e UnverifiableExtensionError) Error() string {
-	return e.err.Error()
+	return e.error
 }
 
 func IsUnverifiableExtensionError(err error) bool {
@@ -105,12 +93,12 @@ func IsUnverifiableExtensionError(err error) bool {
 // NoValidChildBlockError is a sentinel error when the case where a certain block has
 // no valid child.
 type NoValidChildBlockError struct {
-	err error
+	error
 }
 
 func NewNoValidChildBlockError(msg string) error {
 	return NoValidChildBlockError{
-		err: fmt.Errorf(msg),
+		error: fmt.Errorf(msg),
 	}
 }
 
@@ -119,11 +107,7 @@ func NewNoValidChildBlockErrorf(msg string, args ...interface{}) error {
 }
 
 func (e NoValidChildBlockError) Unwrap() error {
-	return e.err
-}
-
-func (e NoValidChildBlockError) Error() string {
-	return e.err.Error()
+	return e.error
 }
 
 func IsNoValidChildBlockError(err error) bool {
@@ -134,26 +118,25 @@ func IsNoValidChildBlockError(err error) bool {
 // has not been ingested yet.
 type UnknownBlockError struct {
 	blockID flow.Identifier
-	err     error
+	error
 }
 
 // WrapAsUnknownBlockError wraps a given error as UnknownBlockError
 func WrapAsUnknownBlockError(blockID flow.Identifier, err error) error {
 	return UnknownBlockError{
 		blockID: blockID,
-		err:     fmt.Errorf("block %v has not been processed yet: %w", blockID, err),
+		error:   fmt.Errorf("block %v has not been processed yet: %w", blockID, err),
 	}
 }
 
 func NewUnknownBlockError(blockID flow.Identifier) error {
 	return UnknownBlockError{
 		blockID: blockID,
-		err:     fmt.Errorf("block %v has not been processed yet", blockID),
+		error:   fmt.Errorf("block %v has not been processed yet", blockID),
 	}
 }
 
-func (e UnknownBlockError) Unwrap() error { return e.err }
-func (e UnknownBlockError) Error() string { return e.err.Error() }
+func (e UnknownBlockError) Unwrap() error { return e.error }
 
 func IsUnknownBlockError(err error) bool {
 	var e UnknownBlockError
