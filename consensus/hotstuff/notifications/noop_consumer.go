@@ -29,6 +29,8 @@ type NoopPartialConsumer struct{}
 
 func (*NoopPartialConsumer) OnEventProcessed() {}
 
+func (*NoopPartialConsumer) OnStart(uint64) {}
+
 func (*NoopPartialConsumer) OnReceiveProposal(uint64, *model.Proposal) {}
 
 func (*NoopPartialConsumer) OnReceiveQc(uint64, *flow.QuorumCertificate) {}

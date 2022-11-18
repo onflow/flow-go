@@ -60,6 +60,13 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnEventProcessed()
 
+	// OnStart notifications are produced by the EventHandler when it starts blocks recovery and
+	// prepares for handling incoming events from EventLoop.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnStart(currentView uint64)
+
 	// OnReceiveProposal notifications are produced by the EventHandler when it starts processing a block.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;

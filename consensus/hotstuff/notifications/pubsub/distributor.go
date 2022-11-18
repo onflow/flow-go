@@ -38,6 +38,14 @@ func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 	p.subscribers = append(p.subscribers, consumer)
 }
 
+func (p *Distributor) OnStart(currentView uint64) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnStart(currentView)
+	}
+}
+
 func (p *Distributor) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()

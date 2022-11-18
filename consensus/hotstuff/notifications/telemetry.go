@@ -42,6 +42,12 @@ func NewTelemetryConsumer(log zerolog.Logger, chain flow.ChainID) *TelemetryCons
 	}
 }
 
+func (t *TelemetryConsumer) OnStart(currentView uint64) {
+	t.pathHandler.StartNextPath(currentView)
+	step := t.pathHandler.NextStep()
+	step.Msg("OnStart")
+}
+
 func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
 	block := proposal.Block
 	t.pathHandler.StartNextPath(currentView)

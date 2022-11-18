@@ -257,6 +257,10 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 // be executed by the same goroutine that also calls the other business logic
 // methods, or concurrency safety has to be implemented externally.
 func (e *EventHandler) Start(ctx context.Context) error {
+	// notify about commencing recovery procedure
+	e.notifier.OnStart(e.paceMaker.CurView())
+	defer e.notifier.OnEventProcessed()
+
 	err := e.processPendingBlocks()
 	if err != nil {
 		return fmt.Errorf("could not process pending blocks: %w", err)

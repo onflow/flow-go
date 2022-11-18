@@ -31,6 +31,10 @@ func (lc *LogConsumer) OnEventProcessed() {
 	lc.log.Debug().Msg("event processed")
 }
 
+func (lc *LogConsumer) OnStart(currentView uint64) {
+	lc.log.Debug().Uint64("cur_view", currentView).Msg("starting event handler")
+}
+
 func (lc *LogConsumer) OnBlockIncorporated(block *model.Block) {
 	lc.logBasicBlockData(lc.log.Debug(), block).
 		Msg("block incorporated")
