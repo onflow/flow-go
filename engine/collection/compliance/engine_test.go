@@ -54,7 +54,7 @@ type EngineSuite struct {
 func (cs *EngineSuite) SetupTest() {
 	cs.CommonSuite.SetupTest()
 
-	// initialize the paramaters
+	// initialize the parameters
 	cs.cluster = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleCollection),
 		unittest.WithWeight(1000),

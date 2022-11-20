@@ -40,6 +40,7 @@ type Core struct {
 	collectionMetrics module.CollectionMetrics
 	headers           storage.Headers
 	state             clusterkv.MutableState
+	// track latest finalized view/height - used to efficiently drop outdated or too-far-ahead blocks
 	finalizedView     counters.StrictMonotonousCounter
 	finalizedHeight   counters.StrictMonotonousCounter
 	pending           module.PendingClusterBlockBuffer // pending block cache
@@ -98,6 +99,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	header := proposal.Header
 	blockID := header.ID()
 	finalHeight := c.finalizedHeight.Value()
+	finalView := c.finalizedView.Value()
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
@@ -117,6 +119,12 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		log = log.With().Strs("tx_ids", flow.IdentifierList(proposal.Payload.Collection.Light().Transactions).Strings()).Logger()
 	}
 	log.Info().Msg("block proposal received")
+
+	// drop proposals below the finalized threshold
+	if header.Height < finalHeight || header.View < finalView {
+		log.Debug().Uint64("final_view", finalView).Msg("dropping block below finalized boundary")
+		return nil
+	}
 
 	// ignore proposals which are too far ahead of our local finalized state
 	// instead, rely on sync engine to catch up finalization more effectively, and avoid
@@ -147,17 +155,6 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	}
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("could not check proposal: %w", err)
-	}
-
-	final, err := c.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not get latest finalized header: %w", err)
-	}
-	if header.Height > final.Height && header.Height-final.Height > c.config.SkipNewProposalsThreshold {
-		log.Debug().
-			Uint64("final_height", final.Height).
-			Msg("dropping block too far ahead of locally finalized height")
-		return nil
 	}
 
 	// there are two possibilities if the proposal is neither already pending

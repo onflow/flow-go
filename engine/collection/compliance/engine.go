@@ -213,11 +213,10 @@ func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[messages.Cluste
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
 func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	final, err := e.state.Final().Head()
-	if err != nil {
-		ctx.Throw(err)
-	}
 	ready()
+
+	finalView := uint64(0)
+	var finalHeader *flow.Header
 
 	doneSignal := ctx.Done()
 	for {
@@ -226,16 +225,17 @@ func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, r
 			return
 		case finalizedBlock := <-e.finalizedBlocksNotifications:
 			// drop outdated notifications
-			if finalizedBlock.View < final.View {
+			if finalizedBlock.View < finalView {
 				continue
 			}
 
 			// retrieve the latest finalized header, so we know the height
-			final, err = e.state.Final().Head() // over-writes `final` variable for next loop iteration
-			if err != nil {                     // no expected errors
+			var err error
+			finalHeader, err = e.headers.ByBlockID(finalizedBlock.BlockID) // over-writes `finalHeader` variable for next loop iteration
+			if err != nil {                                                // no expected errors
 				ctx.Throw(err)
 			}
-			e.core.ProcessFinalizedBlock(final)
+			e.core.ProcessFinalizedBlock(finalHeader)
 		}
 	}
 }
