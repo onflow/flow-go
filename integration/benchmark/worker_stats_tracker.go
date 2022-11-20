@@ -72,7 +72,9 @@ func (st *WorkerStatsTracker) updateEWMAonce(lastStats, stats WorkerStats) {
 	defer st.mux.Unlock()
 
 	st.txsSentEWMA.Add(float64(stats.TxsSent - lastStats.TxsSent))
+	st.stats.TxsSentMovingAverage = st.txsSentEWMA.Value()
 	st.txsExecutedEWMA.Add(float64(stats.TxsExecuted - lastStats.TxsExecuted))
+	st.stats.TxsExecutedMovingAverage = st.txsExecutedEWMA.Value()
 }
 
 func (st *WorkerStatsTracker) Stop() {
@@ -112,8 +114,6 @@ func (st *WorkerStatsTracker) GetStats() WorkerStats {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	st.stats.TxsSentMovingAverage = st.txsSentEWMA.Value()
-	st.stats.TxsExecutedMovingAverage = st.txsExecutedEWMA.Value()
 	return st.stats
 }
 
