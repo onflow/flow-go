@@ -81,6 +81,8 @@ func TestAccountFreezing(t *testing.T) {
 
 		context := fvm.NewContext(
 			fvm.WithChain(chain),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithDerivedBlockData(derivedBlockData))
 
 		derivedBlockData = programs.NewEmptyDerivedBlockData()
@@ -89,6 +91,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		err = txInvoker.Process(context, proc, st, derivedTxnData)
 		require.NoError(t, err)
+		require.NoError(t, proc.Err)
 
 		// account should be frozen now
 		frozen, err = accounts.GetAccountFrozen(address)
@@ -173,7 +176,7 @@ func TestAccountFreezing(t *testing.T) {
 			Address: common.MustBytesToAddress(address[:]),
 			Name:    "Whatever",
 		}
-		entry := derivedBlockData.GetForTestingOnly(cadenceAddr)
+		entry := derivedBlockData.GetProgramForTestingOnly(cadenceAddr)
 		require.NotNil(t, entry)
 
 		// freeze account
@@ -196,7 +199,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		// verify cache is evicted
 
-		entry = derivedBlockData.GetForTestingOnly(cadenceAddr)
+		entry = derivedBlockData.GetProgramForTestingOnly(cadenceAddr)
 		require.Nil(t, entry)
 
 		// loading code from frozen account triggers error
@@ -518,8 +521,16 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 
 		txInvoker := fvm.NewTransactionInvoker()
-		err = txInvoker.Process(context, proc, st, derivedTxnData)
+		err = txInvoker.Process(
+			fvm.NewContextFromParent(
+				context,
+				fvm.WithAuthorizationChecksEnabled(false),
+			),
+			proc,
+			st,
+			derivedTxnData)
 		require.NoError(t, err)
+		require.NoError(t, proc.Err)
 
 		// make sure freeze status is correct
 		var frozen bool

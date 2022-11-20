@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -110,28 +109,17 @@ func (vm *VirtualMachine) Run(
 		return fmt.Errorf("error creating derived transaction data: %w", err)
 	}
 
-	meterParams := meter.DefaultParameters().
-		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
-		WithMemoryLimit(proc.MemoryLimit(ctx))
-
-	meterParams, err = getEnvironmentMeterParameters(
-		ctx,
-		v,
-		derivedTxnData,
-		meterParams,
-	)
+	// TODO(patrick): move this into transaction executor (and maybe also script
+	// executor)
+	meterParams, err := getMeterParameters(ctx, proc, v, derivedTxnData)
 	if err != nil {
-		return fmt.Errorf("error gettng environment meter parameters: %w", err)
+		return fmt.Errorf("error gettng meter parameters: %w", err)
 	}
 
 	interactionLimit := ctx.MaxStateInteractionSize
 	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
-		meterParams = meterParams.WithMemoryLimit(math.MaxUint64)
 		interactionLimit = math.MaxUint64
 	}
-
-	eventSizeLimit := ctx.EventCollectionByteSizeLimit
-	meterParams = meterParams.WithEventEmitByteLimit(eventSizeLimit)
 
 	txnState := state.NewTransactionState(
 		v,

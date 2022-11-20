@@ -3,15 +3,19 @@ package programs
 import (
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 )
 
-func TestBlockProgsWithTransactionOffset(t *testing.T) {
-	block := NewEmptyDerivedBlockDataWithTransactionOffset(18)
+func newEmptyTestBlock() *BlockDerivedData[string, *string] {
+	return NewEmptyBlockDerivedData[string, *string]()
+}
+
+func TestBlockDerivedDataWithTransactionOffset(t *testing.T) {
+	block := NewEmptyBlockDerivedDataWithOffset[string, *string](18)
 
 	require.Equal(
 		t,
@@ -19,65 +23,65 @@ func TestBlockProgsWithTransactionOffset(t *testing.T) {
 		block.LatestCommitExecutionTimeForTestingOnly())
 }
 
-func TestTxnProgsNormalTransactionInvalidExecutionTimeBound(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataNormalTransactionInvalidExecutionTimeBound(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	_, err := block.NewDerivedTransactionData(-1, -1)
+	_, err := block.NewTransactionDerivedData(-1, -1)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewDerivedTransactionData(0, 0)
+	_, err = block.NewTransactionDerivedData(0, 0)
 	require.NoError(t, err)
 
-	_, err = block.NewDerivedTransactionData(0, EndOfBlockExecutionTime)
+	_, err = block.NewTransactionDerivedData(0, EndOfBlockExecutionTime)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewDerivedTransactionData(0, EndOfBlockExecutionTime-1)
+	_, err = block.NewTransactionDerivedData(0, EndOfBlockExecutionTime-1)
 	require.NoError(t, err)
 }
 
-func TestTxnProgsNormalTransactionInvalidSnapshotTime(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataNormalTransactionInvalidSnapshotTime(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	_, err := block.NewDerivedTransactionData(10, 0)
+	_, err := block.NewTransactionDerivedData(10, 0)
 	require.ErrorContains(t, err, "snapshot > execution")
 
-	_, err = block.NewDerivedTransactionData(10, 10)
+	_, err = block.NewTransactionDerivedData(10, 10)
 	require.NoError(t, err)
 
-	_, err = block.NewDerivedTransactionData(999, 998)
+	_, err = block.NewTransactionDerivedData(999, 998)
 	require.ErrorContains(t, err, "snapshot > execution")
 
-	_, err = block.NewDerivedTransactionData(999, 999)
+	_, err = block.NewTransactionDerivedData(999, 999)
 	require.NoError(t, err)
 }
 
-func TestTxnProgsSnapshotReadTransactionInvalidExecutionTimeBound(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataSnapshotReadTransactionInvalidExecutionTimeBound(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	_, err := block.NewSnapshotReadDerivedTransactionData(
+	_, err := block.NewSnapshotReadTransactionDerivedData(
 		ParentBlockTime,
 		ParentBlockTime)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewSnapshotReadDerivedTransactionData(ParentBlockTime, 0)
+	_, err = block.NewSnapshotReadTransactionDerivedData(ParentBlockTime, 0)
 	require.NoError(t, err)
 
-	_, err = block.NewSnapshotReadDerivedTransactionData(0, ChildBlockTime)
+	_, err = block.NewSnapshotReadTransactionDerivedData(0, ChildBlockTime)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewSnapshotReadDerivedTransactionData(
+	_, err = block.NewSnapshotReadTransactionDerivedData(
 		0,
 		EndOfBlockExecutionTime)
 	require.NoError(t, err)
 }
 
-func TestTxnProgsValidateRejectOutOfOrderCommit(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataValidateRejectOutOfOrderCommit(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	testTxn, err := block.NewDerivedTransactionData(0, 0)
+	testTxn, err := block.NewTransactionDerivedData(0, 0)
 	require.NoError(t, err)
 
-	testSetupTxn, err := block.NewDerivedTransactionData(0, 1)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, 1)
 	require.NoError(t, err)
 
 	validateErr := testTxn.Validate()
@@ -91,16 +95,16 @@ func TestTxnProgsValidateRejectOutOfOrderCommit(t *testing.T) {
 	require.False(t, validateErr.IsRetryable())
 }
 
-func TestTxnProgsValidateRejectNonIncreasingExecutionTime(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataValidateRejectNonIncreasingExecutionTime(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	testSetupTxn, err := block.NewDerivedTransactionData(0, 0)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, 0)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	testTxn, err := block.NewDerivedTransactionData(0, 0)
+	testTxn, err := block.NewTransactionDerivedData(0, 0)
 	require.NoError(t, err)
 
 	validateErr := testTxn.Validate()
@@ -108,11 +112,11 @@ func TestTxnProgsValidateRejectNonIncreasingExecutionTime(t *testing.T) {
 	require.False(t, validateErr.IsRetryable())
 }
 
-func TestTxnProgsValidateRejectCommitGapForNormalTxn(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataValidateRejectCommitGapForNormalTxn(t *testing.T) {
+	block := newEmptyTestBlock()
 
 	commitTime := LogicalTime(5)
-	testSetupTxn, err := block.NewDerivedTransactionData(0, commitTime)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
@@ -120,7 +124,7 @@ func TestTxnProgsValidateRejectCommitGapForNormalTxn(t *testing.T) {
 
 	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
 
-	testTxn, err := block.NewDerivedTransactionData(10, 10)
+	testTxn, err := block.NewTransactionDerivedData(10, 10)
 	require.NoError(t, err)
 
 	validateErr := testTxn.Validate()
@@ -128,11 +132,11 @@ func TestTxnProgsValidateRejectCommitGapForNormalTxn(t *testing.T) {
 	require.False(t, validateErr.IsRetryable())
 }
 
-func TestTxnProgsValidateRejectCommitGapForSnapshotRead(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataValidateRejectCommitGapForSnapshotRead(t *testing.T) {
+	block := newEmptyTestBlock()
 
 	commitTime := LogicalTime(5)
-	testSetupTxn, err := block.NewDerivedTransactionData(0, commitTime)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
@@ -140,7 +144,7 @@ func TestTxnProgsValidateRejectCommitGapForSnapshotRead(t *testing.T) {
 
 	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
 
-	testTxn, err := block.NewSnapshotReadDerivedTransactionData(10, 10)
+	testTxn, err := block.NewSnapshotReadTransactionDerivedData(10, 10)
 	require.NoError(t, err)
 
 	validateErr := testTxn.Validate()
@@ -148,26 +152,24 @@ func TestTxnProgsValidateRejectCommitGapForSnapshotRead(t *testing.T) {
 	require.False(t, validateErr.IsRetryable())
 }
 
-func TestTxnProgsValidateRejectOutdatedReadSet(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataValidateRejectOutdatedReadSet(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	testSetupTxn1, err := block.NewDerivedTransactionData(0, 0)
+	testSetupTxn1, err := block.NewTransactionDerivedData(0, 0)
 	require.NoError(t, err)
 
-	testSetupTxn2, err := block.NewDerivedTransactionData(0, 1)
+	testSetupTxn2, err := block.NewTransactionDerivedData(0, 1)
 	require.NoError(t, err)
 
-	testTxn, err := block.NewDerivedTransactionData(0, 2)
+	testTxn, err := block.NewTransactionDerivedData(0, 2)
 	require.NoError(t, err)
 
-	location := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    "address",
-	}
-	expectedProg := &interpreter.Program{}
+	key := "abc"
+	valueString := "value"
+	expectedValue := &valueString
 	expectedState := &state.State{}
 
-	testSetupTxn1.SetProgram(location, expectedProg, expectedState)
+	testSetupTxn1.Set(key, expectedValue, expectedState)
 
 	testSetupTxn1.AddInvalidator(testInvalidator{})
 
@@ -177,9 +179,9 @@ func TestTxnProgsValidateRejectOutdatedReadSet(t *testing.T) {
 	validateErr := testTxn.Validate()
 	require.NoError(t, validateErr)
 
-	actualProg, actualState, ok := testTxn.GetProgram(location)
+	actualProg, actualState, ok := testTxn.Get(key)
 	require.True(t, ok)
-	require.Same(t, expectedProg, actualProg)
+	require.Same(t, expectedValue, actualProg)
 	require.Same(t, expectedState, actualState)
 
 	validateErr = testTxn.Validate()
@@ -195,10 +197,10 @@ func TestTxnProgsValidateRejectOutdatedReadSet(t *testing.T) {
 	require.True(t, validateErr.IsRetryable())
 }
 
-func TestTxnProgsValidateRejectOutdatedWriteSet(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataValidateRejectOutdatedWriteSet(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	testSetupTxn, err := block.NewDerivedTransactionData(0, 0)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, 0)
 	require.NoError(t, err)
 
 	testSetupTxn.AddInvalidator(testInvalidator{invalidateAll: true})
@@ -208,26 +210,21 @@ func TestTxnProgsValidateRejectOutdatedWriteSet(t *testing.T) {
 
 	require.Equal(t, 1, len(block.InvalidatorsForTestingOnly()))
 
-	testTxn, err := block.NewDerivedTransactionData(0, 1)
+	testTxn, err := block.NewTransactionDerivedData(0, 1)
 	require.NoError(t, err)
 
-	testTxn.SetProgram(
-		common.AddressLocation{
-			Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-			Name:    "address",
-		},
-		&interpreter.Program{},
-		&state.State{})
+	value := "value"
+	testTxn.Set("key", &value, &state.State{})
 
 	validateErr := testTxn.Validate()
 	require.ErrorContains(t, validateErr, "outdated write set")
 	require.True(t, validateErr.IsRetryable())
 }
 
-func TestTxnProgsValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	testSetupTxn, err := block.NewDerivedTransactionData(0, 0)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, 0)
 	require.NoError(t, err)
 
 	testSetupTxn.AddInvalidator(testInvalidator{invalidateAll: true})
@@ -236,26 +233,21 @@ func TestTxnProgsValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T) {
 
 	require.Equal(t, 1, len(block.InvalidatorsForTestingOnly()))
 
-	testTxn, err := block.NewDerivedTransactionData(1, 1)
+	testTxn, err := block.NewTransactionDerivedData(1, 1)
 	require.NoError(t, err)
 
-	testTxn.SetProgram(
-		common.AddressLocation{
-			Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-			Name:    "address",
-		},
-		&interpreter.Program{},
-		&state.State{})
+	value := "value"
+	testTxn.Set("key", &value, &state.State{})
 
 	err = testTxn.Validate()
 	require.NoError(t, err)
 }
 
-func TestTxnProgsCommitEndOfBlockSnapshotRead(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataCommitEndOfBlockSnapshotRead(t *testing.T) {
+	block := newEmptyTestBlock()
 
 	commitTime := LogicalTime(5)
-	testSetupTxn, err := block.NewDerivedTransactionData(0, commitTime)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
@@ -263,7 +255,7 @@ func TestTxnProgsCommitEndOfBlockSnapshotRead(t *testing.T) {
 
 	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
 
-	testTxn, err := block.NewSnapshotReadDerivedTransactionData(
+	testTxn, err := block.NewSnapshotReadTransactionDerivedData(
 		EndOfBlockExecutionTime,
 		EndOfBlockExecutionTime)
 	require.NoError(t, err)
@@ -274,11 +266,11 @@ func TestTxnProgsCommitEndOfBlockSnapshotRead(t *testing.T) {
 	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
 }
 
-func TestTxnProgsCommitSnapshotReadDontAdvanceTime(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataCommitSnapshotReadDontAdvanceTime(t *testing.T) {
+	block := newEmptyTestBlock()
 
 	commitTime := LogicalTime(71)
-	testSetupTxn, err := block.NewDerivedTransactionData(0, commitTime)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
@@ -286,7 +278,7 @@ func TestTxnProgsCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 
 	repeatedTime := commitTime + 1
 	for i := 0; i < 10; i++ {
-		txn, err := block.NewSnapshotReadDerivedTransactionData(0, repeatedTime)
+		txn, err := block.NewSnapshotReadTransactionDerivedData(0, repeatedTime)
 		require.NoError(t, err)
 
 		err = txn.Commit()
@@ -299,30 +291,28 @@ func TestTxnProgsCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 		block.LatestCommitExecutionTimeForTestingOnly())
 }
 
-func TestTxnProgsCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	testTxn, err := block.NewDerivedTransactionData(0, 0)
+	testTxn, err := block.NewTransactionDerivedData(0, 0)
 	require.NoError(t, err)
 
-	location := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    "address",
-	}
+	key := "234"
 
-	actualProg, actualState, ok := testTxn.GetProgram(location)
+	actualValue, actualState, ok := testTxn.Get(key)
 	require.False(t, ok)
-	require.Nil(t, actualProg)
+	require.Nil(t, actualValue)
 	require.Nil(t, actualState)
 
-	expectedProg := &interpreter.Program{}
+	valueString := "stuff"
+	expectedValue := &valueString
 	expectedState := &state.State{}
 
-	testTxn.SetProgram(location, expectedProg, expectedState)
+	testTxn.Set(key, expectedValue, expectedState)
 
-	actualProg, actualState, ok = testTxn.GetProgram(location)
+	actualValue, actualState, ok = testTxn.Get(key)
 	require.True(t, ok)
-	require.Same(t, expectedProg, actualProg)
+	require.Same(t, expectedValue, actualValue)
 	require.Same(t, expectedState, actualState)
 
 	testTxn.AddInvalidator(testInvalidator{})
@@ -342,38 +332,36 @@ func TestTxnProgsCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
 	entries := block.EntriesForTestingOnly()
 	require.Equal(t, 1, len(entries))
 
-	entry, ok := entries[location]
+	entry, ok := entries[key]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Same(t, expectedProg, entry.Value)
+	require.Same(t, expectedValue, entry.Value)
 	require.Same(t, expectedState, entry.State)
 }
 
-func TestTxnProgsCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
+	block := newEmptyTestBlock()
 
 	testTxnTime := LogicalTime(47)
-	testTxn, err := block.NewDerivedTransactionData(0, testTxnTime)
+	testTxn, err := block.NewTransactionDerivedData(0, testTxnTime)
 	require.NoError(t, err)
 
-	location := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    "address",
-	}
+	key := "999"
 
-	actualProg, actualState, ok := testTxn.GetProgram(location)
+	actualValue, actualState, ok := testTxn.Get(key)
 	require.False(t, ok)
-	require.Nil(t, actualProg)
+	require.Nil(t, actualValue)
 	require.Nil(t, actualState)
 
-	expectedProg := &interpreter.Program{}
+	valueString := "blah"
+	expectedValue := &valueString
 	expectedState := &state.State{}
 
-	testTxn.SetProgram(location, expectedProg, expectedState)
+	testTxn.Set(key, expectedValue, expectedState)
 
-	actualProg, actualState, ok = testTxn.GetProgram(location)
+	actualValue, actualState, ok = testTxn.Get(key)
 	require.True(t, ok)
-	require.Same(t, expectedProg, actualProg)
+	require.Same(t, expectedValue, actualValue)
 	require.Same(t, expectedState, actualState)
 
 	invalidator := testInvalidator{invalidateAll: true}
@@ -392,10 +380,7 @@ func TestTxnProgsCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
 
 	require.Equal(
 		t,
-		chainedDerivedDataInvalidators[
-			common.AddressLocation,
-			*interpreter.Program,
-		]{
+		chainedDerivedDataInvalidators[string, *string]{
 			{
 				DerivedDataInvalidator: invalidator,
 				executionTime:          testTxnTime,
@@ -406,23 +391,21 @@ func TestTxnProgsCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
 	require.Equal(t, 0, len(block.EntriesForTestingOnly()))
 }
 
-func TestTxnProgsCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	testSetupTxn, err := block.NewDerivedTransactionData(0, 11)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, 11)
 	require.NoError(t, err)
 
-	testTxn, err := block.NewDerivedTransactionData(10, 12)
+	testTxn, err := block.NewTransactionDerivedData(10, 12)
 	require.NoError(t, err)
 
-	location := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    "address",
-	}
-	expectedProg := &interpreter.Program{}
+	key := "17"
+	valueString := "foo"
+	expectedValue := &valueString
 	expectedState := &state.State{}
 
-	testSetupTxn.SetProgram(location, expectedProg, expectedState)
+	testSetupTxn.Set(key, expectedValue, expectedState)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
@@ -430,13 +413,14 @@ func TestTxnProgsCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
 	entries := block.EntriesForTestingOnly()
 	require.Equal(t, 1, len(entries))
 
-	expectedEntry, ok := entries[location]
+	expectedEntry, ok := entries[key]
 	require.True(t, ok)
 
-	otherProg := &interpreter.Program{}
+	otherString := "other"
+	otherValue := &otherString
 	otherState := &state.State{}
 
-	testTxn.SetProgram(location, otherProg, otherState)
+	testTxn.Set(key, otherValue, otherState)
 
 	err = testTxn.Commit()
 	require.NoError(t, err)
@@ -444,64 +428,56 @@ func TestTxnProgsCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
 	entries = block.EntriesForTestingOnly()
 	require.Equal(t, 1, len(entries))
 
-	actualEntry, ok := entries[location]
+	actualEntry, ok := entries[key]
 	require.True(t, ok)
 
 	require.Same(t, expectedEntry, actualEntry)
 	require.False(t, actualEntry.isInvalid)
-	require.Same(t, expectedProg, actualEntry.Value)
+	require.Same(t, expectedValue, actualEntry.Value)
 	require.Same(t, expectedState, actualEntry.State)
-	require.NotSame(t, otherProg, actualEntry.Value)
+	require.NotSame(t, otherValue, actualEntry.Value)
 	require.NotSame(t, otherState, actualEntry.State)
 }
 
-func TestTxnProgsCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	testSetupTxn, err := block.NewDerivedTransactionData(0, 0)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, 0)
 	require.NoError(t, err)
 
-	testTxn, err := block.NewDerivedTransactionData(0, 1)
+	testTxn, err := block.NewTransactionDerivedData(0, 1)
 	require.NoError(t, err)
 
-	loc1 := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    "address1",
-	}
-	expectedProg1 := &interpreter.Program{}
+	key1 := "key1"
+	valStr1 := "value1"
+	expectedValue1 := &valStr1
 	expectedState1 := &state.State{}
 
-	testSetupTxn.SetProgram(loc1, expectedProg1, expectedState1)
+	testSetupTxn.Set(key1, expectedValue1, expectedState1)
 
-	loc2 := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    "address2",
-	}
-	expectedProg2 := &interpreter.Program{}
+	key2 := "key2"
+	valStr2 := "value2"
+	expectedValue2 := &valStr2
 	expectedState2 := &state.State{}
 
-	testSetupTxn.SetProgram(loc2, expectedProg2, expectedState2)
+	testSetupTxn.Set(key2, expectedValue2, expectedState2)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	actualProg, actualState, ok := testTxn.GetProgram(loc1)
+	actualValue, actualState, ok := testTxn.Get(key1)
 	require.True(t, ok)
-	require.Same(t, expectedProg1, actualProg)
+	require.Same(t, expectedValue1, actualValue)
 	require.Same(t, expectedState1, actualState)
 
-	actualProg, actualState, ok = testTxn.GetProgram(loc2)
+	actualValue, actualState, ok = testTxn.Get(key2)
 	require.True(t, ok)
-	require.Same(t, expectedProg2, actualProg)
+	require.Same(t, expectedValue2, actualValue)
 	require.Same(t, expectedState2, actualState)
 
-	actualProg, actualState, ok = testTxn.GetProgram(
-		common.AddressLocation{
-			Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-			Name:    "address3",
-		})
+	actualValue, actualState, ok = testTxn.Get("key3")
 	require.False(t, ok)
-	require.Nil(t, actualProg)
+	require.Nil(t, actualValue)
 	require.Nil(t, actualState)
 
 	testTxn.AddInvalidator(testInvalidator{})
@@ -521,31 +497,31 @@ func TestTxnProgsCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 	entries := block.EntriesForTestingOnly()
 	require.Equal(t, 2, len(entries))
 
-	entry, ok := entries[loc1]
+	entry, ok := entries[key1]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Same(t, expectedProg1, entry.Value)
+	require.Same(t, expectedValue1, entry.Value)
 	require.Same(t, expectedState1, entry.State)
 
-	entry, ok = entries[loc2]
+	entry, ok = entries[key2]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Same(t, expectedProg2, entry.Value)
+	require.Same(t, expectedValue2, entry.Value)
 	require.Same(t, expectedState2, entry.State)
 }
 
-func TestTxnProgsCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
+	block := newEmptyTestBlock()
 
 	testSetupTxn1Time := LogicalTime(2)
-	testSetupTxn1, err := block.NewDerivedTransactionData(0, testSetupTxn1Time)
+	testSetupTxn1, err := block.NewTransactionDerivedData(0, testSetupTxn1Time)
 	require.NoError(t, err)
 
-	testSetupTxn2, err := block.NewDerivedTransactionData(0, 4)
+	testSetupTxn2, err := block.NewTransactionDerivedData(0, 4)
 	require.NoError(t, err)
 
 	testTxnTime := LogicalTime(6)
-	testTxn, err := block.NewDerivedTransactionData(0, testTxnTime)
+	testTxn, err := block.NewTransactionDerivedData(0, testTxnTime)
 	require.NoError(t, err)
 
 	testSetupTxn1Invalidator := testInvalidator{
@@ -556,44 +532,36 @@ func TestTxnProgsCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 	err = testSetupTxn1.Commit()
 	require.NoError(t, err)
 
-	loc1 := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    "address1",
-	}
-	expectedProg1 := &interpreter.Program{}
+	key1 := "key1"
+	valStr1 := "v1"
+	expectedValue1 := &valStr1
 	expectedState1 := &state.State{}
 
-	testSetupTxn2.SetProgram(loc1, expectedProg1, expectedState1)
+	testSetupTxn2.Set(key1, expectedValue1, expectedState1)
 
-	loc2 := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    "address2",
-	}
-	expectedProg2 := &interpreter.Program{}
+	key2 := "key2"
+	valStr2 := "v2"
+	expectedValue2 := &valStr2
 	expectedState2 := &state.State{}
 
-	testSetupTxn2.SetProgram(loc2, expectedProg2, expectedState2)
+	testSetupTxn2.Set(key2, expectedValue2, expectedState2)
 
 	err = testSetupTxn2.Commit()
 	require.NoError(t, err)
 
-	actualProg, actualState, ok := testTxn.GetProgram(loc1)
+	actualValue, actualState, ok := testTxn.Get(key1)
 	require.True(t, ok)
-	require.Same(t, expectedProg1, actualProg)
+	require.Same(t, expectedValue1, actualValue)
 	require.Same(t, expectedState1, actualState)
 
-	actualProg, actualState, ok = testTxn.GetProgram(loc2)
+	actualValue, actualState, ok = testTxn.Get(key2)
 	require.True(t, ok)
-	require.Same(t, expectedProg2, actualProg)
+	require.Same(t, expectedValue2, actualValue)
 	require.Same(t, expectedState2, actualState)
 
-	actualProg, actualState, ok = testTxn.GetProgram(
-		common.AddressLocation{
-			Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-			Name:    "address3",
-		})
+	actualValue, actualState, ok = testTxn.Get("key3")
 	require.False(t, ok)
-	require.Nil(t, actualProg)
+	require.Nil(t, actualValue)
 	require.Nil(t, actualState)
 
 	testTxnInvalidator := testInvalidator{invalidateAll: true}
@@ -611,10 +579,7 @@ func TestTxnProgsCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 
 	require.Equal(
 		t,
-		chainedDerivedDataInvalidators[
-			common.AddressLocation,
-			*interpreter.Program,
-		]{
+		chainedDerivedDataInvalidators[string, *string]{
 			{
 				DerivedDataInvalidator: testSetupTxn1Invalidator,
 				executionTime:          testSetupTxn1Time,
@@ -629,16 +594,16 @@ func TestTxnProgsCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 	require.Equal(t, 0, len(block.EntriesForTestingOnly()))
 }
 
-func TestTxnProgsCommitValidateError(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataCommitValidateError(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	testSetupTxn, err := block.NewDerivedTransactionData(0, 10)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, 10)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	testTxn, err := block.NewDerivedTransactionData(10, 10)
+	testTxn, err := block.NewTransactionDerivedData(10, 10)
 	require.NoError(t, err)
 
 	commitErr := testTxn.Commit()
@@ -646,17 +611,17 @@ func TestTxnProgsCommitValidateError(t *testing.T) {
 	require.False(t, commitErr.IsRetryable())
 }
 
-func TestTxnProgsCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) {
+	block := newEmptyTestBlock()
 
 	expectedTime := LogicalTime(10)
-	testSetupTxn, err := block.NewDerivedTransactionData(0, expectedTime)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, expectedTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	testTxn, err := block.NewSnapshotReadDerivedTransactionData(0, 11)
+	testTxn, err := block.NewSnapshotReadTransactionDerivedData(0, 11)
 	require.NoError(t, err)
 
 	err = testTxn.Commit()
@@ -668,10 +633,10 @@ func TestTxnProgsCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) {
 		block.LatestCommitExecutionTimeForTestingOnly())
 }
 
-func TestTxnProgsCommitBadSnapshotReadInvalidator(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataCommitBadSnapshotReadInvalidator(t *testing.T) {
+	block := newEmptyTestBlock()
 
-	testTxn, err := block.NewSnapshotReadDerivedTransactionData(0, 42)
+	testTxn, err := block.NewSnapshotReadTransactionDerivedData(0, 42)
 	require.NoError(t, err)
 
 	testTxn.AddInvalidator(testInvalidator{invalidateAll: true})
@@ -681,31 +646,26 @@ func TestTxnProgsCommitBadSnapshotReadInvalidator(t *testing.T) {
 	require.False(t, commitErr.IsRetryable())
 }
 
-func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
-	block := NewEmptyDerivedBlockData()
+func TestTxnDerivedDataCommitFineGrainInvalidation(t *testing.T) {
+	block := newEmptyTestBlock()
 
 	// Setup the database with two read entries
 
-	testSetupTxn, err := block.NewDerivedTransactionData(0, 0)
+	testSetupTxn, err := block.NewTransactionDerivedData(0, 0)
 	require.NoError(t, err)
 
-	readLoc1Name := "read-address1"
-	readLoc1 := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    readLoc1Name,
-	}
-	readProg1 := &interpreter.Program{}
+	readKey1 := "read-key-1"
+	readValStr1 := "read-value-1"
+	readValue1 := &readValStr1
 	readState1 := &state.State{}
 
-	readLoc2 := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    "read-address2",
-	}
-	readProg2 := &interpreter.Program{}
+	readKey2 := "read-key-2"
+	readValStr2 := "read-value-2"
+	readValue2 := &readValStr2
 	readState2 := &state.State{}
 
-	testSetupTxn.SetProgram(readLoc1, readProg1, readState1)
-	testSetupTxn.SetProgram(readLoc2, readProg2, readState2)
+	testSetupTxn.Set(readKey1, readValue1, readState1)
+	testSetupTxn.Set(readKey2, readValue2, readState2)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
@@ -714,44 +674,39 @@ func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
 	// two new ones,
 
 	testTxnTime := LogicalTime(15)
-	testTxn, err := block.NewDerivedTransactionData(1, testTxnTime)
+	testTxn, err := block.NewTransactionDerivedData(1, testTxnTime)
 	require.NoError(t, err)
 
-	actualProg, actualState, ok := testTxn.GetProgram(readLoc1)
+	actualValue, actualState, ok := testTxn.Get(readKey1)
 	require.True(t, ok)
-	require.Same(t, readProg1, actualProg)
+	require.Same(t, readValue1, actualValue)
 	require.Same(t, readState1, actualState)
 
-	actualProg, actualState, ok = testTxn.GetProgram(readLoc2)
+	actualValue, actualState, ok = testTxn.Get(readKey2)
 	require.True(t, ok)
-	require.Same(t, readProg2, actualProg)
+	require.Same(t, readValue2, actualValue)
 	require.Same(t, readState2, actualState)
 
-	writeLoc1Name := "write-address1"
-	writeLoc1 := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    writeLoc1Name,
-	}
-	writeProg1 := &interpreter.Program{}
+	writeKey1 := "write key 1"
+	writeValStr1 := "write value 1"
+	writeValue1 := &writeValStr1
 	writeState1 := &state.State{}
 
-	writeLoc2 := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    "write-address2",
-	}
-	writeProg2 := &interpreter.Program{}
+	writeKey2 := "write key 2"
+	writeValStr2 := "write value 2"
+	writeValue2 := &writeValStr2
 	writeState2 := &state.State{}
 
-	testTxn.SetProgram(writeLoc1, writeProg1, writeState1)
-	testTxn.SetProgram(writeLoc2, writeProg2, writeState2)
+	testTxn.Set(writeKey1, writeValue1, writeState1)
+	testTxn.Set(writeKey2, writeValue2, writeState2)
 
 	// Actual test.  Invalidate one pre-existing entry and one new entry.
 
 	invalidator1 := testInvalidator{
-		invalidateName: readLoc1Name,
+		invalidateName: readKey1,
 	}
 	invalidator2 := testInvalidator{
-		invalidateName: writeLoc1Name,
+		invalidateName: writeKey1,
 	}
 	testTxn.AddInvalidator(nil)
 	testTxn.AddInvalidator(invalidator1)
@@ -769,10 +724,7 @@ func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
 
 	require.Equal(
 		t,
-		chainedDerivedDataInvalidators[
-			common.AddressLocation,
-			*interpreter.Program,
-		]{
+		chainedDerivedDataInvalidators[string, *string]{
 			{
 				DerivedDataInvalidator: invalidator1,
 				executionTime:          testTxnTime,
@@ -787,21 +739,21 @@ func TestTxnProgsCommitFineGrainInvalidation(t *testing.T) {
 	entries := block.EntriesForTestingOnly()
 	require.Equal(t, 2, len(entries))
 
-	entry, ok := entries[readLoc2]
+	entry, ok := entries[readKey2]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Same(t, readProg2, entry.Value)
+	require.Same(t, readValue2, entry.Value)
 	require.Same(t, readState2, entry.State)
 
-	entry, ok = entries[writeLoc2]
+	entry, ok = entries[writeKey2]
 	require.True(t, ok)
 	require.False(t, entry.isInvalid)
-	require.Same(t, writeProg2, entry.Value)
+	require.Same(t, writeValue2, entry.Value)
 	require.Same(t, writeState2, entry.State)
 }
 
-func TestBlockProgsNewChildDerivedBlockData(t *testing.T) {
-	parentBlock := NewEmptyDerivedBlockData()
+func TestBlockDerivedDataNewChildDerivedBlockData(t *testing.T) {
+	parentBlock := newEmptyTestBlock()
 
 	require.Equal(
 		t,
@@ -810,7 +762,7 @@ func TestBlockProgsNewChildDerivedBlockData(t *testing.T) {
 	require.Equal(t, 0, len(parentBlock.InvalidatorsForTestingOnly()))
 	require.Equal(t, 0, len(parentBlock.EntriesForTestingOnly()))
 
-	txn, err := parentBlock.NewDerivedTransactionData(0, 0)
+	txn, err := parentBlock.NewTransactionDerivedData(0, 0)
 	require.NoError(t, err)
 
 	txn.AddInvalidator(testInvalidator{invalidateAll: true})
@@ -818,17 +770,15 @@ func TestBlockProgsNewChildDerivedBlockData(t *testing.T) {
 	err = txn.Commit()
 	require.NoError(t, err)
 
-	txn, err = parentBlock.NewDerivedTransactionData(1, 1)
+	txn, err = parentBlock.NewTransactionDerivedData(1, 1)
 	require.NoError(t, err)
 
-	location := common.AddressLocation{
-		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
-		Name:    "address",
-	}
-	prog := &interpreter.Program{}
+	key := "foo bar"
+	valStr := "zzz"
+	value := &valStr
 	state := &state.State{}
 
-	txn.SetProgram(location, prog, state)
+	txn.Set(key, value, state)
 
 	err = txn.Commit()
 	require.NoError(t, err)
@@ -845,15 +795,15 @@ func TestBlockProgsNewChildDerivedBlockData(t *testing.T) {
 	parentEntries := parentBlock.EntriesForTestingOnly()
 	require.Equal(t, 1, len(parentEntries))
 
-	parentEntry, ok := parentEntries[location]
+	parentEntry, ok := parentEntries[key]
 	require.True(t, ok)
 	require.False(t, parentEntry.isInvalid)
-	require.Same(t, prog, parentEntry.Value)
+	require.Same(t, value, parentEntry.Value)
 	require.Same(t, state, parentEntry.State)
 
 	// Verify child is correctly initialized
 
-	childBlock := parentBlock.NewChildDerivedBlockData()
+	childBlock := parentBlock.NewChildBlockDerivedData()
 
 	require.Equal(
 		t,
@@ -865,11 +815,98 @@ func TestBlockProgsNewChildDerivedBlockData(t *testing.T) {
 	childEntries := childBlock.EntriesForTestingOnly()
 	require.Equal(t, 1, len(childEntries))
 
-	childEntry, ok := childEntries[location]
+	childEntry, ok := childEntries[key]
 	require.True(t, ok)
 	require.False(t, childEntry.isInvalid)
-	require.Same(t, prog, childEntry.Value)
+	require.Same(t, value, childEntry.Value)
 	require.Same(t, state, childEntry.State)
 
 	require.NotSame(t, parentEntry, childEntry)
+}
+
+func TestTxnDerivedDataGetOrCompute(t *testing.T) {
+	blockDerivedData := NewEmptyBlockDerivedData[string, int]()
+
+	derivedKey := "derivedKey"
+	derivedValue := 12345
+	addr := "addr"
+	key := "key"
+
+	t.Run("compute value", func(t *testing.T) {
+		view := utils.NewSimpleView()
+		txnState := state.NewTransactionState(view, state.DefaultParameters())
+
+		calledValFunc := false
+		valFunc := func(
+			txnState *state.TransactionState,
+			_ string,
+		) (
+			int,
+			error,
+		) {
+			calledValFunc = true
+			_, err := txnState.Get(addr, key, true)
+			if err != nil {
+				return 0, err
+			}
+
+			return derivedValue, nil
+		}
+
+		txnDerivedData, err := blockDerivedData.NewTransactionDerivedData(0, 0)
+		assert.Nil(t, err)
+
+		val, err := txnDerivedData.GetOrCompute(
+			txnState,
+			derivedKey,
+			valFunc)
+		assert.Nil(t, err)
+		assert.Equal(t, derivedValue, val)
+		assert.True(t, calledValFunc)
+
+		assert.True(
+			t,
+			view.Ledger.RegisterTouches[utils.FullKey(addr, key)])
+
+		// Commit to setup the next test.
+		err = txnDerivedData.Commit()
+		assert.Nil(t, err)
+	})
+
+	t.Run("get value", func(t *testing.T) {
+		view := utils.NewSimpleView()
+		txnState := state.NewTransactionState(view, state.DefaultParameters())
+
+		calledValFunc := false
+		valFunc := func(
+			txnState *state.TransactionState,
+			_ string,
+		) (
+			int,
+			error,
+		) {
+			calledValFunc = true
+			_, err := txnState.Get(addr, key, true)
+			if err != nil {
+				return 0, err
+			}
+
+			return derivedValue, nil
+		}
+
+		txnDerivedData, err := blockDerivedData.NewTransactionDerivedData(1, 1)
+		assert.Nil(t, err)
+
+		val, err := txnDerivedData.GetOrCompute(
+			txnState,
+			derivedKey,
+			valFunc)
+		assert.Nil(t, err)
+		assert.Equal(t, derivedValue, val)
+		assert.False(t, calledValFunc)
+
+		assert.True(
+			t,
+			view.Ledger.RegisterTouches[utils.FullKey(addr, key)])
+	})
 }

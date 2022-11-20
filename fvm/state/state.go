@@ -120,15 +120,23 @@ func NewState(view View, params StateParameters) *State {
 	}
 }
 
-// NewChild generates a new child state
-func (s *State) NewChild() *State {
+// NewChildWithMeterParams generates a new child state using the provide meter
+// parameters.
+func (s *State) NewChildWithMeterParams(
+	params meter.MeterParameters,
+) *State {
 	return &State{
 		committed:        false,
 		view:             s.view.NewChild(),
-		meter:            s.meter.NewChild(),
+		meter:            meter.NewMeter(params),
 		updatedAddresses: make(map[flow.Address]struct{}),
 		stateLimits:      s.stateLimits,
 	}
+}
+
+// NewChild generates a new child state using the parent's meter parameters.
+func (s *State) NewChild() *State {
+	return s.NewChildWithMeterParams(s.meter.MeterParameters)
 }
 
 // InteractionUsed returns the amount of ledger interaction (total ledger byte read + total ledger byte written)

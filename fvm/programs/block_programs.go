@@ -10,18 +10,24 @@ import (
 // DerivedBlockData is a simple fork-aware OCC database for "caching" derived
 // data for a particular block.
 type DerivedBlockData struct {
-	*BlockDerivedData[common.AddressLocation, *interpreter.Program]
+	programs *BlockDerivedData[common.AddressLocation, *interpreter.Program]
 }
 
 // DerivedTransactionData is the derived data scratch space for a single
 // transaction.
 type DerivedTransactionData struct {
-	*TransactionDerivedData[common.AddressLocation, *interpreter.Program]
+	programs *TransactionDerivedData[
+		common.AddressLocation,
+		*interpreter.Program,
+	]
 }
 
 func NewEmptyDerivedBlockData() *DerivedBlockData {
 	return &DerivedBlockData{
-		NewEmptyBlockDerivedData[common.AddressLocation, *interpreter.Program](),
+		programs: NewEmptyBlockDerivedData[
+			common.AddressLocation,
+			*interpreter.Program,
+		](),
 	}
 }
 
@@ -29,13 +35,16 @@ func NewEmptyDerivedBlockData() *DerivedBlockData {
 // beginning of the block.
 func NewEmptyDerivedBlockDataWithTransactionOffset(offset uint32) *DerivedBlockData {
 	return &DerivedBlockData{
-		NewEmptyBlockDerivedDataWithOffset[common.AddressLocation, *interpreter.Program](offset),
+		programs: NewEmptyBlockDerivedDataWithOffset[
+			common.AddressLocation,
+			*interpreter.Program,
+		](offset),
 	}
 }
 
 func (block *DerivedBlockData) NewChildDerivedBlockData() *DerivedBlockData {
 	return &DerivedBlockData{
-		block.NewChildBlockDerivedData(),
+		programs: block.programs.NewChildBlockDerivedData(),
 	}
 }
 
@@ -46,7 +55,7 @@ func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
 	*DerivedTransactionData,
 	error,
 ) {
-	txn, err := block.NewSnapshotReadTransactionDerivedData(
+	txnPrograms, err := block.programs.NewSnapshotReadTransactionDerivedData(
 		snapshotTime,
 		executionTime)
 	if err != nil {
@@ -54,7 +63,7 @@ func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
 	}
 
 	return &DerivedTransactionData{
-		TransactionDerivedData: txn,
+		programs: txnPrograms,
 	}, nil
 }
 
@@ -65,14 +74,26 @@ func (block *DerivedBlockData) NewDerivedTransactionData(
 	*DerivedTransactionData,
 	error,
 ) {
-	txn, err := block.NewTransactionDerivedData(snapshotTime, executionTime)
+	txnPrograms, err := block.programs.NewTransactionDerivedData(
+		snapshotTime,
+		executionTime)
 	if err != nil {
 		return nil, err
 	}
 
 	return &DerivedTransactionData{
-		TransactionDerivedData: txn,
+		programs: txnPrograms,
 	}, nil
+}
+
+func (block *DerivedBlockData) NextTxIndexForTestingOnly() uint32 {
+	return block.programs.NextTxIndexForTestingOnly()
+}
+
+func (block *DerivedBlockData) GetProgramForTestingOnly(
+	addressLocation common.AddressLocation,
+) *invalidatableEntry[*interpreter.Program] {
+	return block.programs.GetForTestingOnly(addressLocation)
 }
 
 func (transaction *DerivedTransactionData) GetProgram(
@@ -82,7 +103,7 @@ func (transaction *DerivedTransactionData) GetProgram(
 	*state.State,
 	bool,
 ) {
-	return transaction.TransactionDerivedData.Get(addressLocation)
+	return transaction.programs.Get(addressLocation)
 }
 
 func (transaction *DerivedTransactionData) SetProgram(
@@ -90,19 +111,19 @@ func (transaction *DerivedTransactionData) SetProgram(
 	program *interpreter.Program,
 	state *state.State,
 ) {
-	transaction.TransactionDerivedData.Set(addressLocation, program, state)
+	transaction.programs.Set(addressLocation, program, state)
 }
 
 func (transaction *DerivedTransactionData) AddInvalidator(
-	invalidator DerivedDataInvalidator[common.AddressLocation, *interpreter.Program],
+	invalidator TransactionInvalidator,
 ) {
-	transaction.TransactionDerivedData.AddInvalidator(invalidator)
+	transaction.programs.AddInvalidator(invalidator.ProgramInvalidator())
 }
 
 func (transaction *DerivedTransactionData) Validate() RetryableError {
-	return transaction.TransactionDerivedData.Validate()
+	return transaction.programs.Validate()
 }
 
 func (transaction *DerivedTransactionData) Commit() RetryableError {
-	return transaction.TransactionDerivedData.Commit()
+	return transaction.programs.Commit()
 }

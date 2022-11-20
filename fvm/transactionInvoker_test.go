@@ -32,7 +32,10 @@ func TestSafetyCheck(t *testing.T) {
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
-		context := fvm.NewContext(fvm.WithLogger(log))
+		context := fvm.NewContext(
+			fvm.WithLogger(log),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
 
 		txnState := state.NewTransactionState(
 			view,
@@ -47,7 +50,8 @@ func TestSafetyCheck(t *testing.T) {
 		require.NoError(t, err)
 
 		err = txInvoker.Process(context, proc, txnState, derivedTxnData)
-		require.Error(t, err)
+		require.Nil(t, err)
+		require.Error(t, proc.Err)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
@@ -65,7 +69,10 @@ func TestSafetyCheck(t *testing.T) {
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
-		context := fvm.NewContext(fvm.WithLogger(log))
+		context := fvm.NewContext(
+			fvm.WithLogger(log),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
 
 		txnState := state.NewTransactionState(
 			view,
@@ -80,7 +87,8 @@ func TestSafetyCheck(t *testing.T) {
 		require.NoError(t, err)
 
 		err = txInvoker.Process(context, proc, txnState, derivedTxnData)
-		require.Error(t, err)
+		require.Nil(t, err)
+		require.Error(t, proc.Err)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")

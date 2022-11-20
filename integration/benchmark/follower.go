@@ -186,7 +186,7 @@ func (f *txFollowerImpl) run() {
 }
 
 func (f *txFollowerImpl) pollCollections() (*flowsdk.Block, []flowsdk.Collection, error) {
-	ctx, cancel := context.WithTimeout(f.ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(f.ctx, 1*time.Second)
 	defer cancel()
 
 	hdr, err := f.client.GetLatestBlockHeader(ctx, true)
