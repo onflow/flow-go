@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -28,18 +27,16 @@ const defaultBlockQueueCapacity = 10_000
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 // Implements collection.Compliance interface.
 type Engine struct {
-	log                   zerolog.Logger
-	metrics               module.EngineMetrics
-	me                    module.Local
-	headers               storage.Headers
-	payloads              storage.ClusterPayloads
-	state                 protocol.State
-	core                  *Core
-	pendingBlocks         *fifoqueue.FifoQueue // queue for processing inbound blocks
-	pendingBlocksNotifier engine.Notifier
-	// tracking finalized view
-	finalizedView              counters.StrictMonotonousCounter
-	finalizationEventsNotifier engine.Notifier
+	log                          zerolog.Logger
+	metrics                      module.EngineMetrics
+	me                           module.Local
+	headers                      storage.Headers
+	payloads                     storage.ClusterPayloads
+	state                        protocol.State
+	core                         *Core
+	pendingBlocks                *fifoqueue.FifoQueue // queue for processing inbound blocks
+	pendingBlocksNotifier        engine.Notifier
+	finalizedBlocksNotifications chan *model.Block // queue for finalized blocks notifications
 
 	cm *component.ComponentManager
 	component.Component
@@ -68,16 +65,16 @@ func NewEngine(
 	}
 
 	eng := &Engine{
-		log:                        engineLog,
-		metrics:                    core.engineMetrics,
-		me:                         me,
-		headers:                    core.headers,
-		payloads:                   payloads,
-		state:                      state,
-		core:                       core,
-		pendingBlocks:              blocksQueue,
-		pendingBlocksNotifier:      engine.NewNotifier(),
-		finalizationEventsNotifier: engine.NewNotifier(),
+		log:                          engineLog,
+		metrics:                      core.engineMetrics,
+		me:                           me,
+		headers:                      core.headers,
+		payloads:                     payloads,
+		state:                        state,
+		core:                         core,
+		pendingBlocks:                blocksQueue,
+		pendingBlocksNotifier:        engine.NewNotifier(),
+		finalizedBlocksNotifications: make(chan *model.Block, 10),
 	}
 
 	// create the component manager and worker threads
@@ -184,13 +181,15 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-// It informs sealing.Core about finalization of the respective block.
+// It informs compliance.Core about finalization of the respective block.
+// We choose to possibly drop notifications rather than block the caller.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
-	if e.finalizedView.Set(block.View) {
-		e.finalizationEventsNotifier.Notify()
+	select {
+	case e.finalizedBlocksNotifications <- block:
+	default:
 	}
 }
 
@@ -214,16 +213,29 @@ func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[messages.Cluste
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
 func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	final, err := e.state.Final().Head()
+	if err != nil {
+		ctx.Throw(err)
+	}
 	ready()
 
 	doneSignal := ctx.Done()
-	blockFinalizedSignal := e.finalizationEventsNotifier.Channel()
 	for {
 		select {
 		case <-doneSignal:
 			return
-		case <-blockFinalizedSignal:
-			e.core.ProcessFinalizedView(e.finalizedView.Value())
+		case finalizedBlock := <-e.finalizedBlocksNotifications:
+			// drop outdated notifications
+			if finalizedBlock.View < final.View {
+				continue
+			}
+
+			// retrieve the latest finalized header, so we know the height
+			final, err = e.state.Final().Head() // over-writes `final` variable for next loop iteration
+			if err != nil {                     // no expected errors
+				ctx.Throw(err)
+			}
+			e.core.ProcessFinalizedBlock(final)
 		}
 	}
 }

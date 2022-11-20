@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -39,6 +40,8 @@ type Core struct {
 	collectionMetrics module.CollectionMetrics
 	headers           storage.Headers
 	state             clusterkv.MutableState
+	finalizedView     counters.StrictMonotonousCounter
+	finalizedHeight   counters.StrictMonotonousCounter
 	pending           module.PendingClusterBlockBuffer // pending block cache
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff
@@ -94,6 +97,7 @@ func NewCore(
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 	header := proposal.Header
 	blockID := header.ID()
+	finalHeight := c.finalizedHeight.Value()
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
@@ -107,8 +111,22 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("signers", header.ParentVoterIndices).
+		Uint64("final_height", finalHeight).
 		Logger()
+	if log.Debug().Enabled() {
+		log = log.With().Strs("tx_ids", flow.IdentifierList(proposal.Payload.Collection.Light().Transactions).Strings()).Logger()
+	}
 	log.Info().Msg("block proposal received")
+
+	// ignore proposals which are too far ahead of our local finalized state
+	// instead, rely on sync engine to catch up finalization more effectively, and avoid
+	// large subtree of blocks to be cached.
+	if header.Height > finalHeight+c.config.SkipNewProposalsThreshold {
+		log.Debug().
+			Uint64("skip_new_proposals_threshold", c.config.SkipNewProposalsThreshold).
+			Msg("dropping block too far ahead of locally finalized height")
+		return nil
+	}
 
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later
@@ -131,9 +149,6 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		return fmt.Errorf("could not check proposal: %w", err)
 	}
 
-	// ignore proposals which are too far ahead of our local finalized state
-	// instead, rely on sync engine to catch up finalization more effectively, and avoid
-	// large subtree of blocks to be cached.
 	final, err := c.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get latest finalized header: %w", err)
@@ -334,11 +349,13 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 	return nil
 }
 
-// ProcessFinalizedView performs pruning of stale data based on finalization event
+// ProcessFinalizedBlock performs pruning of stale data based on finalization event
 // removes pending blocks below the finalized view
-func (c *Core) ProcessFinalizedView(finalizedView uint64) {
+func (c *Core) ProcessFinalizedBlock(finalized *flow.Header) {
 	// remove all pending blocks at or below the finalized view
-	c.pending.PruneByView(finalizedView)
+	c.pending.PruneByView(finalized.View)
+	c.finalizedHeight.Set(finalized.Height)
+	c.finalizedView.Set(finalized.View)
 
 	// always record the metric
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
