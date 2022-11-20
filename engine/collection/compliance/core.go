@@ -87,6 +87,13 @@ func NewCore(
 		timeoutAggregator: timeoutAggregator,
 	}
 
+	// initialize finalized boundary cache
+	final, err := c.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not initialized finalized boundary cache: %w", err)
+	}
+	c.ProcessFinalizedBlock(final)
+
 	// log the mempool size off the bat
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 

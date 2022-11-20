@@ -222,6 +222,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 func (cs *EngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.ClusterBlockFixture()
 	cs.head = &finalizedBlock
+	cs.headerDB[finalizedBlock.ID()] = &finalizedBlock
 
 	*cs.pending = module.PendingClusterBlockBuffer{}
 	// wait for both expected calls before ending the test
