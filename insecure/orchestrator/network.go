@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/hash"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
@@ -128,8 +129,6 @@ func (on *Network) Observe(message *insecure.Message) {
 		}
 	}
 	if message.Ingress != nil {
-		on.logger.Info().Msg("FIND_THIS_STAMP_INGRESS")
-
 		if err := on.processIngressMessage(message.Ingress); err != nil {
 			on.logger.Error().Err(err).Msg("could not process ingress message of corrupt node")
 			return // return to avoid changing the behavior by tweaking the log level.
@@ -159,13 +158,15 @@ func (on *Network) processEgressMessage(message *insecure.EgressMessage) error {
 	on.orchestratorMutex.Lock()
 	defer on.orchestratorMutex.Unlock()
 
+	egressEventID := flow.HashToID(hash.DefaultHasher.ComputeHash(message.Payload))
 	err = on.orchestrator.HandleEgressEvent(&insecure.EgressEvent{
-		CorruptOriginId:   sender,
-		Channel:           channels.Channel(message.ChannelID),
-		FlowProtocolEvent: event,
-		Protocol:          message.Protocol,
-		TargetNum:         message.TargetNum,
-		TargetIds:         targetIds,
+		CorruptOriginId:     sender,
+		Channel:             channels.Channel(message.ChannelID),
+		FlowProtocolEvent:   event,
+		FlowProtocolEventID: egressEventID,
+		Protocol:            message.Protocol,
+		TargetNum:           message.TargetNum,
+		TargetIds:           targetIds,
 	})
 	if err != nil {
 		return fmt.Errorf("could not handle egress event by orchestrator: %w", err)
@@ -196,11 +197,13 @@ func (on *Network) processIngressMessage(message *insecure.IngressMessage) error
 	on.orchestratorMutex.Lock()
 	defer on.orchestratorMutex.Unlock()
 
+	ingressEventID := flow.HashToID(hash.DefaultHasher.ComputeHash(message.Payload))
 	err = on.orchestrator.HandleIngressEvent(&insecure.IngressEvent{
-		OriginID:          senderId,
-		CorruptTargetID:   targetId,
-		Channel:           channels.Channel(message.ChannelID),
-		FlowProtocolEvent: event,
+		OriginID:            senderId,
+		CorruptTargetID:     targetId,
+		Channel:             channels.Channel(message.ChannelID),
+		FlowProtocolEvent:   event,
+		FlowProtocolEventID: ingressEventID,
 	})
 	if err != nil {
 		return fmt.Errorf("could not handle ingress event by orchestrator: %w", err)
