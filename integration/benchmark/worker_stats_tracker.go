@@ -129,7 +129,6 @@ func (st *WorkerStatsTracker) GetTxSent() int {
 	return st.stats.txsSent
 }
 
-// TODO(rbtz): make this a method public so that we can remove all getters from the ContLoadGenerator.
 func (st *WorkerStatsTracker) getStats() workerStats {
 	st.mux.Lock()
 	defer st.mux.Unlock()

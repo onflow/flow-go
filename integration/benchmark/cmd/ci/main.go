@@ -212,6 +212,7 @@ func main() {
 		defer wg.Done()
 		dataSlices = recordTransactionData(
 			lg,
+			workerStatsTracker,
 			*sliceSize,
 			runStartTime,
 			gitSha,
@@ -224,6 +225,7 @@ func main() {
 		defer wg.Done()
 		err := adjustTPS(
 			lg,
+			workerStatsTracker,
 			log,
 			adjustInterval,
 			loadCase.tps,
@@ -260,6 +262,7 @@ func main() {
 
 func recordTransactionData(
 	lg *benchmark.ContLoadGenerator,
+	workerStatsTracker *benchmark.WorkerStatsTracker,
 	sliceDuration time.Duration,
 	runStartTime time.Time,
 	gitSha, goVersion, osVersion string,
@@ -271,13 +274,13 @@ func recordTransactionData(
 
 	for {
 		startTime := time.Now()
-		startExecutedTransactions := lg.GetTxExecuted()
-		startSentTransactions := lg.GetTxSent()
+		startExecutedTransactions := workerStatsTracker.GetTxExecuted()
+		startSentTransactions := workerStatsTracker.GetTxSent()
 
 		select {
 		case endTime := <-t.C:
-			endExecutedTransaction := lg.GetTxExecuted()
-			endSentTransactions := lg.GetTxSent()
+			endExecutedTransaction := workerStatsTracker.GetTxExecuted()
+			endSentTransactions := workerStatsTracker.GetTxSent()
 
 			// calculate this slice
 			outputTps := float64(endExecutedTransaction-startExecutedTransactions) / sliceDuration.Seconds()
@@ -333,6 +336,7 @@ func sendDataToBigQuery(
 // Target TPS is always bounded by [minTPS, maxTPS].
 func adjustTPS(
 	lg *benchmark.ContLoadGenerator,
+	workerStatsTracker *benchmark.WorkerStatsTracker,
 	log zerolog.Logger,
 	interval time.Duration,
 	minTPS uint,
@@ -342,16 +346,16 @@ func adjustTPS(
 	targetTPS := minTPS
 	lastTs := time.Now()
 	lastTPS := float64(minTPS)
-	lastTxs := uint(lg.GetTxExecuted())
-	lastTimedoutTxs := lg.GetTxTimedout()
+	lastTxs := uint(workerStatsTracker.GetTxExecuted())
+	lastTimedoutTxs := workerStatsTracker.GetTxTimedout()
 	for {
 		select {
 		// NOTE: not using a ticker here since adjusting worker count in SetTPS
 		// can take a while and lead to uneven feedback intervals.
 		case nowTs := <-time.After(interval):
-			currentSentTxs := lg.GetTxSent()
-			currentTxs := uint(lg.GetTxExecuted())
-			currentTimedoutTxs := lg.GetTxTimedout()
+			currentSentTxs := workerStatsTracker.GetTxSent()
+			currentTxs := uint(workerStatsTracker.GetTxExecuted())
+			currentTimedoutTxs := workerStatsTracker.GetTxTimedout()
 			// number of timed out transactions in the last interval
 			timedoutTxs := currentTimedoutTxs - lastTimedoutTxs
 
@@ -407,7 +411,7 @@ func adjustTPS(
 			//
 			// SetTPS is a blocking call, so we need to re-fetch the TxExecuted and time.
 			//
-			lastTxs = uint(lg.GetTxExecuted())
+			lastTxs = uint(workerStatsTracker.GetTxExecuted())
 			lastTPS = currentTPS
 			lastTs = time.Now()
 		case <-lg.Done():
