@@ -1,26 +1,30 @@
 package programs
 
-type DerivedDataInvalidator[TVal any] interface {
+import (
+	"github.com/onflow/flow-go/fvm/state"
+)
+
+type DerivedDataInvalidator[TKey comparable, TVal any] interface {
 	// This returns true if the this invalidates any data
-	ShouldInvalidateItems() bool
+	ShouldInvalidateEntries() bool
 
 	// This returns true if the data entry should be invalidated.
-	ShouldInvalidateEntry(TVal) bool
+	ShouldInvalidateEntry(TKey, TVal, *state.State) bool
 }
 
-type derivedDataInvalidatorAtTime[TVal any] struct {
-	DerivedDataInvalidator[TVal]
+type derivedDataInvalidatorAtTime[TKey comparable, TVal any] struct {
+	DerivedDataInvalidator[TKey, TVal]
 
 	executionTime LogicalTime
 }
 
 // NOTE: chainedInvalidator assumes that the entries are order by non-decreasing
 // execution time.
-type chainedDerivedDataInvalidators[TVal any] []derivedDataInvalidatorAtTime[TVal]
+type chainedDerivedDataInvalidators[TKey comparable, TVal any] []derivedDataInvalidatorAtTime[TKey, TVal]
 
-func (chained chainedDerivedDataInvalidators[TVal]) ApplicableInvalidators(
+func (chained chainedDerivedDataInvalidators[TKey, TVal]) ApplicableInvalidators(
 	snapshotTime LogicalTime,
-) chainedDerivedDataInvalidators[TVal] {
+) chainedDerivedDataInvalidators[TKey, TVal] {
 	// NOTE: switch to bisection search (or reverse iteration) if the list
 	// is long.
 	for idx, entry := range chained {
@@ -32,9 +36,9 @@ func (chained chainedDerivedDataInvalidators[TVal]) ApplicableInvalidators(
 	return nil
 }
 
-func (chained chainedDerivedDataInvalidators[TVal]) ShouldInvalidateItems() bool {
+func (chained chainedDerivedDataInvalidators[TKey, TVal]) ShouldInvalidateEntries() bool {
 	for _, invalidator := range chained {
-		if invalidator.ShouldInvalidateItems() {
+		if invalidator.ShouldInvalidateEntries() {
 			return true
 		}
 	}
@@ -42,11 +46,13 @@ func (chained chainedDerivedDataInvalidators[TVal]) ShouldInvalidateItems() bool
 	return false
 }
 
-func (chained chainedDerivedDataInvalidators[TVal]) ShouldInvalidateEntry(
-	entry TVal,
+func (chained chainedDerivedDataInvalidators[TKey, TVal]) ShouldInvalidateEntry(
+	key TKey,
+	value TVal,
+	state *state.State,
 ) bool {
 	for _, invalidator := range chained {
-		if invalidator.ShouldInvalidateEntry(entry) {
+		if invalidator.ShouldInvalidateEntry(key, value, state) {
 			return true
 		}
 	}

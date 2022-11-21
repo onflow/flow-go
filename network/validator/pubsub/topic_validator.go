@@ -168,9 +168,9 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 
 func violation(pid peer.ID, channel channels.Channel, err error) *slashing.Violation {
 	return &slashing.Violation{
-		PeerID:    pid.String(),
-		Channel:   channel,
-		IsUnicast: false,
-		Err:       err,
+		PeerID:   pid.String(),
+		Channel:  channel,
+		Protocol: message.ProtocolPublish,
+		Err:      err,
 	}
 }

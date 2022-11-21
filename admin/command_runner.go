@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
 	pb "github.com/onflow/flow-go/admin/admin"
@@ -200,14 +202,23 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 		}
 	}()
 
-	// Register gRPC server endpoint
-	mux := runtime.NewServeMux()
-	opts := []grpc.DialOption{grpc.WithInsecure()} //nolint:staticcheck
-
-	err = pb.RegisterAdminHandlerFromEndpoint(ctx, mux, "unix:///"+r.grpcAddress, opts)
+	// Initialize gRPC and HTTP muxers
+	gwmux := runtime.NewServeMux()
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	err = pb.RegisterAdminHandlerFromEndpoint(ctx, gwmux, "unix:///"+r.grpcAddress, opts)
 	if err != nil {
 		return fmt.Errorf("failed to register http handlers for admin service: %w", err)
 	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/", gwmux)
+
+	// This adds an ability to use standard go tooling for performance troubleshooting e.g.:
+	//  go tool pprof http://localhost:9002/debug/pprof/goroutine
+	for _, name := range []string{"allocs", "block", "goroutine", "heap", "mutex", "threadcreate"} {
+		mux.HandleFunc(fmt.Sprintf("/debug/pprof/%s", name), pprof.Handler(name).ServeHTTP)
+	}
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 	httpServer := &http.Server{
 		Addr:      r.httpAddress,
@@ -267,7 +278,13 @@ func (r *CommandRunner) runCommand(ctx context.Context, command string, data int
 
 	if validator := r.getValidator(command); validator != nil {
 		if validationErr := validator(req); validationErr != nil {
-			return nil, status.Error(codes.InvalidArgument, validationErr.Error())
+			// for expected validation errors, return code InvalidArgument and the error text
+			if IsInvalidAdminParameterError(validationErr) {
+				return nil, status.Error(codes.InvalidArgument, validationErr.Error())
+			}
+			// for unexpected errors, return code Internal and log a warning
+			r.logger.Err(validationErr).Msg("unexpected error validating admin request")
+			return nil, status.Error(codes.Internal, validationErr.Error())
 		}
 	}
 
@@ -281,6 +298,7 @@ func (r *CommandRunner) runCommand(ctx context.Context, command string, data int
 			} else if errors.Is(handleErr, context.DeadlineExceeded) {
 				return nil, status.Error(codes.DeadlineExceeded, "request timed out")
 			} else {
+				r.logger.Err(handleErr).Msg("unexpected error handling admin request")
 				s, _ := status.FromError(handleErr)
 				return nil, s.Err()
 			}

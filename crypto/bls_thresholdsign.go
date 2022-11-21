@@ -572,9 +572,12 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	}
 	// Generate a polynomial P in Zr[X] of degree t
 	a := make([]scalar, threshold+1)
-	randZrStar(&a[0])
-	for i := 1; i < threshold+1; i++ {
-		randZr(&a[i])
+	randZrStar(&a[0]) // non-identity key
+	if threshold > 0 {
+		for i := 1; i < threshold; i++ {
+			randZr(&a[i])
+		}
+		randZrStar(&a[threshold]) // enforce the polynomial degree
 	}
 	// compute the shares
 	for i := index(1); int(i) <= size; i++ {
@@ -596,5 +599,9 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 		pkShares[i] = newPubKeyBLSBLS12381(&y[i])
 	}
 	pkGroup = newPubKeyBLSBLS12381(&X0)
+
+	// public key shares and group public key
+	// are sampled uniformly at random. The probability of
+	// generating an identity key is therefore negligible.
 	return skShares, pkShares, pkGroup, nil
 }
