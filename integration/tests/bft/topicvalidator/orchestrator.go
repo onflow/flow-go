@@ -186,12 +186,6 @@ func (o *testOrchestrator) initAuthorizedEvents() {
 	}
 }
 
-func (o *testOrchestrator) getFlowProtocolEventID(event interface{}) flow.Identifier {
-	payload, err := o.codec.Encode(event)
-	require.NoError(o.t, err)
-	return flow.HashToID(hash.DefaultHasher.ComputeHash(payload))
-}
-
 // initUnauthorizedMsgByRoleEvents sets n number of events where the sender is unauthorized to
 // send the FlowProtocolEvent. In this case AN's are not authorized to send block proposals.
 func (o *testOrchestrator) initUnauthorizedMsgByRoleEvents(n int) {
@@ -272,4 +266,10 @@ func (o *testOrchestrator) initUnauthorizedPublishOnChannelEvents(n int) {
 		}
 		o.unauthorizedEvents[eventID] = unauthorizedPublishOnChannel
 	}
+}
+
+func (o *testOrchestrator) getFlowProtocolEventID(event interface{}) flow.Identifier {
+	payload, err := o.codec.Encode(event)
+	require.NoError(o.t, err)
+	return flow.HashToID(hash.DefaultHasher.ComputeHash(payload))
 }

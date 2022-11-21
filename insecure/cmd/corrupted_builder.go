@@ -66,7 +66,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 
 		var libP2PNodeFactory p2pbuilder.LibP2PFactoryFunc
 
-		// create default lib p2p factory if corrupt node should enable the topic validator
+		// create default libp2p factory if corrupt node should enable the topic validator
 		if cnb.TopicValidatorEnabled {
 			libP2PNodeFactory = p2pbuilder.DefaultLibP2PNodeFactory(
 				cnb.Logger,
