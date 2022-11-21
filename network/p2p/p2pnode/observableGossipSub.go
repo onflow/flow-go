@@ -90,7 +90,7 @@ func (o *ObservableGossipSubRouter) HandleRPC(rpc *pubsub.RPC) {
 	includedMessages := len(rpc.GetPublish())
 
 	// TODO: add peer id of the sender to the log (currently unavailable in the RPC).
-	o.logger.Debug().
+	o.logger.Trace().
 		Int("iHaveCount", iHaveCount).
 		Int("iWantCount", iWantCount).
 		Int("graftCount", graftCount).
