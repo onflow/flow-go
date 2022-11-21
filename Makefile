@@ -267,14 +267,14 @@ docker-build-execution-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/execution-debug:latest" -t "$(CONTAINER_REGISTRY)/execution-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-debug:$(IMAGE_TAG)" .
 
-# build corrupted execution node for BFT testing
-.PHONY: docker-build-execution-corrupted
-docker-build-execution-corrupted:
+# build corrupt execution node for BFT testing
+.PHONY: docker-build-execution-corrupt
+docker-build-execution-corrupt:
 	# temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
 	./insecure/cmd/build_helper1.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/execution-corrupted:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/execution-corrupt:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupt:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupt:$(IMAGE_TAG)" .
 	./insecure/cmd/build_helper2.sh
 
 .PHONY: docker-build-verification
@@ -288,14 +288,14 @@ docker-build-verification-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/verification-debug:latest" -t "$(CONTAINER_REGISTRY)/verification-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-debug:$(IMAGE_TAG)" .
 
-# build corrupted verification node for BFT testing
-.PHONY: docker-build-verification-corrupted
-docker-build-verification-corrupted:
+# build corrupt verification node for BFT testing
+.PHONY: docker-build-verification-corrupt
+docker-build-verification-corrupt:
 	# temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
 	./insecure/cmd/build_helper1.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/verification-corrupted:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/verification-corrupt:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupt:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupt:$(IMAGE_TAG)" .
 	./insecure/cmd/build_helper2.sh
 
 .PHONY: docker-build-access
@@ -354,10 +354,10 @@ docker-build-loader:
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
-docker-build-flow: docker-build-flow-corrupted docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-observer docker-build-ghost
+docker-build-flow: docker-build-flow-corrupt docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-observer docker-build-ghost
 
-.PHONY: docker-build-flow-corrupted
-docker-build-flow-corrupted: docker-build-execution-corrupted docker-build-verification-corrupted
+.PHONY: docker-build-flow-corrupt
+docker-build-flow-corrupt: docker-build-execution-corrupt docker-build-verification-corrupt
 
 .PHONY: docker-build-benchnet
 docker-build-benchnet: docker-build-flow docker-build-loader
