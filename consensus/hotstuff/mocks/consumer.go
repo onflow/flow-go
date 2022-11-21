@@ -103,6 +103,11 @@ func (_m *Consumer) OnReceiveTc(currentView uint64, tc *flow.TimeoutCertificate)
 	_m.Called(currentView, tc)
 }
 
+// OnStart provides a mock function with given fields: currentView
+func (_m *Consumer) OnStart(currentView uint64) {
+	_m.Called(currentView)
+}
+
 // OnStartingTimeout provides a mock function with given fields: _a0
 func (_m *Consumer) OnStartingTimeout(_a0 model.TimerInfo) {
 	_m.Called(_a0)

@@ -135,8 +135,6 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 // BeforeTest instantiates and starts Follower
 func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
-	s.notifier.On("OnBlockIncorporated", blockWithID(s.rootHeader.ID())).Return().Once()
-
 	var err error
 	s.follower, err = consensus.NewFollower(
 		zerolog.New(os.Stderr),

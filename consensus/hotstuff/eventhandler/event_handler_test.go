@@ -295,6 +295,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.notifier = mocks.NewConsumer(es.T())
 	es.notifier.On("OnEventProcessed").Maybe()
 	es.notifier.On("OnEnteringView", mock.Anything, mock.Anything).Maybe()
+	es.notifier.On("OnStart", mock.Anything).Maybe()
 	es.notifier.On("OnReceiveProposal", mock.Anything, mock.Anything).Maybe()
 	es.notifier.On("OnReceiveQc", mock.Anything, mock.Anything).Maybe()
 	es.notifier.On("OnReceiveTc", mock.Anything, mock.Anything).Maybe()
