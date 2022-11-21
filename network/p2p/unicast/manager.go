@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -29,6 +30,9 @@ type Manager struct {
 	unicasts       []Protocol
 	defaultHandler libp2pnet.StreamHandler
 	sporkId        flow.Identifier
+
+	incomingStreamsMu sync.Mutex
+	incomingStreams   map[peer.ID]libp2pnet.Stream
 }
 
 func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, sporkId flow.Identifier) *Manager {
@@ -52,11 +56,11 @@ func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
 	m.unicasts = []Protocol{
 		&PlainStream{
 			protocolId: defaultProtocolID,
-			handler:    defaultHandler,
+			handler:    m.handleIncomingStream,
 		},
 	}
 
-	m.streamFactory.SetStreamHandler(defaultProtocolID, defaultHandler)
+	m.streamFactory.SetStreamHandler(defaultProtocolID, m.handleIncomingStream)
 	m.logger.Info().Str("protocol_id", string(defaultProtocolID)).Msg("default unicast handler registered")
 }
 
@@ -68,7 +72,7 @@ func (m *Manager) Register(unicast ProtocolName) error {
 		return fmt.Errorf("could not translate protocol name into factory: %w", err)
 	}
 
-	u := factory(m.logger, m.sporkId, m.defaultHandler)
+	u := factory(m.logger, m.sporkId, m.handleIncomingStream)
 
 	m.unicasts = append(m.unicasts, u)
 	m.streamFactory.SetStreamHandler(u.ProtocolId(), u.Handler)
@@ -183,4 +187,32 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	}
 
 	return s, dialAddr, nil
+}
+
+// handleIncomingStream accepts inbound streams from libp2p, and hands them off to the configured
+// unicast stream handler.
+func (m *Manager) handleIncomingStream(s libp2pnet.Stream) {
+	remotePeer := s.Conn().RemotePeer()
+
+	// ensure there is only one incoming unicast stream per peer
+	m.incomingStreamsMu.Lock()
+	if other, has := m.incomingStreams[remotePeer]; has {
+		m.logger.Warn().
+			Str("remote_peer", remotePeer.String()).
+			Msg("duplicate incoming stream. resetting other stream")
+		other.Reset()
+	}
+	m.incomingStreams[remotePeer] = s
+	m.incomingStreamsMu.Unlock()
+
+	// cleanup record keeping when stream is closed
+	defer func() {
+		m.incomingStreamsMu.Lock()
+		if m.incomingStreams[remotePeer] == s {
+			delete(m.incomingStreams, remotePeer)
+		}
+		m.incomingStreamsMu.Unlock()
+	}()
+
+	m.defaultHandler(s)
 }
