@@ -55,11 +55,11 @@ func (o *ObservableGossipSubRouter) AcceptFrom(id peer.ID) pubsub.AcceptStatus {
 	lg := o.logger.With().Str("peer", id.String()).Logger()
 	switch acceptStatus {
 	case pubsub.AcceptAll:
-		lg.Debug().Msg("accepting all messages from peer")
+		lg.Trace().Msg("accepting all messages from peer")
 		o.metrics.OnIncomingRpcAcceptedFully()
 
 	case pubsub.AcceptControl:
-		lg.Debug().Msg("accepting only control messages from peer")
+		lg.Trace().Msg("accepting only control messages from peer")
 		o.metrics.OnIncomingRpcAcceptedOnlyForControlMessages()
 
 	case pubsub.AcceptNone:
