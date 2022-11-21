@@ -113,7 +113,11 @@ func getMeterParamOverridesFromState(
 	serviceAddress := ctx.Chain.ServiceAddress()
 	service := runtime.Address(serviceAddress)
 
-	env := NewScriptEnv(context.Background(), ctx, txnState, derivedTxnData)
+	env := environment.NewScriptEnvironment(
+		context.Background(),
+		ctx.EnvironmentParams,
+		txnState,
+		derivedTxnData)
 
 	overrides := MeterParamOverrides{}
 
