@@ -11,7 +11,7 @@ import (
 type item struct {
 	originID flow.Identifier
 	header   *flow.Header
-	payload  interface{}
+	payload  any
 }
 
 // backend implements a simple cache of pending blocks, indexed by parent ID.

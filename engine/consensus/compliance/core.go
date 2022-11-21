@@ -175,7 +175,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	if found {
 
 		// add the block to the cache
-		_ = c.pending.Add(originID, proposal)
+		_ = c.pending.Add(flow.Slashable[flow.Block]{originID, block})
 		c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		return nil
@@ -187,7 +187,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	_, err = c.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
 
-		_ = c.pending.Add(originID, proposal)
+		_ = c.pending.Add(flow.Slashable[flow.Block]{originID, block})
 
 		c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
