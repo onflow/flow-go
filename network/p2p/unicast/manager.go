@@ -25,21 +25,21 @@ const MaxConnectAttemptSleepDuration = 5
 
 // Manager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
 type Manager struct {
-	logger         zerolog.Logger
-	streamFactory  StreamFactory
-	unicasts       []Protocol
-	defaultHandler libp2pnet.StreamHandler
-	sporkId        flow.Identifier
-
+	logger            zerolog.Logger
+	streamFactory     StreamFactory
+	unicasts          []Protocol
+	defaultHandler    libp2pnet.StreamHandler
+	sporkId           flow.Identifier
 	incomingStreamsMu sync.Mutex
 	incomingStreams   map[peer.ID]libp2pnet.Stream
 }
 
 func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, sporkId flow.Identifier) *Manager {
 	return &Manager{
-		logger:        logger.With().Str("module", "unicast-manager").Logger(),
-		streamFactory: streamFactory,
-		sporkId:       sporkId,
+		logger:          logger.With().Str("module", "unicast-manager").Logger(),
+		streamFactory:   streamFactory,
+		sporkId:         sporkId,
+		incomingStreams: make(map[peer.ID]libp2pnet.Stream),
 	}
 }
 
@@ -191,6 +191,8 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 
 // handleIncomingStream accepts inbound streams from libp2p, and hands them off to the configured
 // unicast stream handler.
+// Note: This handler ensures that there is at most 1 inbound stream per remote peer. If an existing
+// stream is found, it is reset.
 func (m *Manager) handleIncomingStream(s libp2pnet.Stream) {
 	remotePeer := s.Conn().RemotePeer()
 
