@@ -27,8 +27,10 @@ type Suite struct {
 	net                     *testnet.FlowNetwork // used to keep an instance of testnet
 	nodeConfigs             []testnet.NodeConfig // used to keep configuration of nodes in testnet
 	nodeIDs                 []flow.Identifier    // used to keep identifier of nodes in testnet
-	corruptANID             flow.Identifier      // corrupt AN id
-	corruptENID             flow.Identifier      // corrupt EN id
+	attackerANID            flow.Identifier      // corrupt attacker AN id
+	attackerENID            flow.Identifier      // corrupt attacker EN id
+	victimENID              flow.Identifier      // corrupt victim EN id
+	victimVNID              flow.Identifier      // corrupt victim VN id
 	ghostID                 flow.Identifier      // represents id of ghost node
 	Orchestrator            *testOrchestrator
 	orchestratorNetwork     *orchestrator.Network
@@ -42,19 +44,21 @@ func (s *Suite) Ghost() *client.GhostClient {
 	return cli
 }
 
-// SetupSuite runs a bare minimum Flow network to function correctly.
-// 2 of the nodes will be corrupted nodes
-// - 1 corrupt AN that will serve as the attacker or byzantine node in this test.
-// - 1 corrupt EN that will serve as the victim in this test.
+// SetupSuite runs a bare minimum Flow network to function correctly along with 2 attacker nodes
+// and 2 victim nodes.
+// - Corrupt AN that will serve as an attacker and send unauthorized messages to a victim EN.
+// - Corrupt EN that will serve as an attacker and send unauthorized messages to a victim VN.
+// - Corrupt EN with the topic validator enabled that will serve as a victim.
+// - Corrupt VN with the topic validator enabled that will serve as a victim.
 func (s *Suite) SetupSuite() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
-	// create corrupt AN
-	s.corruptANID = unittest.IdentifierFixture()
+	// create corrupt access node
+	s.attackerANID = unittest.IdentifierFixture()
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess,
-		testnet.WithID(s.corruptANID),
+		testnet.WithID(s.attackerANID),
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.AsCorrupted()))
 
@@ -73,21 +77,31 @@ func (s *Suite) SetupSuite() {
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
 
-	// generates one verification node
+	// create corrupt verification node with the topic validator enabled. This is the victim
+	// node that will be published unauthorized messages from the attacker execution node.
+	s.victimVNID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
-		testnet.WithLogLevel(zerolog.FatalLevel))
+		testnet.WithID(s.victimVNID),
+		testnet.WithAdditionalFlag("--topic-validator-enabled=true"),
+		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// generates two execution nodes, 1 of them will be corrupt
-	s.corruptENID = unittest.IdentifierFixture()
+	s.attackerENID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
-		testnet.WithID(s.corruptENID),
+		testnet.WithID(s.attackerENID),
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
+	// create corrupt execution node with the topic validator enabled. This is the victim
+	// node that will be published unauthorized messages from the attacker execution node.
+	s.victimENID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
+		testnet.WithID(s.victimENID),
 		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithAdditionalFlag("--topic-validator-enabled=true"),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
@@ -131,7 +145,7 @@ func (s *Suite) SetupSuite() {
 	// starts tracking blocks by the ghost node
 	s.Track(s.T(), ctx, s.Ghost())
 
-	s.Orchestrator = NewOrchestrator(s.log)
+	s.Orchestrator = NewOrchestrator(s.T(), s.log, s.attackerANID, s.attackerENID, s.victimENID, s.victimVNID)
 
 	// start orchestrator network
 	codec := unittest.NetworkCodec()
