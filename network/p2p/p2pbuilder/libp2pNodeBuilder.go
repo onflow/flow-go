@@ -267,9 +267,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
 			}
 
-			psRouter := p2pnode.NewObservableGossipSub(h, builder.metrics, builder.logger)
-			psOpts = append(psOpts, psRouter.WithDefaultTagTracer())
-			pubSub, err := pubsub.NewGossipSubWithRouter(ctx, h, psRouter, psOpts...)
+			pubSub, err := pubsub.NewGossipSub(ctx, h, psOpts...)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
 			}
