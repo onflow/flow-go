@@ -1,48 +1,99 @@
 package benchmark
 
 import (
-	"fmt"
+	"context"
 	"sync"
 	"time"
 
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/VividCortex/ewma"
+	"github.com/rs/zerolog"
 )
 
-type WorkerStats struct {
-	workers     int
-	txsSent     int
-	txsExecuted int
+type workerStats struct {
+	workers                  int
+	txsSent                  int
+	txsTimedout              int
+	txsExecuted              int
+	txsSentMovingAverage     float64
+	txsExecutedMovingAverage float64
 }
 
 // WorkerStatsTracker keeps track of worker stats
 type WorkerStatsTracker struct {
-	mux              sync.Mutex
-	stats            WorkerStats
-	txsSentPerSecond map[int64]int // tracks txs sent at the timestamp in seconds
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 
-	printer *Worker
+	mux             sync.Mutex
+	stats           workerStats
+	txsSentEWMA     ewma.MovingAverage
+	txsExecutedEWMA ewma.MovingAverage
 }
 
+const defaultMovingAverageAge = 10
+
 // NewWorkerStatsTracker returns a new instance of WorkerStatsTracker
-func NewWorkerStatsTracker() *WorkerStatsTracker {
-	return &WorkerStatsTracker{
-		txsSentPerSecond: make(map[int64]int),
+func NewWorkerStatsTracker(ctx context.Context) *WorkerStatsTracker {
+	ctx, cancel := context.WithCancel(ctx)
+	st := &WorkerStatsTracker{
+		ctx:             ctx,
+		cancel:          cancel,
+		txsSentEWMA:     ewma.NewMovingAverage(defaultMovingAverageAge),
+		txsExecutedEWMA: ewma.NewMovingAverage(defaultMovingAverageAge),
+	}
+
+	st.wg.Add(1)
+	go st.updateEWMAforever()
+	return st
+}
+
+func (st *WorkerStatsTracker) updateEWMAforever() {
+	defer st.wg.Done()
+
+	t := time.NewTicker(time.Second)
+	defer t.Stop()
+
+	lastStats := st.getStats()
+	for {
+		select {
+		case <-t.C:
+			stats := st.getStats()
+			st.updateEWMAonce(lastStats, stats)
+			lastStats = stats
+		case <-st.ctx.Done():
+			return
+		}
 	}
 }
 
-// StartPrinting starts reporting of worker stats
-func (st *WorkerStatsTracker) StartPrinting(interval time.Duration) {
-	printer := NewWorker(0, interval, func(_ int) { fmt.Println(st.Digest()) })
-	st.printer = printer
-	st.printer.Start()
+// updateEWMAonce updates all Exponentially Weighted Moving Averages with the given stats.
+func (st *WorkerStatsTracker) updateEWMAonce(lastStats, stats workerStats) {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	st.txsSentEWMA.Add(float64(stats.txsSent - lastStats.txsSent))
+	st.txsExecutedEWMA.Add(float64(stats.txsExecuted - lastStats.txsExecuted))
 }
 
-// StopPrinting stops reporting of worker stats
-func (st *WorkerStatsTracker) StopPrinting() {
-	st.printer.Stop()
+func (st *WorkerStatsTracker) Stop() {
+	st.cancel()
+	st.wg.Wait()
 }
 
-// TODO(rbtz): move transaction tracking to the follower.
+func (st *WorkerStatsTracker) IncTxTimedout() {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	st.stats.txsTimedout++
+}
+
+func (st *WorkerStatsTracker) GetTxTimedout() int {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	return st.stats.txsTimedout
+}
+
 func (st *WorkerStatsTracker) IncTxExecuted() {
 	st.mux.Lock()
 	defer st.mux.Unlock()
@@ -64,14 +115,11 @@ func (st *WorkerStatsTracker) AddWorkers(i int) {
 	st.stats.workers += i
 }
 
-func (st *WorkerStatsTracker) AddTxSent() {
-	now := time.Now().Unix()
-
+func (st *WorkerStatsTracker) IncTxSent() {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
 	st.stats.txsSent++
-	st.txsSentPerSecond[now]++
 }
 
 func (st *WorkerStatsTracker) GetTxSent() int {
@@ -81,47 +129,28 @@ func (st *WorkerStatsTracker) GetTxSent() int {
 	return st.stats.txsSent
 }
 
-func (st *WorkerStatsTracker) GetStats() WorkerStats {
+// TODO(rbtz): make this a method public so that we can remove all getters from the ContLoadGenerator.
+func (st *WorkerStatsTracker) getStats() workerStats {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
+	st.stats.txsSentMovingAverage = st.txsSentEWMA.Value()
+	st.stats.txsExecutedMovingAverage = st.txsExecutedEWMA.Value()
 	return st.stats
 }
 
-// AvgTPSBetween returns the average transactions per second TPS between the two time points
-func (st *WorkerStatsTracker) AvgTPSBetween(start, stop time.Time) float64 {
-	sum := 0
-
-	st.mux.Lock()
-	defer st.mux.Unlock()
-	for timestamp, count := range st.txsSentPerSecond {
-		if timestamp < start.Unix() || timestamp > stop.Unix() {
-			continue
-		}
-		sum += count
-	}
-
-	diff := stop.Sub(start)
-
-	return float64(sum) / diff.Seconds()
-}
-
-func (st *WorkerStatsTracker) Digest() string {
-	t := table.NewWriter()
-	t.AppendHeader(table.Row{
-		"workers",
-		"total TXs sent",
-		"total TXs finished",
-		"Avg TPS (last 10s)",
+func NewPeriodicStatsLogger(st *WorkerStatsTracker, log zerolog.Logger) *Worker {
+	w := NewWorker(0, 1*time.Second, func(workerID int) {
+		stats := st.getStats()
+		log.Info().
+			Int("workers", stats.workers).
+			Int("txsSent", stats.txsSent).
+			Int("txsTimedout", stats.txsTimedout).
+			Int("txsExecuted", stats.txsExecuted).
+			Float64("txsSentEWMA", stats.txsSentMovingAverage).
+			Float64("txsExecutedEWMA", stats.txsExecutedMovingAverage).
+			Msg("worker stats")
 	})
 
-	stats := st.GetStats()
-	t.AppendRow(table.Row{
-		stats.workers,
-		stats.txsSent,
-		stats.txsExecuted,
-		// use 11 seconds to correct for rounding in buckets
-		st.AvgTPSBetween(time.Now().Add(-11*time.Second), time.Now()),
-	})
-	return t.Render()
+	return w
 }

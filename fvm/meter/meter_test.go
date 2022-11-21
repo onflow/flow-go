@@ -130,15 +130,15 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err := m.MeterComputation(compKind, 1)
 		require.NoError(t, err)
 
-		child1 := m.NewChild()
+		child1 := meter.NewMeter(m.MeterParameters)
 		err = child1.MeterComputation(compKind, 2)
 		require.NoError(t, err)
 
-		child2 := m.NewChild()
+		child2 := meter.NewMeter(m.MeterParameters)
 		err = child2.MeterComputation(compKind, 3)
 		require.NoError(t, err)
 
-		child3 := m.NewChild()
+		child3 := meter.NewMeter(m.MeterParameters)
 		err = child3.MeterComputation(compKind, 4)
 		require.NoError(t, err)
 
@@ -174,7 +174,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err := m.MeterComputation(compKind, 1)
 		require.NoError(t, err)
 
-		child := m.NewChild()
+		child := meter.NewMeter(m.MeterParameters)
 		err = child.MeterComputation(compKind, 1)
 		require.NoError(t, err)
 
@@ -196,7 +196,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err := m.MeterComputation(0, 1)
 		require.NoError(t, err)
 
-		child1 := m.NewChild()
+		child1 := meter.NewMeter(m.MeterParameters)
 		err = child1.MeterComputation(0, 1)
 		require.NoError(t, err)
 
@@ -218,7 +218,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err := m.MeterMemory(0, 1)
 		require.NoError(t, err)
 
-		child1 := m.NewChild()
+		child1 := meter.NewMeter(m.MeterParameters)
 		err = child1.MeterMemory(0, 1)
 		require.NoError(t, err)
 

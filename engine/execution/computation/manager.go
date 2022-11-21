@@ -66,7 +66,7 @@ type ComputationManager interface {
 type ComputationConfig struct {
 	CadenceTracing           bool
 	ExtensiveTracing         bool
-	ProgramsCacheSize        uint
+	DerivedDataCacheSize     uint
 	ScriptLogThreshold       time.Duration
 	ScriptExecutionTimeLimit time.Duration
 
@@ -88,7 +88,7 @@ type Manager struct {
 	vm                       computer.VirtualMachine
 	vmCtx                    fvm.Context
 	blockComputer            computer.BlockComputer
-	programsCache            *programs.ChainPrograms
+	derivedChainData         *programs.DerivedChainData
 	scriptLogThreshold       time.Duration
 	scriptExecutionTimeLimit time.Duration
 	uploaders                []uploader.Uploader
@@ -145,7 +145,7 @@ func New(
 		return nil, fmt.Errorf("cannot create block computer: %w", err)
 	}
 
-	programsCache, err := programs.NewChainPrograms(params.ProgramsCacheSize)
+	derivedChainData, err := programs.NewDerivedChainData(params.DerivedDataCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create programs cache: %w", err)
 	}
@@ -159,7 +159,7 @@ func New(
 		vm:                       vm,
 		vmCtx:                    vmCtx,
 		blockComputer:            blockComputer,
-		programsCache:            programsCache,
+		derivedChainData:         derivedChainData,
 		scriptLogThreshold:       params.ScriptLogThreshold,
 		scriptExecutionTimeLimit: params.ScriptExecutionTimeLimit,
 		uploaders:                uploaders,
@@ -207,8 +207,8 @@ func (e *Manager) ExecuteScript(
 	blockCtx := fvm.NewContextFromParent(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
-		fvm.WithBlockPrograms(
-			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
 	err := func() (err error) {
 
@@ -285,11 +285,11 @@ func (e *Manager) ComputeBlock(
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
 
-	blockPrograms := e.programsCache.GetOrCreateBlockPrograms(
+	derivedBlockData := e.derivedChainData.GetOrCreateDerivedBlockData(
 		block.ID(),
 		block.ParentID())
 
-	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, blockPrograms)
+	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, derivedBlockData)
 	if err != nil {
 		e.log.Error().
 			Hex("block_id", logging.Entity(block.Block)).
@@ -334,8 +334,8 @@ func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, vie
 	blockCtx := fvm.NewContextFromParent(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
-		fvm.WithBlockPrograms(
-			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
 	account, err := e.vm.GetAccount(blockCtx, address, view)
 	if err != nil {

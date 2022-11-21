@@ -63,7 +63,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -137,14 +137,14 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
-	programsCache, err := programs.NewChainPrograms(10)
+	derivedChainData, err := programs.NewDerivedChainData(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
-		blockComputer: blockComputer,
-		me:            me,
-		programsCache: programsCache,
-		tracer:        trace.NewNoopTracer(),
+		blockComputer:    blockComputer,
+		me:               me,
+		derivedChainData: derivedChainData,
+		tracer:           trace.NewNoopTracer(),
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -187,17 +187,17 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		computationResult: computationResult,
 	}
 
-	programsCache, err := programs.NewChainPrograms(10)
+	derivedChainData, err := programs.NewDerivedChainData(10)
 	require.NoError(t, err)
 
 	fakeUploader := &FakeUploader{}
 
 	manager := &Manager{
-		blockComputer: blockComputer,
-		me:            me,
-		programsCache: programsCache,
-		uploaders:     []uploader.Uploader{fakeUploader},
-		tracer:        trace.NewNoopTracer(),
+		blockComputer:    blockComputer,
+		me:               me,
+		derivedChainData: derivedChainData,
+		uploaders:        []uploader.Uploader{fakeUploader},
+		tracer:           trace.NewNoopTracer(),
 	}
 
 	view := delta.NewView(state2.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
@@ -262,7 +262,7 @@ func TestExecuteScript(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 		},
@@ -324,7 +324,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 		},
@@ -369,7 +369,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 			NewCustomVirtualMachine: func() computer.VirtualMachine {
@@ -419,7 +419,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       1 * time.Millisecond,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 			NewCustomVirtualMachine: func() computer.VirtualMachine {
@@ -469,7 +469,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		nil,
 		prov,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       1 * time.Second,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 			NewCustomVirtualMachine: func() computer.VirtualMachine {
@@ -518,7 +518,7 @@ type FakeBlockComputer struct {
 	computationResult *execution.ComputationResult
 }
 
-func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.BlockPrograms) (*execution.ComputationResult, error) {
+func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.DerivedBlockData) (*execution.ComputationResult, error) {
 	return f.computationResult, nil
 }
 
@@ -554,7 +554,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		nil,
 		nil,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -594,7 +594,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		nil,
 		nil,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -646,7 +646,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
 	require.NoError(t, err)
 
 	// setup transactions
@@ -721,14 +721,14 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	programsCache, err := programs.NewChainPrograms(10)
+	derivedChainData, err := programs.NewDerivedChainData(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
-		blockComputer: blockComputer,
-		me:            me,
-		programsCache: programsCache,
-		tracer:        trace.NewNoopTracer(),
+		blockComputer:    blockComputer,
+		me:               me,
+		derivedChainData: derivedChainData,
+		tracer:           trace.NewNoopTracer(),
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -789,7 +789,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		nil,
 		nil,
 		ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -797,19 +797,19 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	vm := manager.vm.(*fvm.VirtualMachine)
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 
-	programs := programs.NewEmptyBlockPrograms()
-	txnPrograms, err := programs.NewTransactionPrograms(0, 0)
+	derivedBlockData := programs.NewEmptyDerivedBlockData()
+	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
 	txnState := state.NewTransactionState(view, state.DefaultParameters())
-	env := fvm.NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
+	env := fvm.NewScriptEnv(context.Background(), ctx, txnState, derivedTxnData)
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, view, derivedBlockData, privateKeys, chain)
 	require.NoError(t, err)
 	account := accounts[0]
 	address := cadence.NewAddress(account)
