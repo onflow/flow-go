@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/onflow/flow-go/model/hash"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -40,9 +41,9 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	// encodes event to create payload
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)
+	eventID := flow.HashToID(hash.DefaultHasher.ComputeHash(payload))
 
 	// creates egress message that goes over gRPC.
-
 	egressMsg := &EgressMessage{
 		ChannelID:       channels.TestNetworkChannel.String(),
 		CorruptOriginID: originId[:],
@@ -59,12 +60,13 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	// creates corresponding event of that message that
 	// is sent by orchestrator network to orchestrator.
 	e := &EgressEvent{
-		CorruptOriginId:   originId,
-		Channel:           channel,
-		FlowProtocolEvent: content,
-		Protocol:          protocol,
-		TargetNum:         targetNum,
-		TargetIds:         targetIds,
+		CorruptOriginId:     originId,
+		Channel:             channel,
+		FlowProtocolEvent:   content,
+		FlowProtocolEventID: eventID,
+		Protocol:            protocol,
+		TargetNum:           targetNum,
+		TargetIds:           targetIds,
 	}
 
 	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId), unittest.WithAddress(DefaultAddress))
