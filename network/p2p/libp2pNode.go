@@ -72,4 +72,6 @@ type LibP2PNode interface {
 	// SetComponentManager sets the component manager for the node.
 	// SetComponentManager may be called at most once.
 	SetComponentManager(cm *component.ComponentManager)
+	// HasSubscription returns true if the node currently has an active subscription to the topic.
+	HasSubscription(topic channels.Topic) bool
 }

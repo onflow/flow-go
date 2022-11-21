@@ -2,6 +2,8 @@ package fvm
 
 import (
 	"context"
+	"fmt"
+	"math"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -16,42 +18,104 @@ import (
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
-func getEnvironmentMeterParameters(
+type MeterParamOverrides struct {
+	ComputationWeights meter.ExecutionEffortWeights // nil indicates no override
+	MemoryWeights      meter.ExecutionMemoryWeights // nil indicates no override
+	MemoryLimit        *uint64                      // nil indicates no override
+}
+
+func getMeterParameters(
 	ctx Context,
+	proc Procedure,
 	view state.View,
-	programs *programs.TransactionPrograms,
-	params meter.MeterParameters,
+	derivedTxnData *programs.DerivedTransactionData,
 ) (
 	meter.MeterParameters,
 	error,
 ) {
-	sth := state.NewTransactionState(
+	procParams := meter.DefaultParameters().
+		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
+		WithMemoryLimit(proc.MemoryLimit(ctx)).
+		WithEventEmitByteLimit(ctx.EventCollectionByteSizeLimit)
+
+	txnState := state.NewTransactionState(
 		view,
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
 			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 
-	sth.DisableAllLimitEnforcements()
+	// TODO(patrick): cache meter param overrides
+	overrides, err := getMeterParamOverrides(
+		ctx,
+		txnState,
+		derivedTxnData)
+	if err != nil {
+		return procParams, err
+	}
 
-	env := NewScriptEnv(context.Background(), ctx, sth, programs)
+	if overrides.ComputationWeights != nil {
+		procParams = procParams.WithComputationWeights(
+			overrides.ComputationWeights)
+	}
 
-	return fillEnvironmentMeterParameters(ctx, env, params)
+	if overrides.MemoryWeights != nil {
+		procParams = procParams.WithMemoryWeights(overrides.MemoryWeights)
+	}
+
+	if overrides.MemoryLimit != nil {
+		procParams = procParams.WithMemoryLimit(*overrides.MemoryLimit)
+	}
+
+	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
+		procParams = procParams.WithMemoryLimit(math.MaxUint64)
+	}
+
+	return procParams, nil
 }
 
-func fillEnvironmentMeterParameters(
+func getMeterParamOverrides(
 	ctx Context,
-	env environment.Environment,
-	params meter.MeterParameters,
+	txnState *state.TransactionState,
+	derivedTxnData *programs.DerivedTransactionData,
 ) (
-	meter.MeterParameters,
+	MeterParamOverrides,
 	error,
 ) {
+	var overrides MeterParamOverrides
+	var err error
+	txnState.RunWithAllLimitsDisabled(func() {
+		overrides, err = getMeterParamOverridesFromState(
+			ctx,
+			txnState,
+			derivedTxnData)
+	})
 
+	if err != nil {
+		return overrides, fmt.Errorf(
+			"error getting environment meter parameter overrides: %w",
+			err)
+	}
+
+	return overrides, nil
+}
+
+func getMeterParamOverridesFromState(
+	ctx Context,
+	txnState *state.TransactionState,
+	derivedTxnData *programs.DerivedTransactionData,
+) (
+	MeterParamOverrides,
+	error,
+) {
 	// Check that the service account exists because all the settings are
 	// stored in it
 	serviceAddress := ctx.Chain.ServiceAddress()
 	service := runtime.Address(serviceAddress)
+
+	env := NewScriptEnv(context.Background(), ctx, txnState, derivedTxnData)
+
+	overrides := MeterParamOverrides{}
 
 	// set the property if no error, but if the error is a fatal error then
 	// return it
@@ -85,30 +149,30 @@ func fillEnvironmentMeterParameters(
 	err = setIfOk(
 		"execution effort weights",
 		err,
-		func() { params = params.WithComputationWeights(computationWeights) })
+		func() { overrides.ComputationWeights = computationWeights })
 	if err != nil {
-		return params, err
+		return overrides, err
 	}
 
 	memoryWeights, err := GetExecutionMemoryWeights(env, service)
 	err = setIfOk(
 		"execution memory weights",
 		err,
-		func() { params = params.WithMemoryWeights(memoryWeights) })
+		func() { overrides.MemoryWeights = memoryWeights })
 	if err != nil {
-		return params, err
+		return overrides, err
 	}
 
 	memoryLimit, err := GetExecutionMemoryLimit(env, service)
 	err = setIfOk(
 		"execution memory limit",
 		err,
-		func() { params = params.WithMemoryLimit(memoryLimit) })
+		func() { overrides.MemoryLimit = &memoryLimit })
 	if err != nil {
-		return params, err
+		return overrides, err
 	}
 
-	return params, nil
+	return overrides, nil
 }
 
 func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](

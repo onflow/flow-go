@@ -11,11 +11,11 @@ func NewScriptEnv(
 	reqContext context.Context,
 	fvmContext Context,
 	txnState *state.TransactionState,
-	programs environment.TransactionPrograms,
+	derivedTxnData environment.DerivedTransactionData,
 ) environment.Environment {
 	return environment.NewScriptEnvironment(
 		reqContext,
 		fvmContext.EnvironmentParams,
 		txnState,
-		programs)
+		derivedTxnData)
 }

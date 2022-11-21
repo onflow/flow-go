@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -506,9 +505,7 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 	// if it's not added, it means the block is not a new block, it already
 	// exists in the queue, then bail
 	if !added {
-		log.Debug().Hex("block_id", logging.Entity(executableBlock)).
-			Int("block_height", int(executableBlock.Height())).
-			Msg("block already exists in the execution queue")
+		lg.Debug().Msg("block already exists in the execution queue")
 		return nil
 	}
 

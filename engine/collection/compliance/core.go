@@ -265,15 +265,20 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 	err := c.state.Extend(block)
 	// if the block proposes an invalid extension of the protocol state, then the block is invalid
 	if state.IsInvalidExtensionError(err) {
-		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
+		return engine.NewInvalidInputErrorf("invalid extension of cluster state (block_id: %x, height: %d): %w",
 			header.ID(), header.Height, err)
 	}
 	// protocol state aborted processing of block as it is on an abandoned fork: block is outdated
 	if state.IsOutdatedExtensionError(err) {
-		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
+		return engine.NewOutdatedInputErrorf("outdated extension of cluster state (block_id: %x, height: %d): %w",
+			header.ID(), header.Height, err)
+	}
+	if state.IsUnverifiableExtensionError(err) {
+		return engine.NewUnverifiableInputError("unverifiable extension of cluster state (block_id: %x, height: %d): %w",
+			header.ID(), header.Height, err)
 	}
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
+		return fmt.Errorf("unexpected error while updating cluster state (block_id: %x, height: %d): %w", header.ID(), header.Height, err)
 	}
 
 	// retrieve the parent

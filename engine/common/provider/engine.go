@@ -188,10 +188,12 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
 
-	lg := e.log.With().Str("origin_id", request.OriginId.String()).Logger()
+	lg := e.log.With().
+		Str("origin_id", request.OriginId.String()).
+		Strs("entity_ids", flow.IdentifierList(request.EntityIds).Strings()).
+		Logger()
 
 	lg.Debug().
-		Strs("entity_ids", flow.IdentifierList(request.EntityIds).Strings()).
 		Msg("entity request received")
 
 	// TODO: add reputation system to punish nodes for malicious behaviour (spam / repeated requests)

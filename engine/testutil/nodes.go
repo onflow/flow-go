@@ -618,7 +618,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		nil,
 		prov,
 		computation.ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       computation.DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: computation.DefaultScriptExecutionTimeLimit,
 		},
