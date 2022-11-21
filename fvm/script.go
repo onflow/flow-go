@@ -7,12 +7,15 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 type ScriptProcedure struct {
@@ -26,6 +29,25 @@ type ScriptProcedure struct {
 	GasUsed        uint64
 	MemoryEstimate uint64
 	Err            errors.CodedError
+	TraceSpan      otelTrace.Span
+}
+
+func (proc *ScriptProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
+	proc.TraceSpan = traceSpan
+}
+
+func (proc *ScriptProcedure) IsSampled() bool {
+	return proc.TraceSpan != nil
+}
+
+func (proc *ScriptProcedure) StartSpanFromProcTraceSpan(
+	tracer module.Tracer,
+	spanName trace.SpanName) otelTrace.Span {
+	if tracer != nil && proc.IsSampled() {
+		return tracer.StartSpanFromParent(proc.TraceSpan, spanName)
+	}
+	return trace.NoopSpan
+
 }
 
 type ScriptProcessor interface {

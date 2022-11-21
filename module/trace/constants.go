@@ -156,6 +156,7 @@ const (
 	FVMVerifyTransaction             SpanName = "fvm.verifyTransaction"
 	FVMSeqNumCheckTransaction        SpanName = "fvm.seqNumCheckTransaction"
 	FVMExecuteTransaction            SpanName = "fvm.executeTransaction"
+	FVMExecuteScript                 SpanName = "fvm.executeScript"
 	FVMDeductTransactionFees         SpanName = "fvm.deductTransactionFees"
 	FVMTransactionStorageUsedCheck   SpanName = "fvm.env.transactionStorageUsedCheck"
 	FVMInvokeContractFunction        SpanName = "fvm.invokeContractFunction"
