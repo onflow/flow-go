@@ -11,6 +11,8 @@ func main() {
 	corruptedExecutionBuilder := cmd.NewExecutionNodeBuilder(corruptedBuilder.FlowNodeBuilder)
 	corruptedExecutionBuilder.LoadFlags()
 
+	corruptedBuilder.LoadCorruptFlags()
+
 	if err := corruptedBuilder.Initialize(); err != nil {
 		corruptedExecutionBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
 	}

@@ -11,6 +11,8 @@ func main() {
 	builder := nodebuilder.FlowAccessNode(nodebuilder.WithFlowNodeBuilder(corruptedBuilder.FlowNodeBuilder)) // use the Access Node builder
 	builder.PrintBuildVersionDetails()
 
+	corruptedBuilder.LoadCorruptFlags()
+
 	// parse all the command line args
 	if err := builder.ParseFlags(); err != nil {
 		builder.Logger.Fatal().Err(err).Send()

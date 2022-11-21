@@ -11,6 +11,8 @@ func main() {
 	corruptedVerificationBuilder := cmd.NewVerificationNodeBuilder(corruptedBuilder.FlowNodeBuilder)
 	corruptedVerificationBuilder.LoadFlags()
 
+	corruptedBuilder.LoadCorruptFlags()
+
 	if err := corruptedBuilder.Initialize(); err != nil {
 		corruptedVerificationBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
 	}
