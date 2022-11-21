@@ -215,27 +215,17 @@ func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[messages.Cluste
 func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
-	finalView := uint64(0)
-	var finalHeader *flow.Header
-
 	doneSignal := ctx.Done()
 	for {
 		select {
 		case <-doneSignal:
 			return
 		case finalizedBlock := <-e.finalizedBlocksNotifications:
-			// drop outdated notifications
-			if finalizedBlock.View < finalView {
-				continue
-			}
-
 			// retrieve the latest finalized header, so we know the height
-			var err error
-			finalHeader, err = e.headers.ByBlockID(finalizedBlock.BlockID) // over-writes `finalHeader` variable for next loop iteration
-			if err != nil {                                                // no expected errors
+			finalHeader, err := e.headers.ByBlockID(finalizedBlock.BlockID)
+			if err != nil { // no expected errors
 				ctx.Throw(err)
 			}
-			finalView = finalHeader.View
 			e.core.ProcessFinalizedBlock(finalHeader)
 		}
 	}
