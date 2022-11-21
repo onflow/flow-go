@@ -235,6 +235,7 @@ func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, r
 			if err != nil {                                                // no expected errors
 				ctx.Throw(err)
 			}
+			finalView = finalHeader.View
 			e.core.ProcessFinalizedBlock(finalHeader)
 		}
 	}
