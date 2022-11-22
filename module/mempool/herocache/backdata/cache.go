@@ -260,13 +260,6 @@ func (c *Cache) Clear() {
 	c.slotCount = 0
 }
 
-// Hash returns the merkle root hash of all entities.
-func (c *Cache) Hash() flow.Identifier {
-	defer c.logTelemetry()
-
-	return flow.ConcatSum(flow.GetIDs(c.All())...)
-}
-
 // put writes the (entityId, entity) pair into this BackData. Boolean return value
 // determines whether the write operation was successful. A write operation fails when there is already
 // a duplicate entityId exists in the BackData, and that entityId is linked to a valid entity.
