@@ -378,9 +378,9 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	block3 := unittest.BlockWithParentFixture(parent.Header)
 
 	// create the pending blocks
-	pending1 := &flow.Slashable[flow.Block]{block1.Header.ProposerID, block1}
-	pending2 := &flow.Slashable[flow.Block]{block2.Header.ProposerID, block2}
-	pending3 := &flow.Slashable[flow.Block]{block3.Header.ProposerID, block3}
+	pending1 := unittest.AsSlashable(block1)
+	pending2 := unittest.AsSlashable(block2)
+	pending3 := unittest.AsSlashable(block3)
 
 	// store the parent on disk
 	parentID := parent.ID()
