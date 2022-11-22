@@ -46,7 +46,7 @@ func TestDerivedChainData(t *testing.T) {
 	err = txn.Commit()
 	require.NoError(t, err)
 
-	entry := block1.GetForTestingOnly(loc1)
+	entry := block1.programs.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
 	require.Same(t, prog1, entry.Value)
 
@@ -70,11 +70,11 @@ func TestDerivedChainData(t *testing.T) {
 	err = txn.Commit()
 	require.NoError(t, err)
 
-	entry = block2.GetForTestingOnly(loc1)
+	entry = block2.programs.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
 	require.Same(t, prog1, entry.Value)
 
-	entry = block2.GetForTestingOnly(loc2)
+	entry = block2.programs.GetForTestingOnly(loc2)
 	require.NotNil(t, entry)
 	require.Same(t, prog2, entry.Value)
 
@@ -88,12 +88,12 @@ func TestDerivedChainData(t *testing.T) {
 	foundBlock = programs.Get(blockId1)
 	require.Same(t, block1, foundBlock)
 
-	entry = block1.GetForTestingOnly(loc1)
+	entry = block1.programs.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
 	require.Same(t, prog1, entry.Value)
 
 	// writes to block2 did't poplute block1.
-	entry = block1.GetForTestingOnly(loc2)
+	entry = block1.programs.GetForTestingOnly(loc2)
 	require.Nil(t, entry)
 
 	//
@@ -108,11 +108,11 @@ func TestDerivedChainData(t *testing.T) {
 	require.NotSame(t, block1, block3)
 	require.NotSame(t, block2, block3)
 
-	entry = block3.GetForTestingOnly(loc1)
+	entry = block3.programs.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
 	require.Same(t, prog1, entry.Value)
 
-	entry = block3.GetForTestingOnly(loc2)
+	entry = block3.programs.GetForTestingOnly(loc2)
 	require.NotNil(t, entry)
 	require.Same(t, prog2, entry.Value)
 
@@ -120,10 +120,10 @@ func TestDerivedChainData(t *testing.T) {
 	foundBlock = programs.GetOrCreateDerivedBlockData(blockId1, flow.ZeroID)
 	require.NotSame(t, block1, foundBlock)
 
-	entry = foundBlock.GetForTestingOnly(loc1)
+	entry = foundBlock.programs.GetForTestingOnly(loc1)
 	require.Nil(t, entry)
 
-	entry = foundBlock.GetForTestingOnly(loc2)
+	entry = foundBlock.programs.GetForTestingOnly(loc2)
 	require.Nil(t, entry)
 
 	block1 = foundBlock
@@ -138,11 +138,11 @@ func TestDerivedChainData(t *testing.T) {
 	require.NotSame(t, block2, scriptBlock)
 	require.NotSame(t, block3, scriptBlock)
 
-	entry = scriptBlock.GetForTestingOnly(loc1)
+	entry = scriptBlock.programs.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
 	require.Same(t, prog1, entry.Value)
 
-	entry = scriptBlock.GetForTestingOnly(loc2)
+	entry = scriptBlock.programs.GetForTestingOnly(loc2)
 	require.NotNil(t, entry)
 	require.Same(t, prog2, entry.Value)
 

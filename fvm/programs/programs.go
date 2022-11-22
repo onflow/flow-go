@@ -52,7 +52,7 @@ func (p *Programs) ChildPrograms() *Programs {
 }
 
 func (p *Programs) NextTxIndexForTestingOnly() uint32 {
-	return p.block.NextTxIndexForTestingOnly()
+	return p.block.programs.NextTxIndexForTestingOnly()
 }
 
 func (p *Programs) GetForTestingOnly(location common.AddressLocation) (*interpreter.Program, *state.State, bool) {

@@ -176,7 +176,7 @@ func TestAccountFreezing(t *testing.T) {
 			Address: common.MustBytesToAddress(address[:]),
 			Name:    "Whatever",
 		}
-		entry := derivedBlockData.GetForTestingOnly(cadenceAddr)
+		entry := derivedBlockData.GetProgramForTestingOnly(cadenceAddr)
 		require.NotNil(t, entry)
 
 		// freeze account
@@ -199,7 +199,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		// verify cache is evicted
 
-		entry = derivedBlockData.GetForTestingOnly(cadenceAddr)
+		entry = derivedBlockData.GetProgramForTestingOnly(cadenceAddr)
 		require.Nil(t, entry)
 
 		// loading code from frozen account triggers error
