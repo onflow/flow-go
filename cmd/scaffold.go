@@ -139,6 +139,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
+	fnb.flags.UintVarP(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.DurationVar(&fnb.BaseConfig.PeerUpdateInterval, "peerupdate-interval", defaultConfig.PeerUpdateInterval, "how often to refresh the peer connections for the node")
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
@@ -580,11 +581,22 @@ func (fnb *FlowNodeBuilder) initLogger() error {
 	// configure logger with standard level, node ID and UTC timestamp
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
+
+	// Drop all log events that exceed this rate limit
+	throttledSampler := &zerolog.BurstSampler{
+		Burst:  uint32(fnb.BaseConfig.debugLogLimit),
+		Period: time.Second,
+	}
+
 	log := fnb.Logger.With().
 		Timestamp().
 		Str("node_role", fnb.BaseConfig.NodeRole).
 		Str("node_id", fnb.NodeID.String()).
-		Logger()
+		Logger().
+		Sample(zerolog.LevelSampler{
+			TraceSampler: throttledSampler,
+			DebugSampler: throttledSampler,
+		})
 
 	log.Info().Msgf("flow %s node starting up", fnb.BaseConfig.NodeRole)
 
@@ -594,9 +606,9 @@ func (fnb *FlowNodeBuilder) initLogger() error {
 		return fmt.Errorf("invalid log level: %w", err)
 	}
 
-	// loglevel is set to debug, then overridden by SetGlobalLevel. this allows admin commands to
-	// modify the level during runtime
-	log = log.Level(zerolog.DebugLevel)
+	// Minimum log level is set to trace, then overridden by SetGlobalLevel.
+	// this allows admin commands to modify the level to any value during runtime
+	log = log.Level(zerolog.TraceLevel)
 	zerolog.SetGlobalLevel(lvl)
 
 	fnb.Logger = log

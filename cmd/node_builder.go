@@ -151,6 +151,7 @@ type BaseConfig struct {
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool
 	level                       string
+	debugLogLimit               uint
 	metricsPort                 uint
 	BootstrapDir                string
 	profilerConfig              profiler.ProfilerConfig
@@ -280,6 +281,7 @@ func DefaultBaseConfig() *BaseConfig {
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
 		level:            "info",
+		debugLogLimit:    1000,
 
 		metricsPort:         8080,
 		tracerEnabled:       false,
