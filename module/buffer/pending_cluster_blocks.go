@@ -3,7 +3,6 @@ package buffer
 import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 )
 
 type PendingClusterBlocks struct {
@@ -15,20 +14,19 @@ func NewPendingClusterBlocks() *PendingClusterBlocks {
 	return b
 }
 
-func (b *PendingClusterBlocks) Add(originID flow.Identifier, proposal *messages.ClusterBlockProposal) bool {
-	block := proposal.Block.ToInternal()
+func (b *PendingClusterBlocks) Add(originID flow.Identifier, block *cluster.Block) bool {
 	return b.backend.add(originID, block.Header, block.Payload)
 }
 
-func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (*cluster.PendingBlock, bool) {
+func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (*flow.Slashable[cluster.Block], bool) {
 	item, ok := b.backend.byID(blockID)
 	if !ok {
 		return nil, false
 	}
 
-	block := &cluster.PendingBlock{
+	block := &flow.Slashable[cluster.Block]{
 		OriginID: item.originID,
-		Block: cluster.Block{
+		Message: &cluster.Block{
 			Header:  item.header,
 			Payload: item.payload.(*cluster.Payload),
 		},
@@ -37,17 +35,17 @@ func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (*cluster.PendingBl
 	return block, true
 }
 
-func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]*cluster.PendingBlock, bool) {
+func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]*flow.Slashable[cluster.Block], bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {
 		return nil, false
 	}
 
-	blocks := make([]*cluster.PendingBlock, 0, len(items))
+	blocks := make([]*flow.Slashable[cluster.Block], 0, len(items))
 	for _, item := range items {
-		block := &cluster.PendingBlock{
+		block := &flow.Slashable[cluster.Block]{
 			OriginID: item.originID,
-			Block: cluster.Block{
+			Message: &cluster.Block{
 				Header:  item.header,
 				Payload: item.payload.(*cluster.Payload),
 			},
