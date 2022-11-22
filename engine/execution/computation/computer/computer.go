@@ -31,6 +31,14 @@ const (
 	SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
 )
 
+type collectionItem struct {
+	*entity.CompleteCollection
+
+	ctx fvm.Context
+
+	isSystemCollection bool
+}
+
 // VirtualMachine runs procedures
 type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.View) error
@@ -91,13 +99,18 @@ func NewBlockComputer(
 	committer ViewCommitter,
 	executionDataProvider *provider.Provider,
 ) (BlockComputer, error) {
+	systemChunkCtx := SystemChunkContext(vmCtx, logger)
+	vmCtx = fvm.NewContextFromParent(
+		vmCtx,
+		fvm.WithMetricsReporter(metrics),
+		fvm.WithTracer(tracer))
 	return &blockComputer{
 		vm:                    vm,
 		vmCtx:                 vmCtx,
 		metrics:               metrics,
 		tracer:                tracer,
 		log:                   logger,
-		systemChunkCtx:        SystemChunkContext(vmCtx, logger),
+		systemChunkCtx:        systemChunkCtx,
 		committer:             committer,
 		executionDataProvider: executionDataProvider,
 	}, nil
@@ -191,7 +204,7 @@ func (e *blockComputer) executeBlock(
 
 	for i, collection := range collections {
 		colView := stateView.NewChild()
-		txIndex, err = e.executeCollection(blockSpan, collectionIndex, txIndex, blockCtx, colView, collection, res)
+		txIndex, err = e.executeCollection(blockSpan, collectionIndex, txIndex, colView, collectionItem{collection, blockCtx, false}, res)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection at txIndex %v: %w", txIndex, err)
 		}
@@ -206,7 +219,6 @@ func (e *blockComputer) executeBlock(
 	}
 
 	// executing system chunk
-	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
 	colView := stateView.NewChild()
 	systemCol, err := e.executeSystemCollection(blockSpan, collectionIndex, txIndex, systemChunkCtx, colView, res)
 	if err != nil {
@@ -276,50 +288,32 @@ func (e *blockComputer) executeSystemCollection(
 	collectionView state.View,
 	res *execution.ComputationResult,
 ) (*flow.Collection, error) {
-	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeSystemCollection)
-	defer colSpan.End()
-
-	startedAt := time.Now()
 	tx, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
 	if err != nil {
 		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
 	}
 
-	err = e.executeTransaction(tx, colSpan, collectionView, systemChunkCtx, collectionIndex, txIndex, res, true)
+	collection := collectionItem{
+		CompleteCollection: &entity.CompleteCollection{
+			Transactions: []*flow.TransactionBody{tx},
+		},
+		ctx:                systemChunkCtx,
+		isSystemCollection: true,
+	}
 
+	_, err = e.executeCollection(
+		blockSpan,
+		collectionIndex,
+		txIndex,
+		collectionView,
+		collection,
+		res)
 	if err != nil {
 		return nil, err
 	}
 
-	systemChunkTxResult := res.TransactionResults[len(res.TransactionResults)-1]
-	if systemChunkTxResult.ErrorMessage != "" {
-		// This log is used as the data source for an alert on grafana.
-		// The system_chunk_error field must not be changed without adding the corresponding
-		// changes in grafana. https://github.com/dapperlabs/flow-internal/issues/1546
-		e.log.Error().
-			Str("error_message", systemChunkTxResult.ErrorMessage).
-			Hex("block_id", logging.Entity(systemChunkCtx.BlockHeader)).
-			Bool("system_chunk_error", true).
-			Bool("critical_error", true).
-			Msg("error executing system chunk transaction")
-	}
-
-	snapshot := collectionView.(*delta.View).Interactions()
-	res.AddStateSnapshot(snapshot)
-	res.UpdateTransactionResultIndex(1)
-
-	compUsed, memUsed := res.ChunkComputationAndMemoryUsed(collectionIndex)
-	eventCounts, eventSize := res.ChunkEventCountsAndSize(collectionIndex)
-	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt),
-		compUsed, memUsed,
-		eventCounts, eventSize,
-		snapshot.NumberOfRegistersTouched,
-		snapshot.NumberOfBytesWrittenToRegisters,
-		1,
-	)
-
 	return &flow.Collection{
-		Transactions: []*flow.TransactionBody{tx},
+		Transactions: collection.Transactions,
 	}, err
 }
 
@@ -327,45 +321,79 @@ func (e *blockComputer) executeCollection(
 	blockSpan otelTrace.Span,
 	collectionIndex int,
 	txIndex uint32,
-	blockCtx fvm.Context,
 	collectionView state.View,
-	collection *entity.CompleteCollection,
+	collection collectionItem,
 	res *execution.ComputationResult,
 ) (uint32, error) {
 
-	e.log.Debug().
-		Hex("block_id", logging.Entity(blockCtx.BlockHeader)).
-		Hex("collection_id", logging.Entity(collection.Guarantee)).
-		Msg("executing collection")
-
 	// call tracing
 	startedAt := time.Now()
-	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeCollection)
-	defer func() {
+
+	var colSpan otelTrace.Span
+	if collection.isSystemCollection {
+		colSpan = e.tracer.StartSpanFromParent(
+			blockSpan,
+			trace.EXEComputeSystemCollection)
+
+		e.log.Debug().
+			Hex("block_id", logging.Entity(collection.ctx.BlockHeader)).
+			Msg("executing system collection")
+	} else {
+		colSpan = e.tracer.StartSpanFromParent(
+			blockSpan,
+			trace.EXEComputeCollection)
+
 		colSpan.SetAttributes(
 			attribute.Int("collection.txCount", len(collection.Transactions)),
-			attribute.String("collection.hash", collection.Guarantee.CollectionID.String()),
-		)
-		colSpan.End()
-	}()
+			attribute.String(
+				"collection.hash",
+				collection.Guarantee.CollectionID.String()))
 
-	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsReporter(e.metrics), fvm.WithTracer(e.tracer))
+		e.log.Debug().
+			Hex("block_id", logging.Entity(collection.ctx.BlockHeader)).
+			Hex("collection_id", logging.Entity(collection.Guarantee)).
+			Msg("executing collection")
+	}
+
+	defer colSpan.End()
+
 	for _, txBody := range collection.Transactions {
-		err := e.executeTransaction(txBody, colSpan, collectionView, txCtx, collectionIndex, txIndex, res, false)
+		err := e.executeTransaction(txBody, colSpan, collectionView, collection.ctx, collectionIndex, txIndex, res, false)
 		txIndex++
 		if err != nil {
 			return txIndex, err
 		}
 	}
+
+	if collection.isSystemCollection {
+		systemChunkTxResult := res.TransactionResults[len(res.TransactionResults)-1]
+		if systemChunkTxResult.ErrorMessage != "" {
+			// This log is used as the data source for an alert on grafana.
+			// The system_chunk_error field must not be changed without adding
+			// the corresponding changes in grafana.
+			// https://github.com/dapperlabs/flow-internal/issues/1546
+			e.log.Error().
+				Str("error_message", systemChunkTxResult.ErrorMessage).
+				Hex("block_id", logging.Entity(collection.ctx.BlockHeader)).
+				Bool("system_chunk_error", true).
+				Bool("system_transaction_error", true).
+				Bool("critical_error", true).
+				Msg("error executing system chunk transaction")
+		}
+	} else {
+		e.log.Info().
+			Str("collectionID", collection.Guarantee.CollectionID.String()).
+			Str("referenceBlockID",
+				collection.Guarantee.ReferenceBlockID.String()).
+			Hex("blockID", logging.Entity(collection.ctx.BlockHeader)).
+			Int("numberOfTransactions", len(collection.Transactions)).
+			Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
+			Msg("collection executed")
+	}
+
 	viewSnapshot := collectionView.(*delta.View).Interactions()
 	res.AddStateSnapshot(viewSnapshot)
 	res.UpdateTransactionResultIndex(len(collection.Transactions))
-	e.log.Info().Str("collectionID", collection.Guarantee.CollectionID.String()).
-		Str("referenceBlockID", collection.Guarantee.ReferenceBlockID.String()).
-		Hex("blockID", logging.Entity(blockCtx.BlockHeader)).
-		Int("numberOfTransactions", len(collection.Transactions)).
-		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
-		Msg("collection executed")
 
 	compUsed, memUsed := res.ChunkComputationAndMemoryUsed(collectionIndex)
 	eventCounts, eventSize := res.ChunkEventCountsAndSize(collectionIndex)
@@ -387,7 +415,7 @@ func (e *blockComputer) executeTransaction(
 	collectionIndex int,
 	txIndex uint32,
 	res *execution.ComputationResult,
-	isSystemChunk bool,
+	isSystemTransaction bool,
 ) error {
 	startedAt := time.Now()
 	memAllocBefore := debug.GetHeapAllocsBytes()
@@ -415,7 +443,8 @@ func (e *blockComputer) executeTransaction(
 		Uint32("tx_index", txIndex).
 		Str("block_id", res.ExecutableBlock.ID().String()).
 		Uint64("height", res.ExecutableBlock.Block.Header.Height).
-		Bool("system_chunk", isSystemChunk).
+		Bool("system_chunk", isSystemTransaction).
+		Bool("system_transaction", isSystemTransaction).
 		Msg("executing transaction in fvm")
 
 	tx := fvm.Transaction(txBody, txIndex)
@@ -430,7 +459,8 @@ func (e *blockComputer) executeTransaction(
 			Uint32("tx_index", txIndex).
 			Str("block_id", res.ExecutableBlock.ID().String()).
 			Uint64("height", res.ExecutableBlock.Block.Header.Height).
-			Bool("system_chunk", isSystemChunk).
+			Bool("system_chunk", isSystemTransaction).
+			Bool("system_transaction", isSystemTransaction).
 			Logger()),
 	)
 	err := e.vm.Run(childCtx, tx, txView)
