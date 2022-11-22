@@ -24,7 +24,7 @@ const (
 	// The numOfAuthorizedEvents allows us to wait for a certain number of authorized messages to be received, this should
 	// give the network enough time to process the unauthorized messages. This ensures us that the unauthorized messages
 	// were indeed dropped and not unprocessed.
-	numOfAuthorizedEvents = 200
+	numOfAuthorizedEvents = 100
 
 	// numOfUnauthorizedEvents the number of unauthorized events per type to send by the test orchestrator.
 	numOfUnauthorizedEvents = 10
