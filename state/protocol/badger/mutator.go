@@ -556,6 +556,14 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// track service event driven metrics and protocol events that should be emitted
 	var events []func()
+
+	// track service events to index
+	var serviceEvents []struct {
+		height   uint64
+		resultID flow.Identifier
+		event    flow.ServiceEvent
+	}
+
 	for _, seal := range parent.Payload.Seals {
 		// skip updating epoch-related metrics if EECC is triggered
 		if epochFallbackTriggered {
@@ -629,6 +637,34 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		m.metrics.EpochEmergencyFallbackTriggered()
 	}
 
+	// FOUR AND A HALF: Index sealed service events by height
+	for _, seal := range block.Payload.Seals {
+
+		result, err := m.results.ByID(seal.ResultID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x) for service events indexing: %w", seal.ResultID, seal.ID(), err)
+		}
+		blockHeader, err := m.headers.ByBlockID(result.BlockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header (id=%x) for result (id=%x) for service events indexing: %w", result.BlockID, result.ID(), err)
+		}
+
+		for _, serviceEvent := range result.ServiceEvents {
+			// it is possible, however very unlikely, that there are multiple service events of the same type in a single result.
+			// This will add multiple identical entries here, but the storage layer will only keep one index entry per combination of
+			// height and event type, essentially disregarding duplicates. Since the situation is very unlikely and other layer will handle
+			// this situation gracefully we leave it like this instead of writing deduplication logic here.
+			serviceEvents = append(serviceEvents, struct {
+				height   uint64
+				resultID flow.Identifier
+				event    flow.ServiceEvent
+			}{
+				height:   blockHeader.Height,
+				resultID: result.ID(),
+				event:    serviceEvent})
+		}
+	}
+
 	// FIFTH: Persist updates in database
 	// * Add this block to the height-indexed set of finalized blocks.
 	// * Update the largest finalized height to this block's height.
@@ -656,6 +692,14 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index the seal by the sealed block ID: %w", err)
+			}
+		}
+
+		// index sealed service events
+		for _, event := range serviceEvents {
+			err := operation.IndexByServiceEvent(event.height, event.resultID, event.event.Type)(tx)
+			if err != nil {
+				return fmt.Errorf("could not index resultID (%s) by service event (type=%s) for height (%d): %w", event.resultID, event.event.Type, event.height, err)
 			}
 		}
 

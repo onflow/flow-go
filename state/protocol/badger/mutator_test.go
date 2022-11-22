@@ -143,7 +143,13 @@ func TestSealedIndex(t *testing.T) {
 		require.NoError(t, err)
 
 		// block 2(result B1)
+		result, _, err := rootSnapshot.SealedResult()
+		require.NoError(t, err)
+
+		serviceEvent := result.ServiceEvents[0]
+
 		b1Receipt := unittest.ReceiptForBlockFixture(b1)
+		b1Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{serviceEvent}
 		b2 := unittest.BlockWithParentFixture(b1.Header)
 		b2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(b1Receipt)))
 		err = state.Extend(context.Background(), b2)
@@ -157,7 +163,11 @@ func TestSealedIndex(t *testing.T) {
 
 		// block 4 (resultB2, resultB3)
 		b2Receipt := unittest.ReceiptForBlockFixture(b2)
+		b2Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{serviceEvent}
+
 		b3Receipt := unittest.ReceiptForBlockFixture(b3)
+		b3Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{serviceEvent}
+
 		b4 := unittest.BlockWithParentFixture(b3.Header)
 		b4.SetPayload(flow.Payload{
 			Receipts: []*flow.ExecutionReceiptMeta{b2Receipt.Meta(), b3Receipt.Meta()},
@@ -213,6 +223,14 @@ func TestSealedIndex(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
+		results := bstorage.NewExecutionResults(metrics, db)
+
+		executionResult, err := results.HighestByServiceEventType(serviceEvent.Type, b7.Header.Height)
+		require.NoError(t, err)
+		// before finalizing B5 index should return some results for bootstrapped data, we can't easily
+		// retrieve it, so we just check it's not what we expect later
+		require.NotEqual(t, b1Receipt.ExecutionResult, *executionResult)
+
 		// when B5 is finalized, can find seal for B1
 		err = state.Finalize(context.Background(), b5.ID())
 		require.NoError(t, err)
@@ -224,6 +242,11 @@ func TestSealedIndex(t *testing.T) {
 		_, err = seals.FinalizedSealForBlock(b2.ID())
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		executionResult, err = results.HighestByServiceEventType(serviceEvent.Type, b7.Header.Height)
+		require.NoError(t, err)
+		//  once B5 is finalized, so is seal for b1, hence index should now find it
+		require.Equal(t, b1Receipt.ExecutionResult, *executionResult)
 
 		// when B7 is finalized, can find seals for B2, B3
 		err = state.Finalize(context.Background(), b6.ID())
@@ -239,6 +262,10 @@ func TestSealedIndex(t *testing.T) {
 		s3, err := seals.FinalizedSealForBlock(b3.ID())
 		require.NoError(t, err)
 		require.Equal(t, b3Seal, s3)
+
+		executionResult, err = results.HighestByServiceEventType(serviceEvent.Type, b7.Header.Height)
+		require.NoError(t, err)
+		require.Equal(t, b3Receipt.ExecutionResult, *executionResult)
 	})
 
 }

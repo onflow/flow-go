@@ -155,6 +155,12 @@ func Bootstrap(
 func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 
+		blocksById := make(map[flow.Identifier]*flow.Block, len(segment.Blocks))
+
+		for _, block := range segment.Blocks {
+			blocksById[block.ID()] = block
+		}
+
 		for _, result := range segment.ExecutionResults {
 			err := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))(tx)
 			if err != nil {
@@ -163,6 +169,21 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			err = transaction.WithTx(operation.IndexExecutionResult(result.BlockID, result.ID()))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index execution result: %w", err)
+			}
+
+			// SealingSegment might not have all the blocks referenced by results.
+			// If the block is missing we skip it while indexing, and that's OK because
+			// we are bootstrapping and service event index before the segment shouldn't matter
+			block, has := blocksById[result.BlockID]
+			if !has {
+				continue
+			}
+
+			for _, serviceEvent := range result.ServiceEvents {
+				err := transaction.WithTx(operation.IndexByServiceEvent(block.Header.Height, result.ID(), serviceEvent.Type))(tx)
+				if err != nil {
+					return fmt.Errorf("could not index results by service event type (type=%s) and height (=%d): %w", serviceEvent.Type, block.Header.Height, err)
+				}
 			}
 		}
 

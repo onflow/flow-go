@@ -461,6 +461,44 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 	}
 }
 
+// findOneHighestButNoHigher looks up the value with a key matching prefix and height part highest possible, smaller or equal to the given value.
+// Returns storage.ErrNotFound if no entry matching can be found.
+// Or, in other words - searches for the last item at or before given height.
+// For example, given the following keys, ordered according to BadgerDB semantics:
+// A 10 X
+// B 10 Y
+// B 11 Z
+// calling findOneReverse with prefix B and height 12 will retrieve 'B 11 Z' key, while B 10 will retrieve `B 10 Y`.
+// Calling A 9 or C 2 will return storage.ErrNotFound
+func findOneHighestButNoHigher(prefix []byte, height uint64, entity interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		if len(prefix) == 0 {
+			return fmt.Errorf("prefix must not be empty")
+		}
+
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = prefix
+		opts.Reverse = true
+
+		it := tx.NewIterator(opts)
+		defer it.Close()
+
+		it.Seek(append(prefix, b(height)...))
+
+		if !it.Valid() {
+			return storage.ErrNotFound
+		}
+
+		return it.Item().Value(func(val []byte) error {
+			err := msgpack.Unmarshal(val, entity)
+			if err != nil {
+				return fmt.Errorf("could not decode entity: %w", err)
+			}
+			return nil
+		})
+	}
+}
+
 // Fail returns a DB operation function that always fails with the given error.
 func Fail(err error) func(*badger.Txn) error {
 	return func(_ *badger.Txn) error {

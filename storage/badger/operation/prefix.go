@@ -91,6 +91,7 @@ const (
 	codeFinalizedCluster             = 105
 	codeServiceEvent                 = 106
 	codeTransactionResultIndex       = 107
+	codeServiceEventIndex            = 108
 	codeIndexCollection              = 200
 	codeIndexExecutionResultByBlock  = 202
 	codeIndexCollectionByTransaction = 203

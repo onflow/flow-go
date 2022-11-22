@@ -3,10 +3,33 @@
 package operation
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// prefixes used to distinguish service events
+const (
+	ServiceEventPrefixSetup  = byte(1)
+	ServiceEventPrefixCommit = byte(2)
+)
+
+// serviceEventTypeToPrefix returns byte prefix for given service event type
+func serviceEventTypeToPrefix(eventType string) byte {
+	switch eventType {
+	case flow.ServiceEventSetup:
+		return ServiceEventPrefixSetup
+	case flow.ServiceEventCommit:
+		return ServiceEventPrefixCommit
+
+	// service events are special and the list is strictly controlled, hardcoded
+	// that's why we panic for an unknown type
+	default:
+		panic(fmt.Sprintf("unexpected service event type: %s", eventType))
+	}
+}
 
 func eventPrefix(prefix byte, blockID flow.Identifier, event flow.Event) []byte {
 	return makePrefix(prefix, blockID, event.TransactionID, event.TransactionIndex, event.EventIndex)
