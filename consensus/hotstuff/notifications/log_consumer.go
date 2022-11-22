@@ -55,9 +55,17 @@ func (lc *LogConsumer) OnDoubleProposeDetected(block *model.Block, alt *model.Bl
 }
 
 func (lc *LogConsumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
-	lc.logBasicBlockData(lc.log.Debug(), proposal.Block).
-		Uint64("cur_view", currentView).
-		Msg("processing proposal")
+	logger := lc.logBasicBlockData(lc.log.Debug(), proposal.Block).
+		Uint64("cur_view", currentView)
+	lastViewTC := proposal.LastViewTC
+	if lastViewTC != nil {
+		logger.
+			Uint64("last_view_tc_view", lastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", lastViewTC.NewestQC.View).
+			Hex("last_view_tc_newest_qc_block_id", logging.ID(lastViewTC.NewestQC.BlockID))
+	}
+
+	logger.Msg("processing proposal")
 }
 
 func (lc *LogConsumer) OnReceiveQc(currentView uint64, qc *flow.QuorumCertificate) {
@@ -179,12 +187,10 @@ func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *mode
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).
 		Hex("proposer_id", logging.ID(block.ProposerID)).
-		Hex("payload_hash", logging.ID(block.PayloadHash))
-	if block.QC != nil {
-		loggerEvent.
-			Uint64("qc_view", block.QC.View).
-			Hex("qc_block_id", logging.ID(block.QC.BlockID))
-	}
+		Hex("payload_hash", logging.ID(block.PayloadHash)).
+		Uint64("qc_view", block.QC.View).
+		Hex("qc_block_id", logging.ID(block.QC.BlockID))
+
 	return loggerEvent
 }
 
