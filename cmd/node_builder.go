@@ -151,7 +151,7 @@ type BaseConfig struct {
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool
 	level                       string
-	debugLogLimit               uint
+	debugLogLimit               uint32
 	metricsPort                 uint
 	BootstrapDir                string
 	profilerConfig              profiler.ProfilerConfig
