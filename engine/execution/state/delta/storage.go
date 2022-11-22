@@ -125,34 +125,45 @@ func (s *BadgerStore) CommitBlockDelta(blockHeight uint64, delta Delta) error {
 }
 
 func (s *BadgerStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEntry) error {
-	// TODO deal with when tx batch size grows big
-	err := s.db.Update(
-		func(tx *badger.Txn) error {
-			var err error
-			for _, reg := range registers {
-				k := []byte(reg.Key.String())
-				if len(reg.Value) == 0 {
-					err = tx.Delete(k)
-					if err != nil {
-						return fmt.Errorf("could not delete data: %w", err)
+
+	batchSize := 100
+	var endIndex int
+	for startIndex := 0; startIndex+batchSize > len(registers); startIndex += batchSize {
+		endIndex = startIndex + batchSize
+		if endIndex > len(registers) {
+			endIndex = len(registers)
+		}
+		err := s.db.Update(
+			func(tx *badger.Txn) error {
+				var err error
+				for _, reg := range registers[startIndex:endIndex] {
+					k := []byte(reg.Key.String())
+					if len(reg.Value) == 0 {
+						err = tx.Delete(k)
+						if err != nil {
+							return fmt.Errorf("could not delete data: %w", err)
+						}
+						continue
 					}
-					continue
+					err = tx.Set(k, reg.Value[:])
+					if err != nil {
+						return fmt.Errorf("could not set data: %w", err)
+					}
 				}
-				err = tx.Set(k, reg.Value[:])
+
+				buf := make([]byte, 8)
+				binary.BigEndian.PutUint64(buf, blockHeight)
+				err = tx.Set(BadgerStoreHeightKey, buf)
 				if err != nil {
-					return fmt.Errorf("could not set data: %w", err)
+					return fmt.Errorf("could not update latest height: %w", err)
 				}
-			}
 
-			buf := make([]byte, 8)
-			binary.BigEndian.PutUint64(buf, blockHeight)
-			err = tx.Set(BadgerStoreHeightKey, buf)
-			if err != nil {
-				return fmt.Errorf("could not update latest height: %w", err)
-			}
-
-			return nil
-		},
-	)
-	return err
+				return nil
+			},
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
