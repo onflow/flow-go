@@ -723,6 +723,7 @@ func main() {
 		Component("consensus message hub", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			messageHub, err := message_hub.NewMessageHub(
 				node.Logger,
+				node.Metrics.Engine,
 				node.Network,
 				node.Me,
 				comp,

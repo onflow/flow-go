@@ -432,8 +432,11 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
+	metrics := module.NewMempoolMetrics(t)
+	metrics.On("MempoolEntries", mock.Anything, mock.Anything).Maybe()
+
 	// initialize the vote aggregator
-	in.voteAggregator, err = voteaggregator.NewVoteAggregator(log, notifier, livenessData.CurrentView, voteCollectors)
+	in.voteAggregator, err = voteaggregator.NewVoteAggregator(log, notifier, metrics, livenessData.CurrentView, voteCollectors)
 	require.NoError(t, err)
 
 	// initialize factories for timeout collector and timeout processor
@@ -479,7 +482,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorFactory)
 
 	// initialize the timeout aggregator
-	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(log, notifier, livenessData.CurrentView, timeoutCollectors)
+	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(log, notifier, metrics, livenessData.CurrentView, timeoutCollectors)
 	require.NoError(t, err)
 
 	safetyData := &hotstuff.SafetyData{

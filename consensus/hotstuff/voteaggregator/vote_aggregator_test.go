@@ -2,6 +2,7 @@ package voteaggregator
 
 import (
 	"context"
+	module "github.com/onflow/flow-go/module/mock"
 	"testing"
 	"time"
 
@@ -35,26 +36,16 @@ type VoteAggregatorTestSuite struct {
 
 func (s *VoteAggregatorTestSuite) SetupTest() {
 	var err error
-	s.collectors = &mocks.VoteCollectors{}
-	s.consumer = &mocks.Consumer{}
-
-	ready := func() <-chan struct{} {
-		channel := make(chan struct{})
-		close(channel)
-		return channel
-	}()
-
-	done := func() <-chan struct{} {
-		channel := make(chan struct{})
-		close(channel)
-		return channel
-	}()
+	s.collectors = mocks.NewVoteCollectors(s.T())
+	s.consumer = mocks.NewConsumer(s.T())
 
 	s.collectors.On("Start", mock.Anything).Once()
-	s.collectors.On("Ready").Return(ready).Once()
-	s.collectors.On("Done").Return(done).Once()
+	unittest.ReadyDoneify(s.collectors)
 
-	s.aggregator, err = NewVoteAggregator(unittest.Logger(), s.consumer, 0, s.collectors)
+	metrics := module.NewMempoolMetrics(s.T())
+	metrics.On("MempoolEntries", mock.Anything, mock.Anything).Maybe()
+
+	s.aggregator, err = NewVoteAggregator(unittest.Logger(), s.consumer, metrics, 0, s.collectors)
 	require.NoError(s.T(), err)
 
 	ctx, cancel := context.WithCancel(context.Background())

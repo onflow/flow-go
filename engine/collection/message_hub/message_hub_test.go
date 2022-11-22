@@ -149,8 +149,11 @@ func (s *MessageHubSuite) SetupTest() {
 		nil,
 	)
 
+	engineMetrics := module.NewEngineMetrics(s.T())
+
 	hub, err := NewMessageHub(
 		unittest.Logger(),
+		engineMetrics,
 		s.net,
 		s.me,
 		s.compliance,

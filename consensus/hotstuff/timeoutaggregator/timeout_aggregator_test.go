@@ -2,6 +2,7 @@ package timeoutaggregator
 
 import (
 	"context"
+	module "github.com/onflow/flow-go/module/mock"
 	"sync"
 	"testing"
 	"time"
@@ -43,7 +44,10 @@ func (s *TimeoutAggregatorTestSuite) SetupTest() {
 
 	s.lowestRetainedView = 100
 
-	s.aggregator, err = NewTimeoutAggregator(unittest.Logger(), s.consumer, s.lowestRetainedView, s.collectors)
+	metrics := module.NewMempoolMetrics(s.T())
+	metrics.On("MempoolEntries", mock.Anything, mock.Anything).Maybe()
+
+	s.aggregator, err = NewTimeoutAggregator(unittest.Logger(), s.consumer, metrics, s.lowestRetainedView, s.collectors)
 	require.NoError(s.T(), err)
 
 	ctx, cancel := context.WithCancel(context.Background())
