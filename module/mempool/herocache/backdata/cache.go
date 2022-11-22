@@ -264,7 +264,7 @@ func (c *Cache) Clear() {
 func (c *Cache) Hash() flow.Identifier {
 	defer c.logTelemetry()
 
-	return flow.MerkleRoot(flow.GetIDs(c.All())...)
+	return flow.ConcatSum(flow.GetIDs(c.All())...)
 }
 
 // put writes the (entityId, entity) pair into this BackData. Boolean return value
