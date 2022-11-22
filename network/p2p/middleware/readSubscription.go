@@ -5,13 +5,13 @@ import (
 	"strings"
 	"sync"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
@@ -23,13 +23,13 @@ type readSubscriptionCB func(msg *message.Message, decodedMsgPayload interface{}
 type readSubscription struct {
 	ctx      context.Context
 	log      zerolog.Logger
-	sub      *pubsub.Subscription
+	sub      p2p.Subscription
 	metrics  module.NetworkMetrics
 	callback readSubscriptionCB
 }
 
 // newReadSubscription reads the messages coming in on the subscription
-func newReadSubscription(ctx context.Context, sub *pubsub.Subscription, callback readSubscriptionCB, log zerolog.Logger, metrics module.NetworkMetrics) *readSubscription {
+func newReadSubscription(ctx context.Context, sub p2p.Subscription, callback readSubscriptionCB, log zerolog.Logger, metrics module.NetworkMetrics) *readSubscription {
 
 	log = log.With().
 		Str("channel", sub.Topic()).

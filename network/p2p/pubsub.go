@@ -47,6 +47,7 @@ type ScoreOption interface {
 
 type Subscription interface {
 	Cancel()
+	Topic() string
 	Next(context.Context) (*pubsub.Message, error)
 }
 
