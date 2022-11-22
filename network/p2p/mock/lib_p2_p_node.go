@@ -24,8 +24,6 @@ import (
 
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-
 	routing "github.com/libp2p/go-libp2p/core/routing"
 
 	unicast "github.com/onflow/flow-go/network/p2p/unicast"
@@ -332,11 +330,11 @@ func (_m *LibP2PNode) Stop() error {
 }
 
 // Subscribe provides a mock function with given fields: topic, topicValidator
-func (_m *LibP2PNode) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (p2p.Subscription, error) {
+func (_m *LibP2PNode) Subscribe(topic channels.Topic, topicValidator p2p.TopicValidatorFunc) (p2p.Subscription, error) {
 	ret := _m.Called(topic, topicValidator)
 
 	var r0 p2p.Subscription
-	if rf, ok := ret.Get(0).(func(channels.Topic, pubsub.ValidatorEx) p2p.Subscription); ok {
+	if rf, ok := ret.Get(0).(func(channels.Topic, p2p.TopicValidatorFunc) p2p.Subscription); ok {
 		r0 = rf(topic, topicValidator)
 	} else {
 		if ret.Get(0) != nil {
@@ -345,7 +343,7 @@ func (_m *LibP2PNode) Subscribe(topic channels.Topic, topicValidator pubsub.Vali
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(channels.Topic, pubsub.ValidatorEx) error); ok {
+	if rf, ok := ret.Get(1).(func(channels.Topic, p2p.TopicValidatorFunc) error); ok {
 		r1 = rf(topic, topicValidator)
 	} else {
 		r1 = ret.Error(1)

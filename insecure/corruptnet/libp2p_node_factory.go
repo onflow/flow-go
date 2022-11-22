@@ -61,8 +61,8 @@ func NewCorruptLibP2PNodeFactory(
 }
 
 func corruptibleGossipSubFactory() p2pbuilder.GossipSubFactoryFuc {
-	return func(ctx context.Context, host host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
-		return corruptlibp2p.NewCorruptGossipSubAdapter(ctx, host, cfg)
+	return func(ctx context.Context, logger zerolog.Logger, host host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+		return corruptlibp2p.NewCorruptGossipSubAdapter(ctx, logger, host, cfg)
 	}
 }
 

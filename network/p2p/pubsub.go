@@ -9,8 +9,18 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 )
 
+type ValidationResult int
+
+const (
+	ValidationAccept ValidationResult = iota
+	ValidationIgnore
+	ValidationReject
+)
+
+type TopicValidatorFunc func(context.Context, peer.ID, *pubsub.Message) ValidationResult
+
 type PubSubAdapter interface {
-	RegisterTopicValidator(topic string, val interface{}) error
+	RegisterTopicValidator(topic string, topicValidator TopicValidatorFunc) error
 	UnregisterTopicValidator(topic string) error
 	Join(topic string) (Topic, error)
 	GetTopics() []string
