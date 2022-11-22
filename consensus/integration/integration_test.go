@@ -19,11 +19,12 @@ func runNodes(signalerCtx irrecoverable.SignalerContext, nodes []*Node) {
 	for _, n := range nodes {
 		go func(n *Node) {
 			n.committee.Start(signalerCtx)
+			n.hot.Start(signalerCtx)
 			n.voteAggregator.Start(signalerCtx)
 			n.timeoutAggregator.Start(signalerCtx)
 			n.compliance.Start(signalerCtx)
 			n.messageHub.Start(signalerCtx)
-			<-util.AllReady(n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync, n.messageHub)
+			<-util.AllReady(n.committee, n.hot, n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync, n.messageHub)
 		}(n)
 	}
 }
@@ -34,6 +35,7 @@ func stopNodes(t *testing.T, cancel context.CancelFunc, nodes []*Node) {
 	for _, n := range nodes {
 		stoppingNodes = append(stoppingNodes, util.AllDone(
 			n.committee,
+			n.hot,
 			n.voteAggregator,
 			n.timeoutAggregator,
 			n.compliance,

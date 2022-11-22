@@ -466,12 +466,16 @@ func main() {
 				return nil, err
 			}
 
+			syncCoreFactory, err := factories.NewSyncCoreFactory(node.Logger, node.SyncCoreConfig)
+			if err != nil {
+				return nil, err
+			}
+
 			syncFactory, err := factories.NewSyncEngineFactory(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				node.SyncCoreConfig,
 			)
 			if err != nil {
 				return nil, err
@@ -534,6 +538,7 @@ func main() {
 				clusterStateFactory,
 				hotstuffFactory,
 				complianceEngineFactory,
+				syncCoreFactory,
 				syncFactory,
 				messageHubFactory,
 			)

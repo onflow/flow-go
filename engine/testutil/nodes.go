@@ -320,12 +320,14 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 	)
 	require.NoError(t, err)
 
+	syncCoreFactory, err := factories.NewSyncCoreFactory(node.Log, chainsync.DefaultConfig())
+	require.NoError(t, err)
+
 	syncFactory, err := factories.NewSyncEngineFactory(
 		node.Log,
 		node.Metrics,
 		node.Net,
 		node.Me,
-		chainsync.DefaultConfig(),
 	)
 	require.NoError(t, err)
 
@@ -355,6 +357,7 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 		clusterStateFactory,
 		hotstuffFactory,
 		complianceEngineFactory,
+		syncCoreFactory,
 		syncFactory,
 		messageHubFactory,
 	)
