@@ -109,6 +109,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	blockID := header.ID()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
+
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
@@ -121,7 +122,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		Int("tx_count", proposal.Payload.Collection.Len()).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Hex("signers", header.ParentVoterIndices).
+		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Uint64("final_height", finalHeight).
 		Uint64("final_view", finalView).
 		Logger()
