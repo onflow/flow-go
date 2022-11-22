@@ -373,7 +373,6 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
 	parent := unittest.BlockWithParentFixture(cs.head)
-	proposal := unittest.ProposalFromBlock(parent)
 	block1 := unittest.BlockWithParentFixture(parent.Header)
 	block2 := unittest.BlockWithParentFixture(parent.Header)
 	block3 := unittest.BlockWithParentFixture(parent.Header)
@@ -398,7 +397,7 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return(doneChan()).Once()
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(proposal, false)
+	err := cs.core.processBlockAndDescendants(parent, false)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff

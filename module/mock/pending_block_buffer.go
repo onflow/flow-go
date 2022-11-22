@@ -4,8 +4,6 @@ package mock
 
 import (
 	flow "github.com/onflow/flow-go/model/flow"
-	messages "github.com/onflow/flow-go/model/messages"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -14,13 +12,13 @@ type PendingBlockBuffer struct {
 	mock.Mock
 }
 
-// Add provides a mock function with given fields: originID, proposal
-func (_m *PendingBlockBuffer) Add(originID flow.Identifier, proposal *messages.BlockProposal) bool {
-	ret := _m.Called(originID, proposal)
+// Add provides a mock function with given fields: originID, block
+func (_m *PendingBlockBuffer) Add(originID flow.Identifier, block *flow.Block) bool {
+	ret := _m.Called(originID, block)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *messages.BlockProposal) bool); ok {
-		r0 = rf(originID, proposal)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.Block) bool); ok {
+		r0 = rf(originID, block)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -29,15 +27,15 @@ func (_m *PendingBlockBuffer) Add(originID flow.Identifier, proposal *messages.B
 }
 
 // ByID provides a mock function with given fields: blockID
-func (_m *PendingBlockBuffer) ByID(blockID flow.Identifier) (*flow.PendingBlock, bool) {
+func (_m *PendingBlockBuffer) ByID(blockID flow.Identifier) (*flow.Slashable[flow.Block], bool) {
 	ret := _m.Called(blockID)
 
-	var r0 *flow.PendingBlock
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.PendingBlock); ok {
+	var r0 *flow.Slashable[flow.Block]
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Slashable[flow.Block]); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.PendingBlock)
+			r0 = ret.Get(0).(*flow.Slashable[flow.Block])
 		}
 	}
 
@@ -52,15 +50,15 @@ func (_m *PendingBlockBuffer) ByID(blockID flow.Identifier) (*flow.PendingBlock,
 }
 
 // ByParentID provides a mock function with given fields: parentID
-func (_m *PendingBlockBuffer) ByParentID(parentID flow.Identifier) ([]*flow.PendingBlock, bool) {
+func (_m *PendingBlockBuffer) ByParentID(parentID flow.Identifier) ([]*flow.Slashable[flow.Block], bool) {
 	ret := _m.Called(parentID)
 
-	var r0 []*flow.PendingBlock
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.PendingBlock); ok {
+	var r0 []*flow.Slashable[flow.Block]
+	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.Slashable[flow.Block]); ok {
 		r0 = rf(parentID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.PendingBlock)
+			r0 = ret.Get(0).([]*flow.Slashable[flow.Block])
 		}
 	}
 
