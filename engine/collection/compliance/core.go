@@ -121,6 +121,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		Hex("proposer", header.ProposerID[:]).
 		Hex("signers", header.ParentVoterIndices).
 		Uint64("final_height", finalHeight).
+		Uint64("final_view", finalView).
 		Logger()
 	if log.Debug().Enabled() {
 		log = log.With().Strs("tx_ids", flow.IdentifierList(proposal.Payload.Collection.Light().Transactions).Strings()).Logger()
@@ -128,8 +129,8 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	log.Info().Msg("block proposal received")
 
 	// drop proposals below the finalized threshold
-	if header.Height < finalHeight || header.View < finalView {
-		log.Debug().Uint64("final_view", finalView).Msg("dropping block below finalized boundary")
+	if header.Height <= finalHeight || header.View <= finalView {
+		log.Debug().Msg("dropping block below finalized boundary")
 		return nil
 	}
 
