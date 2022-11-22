@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/metrics"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -75,6 +76,7 @@ type MessageHub struct {
 	notifications.NoopConsumer
 	log                        zerolog.Logger
 	me                         module.Local
+	engineMetrics              module.EngineMetrics
 	state                      protocol.State
 	payloads                   storage.Payloads
 	con                        network.Conduit
@@ -97,6 +99,7 @@ var _ hotstuff.CommunicatorConsumer = (*MessageHub)(nil)
 // NewMessageHub constructs new instance of message hub
 // No errors are expected during normal operations.
 func NewMessageHub(log zerolog.Logger,
+	engineMetrics module.EngineMetrics,
 	net network.Network,
 	me module.Local,
 	compliance consensus.Compliance,
@@ -127,6 +130,7 @@ func NewMessageHub(log zerolog.Logger,
 	hub := &MessageHub{
 		log:                        log.With().Str("engine", "message_hub").Logger(),
 		me:                         me,
+		engineMetrics:              engineMetrics,
 		state:                      state,
 		payloads:                   payloads,
 		compliance:                 compliance,
@@ -263,9 +267,7 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 	}
 	log.Info().Msg("consensus timeout was broadcast")
 
-	// TODO(active-pacemaker): update metrics
-	//e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
-	//e.core.collectionMetrics.ClusterBlockProposed(block)
+	h.engineMetrics.MessageSent(metrics.EngineConsensusMessageHub, metrics.MessageTimeoutObject)
 
 	return nil
 }
@@ -286,8 +288,7 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 		log.Err(err).Msg("could not send vote")
 		return nil
 	}
-	// TODO(active-pacemaker): update metrics
-	//h.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
+	h.engineMetrics.MessageSent(metrics.EngineConsensusMessageHub, metrics.MessageBlockVote)
 	log.Info().Msg("block vote transmitted")
 
 	return nil
@@ -361,11 +362,9 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	}
 	log.Info().Msg("block proposal was broadcast")
 
-	//TODO(active-pacemaker): update metrics
-	//e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
-
 	// submit proposal to non-consensus nodes
 	h.provideProposal(proposal, allIdentities.Filter(filter.Not(filter.HasRole(flow.RoleConsensus))))
+	h.engineMetrics.MessageSent(metrics.EngineConsensusMessageHub, metrics.MessageBlockProposal)
 
 	return nil
 }
@@ -388,8 +387,6 @@ func (h *MessageHub) provideProposal(proposal *messages.BlockProposal, recipient
 		return
 	}
 
-	// TODO(active-pacemaker): update metrics
-	//h.message.MessageSent(metrics.EngineConsensusProvider, metrics.MessageBlockProposal)
 	log.Info().Msg("block proposal propagated to non-consensus nodes")
 }
 

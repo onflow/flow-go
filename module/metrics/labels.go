@@ -24,16 +24,17 @@ const (
 const (
 	// collection
 	EngineClusterCompliance      = "collection_compliance"
+	EngineCollectionMessageHub   = "collection_message_hub"
 	EngineCollectionIngest       = "collection_ingest"
 	EngineCollectionProvider     = "collection_provider"
 	EngineClusterSynchronization = "cluster-sync"
 	// consensus
-	EnginePropagation        = "propagation"
-	EngineCompliance         = "compliance"
-	EngineConsensusProvider  = "consensus_provider"
-	EngineConsensusIngestion = "consensus_ingestion"
-	EngineSealing            = "sealing"
-	EngineSynchronization    = "sync"
+	EnginePropagation         = "propagation"
+	EngineCompliance          = "compliance"
+	EngineConsensusMessageHub = "consensus_message_hub"
+	EngineConsensusIngestion  = "consensus_ingestion"
+	EngineSealing             = "sealing"
+	EngineSynchronization     = "sync"
 	// common
 	EngineFollower = "follower"
 )
@@ -105,6 +106,7 @@ const (
 	MessageCollectionGuarantee  = "guarantee"
 	MessageBlockProposal        = "proposal"
 	MessageBlockVote            = "vote"
+	MessageTimeoutObject        = "timeout_object"
 	MessageExecutionReceipt     = "receipt"
 	MessageResultApproval       = "approval"
 	MessageSyncRequest          = "ping"
@@ -115,6 +117,7 @@ const (
 	MessageSyncedBlock          = "synced_block"
 	MessageClusterBlockProposal = "cluster_proposal"
 	MessageClusterBlockVote     = "cluster_vote"
+	MessageClusterTimeoutObject = "cluster_timeout_object"
 	MessageClusterBlockResponse = "cluster_block_response"
 	MessageSyncedClusterBlock   = "synced_cluster_block"
 	MessageTransaction          = "transaction"
