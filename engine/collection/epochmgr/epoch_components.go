@@ -47,13 +47,21 @@ func NewEpochComponents(
 	builder := component.NewComponentManagerBuilder()
 	// start new worker that will start child components and wait for them to finish
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		// start vote and timeout aggregators, hotstuff will be started by compliance engine
+		// start components
 		voteAggregator.Start(ctx)
 		timeoutAggregator.Start(ctx)
+		hotstuff.Start(ctx)
 		comp.Start(ctx)
 		messageHub.Start(ctx)
 		// wait until all components start
-		<-util.AllReady(components.comp, components.sync, components.voteAggregator, components.timeoutAggregator, components.messageHub)
+		<-util.AllReady(
+			components.hotstuff,
+			components.comp,
+			components.sync,
+			components.voteAggregator,
+			components.timeoutAggregator,
+			components.messageHub,
+		)
 
 		// signal that startup has finished, and we are ready to go
 		ready()
@@ -61,7 +69,14 @@ func NewEpochComponents(
 		// wait for shutdown to be commenced
 		<-ctx.Done()
 		// wait for compliance engine and event loop to shut down
-		<-util.AllDone(components.comp, components.sync, components.voteAggregator, components.timeoutAggregator, components.messageHub)
+		<-util.AllDone(
+			components.hotstuff,
+			components.comp,
+			components.sync,
+			components.voteAggregator,
+			components.timeoutAggregator,
+			components.messageHub,
+		)
 	})
 	components.ComponentManager = builder.Build()
 
