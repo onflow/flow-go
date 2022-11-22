@@ -73,13 +73,15 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnReceiveProposal(currentView uint64, proposal *model.Proposal)
 
-	// OnReceiveQc notifications are produced by the EventHandler when it starts processing a QC.
+	// OnReceiveQc notifications are produced by the EventHandler when it starts processing a
+	// QuorumCertificate [QC] constructed by the node's internal vote aggregator.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnReceiveQc(currentView uint64, qc *flow.QuorumCertificate)
 
-	// OnReceiveTc notifications are produced by the EventHandler when it starts processing a TC.
+	// OnReceiveTc notifications are produced by the EventHandler when it starts processing a
+	// TimeoutCertificate [TC]  constructed by the node's internal timeout aggregator.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
@@ -99,7 +101,7 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnLocalTimeout(currentView uint64)
 
-	// OnViewChange notifications are produced by PaceMaker when it moves to a new view
+	// OnViewChange notifications are produced by PaceMaker when it transitions to a new view
 	// based on processing a QC or TC. The arguments specify the oldView (first argument),
 	// and the newView to which the PaceMaker transitioned (second argument).
 	// Prerequisites:
