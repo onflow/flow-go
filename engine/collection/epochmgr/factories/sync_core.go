@@ -16,7 +16,6 @@ func NewSyncCoreFactory(
 	log zerolog.Logger,
 	conf chainsync.Config,
 ) (*SyncCoreFactory, error) {
-
 	factory := &SyncCoreFactory{
 		log:  log,
 		conf: conf,
