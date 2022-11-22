@@ -584,6 +584,7 @@ func main() {
 				node.Logger,
 				lowestViewForVoteProcessing,
 				notifier,
+				node.Metrics.Mempool,
 				voteProcessorFactory,
 				finalizationDistributor)
 			if err != nil {
@@ -596,6 +597,7 @@ func main() {
 				node.Logger,
 				lowestViewForVoteProcessing,
 				notifier,
+				node.Metrics.Mempool,
 				timeoutProcessorFactory,
 				timeoutCollectorDistributor,
 			)

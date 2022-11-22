@@ -501,6 +501,7 @@ func main() {
 				node.Me,
 				node.DB,
 				node.State,
+				node.Metrics.Mempool,
 				createMetrics,
 				opts...,
 			)

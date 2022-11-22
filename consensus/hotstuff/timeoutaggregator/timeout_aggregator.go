@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 
 	"github.com/rs/zerolog"
 
@@ -46,11 +48,12 @@ var _ component.Component = (*TimeoutAggregator)(nil)
 // No errors are expected during normal operations.
 func NewTimeoutAggregator(log zerolog.Logger,
 	notifier hotstuff.Consumer,
+	mempoolMetrics module.MempoolMetrics,
 	lowestRetainedView uint64,
 	collectors hotstuff.TimeoutCollectors,
 ) (*TimeoutAggregator, error) {
-	// TODO(active-pacemaker): add metrics to track size of timeouts queue
-	queuedTimeouts, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultTimeoutQueueCapacity))
+	queuedTimeouts, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultTimeoutQueueCapacity),
+		fifoqueue.WithLengthObserver(func(len int) { mempoolMetrics.MempoolEntries(metrics.ResourceTimeoutObjectQueue, uint(len)) }))
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeouts queue")
 	}

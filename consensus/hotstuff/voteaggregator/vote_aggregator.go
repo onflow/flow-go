@@ -3,6 +3,8 @@ package voteaggregator
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -51,11 +53,13 @@ var _ component.Component = (*VoteAggregator)(nil)
 func NewVoteAggregator(
 	log zerolog.Logger,
 	notifier hotstuff.Consumer,
+	mempoolMetrics module.MempoolMetrics,
 	lowestRetainedView uint64,
 	collectors hotstuff.VoteCollectors,
 ) (*VoteAggregator, error) {
 
-	queuedVotes, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultVoteQueueCapacity))
+	queuedVotes, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultVoteQueueCapacity),
+		fifoqueue.WithLengthObserver(func(len int) { mempoolMetrics.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }))
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize votes queue")
 	}

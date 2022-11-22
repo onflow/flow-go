@@ -23,7 +23,7 @@ const (
 
 const (
 	// collection
-	EngineClusterCompliance      = "proposal"
+	EngineClusterCompliance      = "collection_compliance"
 	EngineCollectionIngest       = "collection_ingest"
 	EngineCollectionProvider     = "collection_provider"
 	EngineClusterSynchronization = "cluster-sync"
@@ -82,7 +82,6 @@ const (
 	ResourceNetworkingDnsTxtCache        = "networking_dns_txt_cache"           // networking layer
 
 	ResourceClusterBlockProposalQueue = "cluster_compliance_proposal_queue" // collection node, compliance engine
-	ResourceClusterBlockVoteQueue     = "cluster_compliance_vote_queue"     // collection node, compliance engine
 	ResourceTransactionIngestQueue    = "ingest_transaction_queue"          // collection node, ingest engine
 	ResourceBeaconKey                 = "beacon-key"                        // consensus node, DKG engine
 	ResourceApprovalQueue             = "sealing_approval_queue"            // consensus node, sealing engine
@@ -90,7 +89,8 @@ const (
 	ResourceApprovalResponseQueue     = "sealing_approval_response_queue"   // consensus node, sealing engine
 	ResourceBlockResponseQueue        = "compliance_block_response_queue"   // consensus node, compliance engine
 	ResourceBlockProposalQueue        = "compliance_proposal_queue"         // consensus node, compliance engine
-	ResourceBlockVoteQueue            = "compliance_vote_queue"             // consensus node, compliance engine
+	ResourceBlockVoteQueue            = "vote_aggregator_queue"             // consensus/collection node, vote aggregator
+	ResourceTimeoutObjectQueue        = "timeout_aggregator_queue"          // consensus/collection node, timeout aggregator
 	ResourceCollectionGuaranteesQueue = "ingestion_col_guarantee_queue"     // consensus node, ingestion engine
 	ResourceChunkDataPack             = "chunk_data_pack"                   // execution node
 	ResourceChunkDataPackRequests     = "chunk_data_pack_request"           // execution node

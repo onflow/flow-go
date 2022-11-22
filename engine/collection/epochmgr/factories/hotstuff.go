@@ -30,12 +30,13 @@ import (
 type HotStuffMetricsFunc func(chainID flow.ChainID) module.HotstuffMetrics
 
 type HotStuffFactory struct {
-	log           zerolog.Logger
-	me            module.Local
-	db            *badger.DB
-	protoState    protocol.State
-	createMetrics HotStuffMetricsFunc
-	opts          []consensus.Option
+	log            zerolog.Logger
+	me             module.Local
+	db             *badger.DB
+	protoState     protocol.State
+	mempoolMetrics module.MempoolMetrics
+	createMetrics  HotStuffMetricsFunc
+	opts           []consensus.Option
 }
 
 func NewHotStuffFactory(
@@ -43,17 +44,19 @@ func NewHotStuffFactory(
 	me module.Local,
 	db *badger.DB,
 	protoState protocol.State,
+	mempoolMetrics module.MempoolMetrics,
 	createMetrics HotStuffMetricsFunc,
 	opts ...consensus.Option,
 ) (*HotStuffFactory, error) {
 
 	factory := &HotStuffFactory{
-		log:           log,
-		me:            me,
-		db:            db,
-		protoState:    protoState,
-		createMetrics: createMetrics,
-		opts:          opts,
+		log:            log,
+		me:             me,
+		db:             db,
+		protoState:     protoState,
+		mempoolMetrics: mempoolMetrics,
+		createMetrics:  createMetrics,
+		opts:           opts,
 	}
 	return factory, nil
 }
@@ -118,6 +121,7 @@ func (f *HotStuffFactory) CreateModules(
 		// the lowest retained view starts with the next view of the last finalized view.
 		finalizedBlock.View+1,
 		notifier,
+		f.mempoolMetrics,
 		voteProcessorFactory,
 		finalizationDistributor,
 	)
@@ -132,6 +136,7 @@ func (f *HotStuffFactory) CreateModules(
 		f.log,
 		finalizedBlock.View+1,
 		notifier,
+		f.mempoolMetrics,
 		timeoutProcessorFactory,
 		timeoutCollectorDistributor,
 	)

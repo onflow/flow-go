@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module"
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
@@ -20,6 +21,7 @@ func NewVoteAggregator(
 	log zerolog.Logger,
 	lowestRetainedView uint64,
 	notifier hotstuff.Consumer,
+	mempoolMetrics module.MempoolMetrics,
 	voteProcessorFactory hotstuff.VoteProcessorFactory,
 	distributor *pubsub.FinalizationDistributor,
 ) (hotstuff.VoteAggregator, error) {
@@ -28,7 +30,7 @@ func NewVoteAggregator(
 	voteCollectors := voteaggregator.NewVoteCollectors(log, lowestRetainedView, workerpool.New(4), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator
-	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, lowestRetainedView, voteCollectors)
+	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, mempoolMetrics, lowestRetainedView, voteCollectors)
 	if err != nil {
 		return nil, fmt.Errorf("could not create vote aggregator: %w", err)
 	}
@@ -42,6 +44,7 @@ func NewVoteAggregator(
 func NewTimeoutAggregator(log zerolog.Logger,
 	lowestRetainedView uint64,
 	notifier *pubsub.Distributor,
+	mempoolMetrics module.MempoolMetrics,
 	timeoutProcessorFactory hotstuff.TimeoutProcessorFactory,
 	distributor *pubsub.TimeoutCollectorDistributor,
 ) (hotstuff.TimeoutAggregator, error) {
@@ -50,7 +53,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	collectors := timeoutaggregator.NewTimeoutCollectors(log, lowestRetainedView, timeoutCollectorFactory)
 
 	// initialize the timeout aggregator
-	aggregator, err := timeoutaggregator.NewTimeoutAggregator(log, notifier, lowestRetainedView, collectors)
+	aggregator, err := timeoutaggregator.NewTimeoutAggregator(log, notifier, mempoolMetrics, lowestRetainedView, collectors)
 	if err != nil {
 		return nil, fmt.Errorf("could not create timeout aggregator: %w", err)
 	}
