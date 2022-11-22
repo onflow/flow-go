@@ -28,8 +28,10 @@ type BadgerStore struct {
 
 var _ Storage = &BadgerStore{}
 
-func newStorage(db *badger.DB) *BadgerStore {
-	return &BadgerStore{db: db}
+func NewBadgerStore(db *badger.DB) (*BadgerStore, error) {
+	store := &BadgerStore{db: db}
+	err := store.initHeight()
+	return store, err
 }
 
 func (s *BadgerStore) GetRegister(key flow.RegisterID) (val flow.RegisterValue, found bool, err error) {
@@ -71,6 +73,22 @@ func (s *BadgerStore) BlockHeight() (height uint64, err error) {
 		},
 	)
 	return
+}
+
+func (s *BadgerStore) initHeight() error {
+	err := s.db.Update(
+		func(tx *badger.Txn) error {
+			var err error
+			buf := make([]byte, 8)
+			binary.BigEndian.PutUint64(buf, 0)
+			err = tx.Set(BadgerStoreHeightKey, buf)
+			if err != nil {
+				return fmt.Errorf("could not init height: %w", err)
+			}
+			return nil
+		},
+	)
+	return err
 }
 
 func (s *BadgerStore) CommitBlockDelta(blockHeight uint64, delta Delta) error {

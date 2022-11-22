@@ -97,9 +97,17 @@ func (o *Oracle) BlockIsSealed(blockID flow.Identifier, header *flow.Header) err
 	defer o.lock.Unlock()
 	// TODO check header.Height and if its alread merged ignore it (out of order seal calls)
 
+	h, err := o.storage.BlockHeight()
+	if err != nil {
+		return err
+	}
+	if header.Height != h+1 {
+		return errors.New("block height mismatch (out-of-sync)")
+	}
+
 	// find the view for the block
 	blockView := o.blocksInFlightByID[blockID]
-	// TODO handle the case of not found (alread merged vs not reached there yet)
+	// TODO handle the case of not found (alread merged vs not reached there yete)
 	if blockView == nil {
 		return errors.New("block view not found for the given blockID (out-of-sync)")
 	}
