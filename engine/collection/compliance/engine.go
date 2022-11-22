@@ -27,6 +27,7 @@ const defaultBlockQueueCapacity = 10_000
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 // Implements collection.Compliance interface.
 type Engine struct {
+	*component.ComponentManager
 	log                   zerolog.Logger
 	metrics               module.EngineMetrics
 	me                    module.Local
@@ -39,9 +40,6 @@ type Engine struct {
 	// tracking finalized view
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
-
-	cm *component.ComponentManager
-	component.Component
 }
 
 var _ collection.Compliance = (*Engine)(nil)
@@ -80,11 +78,10 @@ func NewEngine(
 	}
 
 	// create the component manager and worker threads
-	eng.cm = component.NewComponentManagerBuilder().
+	eng.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(eng.processBlocksLoop).
 		AddWorker(eng.finalizationProcessingLoop).
 		Build()
-	eng.Component = eng.cm
 
 	return eng, nil
 }
