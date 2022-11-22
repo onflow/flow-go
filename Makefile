@@ -274,7 +274,7 @@ docker-build-execution-corrupt:
 	./insecure/cmd/build_helper1.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/execution-corrupt:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupt:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupt:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/execution-corrupted:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)" .
 	./insecure/cmd/build_helper2.sh
 
 .PHONY: docker-build-verification
@@ -295,7 +295,7 @@ docker-build-verification-corrupt:
 	./insecure/cmd/build_helper1.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/verification-corrupt:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupt:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupt:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/verification-corrupted:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)" .
 	./insecure/cmd/build_helper2.sh
 
 .PHONY: docker-build-access
