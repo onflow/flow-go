@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -150,7 +151,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	if found {
 
 		// add the block to the cache
-		_ = c.pending.Add(originID, proposal)
+		_ = c.pending.Add(originID, block)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		return nil
@@ -162,7 +163,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	_, err = c.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
 
-		_ = c.pending.Add(originID, proposal)
+		_ = c.pending.Add(originID, block)
 
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
@@ -182,7 +183,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(proposal)
+	err = c.processBlockAndDescendants(block)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -195,12 +196,11 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 // its pending proposals for its children. By induction, any children connected
 // to a valid proposal are validly connected to the finalized state and can be
 // processed as well.
-func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposal) error {
-	block := proposal.Block.ToInternal()
+func (c *Core) processBlockAndDescendants(block *cluster.Block) error {
 	blockID := block.ID()
 
 	// process block itself
-	err := c.processBlockProposal(proposal)
+	err := c.processBlockProposal(block)
 	// child is outdated by the time we started processing it
 	// => node was probably behind and is catching up. Log as warning
 	if engine.IsOutdatedInputError(err) {
@@ -229,8 +229,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 		return nil
 	}
 	for _, child := range children {
-		childProposal := messages.NewClusterBlockProposal(&child.Block)
-		cpr := c.processBlockAndDescendants(childProposal)
+		cpr := c.processBlockAndDescendants(child.Message)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
@@ -245,8 +244,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 
 // processBlockProposal processes the given block proposal. The proposal must connect to
 // the finalized state.
-func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) error {
-	block := proposal.Block.ToInternal()
+func (c *Core) processBlockProposal(block *cluster.Block) error {
 	header := block.Header
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
