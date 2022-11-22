@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/metrics"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -76,6 +77,7 @@ type MessageHub struct {
 	notifications.NoopConsumer
 	log                        zerolog.Logger
 	me                         module.Local
+	engineMetrics              module.EngineMetrics
 	state                      protocol.State
 	payloads                   storage.ClusterPayloads
 	con                        network.Conduit
@@ -98,6 +100,7 @@ var _ hotstuff.CommunicatorConsumer = (*MessageHub)(nil)
 // NewMessageHub constructs new instance of message hub
 // No errors are expected during normal operations.
 func NewMessageHub(log zerolog.Logger,
+	engineMetrics module.EngineMetrics,
 	net network.Network,
 	me module.Local,
 	compliance collection.Compliance,
@@ -140,6 +143,7 @@ func NewMessageHub(log zerolog.Logger,
 	hub := &MessageHub{
 		log:                        log.With().Str("engine", "cluster_message_hub").Logger(),
 		me:                         me,
+		engineMetrics:              engineMetrics,
 		state:                      state,
 		payloads:                   payloads,
 		compliance:                 compliance,
@@ -272,10 +276,7 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 		return nil
 	}
 	log.Info().Msg("cluster timeout was broadcast")
-
-	// TODO(active-pacemaker): update metrics
-	//e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
-	//e.core.collectionMetrics.ClusterBlockProposed(block)
+	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageClusterTimeoutObject)
 
 	return nil
 }
@@ -296,9 +297,8 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 		log.Err(err).Msg("could not send vote")
 		return nil
 	}
-	// TODO(active-pacemaker): update metrics
-	//h.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
 	log.Info().Msg("collection vote transmitted")
+	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageClusterBlockVote)
 
 	return nil
 }
@@ -351,11 +351,8 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 		return nil
 	}
 	log.Info().Msg("cluster proposal was broadcast")
+	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageClusterBlockProposal)
 
-	//TODO(active-pacemaker): update metrics
-	//e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
-
-	//TODO(active-pacemaker): add metrics for ClusterBlockProposed
 	return nil
 }
 
