@@ -67,6 +67,7 @@ func NewCore(
 	pending module.PendingBlockBuffer,
 	sync module.BlockRequester,
 	validator hotstuff.Validator,
+	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
 	opts ...compliance.Opt,
@@ -90,7 +91,7 @@ func NewCore(
 		state:             state,
 		pending:           pending,
 		sync:              sync,
-		hotstuff:          nil, // use `WithConsensus`
+		hotstuff:          hotstuff,
 		validator:         validator,
 		voteAggregator:    voteAggregator,
 		timeoutAggregator: timeoutAggregator,

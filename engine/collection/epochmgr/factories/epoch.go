@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/module"
-	chainsync "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/state/cluster"
@@ -23,6 +22,7 @@ type EpochComponentsFactory struct {
 	hotstuff   *HotStuffFactory
 	compliance *ComplianceEngineFactory
 	sync       *SyncEngineFactory
+	syncCore   *SyncCoreFactory
 	messageHub *MessageHubFactory
 }
 
@@ -35,6 +35,7 @@ func NewEpochComponentsFactory(
 	state *ClusterStateFactory,
 	hotstuff *HotStuffFactory,
 	compliance *ComplianceEngineFactory,
+	syncCore *SyncCoreFactory,
 	sync *SyncEngineFactory,
 	messageHub *MessageHubFactory,
 ) *EpochComponentsFactory {
@@ -46,6 +47,7 @@ func NewEpochComponentsFactory(
 		state:      state,
 		hotstuff:   hotstuff,
 		compliance: compliance,
+		syncCore:   syncCore,
 		sync:       sync,
 		messageHub: messageHub,
 	}
@@ -138,18 +140,6 @@ func (factory *EpochComponentsFactory) Create(
 	timeoutAggregator = hotstuffModules.TimeoutAggregator
 	validator := hotstuffModules.Validator
 
-	complianceEng, err := factory.compliance.Create(mutableState, headers, payloads, hotstuffModules.VoteAggregator, hotstuffModules.TimeoutAggregator, validator)
-	if err != nil {
-		err = fmt.Errorf("could not create compliance engine: %w", err)
-		return
-	}
-
-	var syncCore *chainsync.Core
-	syncCore, sync, err = factory.sync.Create(cluster.Members(), state, blocks, complianceEng)
-	if err != nil {
-		err = fmt.Errorf("could not create sync engine: %w", err)
-		return
-	}
 	hotstuff, err = factory.hotstuff.Create(
 		state,
 		metrics,
@@ -162,12 +152,34 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
+	syncCore, err := factory.syncCore.Create()
+	if err != nil {
+		err = fmt.Errorf("could not create sync core: %w", err)
+		return
+	}
+
+	complianceEng, err := factory.compliance.Create(
+		mutableState,
+		headers,
+		payloads,
+		syncCore,
+		hotstuff,
+		hotstuffModules.VoteAggregator,
+		hotstuffModules.TimeoutAggregator,
+		validator,
+	)
+	if err != nil {
+		err = fmt.Errorf("could not create compliance engine: %w", err)
+		return
+	}
+	compliance = complianceEng
 	hotstuffModules.FinalizationDistributor.AddOnBlockFinalizedConsumer(complianceEng.OnFinalizedBlock)
 
-	// attach dependencies to the compliance engine
-	compliance = complianceEng.
-		WithConsensus(hotstuff).
-		WithSync(syncCore)
+	sync, err = factory.sync.Create(cluster.Members(), state, blocks, syncCore, complianceEng)
+	if err != nil {
+		err = fmt.Errorf("could not create sync engine: %w", err)
+		return
+	}
 
 	clusterMessageHub, err := factory.messageHub.Create(state, payloads, hotstuff, complianceEng, hotstuffModules)
 	if err != nil {

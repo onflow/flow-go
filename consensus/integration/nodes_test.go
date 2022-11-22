@@ -526,6 +526,21 @@ func createNode(
 		TimeoutAggregator:           timeoutAggregator,
 	}
 
+	// initialize hotstuff
+	hot, err := consensus.NewParticipant(
+		log,
+		metricsCollector,
+		build,
+		rootHeader,
+		[]*flow.Header{},
+		hotstuffModules,
+		consensus.WithMinTimeout(hotstuffTimeout),
+		func(cfg *consensus.ParticipantConfig) {
+			cfg.MaxTimeoutObjectRebroadcastInterval = hotstuffTimeout
+		},
+	)
+	require.NoError(t, err)
+
 	// initialize the compliance engine
 	compCore, err := compliance.NewCore(
 		log,
@@ -540,6 +555,7 @@ func createNode(
 		cache,
 		syncCore,
 		validator,
+		hot,
 		voteAggregator,
 		timeoutAggregator,
 	)
@@ -576,23 +592,6 @@ func createNode(
 		},
 	)
 	require.NoError(t, err)
-
-	// initialize the block finalizer
-	hot, err := consensus.NewParticipant(
-		log,
-		metricsCollector,
-		build,
-		rootHeader,
-		[]*flow.Header{},
-		hotstuffModules,
-		consensus.WithMinTimeout(hotstuffTimeout),
-		func(cfg *consensus.ParticipantConfig) {
-			cfg.MaxTimeoutObjectRebroadcastInterval = hotstuffTimeout
-		},
-	)
-	require.NoError(t, err)
-
-	comp = comp.WithConsensus(hot)
 
 	messageHub, err := message_hub.NewMessageHub(
 		log,
