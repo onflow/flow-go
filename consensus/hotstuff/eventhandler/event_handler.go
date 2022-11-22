@@ -269,11 +269,11 @@ func (e *EventHandler) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not process pending blocks: %w", err)
 	}
+	e.paceMaker.Start(ctx)
 	err = e.proposeForNewViewIfPrimary()
 	if err != nil {
 		return fmt.Errorf("could not start new view: %w", err)
 	}
-	e.paceMaker.Start(ctx)
 	return nil
 }
 
