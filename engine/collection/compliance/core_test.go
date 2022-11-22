@@ -44,8 +44,8 @@ type ComplianceCoreSuite struct {
 	// storage data
 	headerDB map[flow.Identifier]*cluster.Block
 
-	pendingDB  map[flow.Identifier]*cluster.PendingBlock
-	childrenDB map[flow.Identifier][]*cluster.PendingBlock
+	pendingDB  map[flow.Identifier]*flow.Slashable[cluster.Block]
+	childrenDB map[flow.Identifier][]*flow.Slashable[cluster.Block]
 
 	// mocked dependencies
 	state          *clusterstate.MutableState
@@ -70,8 +70,8 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 
 	// initialize the storage data
 	cs.headerDB = make(map[flow.Identifier]*cluster.Block)
-	cs.pendingDB = make(map[flow.Identifier]*cluster.PendingBlock)
-	cs.childrenDB = make(map[flow.Identifier][]*cluster.PendingBlock)
+	cs.pendingDB = make(map[flow.Identifier]*flow.Slashable[cluster.Block])
+	cs.childrenDB = make(map[flow.Identifier][]*flow.Slashable[cluster.Block])
 
 	// store the head header and payload
 	cs.headerDB[block.ID()] = cs.head
@@ -121,7 +121,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.pending = &module.PendingClusterBlockBuffer{}
 	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
 	cs.pending.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *cluster.PendingBlock {
+		func(blockID flow.Identifier) *flow.Slashable[cluster.Block] {
 			return cs.pendingDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -130,7 +130,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("ByParentID", mock.Anything).Return(
-		func(blockID flow.Identifier) []*cluster.PendingBlock {
+		func(blockID flow.Identifier) []*flow.Slashable[cluster.Block] {
 			return cs.childrenDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -280,15 +280,14 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
 	parent := unittest.ClusterBlockWithParent(cs.head)
-	proposal := messages.NewClusterBlockProposal(&parent)
 	block1 := unittest.ClusterBlockWithParent(&parent)
 	block2 := unittest.ClusterBlockWithParent(&parent)
 	block3 := unittest.ClusterBlockWithParent(&parent)
 
-	pendingFromBlock := func(block *cluster.Block) *cluster.PendingBlock {
-		return &cluster.PendingBlock{
+	pendingFromBlock := func(block *cluster.Block) *flow.Slashable[cluster.Block] {
+		return &flow.Slashable[cluster.Block]{
 			OriginID: block.Header.ProposerID,
-			Block:    *block,
+			Message:  block,
 		}
 	}
 
@@ -312,7 +311,7 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return(doneChan()).Once()
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(proposal)
+	err := cs.core.processBlockAndDescendants(&parent)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff

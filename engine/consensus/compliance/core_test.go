@@ -46,8 +46,8 @@ type ComplianceCoreSuite struct {
 	// storage data
 	headerDB   map[flow.Identifier]*flow.Header
 	payloadDB  map[flow.Identifier]*flow.Payload
-	pendingDB  map[flow.Identifier]*flow.PendingBlock
-	childrenDB map[flow.Identifier][]*flow.PendingBlock
+	pendingDB  map[flow.Identifier]*flow.Slashable[flow.Block]
+	childrenDB map[flow.Identifier][]*flow.Slashable[flow.Block]
 
 	// mocked dependencies
 	me             *module.Local
@@ -92,8 +92,8 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// initialize the storage data
 	cs.headerDB = make(map[flow.Identifier]*flow.Header)
 	cs.payloadDB = make(map[flow.Identifier]*flow.Payload)
-	cs.pendingDB = make(map[flow.Identifier]*flow.PendingBlock)
-	cs.childrenDB = make(map[flow.Identifier][]*flow.PendingBlock)
+	cs.pendingDB = make(map[flow.Identifier]*flow.Slashable[flow.Block])
+	cs.childrenDB = make(map[flow.Identifier][]*flow.Slashable[flow.Block])
 
 	// store the head header and payload
 	cs.headerDB[block.ID()] = block.Header
@@ -206,7 +206,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.pending = &module.PendingBlockBuffer{}
 	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
 	cs.pending.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.PendingBlock {
+		func(blockID flow.Identifier) *flow.Slashable[flow.Block] {
 			return cs.pendingDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -215,7 +215,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("ByParentID", mock.Anything).Return(
-		func(blockID flow.Identifier) []*flow.PendingBlock {
+		func(blockID flow.Identifier) []*flow.Slashable[flow.Block] {
 			return cs.childrenDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -378,9 +378,9 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	block3 := unittest.BlockWithParentFixture(parent.Header)
 
 	// create the pending blocks
-	pending1 := unittest.PendingFromBlock(block1)
-	pending2 := unittest.PendingFromBlock(block2)
-	pending3 := unittest.PendingFromBlock(block3)
+	pending1 := &flow.Slashable[flow.Block]{block1.Header.ProposerID, block1}
+	pending2 := &flow.Slashable[flow.Block]{block2.Header.ProposerID, block2}
+	pending3 := &flow.Slashable[flow.Block]{block3.Header.ProposerID, block3}
 
 	// store the parent on disk
 	parentID := parent.ID()

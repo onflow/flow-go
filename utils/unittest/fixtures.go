@@ -205,14 +205,6 @@ func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockPropos
 	return messages.NewClusterBlockProposal(block)
 }
 
-func PendingFromBlock(block *flow.Block) *flow.PendingBlock {
-	pending := flow.PendingBlock{
-		OriginID: block.Header.ProposerID,
-		Block:    *block,
-	}
-	return &pending
-}
-
 func StateDeltaFixture() *messages.ExecutionStateDelta {
 	header := BlockHeaderFixture()
 	block := BlockWithParentFixture(header)
