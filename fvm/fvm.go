@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -172,7 +173,11 @@ func (vm *VirtualMachine) GetAccount(
 			err)
 	}
 
-	env := NewScriptEnv(context.Background(), ctx, txnState, derviedTxnData)
+	env := environment.NewScriptEnvironment(
+		context.Background(),
+		ctx.EnvironmentParams,
+		txnState,
+		derviedTxnData)
 	account, err := env.GetAccount(address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {
