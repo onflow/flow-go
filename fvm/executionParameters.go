@@ -18,12 +18,6 @@ import (
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
-type MeterParamOverrides struct {
-	ComputationWeights meter.ExecutionEffortWeights // nil indicates no override
-	MemoryWeights      meter.ExecutionMemoryWeights // nil indicates no override
-	MemoryLimit        *uint64                      // nil indicates no override
-}
-
 func getBasicMeterParameters(
 	ctx Context,
 	proc Procedure,
@@ -63,10 +57,9 @@ func getMeterParameters(
 			WithMeterParameters(procParams))
 
 	// TODO(patrick): cache meter param overrides
-	overrides, err := getMeterParamOverrides(
-		ctx,
+	overrides, err := derivedTxnData.GetMeterParamOverrides(
 		txnState,
-		derivedTxnData)
+		meterParamOverridesComputer{ctx, derivedTxnData})
 	if err != nil {
 		return procParams, err
 	}
@@ -94,21 +87,22 @@ func getMeterParameters(
 	return procParams, nil
 }
 
-func getMeterParamOverrides(
-	ctx Context,
+type meterParamOverridesComputer struct {
+	ctx            Context
+	derivedTxnData *programs.DerivedTransactionData
+}
+
+func (computer meterParamOverridesComputer) Compute(
 	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
+	_ struct{},
 ) (
-	MeterParamOverrides,
+	programs.MeterParamOverrides,
 	error,
 ) {
-	var overrides MeterParamOverrides
+	var overrides programs.MeterParamOverrides
 	var err error
 	txnState.RunWithAllLimitsDisabled(func() {
-		overrides, err = getMeterParamOverridesFromState(
-			ctx,
-			txnState,
-			derivedTxnData)
+		overrides, err = computer.getMeterParamOverrides(txnState)
 	})
 
 	if err != nil {
@@ -120,26 +114,24 @@ func getMeterParamOverrides(
 	return overrides, nil
 }
 
-func getMeterParamOverridesFromState(
-	ctx Context,
+func (computer meterParamOverridesComputer) getMeterParamOverrides(
 	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
 ) (
-	MeterParamOverrides,
+	programs.MeterParamOverrides,
 	error,
 ) {
 	// Check that the service account exists because all the settings are
 	// stored in it
-	serviceAddress := ctx.Chain.ServiceAddress()
+	serviceAddress := computer.ctx.Chain.ServiceAddress()
 	service := runtime.Address(serviceAddress)
 
 	env := environment.NewScriptEnvironment(
 		context.Background(),
-		ctx.EnvironmentParams,
+		computer.ctx.EnvironmentParams,
 		txnState,
-		derivedTxnData)
+		computer.derivedTxnData)
 
-	overrides := MeterParamOverrides{}
+	overrides := programs.MeterParamOverrides{}
 
 	// set the property if no error, but if the error is a fatal error then
 	// return it
@@ -147,7 +139,7 @@ func getMeterParamOverridesFromState(
 		err, fatal = errors.SplitErrorTypes(err)
 		if fatal != nil {
 			// this is a fatal error. return it
-			ctx.Logger.
+			computer.ctx.Logger.
 				Error().
 				Err(fatal).
 				Msgf("error getting %s", prop)
@@ -158,7 +150,7 @@ func getMeterParamOverridesFromState(
 			// could be that no setting was present in the state,
 			// or that the setting was not parseable,
 			// or some other deterministic thing.
-			ctx.Logger.
+			computer.ctx.Logger.
 				Debug().
 				Err(err).
 				Msgf("could not set %s. Using defaults", prop)
