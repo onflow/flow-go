@@ -54,7 +54,7 @@ type EngineSuite struct {
 func (cs *EngineSuite) SetupTest() {
 	cs.CommonSuite.SetupTest()
 
-	// initialize the paramaters
+	// initialize the parameters
 	cs.cluster = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleCollection),
 		unittest.WithWeight(1000),
@@ -216,6 +216,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 func (cs *EngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.ClusterBlockFixture()
 	cs.head = &finalizedBlock
+	cs.headerDB[finalizedBlock.ID()] = &finalizedBlock
 
 	*cs.pending = module.PendingClusterBlockBuffer{}
 	// wait for both expected calls before ending the test

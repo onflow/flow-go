@@ -6,10 +6,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -29,22 +29,20 @@ const defaultBlockQueueCapacity = 10_000
 // `compliance.Core` implements the actual compliance logic.
 // Implements consensus.Compliance interface.
 type Engine struct {
-	log                   zerolog.Logger
-	mempoolMetrics        module.MempoolMetrics
-	engineMetrics         module.EngineMetrics
-	me                    module.Local
-	headers               storage.Headers
-	payloads              storage.Payloads
-	tracer                module.Tracer
-	state                 protocol.State
-	core                  *Core
-	pendingBlocks         *fifoqueue.FifoQueue // queue for processing inbound blocks
-	pendingBlocksNotifier engine.Notifier
-	// tracking finalized view
-	finalizedView              counters.StrictMonotonousCounter
-	finalizationEventsNotifier engine.Notifier
-
 	*component.ComponentManager
+	log                    zerolog.Logger
+	mempoolMetrics         module.MempoolMetrics
+	engineMetrics          module.EngineMetrics
+	me                     module.Local
+	headers                storage.Headers
+	payloads               storage.Payloads
+	tracer                 module.Tracer
+	state                  protocol.State
+	core                   *Core
+	pendingBlocks          *fifoqueue.FifoQueue // queue for processing inbound blocks
+	pendingBlocksNotifier  engine.Notifier
+	finalizedBlockTracker  *tracker.NewestBlockTracker
+	finalizedBlockNotifier engine.Notifier
 }
 
 var _ consensus.Compliance = (*Engine)(nil)
@@ -65,18 +63,19 @@ func NewEngine(
 	}
 
 	eng := &Engine{
-		log:                        log.With().Str("compliance", "engine").Logger(),
-		me:                         me,
-		mempoolMetrics:             core.mempoolMetrics,
-		engineMetrics:              core.engineMetrics,
-		headers:                    core.headers,
-		payloads:                   core.payloads,
-		pendingBlocks:              blocksQueue,
-		state:                      core.state,
-		tracer:                     core.tracer,
-		core:                       core,
-		pendingBlocksNotifier:      engine.NewNotifier(),
-		finalizationEventsNotifier: engine.NewNotifier(),
+		log:                    log.With().Str("compliance", "engine").Logger(),
+		me:                     me,
+		mempoolMetrics:         core.mempoolMetrics,
+		engineMetrics:          core.engineMetrics,
+		headers:                core.headers,
+		payloads:               core.payloads,
+		pendingBlocks:          blocksQueue,
+		state:                  core.state,
+		tracer:                 core.tracer,
+		core:                   core,
+		pendingBlocksNotifier:  engine.NewNotifier(),
+		finalizedBlockTracker:  tracker.NewNewestBlockTracker(),
+		finalizedBlockNotifier: engine.NewNotifier(),
 	}
 
 	// create the component manager and worker threads
@@ -136,13 +135,13 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-// It informs sealing.Core about finalization of respective block.
+// It informs compliance.Core about finalization of the respective block.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
-	if e.finalizedView.Set(block.View) {
-		e.finalizationEventsNotifier.Notify()
+	if e.finalizedBlockTracker.Track(block) {
+		e.finalizedBlockNotifier.Notify()
 	}
 }
 
@@ -169,13 +168,18 @@ func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, r
 	ready()
 
 	doneSignal := ctx.Done()
-	blockFinalizedSignal := e.finalizationEventsNotifier.Channel()
+	blockFinalizedSignal := e.finalizedBlockNotifier.Channel()
 	for {
 		select {
 		case <-doneSignal:
 			return
 		case <-blockFinalizedSignal:
-			e.core.ProcessFinalizedView(e.finalizedView.Value())
+			// retrieve the latest finalized header, so we know the height
+			finalHeader, err := e.headers.ByBlockID(e.finalizedBlockTracker.NewestBlock().BlockID)
+			if err != nil { // no expected errors
+				ctx.Throw(err)
+			}
+			e.core.ProcessFinalizedBlock(finalHeader)
 		}
 	}
 }

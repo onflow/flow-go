@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -29,13 +30,13 @@ func (t *NewestQCTracker) Track(qc *flow.QuorumCertificate) bool {
 	// in case of shared access to updated value.
 	for {
 		// take a snapshot
-		NewestQC := t.NewestQC()
+		newestQC := t.NewestQC()
 		// verify that our update makes sense
-		if NewestQC != nil && NewestQC.View >= qc.View {
+		if newestQC != nil && newestQC.View >= qc.View {
 			return false
 		}
 		// attempt to install new value, repeat in case of shared update.
-		if t.newestQC.CompareAndSwap(unsafe.Pointer(NewestQC), unsafe.Pointer(qc)) {
+		if t.newestQC.CompareAndSwap(unsafe.Pointer(newestQC), unsafe.Pointer(qc)) {
 			return true
 		}
 	}
@@ -68,13 +69,13 @@ func (t *NewestTCTracker) Track(tc *flow.TimeoutCertificate) bool {
 	// in case of shared access to updated value.
 	for {
 		// take a snapshot
-		NewestTC := t.NewestTC()
+		newestTC := t.NewestTC()
 		// verify that our update makes sense
-		if NewestTC != nil && NewestTC.View >= tc.View {
+		if newestTC != nil && newestTC.View >= tc.View {
 			return false
 		}
 		// attempt to install new value, repeat in case of shared update.
-		if t.newestTC.CompareAndSwap(unsafe.Pointer(NewestTC), unsafe.Pointer(tc)) {
+		if t.newestTC.CompareAndSwap(unsafe.Pointer(newestTC), unsafe.Pointer(tc)) {
 			return true
 		}
 	}
@@ -84,4 +85,43 @@ func (t *NewestTCTracker) Track(tc *flow.TimeoutCertificate) bool {
 // Concurrently safe.
 func (t *NewestTCTracker) NewestTC() *flow.TimeoutCertificate {
 	return (*flow.TimeoutCertificate)(t.newestTC.Load())
+}
+
+// NewestBlockTracker is a helper structure which keeps track of the newest block (by view)
+// in concurrency safe way.
+type NewestBlockTracker struct {
+	newestBlock *atomic.UnsafePointer
+}
+
+func NewNewestBlockTracker() *NewestBlockTracker {
+	tracker := &NewestBlockTracker{
+		newestBlock: atomic.NewUnsafePointer(unsafe.Pointer(nil)),
+	}
+	return tracker
+}
+
+// Track updates local state of newestBlock if the provided instance is newer (by view)
+// Concurrently safe.
+func (t *NewestBlockTracker) Track(block *model.Block) bool {
+	// to record the newest value that we have ever seen we need to use loop
+	// with CAS atomic operation to make sure that we always write the latest value
+	// in case of shared access to updated value.
+	for {
+		// take a snapshot
+		newestBlock := t.NewestBlock()
+		// verify that our update makes sense
+		if newestBlock != nil && newestBlock.View >= block.View {
+			return false
+		}
+		// attempt to install new value, repeat in case of shared update.
+		if t.newestBlock.CompareAndSwap(unsafe.Pointer(newestBlock), unsafe.Pointer(block)) {
+			return true
+		}
+	}
+}
+
+// NewestBlock returns the newest block (by view) tracked.
+// Concurrently safe.
+func (t *NewestBlockTracker) NewestBlock() *model.Block {
+	return (*model.Block)(t.newestBlock.Load())
 }
