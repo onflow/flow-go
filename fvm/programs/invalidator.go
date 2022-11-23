@@ -25,12 +25,12 @@ type MeterParamOverrides struct {
 	MemoryLimit        *uint64                      // nil indicates no override
 }
 
-type ProgramInvalidator DerivedDataInvalidator[
+type ProgramInvalidator TableInvalidator[
 	common.AddressLocation,
 	*interpreter.Program,
 ]
 
-type MeterParamOverridesInvalidator DerivedDataInvalidator[
+type MeterParamOverridesInvalidator TableInvalidator[
 	struct{},
 	MeterParamOverrides,
 ]
