@@ -21,7 +21,7 @@ import (
 //	go test -bench=.  -benchmem
 //
 // will track the heap allocations for the Benchmarks
-func BenchmarkStorage(b *testing.B) { benchmarkStorage(100, b) }
+func BenchmarkStorage(b *testing.B) { benchmarkStorage(1_000_000, b) }
 
 // register to read from previous batches
 // insertion (bestcase vs worst case)
@@ -32,8 +32,8 @@ func BenchmarkStorage(b *testing.B) { benchmarkStorage(100, b) }
 func benchmarkStorage(steps int, b *testing.B) {
 	// assumption: 1000 key updates per collection
 	const (
-		bootstrapSize      = 500_000_000
-		numInsPerStep      = 1000
+		bootstrapSize      = 50_000_000
+		numInsPerStep      = 2000
 		keyNumberOfParts   = 2
 		keyPartMinByteSize = 1
 		keyPartMaxByteSize = 100
@@ -43,6 +43,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 	rand.Seed(time.Now().UnixNano())
 
 	unittest.RunWithTempDir(b, func(dir string) {
+		b.Logf("badger dir: %s", dir)
 		opts := badger.
 			DefaultOptions(dir).
 			WithKeepL0InMemory(true).
