@@ -41,7 +41,7 @@ const (
 	ReusableCadenceRuntimePoolSize = 1000
 )
 
-var uploadEnabled = true
+var uploadEnabled = false
 
 func SetUploaderEnabled(enabled bool) {
 	uploadEnabled = enabled
