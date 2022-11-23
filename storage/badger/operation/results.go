@@ -27,6 +27,16 @@ func IndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) fun
 }
 
 // IndexExecutionResultByServiceEventTypeAndHeight indexes result ID by a service event type and a sealed block height
+// this index allows us to answer questions such as what is the latest EpochSetup service event up to
+// block height 1000.
+//
+// why indexing result ID rather than service events? because the service event is included in a result,
+// the indexed result id could help join the result and find the service event
+//
+// why using <service_event_type+sealed_height> as key rather than <sealed_height + service_event_type>?
+// because having service_event_type key first allows us to scan through the index and
+// filter by service event type first, and then find the result for highest height,
+// see LookupLastExecutionResultForServiceEventType
 func IndexExecutionResultByServiceEventTypeAndHeight(resultID flow.Identifier, eventType string, blockHeight uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeServiceEventIndex, serviceEventTypeToPrefix(eventType), blockHeight), resultID)
 }
