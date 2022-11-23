@@ -3,7 +3,6 @@ package reporters
 import (
 	"context"
 	"fmt"
-	"math"
 	goRuntime "runtime"
 	"sync"
 
@@ -66,10 +65,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	defer rwm.Close()
 
 	l := migrations.NewView(payload)
-	txnState := state.NewTransactionState(
-		l,
-		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
-	)
+	txnState := state.NewTransactionState(l, state.DefaultParameters())
 	gen := environment.NewAddressGenerator(txnState, r.Chain)
 
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
@@ -144,10 +140,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		fvm.WithDerivedBlockData(derivedBlockData))
 
 	v := view.NewChild()
-	txnState := state.NewTransactionState(
-		v,
-		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
-	)
+	txnState := state.NewTransactionState(v, state.DefaultParameters())
 	accounts := environment.NewAccounts(txnState)
 
 	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(0, 0)
