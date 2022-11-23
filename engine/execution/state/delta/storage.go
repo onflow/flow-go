@@ -128,7 +128,7 @@ func (s *BadgerStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEnt
 
 	batchSize := 100
 	var endIndex int
-	for startIndex := 0; startIndex+batchSize > len(registers); startIndex += batchSize {
+	for startIndex := 0; startIndex < len(registers); startIndex += batchSize {
 		endIndex = startIndex + batchSize
 		if endIndex > len(registers) {
 			endIndex = len(registers)
