@@ -180,7 +180,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			}
 
 			for _, serviceEvent := range result.ServiceEvents {
-				err := transaction.WithTx(operation.IndexByServiceEvent(block.Header.Height, result.ID(), serviceEvent.Type))(tx)
+				err := transaction.WithTx(operation.IndexExecutionResultByServiceEventTypeAndHeight(result.ID(), serviceEvent.Type, block.Header.Height))(tx)
 				if err != nil {
 					return fmt.Errorf("could not index results by service event type (type=%s) and height (=%d): %w", serviceEvent.Type, block.Header.Height, err)
 				}

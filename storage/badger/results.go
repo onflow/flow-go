@@ -161,7 +161,7 @@ func (r *ExecutionResults) HighestByServiceEventType(serviceEventType string, ma
 
 	var resultID flow.Identifier
 
-	err := operation.LookupLastExecutionResultForServiceEvents(maxHeight, serviceEventType, &resultID)(tx)
+	err := operation.LookupLastExecutionResultForServiceEventType(maxHeight, serviceEventType, &resultID)(tx)
 	if err != nil {
 		return nil, err
 	}

@@ -468,7 +468,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 // A 10 X
 // B 10 Y
 // B 11 Z
-// calling findOneReverse with prefix B and height 12 will retrieve 'B 11 Z' key, while B 10 will retrieve `B 10 Y`.
+// calling findOneHighestButNoHigher with prefix B and height 12 will retrieve 'B 11 Z' key, while B 10 will retrieve `B 10 Y`.
 // Calling A 9 or C 2 will return storage.ErrNotFound
 func findOneHighestButNoHigher(prefix []byte, height uint64, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {

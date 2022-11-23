@@ -26,8 +26,8 @@ func IndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) fun
 	return insert(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
 
-// IndexByServiceEvent indexes result ID by a service event type and a sealed block height
-func IndexByServiceEvent(blockHeight uint64, resultID flow.Identifier, eventType string) func(*badger.Txn) error {
+// IndexExecutionResultByServiceEventTypeAndHeight indexes result ID by a service event type and a sealed block height
+func IndexExecutionResultByServiceEventTypeAndHeight(resultID flow.Identifier, eventType string, blockHeight uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeServiceEventIndex, serviceEventTypeToPrefix(eventType), blockHeight), resultID)
 }
 
@@ -51,6 +51,6 @@ func RemoveExecutionResultIndex(blockID flow.Identifier) func(*badger.Txn) error
 	return remove(makePrefix(codeIndexExecutionResultByBlock, blockID))
 }
 
-func LookupLastExecutionResultForServiceEvents(height uint64, eventType string, resultID *flow.Identifier) func(*badger.Txn) error {
+func LookupLastExecutionResultForServiceEventType(height uint64, eventType string, resultID *flow.Identifier) func(*badger.Txn) error {
 	return findOneHighestButNoHigher(makePrefix(codeServiceEventIndex, serviceEventTypeToPrefix(eventType)), height, resultID)
 }

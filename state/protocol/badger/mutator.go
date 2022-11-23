@@ -557,13 +557,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// track service event driven metrics and protocol events that should be emitted
 	var events []func()
 
-	// track service events to index
-	var serviceEvents []struct {
-		height   uint64
-		resultID flow.Identifier
-		event    flow.ServiceEvent
-	}
-
 	for _, seal := range parent.Payload.Seals {
 		// skip updating epoch-related metrics if EECC is triggered
 		if epochFallbackTriggered {
@@ -637,6 +630,13 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		m.metrics.EpochEmergencyFallbackTriggered()
 	}
 
+	// track service events to index results by event type and height
+	var serviceEvents []struct {
+		height   uint64
+		resultID flow.Identifier
+		event    flow.ServiceEvent
+	}
+
 	// FOUR AND A HALF: Index sealed service events by height
 	for _, seal := range block.Payload.Seals {
 
@@ -697,7 +697,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 		// index sealed service events
 		for _, event := range serviceEvents {
-			err := operation.IndexByServiceEvent(event.height, event.resultID, event.event.Type)(tx)
+			err := operation.IndexExecutionResultByServiceEventTypeAndHeight(event.resultID, event.event.Type, event.height)(tx)
 			if err != nil {
 				return fmt.Errorf("could not index resultID (%s) by service event (type=%s) for height (%d): %w", event.resultID, event.event.Type, event.height, err)
 			}
