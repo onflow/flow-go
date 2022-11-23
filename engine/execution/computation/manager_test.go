@@ -802,7 +802,6 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	require.NoError(t, err)
 
 	txnState := state.NewTransactionState(view, state.DefaultParameters())
-	env := fvm.NewScriptEnv(context.Background(), ctx, txnState, derivedTxnData)
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -827,6 +826,12 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	_, err = manager.ExecuteScript(context.Background(), script, [][]byte{jsoncdc.MustEncode(address)}, header, scriptView)
 
 	require.NoError(t, err)
+
+	env := environment.NewScriptEnvironment(
+		context.Background(),
+		ctx.EnvironmentParams,
+		txnState,
+		derivedTxnData)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)
