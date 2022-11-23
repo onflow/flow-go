@@ -13,6 +13,14 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+const (
+	AccountKeyWeightThreshold = 1000
+
+	DefaultComputationLimit   = 100_000 // 100K
+	DefaultMemoryLimit        = math.MaxUint64
+	DefaultMaxInteractionSize = 20_000_000 // ~20MB
+)
+
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
 	// DisableMemoryAndInteractionLimits will override memory and interaction
@@ -49,13 +57,6 @@ func newContext(ctx Context, opts ...Option) Context {
 	return ctx
 }
 
-const AccountKeyWeightThreshold = 1000
-
-const (
-	DefaultComputationLimit = 100_000        // 100K
-	DefaultMemoryLimit      = math.MaxUint64 //
-)
-
 func defaultContext() Context {
 	return Context{
 		DisableMemoryAndInteractionLimits: false,
@@ -63,7 +64,7 @@ func defaultContext() Context {
 		MemoryLimit:                       DefaultMemoryLimit,
 		MaxStateKeySize:                   state.DefaultMaxKeySize,
 		MaxStateValueSize:                 state.DefaultMaxValueSize,
-		MaxStateInteractionSize:           state.DefaultMaxInteractionSize,
+		MaxStateInteractionSize:           DefaultMaxInteractionSize,
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
 		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
 	}

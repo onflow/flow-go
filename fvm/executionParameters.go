@@ -24,6 +24,26 @@ type MeterParamOverrides struct {
 	MemoryLimit        *uint64                      // nil indicates no override
 }
 
+func getBasicMeterParameters(
+	ctx Context,
+	proc Procedure,
+) meter.MeterParameters {
+	params := meter.DefaultParameters().
+		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
+		WithMemoryLimit(proc.MemoryLimit(ctx)).
+		WithEventEmitByteLimit(ctx.EventCollectionByteSizeLimit).
+		WithStorageInteractionLimit(ctx.MaxStateInteractionSize)
+
+	// NOTE: The memory limit (and interaction limit) may be overridden by the
+	// environment.  We need to ignore the override in that case.
+	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
+		params = params.WithMemoryLimit(math.MaxUint64).
+			WithStorageInteractionLimit(math.MaxUint64)
+	}
+
+	return params
+}
+
 func getMeterParameters(
 	ctx Context,
 	proc Procedure,
@@ -33,17 +53,14 @@ func getMeterParameters(
 	meter.MeterParameters,
 	error,
 ) {
-	procParams := meter.DefaultParameters().
-		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
-		WithMemoryLimit(proc.MemoryLimit(ctx)).
-		WithEventEmitByteLimit(ctx.EventCollectionByteSizeLimit)
+	procParams := getBasicMeterParameters(ctx, proc)
 
 	txnState := state.NewTransactionState(
 		view,
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
+			WithMeterParameters(procParams))
 
 	// TODO(patrick): cache meter param overrides
 	overrides, err := getMeterParamOverrides(
@@ -67,8 +84,11 @@ func getMeterParameters(
 		procParams = procParams.WithMemoryLimit(*overrides.MemoryLimit)
 	}
 
+	// NOTE: The memory limit (and interaction limit) may be overridden by the
+	// environment.  We need to ignore the override in that case.
 	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
-		procParams = procParams.WithMemoryLimit(math.MaxUint64)
+		procParams = procParams.WithMemoryLimit(math.MaxUint64).
+			WithStorageInteractionLimit(math.MaxUint64)
 	}
 
 	return procParams, nil
