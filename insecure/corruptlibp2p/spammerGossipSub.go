@@ -7,6 +7,8 @@ import (
 
 type ControlMessage int
 
+// SpammerGossipSub is a wrapper around the GossipSubRouter that allows us to
+// spam the victim with junk control messages.
 type SpammerGossipSub struct {
 	router *pubsub.GossipSubRouter
 }
@@ -26,3 +28,5 @@ func (s *SpammerGossipSub) SpamIHave(victim peer.ID, msgCount int, msgSize int) 
 		s.router.SendControl(victim, ctlIHave)
 	}
 }
+
+// TODO: SpamIWant, SpamGraft, SpamPrune.
