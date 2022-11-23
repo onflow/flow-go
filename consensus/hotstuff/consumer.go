@@ -60,11 +60,12 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnEventProcessed()
 
-	// OnReceiveVote notifications are produced by the EventHandler when it starts processing a vote.
+	// OnStart notifications are produced by the EventHandler when it starts blocks recovery and
+	// prepares for handling incoming events from EventLoop.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnReceiveVote(currentView uint64, vote *model.Vote)
+	OnStart(currentView uint64)
 
 	// OnReceiveProposal notifications are produced by the EventHandler when it starts processing a block.
 	// Prerequisites:
@@ -72,11 +73,41 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnReceiveProposal(currentView uint64, proposal *model.Proposal)
 
-	// OnEnteringView notifications are produced by the EventHandler when it enters a new view.
+	// OnReceiveQc notifications are produced by the EventHandler when it starts processing a
+	// QuorumCertificate [QC] constructed by the node's internal vote aggregator.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnEnteringView(viewNumber uint64, leader flow.Identifier)
+	OnReceiveQc(currentView uint64, qc *flow.QuorumCertificate)
+
+	// OnReceiveTc notifications are produced by the EventHandler when it starts processing a
+	// TimeoutCertificate [TC]  constructed by the node's internal timeout aggregator.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnReceiveTc(currentView uint64, tc *flow.TimeoutCertificate)
+
+	// OnPartialTc notifications are produced by the EventHandler when it starts processing partial TC
+	// constructed by local timeout aggregator.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnPartialTc(currentView uint64, partialTc *PartialTcCreated)
+
+	// OnLocalTimeout notifications are produced by the EventHandler when it reacts to expiry of round duration timer.
+	// Such a notification indicates that the PaceMaker's timeout was processed by the system.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnLocalTimeout(currentView uint64)
+
+	// OnViewChange notifications are produced by PaceMaker when it transitions to a new view
+	// based on processing a QC or TC. The arguments specify the oldView (first argument),
+	// and the newView to which the PaceMaker transitioned (second argument).
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnViewChange(oldView, newView uint64)
 
 	// OnQcTriggeredViewChange notifications are produced by PaceMaker when it moves to a new view
 	// based on processing a QC. The arguments specify the qc (first argument), which triggered
@@ -94,13 +125,6 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64)
 
-	// OnQcConstructedFromVotes notifications are produced by the VoteAggregator
-	// component, whenever it constructs a QC from votes.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate)
-
 	// OnStartingTimeout notifications are produced by PaceMaker. Such a notification indicates that the
 	// PaceMaker is now waiting for the system to (receive and) process blocks or votes.
 	// The specific timeout type is contained in the TimerInfo.
@@ -108,20 +132,6 @@ type Consumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnStartingTimeout(model.TimerInfo)
-
-	// OnReachedTimeout notifications are produced by PaceMaker. Such a notification indicates that the
-	// PaceMaker's timeout was processed by the system. The specific timeout type is contained in the TimerInfo.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnReachedTimeout(timeout model.TimerInfo)
-
-	// OnQcIncorporated notifications are produced by ForkChoice
-	// whenever a quorum certificate is incorporated into the consensus state.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnQcIncorporated(*flow.QuorumCertificate)
 
 	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
 	// whenever a double voting (same voter voting for different blocks at the same view) was detected.

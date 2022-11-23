@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
@@ -201,12 +200,12 @@ func (t *TimeoutAggregator) PruneUpToView(lowestRetainedView uint64) {
 	t.collectors.PruneUpToView(lowestRetainedView)
 }
 
-// OnEnteringView implements the `OnEnteringView` callback from the `hotstuff.Consumer`.
+// OnViewChange implements the `OnViewChange` callback from the `hotstuff.Consumer`.
 // We notify the enteringViewProcessingLoop worker, which then prunes up to the active view.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (t *TimeoutAggregator) OnEnteringView(viewNumber uint64, _ flow.Identifier) {
-	if t.lowestRetainedView.Set(viewNumber) {
+func (t *TimeoutAggregator) OnViewChange(_, newView uint64) {
+	if t.lowestRetainedView.Set(newView) {
 		t.enteringViewNotifier.Notify()
 	}
 }

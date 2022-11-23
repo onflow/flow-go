@@ -13,15 +13,16 @@ import (
 )
 
 // TelemetryConsumer implements the hotstuff.Consumer interface.
-// consumes outbound notifications produced by the The HotStuff state machine.
+// consumes outbound notifications produced by the HotStuff state machine.
 // For this purpose, the TelemetryConsumer enriches the state machine's notifications:
 //   - The goal is to identify all events as belonging together that were emitted during
 //     a path through the state machine.
 //   - A path through the state machine begins when:
-//     -- a vote is received
-//     -- a block is received
-//     -- a new view is started
-//     -- a timeout is processed
+//     -- a block has been received
+//     -- a QC has been constructed
+//     -- a TC has been constructed
+//     -- a partial TC has been constructed
+//     -- a local timeout has been initiated
 //   - Each path through the state machine is identified by a unique id.
 //
 // Generally, the TelemetryConsumer could export the collected data to a variety of backends.
@@ -41,32 +42,71 @@ func NewTelemetryConsumer(log zerolog.Logger, chain flow.ChainID) *TelemetryCons
 	}
 }
 
-func (t *TelemetryConsumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
-	// TODO: update
-	//       As of Consensus Voting V2, receiving a vote is not an event within the HotStuff state machine anymore.
-	//t.pathHandler.StartNextPath(currentView)
-	// t.pathHandler.NextStep().
-	// 	Uint64("voted_block_view", vote.View).
-	// 	Hex("voted_block_id", vote.BlockID[:]).
-	// 	Hex("voter_id", vote.SignerID[:]).
-	// 	Msg("OnReceiveVote")
+func (t *TelemetryConsumer) OnStart(currentView uint64) {
+	t.pathHandler.StartNextPath(currentView)
+	t.pathHandler.NextStep().Msg("OnStart")
 }
 
 func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
 	block := proposal.Block
 	t.pathHandler.StartNextPath(currentView)
-	step := t.pathHandler.NextStep()
-	step.
+	step := t.pathHandler.NextStep().
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).
 		Hex("block_proposer_id", logging.ID(block.ProposerID)).
-		Time("block_time", block.Timestamp)
-	if block.QC != nil {
+		Time("block_time", block.Timestamp).
+		Uint64("qc_view", block.QC.View).
+		Hex("qc_block_id", logging.ID(block.QC.BlockID))
+
+	lastViewTC := proposal.LastViewTC
+	if lastViewTC != nil {
 		step.
-			Uint64("qc_block_view", block.QC.View).
-			Hex("qc_block_id", logging.ID(block.QC.BlockID))
+			Uint64("last_view_tc_view", lastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", lastViewTC.NewestQC.View).
+			Hex("last_view_tc_newest_qc_block_id", logging.ID(lastViewTC.NewestQC.BlockID))
 	}
+
 	step.Msg("OnReceiveProposal")
+}
+
+func (t *TelemetryConsumer) OnReceiveQc(currentView uint64, qc *flow.QuorumCertificate) {
+	t.pathHandler.StartNextPath(currentView)
+	t.pathHandler.NextStep().
+		Uint64("qc_view", qc.View).
+		Hex("qc_block_id", logging.ID(qc.BlockID)).
+		Msg("OnReceiveQc")
+}
+
+func (t *TelemetryConsumer) OnReceiveTc(currentView uint64, tc *flow.TimeoutCertificate) {
+	t.pathHandler.StartNextPath(currentView)
+	t.pathHandler.NextStep().
+		Uint64("view", tc.View).
+		Uint64("newest_qc_view", tc.NewestQC.View).
+		Hex("newest_qc_block_id", logging.ID(tc.NewestQC.BlockID)).
+		Msg("OnReceiveTc")
+}
+
+func (t *TelemetryConsumer) OnPartialTc(currentView uint64, partialTc *hotstuff.PartialTcCreated) {
+	t.pathHandler.StartNextPath(currentView)
+	step := t.pathHandler.NextStep().
+		Uint64("view", partialTc.View).
+		Uint64("newest_qc_view", partialTc.NewestQC.View).
+		Hex("newest_qc_block_id", logging.ID(partialTc.NewestQC.BlockID))
+
+	lastViewTC := partialTc.LastViewTC
+	if lastViewTC != nil {
+		step.
+			Uint64("last_view_tc_view", lastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", lastViewTC.NewestQC.View).
+			Hex("last_view_tc_newest_qc_block_id", logging.ID(lastViewTC.NewestQC.BlockID))
+	}
+
+	step.Msg("OnPartialTc")
+}
+
+func (t *TelemetryConsumer) OnLocalTimeout(currentView uint64) {
+	t.pathHandler.StartNextPath(currentView)
+	t.pathHandler.NextStep().Msg("OnLocalTimeout")
 }
 
 func (t *TelemetryConsumer) OnEventProcessed() {
@@ -78,31 +118,11 @@ func (t *TelemetryConsumer) OnEventProcessed() {
 	t.pathHandler.CloseCurrentPath()
 }
 
-// TODO: In the new consensus model, `OnEnteringView` and `OnStartingTimeout` are now largely redundant.
-// Will be cleaned up as part of https://github.com/dapperlabs/flow-go/issues/6251
-
 func (t *TelemetryConsumer) OnStartingTimeout(info model.TimerInfo) {
-	// the PaceMarker starts a new timeout only as part of transitioning to new view
-	t.pathHandler.StartNextPath(info.View)
 	t.pathHandler.NextStep().
 		Float64("timeout_duration_seconds", info.Duration.Seconds()).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Msg("OnStartingTimeout")
-}
-
-func (t *TelemetryConsumer) OnEnteringView(viewNumber uint64, leader flow.Identifier) {
-	t.pathHandler.NextStep().
-		Uint64("entered_view", viewNumber).
-		Hex("leader", leader[:]).
-		Msg("OnEnteringView")
-}
-
-func (t *TelemetryConsumer) OnReachedTimeout(info model.TimerInfo) {
-	t.pathHandler.StartNextPath(info.View)
-	t.pathHandler.NextStep().
-		Time("timeout_start_time", info.StartTime).
-		Float64("timeout_duration_seconds", info.Duration.Seconds()).
-		Msg("OnReachedTimeout")
 }
 
 func (t *TelemetryConsumer) OnBlockIncorporated(block *model.Block) {
@@ -119,7 +139,7 @@ func (t *TelemetryConsumer) OnFinalizedBlock(block *model.Block) {
 
 func (t *TelemetryConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
 	t.pathHandler.NextStep().
-		Uint64("qc_block_view", qc.View).
+		Uint64("qc_view", qc.View).
 		Uint64("next_view", newView).
 		Hex("qc_block_id", qc.BlockID[:]).
 		Msg("OnQcTriggeredViewChange")
@@ -143,32 +163,39 @@ func (t *TelemetryConsumer) OnOwnVote(blockID flow.Identifier, view uint64, _ []
 }
 
 func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
-	step := t.pathHandler.NextStep()
-	step.
+	step := t.pathHandler.NextStep().
 		Uint64("block_view", proposal.View).
 		Hex("block_id", logging.ID(proposal.ID())).
 		Hex("block_proposer_id", logging.ID(proposal.ProposerID)).
 		Time("block_time", proposal.Timestamp).
-		//Uint64("qc_block_view", proposal).
+		Uint64("qc_view", proposal.ParentView).
 		Hex("qc_block_id", logging.ID(proposal.ParentID)).
 		Time("targetPublicationTime", targetPublicationTime)
+	lastViewTC := proposal.LastViewTC
+	if lastViewTC != nil {
+		step.
+			Uint64("last_view_tc_view", lastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", lastViewTC.NewestQC.View).
+			Hex("last_view_tc_newest_qc_block_id", logging.ID(lastViewTC.NewestQC.BlockID))
+	}
 	step.Msg("OnOwnProposal")
 }
 
-func (t *TelemetryConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
-	t.pathHandler.StartNextPath(curView)
-	t.pathHandler.NextStep().
-		Uint64("curView", curView).
-		Uint64("qc_block_view", qc.View).
-		Hex("qc_block_id", qc.BlockID[:]).
-		Msg("OnQcConstructedFromVotes")
-}
+func (t *TelemetryConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
+	step := t.pathHandler.NextStep().
+		Uint64("view", timeout.View).
+		Uint64("timeout_tick", timeout.TimeoutTick).
+		Uint64("newest_qc_view", timeout.NewestQC.View).
+		Hex("newest_qc_block_id", logging.ID(timeout.NewestQC.BlockID))
 
-func (t *TelemetryConsumer) OnQcIncorporated(qc *flow.QuorumCertificate) {
-	t.pathHandler.NextStep().
-		Uint64("qc_block_view", qc.View).
-		Hex("qc_block_id", qc.BlockID[:]).
-		Msg("OnQcIncorporated")
+	lastViewTC := timeout.LastViewTC
+	if lastViewTC != nil {
+		step.
+			Uint64("last_view_tc_view", lastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", lastViewTC.NewestQC.View).
+			Hex("last_view_tc_newest_qc_block_id", logging.ID(lastViewTC.NewestQC.BlockID))
+	}
+	step.Msg("OnOwnTimeout")
 }
 
 // PathHandler maintains a notion of the current path through the state machine.
@@ -217,7 +244,7 @@ func (p *PathHandler) CloseCurrentPath() *PathHandler {
 	return p
 }
 
-// IsCurrentPathOpen if and only is the most recently started path has been closed.
+// IsCurrentPathClosed if and only if the most recently started path has been closed.
 func (p *PathHandler) IsCurrentPathClosed() bool {
 	return p.currentPath == nil
 }

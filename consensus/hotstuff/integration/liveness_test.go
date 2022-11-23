@@ -96,15 +96,15 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 func Test2TimeoutOutof4Instances(t *testing.T) {
 
 	healthyReplicas := 2
-	replicasDroppingTimeouts := 2
+	replicasDroppingHappyPathMsgs := 2
 	finalView := uint64(30)
 
 	// generate the 4 hotstuff participants
-	participants := unittest.IdentityListFixture(healthyReplicas + replicasDroppingTimeouts)
-	instances := make([]*Instance, 0, healthyReplicas+replicasDroppingTimeouts)
+	participants := unittest.IdentityListFixture(healthyReplicas + replicasDroppingHappyPathMsgs)
+	instances := make([]*Instance, 0, healthyReplicas+replicasDroppingHappyPathMsgs)
 	root := DefaultRoot()
 	timeouts, err := timeout.NewConfig(
-		pmTimeout, pmTimeout, 1.5, happyPathMaxRoundFailures, 0, maxTimeoutRebroadcast)
+		10*time.Millisecond, 50*time.Millisecond, 1.5, happyPathMaxRoundFailures, 0, maxTimeoutRebroadcast)
 	require.NoError(t, err)
 
 	// set up two instances that work fully
@@ -119,8 +119,8 @@ func Test2TimeoutOutof4Instances(t *testing.T) {
 		instances = append(instances, in)
 	}
 
-	// set up one instance which can't vote, nor propose
-	for n := healthyReplicas; n < healthyReplicas+replicasDroppingTimeouts; n++ {
+	// set up instances which can't vote, nor propose
+	for n := healthyReplicas; n < healthyReplicas+replicasDroppingHappyPathMsgs; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
 			WithParticipants(participants),
@@ -153,10 +153,11 @@ func Test2TimeoutOutof4Instances(t *testing.T) {
 	ref := instances[0]
 	finalizedViews := FinalizedViews(ref)
 	assert.Equal(t, []uint64{0}, finalizedViews, "no view was finalized, because finalization requires 2 direct chain plus a QC which never happen in this case")
-	assert.LessOrEqual(t, finalView, ref.pacemaker.CurView(), "expect instance 0 should made enough progress, but didn't")
+	assert.Equal(t, finalView, ref.pacemaker.CurView(), "expect instance 0 should made enough progress, but didn't")
 	for i := 1; i < healthyReplicas; i++ {
-		assert.Equal(t, ref.forks.FinalizedBlock(), instances[i].forks.FinalizedBlock(), "instance %d should have same finalized block as first instance")
-		assert.Equal(t, finalizedViews, FinalizedViews(instances[i]), "instance %d should have same finalized view as first instance")
+		assert.Equal(t, ref.forks.FinalizedBlock(), instances[i].forks.FinalizedBlock(), "instance %d should have same finalized block as first instance", i)
+		assert.Equal(t, finalizedViews, FinalizedViews(instances[i]), "instance %d should have same finalized view as first instance", i)
+		assert.Equal(t, finalView, instances[i].pacemaker.CurView(), "instance %d should have same active view as first instance", i)
 	}
 }
 
