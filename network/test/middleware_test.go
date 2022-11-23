@@ -1,13 +1,18 @@
 package test
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	ggio "github.com/gogo/protobuf/io"
+	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -27,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/messageutils"
+	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -136,6 +142,10 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, mw)
 		require.NoError(m.T(), mw.Subscribe(testChannel))
 	}
+}
+
+func (m *MiddlewareTestSuite) TearDownTest() {
+	m.stopMiddlewares()
 }
 
 // TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
@@ -409,10 +419,6 @@ func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvi
 	identityOpts := unittest.WithRole(flow.RoleExecution)
 	overlay.On("Identity", mockery.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(identityOpts), true)
 	return overlay
-}
-
-func (m *MiddlewareTestSuite) TearDownTest() {
-	m.stopMiddlewares()
 }
 
 // TestPingRawReception tests the middleware for solely the
@@ -803,6 +809,80 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 
 	// assert that the new message is not received by the target node
 	unittest.RequireNeverReturnBefore(m.T(), msgRcvdFun, 2*time.Second, "message received unexpectedly")
+}
+
+// TestUnicastStreamLimit tests that the middleware does not accept more than the maximum number of
+// unicast streams and streams created beyond the limit are reset
+func (m *MiddlewareTestSuite) TestUnicastStreamLimit() {
+	sender := 0
+	receiver := m.size - 1
+
+	senderNodeID := m.ids[sender].NodeID
+	receiverNodeID := m.ids[receiver].NodeID
+
+	senderPeerID := m.nodes[sender].Host().ID()
+	receiverPeerID := m.nodes[receiver].Host().ID()
+
+	// configured mw.unicastMaxStreamsPerPeer (using default)
+	maxStreams := middleware.DefaultMaxUnicastStreamsPerPeer
+
+	receiveCount := 0
+	m.ov[receiver].On("Receive", senderNodeID, mockery.Anything, mockery.Anything).Return(nil).Run(func(_ mockery.Arguments) {
+		receiveCount++
+	})
+
+	var protocol protocol.ID
+
+	streamCount := maxStreams * 2
+
+	// this test only works if streamCount > mw.unicastMaxStreamsPerPeer
+	require.Greater(m.T(), streamCount, maxStreams)
+
+	streams := make([]libp2pnet.Stream, 0, streamCount)
+	for i := 0; i < streamCount; i++ {
+		s, err := m.nodes[sender].CreateStream(m.mwCtx, receiverPeerID)
+		require.NoError(m.T(), err)
+
+		protocol = s.Protocol()
+		streams = append(streams, s)
+
+		// write message to stream (don't use SendDirect because it will close the stream)
+		msg, _, _ := messageutils.CreateMessage(m.T(), senderNodeID, receiverNodeID, testChannel, "hello")
+		bufw := bufio.NewWriter(s)
+		writer := ggio.NewDelimitedWriter(bufw)
+
+		err = writer.WriteMsg(msg)
+		require.NoError(m.T(), err)
+
+		err = bufw.Flush()
+		require.NoError(m.T(), err)
+	}
+	assert.Len(m.T(), streams, streamCount)
+
+	// give the receiver time to process the messages
+	time.Sleep(50 * time.Millisecond)
+
+	// make sure there are no more than the max number of streams still open (the rest were reset)
+	count := p2putils.CountStreams(m.nodes[receiver].Host(), senderPeerID, protocol, libp2pnet.DirInbound)
+	assert.LessOrEqual(m.T(), count, maxStreams)
+
+	// close all streams. Streams that were reset will return an error
+	// stream processing may happen out of order, so just count up all the resets
+	resets := 0
+	for _, s := range streams {
+		err := s.Close()
+		if err != nil {
+			require.True(m.T(), strings.Contains(err.Error(), "stream reset"))
+			resets++
+		}
+	}
+
+	// middleware should only accept up to mw.unicastMaxStreamsPerPeer messages. it's possible there
+	// are additional resets due to flakiness in the network setup.
+	assert.LessOrEqual(m.T(), receiveCount, maxStreams)
+
+	// the rest should result in resets
+	assert.GreaterOrEqual(m.T(), resets, streamCount-maxStreams)
 }
 
 func (m *MiddlewareTestSuite) stopMiddlewares() {

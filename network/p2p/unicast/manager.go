@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -25,21 +24,18 @@ const MaxConnectAttemptSleepDuration = 5
 
 // Manager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
 type Manager struct {
-	logger            zerolog.Logger
-	streamFactory     StreamFactory
-	unicasts          []Protocol
-	defaultHandler    libp2pnet.StreamHandler
-	sporkId           flow.Identifier
-	incomingStreamsMu sync.Mutex
-	incomingStreams   map[peer.ID]libp2pnet.Stream
+	logger         zerolog.Logger
+	streamFactory  StreamFactory
+	unicasts       []Protocol
+	defaultHandler libp2pnet.StreamHandler
+	sporkId        flow.Identifier
 }
 
 func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, sporkId flow.Identifier) *Manager {
 	return &Manager{
-		logger:          logger.With().Str("module", "unicast-manager").Logger(),
-		streamFactory:   streamFactory,
-		sporkId:         sporkId,
-		incomingStreams: make(map[peer.ID]libp2pnet.Stream),
+		logger:        logger.With().Str("module", "unicast-manager").Logger(),
+		streamFactory: streamFactory,
+		sporkId:       sporkId,
 	}
 }
 
@@ -56,11 +52,11 @@ func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
 	m.unicasts = []Protocol{
 		&PlainStream{
 			protocolId: defaultProtocolID,
-			handler:    m.handleIncomingStream,
+			handler:    defaultHandler,
 		},
 	}
 
-	m.streamFactory.SetStreamHandler(defaultProtocolID, m.handleIncomingStream)
+	m.streamFactory.SetStreamHandler(defaultProtocolID, defaultHandler)
 	m.logger.Info().Str("protocol_id", string(defaultProtocolID)).Msg("default unicast handler registered")
 }
 
@@ -72,7 +68,7 @@ func (m *Manager) Register(unicast ProtocolName) error {
 		return fmt.Errorf("could not translate protocol name into factory: %w", err)
 	}
 
-	u := factory(m.logger, m.sporkId, m.handleIncomingStream)
+	u := factory(m.logger, m.sporkId, m.defaultHandler)
 
 	m.unicasts = append(m.unicasts, u)
 	m.streamFactory.SetStreamHandler(u.ProtocolId(), u.Handler)
@@ -187,34 +183,4 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	}
 
 	return s, dialAddr, nil
-}
-
-// handleIncomingStream accepts inbound streams from libp2p, and hands them off to the configured
-// unicast stream handler.
-// Note: This handler ensures that there is at most 1 inbound stream per remote peer. If an existing
-// stream is found, it is reset.
-func (m *Manager) handleIncomingStream(s libp2pnet.Stream) {
-	remotePeer := s.Conn().RemotePeer()
-
-	// ensure there is only one incoming unicast stream per peer
-	m.incomingStreamsMu.Lock()
-	if other, has := m.incomingStreams[remotePeer]; has {
-		m.logger.Warn().
-			Str("remote_peer", remotePeer.String()).
-			Msg("duplicate incoming stream. resetting other stream")
-		other.Reset()
-	}
-	m.incomingStreams[remotePeer] = s
-	m.incomingStreamsMu.Unlock()
-
-	// cleanup record keeping when stream is closed
-	defer func() {
-		m.incomingStreamsMu.Lock()
-		if m.incomingStreams[remotePeer] == s {
-			delete(m.incomingStreams, remotePeer)
-		}
-		m.incomingStreamsMu.Unlock()
-	}()
-
-	m.defaultHandler(s)
 }

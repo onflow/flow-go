@@ -63,6 +63,9 @@ const (
 
 	// LargeMsgUnicastTimeout is the maximum time to wait for a unicast request to complete for large message size
 	LargeMsgUnicastTimeout = 1000 * time.Second
+
+	// DefaultMaxUnicastStreamsPerPeer is the maximum number of inbound unicast streams that can be opened from a peer
+	DefaultMaxUnicastStreamsPerPeer = 50
 )
 
 var (
@@ -77,7 +80,9 @@ var (
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
+	component.Component
 	sync.Mutex
+
 	ctx context.Context
 	log zerolog.Logger
 	ov  network.Overlay
@@ -101,7 +106,7 @@ type Middleware struct {
 	slashingViolationsConsumer slashing.ViolationsConsumer
 	unicastRateLimiters        *ratelimit.RateLimiters
 	authorizedSenderValidator  *validator.AuthorizedSenderValidator
-	component.Component
+	unicastMaxStreamsPerPeer   int
 }
 
 type MiddlewareOption func(*Middleware)
@@ -150,6 +155,7 @@ func NewMiddleware(
 	bitswapMet module.BitswapMetrics,
 	rootBlockID flow.Identifier,
 	unicastMessageTimeout time.Duration,
+	unicastMaxStreamsPerPeer uint,
 	idTranslator p2p.IDTranslator,
 	codec network.Codec,
 	slashingViolationsConsumer slashing.ViolationsConsumer,
@@ -175,6 +181,7 @@ func NewMiddleware(
 		codec:                      codec,
 		slashingViolationsConsumer: slashingViolationsConsumer,
 		unicastRateLimiters:        ratelimit.NoopRateLimiters(),
+		unicastMaxStreamsPerPeer:   int(unicastMaxStreamsPerPeer),
 	}
 
 	for _, opt := range opts {
@@ -479,6 +486,17 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		log.Debug().
 			Bool(logging.KeySuspicious, true).
 			Msg("dropping unicast stream from rate limited peer")
+		return
+	}
+
+	streamCount := p2putils.CountStreams(m.libP2PNode.Host(), remotePeer, s.Protocol(), libp2pnetwork.DirInbound)
+	if streamCount > m.unicastMaxStreamsPerPeer {
+		m.metrics.UnicastStreamDropped()
+		log.Debug().
+			Err(fmt.Errorf("too many inbound streams from peer")).
+			Int("stream_count", streamCount).
+			Bool(logging.KeySuspicious, true).
+			Msg("resetting new stream")
 		return
 	}
 

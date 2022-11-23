@@ -7,14 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/network/p2p/utils"
-
-	"github.com/onflow/flow-go/network/p2p/translator"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -23,6 +17,9 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/translator"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"

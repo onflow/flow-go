@@ -78,8 +78,8 @@ func FindOutboundStream(host host.Host, targetID peer.ID, protocol core.Protocol
 	return nil, false
 }
 
-// CountStream finds total number of outbound stream to the target id
-func CountStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, dir network.Direction) int {
+// CountStreams finds total number of streams for the target id
+func CountStreams(host host.Host, targetID peer.ID, protocol core.ProtocolID, dir network.Direction) int {
 	streams := FilterStream(host, targetID, protocol, dir, true)
 	return len(streams)
 }
@@ -105,7 +105,7 @@ func FilterStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, di
 		streams := conn.GetStreams()
 		for _, stream := range streams {
 
-			// choose a stream which is marked as outbound and is for the flow protocol
+			// choose a stream which is in the correct direction and uses the flow protocol
 			if stream.Stat().Direction == dir && stream.Protocol() == protocol {
 				filteredStreams = append(filteredStreams, stream)
 				if !all {

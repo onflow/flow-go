@@ -48,6 +48,7 @@ type NetworkCollector struct {
 	// authorization, rate limiting metrics
 	unAuthorizedMessagesCount       *prometheus.CounterVec
 	rateLimitedUnicastMessagesCount *prometheus.CounterVec
+	unicastStreamDroppedCount       prometheus.Counter
 
 	prefix string
 }
@@ -237,6 +238,15 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelRateLimitReason},
 	)
 
+	nc.unicastStreamDroppedCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemUnicast,
+			Name:      nc.prefix + "inbound_stream_dropped_total",
+			Help:      "the number of inbound streams dropped for exceeding the limit",
+		},
+	)
+
 	nc.gossipSubReceivedIHaveCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
@@ -411,6 +421,11 @@ func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense 
 // OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
 func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string) {
 	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
+}
+
+// UnicastStreamDropped tracks the number of unicast streams that were dropped due to exceeding the limit.
+func (nc *NetworkCollector) UnicastStreamDropped() {
+	nc.unicastStreamDroppedCount.Inc()
 }
 
 // OnIWantReceived tracks the number of IWANT messages received by the node from other nodes.

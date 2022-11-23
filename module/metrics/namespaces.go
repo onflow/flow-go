@@ -20,6 +20,7 @@ const (
 const (
 	// subsystemLibp2p = "libp2p"
 	subsystemGossip       = "gossip"
+	subsystemUnicast      = "unicast"
 	subsystemEngine       = "engine"
 	subsystemQueue        = "queue"
 	subsystemDHT          = "dht"

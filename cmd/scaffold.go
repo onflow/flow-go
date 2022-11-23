@@ -193,7 +193,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 
-	// unicast stream handler rate limits
+	// unicast stream handler flags
+	fnb.flags.UintVar(&fnb.BaseConfig.UnicastMaxStreamsPerPeer, "unicast-max-streams-per-peer", defaultConfig.NetworkConfig.UnicastMaxStreamsPerPeer, "maximum number of inbound unicast streams that a peer can have open")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageRateLimit, "unicast-message-rate-limit", defaultConfig.NetworkConfig.UnicastMessageRateLimit, "maximum number of unicast messages that a peer can send per second")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthRateLimit, "unicast-bandwidth-rate-limit", defaultConfig.NetworkConfig.UnicastBandwidthRateLimit, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", defaultConfig.NetworkConfig.UnicastBandwidthBurstLimit, "bandwidth size in bytes a peer is allowed to send at one time")
@@ -410,6 +411,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.Metrics.Bitswap,
 		fnb.SporkID,
 		fnb.BaseConfig.UnicastMessageTimeout,
+		fnb.BaseConfig.UnicastMaxStreamsPerPeer,
 		fnb.IDTranslator,
 		fnb.CodecFactory(),
 		slashingViolationsConsumer,

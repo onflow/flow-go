@@ -36,6 +36,9 @@ type NetworkSecurityMetrics interface {
 
 	// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
 	OnRateLimitedUnicastMessage(role, msgType, topic, reason string)
+
+	// UnicastStreamDropped tracks the number of unicast streams that were dropped due to exceeding the limit.
+	UnicastStreamDropped()
 }
 
 // GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.

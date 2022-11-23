@@ -182,6 +182,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			bitswapmet,
 			sporkID,
 			middleware.DefaultUnicastTimeout,
+			middleware.DefaultMaxUnicastStreamsPerPeer,
 			translator.NewIdentityProviderIDTranslator(idProviders[i]),
 			codec,
 			consumer,
