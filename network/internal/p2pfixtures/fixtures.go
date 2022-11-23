@@ -182,7 +182,7 @@ func SubsMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage [
 }
 
 // SubMustNeverReceiveAnyMessage checks that the subscription never receives any message within the given timeout by the context.
-func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub *pubsub.Subscription) {
+func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub p2p.Subscription) {
 	timeouted := make(chan struct{})
 	go func() {
 		_, err := sub.Next(ctx)
@@ -199,7 +199,7 @@ func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub *pubsu
 
 // HasSubReceivedMessage checks that the subscription have received the given message within the given timeout by the context.
 // It returns true if the subscription has received the message, false otherwise.
-func HasSubReceivedMessage(t *testing.T, ctx context.Context, expectedMessage []byte, sub *pubsub.Subscription) bool {
+func HasSubReceivedMessage(t *testing.T, ctx context.Context, expectedMessage []byte, sub p2p.Subscription) bool {
 	received := make(chan struct{})
 	go func() {
 		msg, err := sub.Next(ctx)
@@ -222,7 +222,7 @@ func HasSubReceivedMessage(t *testing.T, ctx context.Context, expectedMessage []
 }
 
 // SubsMustNeverReceiveAnyMessage checks that all subscriptions never receive any message within the given timeout by the context.
-func SubsMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, subs []*pubsub.Subscription) {
+func SubsMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, subs []p2p.Subscription) {
 	for _, sub := range subs {
 		SubMustNeverReceiveAnyMessage(t, ctx, sub)
 	}
@@ -291,7 +291,7 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 				slashingViolationsConsumer,
 				unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
-		subs[i] = MustBePubSubSubscription(t, ps)
+		subs[i] = ps
 	}
 
 	// let subscriptions propagate
@@ -317,7 +317,7 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
 	_, topic := messageFactory()
 
-	subs := make([]*pubsub.Subscription, len(to))
+	subs := make([]p2p.Subscription, len(to))
 	svc := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
 	tv := validator.TopicValidator(
 		unittest.Logger(),
@@ -333,7 +333,7 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p
 	for i, node := range to {
 		s, err := node.Subscribe(topic, tv)
 		require.NoError(t, err)
-		subs[i] = MustBePubSubSubscription(t, s)
+		subs[i] = s
 	}
 
 	// let subscriptions propagate
@@ -468,10 +468,4 @@ func LongStringMessageFactoryFixture(t *testing.T) func() string {
 		require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
 		return fmt.Sprintf("%s %d \n", msg, time.Now().UnixNano()) // add timestamp to make sure we don't send the same message twice
 	}
-}
-
-func MustBePubSubSubscription(t *testing.T, subscription p2p.Subscription) *pubsub.Subscription {
-	ps, ok := subscription.(*pubsub.Subscription)
-	require.True(t, ok)
-	return ps
 }
