@@ -73,7 +73,6 @@ func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier h
 		return nil, fmt.Errorf("invalid root block: %w", err)
 	}
 	forks.forest.AddVertex(&BlockContainer{Proposal: trustedRootProposal})
-	forks.notifier.OnBlockIncorporated(trustedRoot.Block)
 	return &forks, nil
 }
 

@@ -22,10 +22,6 @@ func NewMetricsConsumer(metrics module.HotstuffMetrics) *MetricsConsumer {
 	}
 }
 
-func (c *MetricsConsumer) OnEnteringView(view uint64, leader flow.Identifier) {
-	c.metrics.SetCurView(view)
-}
-
 func (c *MetricsConsumer) OnQcIncorporated(qc *flow.QuorumCertificate) {
 	c.metrics.SetQCView(qc.View)
 }
