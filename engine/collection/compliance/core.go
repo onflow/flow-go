@@ -123,8 +123,8 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
-		Uint64("final_height", finalHeight).
-		Uint64("final_view", finalView).
+		Uint64("finalized_height", finalHeight).
+		Uint64("finalized_view", finalView).
 		Logger()
 	if log.Debug().Enabled() {
 		log = log.With().Strs("tx_ids", flow.IdentifierList(proposal.Payload.Collection.Light().Transactions).Strings()).Logger()
