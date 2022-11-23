@@ -9,11 +9,6 @@ type NetworkSecurityMetrics struct {
 	mock.Mock
 }
 
-// UnicastStreamDropped provides a mock function with given fields:
-func (_m *NetworkSecurityMetrics) UnicastStreamDropped() {
-	_m.Called()
-}
-
 // OnRateLimitedUnicastMessage provides a mock function with given fields: role, msgType, topic, reason
 func (_m *NetworkSecurityMetrics) OnRateLimitedUnicastMessage(role string, msgType string, topic string, reason string) {
 	_m.Called(role, msgType, topic, reason)
@@ -22,6 +17,11 @@ func (_m *NetworkSecurityMetrics) OnRateLimitedUnicastMessage(role string, msgTy
 // OnUnauthorizedMessage provides a mock function with given fields: role, msgType, topic, offense
 func (_m *NetworkSecurityMetrics) OnUnauthorizedMessage(role string, msgType string, topic string, offense string) {
 	_m.Called(role, msgType, topic, offense)
+}
+
+// UnicastStreamDropped provides a mock function with given fields:
+func (_m *NetworkSecurityMetrics) UnicastStreamDropped() {
+	_m.Called()
 }
 
 type mockConstructorTestingTNewNetworkSecurityMetrics interface {

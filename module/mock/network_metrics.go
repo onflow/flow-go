@@ -28,11 +28,6 @@ func (_m *NetworkMetrics) DirectMessageStarted(topic string) {
 	_m.Called(topic)
 }
 
-// UnicastStreamDropped provides a mock function with given fields:
-func (_m *NetworkMetrics) UnicastStreamDropped() {
-	_m.Called()
-}
-
 // InboundConnections provides a mock function with given fields: connectionCount
 func (_m *NetworkMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
@@ -160,6 +155,11 @@ func (_m *NetworkMetrics) RoutingTablePeerAdded() {
 
 // RoutingTablePeerRemoved provides a mock function with given fields:
 func (_m *NetworkMetrics) RoutingTablePeerRemoved() {
+	_m.Called()
+}
+
+// UnicastStreamDropped provides a mock function with given fields:
+func (_m *NetworkMetrics) UnicastStreamDropped() {
 	_m.Called()
 }
 
