@@ -3,7 +3,6 @@ package corruptlibp2p
 import (
 	"context"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/flow-go/insecure/corruptlibp2p/internal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
@@ -54,10 +53,10 @@ func TestSpam(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
 
-	// create new spammer
-	gsr := internal.NewGossipSubRouterFixture()
-	spammer := NewSpammerGossipSub(gsr.Router)
-
-	// start spamming the first peer
-	spammer.SpamIHave(peerIds[0], 10, 1)
+	//// create new spammer
+	//gsr := internal.NewGossipSubRouterFixture()
+	//spammer := NewSpammerGossipSub(gsr.Router)
+	//
+	//// start spamming the first peer
+	//spammer.SpamIHave(peerIds[0], 10, 1)
 }

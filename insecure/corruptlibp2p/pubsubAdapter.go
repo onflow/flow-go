@@ -87,7 +87,7 @@ func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h ho
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub router: %w", err)
 	}
-	// corruptRouter := internal.NewCorruptGossipSubRouter(router)
+	corruptRouter := internal.NewCorruptGossipSubRouter(router)
 	gossipSub, err := corrupt.NewGossipSubWithRouter(ctx, h, router, gossipSubConfig.Build()...)
 	if err != nil {
 		return nil, err
